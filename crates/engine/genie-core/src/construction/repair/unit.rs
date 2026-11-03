@@ -218,7 +218,10 @@ fn repairee_of(
         radius: tm.radius,
         class: tm.class,
         moves: MasterKind::MOVING <= tm.kind
-            && tm.moving.as_ref().is_some_and(|m| Speed::ZERO < m.speed),
+            && tm
+                .move_stats
+                .as_ref()
+                .is_some_and(|m| Speed::ZERO < m.speed),
     };
     let counting = if tm.kind == MasterKind::BUILDING {
         c.w.parts

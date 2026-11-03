@@ -30,6 +30,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{Master, Masters};
@@ -144,11 +145,14 @@ fn world() -> World {
         hit_points: MasterHitPoints::of_data(60),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(6)),
-        move_sprite: Some(SpriteId::named(7)),
-        run_sprite: Some(SpriteId::named(8)),
         creatable: Some(CreatablePart {
             formation_category: FormationClass::of_data(1),
             ..CreatablePart::default()
+        }),
+        moving: Some(MovingPart {
+            move_sprite: Some(SpriteId::named(7)),
+            run_sprite: Some(SpriteId::named(8)),
+            ..MovingPart::default()
         }),
         ..Master::default()
     };

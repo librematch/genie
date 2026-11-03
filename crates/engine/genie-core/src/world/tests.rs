@@ -138,6 +138,7 @@ use crate::objects::masters::HeroFlags;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
@@ -643,7 +644,7 @@ pub(crate) fn builder_masters() -> Masters {
         combat_level: CombatLevel::NONE,
         hit_points: MasterHitPoints::of_data(25),
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
-        moving: Some(MoveStats {
+        move_stats: Some(MoveStats {
             fly_mode: FlyMode::GROUND,
             speed: Speed::new(0.8),
             base: Speed::new(0.8),
@@ -662,8 +663,6 @@ pub(crate) fn builder_masters() -> Masters {
         }),
         // no sprites (the world's sprites' table is empty)
         standing_sprite: None,
-        move_sprite: None,
-        run_sprite: None,
         creatable: Some(CreatablePart {
             cost: costs(&[]),
             build_time: WholeSeconds::ZERO,
@@ -674,6 +673,11 @@ pub(crate) fn builder_masters() -> Masters {
             tasks,
             work_rate: WorkRate::new(1.0),
             ..ActionPart::default()
+        }),
+        moving: Some(MovingPart {
+            move_sprite: None,
+            run_sprite: None,
+            ..MovingPart::default()
         }),
         ..Master::default()
     };
@@ -1016,7 +1020,7 @@ fn pasture_game(at: Position, livestock: f32, livestock_masters: &[MasterId]) ->
         radius: Footprint::new(0.2, 0.2),
         standing_sprite,
         storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 0)],
-        moving: Some(walker().stats),
+        move_stats: Some(walker().stats),
         ..Master::default()
     };
     let mut masters = vec![pasture];
@@ -1272,7 +1276,7 @@ fn dying_animal(kind: MasterKind, factor: f32) -> Object {
         for a in all.iter_mut().filter(|a| a.kind == MasterKind::MOVING) {
             a.kind = kind;
             a.death_sprite = Some(SpriteId::named(13171));
-            a.max_speed = Speed::new(0.737);
+            a.animated.get_or_insert_with(Default::default).max_speed = Speed::new(0.737);
         }
         *m = Arc::new(Masters::new(all));
     }
@@ -2989,7 +2993,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     for table in &mut t.model.masters {
         if let Some(m) = Arc::make_mut(table)
             .get_mut(ids::BUILDER)
-            .and_then(|m| m.moving.as_mut())
+            .and_then(|m| m.move_stats.as_mut())
         {
             m.facets = Some(SpriteFacets {
                 count: FacetCount::of_data(16),
@@ -3043,7 +3047,14 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
     assert_eq!(shown_after_update(&mut table), None);
     // the MoveTo's constructor (FUN_140aa0df0) reads the builder's own master for its sprite
     let own = Master {
-        move_sprite: Some(SpriteId::named(7)),
+        moving: Some(MovingPart {
+            move_sprite: Some(SpriteId::named(7)),
+            ..t.model.masters[1]
+                .get(ids::BUILDER)
+                .unwrap()
+                .moving
+                .unwrap_or_default()
+        }),
         ..t.model.masters[1].get(ids::BUILDER).unwrap().clone()
     };
     let id = t.players[1].objects[ListIndex::new(0)].id;
@@ -3802,7 +3813,7 @@ fn work_command_without_task_moves_the_unit_there() {
     Arc::make_mut(&mut t.model.masters[1])
         .get_mut(master_id(120))
         .unwrap()
-        .moving = None;
+        .move_stats = None;
     let before = t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -4652,7 +4663,7 @@ fn cart_world() -> World {
             class: class::BUILDING,
             radius: Footprint::new(0.5, 0.5),
             line_of_sight: Distance::new(4.0),
-            moving: Some(walker().stats),
+            move_stats: Some(walker().stats),
             action: Some(ActionPart {
                 tasks: vec![Task {
                     action_kind: CART_TASK,
@@ -5926,7 +5937,7 @@ fn shepherd_world(x: f32) -> World {
             kind: MasterKind::COMBAT,
             class: class::LIVESTOCK,
             radius: Footprint::new(0.2, 0.2),
-            moving: Some(walker().stats),
+            move_stats: Some(walker().stats),
             ..Master::default()
         };
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([sheep])));
@@ -7144,10 +7155,7 @@ fn livestock_enter_world() -> World {
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
-        moving: Some(walker().stats),
-        // no walking or standing sprite: its Enter's MoveTo takes none (the world's sprites'
-        // table holds none)
-        move_sprite: None,
+        move_stats: Some(walker().stats),
         standing_sprite: None,
         action: Some(ActionPart {
             tasks: vec![Task {
@@ -7157,6 +7165,12 @@ fn livestock_enter_world() -> World {
                 ..Task::default()
             }],
             ..ActionPart::default()
+        }),
+        moving: Some(MovingPart {
+            // no walking or standing sprite: its Enter's MoveTo takes none (the world's sprites'
+            // table holds none)
+            move_sprite: None,
+            ..MovingPart::default()
         }),
         ..Master::default()
     };
@@ -7246,6 +7260,8 @@ fn an_enter_move_to_shows_its_sprite_as_it_starts() {
         Arc::make_mut(&mut t.model.masters[1])
             .get_mut(VILLAGER_MALE)
             .unwrap()
+            .moving
+            .get_or_insert_with(Default::default)
             .move_sprite = Some(SpriteId::named(31));
         let v = &mut t.players[1].objects[ListIndex::new(0)];
         let here = v.position();
@@ -9414,7 +9430,7 @@ fn gate_world() -> World {
         height,
         hit_points: MasterHitPoints::of_data(1650),
         // a gate moves (its master's slot 0xe8): its last move time is the mover's
-        moving: Some(walker().stats),
+        move_stats: Some(walker().stats),
         building: Some(BuildingMaster {
             transform_unit: opt_master(transform_unit),
             stack_unit: None,
@@ -11796,8 +11812,11 @@ fn teardown_world() -> World {
         id,
         kind,
         class,
-        move_sprite: None,
         standing_sprite: None,
+        moving: Some(MovingPart {
+            move_sprite: None,
+            ..MovingPart::default()
+        }),
         ..Master::default()
     };
     let table = Masters::new([
@@ -12601,12 +12620,15 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             radius: Footprint::new(0.2, 0.2),
-            // no sprites: the sprites' table holds none
-            move_sprite: None,
             standing_sprite: None,
             action: Some(ActionPart {
                 drop_sites: vec![ids::TOWN_CENTRE],
                 ..ActionPart::default()
+            }),
+            moving: Some(MovingPart {
+                // no sprites: the sprites' table holds none
+                move_sprite: None,
+                ..MovingPart::default()
             }),
             ..Master::default()
         },
@@ -15876,9 +15898,12 @@ fn ai_move_of(
 fn scout_sprites() -> (Masters, Graphics) {
     let master = Master {
         id: VILLAGER_MALE,
-        run_sprite: Some(SpriteId::named(13154)),
-        move_sprite: Some(SpriteId::named(13153)),
         standing_sprite: Some(SpriteId::named(13151)),
+        moving: Some(MovingPart {
+            run_sprite: Some(SpriteId::named(13154)),
+            move_sprite: Some(SpriteId::named(13153)),
+            ..MovingPart::default()
+        }),
         ..Master::default()
     };
     let graphics = [13154, 13153, 13151]
@@ -16712,7 +16737,7 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
         hit_points: MasterHitPoints::of_data(25),
         standing_sprite: Some(SpriteId::named(300)),
         storage,
-        moving: Some(walker().stats),
+        move_stats: Some(walker().stats),
         combat: Some(CombatPart {
             attack_sprite: Some(SpriteId::named(301)),
             weapon_range: Distance::new(0.5),
@@ -17132,7 +17157,7 @@ const fn house_moves() -> MoveStats {
 fn build_command_foundation_holds_its_movement_state() {
     let mut masters = builder_masters();
     let house = masters.get_mut(ids::HOUSE).unwrap();
-    house.moving = Some(house_moves());
+    house.move_stats = Some(house_moves());
     let mut t = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(29910),
@@ -17224,7 +17249,7 @@ fn build_command_foundation_draws_its_facing_before_its_powerup_offset() {
         let mut masters = builder_masters();
         let house = masters.get_mut(ids::HOUSE).unwrap();
         house.standing_sprite = Some(SpriteId::named(588));
-        house.moving = Some(house_moves());
+        house.move_stats = Some(house_moves());
         let mut t = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(29910),
@@ -18173,7 +18198,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_points: MasterHitPoints::of_data(30),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(300)),
-        moving: Some(walker().stats),
+        move_stats: Some(walker().stats),
         creatable: Some(CreatablePart {
             max_volley: MissileCount::of_data(max_volley),
             volley_spread: VolleySpread {
@@ -18205,7 +18230,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         death_spawns: [None, None],
         life: Some(MasterData::default()),
         recyclable: true,
-        moving: Some(MoveStats {
+        move_stats: Some(MoveStats {
             speed: Speed::new(7.0),
             base: Speed::new(7.0),
             ..walker().stats
@@ -18741,7 +18766,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         (
             |t| {
                 for m in &mut t.model.masters {
-                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().moving = None;
+                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().move_stats = None;
                 }
             },
             "a missile master that does not move",
@@ -19930,6 +19955,8 @@ fn an_explore_move_to_shows_the_master_walking_sprite_as_it_starts() {
     Arc::make_mut(&mut t.model.masters[1])
         .get_mut(master)
         .unwrap()
+        .moving
+        .get_or_insert_with(Default::default)
         .move_sprite = Some(SpriteId::named(31));
     let r = in_update(
         &mut t,
@@ -23039,7 +23066,7 @@ fn frozen_unit_may_have_moved_its_master_speed() {
     Arc::make_mut(&mut t.model.masters[1])
         .get_mut(master)
         .unwrap()
-        .moving
+        .move_stats
         .as_mut()
         .unwrap()
         .base = Speed::new(0.8);

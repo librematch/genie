@@ -219,7 +219,7 @@ impl World {
         // the moving setup (FUN_1411580a0) of every building, a moving object though it never
         // moves (a mule cart does): the walk reads its last move time
         let mut mover = player_master(&self.model.masters, player, master)
-            .and_then(|m| m.moving)
+            .and_then(|m| m.move_stats)
             .map(|stats| {
                 Mover::new_object(
                     stats,

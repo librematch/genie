@@ -664,7 +664,7 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
     for masters in &mut t.model.masters {
         let villager = Arc::make_mut(masters).get_mut(ids::VILLAGER_MALE).unwrap();
         villager.standing_sprite = Some(SpriteId::named(300));
-        let moving = villager.moving.as_mut().unwrap();
+        let moving = villager.move_stats.as_mut().unwrap();
         moving.base = Speed::new(0.8);
         moving.speed = Speed::new(1.6);
     }
@@ -1038,7 +1038,7 @@ fn remains_world() -> World {
         id: master_id(801),
         kind: MasterKind::MOVING,
         standing_sprite: Some(SpriteId::named(21)),
-        moving: Some(walker().stats),
+        move_stats: Some(walker().stats),
         ..Master::default()
     };
     for masters in &mut t.model.masters {
@@ -1138,7 +1138,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         "moving remains of an object without a facet the slice holds"
     );
     assert_eq!(
-        reason(&|m| m.moving = None, Facing::Drawn),
+        reason(&|m| m.move_stats = None, Facing::Drawn),
         "moving remains without a moving master"
     );
 }

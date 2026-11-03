@@ -200,7 +200,7 @@ impl World {
             return Ok(None);
         };
         let master = u.master(self.master_tables(), p)?;
-        let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
         let moves = MasterKind::MOVING <= master.kind && below_or_unordered(0.0, speed.get());
         Ok(moves.then_some(u.position().ground()))
     }

@@ -454,7 +454,7 @@ pub(crate) fn switch_master(
         unit.life.master_id = new;
         let moving = motion.mover().is_some_and(Mover::is_moving);
         if let Some(m) = motion.mover_mut() {
-            m.stats = next.moving.ok_or(GenieError::unsupported(
+            m.stats = next.move_stats.ok_or(GenieError::unsupported(
                 "a moving unit's new master does not move",
             ))?;
             // the top speed the unit reads with the sprite it shows, from the new master's base

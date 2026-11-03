@@ -143,7 +143,7 @@ pub fn point_sprite(
 /// 0): the master's walking sprite (`+0x748`), else its standing one (`+0x470`); no terrain look.
 #[must_use]
 pub fn object_sprite(master: &Master) -> Option<SpriteId> {
-    master.move_sprite.or(master.standing_sprite)
+    master.moving_part().move_sprite.or(master.standing_sprite)
 }
 
 /// The sprite the unit AI's moves give their `MoveTo` (slot 0x340, `FUN_1410866e0`, with
@@ -152,8 +152,8 @@ pub fn object_sprite(master: &Master) -> Option<SpriteId> {
 /// no terrain look. None leaves the constructor's default ([`point_sprite`], [`object_sprite`]).
 #[must_use]
 pub fn ai_sprite(master: &Master, walk: bool) -> Option<SpriteId> {
-    let run = master.run_sprite.filter(|_| !walk);
-    run.or(master.move_sprite)
+    let run = master.moving_part().run_sprite.filter(|_| !walk);
+    run.or_else(|| master.moving_part().move_sprite)
 }
 
 /// What a `MoveTo`'s constructors take for the sprite (`+0x58`) when their maker gives none,
@@ -545,6 +545,7 @@ mod tests {
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
     use crate::objects::masters::ActionPart;
+    use crate::objects::masters::MovingPart;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
@@ -753,9 +754,12 @@ mod tests {
     #[test]
     fn move_to_without_sprite_takes_its_constructor_s() {
         let master = Master {
-            run_sprite: Some(SpriteId::named(13154)),
-            move_sprite: Some(SpriteId::named(13153)),
             standing_sprite: Some(SpriteId::named(13151)),
+            moving: Some(MovingPart {
+                run_sprite: Some(SpriteId::named(13154)),
+                move_sprite: Some(SpriteId::named(13153)),
+                ..MovingPart::default()
+            }),
             ..Master::default()
         };
         assert_eq!(
@@ -778,8 +782,11 @@ mod tests {
             Some(SpriteId::named(500))
         );
         let still = Master {
-            run_sprite: None,
-            move_sprite: None,
+            moving: Some(MovingPart {
+                run_sprite: None,
+                move_sprite: None,
+                ..master.moving.unwrap_or_default()
+            }),
             ..master
         };
         assert_eq!(

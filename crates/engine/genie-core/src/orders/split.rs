@@ -362,7 +362,7 @@ impl World {
                 continue;
             };
             let master = u.master(self.master_tables(), p)?;
-            let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
+            let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
             if (MasterKind::MOVING <= master.kind && Speed::ZERO < speed) || queued {
                 points.push(u.position().ground());
             }

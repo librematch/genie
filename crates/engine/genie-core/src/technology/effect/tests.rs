@@ -1062,8 +1062,10 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     )
     .with_motions([(object_id(1), walker()), (object_id(2), walker())]);
     let mut m = combat(master_id(4), class::CLASS_6, 60);
-    (m.max_speed, m.move_sprite, m.run_sprite, m.standing_sprite) =
-        (Speed::new(1.5), None, None, None);
+    m.standing_sprite = None;
+    m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(1.5);
+    let moving = m.moving.get_or_insert_with(Default::default);
+    (moving.move_sprite, moving.run_sprite) = (None, None);
     t.model.masters = vec![Arc::new(Masters::new([m]))];
     t.master_followers(
         PlayerId::new(0),
@@ -1242,8 +1244,11 @@ fn speed_change_reaches_the_units_movement() {
     )
     .with_motions([(id, Motion::Moving(mover))]);
     let mut villager = combat(master_id(4), class::VILLAGER, 25);
-    villager.max_speed = Speed::new(0.8);
-    villager.moving = Some(stats);
+    villager
+        .animated
+        .get_or_insert_with(Default::default)
+        .max_speed = Speed::new(0.8);
+    villager.move_stats = Some(stats);
     t.model.masters = vec![Arc::new(Masters::new([villager]))];
     t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)
         .unwrap();
@@ -1259,6 +1264,8 @@ fn speed_change_reaches_the_units_movement() {
     Arc::make_mut(&mut t.model.masters[0])
         .get_mut(master_id(4))
         .unwrap()
+        .animated
+        .get_or_insert_with(Default::default)
         .max_speed = Speed::ZERO;
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(5, -1, 4, 5, 1.1)], None)

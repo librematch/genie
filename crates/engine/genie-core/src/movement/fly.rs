@@ -136,7 +136,10 @@ impl Fly {
             FlyState::Choosing => {
                 let mover = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
-                    walking: bird.master(c.w.master_tables(), c.player)?.move_sprite,
+                    walking: bird
+                        .master(c.w.master_tables(), c.player)?
+                        .moving_part()
+                        .move_sprite,
                     graphics: &c.w.model.graphics,
                 };
                 let action = c.w.streams.get(Stream::Action);
@@ -409,6 +412,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::layers::{DefaultTask, Motion, Static};
     use crate::objects::lifecycle::Lifecycle;
+    use crate::objects::masters::MovingPart;
     use crate::objects::masters::TaskTerrain;
     #[cfg(test)]
     use crate::objects::masters::{Master, Masters, TaskIndex, WorkValue};
@@ -501,7 +505,10 @@ mod tests {
         t.model.graphics = Arc::new(hawk_graphics());
         t.model.masters = vec![Arc::new(Masters::new([Master {
             id: master_id(96),
-            move_sprite: Some(SpriteId::named(846)),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(846)),
+                ..MovingPart::default()
+            }),
             ..Master::default()
         }]))];
         t

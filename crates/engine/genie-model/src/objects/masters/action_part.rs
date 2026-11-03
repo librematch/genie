@@ -1,4 +1,5 @@
-//! A master's action layer: the RGE action master's values (types 40 and up but 90, the `.dat`'s type-40 section; FD-046-D05).
+//! A master's action layer: the RGE action master's values (types 40 and up but 90, the `.dat`'s
+//! type-40 section; FD-046-D05).
 
 use crate::map::Distance;
 use crate::objects::WorkRate;
@@ -11,7 +12,11 @@ use crate::objects::masters::TaskIndex;
 use genie_diff::Diff;
 use std::sync::LazyLock;
 
-/// The action layer of a master of type 40 and up but 90 (`RGE_Master_Action_Object`, `+0x790`..`+0x7b9`; the `.dat`'s type-40 section, genieutils' `Bird`): its tasks and the default one, its task swap group, its work rate, its search radius, its drop sites and its run pattern. An action unit (40), a combat master (50), a missile (60), a combat unit (70) and a building (80) hold it.
+/// The action layer of a master of type 40 and up but 90 (`RGE_Master_Action_Object`,
+/// `+0x790`..`+0x7b9`; the `.dat`'s type-40 section, genieutils' `Bird`): its tasks and the default
+/// one, its task swap group, its work rate, its search radius, its drop sites and its run pattern.
+/// An action unit (40), a combat master (50), a missile (60), a combat unit (70) and a building
+/// (80) hold it.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ActionPart {
@@ -33,11 +38,14 @@ pub struct ActionPart {
     pub run_pattern: RunPattern,
 }
 
-/// What a master without the layer reads ([`Master::action_part`]): no tasks, no default task, no task swap group, no drop sites and zeros, the import's values for a unit without the type-40 section.
+/// What a master without the layer reads ([`Master::action_part`]): no tasks, no default task, no
+/// task swap group, no drop sites and zeros, the import's values for a unit without the type-40
+/// section.
 static ABSENT: LazyLock<ActionPart> = LazyLock::new(ActionPart::default);
 
 impl Master {
-    /// Its action layer, or for a master of another type the values a master without it reads ([`ABSENT`]).
+    /// Its action layer, or for a master of another type the values a master without it reads
+    /// ([`ABSENT`]).
     #[must_use]
     pub fn action_part(&self) -> &ActionPart {
         self.action.as_ref().unwrap_or(&ABSENT)

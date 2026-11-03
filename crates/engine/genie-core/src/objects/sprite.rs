@@ -373,14 +373,14 @@ pub fn walking(
     if loaded_cart(master, goods, roles) {
         return trade_sprite(master, roles);
     }
-    look.map_or_else(|| master.move_sprite, |l| l.walking)
+    look.map_or_else(|| master.moving_part().move_sprite, |l| l.walking)
 }
 
 /// Slot 0x7d0 of a combat object (`FUN_1412034e0`): its terrain look's running sprite
 /// (`+0x978`), else its master's (`+0x750`).
 #[must_use]
 pub fn running(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.run_sprite, |l| l.running)
+    look.map_or_else(|| master.moving_part().run_sprite, |l| l.running)
 }
 
 /// Slot 0x898 of a combat object (`FUN_141202830`): its terrain look's attack sprite (`+0x970`),
@@ -434,6 +434,7 @@ mod tests {
     use crate::objects::masters::CombatPart;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterKind;
+    use crate::objects::masters::MovingPart;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
     use crate::objects::masters::{BuildingMaster, Task};
@@ -734,8 +735,6 @@ mod tests {
             standing_sprite: Some(SpriteId::named(2575)),
             death_sprite: Some(SpriteId::named(2573)),
             undead_sprite: None,
-            move_sprite: Some(SpriteId::named(10)),
-            run_sprite: Some(SpriteId::named(11)),
             building: Some(BuildingMaster {
                 destruction_sprite: Some(SpriteId::named(389)),
                 construction_sprite: None,
@@ -748,6 +747,11 @@ mod tests {
             combat: Some(CombatPart {
                 attack_sprite: Some(SpriteId::named(12)),
                 ..CombatPart::default()
+            }),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(10)),
+                run_sprite: Some(SpriteId::named(11)),
+                ..MovingPart::default()
             }),
             ..Master::default()
         }
@@ -811,10 +815,13 @@ mod tests {
         let cart = Master {
             class: class::TRADE_CART,
             standing_sprite: Some(SpriteId::named(20)),
-            move_sprite: Some(SpriteId::named(21)),
             action: Some(ActionPart {
                 tasks: vec![other, trade],
                 ..ActionPart::default()
+            }),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(21)),
+                ..MovingPart::default()
             }),
             ..Master::default()
         };

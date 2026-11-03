@@ -161,7 +161,8 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     ];
     masters = Masters::new(masters.iter().cloned().chain(others));
     let v = masters.get_mut(ids::VILLAGER_MALE).unwrap();
-    (v.class, v.move_sprite, v.standing_sprite) = (class, Some(WALKING), Some(STANDING));
+    (v.class, v.standing_sprite) = (class, Some(STANDING));
+    v.moving.get_or_insert_with(Default::default).move_sprite = Some(WALKING);
     let mut mover = walker();
     mover.moved_at = at;
     let builder = Object::with_actions(

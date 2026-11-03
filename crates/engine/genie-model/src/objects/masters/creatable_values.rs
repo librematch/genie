@@ -1,6 +1,7 @@
 //! The creatable layer's values under the TRIBE combat master's setters (slots 0x18, 0x20 and
 //! 0x28): each attribute whose set, add or scale writes one value of the layer. The setters
-//! ([`crate::objects::masters::Master::set_tribe_combat`] …) take the layer once and hand these attributes over.
+//! ([`crate::objects::masters::Master::set_tribe_combat`] …) take the layer once and hand these
+//! attributes over.
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
@@ -29,8 +30,9 @@ use crate::objects::masters::resize_train_locations;
 use crate::objects::masters::select_entry;
 
 impl CreatablePart {
-    /// [`crate::objects::masters::Master::set_tribe_combat`]'s values of the layer (`FUN_1412661d0`): what `attribute` set
-    /// to `v` writes here; `hit_points` is the master's, which the regeneration percent reads.
+    /// [`crate::objects::masters::Master::set_tribe_combat`]'s values of the layer
+    /// (`FUN_1412661d0`): what `attribute` set to `v` writes here; `hit_points` is the master's,
+    /// which the regeneration percent reads.
     pub(super) fn set_value(
         &mut self,
         attribute: MasterAttribute,
@@ -87,9 +89,10 @@ impl CreatablePart {
         }
     }
 
-    /// [`crate::objects::masters::Master::add_tribe_combat`]'s values of the layer (`FUN_141266a60`): what an add of `v` to
-    /// `attribute` writes here; `hit_points` is the master's, `world` holds the sprites. A sprite
-    /// add reads the sprite's id without the others' test for none: none counts as −1.
+    /// [`crate::objects::masters::Master::add_tribe_combat`]'s values of the layer
+    /// (`FUN_141266a60`): what an add of `v` to `attribute` writes here; `hit_points` is the
+    /// master's, `world` holds the sprites. A sprite add reads the sprite's id without the others'
+    /// test for none: none counts as −1.
     pub(super) fn add_value(
         &mut self,
         attribute: MasterAttribute,
@@ -176,8 +179,8 @@ impl CreatablePart {
         }
     }
 
-    /// [`crate::objects::masters::Master::multiply_tribe_combat`]'s values of the layer (`FUN_141267040`): what a scale of
-    /// `attribute` by `v` writes here.
+    /// [`crate::objects::masters::Master::multiply_tribe_combat`]'s values of the layer
+    /// (`FUN_141267040`): what a scale of `attribute` by `v` writes here.
     pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
         use crate::objects::masters::MasterAttribute;
         match attribute {

@@ -64,6 +64,7 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
@@ -166,13 +167,16 @@ fn garrison_masters() -> Masters {
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             copy_id: Some(VILLAGER),
-            // no walking or standing sprite: a MoveTo the villager makes takes none (the
-            // world's sprites' table holds none)
-            move_sprite: None,
             standing_sprite: None,
             action: Some(ActionPart {
                 tasks: vec![task(GARRISON, 3), task(GARRISON, 20)],
                 ..ActionPart::default()
+            }),
+            moving: Some(MovingPart {
+                // no walking or standing sprite: a MoveTo the villager makes takes none (the
+                // world's sprites' table holds none)
+                move_sprite: None,
+                ..MovingPart::default()
             }),
             ..Master::default()
         },
@@ -194,8 +198,11 @@ fn garrison_masters() -> Masters {
             garrison: GarrisonCapacity::of_data(1),
             // no sprites (the world's sprites' table is empty)
             standing_sprite: None,
-            move_sprite: None,
-            run_sprite: None,
+            moving: Some(MovingPart {
+                move_sprite: None,
+                run_sprite: None,
+                ..MovingPart::default()
+            }),
             ..Master::default()
         },
         Master {
@@ -558,7 +565,9 @@ fn entering(at: Point, ship: Point, enter: EnterAction) -> World {
     let mut t = shore_world(at, ship);
     for m in &mut t.model.masters {
         if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
-            (v.standing_sprite, v.move_sprite, v.run_sprite) = (None, None, None);
+            v.standing_sprite = None;
+            let moving = v.moving.get_or_insert_with(Default::default);
+            (moving.move_sprite, moving.run_sprite) = (None, None);
         }
     }
     // its walk turns by 16 facets
@@ -1956,7 +1965,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     if let Some(v) = masters.get_mut(VILLAGER) {
         v.radius = Footprint::new(0.2, 0.2);
         v.tall = true;
-        v.moving = Some(standing());
+        v.move_stats = Some(standing());
     }
     t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
     let n = (w * h) as usize;
@@ -2871,7 +2880,7 @@ fn villager_sent_into_ship_meets_it_at_the_shore_on_the_way() {
     let _ = Arc::make_mut(&mut t.model.graphics).insert(SpriteId::named(2001), running);
     for m in &mut t.model.masters {
         if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
-            s.run_sprite = Some(SpriteId::named(2001));
+            s.moving.get_or_insert_with(Default::default).run_sprite = Some(SpriteId::named(2001));
         }
     }
     t.garrison_order(
@@ -3069,7 +3078,7 @@ fn coast_world(ship: Point) -> World {
             s.radius = Footprint::new(0.5, 0.5);
             s.tall = true;
             s.garrison = GarrisonCapacity::of_data(5);
-            s.moving = Some(sails);
+            s.move_stats = Some(sails);
         }
         if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
             v.terrain_restriction = Some(RestrictionId::named(0));

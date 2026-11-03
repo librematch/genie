@@ -494,7 +494,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (
             MasterAttribute::ROTATION_SPEED,
-            |m| m.turn_speed.get(),
+            |m| m.moving_part().turn_speed.get(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -872,13 +872,13 @@ fn the_static_setters_truncate_as_the_game_does() {
 fn sprite_attribute_takes_only_sprite_the_world_has() {
     let mut m = of_type(MasterKind::MOVING);
     m.standing_sprite = Some(SpriteId::named(5));
-    m.move_sprite = None;
+    m.moving.get_or_insert_with(Default::default).move_sprite = None;
     m.set_attribute(MasterAttribute::STANDING_GRAPHIC, 150.0, &world(false));
     assert_eq!(m.standing_sprite, Some(SpriteId::named(5)));
     m.add_attribute(MasterAttribute::STANDING_GRAPHIC, 3.0, &world(false));
     assert_eq!(m.standing_sprite, Some(SpriteId::named(8)));
     m.add_attribute(MasterAttribute::WALKING_GRAPHIC, 11.0, &world(false));
-    assert_eq!(m.move_sprite, Some(SpriteId::named(10)));
+    assert_eq!(m.moving_part().move_sprite, Some(SpriteId::named(10)));
     m.set_attribute(MasterAttribute::STANDING_GRAPHIC_2, 7.0, &world(false));
     assert_eq!(m.standing_sprite_2, Some(SpriteId::named(7)));
 }
@@ -888,17 +888,20 @@ fn sprite_attribute_takes_only_sprite_the_world_has() {
 #[test]
 fn capped_speed_stops_at_its_type_cap() {
     let mut m = of_type(MasterKind::COMBAT);
-    m.max_speed = Speed::new(4.0);
+    m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(4.0);
     m.add_attribute(MasterAttribute::MOVEMENT_SPEED, 1.0, &world(false));
-    assert_eq!(m.max_speed, Speed::new(5.0));
+    assert_eq!(m.animated_part().max_speed, Speed::new(5.0));
     m.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(true));
-    assert_eq!(m.max_speed, Speed::new(4.5));
+    assert_eq!(m.animated_part().max_speed, Speed::new(4.5));
     let mut missile = of_type(MasterKind::MISSILE);
-    missile.max_speed = Speed::new(7.0);
+    missile
+        .animated
+        .get_or_insert_with(Default::default)
+        .max_speed = Speed::new(7.0);
     missile.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 4.0, &world(true));
-    assert_eq!(missile.max_speed, Speed::new(20.0));
+    assert_eq!(missile.animated_part().max_speed, Speed::new(20.0));
     missile.add_attribute(MasterAttribute::MOVEMENT_SPEED, f32::NAN, &world(true));
-    assert!(missile.max_speed.get().is_nan());
+    assert!(missile.animated_part().max_speed.get().is_nan());
 }
 
 /// `FUN_1410c12b0` and its add and multiply: the amount's high byte names the class, its low
@@ -971,7 +974,7 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
     m.multiply_attribute(MasterAttribute::SHOWN_ATTACK, 3.5, &world(false));
     assert_eq!(m.combat_part().shown.attack, DamageAmount::new(21));
     m.add_attribute(MasterAttribute::ROTATION_SPEED, 0.25, &world(false));
-    assert_eq!(m.turn_speed, Seconds::new(0.25));
+    assert_eq!(m.moving_part().turn_speed, Seconds::new(0.25));
     m.set_attribute(MasterAttribute::DISPLACEMENT_Y, 0.75, &world(false));
     assert_eq!(m.combat_part().weapon_offset, Offset::new(0.0, 0.75, 0.0));
 }
@@ -1323,11 +1326,11 @@ fn moving_master_derived_values_follow_its_attributes() {
     .collect();
     let mut m = of_type(MasterKind::COMBAT);
     m.standing_sprite = Some(SpriteId::named(1));
-    m.move_sprite = Some(SpriteId::named(2));
-    m.run_sprite = None;
-    m.max_speed = Speed::new(1.0);
+    let moving = m.moving.get_or_insert_with(Default::default);
+    (moving.move_sprite, moving.run_sprite) = (Some(SpriteId::named(2)), None);
+    m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(1.0);
     m.radius = Footprint::new(0.2, 0.2);
-    m.moving = Some(MoveStats {
+    m.move_stats = Some(MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::new(1.5),
         base: Speed::new(1.5),
@@ -1346,22 +1349,22 @@ fn moving_master_derived_values_follow_its_attributes() {
     });
     m.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(false));
     follow(&mut m, MasterAttribute::MOVEMENT_SPEED, &graphics, None);
-    let s = m.moving.unwrap();
+    let s = m.move_stats.unwrap();
     assert_eq!((s.base, s.speed), (Speed::new(1.1), Speed::new(1.1 * 1.5)));
     m.set_attribute(MasterAttribute::SIZE_Z, 1.0, &world(false));
     follow(&mut m, MasterAttribute::SIZE_Z, &graphics, None);
     assert!(m.tall);
-    assert_eq!(m.moving.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
+    assert_eq!(m.move_stats.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
     m.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 3.0, &world(false));
     follow(&mut m, MasterAttribute::RUNNING_GRAPHIC, &graphics, None);
-    let s = m.moving.unwrap();
+    let s = m.move_stats.unwrap();
     assert_eq!(s.speed, Speed::new(1.1 * 0.5));
     // 8 facets and 16: no common count
     assert_eq!(s.facets, None);
     m.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 2.0, &world(false));
     follow(&mut m, MasterAttribute::RUNNING_GRAPHIC, &graphics, None);
     assert_eq!(
-        m.moving.unwrap().facets,
+        m.move_stats.unwrap().facets,
         Some(SpriteFacets {
             count: FacetCount::of_data(8),
             turns: false
@@ -1407,7 +1410,7 @@ fn an_id_field_keeps_negative_value_through_an_add() {
     let mut t = of_type(MasterKind::MOVING);
     t.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &w);
     t.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &w);
-    assert_eq!(t.trail.unit.master(), Some(master_id(2)));
+    assert_eq!(t.moving_part().trail.unit.master(), Some(master_id(2)));
 }
 
 /// The action master's (`FUN_14109fbb0` and its add and multiply) work rate, search radius
@@ -1446,9 +1449,9 @@ fn the_action_and_moving_setters_change_their_values() {
             RunPattern::of_data(1)
         )
     );
-    assert_eq!(m.turn_speed, Seconds::new(1.0));
+    assert_eq!(m.moving_part().turn_speed, Seconds::new(1.0));
     assert_eq!(
-        m.trail,
+        m.moving_part().trail,
         Trail {
             unit: MasterField::of(Some(master_id(1302))),
             mode: TrailMode::of_data(3),
@@ -1607,7 +1610,7 @@ fn the_missile_building_and_animated_setters() {
     );
     let mut a = of_type(MasterKind::DOPPELGANGER);
     a.set_attribute(MasterAttribute::MOVEMENT_SPEED, 1.2, &world(false));
-    assert_eq!(a.max_speed, Speed::new(1.2));
+    assert_eq!(a.animated_part().max_speed, Speed::new(1.2));
 }
 
 /// The master copy (slot 8, `Master::copy_from`): every value but the id, class,
@@ -1885,10 +1888,10 @@ fn master_moves_with_moving_part_whose_speed_is_above_0() {
         weapon_range: Distance::ZERO,
     };
     let mut m = of_type(MasterKind::COMBAT);
-    m.moving = None;
+    m.move_stats = None;
     assert!(!m.moves());
-    m.moving = Some(moving(0.9));
+    m.move_stats = Some(moving(0.9));
     assert!(m.moves());
-    m.moving = Some(moving(0.0));
+    m.move_stats = Some(moving(0.0));
     assert!(!m.moves());
 }

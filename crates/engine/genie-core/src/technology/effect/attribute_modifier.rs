@@ -217,7 +217,7 @@ impl World {
             return Ok(());
         }
         let sprites = MasterSprites {
-            moving: g(master.move_sprite),
+            moving: g(master.moving_part().move_sprite),
             attack: g(master.combat_part().attack_sprite),
             standing: g(master.standing_sprite),
             idle_attack: g(master.creatable_part().idle_attack_sprite),

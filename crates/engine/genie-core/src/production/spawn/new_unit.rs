@@ -107,7 +107,7 @@ impl World {
                 .filter(|g| g.target != Some(building.id))
                 .map(|g| g.point.ground()),
         };
-        if made.moving.is_none() {
+        if made.move_stats.is_none() {
             return Err(GenieError::unsupported(
                 "a new unit of a master that does not move",
             ));
@@ -332,7 +332,7 @@ impl World {
                 "a new object of a recyclable master (a negative id)",
             ));
         }
-        let moving = made.moving.ok_or(GenieError::unsupported(
+        let moving = made.move_stats.ok_or(GenieError::unsupported(
             "a new unit of a master that does not move",
         ))?;
         // the constructor's new_position: the ground's height by the master's fly mode (slot

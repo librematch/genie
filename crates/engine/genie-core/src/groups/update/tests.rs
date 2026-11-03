@@ -57,6 +57,7 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
@@ -673,11 +674,14 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
             hit_points: MasterHitPoints::of_data(60),
             radius: Footprint::new(0.2, 0.2),
             standing_sprite: SpriteId::of_data(sprites[0]),
-            move_sprite: SpriteId::of_data(sprites[1]),
-            run_sprite: SpriteId::of_data(sprites[2]),
             creatable: Some(CreatablePart {
                 formation_category: FormationClass::of_data(1),
                 ..CreatablePart::default()
+            }),
+            moving: Some(MovingPart {
+                move_sprite: SpriteId::of_data(sprites[1]),
+                run_sprite: SpriteId::of_data(sprites[2]),
+                ..MovingPart::default()
             }),
             ..Master::default()
         };

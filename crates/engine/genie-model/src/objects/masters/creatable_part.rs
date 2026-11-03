@@ -1,4 +1,5 @@
-//! A master's creatable layer: the TRIBE combat master's values (types 70 and 80, the `.dat`'s creatable section; FD-046-D05).
+//! A master's creatable layer: the TRIBE combat master's values (types 70 and 80, the `.dat`'s
+//! creatable section; FD-046-D05).
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
@@ -6,6 +7,7 @@ use crate::combat::{Firepower, MissileCount};
 use crate::objects::Regeneration;
 use crate::objects::SpriteId;
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::ChargeEvent;
@@ -21,6 +23,7 @@ use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::SpacingModifier;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::TrainLocation;
@@ -30,7 +33,9 @@ use crate::world::WholeSeconds;
 use genie_diff::Diff;
 use std::sync::LazyLock;
 
-/// The creatable layer of a master of type 70 or 80 (`TRIBE_Master_Combat_Object`, `+0x880`..`+0x94f`; the `.dat`'s creatable section): its costs, train locations, volleys, charge and the values its interface shows.
+/// The creatable layer of a master of type 70 or 80 (`TRIBE_Master_Combat_Object`,
+/// `+0x880`..`+0x94f`; the `.dat`'s creatable section): its costs, train locations, volleys, charge
+/// and the values its interface shows.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreatablePart {
@@ -109,13 +114,17 @@ pub struct CreatablePart {
 static ABSENT: LazyLock<CreatablePart> = LazyLock::new(CreatablePart::default);
 
 impl Master {
-    /// A master of type `kind` with the defaults of the layers its type holds (the action layer
-    /// for [`MasterKind::has_action_layer`], the combat one for [`MasterKind::has_combat_layer`],
-    /// the creatable one for [`MasterKind::has_creatable_layer`]).
+    /// A master of type `kind` with the defaults of the layers its type holds (the animated layer
+    /// for [`MasterKind::has_animated_layer`], the moving one for
+    /// [`MasterKind::has_moving_layer`], the action one for [`MasterKind::has_action_layer`], the
+    /// combat one for [`MasterKind::has_combat_layer`], the creatable one for
+    /// [`MasterKind::has_creatable_layer`]).
     #[must_use]
     pub fn of_kind(kind: MasterKind) -> Self {
         Self {
             kind,
+            animated: kind.has_animated_layer().then(AnimatedPart::default),
+            moving: kind.has_moving_layer().then(MovingPart::default),
             action: kind.has_action_layer().then(ActionPart::default),
             combat: kind.has_combat_layer().then(CombatPart::default),
             creatable: kind.has_creatable_layer().then(CreatablePart::default),

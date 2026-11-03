@@ -79,7 +79,7 @@ impl Unit {
                 "a missile of a master that is not recyclable",
             ));
         }
-        let moving = made.moving.ok_or(GenieError::unsupported(
+        let moving = made.move_stats.ok_or(GenieError::unsupported(
             "a missile master that does not move",
         ))?;
         let (id, flying) = if let Some(pooled) = c.w.recycling.missiles.pop() {

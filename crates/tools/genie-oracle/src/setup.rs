@@ -424,7 +424,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
                 .filter(|m| m.kind == MasterKind::COMBAT)
         };
         turns.spatial.fastest = all()
-            .filter_map(|m| m.moving.as_ref().map(|s| s.speed.get()))
+            .filter_map(|m| m.move_stats.as_ref().map(|s| s.speed.get()))
             .fold(0.0, f32::max);
         turns.spatial.reach = Distance::new(
             all()

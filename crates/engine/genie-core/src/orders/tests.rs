@@ -56,6 +56,7 @@ use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterKind;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
@@ -436,8 +437,11 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                 radius: Footprint::new(0.2, 0.2),
                 // no sprites (the world's sprites' table is empty)
                 standing_sprite: None,
-                move_sprite: None,
-                run_sprite: None,
+                moving: Some(MovingPart {
+                    move_sprite: None,
+                    run_sprite: None,
+                    ..MovingPart::default()
+                }),
                 ..Master::default()
             },
             Master {
@@ -1010,13 +1014,16 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         .combat
         .get_or_insert_with(Default::default)
         .attack_sprite = Some(SpriteId::named(301));
-    soldier.move_sprite = Some(SpriteId::named(302));
+    soldier
+        .moving
+        .get_or_insert_with(Default::default)
+        .move_sprite = Some(SpriteId::named(302));
     soldier
         .combat
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::ZERO;
     soldier.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
-    soldier.moving = Some(walker.stats);
+    soldier.move_stats = Some(walker.stats);
     t.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(126),
         kind: MasterKind::COMBAT,
@@ -1141,11 +1148,14 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         id,
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: MasterKind::COMBAT,
-        move_sprite: None,
         standing_sprite: None,
         creatable: Some(CreatablePart {
             formation_category,
             ..CreatablePart::default()
+        }),
+        moving: Some(MovingPart {
+            move_sprite: None,
+            ..MovingPart::default()
         }),
         ..Master::default()
     };
@@ -1477,7 +1487,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     t.model.masters.push(Arc::new(Masters::new([])));
     let walker = walker();
     if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        m.moving = Some(walker.stats);
+        m.move_stats = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.put_mover(unit.id, Some(walker));
@@ -1839,7 +1849,7 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     let walker = walker();
     if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        m.moving = Some(walker.stats);
+        m.move_stats = Some(walker.stats);
     }
     let unit = &mut t.players[1].objects[ListIndex::new(0)];
     t.parts.put_mover(unit.id, Some(walker));
@@ -1903,7 +1913,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
         let walker = walker();
         if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-            m.moving = Some(walker.stats);
+            m.move_stats = Some(walker.stats);
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         t.parts.put_mover(unit.id, Some(walker));
@@ -2169,9 +2179,12 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         kind: MasterKind::COMBAT,
         class: class::CLASS_12,
         object_flags: ObjectFlags::SCOUT,
-        // no sprites: the Explore's MoveTo takes none (the world's sprites' table holds none)
-        move_sprite: None,
         standing_sprite: None,
+        moving: Some(MovingPart {
+            // no sprites: the Explore's MoveTo takes none (the world's sprites' table holds none)
+            move_sprite: None,
+            ..MovingPart::default()
+        }),
         ..Master::default()
     };
     t.model
@@ -2862,7 +2875,7 @@ fn followers() -> World {
     t.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
-        moving: Some(walker.stats),
+        move_stats: Some(walker.stats),
         ..Master::default()
     }]));
     for u in &mut t.players[1].objects {
@@ -3560,7 +3573,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
-        moving: Some(walker.stats),
+        move_stats: Some(walker.stats),
         ..Master::default()
     };
     t.model.masters[1] = Arc::new(Masters::new([

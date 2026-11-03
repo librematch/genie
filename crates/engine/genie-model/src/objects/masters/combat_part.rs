@@ -1,4 +1,5 @@
-//! A master's combat layer: the RGE combat master's values (types 50 and up but 90, the `.dat`'s type-50 section; FD-046-D05).
+//! A master's combat layer: the RGE combat master's values (types 50 and up but 90, the `.dat`'s
+//! type-50 section; FD-046-D05).
 
 use crate::combat::Firepower;
 use crate::combat::missile::MissSpread;

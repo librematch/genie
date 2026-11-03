@@ -470,7 +470,7 @@ impl TransportAction {
                     })?;
                 task.sprites.moving
             }
-            None => master.move_sprite,
+            None => master.moving_part().move_sprite,
         })
     }
 

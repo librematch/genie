@@ -81,7 +81,7 @@ impl World {
             gather: toward,
             walls,
         };
-        let moving = made.moving.ok_or(NOT_MOVING)?;
+        let moving = made.move_stats.ok_or(NOT_MOVING)?;
         let restriction = self
             .spatial
             .terrain
@@ -282,7 +282,7 @@ impl World {
                     angle_of_facet(facet, own)
                 }
             };
-            Some(made.moving.ok_or(GenieError::unsupported(
+            Some(made.move_stats.ok_or(GenieError::unsupported(
                 "moving remains without a moving master",
             ))?)
         } else {

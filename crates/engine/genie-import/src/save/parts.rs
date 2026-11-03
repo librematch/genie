@@ -5,7 +5,9 @@ use genie_save::generated::world::{
     Master, RgeMasterAnimatedObject, RgeMasterCombatObject, RgeMasterMovingObject,
 };
 
-/// The animated part of a player's master, which holds its speed (`mMaxSpeed`, master `+0x740`).
+/// The animated part of a player's master, which holds its speed (`mMaxSpeed`, master `+0x740`):
+/// an animated or doppelganger master's own record (both `RGE_Master_Animated_Object`), else the
+/// one its moving, action, combat or missile record holds.
 #[must_use]
 pub fn animated_master(m: &Master) -> Option<&RgeMasterAnimatedObject> {
     let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
@@ -22,6 +24,7 @@ pub fn animated_master(m: &Master) -> Option<&RgeMasterAnimatedObject> {
     }
     let r = m.rge_master.as_deref()?;
     None.or(r.rge_master_animated_object.as_deref())
+        .or(r.rge_master_doppleganger_object.as_deref())
         .or_else(|| {
             r.rge_master_moving_object
                 .as_deref()

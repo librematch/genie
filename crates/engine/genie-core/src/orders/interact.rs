@@ -85,7 +85,7 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
         let still = master.kind < MasterKind::MOVING
             || (!self
                 .model

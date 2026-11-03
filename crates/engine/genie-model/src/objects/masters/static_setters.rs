@@ -19,6 +19,7 @@ use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
 use crate::objects::masters::ObjectFlags;
@@ -36,10 +37,7 @@ use crate::objects::masters::multiply_short;
 use crate::objects::masters::resize_damage_graphics;
 use crate::objects::masters::select_entry;
 use crate::objects::masters::set_sprite;
-use crate::objects::masters::{MasterField, MasterId};
-use crate::objects::masters::{TrailDensity, TrailMode};
 use crate::players::Amount;
-use crate::world::Seconds;
 
 impl Master {
     /// `FUN_141126400`, the static master's slot 0x18.
@@ -416,8 +414,11 @@ impl Master {
         } else {
             masters_tuning.speed_cap
         };
-        if capped && !at_most_or_unordered(self.max_speed.get(), cap) {
-            self.max_speed = Speed::new(cap);
+        if let Some(p) = self.animated.as_mut()
+            && capped
+            && !at_most_or_unordered(p.max_speed.get(), cap)
+        {
+            p.max_speed = Speed::new(cap);
         }
     }
 
@@ -429,7 +430,9 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            self.max_speed = Speed::new(v);
+            if let Some(p) = self.animated.as_mut() {
+                p.max_speed = Speed::new(v);
+            }
         } else {
             self.set_static(attribute, v, world);
         }
@@ -443,7 +446,9 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            self.max_speed += Speed::new(v);
+            if let Some(p) = self.animated.as_mut() {
+                p.max_speed += Speed::new(v);
+            }
             self.cap_speed(world.capped, world.masters_tuning);
         } else {
             self.add_static(attribute, v, world);
@@ -458,7 +463,9 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            self.max_speed *= v;
+            if let Some(p) = self.animated.as_mut() {
+                p.max_speed *= v;
+            }
             self.cap_speed(world.capped, world.masters_tuning);
         } else {
             self.multiply_static(attribute, v, world);
@@ -472,19 +479,18 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::ROTATION_SPEED => self.turn_speed = Seconds::new(v),
-            MasterAttribute::WALKING_GRAPHIC => {
-                set_sprite(&mut self.move_sprite, cvttss2si(v), world);
+            MasterAttribute::ROTATION_SPEED
+            | MasterAttribute::WALKING_GRAPHIC
+            | MasterAttribute::RUNNING_GRAPHIC
+            | MasterAttribute::TRAILING_UNIT
+            | MasterAttribute::TRAIL_MODE
+            | MasterAttribute::TRAIL_DENSITY => {
+                if let Some(p) = self.moving.as_mut() {
+                    p.set_value(attribute, v, world);
+                }
             }
-            MasterAttribute::RUNNING_GRAPHIC => {
-                set_sprite(&mut self.run_sprite, cvttss2si(v), world);
-            }
-            MasterAttribute::TRAILING_UNIT => self.trail.unit = MasterField::of_data(low16(v)),
-            MasterAttribute::TRAIL_MODE => self.trail.mode = TrailMode::of_data(low8(v)),
-            MasterAttribute::TRAIL_DENSITY => self.trail.density = TrailDensity::new(v),
             _ => self.set_animated(attribute, v, world),
         }
     }
@@ -498,14 +504,16 @@ impl Master {
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
-            MasterAttribute::WALKING_GRAPHIC => add_sprite(&mut self.move_sprite, v, world),
-            MasterAttribute::RUNNING_GRAPHIC => add_sprite(&mut self.run_sprite, v, world),
-            MasterAttribute::TRAILING_UNIT => {
-                self.trail.unit = self.trail.unit.plus(low16(v));
+            MasterAttribute::ROTATION_SPEED
+            | MasterAttribute::WALKING_GRAPHIC
+            | MasterAttribute::RUNNING_GRAPHIC
+            | MasterAttribute::TRAILING_UNIT
+            | MasterAttribute::TRAIL_MODE
+            | MasterAttribute::TRAIL_DENSITY => {
+                if let Some(p) = self.moving.as_mut() {
+                    p.add_value(attribute, v, world);
+                }
             }
-            MasterAttribute::TRAIL_MODE => self.trail.mode = self.trail.mode.plus(low8(v)),
-            MasterAttribute::TRAIL_DENSITY => self.trail.density += TrailDensity::new(v),
             _ => self.add_animated(attribute, v, world),
         }
     }
@@ -518,8 +526,11 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            MasterAttribute::ROTATION_SPEED => self.turn_speed *= v,
-            MasterAttribute::TRAIL_DENSITY => self.trail.density *= v,
+            MasterAttribute::ROTATION_SPEED | MasterAttribute::TRAIL_DENSITY => {
+                if let Some(p) = self.moving.as_mut() {
+                    p.multiply_value(attribute, v);
+                }
+            }
             _ => self.multiply_animated(attribute, v, world),
         }
     }

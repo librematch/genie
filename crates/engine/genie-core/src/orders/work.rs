@@ -529,7 +529,7 @@ impl World {
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        if !master.moving.is_some_and(|m| Speed::ZERO < m.speed) {
+        if !master.move_stats.is_some_and(|m| Speed::ZERO < m.speed) {
             return Ok(());
         }
         // slot 0x828 with 1 (the move's order and action) for a unit in state 2, -1 for

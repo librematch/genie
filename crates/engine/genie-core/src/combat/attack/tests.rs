@@ -51,6 +51,7 @@ use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskSprites;
@@ -695,8 +696,11 @@ impl Rig {
             id: master_id(4),
             kind: MasterKind::COMBAT,
             class: class::CLASS_6,
-            move_sprite: None,
             standing_sprite: None,
+            moving: Some(MovingPart {
+                move_sprite: None,
+                ..MovingPart::default()
+            }),
             ..Master::default()
         };
         t.model.masters = vec![Masters::new([master]); t.players.len()]
@@ -1977,11 +1981,14 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
         .map(|id| (SpriteId::named(id), g(SpriteId::named(id))))
         .collect();
     let master = Master {
-        move_sprite: Some(SpriteId::named(10)),
-        run_sprite: Some(SpriteId::named(11)),
         combat: Some(CombatPart {
             attack_sprite: Some(SpriteId::named(12)),
             ..CombatPart::default()
+        }),
+        moving: Some(MovingPart {
+            move_sprite: Some(SpriteId::named(10)),
+            run_sprite: Some(SpriteId::named(11)),
+            ..MovingPart::default()
         }),
         ..Master::default()
     };

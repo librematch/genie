@@ -120,7 +120,7 @@ impl PlaceMap for WorldMap<'_> {
                         .is_some_and(|c| c.desolid),
                     player: owner,
                     moving: master
-                        .moving
+                        .move_stats
                         .as_ref()
                         .is_some_and(|m| Speed::ZERO < m.speed),
                     fog_visibility: master.fog_visibility,

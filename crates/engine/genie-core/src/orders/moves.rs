@@ -81,7 +81,7 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let speed = master.moving.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
         if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
             if order.queued {
                 return Err(GenieError::unsupported(

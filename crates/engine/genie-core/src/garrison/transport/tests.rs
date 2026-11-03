@@ -17,6 +17,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::layers::{Motion, MotionMut, Static};
 use crate::objects::masters::ActionPart;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
@@ -795,7 +796,6 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
 fn transport_move_to_shows_its_task_or_its_master_sprite() {
     use crate::objects::masters::{Master, Task};
     let master = Master {
-        move_sprite: Some(SpriteId::named(7)),
         action: Some(ActionPart {
             tasks: vec![
                 Task {
@@ -810,6 +810,10 @@ fn transport_move_to_shows_its_task_or_its_master_sprite() {
             ],
             ..ActionPart::default()
         }),
+        moving: Some(MovingPart {
+            move_sprite: Some(SpriteId::named(7)),
+            ..MovingPart::default()
+        }),
         ..Master::default()
     };
     let on = |task, master: &Master| TransportAction::given_sprite(task, master);
@@ -817,7 +821,10 @@ fn transport_move_to_shows_its_task_or_its_master_sprite() {
     assert_eq!(on(Some(task_id(5)), &master), Ok(None));
     assert_eq!(on(None, &master), Ok(Some(SpriteId::named(7))));
     let walkless = Master {
-        move_sprite: None,
+        moving: Some(MovingPart {
+            move_sprite: None,
+            ..master.moving.unwrap_or_default()
+        }),
         ..master.clone()
     };
     assert_eq!(on(None, &walkless), Ok(None));

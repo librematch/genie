@@ -77,7 +77,7 @@ impl World {
                 continue;
             };
             let m = unit.master(self.master_tables(), q)?;
-            let speed = m.moving.map_or(Speed::ZERO, |s| s.speed);
+            let speed = m.move_stats.map_or(Speed::ZERO, |s| s.speed);
             let kind = m.kind;
             let moves = MasterKind::MOVING <= kind && below_or_unordered(0.0, speed.get());
             if !moves && !queued {

@@ -11,8 +11,8 @@ use crate::objects::masters::RunPattern;
 use crate::objects::masters::low8;
 
 impl ActionPart {
-    /// [`crate::objects::masters::Master::set_action`]'s values of the layer: what `attribute` with `v` writes here (the
-    /// attributes the setter hands over, each one of the layer's values).
+    /// [`crate::objects::masters::Master::set_action`]'s values of the layer: what `attribute` with
+    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
     pub(super) fn set_value(&mut self, attribute: MasterAttribute, v: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {
@@ -28,8 +28,8 @@ impl ActionPart {
         }
     }
 
-    /// [`crate::objects::masters::Master::add_action`]'s values of the layer: what `attribute` with `v` writes here (the
-    /// attributes the setter hands over, each one of the layer's values).
+    /// [`crate::objects::masters::Master::add_action`]'s values of the layer: what `attribute` with
+    /// `v` writes here (the attributes the setter hands over, each one of the layer's values).
     pub(super) fn add_value(&mut self, attribute: MasterAttribute, v: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {
@@ -45,8 +45,8 @@ impl ActionPart {
         }
     }
 
-    /// [`crate::objects::masters::Master::multiply_action`]'s values of the layer: what `attribute` with `v` writes here (the
-    /// attributes the setter hands over, each one of the layer's values).
+    /// [`crate::objects::masters::Master::multiply_action`]'s values of the layer: what `attribute`
+    /// with `v` writes here (the attributes the setter hands over, each one of the layer's values).
     pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
         match attribute {
             MasterAttribute::WORK_RATE => {

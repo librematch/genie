@@ -63,6 +63,23 @@ impl MasterKind {
         Self(value)
     }
 
+    /// Whether a master of this type holds the animated layer (`RGE_Master_Animated_Object`'s
+    /// value, `+0x740`): the `.dat` reads the speed for the types 20 and up but 90; the save
+    /// holds the RGE animated part for 20 and up (a doppelganger's, 25, too).
+    #[must_use]
+    pub const fn has_animated_layer(self) -> bool {
+        Self::ANIMATED.0 <= self.0 && self.0 != 90
+    }
+
+    /// Whether a master of this type holds the moving layer (`RGE_Master_Moving_Object`'s
+    /// values, `+0x748`..`+0x764`): the `.dat` reads the type-30 section (genieutils'
+    /// `DeadFish`) for the types 30 and up but 90; the save holds the RGE moving part for 30 and
+    /// up.
+    #[must_use]
+    pub const fn has_moving_layer(self) -> bool {
+        Self::MOVING.0 <= self.0 && self.0 != 90
+    }
+
     /// Whether a master of this type holds the action layer (`RGE_Master_Action_Object`'s
     /// values, `+0x790`..`+0x7b9`): the `.dat` reads the type-40 section (genieutils' `Bird`)
     /// for the types 40 and up but 90; the save holds the RGE action part for 40 and up.

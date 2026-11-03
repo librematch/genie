@@ -21,7 +21,7 @@ fn sprite_speed(base: Speed, sprite: Option<SpriteId>, graphics: &Graphics) -> S
 }
 
 /// What a unit moving with master `master` reads after attribute `attribute` changed
-/// (`stats`, the master's [`Master::moving`] or a unit's copy): in the game the unit reads its
+/// (`stats`, the master's [`Master::move_stats`] or a unit's copy): in the game the unit reads its
 /// master, so its radii, speeds, turn time, terrain restriction (its mask from `terrain`,
 /// kept without one), fast turn, weapon range and facets follow the master's values.
 pub fn follow_moving(
@@ -40,11 +40,14 @@ pub fn follow_moving(
         | MasterAttribute::STANDING_GRAPHIC
         | MasterAttribute::WALKING_GRAPHIC
         | MasterAttribute::RUNNING_GRAPHIC => {
-            stats.base = master.max_speed;
-            let run = master.run_sprite.or(master.move_sprite);
-            stats.speed = sprite_speed(master.max_speed, run, graphics);
+            stats.base = master.animated_part().max_speed;
+            let run = master
+                .moving_part()
+                .run_sprite
+                .or_else(|| master.moving_part().move_sprite);
+            stats.speed = sprite_speed(master.animated_part().max_speed, run, graphics);
         }
-        MasterAttribute::ROTATION_SPEED => stats.turn_time = master.turn_speed,
+        MasterAttribute::ROTATION_SPEED => stats.turn_time = master.moving_part().turn_speed,
         MasterAttribute::TERRAIN_RESTRICTION_ID => {
             // a restriction below 0 has no mask; the stats keep theirs
             if let Some(r) = master.terrain_restriction {
@@ -91,8 +94,9 @@ pub fn follow(
             }
         }
         MasterAttribute::MOVEMENT_SPEED => {
+            let speed = master.animated_part().max_speed;
             if let Some(m) = master.missile_stats.as_mut() {
-                m.speed = master.max_speed;
+                m.speed = speed;
             }
         }
         MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
@@ -116,8 +120,8 @@ pub fn follow(
         }
         _ => {}
     }
-    if let Some(mut stats) = master.moving.take() {
+    if let Some(mut stats) = master.move_stats.take() {
         follow_moving(master, &mut stats, attribute, graphics, terrain);
-        master.moving = Some(stats);
+        master.move_stats = Some(stats);
     }
 }

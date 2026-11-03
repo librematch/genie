@@ -406,7 +406,7 @@ impl World {
             }
             _ => None,
         };
-        let moving = made.moving.as_ref().ok_or(NOT_MOVING)?;
+        let moving = made.move_stats.as_ref().ok_or(NOT_MOVING)?;
         let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         let _ = terrain
             .restriction(moving.restriction)

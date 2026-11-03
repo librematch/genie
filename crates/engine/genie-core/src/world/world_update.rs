@@ -66,7 +66,7 @@ impl World {
         let masters = &self.model.masters;
         self.spatial.grow_unknown(dt, |player, master| {
             player_master(masters, player, master)
-                .and_then(|m| m.moving)
+                .and_then(|m| m.move_stats)
                 .map_or(Speed::new(f32::INFINITY), |m| m.base)
         });
     }

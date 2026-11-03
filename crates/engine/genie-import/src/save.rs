@@ -31,6 +31,7 @@ use genie_model::objects::SpriteFlags;
 use genie_model::objects::SpriteId;
 use genie_model::objects::WorkRate;
 use genie_model::objects::facing::SpriteFacets;
+use genie_model::objects::masters::AnimatedPart;
 use genie_model::objects::masters::CarryCapacity;
 use genie_model::objects::masters::ChargeKind;
 use genie_model::objects::masters::ChargeTarget;
@@ -46,6 +47,7 @@ use genie_model::objects::masters::HeroFlags;
 use genie_model::objects::masters::HitChance;
 use genie_model::objects::masters::InvulnerabilityLevel;
 use genie_model::objects::masters::MasterField;
+use genie_model::objects::masters::MovingPart;
 use genie_model::objects::masters::ObjectFlags;
 use genie_model::objects::masters::RunPattern;
 use genie_model::objects::masters::SoundEvents;
@@ -54,6 +56,9 @@ use genie_model::objects::masters::TargetOwner;
 use genie_model::objects::masters::TaskFlags;
 use genie_model::objects::masters::TaskSprites;
 use genie_model::objects::masters::TaskTerrain;
+use genie_model::objects::masters::Trail;
+use genie_model::objects::masters::TrailDensity;
+use genie_model::objects::masters::TrailMode;
 use genie_model::objects::masters::VolleySpread;
 use genie_model::objects::masters::WorkValue;
 use genie_model::objects::masters::{
@@ -415,8 +420,20 @@ pub fn work_masters(
         work.damage_sprites = !s.damage_sprite.is_empty();
         // what the masters' attribute setters change: the top and turn speeds (+0x740,
         // +0x758), the damage sprites (+0x638) and the train locations (+0x898)
-        work.max_speed = animated_master(m).map_or(Speed::ZERO, |a| Speed::new(a.max_speed));
-        work.turn_speed = moving_master(m).map_or(Seconds::ZERO, |mv| Seconds::new(mv.turn_speed));
+        work.animated = animated_master(m).map(|a| AnimatedPart {
+            max_speed: Speed::new(a.max_speed),
+        });
+        work.moving = moving_master(m).map(|mv| MovingPart {
+            move_sprite: SpriteId::of_data(mv.move_sprite_id),
+            run_sprite: SpriteId::of_data(mv.run_sprite_id),
+            turn_speed: Seconds::new(mv.turn_speed),
+            // the save's trail spacing is the float's four bytes (`.dat` tracking_unit_density)
+            trail: Trail {
+                unit: MasterField::of_data(mv.obj_trail_id.cast_signed()),
+                mode: TrailMode::of_data(mv.obj_trail_options),
+                density: TrailDensity::new(f32::from_bits(mv.obj_trail_spacing)),
+            },
+        });
         work.damage_graphics = s
             .damage_sprite
             .iter()
@@ -431,12 +448,6 @@ pub fn work_masters(
             .unwrap_or_default();
         work.standing_sprite = SpriteId::of_data(s.idle_sprite_id);
         work.standing_sprite_2 = SpriteId::of_data(s.idle2_sprite_id);
-        (work.move_sprite, work.run_sprite) = moving_master(m).map_or((None, None), |mv| {
-            (
-                SpriteId::of_data(mv.move_sprite_id),
-                SpriteId::of_data(mv.run_sprite_id),
-            )
-        });
         work.death_sprite = SpriteId::of_data(s.death_sprite_id);
         work.garrison = GarrisonCapacity::of_data(s.obj_max);
         work.death_spawns = [
@@ -445,7 +456,7 @@ pub fn work_masters(
         ];
         work.terrain_restriction = RestrictionId::of_data(s.terrain_restriction_mask_id);
         work.life = MasterId::of_data(s.copy_id()).and_then(|m| table.get(civ, m));
-        work.moving = moving_stats(m, s, civ, table);
+        work.move_stats = moving_stats(m, s, civ, table);
         Some(Ok(work))
     });
     Ok(Masters::new(

@@ -1,7 +1,7 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_dat::de::{Bird, Creatable, Sound, Task, Type50, Unit};
+use genie_dat::de::{Bird, Creatable, DeadFish, Sound, Task, Type50, Unit};
 use genie_model::GenieError;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
@@ -9,6 +9,7 @@ use genie_model::map::Distance;
 use genie_model::map::RestrictionId;
 use genie_model::map::TerrainId;
 use genie_model::map::{Footprint, GroundOffset, Radii};
+use genie_model::movement::Speed;
 use genie_model::objects::HitPoints;
 use genie_model::objects::MasterHitPoints;
 use genie_model::objects::SpriteId;
@@ -204,6 +205,10 @@ pub(super) fn dat_work(
         ]),
         death_sprite: SpriteId::of_data(unit.dying_graphic),
         death_spawns: [unit.dead_unit_id, unit.blood_unit_id].map(MasterId::of_data),
+        animated: unit.speed.map(|speed| work::AnimatedPart {
+            max_speed: Speed::new(speed),
+        }),
+        moving: unit.dead_fish.as_ref().map(dat_moving),
         creatable: unit.creatable.as_ref().map(dat_creatable).transpose()?,
         combat: unit.type50.as_ref().map(dat_combat),
         action: unit
@@ -213,6 +218,21 @@ pub(super) fn dat_work(
             .transpose()?,
         ..work::Master::default()
     })
+}
+
+/// The moving layer of a `.dat` unit's type-30 section ([`work::MovingPart`], genieutils'
+/// `DeadFish`): its walking and running sprites, its turn speed and its trail.
+const fn dat_moving(d: &DeadFish) -> work::MovingPart {
+    work::MovingPart {
+        move_sprite: SpriteId::of_data(d.walking_graphic),
+        run_sprite: SpriteId::of_data(d.running_graphic),
+        turn_speed: Seconds::new(d.rotation_speed),
+        trail: work::Trail {
+            unit: work::MasterField::of_data(d.tracking_unit),
+            mode: work::TrailMode::of_data(d.tracking_unit_mode),
+            density: work::TrailDensity::new(d.tracking_unit_density),
+        },
+    }
 }
 
 /// The combat layer of a `.dat` unit's type-50 section ([`work::CombatPart`]): the values the
@@ -347,10 +367,16 @@ pub fn attributes<const N: usize>(
 #[cfg(test)]
 mod tests {
     use crate::dat::dat_work::dat_action;
+    use crate::dat::dat_work::dat_moving;
     use genie_dat::de::Bird;
+    use genie_dat::de::DeadFish;
     use genie_model::map::Distance;
+    use genie_model::objects::SpriteId;
     use genie_model::objects::WorkRate;
+    use genie_model::objects::masters::MasterField;
     use genie_model::objects::masters::{MasterId, RunPattern, TaskGroup, TaskIndex};
+    use genie_model::objects::masters::{Trail, TrailDensity, TrailMode};
+    use genie_model::world::Seconds;
 
     /// A type-40 section with two drop sites, the second none (−1), and no tasks.
     fn bird() -> Bird {
@@ -386,5 +412,44 @@ mod tests {
         );
         assert_eq!(part.run_pattern, RunPattern::of_data(3));
         assert_eq!(part.tasks, Vec::new());
+    }
+
+    /// A type-30 section that leaves footprints (trail unit 1002, mode 1, density 0.5) and runs
+    /// with no sprite of its own (−1).
+    fn dead_fish() -> DeadFish {
+        DeadFish {
+            walking_graphic: 640,
+            running_graphic: -1,
+            rotation_speed: 0.25,
+            old_size_class: 0,
+            tracking_unit: 1002,
+            tracking_unit_mode: 1,
+            tracking_unit_density: 0.5,
+            old_move_algorithm: 0,
+            turn_radius: 0.0,
+            turn_radius_speed: 3.4e38,
+            max_yaw_per_second_moving: 0.0,
+            stationary_yaw_revolution_time: 0.0,
+            max_yaw_per_second_stationary: 0.0,
+            min_collision_size_multiplier: 1.0,
+        }
+    }
+
+    /// The moving layer holds the type-30 section's sprites, turn speed and trail; a running
+    /// sprite of −1 is none.
+    #[test]
+    fn the_moving_layer_holds_the_type_30_sections_values() {
+        let part = dat_moving(&dead_fish());
+        assert_eq!(part.move_sprite, SpriteId::of_data(640));
+        assert_eq!(part.run_sprite, None);
+        assert_eq!(part.turn_speed, Seconds::new(0.25));
+        assert_eq!(
+            part.trail,
+            Trail {
+                unit: MasterField::of_data(1002),
+                mode: TrailMode::of_data(1),
+                density: TrailDensity::new(0.5),
+            }
+        );
     }
 }

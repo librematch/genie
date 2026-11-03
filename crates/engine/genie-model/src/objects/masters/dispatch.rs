@@ -112,19 +112,19 @@ impl Master {
     #[must_use]
     pub fn unloaded_for(&self, attribute: MasterAttribute) -> Option<&'static str> {
         use crate::objects::masters::MasterAttribute;
-        let moving = self.moving.as_ref();
+        let moving = self.move_stats.as_ref();
         match attribute {
             MasterAttribute::MOVEMENT_SPEED
             | MasterAttribute::STANDING_GRAPHIC
             | MasterAttribute::WALKING_GRAPHIC
             | MasterAttribute::RUNNING_GRAPHIC
-                if self.max_speed == Speed::ZERO
+                if self.animated_part().max_speed == Speed::ZERO
                     && moving.is_some_and(|m| m.speed != Speed::ZERO) =>
             {
                 Some("a master's speed (+0x740) the loader did not fill")
             }
             MasterAttribute::ROTATION_SPEED
-                if self.turn_speed == Seconds::ZERO
+                if self.moving_part().turn_speed == Seconds::ZERO
                     && moving.is_some_and(|m| m.turn_time != Seconds::ZERO) =>
             {
                 Some("a master's turn speed (+0x758) the loader did not fill")

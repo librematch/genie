@@ -216,12 +216,12 @@ impl World {
                 .and_then(|u| u.sprite)
                 .is_some_and(|a| Some(a.graphic.id) == s)
         };
-        if shows(old.move_sprite) {
-            if let Some(s) = new.move_sprite {
+        if shows(old.moving_part().move_sprite) {
+            if let Some(s) = new.moving_part().move_sprite {
                 self.show(place, s)?;
             }
-        } else if shows(old.run_sprite)
-            && let Some(s) = new.run_sprite
+        } else if shows(old.moving_part().run_sprite)
+            && let Some(s) = new.moving_part().run_sprite
         {
             self.show(place, s)?;
         }
@@ -489,7 +489,7 @@ impl World {
         let graphics = &self.model.graphics;
         let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
         let sprites = MasterSprites {
-            moving: g(new.move_sprite),
+            moving: g(new.moving_part().move_sprite),
             attack: g(new.combat_part().attack_sprite),
             standing: g(new.standing_sprite),
             idle_attack: g(new.creatable_part().idle_attack_sprite),
@@ -613,6 +613,7 @@ mod tests {
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::DamageSpriteMode;
     use crate::objects::masters::MasterId;
+    use crate::objects::masters::MovingPart;
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
@@ -1489,14 +1490,20 @@ mod tests {
     fn an_upgrade_moving_object_shows_the_new_walking_or_running_sprite() {
         let old = Master {
             id: master_id(4),
-            move_sprite: Some(SpriteId::named(100)),
-            run_sprite: Some(SpriteId::named(101)),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(100)),
+                run_sprite: Some(SpriteId::named(101)),
+                ..MovingPart::default()
+            }),
             ..Master::default()
         };
         let new = Master {
             id: master_id(5),
-            move_sprite: Some(SpriteId::named(200)),
-            run_sprite: Some(SpriteId::named(201)),
+            moving: Some(MovingPart {
+                move_sprite: Some(SpriteId::named(200)),
+                run_sprite: Some(SpriteId::named(201)),
+                ..MovingPart::default()
+            }),
             ..Master::default()
         };
         let shown = |at: i16, new: &Master| {
@@ -1520,7 +1527,10 @@ mod tests {
         assert_eq!(shown(101, &new), Some(SpriteId::named(201)));
         assert_eq!(shown(102, &new), Some(SpriteId::named(102)));
         let walkless = Master {
-            move_sprite: None,
+            moving: Some(MovingPart {
+                move_sprite: None,
+                ..new.moving.unwrap_or_default()
+            }),
             ..new
         };
         assert_eq!(shown(100, &walkless), Some(SpriteId::named(100)));

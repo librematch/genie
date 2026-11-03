@@ -5,12 +5,14 @@
 //! ([`follow`]). The values are game data: the player's masters in the save, with the
 //! `.dat`'s values for what the save does not carry.
 
+use genie_model::objects::masters::animated_part;
 use genie_model::objects::masters::combat_level;
 use genie_model::objects::masters::conversion_adjust;
 use genie_model::objects::masters::cost_amount;
 use genie_model::objects::masters::cost_slot;
 mod derived;
 mod lookup;
+use genie_model::objects::masters::moving_part;
 use genie_model::objects::masters::spacing_modifier;
 use genie_model::objects::masters::target_owner;
 use genie_model::objects::masters::task_id;
@@ -19,11 +21,13 @@ use genie_model::objects::masters::task_terrain;
 use genie_model::objects::masters::trail;
 use genie_model::objects::masters::values;
 
+pub use self::animated_part::AnimatedPart;
 pub use self::combat_level::CombatLevel;
 pub use self::cost_amount::CostAmount;
 pub use self::cost_slot::{COST_SLOTS, CostSlot, entries as cost_entries};
 pub use self::derived::{follow, follow_moving};
 pub use self::lookup::{MasterTables, OwnerMasters, PlayersMasters, player_master, work_master};
+pub use self::moving_part::MovingPart;
 pub use self::spacing_modifier::SpacingModifier;
 pub use self::target_owner::TargetOwner;
 pub use self::task_id::TaskId;

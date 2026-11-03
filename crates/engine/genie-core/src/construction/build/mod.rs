@@ -897,7 +897,7 @@ mod stack_tests {
                         p.volley_missile = None;
                     }
                     // every building holds its movement state
-                    m.moving = Some(MoveStats {
+                    m.move_stats = Some(MoveStats {
                         fly_mode: FlyMode::GROUND,
                         speed: Speed::ZERO,
                         base: Speed::ZERO,

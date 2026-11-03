@@ -17,6 +17,7 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::lifecycle::MasterData;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::AdjacentMode;
+use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
@@ -39,6 +40,7 @@ use crate::objects::masters::InterfaceKind;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
+use crate::objects::masters::MovingPart;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
@@ -46,12 +48,10 @@ use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::Task;
-use crate::objects::masters::Trail;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::{HotkeyId, LocationButton};
 use crate::technology::TechId;
-use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use genie_diff::Diff;
 
@@ -68,7 +68,7 @@ impl Master {
     /// master's slot 0xe8, [`MoveStats::base`]) is above 0 (`FUN_14123bb20`'s test).
     #[must_use]
     pub fn moves(&self) -> bool {
-        self.moving.is_some_and(|m| Speed::ZERO < m.base)
+        self.move_stats.is_some_and(|m| Speed::ZERO < m.base)
     }
 
     /// The facets the facing routines read of a unit of this master ([`MoveStats::facets`]):
@@ -79,7 +79,10 @@ impl Master {
     pub fn sprite_facets(&self, graphics: &Graphics) -> Option<SpriteFacets> {
         let mut sprites = vec![self.standing_sprite, self.standing_sprite_2];
         if MasterKind::MOVING <= self.kind {
-            sprites.extend([self.move_sprite, self.run_sprite]);
+            sprites.extend([
+                self.moving_part().move_sprite,
+                self.moving_part().run_sprite,
+            ]);
         }
         if MasterKind::RGE_COMBAT <= self.kind {
             sprites.push(self.combat_part().attack_sprite);
@@ -259,23 +262,18 @@ pub struct Master {
     /// Its second standing sprite (`+0x478`, the `.dat`'s `standing_graphic[1]`), whose idle
     /// animation the object swaps in (`0x141071880`); None for none.
     pub standing_sprite_2: Option<SpriteId>,
-    /// Its walking sprite (`+0x748`, `move_sprite_id`; the unit's slot 0x7c8) and its running
-    /// one (`+0x750`, `run_sprite_id`; slot 0x7d0), −1 for none.
-    pub move_sprite: Option<SpriteId>,
-    /// Its running sprite (`+0x750`), −1 for none.
-    pub run_sprite: Option<SpriteId>,
+    /// The moving layer (types 30 and up but 90, `+0x748`..`+0x764`): sprites, turn speed, trail;
+    /// None for other masters.
+    pub moving: Option<MovingPart>,
     /// A missile master's flight (type 60, [`crate::combat::missile::MissileStats`]).
     pub missile_stats: Option<MissileStats>,
     /// What a unit of this master moves with, its speed with the master's walking sprite (the
     /// run sprite `+0x750` if it has one, else the move sprite `+0x748`); None for a master that
     /// does not move.
-    pub moving: Option<MoveStats>,
-    /// `+0x740`, `mMaxSpeed` (the `.dat`'s `speed`): the top speed before a sprite's factor, from
-    /// which [`Master::moving`]'s speeds and [`crate::combat::missile::MissileStats::speed`] follow.
-    pub max_speed: Speed,
-    /// `+0x758`, `turn_speed` (the `.dat`'s `rotation_speed`), which [`MoveStats::turn_time`]
-    /// follows.
-    pub turn_speed: Seconds,
+    pub move_stats: Option<MoveStats>,
+    /// The animated layer (types 20 and up but 90, `+0x740`): the top speed; None for other
+    /// masters.
+    pub animated: Option<AnimatedPart>,
     /// `+0x488`, the undead sprite (`undeadSpriteId`, −1 for none).
     pub undead_sprite: Option<SpriteId>,
     /// `+0x650`, `occlusion_flag` (the `.dat`'s `occlusion_mode`).
@@ -293,8 +291,6 @@ pub struct Master {
     pub damage_graphics: Vec<DamageGraphic>,
     /// `+0x731`, `mDamageSpriteEntryMod`: the damage sprite the attributes 91, 156 and 157 change.
     pub damage_graphic_entry: DamageGraphicEntry,
-    /// A moving master's trail (`+0x75e`..`+0x764`).
-    pub trail: Trail,
 }
 
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's

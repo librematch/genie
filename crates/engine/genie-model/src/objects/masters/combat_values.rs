@@ -24,7 +24,8 @@ use crate::objects::masters::{MasterField, RestrictionField};
 use crate::world::Seconds;
 
 impl CombatPart {
-    /// [`crate::objects::masters::Master::set_combat`]'s values of the layer (`FUN_1410c12b0`): what `attribute` set to `v` writes here; `world` holds the sprites.
+    /// [`crate::objects::masters::Master::set_combat`]'s values of the layer (`FUN_1410c12b0`):
+    /// what `attribute` set to `v` writes here; `world` holds the sprites.
     pub(super) fn set_value(
         &mut self,
         attribute: MasterAttribute,
@@ -110,7 +111,8 @@ impl CombatPart {
         }
     }
 
-    /// [`crate::objects::masters::Master::add_combat`]'s values of the layer (`FUN_1410c16e0`): what an add of `v` to `attribute` writes here; `world` holds the sprites.
+    /// [`crate::objects::masters::Master::add_combat`]'s values of the layer (`FUN_1410c16e0`):
+    /// what an add of `v` to `attribute` writes here; `world` holds the sprites.
     pub(super) fn add_value(
         &mut self,
         attribute: MasterAttribute,
@@ -198,7 +200,8 @@ impl CombatPart {
         }
     }
 
-    /// [`crate::objects::masters::Master::multiply_combat`]'s values of the layer (`FUN_1410c1bf0`): what a scale of `attribute` by `v` writes here.
+    /// [`crate::objects::masters::Master::multiply_combat`]'s values of the layer
+    /// (`FUN_1410c1bf0`): what a scale of `attribute` by `v` writes here.
     pub(super) fn multiply_value(&mut self, attribute: MasterAttribute, v: f32) {
         use crate::objects::masters::MasterAttribute;
         match attribute {

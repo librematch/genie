@@ -405,7 +405,8 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
     t.model.graphics = Arc::new(graphics());
     for masters in &mut t.model.masters {
         let m = Arc::make_mut(masters).get_mut(ids::BUILDER).unwrap();
-        (m.standing_sprite, m.move_sprite) = (Some(SpriteId::named(5)), Some(SpriteId::named(20)));
+        m.standing_sprite = Some(SpriteId::named(5));
+        m.moving.get_or_insert_with(Default::default).move_sprite = Some(SpriteId::named(20));
     }
     let work = Work {
         target: Some(object_id(10028)),

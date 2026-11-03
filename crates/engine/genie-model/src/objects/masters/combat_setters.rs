@@ -143,7 +143,11 @@ impl Master {
                     p.add_value(attribute, v, world);
                 }
             }
-            MasterAttribute::ROTATION_SPEED => self.turn_speed += Seconds::new(v),
+            MasterAttribute::ROTATION_SPEED => {
+                if let Some(p) = self.moving.as_mut() {
+                    p.turn_speed += Seconds::new(v);
+                }
+            }
             MasterAttribute::ARMOR | MasterAttribute::ATTACK => {
                 self.add_class_amount(attribute, v, world);
             }
@@ -224,7 +228,11 @@ impl Master {
                     p.multiply_value(attribute, v);
                 }
             }
-            MasterAttribute::ROTATION_SPEED => self.turn_speed *= v,
+            MasterAttribute::ROTATION_SPEED => {
+                if let Some(p) = self.moving.as_mut() {
+                    p.turn_speed *= v;
+                }
+            }
             MasterAttribute::ARMOR | MasterAttribute::ATTACK => {
                 self.multiply_class_amount(attribute, v, world);
             }
