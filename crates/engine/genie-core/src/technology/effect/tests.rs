@@ -57,7 +57,9 @@ use crate::players::{ByPlayer, relation_row};
 use crate::production::LocationButton;
 use crate::production::{MakeTech, MakeTechState, Making, Production};
 use crate::technology::CostPaid;
+use crate::technology::Effect;
 use crate::technology::EffectId;
+use crate::technology::Effects;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
@@ -1556,8 +1558,8 @@ fn technology_change_reaches_its_costs_locations_and_state() {
 /// Kind 8's other modes: a technology past the player's tree changes nothing; a location
 /// within the list changes it alone (â2, a research time's add: at its building); one past
 /// the list of a technology without locations changes nothing; 9 the stacking, 12 with 1
-/// makes it unavailable; 18 the effect override (a researched technology's new effect would
-/// run from the world's effect table, not modelled).
+/// makes it unavailable; 18 the effect override, whose new effect a researched technology
+/// gives at once (`FUN_1413d4320`, the world's effect table).
 #[test]
 fn technology_change_location_stacking_and_effect_override() {
     use crate::technology::Location;
@@ -1587,11 +1589,27 @@ fn technology_change_location_stacking_and_effect_override() {
     t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 7.0)], None)
         .unwrap();
     assert_eq!(t.players[0].techs[0].effect_override, EffectId::of_data(7));
+    let gold = |t: &World| t.players[0].attributes[3];
+    t.model.effects = Arc::new(Effects::new(vec![
+        Effect::default(),
+        Effect {
+            commands: vec![attribute(1, 3, 1, -1, 20.0)],
+        },
+    ]));
+    // not researched: the new effect waits for the research
+    t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 1.0)], None)
+        .unwrap();
+    assert_eq!(gold(&t), Amount::ZERO);
     t.players[0].techs[0].state = ResearchState::Researched;
-    assert!(
-        t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 8.0)], None)
-            .is_err()
-    );
+    t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 1.0)], None)
+        .unwrap();
+    assert_eq!(gold(&t), Amount::new(20.0));
+    // an id the table does not hold gives nothing, −1 neither
+    t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, 8.0)], None)
+        .unwrap();
+    t.do_effect(PlayerId::new(0), &[attribute(8, 0, 18, -1, -1.0)], None)
+        .unwrap();
+    assert_eq!(gold(&t), Amount::new(20.0));
     // no locations: a location past the list changes nothing
     let mut t = barracks_tech();
     t.players[0].techs[0].locations.clear();
@@ -1803,7 +1821,8 @@ fn the_enable_command_sets_available_unless_disabled() {
 }
 
 /// A research whose effect reaches its building (the object `FUN_1413cdcd0` passes, which its
-/// callers do not yet) stops before it changes anything; one with an effect override too.
+/// callers do not yet) stops before it changes anything; the effect is its override's when it
+/// has one (`FUN_1413ce9b0`).
 #[test]
 fn research_whose_effect_needs_its_building_stops() {
     use crate::technology::{TechDef, TechState};
@@ -1826,29 +1845,78 @@ fn research_whose_effect_needs_its_building_stops() {
     );
     let def = |effect| TechDef {
         required: [TechId::of_data(-1); 6],
-        effect_id: EffectId::of_data(7),
-        effect,
+        effect_id: EffectId::of_data(effect),
         ..TechDef::default()
     };
-    t.model.techs = Arc::new(vec![
-        def(vec![attribute(204, 82, -1, 0, 1500.0)]),
-        def(vec![attribute(4, -1, 4, 0, 15.0)]),
-    ]);
+    t.model.techs = Arc::new(vec![def(0), def(1)]);
+    t.model.effects = Arc::new(Effects::new(vec![
+        Effect {
+            commands: vec![attribute(204, 82, -1, 0, 1500.0)],
+        },
+        Effect {
+            commands: vec![attribute(4, -1, 4, 0, 15.0)],
+        },
+    ]));
     assert!(
         t.complete_research(PlayerId::new(0), tech_id(0), None)
             .is_err()
     );
     assert_eq!(t.players[0].techs[0].state, ResearchState::Researching);
-    t.players[0].techs[1].effect_override = EffectId::of_data(9);
+    t.players[0].techs[1].effect_override = EffectId::of_data(0);
     assert!(
         t.complete_research(PlayerId::new(0), tech_id(1), None)
             .is_err()
     );
-    t.players[0].techs[1].effect_override = EffectId::of_data(7);
+    t.players[0].techs[1].effect_override = EffectId::of_data(9);
     assert_eq!(
         t.complete_research(PlayerId::new(0), tech_id(1), None),
         Ok(true)
     );
+}
+
+/// A completed research gives the effect of the world's table its override names (`+0x62`,
+/// `FUN_1413ce9b0`), its own (`+0x3a`) without one (−1); an override below −1 gives none.
+#[test]
+fn researches_give_their_override_effect_instead_of_their_own() {
+    use crate::technology::{TechDef, TechState};
+    let state = TechState {
+        state: ResearchState::Researching,
+        building_master: None,
+        ..TechState::default()
+    };
+    let player = Player {
+        techs: vec![state; 3],
+        attributes: vec![Amount::ZERO; 300],
+        ..Player::default()
+    };
+    let mut t = World::new(
+        WorldTime::ZERO,
+        FrameSeed::of_data(0),
+        PlayerId::new(0),
+        vec![Millis::ZERO],
+        vec![player],
+    );
+    let def = TechDef {
+        required: [TechId::of_data(-1); 6],
+        effect_id: EffectId::of_data(0),
+        ..TechDef::default()
+    };
+    t.model.techs = Arc::new(vec![def; 3]);
+    let gold = |amount| Effect {
+        commands: vec![attribute(1, 3, 1, -1, amount)],
+    };
+    t.model.effects = Arc::new(Effects::new(vec![gold(20.0), gold(5.0)]));
+    t.players[0].techs[1].effect_override = EffectId::of_data(1);
+    t.players[0].techs[2].effect_override = EffectId::of_data(-2);
+    let mut held = Vec::new();
+    for tech in 0..3 {
+        assert_eq!(
+            t.complete_research(PlayerId::new(0), tech_id(tech), None),
+            Ok(true)
+        );
+        held.push(t.players[0].attributes[3]);
+    }
+    assert_eq!(held, [20.0, 25.0, 25.0].map(Amount::new));
 }
 
 /// An age (101 to 103) completes as any research and adds its event (0 to 2) to the

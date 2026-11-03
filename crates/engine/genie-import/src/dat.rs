@@ -37,7 +37,7 @@ use crate::tables::UnitLinesError;
 use crate::tables::drop_sites;
 use crate::tables::linked_techs;
 use crate::tables::unit_lines;
-use genie_dat::de::{Effect, Error, ResearchResourceCost, Sound, Tech, Unit};
+use genie_dat::de::{Effect as DatEffect, Error, ResearchResourceCost, Sound, Tech, Unit};
 use genie_model::map::terrain::{TerrainKind, terrain_class};
 use genie_model::map::{Restriction, TerrainMask};
 use genie_model::objects::lines::UnitLine;
@@ -45,7 +45,9 @@ use genie_model::objects::sprite::Graphic;
 use genie_model::objects::{Graphics, SpriteFlags};
 use genie_model::players::history::HISTORY_PERIOD;
 use genie_model::players::history::HistoryUpdates;
-use genie_model::technology::{Cost, EffectCommand, Linked, TechDef, TechKind, TechMode};
+use genie_model::technology::{
+    Cost, Effect, EffectCommand, Effects, Linked, TechDef, TechKind, TechMode,
+};
 use genie_model::unit_ai::task_finder::DropSite;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -300,24 +302,19 @@ pub struct MasterTable {
     /// The technologies, by id.
     pub techs: Vec<TechDef>,
     /// The effects' commands, by id (the world's effect table).
-    pub effects: Vec<Vec<EffectCommand>>,
+    pub effects: Effects,
     /// The history period (the `.dat`'s `time_slice`, which the world keeps at `+0x8b8`); the
     /// world constructor's [`genie_model::players::history::HISTORY_PERIOD`] without a `.dat`.
     pub time_slice: HistoryUpdates,
 }
 
 /// A technology of the `.dat` as the tech tree holds it: its costs, its type and its effect's
-/// commands.
-fn tech_def(dat: &DatFile, t: &Tech) -> Result<TechDef, GenieError> {
-    let effect = usize::try_from(t.effect_id)
-        .ok()
-        .and_then(|e| dat.effects.get(e))
-        .map_or_else(|| Ok(Vec::new()), effect_commands)?;
+/// id, which names the effect table's entry ([`tech_tables`]).
+fn tech_def(t: &Tech) -> Result<TechDef, GenieError> {
     Ok(TechDef {
         costs: tech_costs(t)?,
         kind: TechKind::from(t.kind),
         effect_id: EffectId::of_data(t.effect_id),
-        effect,
         required: t.required_techs.map(TechId::of_data),
         required_count: t.required_tech_count,
         civ: CivId::of_tech(t.civ)?,
@@ -348,31 +345,25 @@ fn tech_costs(t: &Tech) -> Result<[Cost; 3], GenieError> {
     Ok([cost(c0)?, cost(c1)?, cost(c2)?])
 }
 
-/// The technologies ([`tech_def`]) and the effect table ([`effect_commands`]), by id.
+/// The technologies ([`tech_def`]) and the effect table ([`effect`]), by id.
 fn tech_tables(dat: &DatFile) -> Result<TechTables, GenieError> {
-    let techs = dat
-        .techs
-        .iter()
-        .map(|t| tech_def(dat, t))
-        .collect::<Result<_, _>>()?;
-    let effects = dat
-        .effects
-        .iter()
-        .map(effect_commands)
-        .collect::<Result<_, _>>()?;
-    Ok((techs, effects))
+    let techs = dat.techs.iter().map(tech_def).collect::<Result<_, _>>()?;
+    let effects = dat.effects.iter().map(effect).collect::<Result<_, _>>()?;
+    Ok((techs, Effects::new(effects)))
 }
 
-/// The technologies and the effects' commands, by id.
-type TechTables = (Vec<TechDef>, Vec<Vec<EffectCommand>>);
+/// The technologies and the effect table, by id.
+type TechTables = (Vec<TechDef>, Effects);
 
-/// An effect's commands as the engine's effect table holds them, each parsed by its kind
+/// An effect as the engine's effect table holds it: its commands, each parsed by its kind
 /// ([`genie_model::technology::EffectCommand::of_data`]).
-fn effect_commands(e: &Effect) -> Result<Vec<EffectCommand>, GenieError> {
-    e.commands
+fn effect(e: &DatEffect) -> Result<Effect, GenieError> {
+    let commands = e
+        .commands
         .iter()
         .map(|c| EffectCommand::of_data(c.kind, c.a, c.b, c.c, c.d))
-        .collect()
+        .collect::<Result<_, _>>()?;
+    Ok(Effect { commands })
 }
 
 /// What stops [`MasterTable::read`].
@@ -518,7 +509,7 @@ impl MasterTable {
             linked_techs: BTreeMap::new(),
             unit_lines: Vec::new(),
             techs: Vec::new(),
-            effects: Vec::new(),
+            effects: Effects::default(),
             time_slice: HISTORY_PERIOD,
         }
     }

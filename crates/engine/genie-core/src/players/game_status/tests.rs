@@ -1043,14 +1043,14 @@ fn queue_cancel_gives_back_its_researches_and_the_destructor_counts_done_one() {
 /// gold; an id the table does not hold does nothing.
 #[test]
 fn research_gives_the_effect_attribute_269_names() {
-    use crate::technology::EffectCommand;
+    use crate::technology::{Effect, EffectCommand, Effects};
     let run = |reward: f32| {
         let mut t = researching(25.0);
         t.players[1].attributes.resize(300, Amount::ZERO);
         t.players[1].attributes[269] = Amount::new(reward);
-        t.model.effects = Arc::new(vec![Vec::new(); 301]);
-        Arc::make_mut(&mut t.model.effects)[300] =
-            vec![EffectCommand::of_data(1, 3, 1, -1, 20.0).unwrap()];
+        let mut effects = vec![Effect::default(); 301];
+        effects[300].commands = vec![EffectCommand::of_data(1, 3, 1, -1, 20.0).unwrap()];
+        t.model.effects = Arc::new(Effects::new(effects));
         let gold = t.players[1].attributes[3];
         t.produce(PlayerId::new(1), ListIndex::new(0), Seconds::new(1.0))
             .unwrap();

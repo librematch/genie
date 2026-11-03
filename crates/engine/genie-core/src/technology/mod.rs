@@ -21,6 +21,7 @@ use genie_model::technology::cost_paid;
 pub mod effect;
 use genie_model::technology::effect_command;
 use genie_model::technology::effect_id;
+use genie_model::technology::effects;
 mod research_count;
 mod research_state;
 use genie_model::technology::tech_def;
@@ -37,6 +38,7 @@ pub use self::effect_command::{
     CostEdit, CostUnits, EffectCommand, ObjectsKind, Party, ResourceChange,
 };
 pub use self::effect_id::EffectId;
+pub use self::effects::{Effect, Effects};
 pub use self::research_count::{ResearchCap, ResearchCount};
 pub use self::research_state::ResearchState;
 pub use self::tech_def::Cost;
@@ -141,6 +143,17 @@ impl TechState {
             .iter()
             .find(|l| l.building == Some(building))
             .or_else(|| self.locations.first())
+    }
+
+    /// `FUN_1413ce9b0`'s effect of the research of `def`: its override (`+0x62`) unless that is
+    /// −1, else the technology's own (`+0x3a`); an id outside the effect table gives none.
+    #[must_use]
+    pub fn effect(&self, def: &TechDef) -> EffectId {
+        if self.effect_override == EffectId::NONE {
+            def.effect_id
+        } else {
+            self.effect_override
+        }
     }
 
     /// `FUN_1411c3190` for a research in state 2 or 4 (else none): the costs its queue entry

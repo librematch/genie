@@ -17,6 +17,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
+use crate::technology::Effect;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Attributes, TechKind, TechState, factors};
@@ -428,7 +429,12 @@ impl World {
         let t = tech.index();
         let def = self.model.techs.checked(t)?;
         let state = self.players.player(player)?.techs.checked(t)?;
-        let one = !state.allow_multiple || def.upgrades();
+        let one = !state.allow_multiple
+            || self
+                .model
+                .effects
+                .get(def.effect_id)
+                .is_some_and(Effect::upgrades);
         let count: u16 = if !shift || one { 1 } else { 5 };
         self.queue_at(player, i, None, count, Some(tech), QueueButton::NONE)
     }

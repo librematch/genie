@@ -457,6 +457,27 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
 
 /// `FUN_1410c1bf0` on the armor and attack amounts: a percentage of the class's entry plus
 /// 0.5, truncated; a class the master lacks changes nothing; an attack class at 0 the handicap
+/// An effect on a layer the master lacks changes nothing: a moving master (30) holds no action
+/// or combat layer, so its setters (the moving master's slots, then the animated and the static
+/// one) pass the attack, armour, range, reload and work rate by, as the game's do.
+#[test]
+fn effects_on_layers_the_master_lacks_change_nothing() {
+    let before = of_type(MasterKind::MOVING);
+    let mut m = before.clone();
+    for a in [
+        MasterAttribute::ATTACK,
+        MasterAttribute::ARMOR,
+        MasterAttribute::MAXIMUM_RANGE,
+        MasterAttribute::ATTACK_RELOAD_TIME,
+        MasterAttribute::WORK_RATE,
+    ] {
+        m.set_attribute(a, 3.0, &world(false));
+        m.add_attribute(a, 2.0, &world(false));
+        m.multiply_attribute(a, 2.0, &world(false));
+    }
+    assert_eq!(m, before);
+}
+
 /// raises scales the percentage by the factor (which a product of 0 keeps at 0).
 #[test]
 fn combat_multiply_takes_percentage_of_the_class_amount() {

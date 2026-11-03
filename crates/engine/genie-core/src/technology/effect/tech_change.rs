@@ -66,8 +66,8 @@ impl World {
     /// technology's locations a new one is added, a copy of the last with no building): a cost
     /// mode changes a cost ([`World::tech_cost`]); 4 sets the location's building to a master the
     /// player has, 5 its button; 9 the stacking, 10 the research cap; 12 the state; 18 the
-    /// effect override (an already researched technology's new effect would run at once, from
-    /// the world's effect table, not held); the research time modes ([`tech_time_mode`]) change
+    /// effect override (an already researched technology gives its new effect at once,
+    /// `FUN_1413d4320`); the research time modes ([`tech_time_mode`]) change
     /// the time ([`World::research_time`]) and update the dependents. The icon (6), name (7),
     /// description (8) and hotkey (11) overrides are the interface's. A technology past the
     /// player's tree changes nothing (the game also reads its one past the end, not modelled).
@@ -130,7 +130,8 @@ impl World {
     }
 
     /// The modify command's plain fields of player `p`'s technology `t` (`mode` 4 the building, 5
-    /// the button, 9 the stacking, 10 the research cap, 12 the state, 18 the effect override),
+    /// the button, 9 the stacking, 10 the research cap, 12 the state, 18 the effect override,
+    /// `FUN_1413d4320`),
     /// those of a location at `at` only (all without one).
     fn set_tech_field(
         &mut self,
@@ -163,12 +164,13 @@ impl World {
             }
             ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
             ModifyMode::EFFECT_OVERRIDE => {
+                // `FUN_1413d4320`: a researched technology gives its new effect at once, with no
+                // object
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 state.effect_override = EffectId::of_data(short);
                 if state.state == ResearchState::Researched {
-                    return Err(GenieError::unsupported(
-                        "a researched technology's new effect (the world's effect table)",
-                    ));
+                    let effect = state.effect_override;
+                    self.do_table_effect(p, effect, None)?;
                 }
             }
             _ => {}
@@ -235,7 +237,8 @@ impl World {
         }
         let def = self.model.techs.checked(t)?.clone();
         self.research_effect_known(p, tech)?;
-        self.do_effect(p, &def.effect, None)?;
+        let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
+        self.do_table_effect(p, effect, None)?;
         let owner = self.players.player(p)?;
         let get = |k: AttributeId| Attributes::get(owner, k);
         let factors = factors(tech, &get, self.model.slots)?;

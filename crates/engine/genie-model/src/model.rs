@@ -11,7 +11,7 @@ use crate::objects::Graphics;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::Masters;
 use crate::players::world_player::TechTree;
-use crate::technology::EffectCommand;
+use crate::technology::Effects;
 use crate::technology::Linked;
 use crate::technology::TechDef;
 use crate::technology::TechId;
@@ -39,8 +39,8 @@ pub struct Model {
     /// The `.dat`'s technologies, by id.
     pub techs: Arc<Vec<TechDef>>,
     /// The world's effect table (`+0x128`, `TRIBE_Effects`): every effect's commands by id, the
-    /// `.dat`'s (the patch table, D11).
-    pub effects: Arc<Vec<Vec<EffectCommand>>>,
+    /// `.dat`'s, the one table a technology's effect id names (the patch table, D11).
+    pub effects: Arc<Effects>,
     /// The game's tech tree table and its civilisations' unique units, which the defeat check's
     /// count of the units a building will train reads.
     pub tech_tree: Arc<TechTree>,

@@ -295,6 +295,9 @@
     state | ObjectState | optional | doc "`object_state`: the state such an object must be in (none for −1, any).",
     attribute | AttributeId | optional | doc "`attribute_type`: the resource it gives, none for −1.",
   },
+  Effect | doc "An effect: its commands, in the `.dat`'s order." = {
+    commands | Array (EffectCommand) | doc "The commands, each parsed by its kind ([`EffectCommand::of_data`]).",
+  },
   EffectCommand | doc "One command of an effect, by its kind. The base's kinds name the [`Party`] they reach." = [| 'Attribute ({
     party | Party | doc "The block's players.",
     change | Change | doc "Kind 0 sets, 4 adds, 5 multiplies.",
@@ -351,6 +354,7 @@
     mode | ChangeMode | doc "The third argument's low byte.",
   }), 'Inert (std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && 0 <= x && x <= 255)) |],
   EffectId | doc "An effect's id: its place in the world's effect table (`+0x128`), as a technology (`+0x3a`) and\na player's effect override (`+0x62`) hold it, −1 for none. Every short is kept.\nThe default is 0, as a zeroed record holds it." = std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767),
+  Effects | doc "The effect table by id (the world's `+0x128`): a technology's effect (`TechDef::effect_id`),\na scenario's and a world effect attribute's read it." = Array (Effect),
   ExploreTuning | doc "The `explore` port's tuning values." = {
     los_margin | Number | doc "The auto scout's search reaches within its line of sight less this (`FUN_140c65490`, `DAT_14330eb8c`).\n\n`explore::LOS_MARGIN`: 1 in build 158041.",
   },
@@ -625,7 +629,7 @@
     lines | UnitLines | doc "The game's unit lines (`unitlines.json`); empty when not loaded.",
     linked_techs | {} | doc "The game's linked technologies (`linkedTechs.json`, the table at the game settings'\n`+0x18` that `FUN_140f39f40` looks up), by technology; empty when not loaded.",
     techs | Array (TechDef) | doc "The `.dat`'s technologies, by id.",
-    effects | Array (Array (EffectCommand)) | doc "The world's effect table (`+0x128`, `TRIBE_Effects`): every effect's commands by id, the\n`.dat`'s (the patch table, D11).",
+    effects | Effects | doc "The world's effect table (`+0x128`, `TRIBE_Effects`): every effect's commands by id, the\n`.dat`'s, the one table a technology's effect id names (the patch table, D11).",
     tech_tree | TechTree | doc "The game's tech tree table and its civilisations' unique units, which the defeat check's\ncount of the units a building will train reads.",
     roles | Roles | doc "The roles of the ids, the build layer's (FD-046-D04, D08).",
     slots | Slots | doc "The ids the engine names by role, the build layer's.",
@@ -826,8 +830,7 @@
   TechDef | doc "A technology of the `.dat` as the tech tree holds it (its 0x88-byte record)." = {
     costs | Array (Cost) | doc "`+0x2a`, `+0x30`, `+0x36`: the cost entries' attributes, amounts and paid flags.",
     kind | TechKind | doc "`+0x3c`, the technology's type.",
-    effect_id | EffectId | doc "Its effect (`+0x3a`) and the effect's commands (the world's effect table `+0x128`).",
-    effect | Array (EffectCommand) | doc "The effect's commands.",
+    effect_id | EffectId | doc "Its effect (`+0x3a`): an id of the world's effect table (`+0x128`,\n[`crate::technology::Effects`]), −1 for none.",
     required | Array (TechId) | doc "`+0x18`, `+0x24`: the technologies it requires and how many of them.",
     required_count | std.contract.from_predicate (fun x => std.is_number x && x % 1 == 0 && -32768 <= x && x <= 32767) | doc "How many of them it requires.",
     civ | CivId | optional | doc "`+0x26`: the civ it belongs to (below 1 every civ's); `+0x28`: the game modes it is for\n(0 every one, `FUN_1413cf2f0`).",

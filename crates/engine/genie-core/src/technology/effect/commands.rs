@@ -8,10 +8,12 @@ use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::technology::DisabledTech;
+use crate::technology::EffectId;
 use crate::technology::{EffectCommand, Party};
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::slots::PlayerSlots;
+use std::sync::Arc;
 
 impl World {
     /// The players party `party` reaches from player `p`: for a relation, each player past Gaia
@@ -38,12 +40,29 @@ impl World {
             .collect()
     }
 
-    /// `TRIBE_Effects::do_effect` (`FUN_141462440`) of an effect's commands `effect` (the
-    /// effect's id names them in the game's table; its 0x318 makes the spawns count in the local
-    /// player's statistics, which are not simulation) for player `p` with the effect's object `object` (none for a research's): first its
-    /// technology commands in order, the cost modifier (`'e'`, [`World::tech_cost`]), the disable
-    /// command (`'f'`, an id other than â1, [`World::disable_tech`]) and the research time
-    /// modifier (`'g'`, [`World::research_time`]); then the base's ([`World::base_effect`]).
+    /// `TRIBE_Effects::do_effect` (`FUN_141462440`) of effect `id` of the world's effect table
+    /// (`+0x128`, [`crate::technology::Effects::get`], `FUN_140ec4510`): its commands
+    /// ([`World::do_effect`]) for player `p` with the effect's object `object`; an id outside
+    /// the table does nothing.
+    pub(crate) fn do_table_effect(
+        &mut self,
+        p: PlayerId,
+        id: EffectId,
+        object: Option<ObjectId>,
+    ) -> Result<(), GenieError> {
+        let effects = Arc::clone(&self.model.effects);
+        effects
+            .get(id)
+            .map_or(Ok(()), |e| self.do_effect(p, &e.commands, object))
+    }
+
+    /// `TRIBE_Effects::do_effect` (`FUN_141462440`) of an effect's commands `effect` (those of an
+    /// effect of the table, [`World::do_table_effect`]; its 0x318 makes the spawns count in the
+    /// local player's statistics, which are not simulation) for player `p` with the effect's object
+    /// `object` (none for a research's): first its technology commands in order, the cost modifier
+    /// (`'e'`, [`World::tech_cost`]), the disable command (`'f'`, an id other than â1,
+    /// [`World::disable_tech`]) and the research time modifier (`'g'`, [`World::research_time`]);
+    /// then the base's ([`World::base_effect`]).
     pub(crate) fn do_effect(
         &mut self,
         p: PlayerId,

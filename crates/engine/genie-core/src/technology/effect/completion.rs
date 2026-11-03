@@ -18,7 +18,6 @@ use crate::players::history::EventKind;
 use crate::production::LocationButton;
 use crate::technology::ChangeMode;
 use crate::technology::DisabledTech;
-use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
@@ -75,7 +74,8 @@ impl World {
         }
         self.research_effect_known(p, tech)?;
         self.players.player_mut(p)?.techs.checked_mut(t)?.state = ResearchState::Researched;
-        self.do_effect(p, &def.effect, None)?;
+        let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
+        self.do_table_effect(p, effect, None)?;
         self.update_dependents(p, tech)?;
         let owner = &self.players.player(p)?;
         let state = owner.techs.checked(t)?;
@@ -111,9 +111,9 @@ impl World {
         Ok(true)
     }
 
-    /// Whether player `p`'s technology `t` gives an effect this file runs (`FUN_1413ce9b0`): its
-    /// override's when it has one (the world's effect table `+0x128`, not held: only its own
-    /// effect is known), with the research's building as the effect's object (`FUN_1413cdcd0`'s
+    /// Whether the effect player `p`'s technology `t` gives (`FUN_1413ce9b0`,
+    /// [`crate::technology::TechState::effect`]: its override's when it has one) runs here, with
+    /// the research's building as the effect's object (`FUN_1413cdcd0`'s
     /// `param_4`, which the callers do not pass yet): an effect that reaches its object (an
     /// enable for one building, an upgrade of the object, the object's kinds 203 to 206, a
     /// disable of a building's own technology) would differ without it.
@@ -129,7 +129,12 @@ impl World {
         };
         // the player's own enable for one building and upgrade of the object (kinds 2 and 3),
         // the disable of a shared technology, the object's kinds 203 to 206
-        let reaches_object = def.effect.iter().any(|c| match *c {
+        let commands = self
+            .model
+            .effects
+            .get(state.effect(def))
+            .map_or(&[][..], |e| &e.commands);
+        let reaches_object = commands.iter().any(|c| match *c {
             EffectCommand::Enable {
                 party: Party::Own,
                 one,
@@ -146,9 +151,6 @@ impl World {
             }
             _ => false,
         });
-        if state.effect_override != EffectId::NONE && state.effect_override != def.effect_id {
-            return Err(GenieError::unsupported("a technology's effect override"));
-        }
         if reaches_object {
             return Err(GenieError::unsupported(
                 "a research's effect on its building (FUN_1413cdcd0's param_4, not passed)",

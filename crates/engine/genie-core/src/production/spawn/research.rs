@@ -10,6 +10,8 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::{Entry, Production, refund_tech};
 use crate::production::{MakeTech, MakeTechState, Making};
+use crate::technology::Effect;
+use crate::technology::EffectId;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Location, ResearchCount, TechDef, TechKind, is_age};
@@ -208,13 +210,8 @@ impl World {
                 .get(self.model.slots.attribute.world_effect)?)
             .get(),
         ) as i16;
-        if 0 < reward
-            && let Some(effect) = usize::try_from(reward)
-                .ok()
-                .and_then(|e| self.model.effects.get(e))
-                .cloned()
-        {
-            self.do_effect(p, &effect, Some(id))?;
+        if 0 < reward {
+            self.do_table_effect(p, EffectId::of_data(reward), Some(id))?;
         }
         Ok(())
     }
@@ -290,7 +287,12 @@ impl World {
         if !(state.stack && state.times_researched.get() < cap) {
             return Ok(());
         }
-        let once = !state.allow_multiple || def.upgrades();
+        let once = !state.allow_multiple
+            || self
+                .model
+                .effects
+                .get(def.effect_id)
+                .is_some_and(Effect::upgrades);
         let master = owner.objects.checked(i)?.life.master_id;
         let mut time = def
             .locations
