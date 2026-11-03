@@ -3,6 +3,7 @@
 //! out of the action list, and the work, which runs on the world with the builder lent: the
 //! foundation's work, its starts and its completion.
 
+use crate::construction::BuildProgress;
 use crate::construction::build::BuildState;
 use crate::gathering::DropSiteId;
 use crate::map::Rect;
@@ -255,8 +256,8 @@ impl BuildAction {
     /// `FUN_1411cc430`'s `rate` seconds of work on the foundation, the builder lent to the
     /// world ([`World::work_building`]): its annexes' and its own construction's start with
     /// its owner's watch, and the completion of the work that reaches its build time
-    /// (`set_state(2)`, [`World::complete_building`]), each where the routine makes it. True
-    /// while its construction goes on (the routine's 0).
+    /// (`set_state(2)`, [`World::complete_building`]), each where the routine makes it.
+    /// [`BuildProgress::Ongoing`] while its construction goes on (the routine's 0).
     ///
     /// # Errors
     ///
@@ -267,7 +268,7 @@ impl BuildAction {
         builder: &mut Unit,
         actions: &mut Action,
         rate: Seconds,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<BuildProgress, GenieError> {
         let target = self.target.ok_or(NOT_HELD)?;
         self.lend(c, builder, actions, |w, _, _| w.work_building(target, rate))
     }

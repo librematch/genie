@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::pathing::ShortFound;
+use crate::pathing::hull_path::area::AreaGrowth;
 use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::find::Hulls;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
@@ -138,7 +139,7 @@ impl HullPather<'_> {
         }
         rounds.entered_box = false;
         if let Some(goal) = rounds.goal_hull {
-            rounds.entered_box = self.enter_goal_hull(q, goal)?;
+            rounds.entered_box = self.enter_goal_hull(q, goal)? == WalkResult::WaysFromBox;
         }
         Ok(None)
     }
@@ -265,8 +266,12 @@ impl HullPather<'_> {
 
     /// A goal inside the hull `hull`: the ways in (`walk_in` backwards from the goal into
     /// `entrances`, at most [`PATHS`]), their ends joined to the hull's points
-    /// ([`HullPather::join_entrances`]). Whether the walk ended in a box (its result 5).
-    fn enter_goal_hull(&mut self, q: &HullQuery, hull: HullIndex) -> Result<bool, GenieError> {
+    /// ([`HullPather::join_entrances`]). The walk's result (5 when it ended in a box).
+    fn enter_goal_hull(
+        &mut self,
+        q: &HullQuery,
+        hull: HullIndex,
+    ) -> Result<WalkResult, GenieError> {
         let mut entrances = take(&mut self.entrances);
         for e in &mut entrances {
             e.points.clear();
@@ -286,9 +291,9 @@ impl HullPather<'_> {
             count: &mut count,
         });
         self.entrances = entrances;
-        let entered_box = walk?.result == WalkResult::WaysFromBox;
+        let result = walk?.result;
         self.join_entrances(hull, count, &sides)?;
-        Ok(entered_box)
+        Ok(result)
     }
 
     /// One node of the search, the open list's best: beyond the nodes' cap the next round; an
@@ -309,7 +314,7 @@ impl HullPather<'_> {
             return Ok(Expanded::Next);
         }
         if !self.in_area(self.nodes.checked(best)?.at) {
-            if !self.grow_area()? {
+            if self.grow_area()? == AreaGrowth::TooLarge {
                 return Ok(Expanded::End);
             }
             rounds.growths += 1;

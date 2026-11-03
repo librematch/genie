@@ -41,6 +41,16 @@ pub(super) struct Moved {
     pub(super) now: WorldTime,
 }
 
+/// Whether level 0's look ahead moved its parent's waypoint ahead (`LAB_14115136c`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum LookAhead {
+    /// The parent's waypoint moved ahead, level 0 went and the parent asks for a path.
+    MovedAhead,
+    /// No waypoint ahead was within reach: the levels stay.
+    Kept,
+}
+
 impl Mover {
     /// The waypoint the level walks to was reached (`LAB_14115136c`, the level's bit 0): with
     /// bit 1 the unit takes the waypoint's place (slot 0x58, the position setter); the level moves
@@ -89,7 +99,7 @@ impl Mover {
             .is_some_and(|p| p.level == WaypointLevel::Planned && !p.points.is_empty());
         if self.paths.walked()?.level == WaypointLevel::Walked
             && parent_is_level_1
-            && self.look_ahead(me, world, by_id)?
+            && self.look_ahead(me, world, by_id)? == LookAhead::MovedAhead
         {
             return Ok(Next::Again);
         }
@@ -269,13 +279,13 @@ impl Mover {
     /// from the parent's fifth waypoint on (at most its last) back toward its current one, the
     /// first within 10 tiles (squared, `DAT_14330ebcc`) that the unit can walk to straight
     /// (`FUN_141142750`) becomes the parent's waypoint; level 0 goes, and the parent asks for a
-    /// path (state 2) as the motion step starts again. True when it did.
+    /// path (state 2) as the motion step starts again ([`LookAhead::MovedAhead`]).
     pub(super) fn look_ahead(
         &mut self,
         me: &Me,
         world: &mut Spatial,
         by_id: ObjectsRef<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<LookAhead, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
         let target = self.paths.walked()?.target;
         let parent = self.paths.parent()?;
@@ -295,13 +305,13 @@ impl Mover {
             k = k.previous();
         }
         if k == from {
-            return Ok(false);
+            return Ok(LookAhead::Kept);
         }
         let _ = self.paths.remove(0);
         let parent = self.paths.walked_mut()?;
         parent.waypoint = k;
         parent.state = PathState::WantsPath;
-        Ok(true)
+        Ok(LookAhead::MovedAhead)
     }
 
     /// `FUN_141142750` with its last argument 1: whether the unit walks straight to `p`. The point

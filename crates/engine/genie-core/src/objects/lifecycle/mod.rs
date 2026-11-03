@@ -10,6 +10,7 @@
 use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::HitPoints;
+use crate::objects::ListFate;
 use crate::objects::SpriteId;
 use crate::objects::masters::MasterId;
 use crate::players::Amount;
@@ -160,13 +161,13 @@ impl Lifecycle {
 
     /// One update of `dt_seconds` ([`Millis::seconds`](crate::world::Millis::seconds)), with the
     /// tick's Object stream and whether the object's current sprite still animates (`sprite`).
-    /// True when the object leaves its list.
+    /// [`ListFate::Leaves`] when the object leaves its list, else [`ListFate::Stays`].
     pub fn update(
         &mut self,
         dt_seconds: Seconds,
         object: &mut Well512,
         sprite: SpritePlay,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<ListFate, GenieError> {
         if self.goto_sleep {
             // the object's update moves it to the sleeping list first (`Unit::update`)
             return Err(GenieError::unsupported("the object goes to sleep"));
@@ -176,7 +177,7 @@ impl Lifecycle {
                 if self.hp < HitPoints::new(1.0) {
                     self.die(object)?;
                 }
-                Ok(false)
+                Ok(ListFate::Stays)
             }
             ObjectState::Dying | ObjectState::Dead => {
                 self.dead(dt_seconds)?;
@@ -189,7 +190,7 @@ impl Lifecycle {
                         ObjectState::Dead
                     };
                 }
-                Ok(false)
+                Ok(ListFate::Stays)
             }
             // RGE_Animated_Object::update: the dying sprite plays; once it stops, state 5 (the
             // caller clears the animation speed, `+0x7b8`, and leaves the remains)
@@ -197,16 +198,16 @@ impl Lifecycle {
                 if sprite == SpritePlay::Still {
                     self.state = ObjectState::Dead;
                 }
-                Ok(false)
+                Ok(ListFate::Stays)
             }
             // RGE_Static_Object::update: an object of a resource (FUN_140fdd470) leaves Gaia's
             // list of that resource (FUN_14165b910: player +0x50, +0x48, +0x60, +0x58 for kinds
             // 0 to 3, for Gaia's objects only), which the slice does not hold; then state 8
             ObjectState::Removed => {
                 self.state = ObjectState::Gone;
-                Ok(false)
+                Ok(ListFate::Stays)
             }
-            ObjectState::Gone => Ok(true),
+            ObjectState::Gone => Ok(ListFate::Leaves),
             _ => Err(GenieError::unsupported("object state not modelled")),
         }
     }
@@ -285,6 +286,7 @@ mod tests {
             if life
                 .update(dt.seconds(), &mut Well512::default(), SpritePlay::Still)
                 .unwrap()
+                == ListFate::Leaves
             {
                 return (states, Some(i));
             }
@@ -486,12 +488,12 @@ mod tests {
         let mut object = Well512::default();
         assert_eq!(
             life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
-            Ok(false)
+            Ok(ListFate::Stays)
         );
         assert_eq!(life.state, ObjectState::Gone);
         assert_eq!(
             life.update(Seconds::new(0.104), &mut object, SpritePlay::Still),
-            Ok(true)
+            Ok(ListFate::Leaves)
         );
     }
 

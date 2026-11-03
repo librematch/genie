@@ -16,6 +16,7 @@ use crate::groups::formation::top_path;
 use crate::groups::group_list::member_gone;
 use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
+use crate::map::spatial::SearchLists;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
 use crate::movement::PathFlags;
@@ -351,7 +352,7 @@ impl World {
             &search,
             &self.model.tuning.spatial,
             self.model.tuning.registry,
-        )?;
+        )? == SearchLists::Fresh;
         let lists = self.spatial.searched().ok_or(GenieError::unsupported(
             "a group member's search that reads the registry's last answer (before any query)",
         ))?;

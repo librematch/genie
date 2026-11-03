@@ -89,20 +89,24 @@ impl Fly {
     }
 
     /// `set_state` (`0x140a84a50`): 2 and 3 drop the `MoveTo` (its teardown stops the bird, the
-    /// caller's: the returned flag); 4 takes the flight's (`state`'s); 2 gives the bird its
+    /// caller's: [`MoveToDrop::Dropped`]); 4 takes the flight's (`state`'s); 2 gives the bird its
     /// master's sprite (slot 0x68, not held for a bird); 3 draws the flight's time,
     /// `r * 10 / 0x7fff + 5` seconds, from the Action stream.
-    fn set_state(&mut self, state: FlyState, action: &mut Well512) -> bool {
+    fn set_state(&mut self, state: FlyState, action: &mut Well512) -> MoveToDrop {
         let walked = self.state.move_to().is_some();
         self.state = state;
         if matches!(state, FlyState::Flying { .. }) {
-            return false;
+            return MoveToDrop::NoneDropped;
         }
         if state == FlyState::Choosing {
             let r = action.rand15() as i32;
             self.timer = Seconds::new(((r * 10) / 0x7fff + 5) as f32);
         }
-        walked
+        if walked {
+            MoveToDrop::Dropped
+        } else {
+            MoveToDrop::NoneDropped
+        }
     }
 
     /// One update (`0x140a84b40`) of bird `bird` (`me`) through its step: the timer counts
@@ -200,7 +204,8 @@ impl Fly {
     /// class to keep away from are not modelled. The flight's sprite ([`Fly::flight_sprite`]):
     /// a task with sprites draws one, else the master's walking sprite. The `MoveTo` to the point
     /// at the bird's height within 0 with that sprite starts (state 3) and the bird flies
-    /// (`set_state` 4); with no distance or no point it rests.
+    /// (`set_state` 4); with no distance or no point it rests. The answer: whether the rest
+    /// dropped a `MoveTo` (a flight drops none, [`MoveToDrop::NoneDropped`]).
     fn choose(
         &mut self,
         at: Position,
@@ -208,7 +213,7 @@ impl Fly {
         map: GridSize,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveToDrop, GenieError> {
         let t = self.task;
         let (speed, position) = (mover.stats.speed, at);
         let radius = mover.stats.radius.ground();
@@ -277,7 +282,7 @@ impl Fly {
             },
             action,
         );
-        Ok(false)
+        Ok(MoveToDrop::NoneDropped)
     }
 
     /// The sprite of state 3's `MoveTo`: a task with a moving (`+0x40`), proceeding (`+0x48`) or
@@ -335,15 +340,25 @@ impl Fly {
     }
 }
 
+/// Whether the Fly's `set_state` dropped its `MoveTo` (`0x140a84a50`'s answer).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+enum MoveToDrop {
+    /// States 2 and 3 dropped it: the caller stops the bird.
+    Dropped,
+    /// There was none, or state 4 keeps it.
+    NoneDropped,
+}
+
 /// The teardown of a dropped `MoveTo` (slot 0x5d0, [`Mover::stop`]): the bird stops when it
 /// has movement state (its `mover`).
 ///
 /// # Errors
 ///
 /// What the stop does not model.
-fn stop_if(mover: Option<&mut Mover>, dropped: bool) -> Result<(), GenieError> {
+fn stop_if(mover: Option<&mut Mover>, dropped: MoveToDrop) -> Result<(), GenieError> {
     match mover {
-        Some(mover) if dropped => mover.stop(),
+        Some(mover) if dropped == MoveToDrop::Dropped => mover.stop(),
         _ => Ok(()),
     }
 }
@@ -406,6 +421,7 @@ mod tests {
     use crate::movement::Speed;
     use crate::movement::move_to::MoveTo;
     use crate::objects::ActionState;
+    use crate::objects::DefaultStart;
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::SpeedMultiplier;
@@ -639,7 +655,7 @@ mod tests {
         };
         let mut fly = plain(unsprited);
         let (got, draws) = choose(&mut fly, GridSize::new(120, 120));
-        assert_eq!((got, draws), (Ok(false), 1));
+        assert_eq!((got, draws), (Ok(MoveToDrop::NoneDropped), 1));
         assert!(matches!(fly.state, FlyState::Flying { move_to: Some(_) }));
         for task in [
             Task {
@@ -850,7 +866,7 @@ mod tests {
             (r, fly)
         };
         let (r, fly) = start(TaskIndex::of_data(0));
-        assert_eq!(r, Ok(true));
+        assert_eq!(r, Ok(DefaultStart::Started));
         assert_eq!(fly.map(|f| f.task), Some(task));
         let (r, fly) = start(None);
         assert_eq!(

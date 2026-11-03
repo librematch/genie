@@ -3,6 +3,8 @@
 //! ([`crate::world::World::complete_building`]).
 
 use crate::GenieError;
+use crate::construction::BuildProgress;
+use crate::construction::ConstructionStart;
 use crate::construction::build::{Construction, SITE_GONE, STARTED};
 use crate::map::Snow;
 use crate::map::TerrainId;
@@ -195,10 +197,10 @@ pub(super) fn completion_counts(
 
 impl Construction {
     /// `FUN_1411cc430`'s work of `amount` seconds on a foundation in state 0 with at least 1 hit
-    /// point: at most up to its build time, it adds its share of its master's hit points `hp`
-    /// (all of them without a build time of at least 1), never past them; true when its build
-    /// points reach its build time.
-    pub(crate) fn add_work(&mut self, hp: &mut HitPoints, amount: Seconds) -> bool {
+    /// point: at most up to its build time, it adds its share of its master's hit points `hp` (all
+    /// of them without a build time of at least 1), never past them; [`BuildProgress::Ended`] when
+    /// its build points reach its build time, else [`BuildProgress::Ongoing`].
+    pub(crate) fn add_work(&mut self, hp: &mut HitPoints, amount: Seconds) -> BuildProgress {
         let mut amount = amount.get();
         let build_time = Seconds::of_master(self.build_time).get();
         let hit_points = HitPoints::of_master(self.hit_points).get();
@@ -213,20 +215,24 @@ impl Construction {
         *hp = HitPoints::new(if hit_points < new { hit_points } else { new });
         let before = self.progress.get();
         self.progress = Seconds::new(amount + before);
-        at_most_or_unordered(build_time, amount + before)
+        if at_most_or_unordered(build_time, amount + before) {
+            BuildProgress::Ended
+        } else {
+            BuildProgress::Ongoing
+        }
     }
 
     /// The construction starts (`FUN_1411e5670`) on a desolid foundation (one not desolid, or
     /// without its own master copy `+0x6c0`, which a desolid one always holds, returns at once,
-    /// false): its master is its owner's again (the same in the slice), its missiles per volley
-    /// its master's (`+0xa00`, the caller's: true); it is no longer desolid, holds a sliver of
-    /// progress, and gets its obstruction record (`FUN_141056460`: the tiles it marks, which the
-    /// planners see, and its shape in the mesh); its footprint comes into its player's sight and
-    /// its tiles link to its anchor again (`FUN_140f73900`); its owner watches it
-    /// (`FUN_141090430` when `FUN_1411cc980`, the caller's:
-    /// [`crate::world::World::construction_starts`] calls the watch at once); its last move time becomes the world's time plus 1. Not held: its damage sprites (made
-    /// for a player not allied with the local one), the tall count of its tile (`FUN_140f64540`)
-    /// and `+0xca4`.
+    /// [`ConstructionStart::NotDesolid`]): its master is its owner's again (the same in the slice),
+    /// its missiles per volley its master's (`+0xa00`, the caller's: [`ConstructionStart::Begun`]);
+    /// it is no longer desolid, holds a sliver of progress, and gets its obstruction record
+    /// (`FUN_141056460`: the tiles it marks, which the planners see, and its shape in the mesh);
+    /// its footprint comes into its player's sight and its tiles link to its anchor again
+    /// (`FUN_140f73900`); its owner watches it (`FUN_141090430` when `FUN_1411cc980`, the caller's:
+    /// [`crate::world::World::construction_starts`] calls the watch at once); its last move time
+    /// becomes the world's time plus 1. Not held: its damage sprites (made for a player not allied
+    /// with the local one), the tall count of its tile (`FUN_140f64540`) and `+0xca4`.
     ///
     /// # Errors
     ///
@@ -239,13 +245,13 @@ impl Construction {
         pathing: &mut Pathing,
         now: WorldTime,
         sight: SightLayer<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<ConstructionStart, GenieError> {
         let SightLayer {
             roles,
             visibility_tuning,
         } = sight;
         if !c.desolid {
-            return Ok(false);
+            return Ok(ConstructionStart::NotDesolid);
         }
         let placed = *world.get(id).ok_or(SITE_GONE)?;
         c.desolid = false;
@@ -264,6 +270,6 @@ impl Construction {
         if let Some(m) = mover {
             m.last_move = now.after(Millis::new(1));
         }
-        Ok(true)
+        Ok(ConstructionStart::Begun)
     }
 }

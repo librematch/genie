@@ -37,6 +37,17 @@ use crate::world::layer::generated::SpatialTuning;
 use crate::world::layer::generated::VisibilityTuning;
 use std::fmt::{Debug, Error, Formatter};
 
+/// Whether a unit AI's search queried afresh or read the cache's last answer
+/// ([`Spatial::search_query`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum SearchLists {
+    /// The registry's query ran: the lists are this search's.
+    Fresh,
+    /// The cache held near the place, or the query read nothing: the last answer stands.
+    Cached,
+}
+
 impl Spatial {
     /// `FormationTransform`'s line query (`FUN_141051900` with flags 0x40, any player, the
     /// segment test `FUN_141051e00`) with the buffer `grow` the formation finds
@@ -198,7 +209,8 @@ impl Spatial {
         let _ = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
         ))?;
-        let fresh = self.search_query(player, search, spatial_tuning, registry_tuning)?;
+        let fresh = self.search_query(player, search, spatial_tuning, registry_tuning)?
+            == SearchLists::Fresh;
         let _ = self.last_found()?;
         self.pick_found(
             (me, player),
@@ -249,7 +261,8 @@ impl Spatial {
     }
 
     /// The query of a unit AI's search (`FUN_140c63e20`'s first part): over the player's
-    /// registry unless the [`SearchCache`] holds near the place; true when it queried afresh. The
+    /// registry unless the [`SearchCache`] holds near the place ([`SearchLists::Fresh`] when it
+    /// queried afresh, else [`SearchLists::Cached`]). The
     /// lists it leaves are [`Spatial::searched`]'s.
     ///
     /// [`SearchCache`]: crate::map::spatial::SearchCache
@@ -259,7 +272,7 @@ impl Spatial {
         search: &Search<'_>,
         spatial_tuning: &SpatialTuning,
         registry_tuning: RegistryTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<SearchLists, GenieError> {
         let v = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
         ))?;
@@ -268,7 +281,7 @@ impl Spatial {
         ))?;
         let relations = self.query_kinds(player, r.players)?;
         let (x, y) = (search.at.x(), search.at.y());
-        let mut fresh = false;
+        let mut answer = SearchLists::Cached;
         let (dx, dy) = (x - self.search_cache.at.x(), y - self.search_cache.at.y());
         if spatial_tuning.search_reuse_squared < dy * dy + dx * dx || !self.search_cache.holds {
             self.search_cache.hold(search.at);
@@ -296,10 +309,10 @@ impl Spatial {
                 registry_tuning,
             )? {
                 self.search_cache.remember(lists);
-                fresh = true;
+                answer = SearchLists::Fresh;
             }
         }
-        Ok(fresh)
+        Ok(answer)
     }
 
     /// A unit AI's full update starts (`0x140c66b10`): the search cache lets go.

@@ -11,6 +11,7 @@ use crate::GenieError;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
+use crate::objects::Wake;
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::Masters;
 use crate::objects::masters::PlayersMasters;
@@ -377,7 +378,8 @@ impl<'a> Others<'a> {
     /// The sleeping object `id` wakes (`FUN_14119deb0` with 0, [`World::wake`]): it leaves its
     /// player's sleeping list for the end of the live one, no longer flagged to sleep, and the
     /// remove and add (slots 0x2d8, 0x2d0) file it last in its player's tracker (`own_tracker`
-    /// the owner's; `masters` and `lines` give the key). False when no sleeping list holds it.
+    /// the owner's; `masters` and `lines` give the key). [`Wake::NotAsleep`] when no sleeping list
+    /// holds it.
     ///
     /// [`World::wake`]: crate::world::World::wake
     pub(crate) fn wake(
@@ -386,7 +388,7 @@ impl<'a> Others<'a> {
         own_tracker: &mut Tracker,
         (masters, lines): (&[Arc<Masters>], &UnitLines),
         roles: &Roles,
-    ) -> bool {
+    ) -> Wake {
         let Self {
             player,
             own,
@@ -412,36 +414,36 @@ impl<'a> Others<'a> {
             index.filed(id).filter(|place| place.sleeping())
         };
         let Some(place) = place else {
-            return false;
+            return Wake::NotAsleep;
         };
         let q = place.player();
         let (live, sleeping, tracker) = match q.index().cmp(&before.len()) {
             Ordering::Equal => (&mut **own, &mut **own_sleeping, own_tracker),
             Ordering::Less => {
                 let Some(pl) = before.get_mut(q.index()) else {
-                    return false;
+                    return Wake::NotAsleep;
                 };
                 (&mut pl.objects, &mut pl.sleeping, &mut pl.tracker)
             }
             Ordering::Greater => {
                 let Some(pl) = after.get_mut(q.index() - before.len() - 1) else {
-                    return false;
+                    return Wake::NotAsleep;
                 };
                 (&mut pl.objects, &mut pl.sleeping, &mut pl.tracker)
             }
         };
         if sleeping.get(place.slot()).is_none_or(|u| u.id != id) {
-            return false;
+            return Wake::NotAsleep;
         }
         let Ok(mut woken) = index.swap_remove(sleeping, place) else {
-            return false;
+            return Wake::NotAsleep;
         };
         woken.life.goto_sleep = false;
         let k = key(masters.of(q), lines, woken.life.master_id, roles);
         let _ = index.push(live, Place::Live(q, ListIndex::new(0)), woken);
         tracker.remove(id, k);
         tracker.add(id, k);
-        true
+        Wake::Woke
     }
 }
 
@@ -454,18 +456,18 @@ impl World {
 
     /// The sleeping object `id` wakes (`FUN_14119deb0` with 0): it leaves its player's sleeping
     /// list for the end of the live one, no longer flagged to sleep, and the remove and add
-    /// (slots 0x2d8, 0x2d0) file it last in its player's tracker. False when no sleeping list
-    /// holds it.
-    pub(crate) fn wake_sleeper(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    /// (slots 0x2d8, 0x2d0) file it last in its player's tracker. [`Wake::NotAsleep`] when no
+    /// sleeping list holds it.
+    pub(crate) fn wake_sleeper(&mut self, id: ObjectId) -> Result<Wake, GenieError> {
         let Some(Place::Sleeping(p, i)) = self.place(id) else {
-            return Ok(false);
+            return Ok(Wake::NotAsleep);
         };
         let mut woken = self.swap_remove_asleep(p, i)?;
         woken.unit.life.goto_sleep = false;
         let master = woken.unit.life.master_id;
         let _ = self.push_live(p, woken)?;
         self.track_relist(p, id, master)?;
-        Ok(true)
+        Ok(Wake::Woke)
     }
 
     /// Player `p`'s live object `id` out of its slot (its stand-in, [`TAKEN_OUT`], holds it),
@@ -723,10 +725,17 @@ mod tests {
             (&mut before, &mut after),
             &mut index,
         );
-        assert!(others.wake(object_id(13), &mut tracker, (&[], &lines), &roles()));
-        assert!(others.wake(object_id(2), &mut tracker, (&[], &lines), &roles()));
-        assert!(
-            !others.wake(object_id(20), &mut tracker, (&[], &lines), &roles()),
+        assert_eq!(
+            others.wake(object_id(13), &mut tracker, (&[], &lines), &roles()),
+            Wake::Woke
+        );
+        assert_eq!(
+            others.wake(object_id(2), &mut tracker, (&[], &lines), &roles()),
+            Wake::Woke
+        );
+        assert_eq!(
+            others.wake(object_id(20), &mut tracker, (&[], &lines), &roles()),
+            Wake::NotAsleep,
             "20 is awake"
         );
         assert_eq!(

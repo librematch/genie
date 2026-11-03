@@ -6,6 +6,7 @@ use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::objects::AnimateState;
 use crate::objects::HitPoints;
+use crate::objects::ListFate;
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
 use crate::objects::facing::facet_of_angle;
@@ -47,14 +48,14 @@ impl Unit {
         } else {
             SpritePlay::Still
         };
-        let leaves = if self
-            .life
-            .update(c.dt.seconds(), c.w.streams.get(Stream::Object), sprite)?
-        {
-            Outcome::Leave
-        } else {
-            Outcome::Stay
-        };
+        let leaves =
+            match self
+                .life
+                .update(c.dt.seconds(), c.w.streams.get(Stream::Object), sprite)?
+            {
+                ListFate::Leaves => Outcome::Leave,
+                ListFate::Stays => Outcome::Stay,
+            };
         self.state_set_off(actions, c, before, roles)?;
         Ok(leaves)
     }

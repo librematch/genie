@@ -5,6 +5,8 @@
 use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::construction::BuildProgress;
+use crate::construction::ConstructionStart;
 use crate::construction::FoundationId;
 use crate::construction::build::Clearer;
 use crate::construction::build::{Completion, Construction, StackUnit};
@@ -151,7 +153,8 @@ impl World {
                 roles: &self.model.roles,
                 visibility_tuning: self.model.tuning.visibility,
             },
-        )? {
+        )? == ConstructionStart::Begun
+        {
             self.parts.combat_mut(u.id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }
@@ -183,15 +186,16 @@ pub(crate) fn held(players: &mut [Player], place: Place) -> Result<&mut Unit, Ge
 
 impl World {
     /// `FUN_1411cc430` outside a builder's update, `amount` seconds on the building `id`: first
-    /// each annex (`+0xbc0`..`+0xbd8`) of a building type that is desolid starts
-    /// (`FUN_1411cd0d0`, [`crate::world::World::clear_foundations_under`], then `FUN_1411e5670`,
-    /// [`crate::world::World::construction_starts`]), then while the building is an annex of a
-    /// main building in state 0 with at least 1 hit point (COMISS: a NaN too) the work goes to
-    /// the main building, whose annexes start alike. A building in state 0 with at least 1 hit
-    /// point (a NaN not) starts if desolid and takes the work ([`Construction::add_work`]); one
-    /// that reaches its build time completes (`set_state(2)`, [`crate::world::World::set_state`]).
-    /// True while its construction goes on (the routine's 0): false for one done before the work
-    /// (not in state 0, or below 1 hit point) and one the work completed.
+    /// each annex (`+0xbc0`..`+0xbd8`) of a building type that is desolid starts (`FUN_1411cd0d0`,
+    /// [`crate::world::World::clear_foundations_under`], then `FUN_1411e5670`,
+    /// [`crate::world::World::construction_starts`]), then while the building is an annex of a main
+    /// building in state 0 with at least 1 hit point (COMISS: a NaN too) the work goes to the main
+    /// building, whose annexes start alike. A building in state 0 with at least 1 hit point (a NaN
+    /// not) starts if desolid and takes the work ([`Construction::add_work`]); one that reaches its
+    /// build time completes (`set_state(2)`, [`crate::world::World::set_state`]).
+    /// [`BuildProgress::Ongoing`] while its construction goes on (the routine's 0):
+    /// [`BuildProgress::Ended`] for one done before the work (not in state 0, or below 1 hit point)
+    /// and one the work completed.
     ///
     /// # Errors
     ///
@@ -200,7 +204,7 @@ impl World {
         &mut self,
         id: FoundationId,
         amount: Seconds,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<BuildProgress, GenieError> {
         let mut at = id.id();
         loop {
             for annex in self.objects().annexes(at).ids() {
@@ -236,7 +240,7 @@ impl World {
         }
         let (q, u) = self.object(at).ok_or(NOT_HELD)?;
         if u.life.state != ObjectState::Foundation || below_or_unordered(u.life.hp.get(), 1.0) {
-            return Ok(false);
+            return Ok(BuildProgress::Ended);
         }
         if self
             .parts
@@ -250,11 +254,11 @@ impl World {
         let q = self.object(at).ok_or(NOT_HELD)?.0;
         let (u, layer) = self.object_and_layer_mut(at)?.ok_or(NOT_HELD)?;
         let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        if !c.add_work(&mut u.life.hp, amount) {
-            return Ok(true);
+        if c.add_work(&mut u.life.hp, amount) == BuildProgress::Ongoing {
+            return Ok(BuildProgress::Ongoing);
         }
         self.set_state(q, at, ObjectState::Alive)?;
-        Ok(false)
+        Ok(BuildProgress::Ended)
     }
 
     /// The stack unit (`+0x986`) of the completed building `building` of player `p`

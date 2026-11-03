@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::commands::RecordDrop;
+use crate::construction::BuildProgress;
 use crate::construction::FootprintWaits;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
@@ -374,7 +375,7 @@ impl BuildAction {
         if 1.0 < n {
             rate *= ((n - 1.0) * c.w.model.tuning.build.extra_builder + 1.0) / n;
         }
-        if self.work_on(c, builder, actions, Seconds::new(rate))? {
+        if self.work_on(c, builder, actions, Seconds::new(rate))? == BuildProgress::Ongoing {
             return Ok(());
         }
         // a finished foundation with hit points ends the work (its `+0x278`, decoded); one

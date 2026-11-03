@@ -29,6 +29,7 @@ use crate::commands::{
     UnitList, UnitOrderAction, UnitOrderCommand, UnloadCommand, UnmodelledCommand, Waypoints,
 };
 use crate::commands::{QueueId, SpriteOverride, TradeLots};
+use crate::construction::BuildProgress;
 use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
 use crate::construction::build::BuildState;
@@ -111,6 +112,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::Voice;
+use crate::objects::Wake;
 use crate::objects::WorkRate;
 use crate::objects::actions::ActionList;
 use crate::objects::facing::{SpriteFacets, drawn_angle};
@@ -2706,7 +2708,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
     t.link_test_annex(object_id(10031), object_id(10028));
     assert_eq!(
         t.work_building(FoundationId::new(object_id(10031)), Seconds::new(0.021)),
-        Ok(true)
+        Ok(BuildProgress::Ongoing)
     );
     let c = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
     let started = f32::from_bits(0x2edb_e6ff);
@@ -6471,8 +6473,12 @@ fn an_own_object_taken_out_leaves_the_world_until_it_goes_back() {
         t.locate(object_id(521)).map(|(q, _, s)| (q, s)),
         Some((PlayerId::new(0), true))
     );
-    assert!(t.wake_sleeper(object_id(521)).unwrap());
-    assert!(!t.wake_sleeper(object_id(521)).unwrap(), "awake already");
+    assert_eq!(t.wake_sleeper(object_id(521)), Ok(Wake::Woke));
+    assert_eq!(
+        t.wake_sleeper(object_id(521)),
+        Ok(Wake::NotAsleep),
+        "awake already"
+    );
     assert_eq!(
         t.locate(object_id(521)).map(|(q, _, s)| (q, s)),
         Some((PlayerId::new(0), false))

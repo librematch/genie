@@ -1,4 +1,6 @@
 use super::*;
+use crate::construction::BuildProgress;
+use crate::construction::ConstructionStart;
 use crate::construction::MainBuildingId;
 use crate::construction::build::Clearer;
 use crate::map::Footprint;
@@ -885,7 +887,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     let mut t = site_world(world, vec![master], vec![house]);
     assert_eq!(
         t.work_building(FoundationId::new(object_id(10026)), Seconds::new(0.02)),
-        Ok(false)
+        Ok(BuildProgress::Ended)
     );
     let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
     let c = t.parts.building_of(h.id).construction.unwrap();
@@ -1053,7 +1055,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
     let rate = 1.0f32 * 1.0 * 0.021;
     assert_eq!(
         t.work_building(FoundationId::new(object_id(10028)), Seconds::new(rate)),
-        Ok(true)
+        Ok(BuildProgress::Ongoing)
     );
     let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
     let c = t.parts.building_of(h.id).construction.unwrap();
@@ -1136,7 +1138,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     }
     assert_eq!(
         t.work_building(FoundationId::new(object_id(10028)), Seconds::new(0.021)),
-        Ok(true)
+        Ok(BuildProgress::Ongoing)
     );
     let site = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
     let post = site(object_id(10029));
@@ -1207,7 +1209,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
             visibility_tuning: tuning().visibility,
         },
     );
-    assert_eq!(started, Ok(true));
+    assert_eq!(started, Ok(ConstructionStart::Begun));
     assert_eq!(mover.last_move, WorldTime::from_millis(8281));
 }
 
@@ -1277,13 +1279,19 @@ fn an_annex_work_goes_to_its_main_building() {
             .state;
         (going, state)
     };
-    assert_eq!(run(foundation, 0.021), (Ok(true), ObjectState::Foundation));
+    assert_eq!(
+        run(foundation, 0.021),
+        (Ok(BuildProgress::Ongoing), ObjectState::Foundation)
+    );
     let nearly = Construction {
         progress: Seconds::new(24.99),
         desolid: false,
         ..foundation
     };
-    assert_eq!(run(nearly, 0.021), (Ok(false), ObjectState::Alive));
+    assert_eq!(
+        run(nearly, 0.021),
+        (Ok(BuildProgress::Ended), ObjectState::Alive)
+    );
 }
 
 use crate::combat::Firepower;

@@ -46,6 +46,7 @@ calls `Unit::update` (`unit/update.rs`), which runs the object's chain of update
 | [`mod.rs`](mod.rs) | One object and what every object has and runs: the object the engine tracks (`unit::Unit`) with its update, its actions' holdings and stops, its life and death, its release, its sprite and facing, and the masters it is made from. |
 | [`object_id.rs`](object_id.rs) | An object's id as one type: the id that names an object across ticks, as the commands, their unit lists and their targets hold it. |
 | [`object_list.rs`](object_list.rs) | One of a player's object lists (FD-045-D11, D20): its objects in update order. |
+| [`outcomes.rs`](outcomes.rs) | What an object's update steps answer: whether it falls asleep (`SleepCheck`), starts its default task (`DefaultStart`) or leaves its list (`ListFate`), and whether a wake found it asleep (`Wake`). |
 | [`release.rs`](release.rs) | An object's leave of the world and its release by the action that held it (slot 0x180); the update's regeneration and hit point check, and a walk's pause. |
 | [`relic_count.rs`](relic_count.rs) | A count of relics. |
 | [`relics.rs`](relics.rs) | A building's relic counts (`Relics`). |

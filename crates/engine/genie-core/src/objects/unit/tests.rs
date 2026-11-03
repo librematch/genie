@@ -26,6 +26,7 @@ use crate::objects::ActionState;
 use crate::objects::ListIndex;
 use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
+use crate::objects::SleepCheck;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
@@ -84,9 +85,9 @@ fn static_object_flagged_to_sleep_ends_its_update() {
         ..Unit::default()
     };
     let mut u = flagged(Class::Static);
-    assert_eq!(u.go_to_sleep(None, None), Ok(true));
+    assert_eq!(u.go_to_sleep(None, None), Ok(SleepCheck::FallsAsleep));
     assert!(!u.life.goto_sleep);
-    assert_eq!(u.go_to_sleep(None, None), Ok(false));
+    assert_eq!(u.go_to_sleep(None, None), Ok(SleepCheck::StaysAwake));
     let mut animated = flagged(Class::Animated);
     assert_eq!(
         animated.go_to_sleep(None, None).unwrap_err().reason(),

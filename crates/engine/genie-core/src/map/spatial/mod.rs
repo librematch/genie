@@ -56,7 +56,7 @@ use self::pather::{WalkTest, record_meets_segment};
 #[cfg(test)]
 use self::pather::{box_meets_segment, ccw};
 pub use self::record_id::RecordId;
-pub use self::search::SearchQuery;
+pub use self::search::{SearchLists, SearchQuery};
 pub use self::tile_sight::TileSight;
 use crate::gathering::PastureId;
 use crate::groups::GroupId;

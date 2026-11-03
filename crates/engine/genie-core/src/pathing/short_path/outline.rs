@@ -44,6 +44,17 @@ pub(super) enum Outline {
     StepLimit,
 }
 
+/// Whether a traced vertex closed the polygon's outline or joined it (`FUN_140fa2fa0`'s 1
+/// or 0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum VertexTrace {
+    /// The outline closes: the vertex is not added.
+    Closes,
+    /// The vertex joined the polygon.
+    Appended,
+}
+
 /// A new polygon's walk: the polygon and the node it comes from.
 struct NewWalk {
     poly: PolyIndex,
@@ -53,8 +64,9 @@ struct NewWalk {
 impl Search<'_> {
     /// `FUN_140fa2fa0`: append a vertex to the polygon being traced, unless the outline closes:
     /// after a full turn (`|winding| == 4`) the vertex passes the first one along the start side's
-    /// line. On closing, a first vertex whose side repeats the last one's is dropped.
-    pub(super) fn append(poly: &mut Poly, vertex: Traced) -> bool {
+    /// line ([`VertexTrace::Closes`], else [`VertexTrace::Appended`]). On closing, a first
+    /// vertex whose side repeats the last one's is dropped.
+    pub(super) fn append(poly: &mut Poly, vertex: Traced) -> VertexTrace {
         let Traced {
             vertex: pos,
             first,
@@ -88,13 +100,13 @@ impl Search<'_> {
                     let _ = poly.sides.remove(0);
                     let _ = poly.shapes.remove(0);
                 }
-                return true;
+                return VertexTrace::Closes;
             }
         }
         poly.vertices.push(pos);
         poly.sides.push(side);
         poly.shapes.push(shape);
-        false
+        VertexTrace::Appended
     }
 
     /// The coordinate of `p` along a side's axis (x for sides 0 and 2, y for 1 and 3).
@@ -232,7 +244,8 @@ impl Search<'_> {
                             shape: on,
                             winding: wp,
                         },
-                    ) {
+                    ) == VertexTrace::Closes
+                    {
                         poly.costs = vec![UNSET; poly.vertices.len()];
                         return Ok(Outline::Closed);
                     }

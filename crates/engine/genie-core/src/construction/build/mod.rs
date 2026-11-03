@@ -453,6 +453,7 @@ pub(crate) const DROPPED_ORDERS: [OrderKind; 3] =
 #[cfg(test)]
 mod stack_tests {
     use super::*;
+    use crate::construction::BuildProgress;
     #[cfg(test)]
     use crate::construction::MainBuildingId;
     use crate::map::Footprint;
@@ -737,7 +738,7 @@ mod stack_tests {
         t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
         assert_eq!(
             t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
-            Ok(false)
+            Ok(BuildProgress::Ended)
         );
         assert_eq!(
             t.players[1].history.events,
@@ -767,7 +768,7 @@ mod stack_tests {
         let mut t = world();
         assert_eq!(
             t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
-            Ok(false)
+            Ok(BuildProgress::Ended)
         );
         let ids: Vec<(i32, i16, ObjectState)> = t.players[1]
             .objects
@@ -966,7 +967,7 @@ mod stack_tests {
             .attacking_units = vec![object_id(99_999)];
         assert_eq!(
             gone.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
-            Ok(false)
+            Ok(BuildProgress::Ended)
         );
         let mut held = world();
         let first = held.players[1].objects[ListIndex::new(0)].id;

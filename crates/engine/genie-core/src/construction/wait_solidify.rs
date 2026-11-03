@@ -15,6 +15,7 @@ use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::map::Position;
 use crate::objects::ObjectId;
+use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Task;
 use crate::players::Amount;
@@ -64,16 +65,21 @@ impl WaitSolidify {
     }
 
     /// Its update (slot 0x30, `FUN_140ae8b70`) with the foundation's build points (`+0xc50`),
-    /// None when the world does not hold it (`FUN_1415417a0`): true (1, done) unless the world
-    /// holds it with build points at most `WaitSolidifyTuning::solid_from`. `COMISD` with `JA`: build points that
+    /// None when the world does not hold it (`FUN_1415417a0`): [`UpdateCode::Done`] (1) unless
+    /// the world holds it with build points at most `WaitSolidifyTuning::solid_from`
+    /// ([`UpdateCode::UnderWay`], 0). `COMISD` with `JA`: build points that
     /// are not a number keep it waiting.
     #[must_use]
     pub fn update(
         &self,
         progress: Option<Seconds>,
         wait_solidify_tuning: WaitSolidifyTuning,
-    ) -> bool {
-        progress.is_none_or(|p| f64::from(p.get()) > wait_solidify_tuning.solid_from)
+    ) -> UpdateCode {
+        if progress.is_none_or(|p| f64::from(p.get()) > wait_solidify_tuning.solid_from) {
+            UpdateCode::Done
+        } else {
+            UpdateCode::UnderWay
+        }
     }
 
     /// Its `set_state` (slot 0x80, `FUN_140ae8b60`): the state, nothing else.
@@ -231,17 +237,28 @@ mod tests {
     #[test]
     fn the_wait_ends_once_the_foundation_is_past_hundredth_or_gone() {
         let w = WaitSolidify::new(task(), foundation(8123));
-        assert!(
-            w.update(None, tuning().wait_solidify),
+        let wait = tuning().wait_solidify;
+        assert_eq!(
+            w.update(None, wait),
+            UpdateCode::Done,
             "a foundation the world does not hold"
         );
-        assert!(!w.update(Some(Seconds::ZERO), tuning().wait_solidify));
+        assert_eq!(w.update(Some(Seconds::ZERO), wait), UpdateCode::UnderWay);
         // 0.01f32 widens to 0.009999999776…, at most the double 0.01
-        assert!(!w.update(Some(Seconds::new(0.01)), tuning().wait_solidify));
-        assert!(w.update(Some(Seconds::new(0.010_001)), tuning().wait_solidify));
-        assert!(w.update(Some(Seconds::new(1.5)), tuning().wait_solidify));
+        assert_eq!(
+            w.update(Some(Seconds::new(0.01)), wait),
+            UpdateCode::UnderWay
+        );
+        assert_eq!(
+            w.update(Some(Seconds::new(0.010_001)), wait),
+            UpdateCode::Done
+        );
+        assert_eq!(w.update(Some(Seconds::new(1.5)), wait), UpdateCode::Done);
         // COMISD with JA: unordered is not above
-        assert!(!w.update(Some(Seconds::new(f32::NAN)), tuning().wait_solidify));
+        assert_eq!(
+            w.update(Some(Seconds::new(f32::NAN)), wait),
+            UpdateCode::UnderWay
+        );
     }
 
     #[test]

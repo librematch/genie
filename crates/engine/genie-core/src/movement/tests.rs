@@ -19,6 +19,7 @@ use crate::movement::move_to::Patience;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::PlanFlags;
 use crate::movement::request_plans::{NewPath, Way};
+use crate::movement::waypoint::LookAhead;
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
@@ -1744,7 +1745,10 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
         Tiles::new(GridSize::new(120, 120), vec![2; 14400]),
     );
     // on open ground: waypoint 3 is beyond 10 tiles, waypoint 2 within, so it takes 2
-    assert_eq!(m.look_ahead(&me, &mut w, ObjectsRef::empty()), Ok(true));
+    assert_eq!(
+        m.look_ahead(&me, &mut w, ObjectsRef::empty()),
+        Ok(LookAhead::MovedAhead)
+    );
     assert_eq!(m.paths.len(), 1);
     assert_eq!(
         (
@@ -1793,7 +1797,10 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             }),
         },
     );
-    assert_eq!(m.look_ahead(&me, &mut w, ObjectsRef::empty()), Ok(false));
+    assert_eq!(
+        m.look_ahead(&me, &mut w, ObjectsRef::empty()),
+        Ok(LookAhead::Kept)
+    );
     assert_eq!(m.paths.len(), 2);
 }
 

@@ -16,6 +16,16 @@ use crate::pathing::hull_path::{
 };
 use crate::world::slots::CheckedIndex;
 
+/// Whether the hull search's area grew ([`HullPather::grow_area`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum AreaGrowth {
+    /// It grew by two tiles each way.
+    Grown,
+    /// It would hold more than [`MOST_AREA`] tiles: the search ends.
+    TooLarge,
+}
+
 impl HullPather<'_> {
     /// `FindShortPath`'s goal query when no target stands on the goal (`FUN_141051900` with
     /// flags 0x20 at `to`, the manager's buffer and ignore list the pather's, its player for the
@@ -147,15 +157,16 @@ impl HullPather<'_> {
     }
 
     /// The area grows by two tiles each way on the map (its new tiles' obstructions, then the
-    /// cliffs about it); false when it would hold more than [`MOST_AREA`] tiles.
-    pub(super) fn grow_area(&mut self) -> Result<bool, GenieError> {
+    /// cliffs about it); [`AreaGrowth::TooLarge`] when it would hold more than [`MOST_AREA`]
+    /// tiles.
+    pub(super) fn grow_area(&mut self) -> Result<AreaGrowth, GenieError> {
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let x0 = (self.area.x0() - 2).max(0);
         let y0 = (self.area.y0() - 2).max(0);
         let x1 = (self.area.x1() + 2).min(w - 1);
         let y1 = (self.area.y1() + 2).min(h - 1);
         if MOST_AREA < (x1 - x0) * (y1 - y0) {
-            return Ok(false);
+            return Ok(AreaGrowth::TooLarge);
         }
         let grown = TileRect::new(x0, y0, x1, y1);
         for x in x0..=x1 {
@@ -165,7 +176,7 @@ impl HullPather<'_> {
         }
         self.area = grown;
         self.process_cliffs()?;
-        Ok(true)
+        Ok(AreaGrowth::Grown)
     }
 
     /// The entrance paths' ends join the goal's hull (`FindShortPath`): each on the hull side it

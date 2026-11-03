@@ -5,7 +5,9 @@ use crate::combat::attack::run_down_attack_timers;
 use crate::math::rng::Stream;
 use crate::movement::MoveState;
 use crate::movement::{Me, Mover};
+use crate::objects::DefaultStart;
 use crate::objects::ObjectState;
+use crate::objects::SleepCheck;
 use crate::objects::SpriteFlags;
 use crate::objects::actions::Action;
 use crate::objects::facing::SpriteFacets;
@@ -61,7 +63,9 @@ impl Unit {
         roles: &Roles,
     ) -> Result<Option<Outcome>, GenieError> {
         self.death_blast(actions, c, roles)?;
-        if self.go_to_sleep(c.w.parts.mover_of(self.id), c.w.parts.unit_ai.get(self.id))? {
+        if self.go_to_sleep(c.w.parts.mover_of(self.id), c.w.parts.unit_ai.get(self.id))?
+            == SleepCheck::FallsAsleep
+        {
             return Ok(None);
         }
         self.take_sprite_facets(c.w.parts.mover_mut(self.id));
@@ -93,7 +97,7 @@ impl Unit {
         slots: Slots,
     ) -> Result<Option<Captured>, GenieError> {
         let started = self.start_default_task(actions, c)?;
-        let captured = if started {
+        let captured = if started == DefaultStart::Started {
             None
         } else if self.life.inside.is_some() {
             self.inside_update(actions, c)?;
@@ -205,17 +209,18 @@ impl Unit {
         self.hunt_part(actions, c, me, &mut own, tree_lost, roles)
     }
 
-    /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops
-    /// the flag, is marked asleep (`+0x641`) and moves to its player's sleeping list (player
-    /// slots 0x2d8 and 0x2d0), and its update ends (true); only static objects (type 10) are
-    /// flagged, so one with movement state (its `mover`) or a unit AI is not modelled.
+    /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops the
+    /// flag, is marked asleep (`+0x641`) and moves to its player's sleeping list (player slots
+    /// 0x2d8 and 0x2d0), and its update ends ([`SleepCheck::FallsAsleep`]); only static objects
+    /// (type 10) are flagged, so one with movement state (its `mover`) or a unit AI is not
+    /// modelled.
     pub(crate) fn go_to_sleep(
         &mut self,
         mover: Option<&Mover>,
         ai: Option<&UnitAi>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<SleepCheck, GenieError> {
         if !self.life.goto_sleep {
-            return Ok(false);
+            return Ok(SleepCheck::StaysAwake);
         }
         if self.life.class != Class::Static || mover.is_some() || ai.is_some() {
             return Err(GenieError::unsupported(
@@ -223,7 +228,7 @@ impl Unit {
             ));
         }
         self.life.goto_sleep = false;
-        Ok(true)
+        Ok(SleepCheck::FallsAsleep)
     }
 
     /// The yaw and the facing read the current sprite's facets: the movement state (`mover`)
@@ -343,12 +348,11 @@ impl LayersAction {
         buildings: &PartTable<Building>,
         wait_solidify_tuning: WaitSolidifyTuning,
     ) -> HeadCode {
-        let ended = self.list.wait_solidify().is_some_and(|w| {
-            w.update(
+        self.list.wait_solidify().map_or(HeadCode::Keeps, |w| {
+            HeadCode::of(w.update(
                 wait_progress(w.target, others, buildings),
                 wait_solidify_tuning,
-            )
-        });
-        HeadCode::ended(ended)
+            ))
+        })
     }
 }

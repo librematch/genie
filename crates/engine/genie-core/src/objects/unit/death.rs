@@ -1,6 +1,7 @@
 //! An object's death (`set_state(3)` and the static part of it) and a foundation's death.
 
 use crate::GenieError;
+use crate::construction::ConstructionStart;
 use crate::construction::build::NO_CONSTRUCTION;
 use crate::construction::build::{Completion, Construction};
 use crate::gathering::PastureId;
@@ -252,7 +253,7 @@ impl Unit {
                 visibility_tuning: c.w.model.tuning.visibility,
             },
         )?;
-        if started {
+        if started == ConstructionStart::Begun {
             c.w.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
             let (p, id) = (c.player, self.id);
             c.lend((&mut *self, &mut *actions), |w| w.watch_started(p, id))?;
