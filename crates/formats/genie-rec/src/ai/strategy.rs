@@ -78,7 +78,7 @@ pub struct StrategyAi {
     /// The ID of a second target.
     pub second_target_id: u32,
     /// The type of the second target.
-    pub second_target_type: u32,
+    pub second_target_kind: u32,
     /// The current target point.
     pub target_point: Waypoint,
     /// A second target point.
@@ -107,7 +107,7 @@ impl ReadableHeaderElement for StrategyAi {
             current_victory_condition: input.read_u32::<LE>()?,
             target_id: input.read_u32::<LE>()?,
             second_target_id: input.read_u32::<LE>()?,
-            second_target_type: input.read_u32::<LE>()?,
+            second_target_kind: input.read_u32::<LE>()?,
             target_point: Waypoint::read_from(input)?,
             target_point_2: Waypoint::read_from(input)?,
             target_attribute: input.read_u32::<LE>()?,

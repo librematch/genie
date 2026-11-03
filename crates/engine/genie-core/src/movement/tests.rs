@@ -132,7 +132,7 @@ fn stats() -> MoveStats {
 fn level(level: u8, points: &[Point], state: PathState) -> PathData {
     PathData {
         level: WaypointLevel::of_byte(level),
-        linked_type: LinkedPathType::of_data(i32::from(level == 0)),
+        linked_kind: LinkedPathKind::of_data(i32::from(level == 0)),
         points: points
             .iter()
             .map(|p| BVector::new(p.x(), 0.0, p.y()))
@@ -282,7 +282,7 @@ fn the_ignore_list_takes_the_own_list_when_the_top_path_is_this_update_s() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(16360),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         object: &mut object,
         groups: &groups,
     };
@@ -462,7 +462,7 @@ fn drop_off_walker_ignores_the_allied_workers_standing_beside_it() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         object: &mut object,
         groups: &groups,
     };
@@ -533,7 +533,7 @@ fn the_drop_off_walker_start_is_blocked_in_terrain_its_mask_lacks() {
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut object,
             groups: &groups,
         };
@@ -620,7 +620,7 @@ fn big_unit_short_path_takes_the_old_pather() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         object: &mut object,
         groups: &groups,
     };
@@ -736,7 +736,7 @@ fn kept_hit_on_the_target_alone_is_kept_and_reaches_the_waypoint() {
         &[RecordId::from(object_id(9175))],
         projected,
         Seconds::new(DT),
-        (WorldTime::from_millis(16361), PlayerType::HUMAN),
+        (WorldTime::from_millis(16361), PlayerKind::HUMAN),
     );
     let avoided = avoided.unwrap();
     assert!(avoided.at_target);
@@ -794,7 +794,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &me,
             &w,
             &[RecordId::from(object_id(9175))],
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
             ObjectsRef::empty()
         ),
         Ok(Next::Again)
@@ -808,7 +808,7 @@ fn kept_hits_replan_the_parent_or_stop_walk_without_one() {
             &me,
             &w,
             &[RecordId::from(object_id(9175))],
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
             ObjectsRef::empty()
         ),
         Ok(Next::Done(Motion::Done))
@@ -844,7 +844,7 @@ fn map_edge_record_is_hit_without_an_object() {
             &[edge],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerType::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
         )
         .unwrap();
     assert_eq!(
@@ -858,7 +858,7 @@ fn map_edge_record_is_hit_without_an_object() {
             &[edge, RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerType::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
         )
         .unwrap();
     assert!(!avoided.at_target);
@@ -949,7 +949,7 @@ fn big_unit_path_request_takes_the_old_pather_with_the_walk_kept_hits() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::from_millis(100),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         object: &mut object,
         groups: &groups,
     };
@@ -1038,7 +1038,7 @@ fn the_reach_test_starts_where_the_unit_last_moved_to() {
     let mut plan = Planning {
         pathing: &mut pathing,
         now: WorldTime::ZERO,
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         object: &mut object,
         groups: &groups,
     };
@@ -1343,7 +1343,7 @@ fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
         to_end: Distance::new(FAR),
     };
     let mut m = builder_9177();
-    m.paths[0].linked_type = LinkedPathType::of_data(2);
+    m.paths[0].linked_kind = LinkedPathKind::of_data(2);
     m.paths[1].path_flags = PathFlags::LOOPS;
     m.paths[1].waypoint = WaypointIndex::of_data(1);
     assert!(matches!(m.arrived(goal), Ok(Next::Again)));
@@ -1352,7 +1352,7 @@ fn an_arrived_level_hands_looping_parent_its_next_waypoint() {
         (1, PathState::WantsPath, 0)
     );
     let mut m = builder_9177();
-    m.paths[0].linked_type = LinkedPathType::of_data(0);
+    m.paths[0].linked_kind = LinkedPathKind::of_data(0);
     assert!(matches!(m.arrived(goal), Ok(Next::Dispatch)));
     assert_eq!(m.paths.len(), 2);
 }
@@ -1499,13 +1499,13 @@ fn gate_gap_is_the_least_over_it_and_its_annexes() {
         class,
         player: PlayerId::new(1),
         master: ids::ID_0,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
         unknown: None,
         obstruction: Some(Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::RESOURCE,
         }),
     };
@@ -1777,13 +1777,13 @@ fn level_0_looks_ahead_to_the_farthest_parent_waypoint_it_walks_to_straight() {
             class: class::TREE,
             player: PlayerId::new(0),
             master: ids::ID_0,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::RESOURCE,
             }),
         },
@@ -2114,7 +2114,7 @@ fn long_plan_reaches_its_waypoint_stops_short_or_ends_at_band() {
         let plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut object,
             groups: &groups,
         };
@@ -2278,7 +2278,7 @@ impl WalkRig {
             plan: Some(Planning {
                 pathing: &mut self.pathing,
                 now: WorldTime::ZERO,
-                player_type: PlayerType::HUMAN,
+                player_kind: PlayerKind::HUMAN,
                 object: &mut self.object,
                 groups: &self.groups,
             }),
@@ -2799,13 +2799,13 @@ fn next_waypoint_an_object_stands_on_goes() {
             class: class::BUILDING,
             player: PlayerId::new(2),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -3188,7 +3188,7 @@ fn two_members_of_one_group_rank_by_their_places_in_it() {
             &[RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerType::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
         )
         .unwrap()
         .pauses
@@ -3259,7 +3259,7 @@ fn group_member_on_an_own_move_of_reason_0_keeps_only_buildings_walls_and_gates(
             &[RecordId::from(object_id(9175))],
             projected,
             Seconds::new(DT),
-            (WorldTime::from_millis(16361), PlayerType::HUMAN),
+            (WorldTime::from_millis(16361), PlayerKind::HUMAN),
         )
         .unwrap()
         .kept

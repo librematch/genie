@@ -34,7 +34,7 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
-const DELETABLE_TYPE: MasterKind = MasterKind::of_data(70);
+const DELETABLE_KIND: MasterKind = MasterKind::of_data(70);
 
 /// `CANCEL_BUILD` (0x6a, `do_command` case 0x6a): the player deletes its object `id`
 /// ([`World::delete`]).
@@ -86,7 +86,7 @@ impl World {
         }
         let master = unit.master(self.master_tables(), owner)?;
         if unit.undeletable
-            || master.kind < DELETABLE_TYPE
+            || master.kind < DELETABLE_KIND
             || self
                 .model
                 .roles
@@ -554,11 +554,11 @@ impl World {
         id: ObjectId,
         master: &Master,
     ) -> Result<(), GenieError> {
-        let player_type = self.players.player(owner)?.kind;
+        let player_kind = self.players.player(owner)?.kind;
         let annex_of = self.parts.building_of(id).annex_of;
         let (roles, slots) = (self.model.roles.clone(), self.model.slots);
         let held = self.object_and_combat_mut(id)?.ok_or(NOT_HELD)?;
-        let death = built_death(held, annex_of, master, player_type, &roles, slots)?;
+        let death = built_death(held, annex_of, master, player_kind, &roles, slots)?;
         for &(kind, amount) in &death.adds {
             self.players
                 .player_mut(owner)?
@@ -654,7 +654,7 @@ mod tests {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::NONE,
                 },
                 snow: Snow::None,
@@ -942,7 +942,7 @@ mod clearing_tests {
                 class: class::CLASS_40,
                 radius: Footprint::new(0.5, 0.5),
                 height: Distance::new(1.0),
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::YES,
                 ..Master::default()
             },
@@ -1002,9 +1002,9 @@ mod clearing_tests {
             for u in all {
                 let m = ms.get(u.life.master_id).expect("a test master");
                 let mut at = placed(&u, m, p);
-                if m.obstruction_kind == ObstructionKind::TYPE_2 {
+                if m.obstruction_kind == ObstructionKind::KIND_2 {
                     at.obstruction = Some(Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::NONE,
                     });
                 }
@@ -1183,7 +1183,7 @@ mod clearing_tests {
     /// `FUN_14121cc40`'s refund at a death from state 2: a unit's paid cost leaves attributes 98
     /// and 164, a building's 98 and 165, the castle's and the wonder's 98 alone, an annex's none.
     #[test]
-    fn death_refunds_its_paid_cost_by_its_type() {
+    fn death_refunds_its_paid_cost_by_its_kind() {
         let unit = Master {
             kind: MasterKind::COMBAT,
             creatable: Some(CreatablePart {

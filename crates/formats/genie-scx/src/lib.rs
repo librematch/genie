@@ -25,7 +25,7 @@ mod header;
 mod map;
 mod player;
 mod triggers;
-mod types;
+mod values;
 mod victory;
 
 use format::ScxFormat;
@@ -34,13 +34,13 @@ use std::io::{self, Read, Write};
 
 pub use format::{ScenarioObject, TribeScen};
 pub use genie_support::{DecodeStringError, EncodeStringError};
-pub use genie_support::{StringKey, UnitTypeId};
+pub use genie_support::{StringKey, UnitKindId};
 pub use header::{DlcOptions, ScxHeader};
 pub use map::{Map, Tile};
 pub use player::{ScenarioPlayerData, WorldPlayerData};
 use std::result::Result as StdResult;
 pub use triggers::{Trigger, TriggerCondition, TriggerEffect, TriggerSystem};
-pub use types::*;
+pub use values::*;
 pub use victory::{VictoryConditions, VictoryEntry, VictoryPointEntry, VictoryState};
 
 /// Error type for SCX methods, containing all types of errors that may occur while reading or

@@ -31,8 +31,8 @@ A player has more than its objects. This folder holds the rest:
 | [`market_values.rs`](market_values.rs) | The market's values: a commodity's price, its swing and its net trades. |
 | [`mod.rs`](mod.rs) | The players beside their objects: their game status (playing, won, lost), diplomacy, tribute, treason, the market, their history, their object trackers, and the world player's own update. |
 | [`player_id.rs`](player_id.rs) | A player's number as one type: the player a command comes from or names, and the index of the world's players. |
+| [`player_kind.rs`](player_kind.rs) | A player's type as one type: `player+0x10`, the save's class byte. |
 | [`player_set.rs`](player_set.rs) | A set of players, one bit each (`PlayerSet`). |
-| [`player_type.rs`](player_type.rs) | A player's type as one type: `player+0x10`, the save's class byte. |
 | [`posture.rs`](posture.rs) | A player's offensive posture. |
 | [`query_relation.rs`](query_relation.rs) | A search's relation number: which players' objects `ClosestObject` asks for or passes over. |
 | [`relation.rs`](relation.rs) | How a player stands to another as one type (`Relation`), and a player's row of them (`Relations`, `relation[i]`, `player+0x260`). |

@@ -25,7 +25,7 @@ use crate::orders::lock_gate;
 use crate::players::PlayerId;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightLayer;
 use crate::world::Seconds;
 use crate::world::index::Place;
@@ -81,7 +81,7 @@ impl World {
             master: Some(master),
             farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
             masters: self.model.masters.of(owner),
-            player_type: self.players.player(owner)?.kind,
+            player_kind: self.players.player(owner)?.kind,
             ai: self.parts.unit_ai.contains(u.id),
         };
         let part = completion.first_part(&construction, &self.model.roles)?;
@@ -438,7 +438,7 @@ impl World {
             }
             return Ok(Some(id));
         }
-        let ai = Ok(unit_ai_type(&made, master, &self.model.roles));
+        let ai = Ok(unit_ai_kind(&made, master, &self.model.roles));
         let (id, _) = self.make_building(p, master, ai, at)?;
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;

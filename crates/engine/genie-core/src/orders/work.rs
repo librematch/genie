@@ -31,7 +31,7 @@ use crate::objects::masters::TaskGroup;
 use crate::objects::masters::work_master;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -155,9 +155,9 @@ impl World {
             .class;
         let unit = self.players.live_mut(player, idx)?;
         if matches!(task.action_kind, GATHER | HUNT) {
-            let (kind, held) = (task.attribute_type, unit.life.attribute_type);
+            let (kind, held) = (task.attribute_kind, unit.life.attribute_kind);
             if held != kind && !both_food(kind, held) {
-                unit.life.attribute_type = kind;
+                unit.life.attribute_kind = kind;
                 unit.life.amount = Amount::ZERO;
             }
         }
@@ -233,7 +233,7 @@ impl World {
         }
         // the top action of type 0x7e would hear the target through its slot 0x48: the slice
         // holds no action of that type. An Artifact on top ends a command of an Enter task here.
-        if top == Some(ARTIFACT_TYPE) && task.action_kind == ENTER {
+        if top == Some(ARTIFACT_KIND) && task.action_kind == ENTER {
             return Ok(());
         }
         if kept {
@@ -497,11 +497,11 @@ impl World {
                 task: HuntTask {
                     id: task.id,
                     range: task.work_range,
-                    resource: task.attribute_type,
+                    resource: task.attribute_kind,
                     sprites: task.sprites,
                     work_value: task.work_val1,
-                    productivity: task.attribute_type2,
-                    kind4: task.attribute_type4,
+                    productivity: task.attribute_kind2,
+                    kind4: task.attribute_kind4,
                 },
                 point,
                 clears,

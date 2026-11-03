@@ -1,20 +1,20 @@
 //! The attributes every unit type has: the resource storage, the damage sprites and the static
-//! part ([`StaticUnitTypeAttributes`]).
+//! part ([`StaticUnitKindAttributes`]).
 
 use crate::conv::{fits, invalid_data, opt_fits};
 use crate::sound::SoundId;
 use crate::sprite::{GraphicId, SpriteId};
-use crate::unit_type::{UnitClass, write_opt_string_key};
+use crate::unit_kind::{UnitClass, write_opt_string_key};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{StringKey, UnitTypeId, read_opt_u16};
+use genie_support::{StringKey, UnitKindId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// A resource a unit stores (e.g. the food in a sheep), with how it is stored.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct UnitAttribute {
     /// Resource type; 0xFFFF marks an unused slot.
-    pub attribute_type: u16,
+    pub attribute_kind: u16,
     /// How much of the resource the unit holds.
     pub amount: f32,
     /// When the resource is stored or released (genieutils' storage `Flag`); not decoded here.
@@ -29,7 +29,7 @@ impl UnitAttribute {
     /// Returns an error if reading from `input` fails.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         Ok(Self {
-            attribute_type: input.read_u16::<LE>()?,
+            attribute_kind: input.read_u16::<LE>()?,
             amount: input.read_f32::<LE>()?,
             flag: input.read_u8()?,
         })
@@ -41,7 +41,7 @@ impl UnitAttribute {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to(self, mut output: impl Write) -> Result<()> {
-        output.write_u16::<LE>(self.attribute_type)?;
+        output.write_u16::<LE>(self.attribute_kind)?;
         output.write_f32::<LE>(self.amount)?;
         output.write_u8(self.flag)?;
         Ok(())
@@ -97,10 +97,10 @@ impl DamageSprite {
 // The bools are flags of the file format.
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
-pub struct StaticUnitTypeAttributes {
+pub struct StaticUnitKindAttributes {
     pub(super) name: String,
     /// ID of this unit type.
-    pub id: UnitTypeId,
+    pub id: UnitKindId,
     /// Language string ID of the unit's name.
     pub string_id: StringKey,
     pub(super) string_id2: Option<StringKey>,
@@ -130,7 +130,7 @@ pub struct StaticUnitTypeAttributes {
     /// Sound played when the unit takes damage, or `None`.
     pub damage_sound: Option<SoundId>,
     /// Unit type that replaces this unit when it dies (e.g. its corpse), or `None`.
-    pub death_spawn: Option<UnitTypeId>,
+    pub death_spawn: Option<UnitKindId>,
     /// genieutils' `SortNumber`; its use is not known yet.
     pub sort_number: u8,
     /// Whether buildings can be placed over this unit.
@@ -161,7 +161,7 @@ pub struct StaticUnitTypeAttributes {
     /// The terrain restriction (terrain table) that says where the unit can be.
     pub terrain_restriction_id: u16,
     /// Whether and how the unit flies (genieutils' `FlyMode`).
-    pub movement_type: u8,
+    pub movement_kind: u8,
     /// The most resource the unit can hold (genieutils' `ResourceCapacity`).
     pub attribute_max_amount: u16,
     /// How fast the unit's resource decays (genieutils' `ResourceDecay`).
@@ -198,7 +198,7 @@ pub struct StaticUnitTypeAttributes {
     /// How the unit is drawn when it is hidden behind others (genieutils' `OcclusionMode`).
     pub occlusion_mask: u8,
     /// Shape of the unit's obstruction (genieutils' `ObstructionType`).
-    pub obstruction_type: u8,
+    pub obstruction_kind: u8,
     /// The byte genieutils reads as `ObstructionClass`; genie-rs takes it as the selection shape.
     pub selection_shape: u8,
     /// Object flags, stored as a u32 from data version 11.55 on; 0 for older files, which lack
@@ -223,15 +223,15 @@ pub struct StaticUnitTypeAttributes {
     /// genieutils' `ConvertTerrain` flag; its effect is not known yet.
     pub convert_terrain_flag: u8,
     /// ID of the unit type this one copies; newer files also use it to pick the unit's task list
-    /// (see [`ActionUnitTypeAttributes::tasks`]).
+    /// (see [`ActionUnitKindAttributes::tasks`]).
     ///
-    /// [`ActionUnitTypeAttributes::tasks`]: crate::unit_type::movers::ActionUnitTypeAttributes::tasks
+    /// [`ActionUnitKindAttributes::tasks`]: crate::unit_kind::movers::ActionUnitKindAttributes::tasks
     pub copy_id: u16,
     /// ID of the unit's base unit type (genieutils' `BaseID`).
     pub unit_group: u16,
 }
 
-impl StaticUnitTypeAttributes {
+impl StaticUnitKindAttributes {
     /// Read the static attributes from an input stream.
     ///
     /// # Errors
@@ -240,23 +240,23 @@ impl StaticUnitTypeAttributes {
     ///
     /// Also fails if the name is not valid UTF-8.
     pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
-        let mut unit_type = Self::default();
+        let mut unit_kind = Self::default();
         let name_len = input.read_u16::<LE>()?;
-        unit_type.read_identity(&mut input)?;
-        unit_type.read_sounds_and_placement(&mut input)?;
-        unit_type.read_levels(&mut input)?;
-        unit_type.read_resource_flags(&mut input, version)?;
-        unit_type.read_attributes(&mut input)?;
-        unit_type.name = {
+        unit_kind.read_identity(&mut input)?;
+        unit_kind.read_sounds_and_placement(&mut input)?;
+        unit_kind.read_levels(&mut input)?;
+        unit_kind.read_resource_flags(&mut input, version)?;
+        unit_kind.read_attributes(&mut input)?;
+        unit_kind.name = {
             // TODO use not-UTF8 for the name
             let mut bytes = vec![0; usize::from(name_len)];
             input.read_exact(&mut bytes)?;
             String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect())
                 .map_err(invalid_data)?
         };
-        unit_type.copy_id = input.read_u16::<LE>()?;
-        unit_type.unit_group = input.read_u16::<LE>()?;
-        Ok(unit_type)
+        unit_kind.copy_id = input.read_u16::<LE>()?;
+        unit_kind.unit_group = input.read_u16::<LE>()?;
+        Ok(unit_kind)
     }
 
     /// The ids, the class, the sprites, the hit points, the line of sight, the garrison and the
@@ -301,7 +301,7 @@ impl StaticUnitTypeAttributes {
         self.elevation_flag = input.read_u8()? != 0;
         self.fog_flag = input.read_u8()? != 0;
         self.terrain_restriction_id = input.read_u16::<LE>()?;
-        self.movement_type = input.read_u8()?;
+        self.movement_kind = input.read_u8()?;
         Ok(())
     }
 
@@ -330,7 +330,7 @@ impl StaticUnitTypeAttributes {
         self.create_doppleganger = input.read_u8()? != 0;
         self.resource_group = input.read_u8()?;
         self.occlusion_mask = input.read_u8()?;
-        self.obstruction_type = input.read_u8()?;
+        self.obstruction_kind = input.read_u8()?;
         self.selection_shape = input.read_u8()?;
         self.object_flags = if version < 11.55 {
             0
@@ -352,7 +352,7 @@ impl StaticUnitTypeAttributes {
     fn read_attributes(&mut self, mut input: impl Read) -> Result<()> {
         for _ in 0..3 {
             let attr = UnitAttribute::read_from(&mut input)?;
-            if attr.attribute_type != 0xFFFF {
+            if attr.attribute_kind != 0xFFFF {
                 self.attributes.push(attr);
             }
         }
@@ -440,7 +440,7 @@ impl StaticUnitTypeAttributes {
         output.write_u8(u8::from(self.elevation_flag))?;
         output.write_u8(u8::from(self.fog_flag))?;
         output.write_u16::<LE>(self.terrain_restriction_id)?;
-        output.write_u8(self.movement_type)?;
+        output.write_u8(self.movement_kind)?;
         Ok(())
     }
 
@@ -469,7 +469,7 @@ impl StaticUnitTypeAttributes {
         output.write_u8(u8::from(self.create_doppleganger))?;
         output.write_u8(self.resource_group)?;
         output.write_u8(self.occlusion_mask)?;
-        output.write_u8(self.obstruction_type)?;
+        output.write_u8(self.obstruction_kind)?;
         output.write_u8(self.selection_shape)?;
         output.write_u32::<LE>(self.object_flags)?;
         output.write_u8(self.civilization)?;
@@ -507,8 +507,8 @@ mod tests {
 
     /// A unit type with a value in each section: two attributes, a damage sprite, sprites and
     /// sounds, flags and a name.
-    fn archer() -> StaticUnitTypeAttributes {
-        let mut unit = StaticUnitTypeAttributes {
+    fn archer() -> StaticUnitKindAttributes {
+        let mut unit = StaticUnitKindAttributes {
             name: "Archer".to_owned(),
             id: 4.into(),
             string_id: StringKey::from(5084u32),
@@ -535,15 +535,15 @@ mod tests {
             selected_sound: Some(SoundId::from(9u16)),
             copy_id: 4,
             unit_group: 4,
-            ..StaticUnitTypeAttributes::default()
+            ..StaticUnitKindAttributes::default()
         };
         unit.attributes.push(UnitAttribute {
-            attribute_type: 0,
+            attribute_kind: 0,
             amount: 1.0,
             flag: 1,
         });
         unit.attributes.push(UnitAttribute {
-            attribute_type: 4,
+            attribute_kind: 4,
             amount: 0.5,
             flag: 0,
         });
@@ -553,10 +553,10 @@ mod tests {
     /// A unit type's bytes from 11.55 on (with its object flags) read back and written again
     /// give the same bytes; the name ends the record but for the copy id and group.
     #[test]
-    fn static_unit_type_writes_back_the_bytes_it_read() {
+    fn static_unit_kind_writes_back_the_bytes_it_read() {
         let mut bytes = vec![];
         archer().write_to(&mut bytes, 12.0).unwrap();
-        let unit = StaticUnitTypeAttributes::read_from(bytes.as_slice(), 12.0).unwrap();
+        let unit = StaticUnitKindAttributes::read_from(bytes.as_slice(), 12.0).unwrap();
         assert_eq!(
             (
                 unit.name.as_str(),
@@ -574,7 +574,7 @@ mod tests {
 
     /// Before 11.55 the record has no object flags: they read as 0.
     #[test]
-    fn an_old_unit_type_has_no_object_flags() {
+    fn an_old_unit_kind_has_no_object_flags() {
         let unit = archer();
         let mut bytes = vec![];
         unit.write_to(&mut bytes, 12.0).unwrap();
@@ -585,7 +585,7 @@ mod tests {
         unit.write_levels(&mut head).unwrap();
         let flags_at = head.len() + 7;
         let old = [&bytes[..flags_at], &bytes[flags_at + 4..]].concat();
-        let read = StaticUnitTypeAttributes::read_from(old.as_slice(), 11.5).unwrap();
+        let read = StaticUnitKindAttributes::read_from(old.as_slice(), 11.5).unwrap();
         assert_eq!((read.object_flags, read.name.as_str()), (0, "Archer"));
     }
 }

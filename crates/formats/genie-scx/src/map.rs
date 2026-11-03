@@ -15,7 +15,7 @@ pub struct Tile {
     /// Unused?
     pub zone: i8,
     /// Definitive Edition 2 value, not sure what it does, only seen `-1` in the wild so far
-    mask_type: Option<u16>,
+    mask_kind: Option<u16>,
 }
 
 impl Tile {
@@ -30,10 +30,10 @@ impl Tile {
             layered_terrain: None,
             elevation: input.read_i8()?,
             zone: input.read_i8()?,
-            mask_type: None,
+            mask_kind: None,
         };
         if version >= 1 {
-            tile.mask_type = read_opt_u16(&mut input)?;
+            tile.mask_kind = read_opt_u16(&mut input)?;
             tile.layered_terrain = read_opt_u16(&mut input)?;
         }
         Ok(tile)
@@ -50,7 +50,7 @@ impl Tile {
         output.write_i8(self.zone)?;
 
         if version >= 1 {
-            output.write_u16::<LE>(self.mask_type.unwrap_or(0xFFFF))?;
+            output.write_u16::<LE>(self.mask_kind.unwrap_or(0xFFFF))?;
             output.write_u16::<LE>(self.layered_terrain.unwrap_or(0xFFFF))?;
         }
 
@@ -87,9 +87,9 @@ impl Map {
     }
 
     /// Fill the map with the given terrain type.
-    pub fn fill(&mut self, terrain_type: u8) {
+    pub fn fill(&mut self, terrain_kind: u8) {
         for tile in &mut self.tiles {
-            tile.terrain = terrain_type;
+            tile.terrain = terrain_kind;
         }
     }
 

@@ -276,7 +276,7 @@ impl World {
             let (kind, class, master) = (m.kind, m.class, m.id);
             let takes_villagers = m
                 .building
-                .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS));
+                .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS));
             let near = |t: &Self| -> Result<bool, GenieError> {
                 let (other_at, other_radius) = t.ground(id)?;
                 let gap = footprint_gap_squared(other_at, other_radius, at, radius);
@@ -350,7 +350,7 @@ impl World {
             let m = b.master(self.master_tables(), owner)?;
             let takes_villagers = m
                 .building
-                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
+                .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
             if m.kind != MasterKind::BUILDING
                 || ObjectState::Dying <= b.life.state
                 || !takes_villagers
@@ -401,7 +401,7 @@ impl World {
             let m = b.master(self.master_tables(), owner)?;
             let takes_villagers = m
                 .building
-                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
+                .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
             if b.life.state != ObjectState::Alive
                 || b.life.inside.is_some()
                 || m.kind != MasterKind::BUILDING
@@ -568,7 +568,7 @@ impl World {
                 && world.allied(player, tp, true)
                 && tm
                     .building
-                    .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS)))
+                    .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS)))
             .then_some(true)
         } else {
             Some(false)

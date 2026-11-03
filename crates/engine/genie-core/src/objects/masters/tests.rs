@@ -55,9 +55,9 @@ use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::static_roles;
 use crate::testing::tuning;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::task_finder::TaskOn;
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::unit_ai_kind;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use std::sync::Arc;
@@ -68,9 +68,9 @@ fn sprite_value(s: Option<SpriteId>) -> f32 {
     f32::from(s.map_or(-1, SpriteId::get))
 }
 
-fn task(action_type: ActionKind, object_group: i16, object_id: i16, work_val1: f32) -> Task {
+fn task(action_kind: ActionKind, object_group: i16, object_id: i16, work_val1: f32) -> Task {
     Task {
-        action_kind: action_type,
+        action_kind,
         object_group: class_of(object_group),
         object_id: opt_master(object_id),
         work_val1: WorkValue::new(work_val1),
@@ -203,7 +203,7 @@ fn world(capped: bool) -> AttributeWorld<'static> {
     }
 }
 
-fn of_type(kind: MasterKind) -> Master {
+fn of_kind(kind: MasterKind) -> Master {
     Master::of_kind(kind)
 }
 
@@ -363,7 +363,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
             [3.0, 5.0, 5.0],
         ),
         (
-            MasterAttribute::OBSTRUCTION_TYPE,
+            MasterAttribute::OBSTRUCTION_KIND,
             |m| f32::from(m.obstruction_kind.get()),
             [3.0, 3.0, 3.0],
         ),
@@ -443,7 +443,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
     let mut m = stocked(MasterKind::STATIC);
     m.object_flags = ObjectFlags::from_bits_retain(0x1234);
     m.set_attribute(MasterAttribute::TRAIT_PIECE, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::OBSTRUCTION_TYPE, 4.0, &world(false));
+    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
     m.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 0.0, &world(false));
     assert_eq!(
         (m.object_flags, m.obstruction_kind),
@@ -462,7 +462,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
 /// one) pass the attack, armour, range, reload and work rate by, as the game's do.
 #[test]
 fn effects_on_layers_the_master_lacks_change_nothing() {
-    let before = of_type(MasterKind::MOVING);
+    let before = of_kind(MasterKind::MOVING);
     let mut m = before.clone();
     for a in [
         MasterAttribute::ATTACK,
@@ -481,7 +481,7 @@ fn effects_on_layers_the_master_lacks_change_nothing() {
 /// raises scales the percentage by the factor (which a product of 0 keeps at 0).
 #[test]
 fn combat_multiply_takes_percentage_of_the_class_amount() {
-    let mut m = of_type(MasterKind::RGE_COMBAT);
+    let mut m = of_kind(MasterKind::RGE_COMBAT);
     m.combat.get_or_insert_with(Default::default).armors =
         vec![ClassAmount::new(4, 3), ClassAmount::new(3, 5)];
     m.combat.get_or_insert_with(Default::default).weapons =
@@ -690,7 +690,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
             [3.0, 5.0, 5.0],
         ),
         (
-            MasterAttribute::CHARGE_TYPE,
+            MasterAttribute::CHARGE_KIND,
             |m| f32::from(m.creatable_part().charge_kind.get()),
             [3.0; 3],
         ),
@@ -823,7 +823,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
 /// `+0x648`) both stop at 0x7fff, a NaN too (`COMISS` then `JBE`).
 #[test]
 fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
-    let mut m = of_type(MasterKind::STATIC);
+    let mut m = of_kind(MasterKind::STATIC);
     m.set_attribute(MasterAttribute::HIT_POINTS, 25.9, &world(false));
     assert_eq!(m.hit_points, MasterHitPoints::of_data(25));
     m.add_attribute(MasterAttribute::HIT_POINTS, 15.7, &world(false));
@@ -853,7 +853,7 @@ fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
 /// truncation, the trait piece its high half; an obstruction type the table refuses is 0.
 #[test]
 fn the_static_setters_truncate_as_the_game_does() {
-    let mut m = of_type(MasterKind::TREE);
+    let mut m = of_kind(MasterKind::TREE);
     m.storage = vec![
         (Some(player_attribute::MEAT), Amount::new(100.0), 1),
         (None, Amount::ZERO, 0),
@@ -874,9 +874,9 @@ fn the_static_setters_truncate_as_the_game_does() {
     m.object_flags = ObjectFlags::from_bits_retain(0x1234_5678);
     m.set_attribute(MasterAttribute::TRAIT_PIECE, 3.0, &world(false));
     assert_eq!(m.object_flags, ObjectFlags::from_bits_retain(0x0003_5678));
-    m.set_attribute(MasterAttribute::OBSTRUCTION_TYPE, 5.0, &world(false));
+    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 5.0, &world(false));
     assert_eq!(m.obstruction_kind, ObstructionKind::CIRCLE);
-    m.set_attribute(MasterAttribute::OBSTRUCTION_TYPE, 4.0, &world(false));
+    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
     assert_eq!(m.obstruction_kind, ObstructionKind::NONE);
     // "Can Be Built On" writes the blast defense level; its multiply does not round
     m.set_attribute(MasterAttribute::CAN_BE_BUILT_ON, 3.0, &world(false));
@@ -893,7 +893,7 @@ fn the_static_setters_truncate_as_the_game_does() {
 /// sprite; an add starts from −1 for none.
 #[test]
 fn sprite_attribute_takes_only_sprite_the_world_has() {
-    let mut m = of_type(MasterKind::MOVING);
+    let mut m = of_kind(MasterKind::MOVING);
     m.standing_sprite = Some(SpriteId::named(5));
     m.moving.get_or_insert_with(Default::default).move_sprite = None;
     m.set_attribute(MasterAttribute::STANDING_GRAPHIC, 150.0, &world(false));
@@ -909,14 +909,14 @@ fn sprite_attribute_takes_only_sprite_the_world_has() {
 /// `FUN_1410a8b60`, `FUN_1410a8c00`: a capped add or multiply of the speed stops at 4.5, a
 /// missile master's at 20; a NaN speed passes (`COMISS`, `JBE`).
 #[test]
-fn capped_speed_stops_at_its_type_cap() {
-    let mut m = of_type(MasterKind::COMBAT);
+fn capped_speed_stops_at_its_kind_cap() {
+    let mut m = of_kind(MasterKind::COMBAT);
     m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(4.0);
     m.add_attribute(MasterAttribute::MOVEMENT_SPEED, 1.0, &world(false));
     assert_eq!(m.animated_part().max_speed, Speed::new(5.0));
     m.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(true));
     assert_eq!(m.animated_part().max_speed, Speed::new(4.5));
-    let mut missile = of_type(MasterKind::MISSILE);
+    let mut missile = of_kind(MasterKind::MISSILE);
     missile
         .animated
         .get_or_insert_with(Default::default)
@@ -932,7 +932,7 @@ fn capped_speed_stops_at_its_type_cap() {
 /// multiply by `amount / 100`.
 #[test]
 fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
-    let mut m = of_type(MasterKind::COMBAT);
+    let mut m = of_kind(MasterKind::COMBAT);
     m.combat.get_or_insert_with(Default::default).armors = vec![
         ClassAmount::new(4, 1),
         ClassAmount::new(3, 2),
@@ -986,7 +986,7 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
 /// and the shown values by the truncated amount (`IMUL`).
 #[test]
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
-    let mut m = of_type(MasterKind::RGE_COMBAT);
+    let mut m = of_kind(MasterKind::RGE_COMBAT);
     m.combat.get_or_insert_with(Default::default).base_armor = DamageAmount::new(3);
     m.combat.get_or_insert_with(Default::default).fire_frame = Frame::of_data(5);
     m.combat.get_or_insert_with(Default::default).shown.attack = DamageAmount::new(7);
@@ -1006,7 +1006,7 @@ fn some_combat_shorts_multiply_by_the_truncated_amount() {
 /// multiplies; then the RGE combat master's setter runs.
 #[test]
 fn missile_smart_mode_multiply_sets_it() {
-    let mut m = of_type(MasterKind::MISSILE);
+    let mut m = of_kind(MasterKind::MISSILE);
     m.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::LEADS_TARGET,
@@ -1034,7 +1034,7 @@ fn missile_smart_mode_multiply_sets_it() {
 /// to the negated amount and the population storage to the amount.
 #[test]
 fn the_cost_attributes_change_their_resource_entries() {
-    let mut m = of_type(MasterKind::BUILDING);
+    let mut m = of_kind(MasterKind::BUILDING);
     m.creatable.get_or_insert_with(Default::default).cost = costs(&[
         (player_attribute::WOOD, 25, true),
         (player_attribute::HEADROOM, 1, false),
@@ -1094,7 +1094,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
         button: LocationButton::of_data(1),
         hotkey: HotkeyId::of_data(16_000),
     };
-    let mut m = of_type(MasterKind::COMBAT);
+    let mut m = of_kind(MasterKind::COMBAT);
     m.creatable
         .get_or_insert_with(Default::default)
         .train_locations = vec![
@@ -1192,7 +1192,7 @@ fn the_train_location_attributes_change_the_selected_entry() {
 /// entry removing the last leaves 0xff.
 #[test]
 fn the_damage_sprite_attributes_resize_and_select() {
-    let mut m = of_type(MasterKind::ANIMATED);
+    let mut m = of_kind(MasterKind::ANIMATED);
     m.damage_graphic_entry = DamageGraphicEntry::of_data(2);
     m.set_attribute(
         MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM,
@@ -1239,7 +1239,7 @@ fn the_damage_sprite_attributes_resize_and_select() {
 /// master's setter (the regeneration from the hit points, 120).
 #[test]
 fn building_master_setters_fall_back_on_the_combat_master_s() {
-    let mut m = of_type(MasterKind::BUILDING);
+    let mut m = of_kind(MasterKind::BUILDING);
     m.building = Some(BuildingMaster {
         foundation_terrain: Some(TerrainId::named(0)),
         ..BuildingMaster::default()
@@ -1257,7 +1257,7 @@ fn building_master_setters_fall_back_on_the_combat_master_s() {
     );
     assert_eq!(m.creatable_part().regeneration, Regeneration::new(300.0));
     assert_eq!(m, {
-        let mut same = of_type(MasterKind::BUILDING);
+        let mut same = of_kind(MasterKind::BUILDING);
         same.building = Some(b);
         same.hit_points = MasterHitPoints::of_data(600);
         same.creatable
@@ -1272,7 +1272,7 @@ fn building_master_setters_fall_back_on_the_combat_master_s() {
 /// an effect on them leaves it as it was.
 #[test]
 fn an_effect_on_the_creatable_layer_leaves_masters_without_it_unchanged() {
-    let moving = of_type(MasterKind::MOVING);
+    let moving = of_kind(MasterKind::MOVING);
     for attribute in [
         MasterAttribute::MAXIMUM_CHARGE,
         MasterAttribute::RECHARGE_RATE,
@@ -1292,7 +1292,7 @@ fn an_effect_on_the_creatable_layer_leaves_masters_without_it_unchanged() {
 /// terrain 1, and a set below 0 is none again.
 #[test]
 fn foundation_terrain_add_counts_none_as_minus_one() {
-    let mut m = of_type(MasterKind::BUILDING);
+    let mut m = of_kind(MasterKind::BUILDING);
     m.building = Some(BuildingMaster::default());
     m.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
     assert_eq!(
@@ -1344,7 +1344,7 @@ fn moving_master_derived_values_follow_its_attributes() {
     ]
     .into_iter()
     .collect();
-    let mut m = of_type(MasterKind::COMBAT);
+    let mut m = of_kind(MasterKind::COMBAT);
     m.standing_sprite = Some(SpriteId::named(1));
     let moving = m.moving.get_or_insert_with(Default::default);
     (moving.move_sprite, moving.run_sprite) = (Some(SpriteId::named(2)), None);
@@ -1398,7 +1398,7 @@ fn moving_master_derived_values_follow_its_attributes() {
 #[test]
 fn an_id_field_keeps_negative_value_through_an_add() {
     let w = world(false);
-    let mut m = of_type(MasterKind::RGE_COMBAT);
+    let mut m = of_kind(MasterKind::RGE_COMBAT);
     for a in [
         MasterAttribute::PROJECTILE_UNIT,
         MasterAttribute::TERRAIN_DEFENSE_BONUS,
@@ -1427,7 +1427,7 @@ fn an_id_field_keeps_negative_value_through_an_add() {
     m.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &w);
     m.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &w);
     assert_eq!(m.combat_part().missile.get(), 1);
-    let mut t = of_type(MasterKind::MOVING);
+    let mut t = of_kind(MasterKind::MOVING);
     t.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &w);
     t.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &w);
     assert_eq!(t.moving_part().trail.unit.master(), Some(master_id(2)));
@@ -1438,7 +1438,7 @@ fn an_id_field_keeps_negative_value_through_an_add() {
 /// interface's sounds change nothing.
 #[test]
 fn the_action_and_moving_setters_change_their_values() {
-    let mut m = of_type(MasterKind::ACTION);
+    let mut m = of_kind(MasterKind::ACTION);
     m.set_attribute(MasterAttribute::WORK_RATE, 0.5, &world(false));
     m.add_attribute(MasterAttribute::WORK_RATE, 0.25, &world(false));
     m.multiply_attribute(MasterAttribute::WORK_RATE, 2.0, &world(false));
@@ -1486,7 +1486,7 @@ fn the_action_and_moving_setters_change_their_values() {
 /// change nothing.
 #[test]
 fn the_combat_master_own_values_change() {
-    let mut m = of_type(MasterKind::COMBAT);
+    let mut m = of_kind(MasterKind::COMBAT);
     m.hit_points = MasterHitPoints::of_data(100);
     m.combat.get_or_insert_with(Default::default).attack_sprite2 = Some(SpriteId::named(10));
     m.set_attribute(MasterAttribute::HERO_STATUS, 1.0, &world(false));
@@ -1495,7 +1495,7 @@ fn the_combat_master_own_values_change() {
     m.multiply_attribute(MasterAttribute::MAXIMUM_CHARGE, 1.5, &world(false));
     m.set_attribute(MasterAttribute::RECHARGE_RATE, 0.5, &world(false));
     m.set_attribute(MasterAttribute::CHARGE_EVENT, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::CHARGE_TYPE, 6.0, &world(false));
+    m.set_attribute(MasterAttribute::CHARGE_KIND, 6.0, &world(false));
     m.set_attribute(
         MasterAttribute::MAX_CONVERSION_TIME_MODIFIER,
         3.0,
@@ -1595,7 +1595,7 @@ fn the_combat_master_own_values_change() {
 /// type; an animated master's set (`FUN_1410a8b00`) its speed.
 #[test]
 fn the_missile_building_and_animated_setters() {
-    let mut m = of_type(MasterKind::MISSILE);
+    let mut m = of_kind(MasterKind::MISSILE);
     m.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::NONE,
@@ -1617,15 +1617,15 @@ fn the_missile_building_and_animated_setters() {
         )
     );
     assert_eq!(m.combat_part().weapon_range, Distance::new(5.0));
-    let mut b = of_type(MasterKind::BUILDING);
+    let mut b = of_kind(MasterKind::BUILDING);
     b.building = Some(BuildingMaster::default());
     b.add_attribute(MasterAttribute::BUILDING_ICON_OVERRIDE, 3.0, &world(false));
-    b.add_attribute(MasterAttribute::GARRISON_TYPE, 2.0, &world(false));
+    b.add_attribute(MasterAttribute::GARRISON_KIND, 2.0, &world(false));
     assert_eq!(
-        (b.building.unwrap().facet, b.building.unwrap().garrison_type),
+        (b.building.unwrap().facet, b.building.unwrap().garrison_kind),
         (3, GarrisonKinds::INFANTRY)
     );
-    let mut a = of_type(MasterKind::DOPPELGANGER);
+    let mut a = of_kind(MasterKind::DOPPELGANGER);
     a.set_attribute(MasterAttribute::MOVEMENT_SPEED, 1.2, &world(false));
     assert_eq!(a.animated_part().max_speed, Speed::new(1.2));
 }
@@ -1792,7 +1792,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
 }
 
 #[test]
-fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
+fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
     let master = |class, volley_missile, combat_level| Master {
         class,
         combat_level,
@@ -1804,45 +1804,45 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     };
     // a building without a volley missile, with one (the tower's), and a boar's combat level
     assert_eq!(
-        unit_ai_type(
+        unit_ai_kind(
             &master(class::BUILDING, None, CombatLevel::NONE),
             ids::HOUSE,
             &roles()
         ),
-        Some(UnitAiType::BUILDING)
+        Some(UnitAiKind::BUILDING)
     );
     assert_eq!(
-        unit_ai_type(
+        unit_ai_kind(
             &master(class::BUILDING, Some(master_id(5)), CombatLevel::NONE),
             master_id(79),
             &roles(),
         ),
-        Some(UnitAiType::TOWER)
+        Some(UnitAiKind::TOWER)
     );
     assert_eq!(
-        unit_ai_type(
+        unit_ai_kind(
             &master(class::PREDATOR, None, CombatLevel::ANIMAL),
             master_id(48),
             &roles()
         ),
-        Some(UnitAiType::BOAR)
+        Some(UnitAiKind::BOAR)
     );
     assert_eq!(
-        unit_ai_type(
+        unit_ai_kind(
             &master(class::PREDATOR, None, CombatLevel::NONE),
             master_id(126),
             &roles()
         ),
-        Some(UnitAiType::LION)
+        Some(UnitAiKind::LION)
     );
     // the factory's own ids first
     assert_eq!(
-        unit_ai_type(
+        unit_ai_kind(
             &master(class::BUILDING, None, CombatLevel::NONE),
             ids::ID_1105,
             &roles()
         ),
-        Some(UnitAiType::SIEGE_TOWER)
+        Some(UnitAiKind::SIEGE_TOWER)
     );
 }
 
@@ -1904,7 +1904,7 @@ fn master_moves_with_moving_part_whose_speed_is_above_0() {
         facets: None,
         weapon_range: Distance::ZERO,
     };
-    let mut m = of_type(MasterKind::COMBAT);
+    let mut m = of_kind(MasterKind::COMBAT);
     m.move_stats = None;
     assert!(!m.moves());
     m.move_stats = Some(moving(0.9));

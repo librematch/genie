@@ -23,12 +23,12 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::Ask;
 use crate::unit_ai::{
@@ -168,11 +168,11 @@ pub enum Pick {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Attacker {
     /// The unit AI's type.
-    pub ai_type: UnitAiType,
+    pub ai_kind: UnitAiKind,
     /// The unit's player.
     pub player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The unit's state.
     pub state: ObjectState,
     /// The kind it holds (`attribute_type_held`, `+0x308`), none for −1.
@@ -301,23 +301,23 @@ pub fn can_attack(
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
-    match me.ai_type {
-        UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-        UnitAiType::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
+    match me.ai_kind {
+        UnitAiKind::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
+        UnitAiKind::PREDATOR => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
         BOAR_AI
-        | UnitAiType::RANGED_6
-        | UnitAiType::RANGED_7
+        | UnitAiKind::RANGED_6
+        | UnitAiKind::RANGED_7
         | TRADE_AI
         | TRANSPORT_AI
         | FISHING_AI
         | ARTIFACT_AI
         | SIEGE_TOWER_AI
-        | UnitAiType::LIVESTOCK => Ok(true),
-        UnitAiType::LION => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
+        | UnitAiKind::LIVESTOCK => Ok(true),
+        UnitAiKind::LION => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
         CIVILIAN => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
         BUILDING_AI => Ok(false),
-        UnitAiType::TOWER => tower_can_attack(me, t, roles, unit_ai_tuning),
-        UnitAiType::SOLDIER => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
+        UnitAiKind::TOWER => tower_can_attack(me, t, roles, unit_ai_tuning),
+        UnitAiKind::SOLDIER => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
         SIEGE_AI => siege_can_attack(me, seeker, t, false, roles, unit_ai_tuning),
         _ => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
@@ -463,7 +463,7 @@ pub fn soldier_can_attack(
     if !t.targeting {
         return Ok(false);
     }
-    if me.player_type.is_computer() {
+    if me.player_kind.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's soldier's attack check",
         ));

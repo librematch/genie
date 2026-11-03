@@ -2,7 +2,7 @@
 //! every listed unit is in.
 
 use crate::GenieError;
-use crate::groups::{Differentiator, UnitType};
+use crate::groups::{Differentiator, UnitKind};
 use crate::groups::{GroupId, UnitGroup};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
@@ -39,7 +39,7 @@ pub struct UnitGroups {
     /// each count of a sub-formation's unit types (`FUN_1410116c0`) writes its types from the
     /// front and copies the whole array into the group's `mUnitTypes`, so the words past the
     /// types are an earlier count's. Empty is all zero, as the process starts.
-    pub unit_types_scratch: Vec<UnitType>,
+    pub unit_kinds_scratch: Vec<UnitKind>,
 }
 
 impl UnitGroups {

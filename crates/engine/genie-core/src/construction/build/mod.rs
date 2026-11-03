@@ -26,7 +26,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::TaskId;
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -149,7 +149,7 @@ impl BuildTask {
             range: task.work_range,
             work_value: task.work_val1,
             work_rate,
-            resource: task.attribute_type,
+            resource: task.attribute_kind,
             id: task.id,
             moving: task.sprites.moving,
         }
@@ -192,8 +192,8 @@ pub struct Completion<'a> {
     pub farm_bonus: FarmBonus,
     /// The owner's masters, whose table `FUN_141659d20` reads.
     pub masters: Option<&'a Masters>,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The building has a unit AI (`+0x6b0`): a mule cart's.
     pub ai: bool,
 }
@@ -234,7 +234,7 @@ impl Completion<'_> {
         let master = self.master.ok_or(GenieError::unsupported(
             "a completion of a master the slice does not have",
         ))?;
-        if self.player_type.is_computer() {
+        if self.player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's building part (FUN_1411e7ca0)",
             ));
@@ -493,7 +493,7 @@ mod stack_tests {
     use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::ids;
-    use crate::unit_ai::UnitAiType;
+    use crate::unit_ai::UnitAiKind;
     use crate::world::Millis;
     use crate::world::WorldTime;
     #[cfg(test)]
@@ -552,7 +552,7 @@ mod stack_tests {
     fn masters() -> Masters {
         let mut foundation = building(
             621,
-            (2.0, 4.0, ObstructionKind::TYPE_2),
+            (2.0, 4.0, ObstructionKind::KIND_2),
             (150, 2400),
             -1,
             &[],
@@ -594,7 +594,7 @@ mod stack_tests {
             tc,
             building(
                 618,
-                (1.0, 3.0, ObstructionKind::TYPE_2),
+                (1.0, 3.0, ObstructionKind::KIND_2),
                 (100, 2400),
                 621,
                 &[],
@@ -647,7 +647,7 @@ mod stack_tests {
                 hit_points: MasterHitPoints::of_data(2400),
                 build_time: WholeSeconds::of_data(150),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -695,13 +695,13 @@ mod stack_tests {
                 class: class::BUILDING,
                 player: PlayerId::new(1),
                 master: ids::TOWN_CENTRE_621,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
                 unknown: None,
                 obstruction: Some(Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 }),
             },
@@ -726,7 +726,7 @@ mod stack_tests {
         for ms in &mut t.model.masters {
             let castle = building(
                 82,
-                (2.0, 4.0, ObstructionKind::TYPE_2),
+                (2.0, 4.0, ObstructionKind::KIND_2),
                 (150, 2400),
                 -1,
                 &[],
@@ -816,12 +816,12 @@ mod stack_tests {
         );
         // the tower's unit AI for the town centre, the building's for the annexes
         assert_eq!(
-            t.parts.unit_ai.get(object_id(8768)).map(|ai| ai.ai_type),
-            Some(UnitAiType::TOWER)
+            t.parts.unit_ai.get(object_id(8768)).map(|ai| ai.ai_kind),
+            Some(UnitAiKind::TOWER)
         );
         assert_eq!(
-            t.parts.unit_ai.get(object_id(8769)).map(|ai| ai.ai_type),
-            Some(UnitAiType::BUILDING)
+            t.parts.unit_ai.get(object_id(8769)).map(|ai| ai.ai_kind),
+            Some(UnitAiKind::BUILDING)
         );
         // the foundation lacked 0.84 of its 2400 hit points after its last work: the town
         // centre lacks them too

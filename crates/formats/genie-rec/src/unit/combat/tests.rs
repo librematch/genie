@@ -71,7 +71,7 @@ fn combat_unit_of_11_74_reads_every_counter_and_the_town_bell() {
     assert_eq!(unit.town_bell_target_id.map(u32::from), Some(620));
     assert_eq!(unit.town_bell_target_location, Some((30.0, 31.0)));
     assert_eq!(unit.town_bell_target_id_2.map(u32::from), Some(621));
-    assert_eq!((unit.town_bell_target_type, unit.town_bell_action), (4, 8));
+    assert_eq!((unit.town_bell_target_kind, unit.town_bell_action), (4, 8));
     assert_eq!(unit.berserker_timer.to_bits(), 2.5_f32.to_bits());
     assert_eq!((unit.num_builders, unit.num_healers), (3, 4));
 }

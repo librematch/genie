@@ -102,7 +102,7 @@ pub struct Artifact {
 }
 
 /// The action type the checkpoint adds for an Artifact action.
-pub const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
+pub const ARTIFACT_KIND: ActionKind = ActionKind::named(107);
 
 use crate::garrison::EnterAction;
 use crate::objects::layers::Action as LayersAction;

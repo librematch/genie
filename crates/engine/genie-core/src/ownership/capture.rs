@@ -130,7 +130,7 @@ impl Unit {
         }
         let trading = actions.top_action_kind() == Some(TRADE_ACTION)
             && below_or_unordered(0.0, self.life.amount.get())
-            && self.life.attribute_type.is_some();
+            && self.life.attribute_kind.is_some();
         if !roles.of_class(class).contains(ClassRoles::LIVESTOCK)
             && !trading
             && c.w

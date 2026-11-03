@@ -9,7 +9,7 @@ use crate::player::{
 };
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
-use crate::unit_type::CompactUnitType;
+use crate::unit_kind::CompactUnitKind;
 use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::tech_tree::TechTree;
@@ -33,7 +33,7 @@ impl ReadableHeaderElement for Player {
         skip_queues_and_dodging(input)?;
         skip_old_battle_stats(input)?;
         player.read_tech_tree_ai_and_gaia(input)?;
-        player.read_unit_types(input)?;
+        player.read_unit_kinds(input)?;
         player.read_maps_and_units(input)?;
         Ok(player)
     }
@@ -154,15 +154,15 @@ impl Player {
 
     /// The unit types: a flag for each, then the available ones (from 10.55 between the check
     /// bytes 22 and 33).
-    fn read_unit_types<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
-        let num_unit_types = input.read_u32::<LE>()?;
-        let available_unit_types = (0..num_unit_types)
+    fn read_unit_kinds<R: Read>(&mut self, input: &mut RecordingHeaderReader<R>) -> Result<()> {
+        let num_unit_kinds = input.read_u32::<LE>()?;
+        let available_unit_kinds = (0..num_unit_kinds)
             .map(|_| Ok(input.read_u32::<LE>()? != 0))
             .collect::<Result<Vec<_>>>()?;
         expect_marker(input, 11)?;
-        self.unit_types = available_unit_types
+        self.unit_kinds = available_unit_kinds
             .into_iter()
-            .map(|available| available.then(|| read_unit_type(input)).transpose())
+            .map(|available| available.then(|| read_unit_kind(input)).transpose())
             .collect::<Result<_>>()?;
         expect_marker(input, 11)
     }
@@ -183,9 +183,9 @@ impl Player {
 }
 
 /// An available unit type between its check bytes.
-fn read_unit_type<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<CompactUnitType> {
+fn read_unit_kind<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<CompactUnitKind> {
     expect_marker(input, 22)?;
-    let ty = CompactUnitType::read_from(input)?;
+    let ty = CompactUnitKind::read_from(input)?;
     expect_marker(input, 33)?;
     Ok(ty)
 }

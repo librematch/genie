@@ -36,10 +36,10 @@ use crate::unit_ai::task_finder::world::{TaskWorld, point_terrain, task_search, 
 use crate::unit_ai::task_finder::{Actor, TaskTarget};
 use crate::unit_ai::task_finder::{TaskOn, enabled};
 use crate::unit_ai::world_view::Wait;
-use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::index::Place;
 use crate::world::slots::PlayerSlots;
-use crate::world::{STATIC_TYPES_END, World};
+use crate::world::{STATIC_KINDS_END, World};
 
 /// `work_master` returns a master the player has; one it lacks is a broken world.
 const NO_WORK_MASTER: GenieError =
@@ -111,11 +111,11 @@ impl World {
         let (player, foundation, _) = site;
         if to_queue {
             self.queue_builder((q, idx), site, position, commits)?;
-        } else if STATIC_TYPES_END <= kind && q == player {
+        } else if STATIC_KINDS_END <= kind && q == player {
             let task = self.build_task(q, id, site, position)?;
             self.empty_queue_for_work(q, idx, kind)?;
             self.build_directly(q, idx, task, site, position)?;
-        } else if STATIC_TYPES_END <= kind {
+        } else if STATIC_KINDS_END <= kind {
             self.empty_queue_for_work(q, idx, kind)?;
             // another player's unit: slot 0x128's slot 0x7e8 finds whatever task it has on
             // the foundation (a Build on an ally's), the work command's general path
@@ -302,7 +302,7 @@ impl World {
             range: Distance::ZERO,
             shown: position.ground(),
             ready: true,
-            target_type: Some(OrderTargetType::of_master(master)),
+            target_kind: Some(OrderTargetKind::of_master(master)),
         };
         let ai = self
             .parts

@@ -6,7 +6,7 @@ use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::PointLine;
-use crate::groups::TransformType;
+use crate::groups::TransformKind;
 use crate::groups::formation::EPSILON;
 use crate::groups::group_list::NO_FORMATION;
 use crate::groups::{Formation, UnitGroup};
@@ -73,7 +73,7 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn own_formation_type(&self, g: &UnitGroup) -> Result<FormationKind, GenieError> {
+    pub fn own_formation_kind(&self, g: &UnitGroup) -> Result<FormationKind, GenieError> {
         let current = g
             .current_formation
             .as_ref()
@@ -126,26 +126,26 @@ impl World {
     /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) lays group `g` out in for the type
     /// `given`: the given one, else (none, the game's −1) the group's lock
     /// (`mFormationLockedType`), or without a lock (−1) or with a horde's (0) its own choice
-    /// ([`World::own_formation_type`]).
+    /// ([`World::own_formation_kind`]).
     ///
     /// # Errors
     ///
-    /// As [`World::own_formation_type`].
-    pub fn formation_type(
+    /// As [`World::own_formation_kind`].
+    pub fn formation_kind(
         &self,
         g: &UnitGroup,
         given: Option<FormationKind>,
     ) -> Result<FormationKind, GenieError> {
-        Ok(match (given, g.formation_locked_type) {
+        Ok(match (given, g.formation_locked_kind) {
             (Some(given), _) => given,
-            (None, None | Some(FormationKind::HORDE)) => self.own_formation_type(g)?,
+            (None, None | Some(FormationKind::HORDE)) => self.own_formation_kind(g)?,
             (None, Some(locked)) => locked,
         })
     }
 
     /// `UpdateDesiredPositions` (`FUN_14103fd00`) of group `group` with the type `given` (none for
     /// the game's −1): nothing without members. A group without a formation gets an empty one
-    /// ([`Formation::new`]); the type is [`World::formation_type`]'s. A type other
+    /// ([`Formation::new`]); the type is [`World::formation_kind`]'s. A type other
     /// than the formation's, or a given one, makes the formation the previous one and a new one
     /// the current. A formation not yet of the type with a slot per member is laid out: a line,
     /// staggered or flanked line or a column by createColumnLine
@@ -176,7 +176,7 @@ impl World {
         if g.members.is_empty() {
             return Ok(());
         }
-        let kind = self.formation_type(g, given)?;
+        let kind = self.formation_kind(g, given)?;
         let current_kind = g
             .current_formation
             .as_ref()
@@ -272,7 +272,7 @@ pub(super) fn transform_slot(
     rotation: &Rotation,
     point: BVector,
     index: i32,
-    transform_type: TransformType,
+    transform_kind: TransformKind,
     (world_time, map): (WorldTime, GridSize),
     group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
@@ -284,7 +284,7 @@ pub(super) fn transform_slot(
     }
     let slot = formation.slots.checked_mut(index as usize)?;
     if slot.transformed != 1 {
-        let offset = if transform_type.unturned() {
+        let offset = if transform_kind.unturned() {
             slot.offset
         } else {
             rotate(rotation, slot.offset)

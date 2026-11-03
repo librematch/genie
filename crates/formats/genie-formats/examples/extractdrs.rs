@@ -99,7 +99,7 @@ fn get(args: Get) -> anyhow::Result<()> {
 
     for table in drs.tables() {
         if let Some(resource) = table.get_resource(args.resource_id) {
-            let buf = drs.read_resource(&mut file, table.resource_type, resource.id)?;
+            let buf = drs.read_resource(&mut file, table.resource_kind, resource.id)?;
             stdout().write_all(&buf)?;
             return Ok(());
         }
@@ -127,7 +127,7 @@ fn extract(args: Extract) -> anyhow::Result<()> {
         }
 
         for resource in table.resources() {
-            let buf = drs.read_resource(&mut file, table.resource_type, resource.id)?;
+            let buf = drs.read_resource(&mut file, table.resource_kind, resource.id)?;
             let mut outfile =
                 File::create(args.out.join(format!("{}.{}", resource.id, table_ext)))?;
             outfile.write_all(&buf)?;
@@ -175,8 +175,8 @@ fn add(args: Add) -> anyhow::Result<()> {
 
     for t in drs_read.tables() {
         for r in t.resources() {
-            let b = drs_read.get_resource_reader(&mut input, t.resource_type, r.id)?;
-            drs_write.add(t.resource_type, r.id, b)?;
+            let b = drs_read.get_resource_reader(&mut input, t.resource_kind, r.id)?;
+            drs_write.add(t.resource_kind, r.id, b)?;
         }
     }
 

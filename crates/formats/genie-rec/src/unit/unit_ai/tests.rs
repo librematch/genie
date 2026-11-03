@@ -48,7 +48,7 @@ fn unit_ai_bytes() -> Vec<u8> {
 #[test]
 fn an_order_reads_its_target_and_range() {
     let order = read_all::<UnitAiOrder>(&order_bytes(), 11.97);
-    assert_eq!((order.issuer, order.order_type, order.priority), (1, 2, 3));
+    assert_eq!((order.issuer, order.order_kind, order.priority), (1, 2, 3));
     assert_eq!(u32::from(order.target_id), 500);
     assert_eq!(u8::from(order.target_player), 2);
     assert_eq!(order.target_location, (1.0, 2.0, 0.5));
@@ -59,7 +59,7 @@ fn an_order_reads_its_target_and_range() {
 fn notification_reads_its_parameters() {
     let note = read_all::<UnitAiNotification>(&words(&[1, 2, 3, 4, 5, 6]), 11.97);
     assert_eq!(
-        (note.caller, note.recipient, note.notification_type),
+        (note.caller, note.recipient, note.notification_kind),
         (1, 2, 3)
     );
     assert_eq!(note.params, (4, 5, 6));
@@ -95,14 +95,14 @@ fn an_old_unit_ai_ends_at_its_patrol_waypoint() {
     assert_eq!(ai.current_order_priority, Some(5));
     assert_eq!(ai.current_action, Some(6));
     assert_eq!(ai.current_target, Some(502));
-    assert_eq!(ai.current_target_type, None);
+    assert_eq!(ai.current_target_kind, None);
     assert_eq!(ai.current_target_location, (3.0, 4.0, 0.0));
     assert_eq!(ai.desired_target_distance.to_bits(), 1.5_f32.to_bits());
     assert_eq!(
         (ai.last_action, ai.last_order, ai.last_target),
         (None, Some(9), None)
     );
-    assert_eq!((ai.last_target_type, ai.last_update_type), (Some(3), None));
+    assert_eq!((ai.last_target_kind, ai.last_update_kind), (Some(3), None));
     assert_eq!(
         [
             ai.idle_timer,
@@ -157,7 +157,7 @@ fn unit_ai_of_11_44_reads_every_later_field() {
     assert_eq!(ai.retarget_entries.len(), 1);
     assert_eq!(ai.retarget_entries[0].retarget_timeout, 30);
     assert_eq!(ai.best_unit_to_attack, Some(509));
-    assert_eq!(ai.formation_type, 6);
+    assert_eq!(ai.formation_kind, 6);
 }
 
 /// Each later field starts at its own version: at 11.05 the retarget entries are read, the

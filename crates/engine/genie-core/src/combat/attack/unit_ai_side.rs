@@ -384,7 +384,7 @@ impl UnitView<'_, '_> {
                 &self.c.w.model.graphics,
             ),
             Some(ai),
-            (self.player_type, self.c.w.world_time),
+            (self.player_kind, self.c.w.world_time),
             roles,
             &self.c.w.model.tuning.turn,
         );

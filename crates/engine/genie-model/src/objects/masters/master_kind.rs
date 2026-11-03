@@ -1,12 +1,12 @@
 //! A master's type as one type: the byte at `+0x8` that tells a static object from a combat unit
-//! or a building, which the `.dat` names `unit_type`.
+//! or a building, which the `.dat` names `unit_kind`.
 
 use genie_diff::{Diff, Differ};
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
-/// A master's type (`+0x8`, the `.dat`'s `unit_type`): 10 to 80 in steps the game names (its
+/// A master's type (`+0x8`, the `.dat`'s `unit_kind`): 10 to 80 in steps the game names (its
 /// constants, the one definition of the type bytes: every routine that tests a type names it
 /// here, and the attribute setters, slots 0x18, 0x20 and 0x28, differ by type). The routines that
 /// test a type compare it with a threshold (`kind >= MasterKind::COMBAT`), so it is ordered. The
@@ -61,7 +61,7 @@ impl MasterKind {
         self.0
     }
 
-    /// The type a master holds (`+0x8`, the `.dat`'s `unit_type`): any byte is one.
+    /// The type a master holds (`+0x8`, the `.dat`'s `unit_kind`): any byte is one.
     #[must_use]
     pub const fn of_data(value: u8) -> Self {
         Self(value)
@@ -149,7 +149,7 @@ mod tests {
 
     /// Any byte is a type, and the named ones compare as the game's thresholds do.
     #[test]
-    fn type_is_any_byte_and_the_named_ones_are_ordered() {
+    fn kind_is_any_byte_and_the_named_ones_are_ordered() {
         assert_eq!(MasterKind::of_data(70), MasterKind::COMBAT);
         assert_eq!(MasterKind::of_data(0).get(), 0);
         assert!(MasterKind::ACTION < MasterKind::COMBAT);

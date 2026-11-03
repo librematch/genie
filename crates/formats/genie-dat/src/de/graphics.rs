@@ -110,7 +110,7 @@ pub struct Graphic {
     /// Time before the animation starts again, in seconds.
     pub replay_delay: f32,
     /// Bit flags for how the animation plays (e.g. looping); not all known yet.
-    pub sequence_type: u8,
+    pub sequence_kind: u8,
     /// The graphic's id.
     pub id: i16,
     /// How the missing angles are mirrored from the stored ones.

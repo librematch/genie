@@ -26,7 +26,7 @@ use crate::objects::masters::Task;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
 use crate::orders::object_gone;
-use crate::ownership::artifact::{ARTIFACT_TYPE, ArtifactSub};
+use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
@@ -101,7 +101,7 @@ impl World {
         let Some(task) = self.find_work_task(player, idx, target, Some(GARRISON), true)? else {
             return Ok(false);
         };
-        let under_artifact = top == Some(ARTIFACT_TYPE);
+        let under_artifact = top == Some(ARTIFACT_KIND);
         let failed = self.enter_with(player, idx, target, &task, under_artifact)?;
         self.post_own_failure(player, idx, failed)?;
         Ok(true)
@@ -497,7 +497,7 @@ impl World {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            player_type: self.players.player(tp)?.kind,
+            player_kind: self.players.player(tp)?.kind,
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };

@@ -25,7 +25,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -36,8 +36,8 @@ use crate::world::step::Step;
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PointWalker {
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The unit is a villager (class 4): its `MoveTo` waits once when the motion step gives up.
     pub villager: bool,
     /// Its unit AI's stance (`+0x1a9`), 0 without one: the wait is a second below 2, else two.
@@ -71,8 +71,8 @@ pub struct HuntStart<'a> {
     pub target: &'a Quarry,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The game settings' test `FUN_141302150`.
     pub carry_rule: bool,
     /// What the hunter carries, its resource kind and amount.
@@ -152,7 +152,7 @@ impl HuntAction {
             task,
             target,
             player,
-            player_type,
+            player_kind,
             carry_rule,
             held,
             walks,
@@ -171,7 +171,7 @@ impl HuntAction {
         if Amount::ZERO < target.amount {
             let kind = task.resource;
             let both_food = both_food(kind, held.kind);
-            let drops = player_type.is_computer() && held.amount == Amount::ZERO;
+            let drops = player_kind.is_computer() && held.amount == Amount::ZERO;
             if held.kind != kind {
                 if both_food {
                     held.kind = kind;
@@ -516,7 +516,7 @@ impl HuntAction {
         who: PointWalker,
     ) -> Result<PointWalk, GenieError> {
         let gives_up = GiveUp {
-            waits: !who.player_type.is_computer() && who.villager,
+            waits: !who.player_kind.is_computer() && who.villager,
             stance: who.stance,
         };
         let ended = match self.update_list(c, unit, me, gives_up)?.get() {
@@ -525,7 +525,7 @@ impl HuntAction {
             3 => false,
             code => return Err(QUIET_CODE.with("code", code)),
         };
-        if who.player_type.is_computer() {
+        if who.player_kind.is_computer() {
             return Err(GenieError::unsupported(if ended {
                 "a computer player's hunt after its walk (set_state 1)"
             } else {

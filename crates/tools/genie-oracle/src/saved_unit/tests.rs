@@ -15,11 +15,11 @@ use genie_core::objects::layers::{DefaultTask, UnreadDefault, Unstartable};
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::orders::town_bell::TownBell;
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::players::CivId;
 use genie_core::technology::TechId;
 use genie_save::generated::world::{
-    Action, PlayerObjects, RgeAction, RgeActionByType, RgeMissileObject, RgeObject,
+    Action, PlayerObjects, RgeAction, RgeActionByKind, RgeMissileObject, RgeObject,
 };
 
 /// A two-player game's players with Gaia.
@@ -91,7 +91,7 @@ fn livestock_starts_with_its_artifact() {
     .with_default_action(
         CivId::GAIA,
         MasterId::of_data(83).unwrap(),
-        DefaultAction::Type(ARTIFACT_TYPE),
+        DefaultAction::Kind(ARTIFACT_KIND),
     )
     .unwrap();
     let sheep = combat_object(5, 83);
@@ -135,9 +135,9 @@ fn without_table_the_default_task_is_reported() {
 fn saved_action_the_slice_does_not_model_is_reported() {
     let mut scout = combat_object(5, 83);
     let explore = Action {
-        rge_action_by_type: Some(Box::new(RgeActionByType {
+        rge_action_by_kind: Some(Box::new(RgeActionByKind {
             rge_action_explore: Some(Box::new(RgeAction::default())),
-            ..RgeActionByType::default()
+            ..RgeActionByKind::default()
         })),
         ..Action::default()
     };
@@ -220,9 +220,9 @@ fn build_work_rate_takes_the_builder_powerup() {
     acting.tasks = Some(Box::new(TaskList {
         list_num: 1,
         list: vec![TaskListEntry1 {
-            task_type: 1,
+            task_kind: 1,
             task: Task {
-                action_type: ActionKind::BUILD.get(),
+                action_kind: ActionKind::BUILD.get(),
                 ..Task::default()
             },
         }],

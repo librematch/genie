@@ -12,7 +12,7 @@ use crate::map::DistanceSquared;
 use crate::map::Point;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
-use crate::movement::LinkedPathType;
+use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::PlanTries;
@@ -191,7 +191,7 @@ fn tile_plan(
     let spatial = &mut *world.spatial;
     let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
     let mut planning = world.plan.reborrow();
-    planning.player_type = lead.player_type;
+    planning.player_kind = lead.player_kind;
     let r = tile_plan_for(
         lead.walker,
         leg.from,
@@ -254,7 +254,7 @@ fn short_plan(
     let mut r = ShortFound::InRange;
     if lead.solid {
         let mut planning = world.plan.reborrow();
-        planning.player_type = lead.player_type;
+        planning.player_kind = lead.player_kind;
         r = short_path_for(
             lead.walker,
             leg.from,
@@ -375,7 +375,7 @@ fn long_plan(
         &walker,
         leg.from,
         spatial,
-        lead.player_type,
+        lead.player_kind,
         (leg.waypoint, leg.range.get()),
         leg.target_id.zip(target),
         by_id,
@@ -471,10 +471,10 @@ pub(super) fn link(
         } else {
             WaypointLevel::WALKED
         },
-        linked_type: if found {
-            LinkedPathType::REACHES_WAYPOINT
+        linked_kind: if found {
+            LinkedPathKind::REACHES_WAYPOINT
         } else {
-            LinkedPathType::MOVES_ON
+            LinkedPathKind::MOVES_ON
         },
         ..PathData::without_path()
     };

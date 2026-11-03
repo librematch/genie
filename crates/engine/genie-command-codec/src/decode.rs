@@ -209,7 +209,7 @@ fn listed_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
             player: PlayerId::from(c.commp_id),
             units: listed(c.num, &c.ids),
             point: Point::new(c.x, c.y),
-            pick: UnloadPick::of_packet(c.flag, c.unit_type),
+            pick: UnloadPick::of_packet(c.flag, c.unit_kind),
             sound: c.field_0x18 != 0,
         }),
         Packet::UnitOrder(c) => Command::UnitOrder(UnitOrderCommand {

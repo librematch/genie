@@ -5,7 +5,7 @@ use crate::reader::RecordingHeaderReader;
 use crate::unit::UnitAi;
 use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
-use genie_dat::unit_type::UnitType;
+use genie_dat::unit_kind::UnitKind;
 use genie_support::read_opt_u32;
 use std::io::Read;
 
@@ -63,7 +63,7 @@ pub struct MissileUnitAttributes {
     /// The object that fired the projectile.
     pub fired_from_id: ObjectId,
     /// The object's own copy of its unit type, if it has one.
-    pub own_base: Option<UnitType>,
+    pub own_base: Option<UnitKind>,
 }
 
 impl ReadableHeaderElement for MissileUnitAttributes {
@@ -78,12 +78,12 @@ impl ReadableHeaderElement for MissileUnitAttributes {
 
 /// The unit's own copy of its type, behind a flag: a unit whose type a technology changed
 /// for it alone.
-fn read_own_base<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<UnitType>> {
+fn read_own_base<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Option<UnitKind>> {
     if input.read_u8()? == 0 {
         return Ok(None);
     }
     let version = input.version();
-    Ok(Some(UnitType::read_from(&mut *input, version)?))
+    Ok(Some(UnitKind::read_from(&mut *input, version)?))
 }
 
 impl WritableHeaderElement for MissileUnitAttributes {}
@@ -96,7 +96,7 @@ pub struct CombatUnitAttributes {
     /// Whether the unit uses its special attack animation.
     pub using_special_attack_animation: u8,
     /// The object's own copy of its unit type, if it has one.
-    pub own_base: Option<UnitType>,
+    pub own_base: Option<UnitKind>,
     /// Six attribute amounts; not known yet which.
     pub attribute_amounts: [u16; 6],
     /// The decay timer; stored from save version 9.16 on.
@@ -118,7 +118,7 @@ pub struct CombatUnitAttributes {
     /// A second town bell target object; stored from save version 11.71 on.
     pub town_bell_target_id_2: Option<ObjectId>,
     /// The town bell target's type; stored from save version 11.71 on.
-    pub town_bell_target_type: u32,
+    pub town_bell_target_kind: u32,
     /// The town bell action; stored from save version 11.74 on.
     pub town_bell_action: u32,
     /// The hit point regeneration timer (as Berserkers have); stored from save version
@@ -186,7 +186,7 @@ impl CombatUnitAttributes {
         }
         if input.version() >= 11.71 {
             self.town_bell_target_id_2 = read_opt_u32(input)?;
-            self.town_bell_target_type = input.read_u32::<LE>()?;
+            self.town_bell_target_kind = input.read_u32::<LE>()?;
         }
         if input.version() >= 11.74 {
             self.town_bell_action = input.read_u32::<LE>()?;

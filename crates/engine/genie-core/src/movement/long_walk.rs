@@ -7,7 +7,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
 use crate::pathing::long_path::gate_lets_pass;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 
 use crate::map::Footprint;
 use crate::map::Point;
@@ -134,7 +134,7 @@ pub(crate) fn long_path_for(
     walker: &LongWalker<'_>,
     from: Point,
     world: &Spatial,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
     (to, range): (BVector, f32),
     target: Option<(ObjectId, &Placed)>,
     by_id: ObjectsRef<'_>,
@@ -159,7 +159,7 @@ pub(crate) fn long_path_for(
         target: long_target,
         moves: walker.moves,
         mask: walker.mask,
-        player_type,
+        player_kind,
         lowered,
         within_range: false,
         near_player: false,
@@ -214,7 +214,7 @@ pub struct ShortAsk<'a> {
 /// `level_target`, the object the world holds, with a main building's annexes over it); None
 /// without a planner for the walker's restriction. The planner reads the first byte of the
 /// target's record (`+0x658`): 3, a box, for the obstruction types 2, 10, 11 and 13
-/// (`FUN_141056460`). A computer's plan (`plan.player_type`) is not full.
+/// (`FUN_141056460`). A computer's plan (`plan.player_kind`) is not full.
 ///
 /// # Errors
 ///
@@ -238,10 +238,10 @@ pub(crate) fn tile_plan_for(
     let target_box = target.and_then(|t| t.obstruction).is_some_and(|o| {
         matches!(
             o.kind,
-            ObstructionKind::TYPE_2
-                | ObstructionKind::TYPE_10
-                | ObstructionKind::TYPE_11
-                | ObstructionKind::TYPE_13
+            ObstructionKind::KIND_2
+                | ObstructionKind::KIND_10
+                | ObstructionKind::KIND_11
+                | ObstructionKind::KIND_13
         )
     });
     let req = Request {
@@ -250,7 +250,7 @@ pub(crate) fn tile_plan_for(
         radii,
         range,
         closed: Vec::new(),
-        full: !plan.player_type.is_computer(),
+        full: !plan.player_kind.is_computer(),
     };
     let annexes = level_target
         .filter(|&t| by_id.annex_of(t).is_none())
@@ -322,7 +322,7 @@ pub(super) fn include_kept(
             let p = world
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a kept hit without a place"))?;
-            if p.obstruction_kind == ObstructionKind::TYPE_11 {
+            if p.obstruction_kind == ObstructionKind::KIND_11 {
                 return Err(GenieError::unsupported(
                     "a kept hit of obstruction type 11 (its outline)",
                 ));

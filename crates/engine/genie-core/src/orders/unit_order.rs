@@ -360,7 +360,7 @@ impl World {
             by,
             asked: hunt_asked_drop_off(
                 resource,
-                unit.life.attribute_type,
+                unit.life.attribute_kind,
                 self.players.player(p)?.attributes.len(),
                 self.model.slots,
             ),
@@ -422,7 +422,7 @@ impl World {
             pathing: &mut self.pathing,
             object: self.streams.get(Stream::Object),
             world_time: self.world_time,
-            player_type: player.kind,
+            player_kind: player.kind,
             groups: &self.groups,
         };
         let others = OthersRef::of(&self.players, &self.index, p)?;

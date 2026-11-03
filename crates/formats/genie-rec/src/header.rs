@@ -16,7 +16,7 @@ use std::io::Read;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AiCommand {
     /// The kind of command.
-    pub command_type: i32,
+    pub command_kind: i32,
     /// The fact or action id.
     pub id: u16,
     /// The command's four parameters.
@@ -26,7 +26,7 @@ pub struct AiCommand {
 impl ReadableHeaderElement for AiCommand {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut cmd = Self {
-            command_type: input.read_i32::<LE>()?,
+            command_kind: input.read_i32::<LE>()?,
             id: input.read_u16::<LE>()?,
             ..Default::default()
         };
@@ -140,7 +140,7 @@ pub struct AiFactState {
     /// The map size setting.
     pub map_size: u8,
     /// The map type setting.
-    pub map_type: u8,
+    pub map_kind: u8,
     /// The starting resources setting.
     pub starting_resources: u8,
     /// The starting age setting.
@@ -169,7 +169,7 @@ impl Debug for AiFactState {
             .field("death_match", &self.death_match)
             .field("regicide", &self.regicide)
             .field("map_size", &self.map_size)
-            .field("map_type", &self.map_type)
+            .field("map_type", &self.map_kind)
             .field("starting_resources", &self.starting_resources)
             .field("starting_age", &self.starting_age)
             .field("cheats_enabled", &self.cheats_enabled)
@@ -190,7 +190,7 @@ impl ReadableHeaderElement for AiFactState {
         let death_match = input.read_u32::<LE>()? != 0;
         let regicide = input.read_u32::<LE>()? != 0;
         let map_size = fits(input.read_u32::<LE>()?)?;
-        let map_type = fits(input.read_u32::<LE>()?)?;
+        let map_kind = fits(input.read_u32::<LE>()?)?;
         let starting_resources = fits(input.read_u32::<LE>()?)?;
         let starting_age = fits(input.read_u32::<LE>()?)?;
         let cheats_enabled = input.read_u32::<LE>()? != 0;
@@ -216,7 +216,7 @@ impl ReadableHeaderElement for AiFactState {
             death_match,
             regicide,
             map_size,
-            map_type,
+            map_kind,
             starting_resources,
             starting_age,
             cheats_enabled,

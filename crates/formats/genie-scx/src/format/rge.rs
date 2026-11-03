@@ -42,7 +42,7 @@ pub(crate) struct RgeScen {
     pub(super) player_city_plans: Vec<Option<String>>,
     pub(super) player_ai_rules: Vec<Option<String>>,
     pub(super) player_files: Vec<PlayerFiles>,
-    pub(super) ai_rules_types: Vec<i8>,
+    pub(super) ai_rules_kinds: Vec<i8>,
 }
 
 impl RgeScen {
@@ -85,7 +85,7 @@ impl RgeScen {
         if version > 1.13 {
             for properties in &mut self.player_base_properties {
                 properties.active = input.read_i32::<LE>()?;
-                properties.player_type = input.read_i32::<LE>()?;
+                properties.player_kind = input.read_i32::<LE>()?;
                 properties.civilization = input.read_i32::<LE>()?;
                 properties.posture = input.read_i32::<LE>()?;
             }
@@ -173,10 +173,10 @@ impl RgeScen {
             files.city_plan = input.read_str(city_plan_length)?;
             files.ai_rules = input.read_str(ai_rules_length)?;
         }
-        self.ai_rules_types = vec![0; 16];
+        self.ai_rules_kinds = vec![0; 16];
         if version >= 1.20 {
-            for rule_type in &mut self.ai_rules_types {
-                *rule_type = input.read_i8()?;
+            for rule_kind in &mut self.ai_rules_kinds {
+                *rule_kind = input.read_i8()?;
             }
         }
         Ok(())
@@ -220,7 +220,7 @@ impl RgeScen {
             assert_eq!(self.player_base_properties.len(), 16);
             for props in &self.player_base_properties {
                 output.write_i32::<LE>(props.active)?;
-                output.write_i32::<LE>(props.player_type)?;
+                output.write_i32::<LE>(props.player_kind)?;
                 output.write_i32::<LE>(props.civilization)?;
                 output.write_i32::<LE>(props.posture)?;
             }
@@ -319,9 +319,9 @@ impl RgeScen {
             write_files(&mut output, files, version)?;
         }
         if version >= 1.20 {
-            assert_eq!(self.ai_rules_types.len(), 16);
-            for ai_rules_type in &self.ai_rules_types {
-                output.write_i8(*ai_rules_type)?;
+            assert_eq!(self.ai_rules_kinds.len(), 16);
+            for ai_rules_kind in &self.ai_rules_kinds {
+                output.write_i8(*ai_rules_kind)?;
             }
         }
         Ok(())
@@ -409,7 +409,7 @@ mod tests {
             player_base_properties: (0..16)
                 .map(|i| PlayerBaseProperties {
                     posture: i,
-                    player_type: 2,
+                    player_kind: 2,
                     civilization: i + 1,
                     active: 1,
                 })
@@ -433,7 +433,7 @@ mod tests {
                     ai_rules: Some(format!("(defrule {i})")),
                 })
                 .collect(),
-            ai_rules_types: (0..16).collect(),
+            ai_rules_kinds: (0..16).collect(),
             ..RgeScen::default()
         }
     }
@@ -562,7 +562,7 @@ mod tests {
             let rules = 1.08 <= version;
             assert_eq!(back.player_ai_rules[2].is_some(), rules, "{version}");
             assert_eq!(back.player_files[2].ai_rules.is_some(), rules);
-            assert_eq!(back.ai_rules_types[2], if 1.20 <= version { 2 } else { 0 });
+            assert_eq!(back.ai_rules_kinds[2], if 1.20 <= version { 2 } else { 0 });
         }
     }
 

@@ -8,8 +8,8 @@ use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
-use crate::groups::TransformType;
-use crate::groups::UnitType;
+use crate::groups::TransformKind;
+use crate::groups::UnitKind;
 use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
@@ -82,10 +82,10 @@ pub(crate) fn slots_by_place(
     formation.maximum_width = -1;
     formation.maximum_depth = -1;
     formation.number_lines = 0;
-    formation.transform_type = if user_defined {
-        TransformType::TURNED
+    formation.transform_kind = if user_defined {
+        TransformKind::TURNED
     } else {
-        TransformType::UNTURNED
+        TransformKind::UNTURNED
     };
     let position = group.motion.position[0];
     for (i, m) in members.iter().enumerate().take(n) {
@@ -104,7 +104,7 @@ pub(crate) fn slots_by_place(
         s.position_filled = 1;
         s.active = 1;
         s.desired_category = m.category;
-        s.desired_sub_category = UnitType::NONE;
+        s.desired_sub_category = UnitKind::NONE;
     }
     formation.use_slots(n);
     if user_defined {
@@ -158,21 +158,21 @@ pub(crate) fn reset_line(line: &mut FormationLine, width: i32, depth: i32) -> bo
 /// none, else from the current's category plus 1, up to 5); `placed` counts its slots.
 fn next_statistic(group: &UnitGroup, current: Option<usize>, placed: &mut usize) -> Option<usize> {
     if let Some(i) = current
-        && *placed < group.unit_types.get(i)?.units.len()
+        && *placed < group.unit_kinds.get(i)?.units.len()
     {
         return current;
     }
     *placed = 0;
     let mut c = match current {
-        Some(i) => group.unit_types.get(i)?.formation_category.next(),
+        Some(i) => group.unit_kinds.get(i)?.formation_category.next(),
         None => FormationCategory::named(0),
     };
     while c <= FormationCategory::PROTECTED {
         if let Some(i) = group
-            .unit_types
+            .unit_kinds
             .iter()
             .position(|s| s.formation_category == c)
-            && !group.unit_types.get(i)?.units.is_empty()
+            && !group.unit_kinds.get(i)?.units.is_empty()
         {
             return Some(i);
         }
@@ -216,7 +216,7 @@ pub(crate) fn phalanx_slots(
     }
     formation.kind = FormationKind::PHALANX;
     formation.use_slots(0);
-    formation.transform_type = TransformType::BY_LINES;
+    formation.transform_kind = TransformKind::BY_LINES;
     formation.maximum_width = lines;
     formation.maximum_depth = lines;
     formation.number_lines = lines;
@@ -254,10 +254,10 @@ pub(crate) fn phalanx_slots(
                 position_filled: 0,
                 active: 1,
                 desired_category: match statistic {
-                    Some(i) => group.unit_types.checked(i)?.formation_category,
+                    Some(i) => group.unit_kinds.checked(i)?.formation_category,
                     None => FormationCategory::ANY,
                 },
-                desired_sub_category: UnitType::NONE,
+                desired_sub_category: UnitKind::NONE,
                 transformed: formation.slot_mut(slot)?.transformed,
             };
             let l = formation.lines.checked_mut(line as usize)?;
@@ -481,7 +481,7 @@ pub(crate) fn box_slots(
     let mut used = 0usize;
     for c in FormationCategory::EACH.into_iter().rev() {
         let Some(stat) = group
-            .unit_types
+            .unit_kinds
             .iter()
             .find(|u| u.formation_category == c)
             .filter(|u| !u.units.is_empty())
@@ -534,7 +534,7 @@ pub(crate) fn box_slots(
                 position_filled: 0,
                 active: 1,
                 desired_category: c,
-                desired_sub_category: UnitType::NONE,
+                desired_sub_category: UnitKind::NONE,
                 transformed: formation.slot_mut(at)?.transformed,
             };
         }
@@ -543,7 +543,7 @@ pub(crate) fn box_slots(
     }
     formation.number_lines = 0;
     formation.kind = FormationKind::BOX;
-    formation.transform_type = TransformType::TURNED;
+    formation.transform_kind = TransformKind::TURNED;
     // CVTTSS2SI at 0x141012147 (a NaN or out of range width is i32::MIN)
     let width = cvttss2si(max_x - min_x);
     formation.maximum_width = width;
@@ -674,7 +674,7 @@ mod tests {
     use super::*;
     #[cfg(test)]
     use crate::groups::formation::tests::slot_world;
-    use crate::groups::{Member, UnitTypeStatistic};
+    use crate::groups::{Member, UnitKindStatistic};
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
     use crate::test_ids::object_id_list;
@@ -690,12 +690,12 @@ mod tests {
             .collect();
         g.desired_spacing = Distance::new(spacing);
         g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
-        g.unit_types = stats
+        g.unit_kinds = stats
             .iter()
-            .map(|&(category, n)| UnitTypeStatistic {
+            .map(|&(category, n)| UnitKindStatistic {
                 formation_category: FormationCategory::named(category),
                 units: object_id_list(0..n as i32),
-                ..UnitTypeStatistic::default()
+                ..UnitKindStatistic::default()
             })
             .collect();
         g
@@ -734,12 +734,12 @@ mod tests {
         assert_eq!(
             (
                 f.kind,
-                f.transform_type,
+                f.transform_kind,
                 f.maximum_width,
                 f.maximum_depth,
                 f.number_lines
             ),
-            (FormationKind::HORDE, TransformType::UNTURNED, -1, -1, 0)
+            (FormationKind::HORDE, TransformKind::UNTURNED, -1, -1, 0)
         );
         assert_eq!(f.slots.len(), 3);
         let s = &f.slots[0];
@@ -762,7 +762,7 @@ mod tests {
             ),
             (1, WorldTime::from_millis(640), 1, 1, 1)
         );
-        assert_eq!(s.desired_sub_category, UnitType::NONE);
+        assert_eq!(s.desired_sub_category, UnitKind::NONE);
         assert_eq!((f.slots[1].unit_id, f.slots[1].active), (None, 0));
         assert_eq!(f.slots[2].offset, BVector::new(5.0, 0.0, 0.0));
         // no members, no layout
@@ -804,8 +804,8 @@ mod tests {
             .unwrap()
         );
         assert_eq!(
-            (f.kind, f.transform_type),
-            (FormationKind::USER_DEFINED, TransformType::TURNED)
+            (f.kind, f.transform_kind),
+            (FormationKind::USER_DEFINED, TransformKind::TURNED)
         );
         let offsets: Vec<BVector> = f.slots.iter().map(|s| s.offset).collect();
         assert_eq!(
@@ -915,18 +915,18 @@ mod tests {
         let g = &mut t.groups.groups[0];
         g.desired_spacing = Distance::new(1.0);
         g.motion.position[0] = BVector::new(6.0, 0.0, 6.0);
-        g.unit_types = vec![
-            UnitTypeStatistic {
+        g.unit_kinds = vec![
+            UnitKindStatistic {
                 formation_category: FormationCategory::named(1),
                 units: vec![object_id(10), object_id(11)],
                 desired_spacing: Distance::new(1.0),
-                ..UnitTypeStatistic::default()
+                ..UnitKindStatistic::default()
             },
-            UnitTypeStatistic {
+            UnitKindStatistic {
                 formation_category: FormationCategory::named(3),
                 units: vec![object_id(12)],
                 desired_spacing: Distance::new(1.0),
-                ..UnitTypeStatistic::default()
+                ..UnitKindStatistic::default()
             },
         ];
         t
@@ -1021,16 +1021,16 @@ mod tests {
             ]
         );
         assert_eq!(
-            (f.kind, f.transform_type),
-            (FormationKind::HORDE, TransformType::UNTURNED)
+            (f.kind, f.transform_kind),
+            (FormationKind::HORDE, TransformKind::UNTURNED)
         );
         let mut f = Formation::new();
         assert!(t.create_udf(&mut f, &g).unwrap());
         assert_eq!(
-            (f.kind, f.transform_type, f.slots[3].unit_id),
+            (f.kind, f.transform_kind, f.slots[3].unit_id),
             (
                 FormationKind::USER_DEFINED,
-                TransformType::TURNED,
+                TransformKind::TURNED,
                 Some(object_id(12))
             )
         );
@@ -1061,12 +1061,12 @@ mod tests {
         assert_eq!(
             (
                 f.kind,
-                f.transform_type,
+                f.transform_kind,
                 f.maximum_width,
                 f.maximum_depth,
                 f.number_lines
             ),
-            (FormationKind::PHALANX, TransformType::BY_LINES, 3, 3, 3)
+            (FormationKind::PHALANX, TransformKind::BY_LINES, 3, 3, 3)
         );
         let slots: Vec<(BVector, i32, i32)> = f
             .slots
@@ -1303,8 +1303,8 @@ mod tests {
         let mut f = Formation::new();
         assert!(box_slots(&mut f, &g, WorldTime::from_millis(5), &tuning().group).unwrap());
         assert_eq!(
-            (f.kind, f.transform_type, f.maximum_width, f.maximum_depth),
-            (FormationKind::BOX, TransformType::TURNED, 4, 4)
+            (f.kind, f.transform_kind, f.maximum_width, f.maximum_depth),
+            (FormationKind::BOX, TransformKind::TURNED, 4, 4)
         );
         let slots: Vec<(BVector, i32)> = f
             .slots

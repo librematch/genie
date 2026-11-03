@@ -14,7 +14,7 @@ use crate::objects::actions;
 use crate::objects::actions::ActionList;
 use crate::objects::layers::DefaultTask;
 use crate::objects::masters::ActionKind;
-use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact};
+use crate::ownership::artifact::{ARTIFACT_KIND, Artifact};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
 use genie_diff::Diff;
@@ -66,7 +66,7 @@ impl Action {
         }
         match self.top_action_kind() {
             None => Ok(true),
-            Some(ARTIFACT_TYPE) => Ok(self.list.artifact().is_some_and(Artifact::idle)),
+            Some(ARTIFACT_KIND) => Ok(self.list.artifact().is_some_and(Artifact::idle)),
             // a Make has no target, but its point (`+0x38`) is the base constructor's 0.0
             Some(MOVE_TO | MAKE) => Ok(false),
             Some(_) => Err(GenieError::unsupported(

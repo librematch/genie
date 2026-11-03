@@ -4,14 +4,14 @@ use crate::fixtures::{
 };
 use crate::masters::MasterTable;
 use crate::setup::{slice, wonder_time};
-use crate::test_ids::action_type;
+use crate::test_ids::action_kind;
 use crate::test_ids::object_id;
 use genie_core::combat::Firepower;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
 use genie_core::players::CivId;
 use genie_core::players::PlayerId;
-use genie_core::players::PlayerType;
+use genie_core::players::PlayerKind;
 use genie_core::players::history::HistoryUpdates;
 use genie_core::technology::ResearchState;
 use genie_core::world::WorldTime;
@@ -35,7 +35,7 @@ fn wonder(id: i32, state: u8, timer: f32) -> Object {
         .tribe_combat_object
         .rge_combat_object
         .rge_action_object
-        .actions = action_list(vec![(action_type(120), action)]);
+        .actions = action_list(vec![(action_kind(120), action)]);
     wonder
 }
 
@@ -57,12 +57,12 @@ fn the_countdown_is_the_least_standing_wonders_timer() {
         .as_deref_mut()
         .unwrap()
         .player_objects;
-    objects.sleeping_objects.object_type_list = human(vec![wonder(3, 7, 200.0)])
+    objects.sleeping_objects.object_kind_list = human(vec![wonder(3, 7, 200.0)])
         .human_or_coop_player
         .unwrap()
         .player_objects
         .objects
-        .object_type_list;
+        .object_kind_list;
     let save = header(vec![player]);
     assert_eq!(
         wonder_time(&save.players()[0]).get().to_bits(),
@@ -103,7 +103,7 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         [0, 2]
     );
     let p = &turns.players[1];
-    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerType::HUMAN));
+    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerKind::HUMAN));
     assert_eq!(
         p.resources().map(|r| r.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)

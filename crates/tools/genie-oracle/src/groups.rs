@@ -11,8 +11,8 @@ use genie_core::groups::MotionFlags;
 use genie_core::groups::{
     Differentiator, Formation, FormationCategory, FormationKind, FormationLine, GroupCommand,
     GroupCommandKind, GroupId, GroupOrder, GroupTarget, LinePoint, Member, Motion, MovePath,
-    MoveReason, PointLine, Slot, SlotState, SpecificMove, TargetData, TransformType, UnitGroup,
-    UnitGroups, UnitType, UnitTypeStatistic,
+    MoveReason, PointLine, Slot, SlotState, SpecificMove, TargetData, TransformKind, UnitGroup,
+    UnitGroups, UnitKind, UnitKindStatistic,
 };
 use genie_core::map::Distance;
 use genie_core::math::fmath::BVector;
@@ -52,8 +52,8 @@ fn words(b: &[u8; 200]) -> Vec<u32> {
 }
 
 /// The 200 bytes of a statistic's unit types (`mUnitTypes`) as 50 unit types.
-fn unit_types(b: &[u8; 200]) -> Vec<UnitType> {
-    words(b).into_iter().map(UnitType::of_word).collect()
+fn unit_kinds(b: &[u8; 200]) -> Vec<UnitKind> {
+    words(b).into_iter().map(UnitKind::of_word).collect()
 }
 
 fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError> {
@@ -87,7 +87,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> Result<Motion, GenieError
 
 fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
     Ok(Formation {
-        kind: FormationKind::from(f.type_),
+        kind: FormationKind::from(f.kind),
         slots: f
             .slots
             .iter()
@@ -103,7 +103,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                     position_filled: s.slots_position_filled,
                     desired_category: FormationCategory::named(s.slots_desired_category),
                     active: s.slots_active,
-                    desired_sub_category: UnitType::of_word(
+                    desired_sub_category: UnitKind::of_word(
                         s.slots_desired_sub_category.cast_unsigned(),
                     ),
                     transformed: 0,
@@ -124,7 +124,7 @@ fn formation(f: &saved::Formation) -> Result<Formation, GenieError> {
                 distance_back: Distance::new(l.distance_back),
             })
             .collect(),
-        transform_type: TransformType::of_data(f.transform_type),
+        transform_kind: TransformKind::of_data(f.transform_kind),
         number_lines: f.number_lines,
         transform_orientation: vec3(&f.transform_orientation),
         // a load's array holds the saved slots alone
@@ -174,7 +174,7 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
         previous_formation: g.previous_formation.as_deref().map(formation).transpose()?,
         current_formation: g.current_formation.as_deref().map(formation).transpose()?,
         garbage: g.garbage,
-        formation_locked_type: FormationKind::of_field(g.formation_locked_type),
+        formation_locked_kind: FormationKind::of_field(g.formation_locked_kind),
         flags: GroupFlags::from_bits_retain(g.group_flags_bits),
         centroid: vec3(&g.centroid),
         desired_height: g.desired_height,
@@ -200,34 +200,34 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> Result<UnitGroup, Genie
             length: Distance::new(g.stored_positions.length),
             desired_length: Distance::new(g.stored_positions.desired_length),
         },
-        unit_types: g
-            .unit_types
-            .unit_type_statistic
+        unit_kinds: g
+            .unit_kinds
+            .unit_kind_statistic
             .iter()
             .map(|u| {
-                Ok(UnitTypeStatistic {
+                Ok(UnitKindStatistic {
                     formation_category: FormationCategory::named(u.formation_category),
                     units: object_ids(&u.units)?,
                     used: u.used,
                     attack_range: Distance::new(u.attack_range),
                     desired_spacing: Distance::new(u.desired_spacing),
-                    number_unit_types: u.number_unit_types,
-                    unit_types: unit_types(&u.unit_types),
-                    unit_type_counts: words(&u.unit_type_counts),
+                    number_unit_kinds: u.number_unit_kinds,
+                    unit_kinds: unit_kinds(&u.unit_kinds),
+                    unit_kind_counts: words(&u.unit_kind_counts),
                 })
             })
             .collect::<Result<_, GenieError>>()?,
         waypoints: g.waypoints.iter().map(vec3).collect(),
         current_command: GroupCommandKind::named(g.current_command),
         current_target: TargetData {
-            target: GroupTarget::of_saved(t.target, t.type_),
+            target: GroupTarget::of_saved(t.target, t.kind),
             original_position: vec3(&t.original_position),
             range: Distance::new(t.range),
             target_radius: Distance::new(t.target_radius),
             disable_retargeting: t.disable_retargeting,
             certain_action: ActionKind::of_data(t.certain_action),
         },
-        attack_plan_type: g.attack_plan_type,
+        attack_plan_kind: g.attack_plan_kind,
         idle_timer: Millis::new(g.idle_timer),
         order_queue: g
             .order_queue
@@ -300,7 +300,7 @@ pub fn unit_groups(world: &saved::BaseWorld) -> Result<UnitGroups, GenieError> {
         groups,
         counter: GroupId::try_from(g.unit_group_counter)?,
         commands,
-        unit_types_scratch: Vec::new(),
+        unit_kinds_scratch: Vec::new(),
     })
 }
 
@@ -318,9 +318,9 @@ pub fn globals_from_dump(text: &str, groups: &mut UnitGroups) {
                 }
             }
             Some("unit_types_scratch") => {
-                groups.unit_types_scratch = values
+                groups.unit_kinds_scratch = values
                     .iter()
-                    .map(|&v| UnitType::of_word(v.cast_unsigned()))
+                    .map(|&v| UnitKind::of_word(v.cast_unsigned()))
                     .collect();
             }
             _ => {}
@@ -345,8 +345,8 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
             ));
         }
         let words = |g: &UnitGroups| {
-            let mut w = g.unit_types_scratch.clone();
-            w.resize(50, UnitType::CLEARED);
+            let mut w = g.unit_kinds_scratch.clone();
+            w.resize(50, UnitKind::CLEARED);
             w
         };
         if words(slice) != words(game) {
@@ -527,7 +527,7 @@ impl Flat for MoveReason {
 }
 
 /// A formation's transform type flattens as its value, as the save holds it.
-impl Flat for TransformType {
+impl Flat for TransformKind {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }
@@ -541,7 +541,7 @@ impl Flat for Differentiator {
 }
 
 /// A unit type flattens as its signed word.
-impl Flat for UnitType {
+impl Flat for UnitKind {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         self.get().flat(path, out);
     }
@@ -621,13 +621,13 @@ flat_struct! {
     FormationLine { depth, indices, attack_range, distance_back }
     Formation {
         kind, slots, number_transformed_slots, maximum_width, maximum_depth, about_faced, lines,
-        transform_type, number_lines, transform_orientation,
+        transform_kind, number_lines, transform_orientation,
     }
     LinePoint { point, forward, up, right }
     PointLine { points, length, desired_length }
-    UnitTypeStatistic {
-        formation_category, units, used, attack_range, desired_spacing, number_unit_types,
-        unit_types, unit_type_counts,
+    UnitKindStatistic {
+        formation_category, units, used, attack_range, desired_spacing, number_unit_kinds,
+        unit_kinds, unit_kind_counts,
     }
     TargetData {
         target, original_position, range, target_radius, disable_retargeting,
@@ -639,10 +639,10 @@ flat_struct! {
     }
     UnitGroup {
         motion, id, owner, stance, members, previous_formation, current_formation, garbage,
-        formation_locked_type, flags, centroid, desired_height, largest_unit_radius,
+        formation_locked_kind, flags, centroid, desired_height, largest_unit_radius,
         smallest_unit_radius, desired_spacing, smallest_unit_range, smallest_ranged_unit_range,
-        largest_unit_range, largest_ranged_unit_range, stored_positions, unit_types, waypoints,
-        current_command, current_target, attack_plan_type, idle_timer, order_queue, hibernating,
+        largest_unit_range, largest_ranged_unit_range, stored_positions, unit_kinds, waypoints,
+        current_command, current_target, attack_plan_kind, idle_timer, order_queue, hibernating,
         command_queue, objects, differentiator_id, seconds_not_under_attack,
         differentiator_groups, total_spacing, non_retarget_units,
     }
@@ -738,8 +738,8 @@ mod tests {
         );
         assert_eq!(groups.commands, Differentiator::of_data(12));
         assert_eq!(
-            groups.unit_types_scratch,
-            [UnitType::of_word(1), UnitType::of_word(2), UnitType::NONE]
+            groups.unit_kinds_scratch,
+            [UnitKind::of_word(1), UnitKind::of_word(2), UnitKind::NONE]
         );
         globals_from_dump("group_commands\n\n", &mut groups);
         assert_eq!(groups.commands, Differentiator::of_data(12));

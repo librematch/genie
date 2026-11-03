@@ -24,12 +24,12 @@ use genie_core::objects::SpriteId;
 use genie_core::objects::Voice;
 use genie_core::objects::WorkRate;
 use genie_core::objects::layers::{UnreadDefault, Unstartable};
-use genie_core::objects::masters::ACTION_FACTORY_TYPES;
+use genie_core::objects::masters::ACTION_FACTORY_KINDS;
 use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::{Master as MastersMaster, Task};
 use genie_core::objects::sprite::ActiveSprite;
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::ownership::artifact::Artifact;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
@@ -77,9 +77,9 @@ pub(super) fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<A
         .and_then(|id| graphics.get(id))
         .copied()?;
     let nodes = || {
-        list.sprite_type_list
+        list.sprite_kind_list
             .iter()
-            .filter_map(|e| e.type_.as_deref())
+            .filter_map(|e| e.kind.as_deref())
     };
     let Some(node) = nodes()
         .filter_map(|n| n.rge_active_animated_sprite.as_deref())
@@ -119,7 +119,7 @@ pub(super) fn saved_attack(
         .base()
         .ok_or(GenieError::unsupported("a saved Attack without its base"))?;
     let a = sub
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref()
         .and_then(|t| t.rge_action_attack.as_deref())
         .ok_or(GenieError::unsupported(
@@ -209,7 +209,7 @@ pub(super) fn fly_task(
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionKind::of_data(e.task.action_type) == Some(fly))
+            .find(|e| ActionKind::of_data(e.task.action_kind) == Some(fly))
             .ok_or(GenieError::unsupported(
                 "a bird whose master has no Fly task",
             ))?;
@@ -243,7 +243,7 @@ pub(super) fn master_build_task(
         let entry = tasks
             .list
             .iter()
-            .find(|e| ActionKind::of_data(e.task.action_type) == Some(build))
+            .find(|e| ActionKind::of_data(e.task.action_kind) == Some(build))
             .ok_or(GenieError::unsupported(
                 "a builder whose master has no Build task",
             ))?;
@@ -447,7 +447,7 @@ pub(super) fn default_task(
     };
     match action {
         DefaultAction::None => Ok(None),
-        DefaultAction::Type(ARTIFACT_TYPE) => {
+        DefaultAction::Kind(ARTIFACT_KIND) => {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
             let moving = masters
                 .and_then(|t| t.work(civ, dat_id(objects, s.master_obj)?))
@@ -458,13 +458,13 @@ pub(super) fn default_task(
                 moving,
             )))))
         }
-        DefaultAction::Type(FLY) => Ok(Some(DefaultStart::Fly)),
-        DefaultAction::Type(MAKE) => Ok(Some(DefaultStart::Make)),
+        DefaultAction::Kind(FLY) => Ok(Some(DefaultStart::Fly)),
+        DefaultAction::Kind(MAKE) => Ok(Some(DefaultStart::Make)),
         // the action list's factory (`FUN_140aca4b0`, then the RGE one `FUN_140a97e00`) makes
         // no action of the other types: the default task starts nothing (wild animals' Explore,
         // type 6)
-        DefaultAction::Type(t) if !ACTION_FACTORY_TYPES.contains(&t) => Ok(None),
-        DefaultAction::Type(t) => Err(Unstartable::Unported(t)),
+        DefaultAction::Kind(t) if !ACTION_FACTORY_KINDS.contains(&t) => Ok(None),
+        DefaultAction::Kind(t) => Err(Unstartable::Unported(t)),
         DefaultAction::NoSuchTask => Err(Unstartable::Unread(UnreadDefault::NoSuchTask)),
     }
 }

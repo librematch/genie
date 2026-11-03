@@ -5,7 +5,7 @@ use crate::map::{Tile, TileOffset, TileRect};
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterKind;
 use crate::ownership::CaptureKind;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
@@ -31,7 +31,7 @@ fn world(players: PlayerId) -> Visibility {
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN; players.index()],
+        vec![PlayerKind::HUMAN; players.index()],
     )
 }
 
@@ -70,8 +70,8 @@ fn rec(id: i32, x: f32, y: f32) -> VisibleResource {
 #[test]
 fn the_first_other_player_that_sees_the_object_takes_it_over() {
     use crate::world::player::Player;
-    let (human, computer) = (PlayerType::HUMAN, PlayerType::COMPUTER);
-    let players = |kinds: [PlayerType; 4]| {
+    let (human, computer) = (PlayerKind::HUMAN, PlayerKind::COMPUTER);
+    let players = |kinds: [PlayerKind; 4]| {
         kinds.map(|kind| Player {
             kind,
             ..Player::default()
@@ -839,7 +839,7 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
 #[test]
 fn computer_players_newly_explored_tiles_are_queued_for_its_ai_module() {
     let mut v = world(PlayerId::new(3));
-    v.player_types = vec![PlayerType::HUMAN, PlayerType::COMPUTER, PlayerType::HUMAN];
+    v.player_kinds = vec![PlayerKind::HUMAN, PlayerKind::COMPUTER, PlayerKind::HUMAN];
     assert_eq!(
         v.explore(
             PlayerId::new(1),

@@ -131,14 +131,14 @@ fn unit_list_ends_at_class_0() {
 
 /// Unit types without the available flag read nothing behind their flags.
 #[test]
-fn unavailable_unit_types_are_none() {
+fn unavailable_unit_kinds_are_none() {
     let bytes = Bytes::default().words(&[2, 0, 0]).0;
     let mut reader = header_reader(&bytes, 10.0);
     let mut player = Player::default();
-    player.read_unit_types(&mut reader).unwrap();
+    player.read_unit_kinds(&mut reader).unwrap();
     assert!(consumed(&mut reader));
-    assert_eq!(player.unit_types.len(), 2);
-    assert!(player.unit_types.iter().all(Option::is_none));
+    assert_eq!(player.unit_kinds.len(), 2);
+    assert!(player.unit_kinds.iter().all(Option::is_none));
 }
 
 /// A computer player (kind 3) has a flag for its AI; a human has none, and only Gaia

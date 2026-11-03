@@ -28,7 +28,7 @@ use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
 use genie_core::unit_ai::{AiAction, OrderKind};
 use genie_core::unit_ai::{
-    Attackers, Home, Notify, OrderRecord, PatrolPath, QueuedOrder, UnitAi, UnitAiType, UnitStance,
+    Attackers, Home, Notify, OrderRecord, PatrolPath, QueuedOrder, UnitAi, UnitAiKind, UnitStance,
     notify_capacity,
 };
 use genie_core::world::Millis;
@@ -102,7 +102,7 @@ pub(super) fn lifecycle(
         },
         state: ObjectState::of_byte(s.object_state)?,
         hp: HitPoints::new(s.hp),
-        attribute_type: AttributeId::of_data(s.attribute_type_held),
+        attribute_kind: AttributeId::of_data(s.attribute_kind_held),
         amount: Amount::new(s.attribute_amount_held),
         dying_sprite,
         death_spawn: death_spawn >= 0,
@@ -129,12 +129,12 @@ pub(super) fn unit_ai(
         return Ok(None);
     };
     Ok(Some(UnitAi {
-        ai_type: UnitAiType::of_value(combat.need_unit_ai as u32),
+        ai_kind: UnitAiKind::of_value(combat.need_unit_ai as u32),
         current_order: OrderKind::of_field(ai.current_order_value)?,
         order_priority: OrderPriority::of_data(ai.current_order_priority_value),
         current_action: AiAction::of_field(ai.current_action_value)?,
         current_target: ObjectId::of_field(ai.current_target_value),
-        target_class: ClassId::of_param(ai.current_target_type_value)?,
+        target_class: ClassId::of_param(ai.current_target_kind_value)?,
         target_point: Position::new(
             ai.current_target_xvalue,
             ai.current_target_yvalue,
@@ -145,7 +145,7 @@ pub(super) fn unit_ai(
         last_order: OrderKind::of_field(ai.last_order_value)?,
         last_action: AiAction::of_field(ai.last_action_value)?,
         last_target: ObjectId::of_field(ai.last_target_value),
-        last_target_class: ClassId::of_param(ai.last_target_type_value)?,
+        last_target_class: ClassId::of_param(ai.last_target_kind_value)?,
         idle_timer: Millis::new(ai.idle_timer_value),
         adjusted_idle_timeout: Millis::new(ai.adjusted_idle_timeout_value),
         idle_timeout: Millis::new(ai.idle_timeout_value),
@@ -155,7 +155,7 @@ pub(super) fn unit_ai(
         last_retarget_time: WorldTime::from_millis(ai.last_retarget_time),
         retarget_timer: Millis::new(ai.randomized_retarget_timer),
         stance: UnitStance::of_byte(ai.state_value),
-        formation_type: FormationKind::of_byte(ai.formation_type),
+        formation_kind: FormationKind::of_byte(ai.formation_kind),
         state_position: Point::new(ai.state_position_xvalue, ai.state_position_yvalue),
         retarget_disabled: ai.disable_retargeting,
         alert_mode: ai.alert_mode_value != 0,
@@ -188,7 +188,7 @@ pub(super) fn unit_ai(
             .collect::<Result<_, _>>()?,
         // the load's factory capacity, doubled for what it reads
         notify_capacity: notify_capacity(
-            UnitAiType::of_value(combat.need_unit_ai as u32),
+            UnitAiKind::of_value(combat.need_unit_ai as u32),
             ai.temp_notify.len(),
         ),
         processing: false,

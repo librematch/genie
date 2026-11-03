@@ -19,7 +19,7 @@ use crate::movement::PathState;
 use crate::movement::WaypointIndex;
 use crate::movement::{Planning, footprint_gap};
 use crate::objects::ObjectKey;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
@@ -297,10 +297,10 @@ impl World {
             return Ok(());
         };
         let view = GroupView {
-            player_type: g
+            player_kind: g
                 .owner
                 .and_then(|o| self.players.get(o.index()))
-                .map_or(PlayerType::PHANTOM, |p| p.kind),
+                .map_or(PlayerKind::PHANTOM, |p| p.kind),
             members: g
                 .members
                 .iter()
@@ -320,7 +320,7 @@ impl World {
             let mut plan = Planning {
                 pathing: &mut self.pathing,
                 now: self.world_time,
-                player_type: lead.player_type,
+                player_kind: lead.player_kind,
                 object: self.streams.get(Stream::Object),
                 groups: &self.groups,
             };

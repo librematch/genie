@@ -87,7 +87,7 @@ impl Master {
             MasterAttribute::MAXIMUM_CHARGE
             | MasterAttribute::RECHARGE_RATE
             | MasterAttribute::CHARGE_EVENT
-            | MasterAttribute::CHARGE_TYPE
+            | MasterAttribute::CHARGE_KIND
             | MasterAttribute::CHARGE_PROJECTILE_UNIT => self.set_charge(attribute, v),
             MasterAttribute::SPECIAL_GRAPHIC
             | MasterAttribute::IDLE_ATTACK_GRAPHIC
@@ -154,7 +154,7 @@ impl Master {
                     p.charge_event = ChargeEvent::of_data(low16(v));
                 }
             }
-            MasterAttribute::CHARGE_TYPE => {
+            MasterAttribute::CHARGE_KIND => {
                 if let Some(p) = self.creatable.as_mut() {
                     p.charge_kind = ChargeKind::of_data(low16(v));
                 }
@@ -379,9 +379,9 @@ impl Master {
                     b.facet = low16(v);
                 }
             }
-            MasterAttribute::GARRISON_TYPE => {
+            MasterAttribute::GARRISON_KIND => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_type = GarrisonKinds::from_bits_retain(low8(v));
+                    b.garrison_kind = GarrisonKinds::from_bits_retain(low8(v));
                 }
             }
             MasterAttribute::FOUNDATION_TERRAIN => {
@@ -422,10 +422,10 @@ impl Master {
                     b.facet = b.facet.wrapping_add(low16(v));
                 }
             }
-            MasterAttribute::GARRISON_TYPE => {
+            MasterAttribute::GARRISON_KIND => {
                 if let Some(b) = self.building.as_mut() {
-                    b.garrison_type = GarrisonKinds::from_bits_retain(
-                        b.garrison_type.bits().wrapping_add(low8(v)),
+                    b.garrison_kind = GarrisonKinds::from_bits_retain(
+                        b.garrison_kind.bits().wrapping_add(low8(v)),
                     );
                 }
             }

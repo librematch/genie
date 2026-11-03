@@ -54,7 +54,7 @@ pub(super) fn frames<'a>(chapter: &de::Chapter<'a>, limit: usize) -> Result<Vec<
 /// A saved wait state that names no state.
 pub(super) fn saved_move_wait(sub: &Action) -> Result<MoveWait, genie_core::GenieError> {
     use genie_core::movement::move_to::{MoveWait, MoveWaitState};
-    sub.rge_action_by_type
+    sub.rge_action_by_kind
         .as_deref()
         .and_then(|t| t.rge_action_move_to.as_deref())
         .map_or_else(

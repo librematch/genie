@@ -64,7 +64,7 @@ pub struct Pathing {
     pub restrictions: Vec<Restriction>,
     /// The game type (the world's `game_type`): type 12 has the escape the motion step runs for
     /// a unit on an `E` tile (`FUN_141158210` result 1), which the slice does not model.
-    pub game_type: u8,
+    pub game_kind: u8,
     /// The restrictions the world's load gave planners (`FUN_140f7d310`, [`Pathing::register`]),
     /// in their order; None builds one for any restriction (a world made without a load).
     planned: Option<Vec<RestrictionId>>,
@@ -177,13 +177,13 @@ impl Pathing {
         size: GridSize,
         terrain: Vec<TerrainId>,
         restrictions: Vec<Restriction>,
-        game_type: u8,
+        game_kind: u8,
     ) -> Self {
         Self {
             size,
             terrain,
             restrictions,
-            game_type,
+            game_kind,
             ..Self::default()
         }
     }
@@ -375,7 +375,7 @@ impl Pathing {
             }
             return;
         }
-        let radius = if p.obstruction_kind == ObstructionKind::TYPE_11 {
+        let radius = if p.obstruction_kind == ObstructionKind::KIND_11 {
             outline
         } else {
             p.radius

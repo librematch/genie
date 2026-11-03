@@ -111,7 +111,7 @@ impl Unit {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);
-        if ai.ai_type != CIVILIAN {
+        if ai.ai_kind != CIVILIAN {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
@@ -208,7 +208,7 @@ impl Unit {
         Ok(match carrying {
             Some(g)
                 if gather.task.resource.is_some()
-                    && self.life.attribute_type == gather.task.resource
+                    && self.life.attribute_kind == gather.task.resource
                     && 1 <= self.life.amount.get() as i32 =>
             {
                 Some(g)
@@ -231,7 +231,7 @@ impl Unit {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let (player_type, farm_stops) = (
+        let (player_kind, farm_stops) = (
             c.w.players.player(c.player)?.kind,
             c.w.settings.walkable_farms,
         );
@@ -267,7 +267,7 @@ impl Unit {
             GatherRetarget {
                 target: &resource,
                 player: c.player,
-                player_type,
+                player_kind,
                 walks,
                 farm_stops,
                 rate,
@@ -362,7 +362,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            player_type: c.w.players.player(c.player)?.kind,
+            player_kind: c.w.players.player(c.player)?.kind,
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
@@ -543,7 +543,7 @@ impl Unit {
         outside: bool,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<DropSiteId>, GenieError> {
-        let by_path = !c.player_type.is_computer();
+        let by_path = !c.player_kind.is_computer();
         self.drop_site_with(
             (actions, mover),
             c,
@@ -584,7 +584,7 @@ impl Unit {
         let mut plan = Planning {
             pathing: &mut *c.pathing,
             now: c.world_time,
-            player_type: c.player_type,
+            player_kind: c.player_kind,
             object: &mut *c.object,
             groups: c.groups,
         };

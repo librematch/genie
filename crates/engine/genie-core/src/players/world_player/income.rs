@@ -9,7 +9,7 @@ use crate::math::fmath::log;
 use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::ResourceStat;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
@@ -151,7 +151,7 @@ impl World {
             return Ok(());
         }
         *player.attributes.checked_mut(k)? += amount;
-        if player.kind == PlayerType::COMPUTER && kind.is_resource() {
+        if player.kind == PlayerKind::COMPUTER && kind.is_resource() {
             let pct = *player.escrow_percentage.checked(k)?;
             if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct.get(), 0.0) {
                 *player.escrow.checked_mut(k)? += pct.of(amount);
@@ -212,7 +212,7 @@ impl World {
     /// run, reads it too, and the player's update ends with the list emptied (`FUN_141661030`).
     /// Gaia's update has no tail.
     pub fn world_player_tail(&mut self, p: PlayerId) -> Result<(), GenieError> {
-        if self.players.player(p)?.kind == PlayerType::GAIA || self.spatial.scout_map(p).is_none() {
+        if self.players.player(p)?.kind == PlayerKind::GAIA || self.spatial.scout_map(p).is_none() {
             return Ok(());
         }
         let Some(tiles) = self

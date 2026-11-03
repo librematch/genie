@@ -30,7 +30,7 @@ pub struct DropSite {
     pub targets: Vec<DropTarget>,
     /// `+0x30`, `update_ai_resource_types`: the basic resources (0 to 3) it takes, which the
     /// table's search by resource reads (`table_drop_buildings`).
-    pub resource_types: Vec<AttributeId>,
+    pub resource_kinds: Vec<AttributeId>,
     /// The entry has `accepts_livestock` (`FUN_140fdf480` keeps the key's presence): its building
     /// is one of the drop sites a hunted livestock is led to (`DAT_143f157f0`, in table order).
     pub livestock: bool,

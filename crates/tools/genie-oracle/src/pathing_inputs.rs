@@ -148,7 +148,7 @@ pub fn planner_from_save(
     let terrain_ids: Vec<TerrainId> = map
         .rows
         .iter()
-        .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
+        .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_kind)))
         .collect();
     let layer = layer().map_err(Error::Unmodelled)?;
     let spatial = spatial(&header, terrain, layer).map_err(Error::Unmodelled)?;

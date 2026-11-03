@@ -226,7 +226,7 @@ fn finder_object(
         master: MasterId::try_from(s.master_obj)?,
         state: ObjectState::of_byte(s.object_state)?,
         held: Held {
-            kind: AttributeId::of_field(s.attribute_type_held)?,
+            kind: AttributeId::of_field(s.attribute_kind_held)?,
             amount: Amount::new(s.attribute_amount_held),
         },
         hp: HitPoints::new(

@@ -305,7 +305,7 @@ impl World {
         };
         // the lead's slot 0x270: an object that does not move (a ghost found by the lead -1)
         // stands nowhere (`FUN_141071e30`)
-        if g.formation_locked_type == Some(FormationKind::FLANKED)
+        if g.formation_locked_kind == Some(FormationKind::FLANKED)
             && let Some(lead) = self.lead_object(m).filter(WorldObject::moves)
         {
             let master = self.master(lead.player(), lead.master_id(self.model.slots))?;
@@ -325,7 +325,7 @@ impl World {
                 return Ok(());
             }
         }
-        let limit = if g.formation_locked_type == Some(FormationKind::STAGGERED) {
+        let limit = if g.formation_locked_kind == Some(FormationKind::STAGGERED) {
             g.desired_spacing
         } else {
             g.desired_spacing * self.model.tuning.group.front_share
@@ -653,7 +653,7 @@ mod tests {
     fn staggered_lock_takes_the_whole_spacing() {
         let units = vec![unit(11, 13.0, 11.5), unit(12, 19.0, 13.0)];
         let mut t = front_world(units.clone());
-        t.groups.groups[0].formation_locked_type = Some(FormationKind::STAGGERED);
+        t.groups.groups[0].formation_locked_kind = Some(FormationKind::STAGGERED);
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 11.5));
@@ -695,7 +695,7 @@ mod tests {
         mover.moved_at = lead.position();
         let units = vec![Object::moving(lead, mover), unit(11, 10.2, 10.1).into()];
         let flanked = |t: &mut World| {
-            t.groups.groups[0].formation_locked_type = Some(FormationKind::FLANKED);
+            t.groups.groups[0].formation_locked_kind = Some(FormationKind::FLANKED);
             t.groups.groups[0].motion.lead = Some(object_id(10));
         };
         let mut t = front_world(units.clone());
@@ -734,7 +734,7 @@ mod tests {
     fn flanked_group_tests_the_world_object_of_its_lead_id() {
         let units = vec![unit(10, 15.0, 10.5), unit(11, 10.2, 10.1)];
         let flanked = |t: &mut World| {
-            t.groups.groups[0].formation_locked_type = Some(FormationKind::FLANKED);
+            t.groups.groups[0].formation_locked_kind = Some(FormationKind::FLANKED);
             t.groups.groups[0].members.truncate(2);
             t.groups.groups[0].motion.lead = Some(object_id(-2));
         };

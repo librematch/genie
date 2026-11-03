@@ -15,7 +15,7 @@ use std::io::Read;
 #[derive(Debug, Default, Clone)]
 pub struct InformationAi {
     /// Four lists of `u32` values, one per resource type; their meaning is not known yet.
-    pub resource_types: Vec<Vec<u32>>,
+    pub resource_kinds: Vec<Vec<u32>>,
     /// The AI's doctrine value.
     pub doctrine: i32,
     /// The AI's random number.
@@ -90,8 +90,8 @@ impl InformationAi {
         for _ in 0..4096 {
             let _garbage = input.read_u32::<LE>()?;
         }
-        let mut resource_type_counts = vec![0; 4096];
-        input.read_u32_into::<LE>(&mut resource_type_counts)?;
+        let mut resource_kind_counts = vec![0; 4096];
+        input.read_u32_into::<LE>(&mut resource_kind_counts)?;
         ai.doctrine = input.read_i32::<LE>()?;
         ai.random_number = input.read_i32::<LE>()?;
         for _ in 0..40 {
@@ -106,12 +106,12 @@ impl InformationAi {
             }
         }
 
-        if ai.resource_types.len() < 4 {
-            ai.resource_types.resize(4, vec![]);
+        if ai.resource_kinds.len() < 4 {
+            ai.resource_kinds.resize(4, vec![]);
         }
         for resource_id in 0..4 {
             let num_res = input.read_u32::<LE>()?;
-            let list = &mut ai.resource_types[resource_id];
+            let list = &mut ai.resource_kinds[resource_id];
             for _ in 0..num_res {
                 list.push(input.read_u32::<LE>()?);
             }
@@ -190,7 +190,7 @@ fn read_building_lots<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<V
     let mut lots = vec![];
     for _ in 0..len {
         let lot = BuildingLot::read_from(input)?;
-        if lot.unit_type_id.is_none() {
+        if lot.unit_kind_id.is_none() {
             continue;
         }
         lots.push(lot);

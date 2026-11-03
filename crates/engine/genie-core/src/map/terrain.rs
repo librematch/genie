@@ -127,7 +127,7 @@ pub struct Terrain {
 /// A tile's side (`DAT_14330eb8c`), which the slope shares measure against.
 const TILE: f32 = TERRAIN_TILE;
 
-/// `FUN_140f69470` (HD's `RGE_Map::get_tile_type`): the shape of the tile of elevation `e` from
+/// `FUN_140f69470` (HD's `RGE_Map::get_tile_kind`): the shape of the tile of elevation `e` from
 /// its neighbours' (`n`orth is `y − 1`, `e`ast `x + 1`; a neighbour off the map counts as the
 /// tile's own): a side or corner one step up decides it, in the routine's order; 0 is flat.
 #[allow(clippy::many_single_char_names)]

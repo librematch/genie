@@ -10,7 +10,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::UnitRelation;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -856,7 +856,7 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
     };
     let human = soldier();
     let computer = Searcher {
-        player_type: PlayerType::COMPUTER,
+        player_kind: PlayerKind::COMPUTER,
         ..soldier()
     };
     let house = Thing {

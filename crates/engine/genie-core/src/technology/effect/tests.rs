@@ -50,7 +50,7 @@ use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::{ByPlayer, relation_row};
@@ -304,7 +304,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
                 class: class::CLASS_0,
                 player: PlayerId::new(0),
                 master: ids::HOUSE,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -316,7 +316,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     let master = Master {
         id: ids::HOUSE,
         height: Distance::new(2.0),
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         obstruction_class: ObstructionClass::UNIT,
         ..Master::default()
     };
@@ -325,7 +325,7 @@ fn an_object_takes_its_record_again_unless_dying_inside_or_flat() {
     }
     let record = |t: &World, id: ObjectId| t.spatial.get(id).and_then(|p| p.obstruction);
     let wall = Some(Obstruction {
-        kind: ObstructionKind::TYPE_2,
+        kind: ObstructionKind::KIND_2,
         class: ObstructionClass::UNIT,
     });
     assert_eq!(
@@ -919,7 +919,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             vec![VisionBits::NONE; n],
             Vec::new(),
             0,
-            vec![PlayerType::HUMAN],
+            vec![PlayerKind::HUMAN],
         );
         let seer = Seer {
             player: PlayerId::new(0),
@@ -1170,7 +1170,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
         MasterAttribute::DEAD_UNIT_ID,
         MasterAttribute::BLOOD_UNIT,
         MasterAttribute::TRAIN_TIME,
-        MasterAttribute::OBSTRUCTION_TYPE,
+        MasterAttribute::OBSTRUCTION_KIND,
         MasterAttribute::SIZE_Z,
         MasterAttribute::LINE_OF_SIGHT,
     ];
@@ -2402,7 +2402,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
             radius: Footprint::new(0.5, 0.5),
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             obstruction_class: ObstructionClass::UNIT,
             ..Master::default()
         },
@@ -2416,7 +2416,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
             class: class::BUILDING,
             player: PlayerId::new(0),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -2431,7 +2431,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     assert_eq!(
         record(&t),
         Some(Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT
         })
     );
@@ -2440,7 +2440,7 @@ fn height_or_obstruction_change_takes_the_records_off_and_gives_them_again() {
     assert_eq!(
         record(&t),
         Some(Obstruction {
-            kind: ObstructionKind::TYPE_3,
+            kind: ObstructionKind::KIND_3,
             class: ObstructionClass::UNIT
         })
     );

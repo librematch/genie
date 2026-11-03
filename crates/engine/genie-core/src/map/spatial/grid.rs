@@ -65,10 +65,10 @@ impl Spatial {
         let (x, y) = (p.position.x(), p.position.y());
         let half_tile_box = matches!(
             kind,
-            ObstructionKind::TYPE_2
-                | ObstructionKind::TYPE_10
-                | ObstructionKind::TYPE_11
-                | ObstructionKind::TYPE_13
+            ObstructionKind::KIND_2
+                | ObstructionKind::KIND_10
+                | ObstructionKind::KIND_11
+                | ObstructionKind::KIND_13
         );
         if half_tile_box && x % 0.5 < 0.001 && y % 0.5 < 0.001 {
             x1 -= 0.001;
@@ -413,7 +413,7 @@ impl Spatial {
                 let bx = Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0);
                 if self.visits_cell(level, x >> shift, y >> shift, query)
                     && !ignore.contains(&id)
-                    && meets(ObstructionKind::TYPE_3, bx)
+                    && meets(ObstructionKind::KIND_3, bx)
                 {
                     hits.push(id);
                     if MOST_HITS <= hits.len() {

@@ -480,7 +480,7 @@ pub(super) fn blocks_build(
         return false;
     }
     let (or, tall) =
-        if (ObstructionKind::TYPE_11..=ObstructionKind::TYPE_13).contains(&o.obstruction_kind) {
+        if (ObstructionKind::KIND_11..=ObstructionKind::KIND_13).contains(&o.obstruction_kind) {
             let oz = o.outline.z();
             (
                 o.outline.ground(),

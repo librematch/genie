@@ -2,8 +2,8 @@ use super::*;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
-use crate::groups::TransformType;
-use crate::groups::{LinePoint, Member, PointLine, UnitGroups, UnitTypeStatistic, WorldObject};
+use crate::groups::TransformKind;
+use crate::groups::{LinePoint, Member, PointLine, UnitGroups, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -19,7 +19,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
-use crate::movement::{LinkedPathType, PlanTries, WaypointIndex};
+use crate::movement::{LinkedPathKind, PlanTries, WaypointIndex};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -35,8 +35,8 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::unit::{TAKEN_OUT, Unit};
 use crate::players::PlayerId;
+use crate::players::PlayerKind;
 use crate::players::PlayerSet;
-use crate::players::PlayerType;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -187,7 +187,7 @@ pub(crate) fn slot_at(at: BVector, category: i32) -> Slot {
         unit_id: None,
         transform_position: at,
         desired_category: FormationCategory::named(category),
-        desired_sub_category: UnitType::NONE,
+        desired_sub_category: UnitKind::NONE,
         active: 1,
         transformed: 1,
         ..Slot::default()
@@ -280,7 +280,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
             },
         ]));
     }
-    t.players[1].kind = PlayerType::HUMAN;
+    t.players[1].kind = PlayerKind::HUMAN;
     t.players[1].ghosts = vec![Ghost {
         id: object_id(-2),
         original: None,
@@ -326,7 +326,7 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
 /// `FUN_14100e370` from the origin: of all, 12 (category 3) is nearest; of category 1, 11;
 /// of master 4, 10; with 11 used, 10; of category 2, none.
 #[test]
-fn the_closest_unit_matches_its_slots_category_and_type() {
+fn the_closest_unit_matches_its_slots_category_and_kind() {
     let t = slot_world(
         &[(10, 4, 5.0, 0.0), (11, 5, 2.0, 0.0), (12, 6, 1.0, 0.0)],
         &[],
@@ -334,17 +334,17 @@ fn the_closest_unit_matches_its_slots_category_and_type() {
     let g = t.groups.get(group_id(1)).unwrap();
     let o = BVector::ZERO;
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(-1), UnitType::NONE, &[])
+        t.closest_unit(g, o, FormationCategory::named(-1), UnitKind::NONE, &[])
             .unwrap(),
         Some(object_id(12))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(1), UnitType::NONE, &[])
+        t.closest_unit(g, o, FormationCategory::named(1), UnitKind::NONE, &[])
             .unwrap(),
         Some(object_id(11))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(1), UnitType::of_word(4), &[])
+        t.closest_unit(g, o, FormationCategory::named(1), UnitKind::of_word(4), &[])
             .unwrap(),
         Some(object_id(10))
     );
@@ -353,14 +353,14 @@ fn the_closest_unit_matches_its_slots_category_and_type() {
             g,
             o,
             FormationCategory::named(1),
-            UnitType::NONE,
+            UnitKind::NONE,
             &[Some(object_id(11))]
         )
         .unwrap(),
         Some(object_id(10))
     );
     assert_eq!(
-        t.closest_unit(g, o, FormationCategory::named(2), UnitType::NONE, &[])
+        t.closest_unit(g, o, FormationCategory::named(2), UnitKind::NONE, &[])
             .unwrap(),
         None
     );
@@ -560,7 +560,7 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
     t.groups.groups[0].current_target.original_position = BVector::new(9.0, 0.0, 9.0);
     let mut run = |kind: i32| {
         let mut f = Formation::new();
-        f.transform_type = TransformType::of_data(kind);
+        f.transform_kind = TransformKind::of_data(kind);
         f.transform_orientation = BVector::new(0.0, 0.0, 1.0);
         f.slots = vec![Slot {
             offset: BVector::new(1.0, 0.0, 0.0),
@@ -585,7 +585,7 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
     assert_eq!(run(2), (false, BVector::new(10.0, 0.0, 9.0), 2));
     // facing back: the slot takes its (only) unit anew
     let mut f = Formation::new();
-    f.transform_type = TransformType::UNTURNED;
+    f.transform_kind = TransformKind::UNTURNED;
     f.transform_orientation = BVector::new(0.0, 0.0, -1.0);
     f.slots = vec![slot_at(BVector::ZERO, 1)];
     assert!(t.formation_transform(&mut f, group_id(1), false).unwrap());
@@ -820,7 +820,7 @@ fn nan_distance_back_takes_the_index_times_the_spacing() {
     t.groups.groups[0].motion.position[0] = BVector::new(9.0, 0.0, 5.0);
     t.groups.groups[0].desired_spacing = Distance::new(2.0);
     let mut f = Formation::new();
-    f.transform_type = TransformType::BY_LINES;
+    f.transform_kind = TransformKind::BY_LINES;
     f.number_lines = 2;
     f.slots = vec![slot_at(BVector::ZERO, 1), slot_at(BVector::ZERO, 1)];
     f.lines = vec![
@@ -868,20 +868,20 @@ fn grid_cell_counts_its_slots_in_bits_1_to_5() {
 
 /// One statistic of category 1 holding `units`, all of master 4, spacing 1.
 fn one_statistic(t: &mut World, units: &[ObjectId]) {
-    let mut unit_types = vec![UnitType::CLEARED; 50];
-    unit_types[0] = UnitType::of_word(4);
+    let mut unit_kinds = vec![UnitKind::CLEARED; 50];
+    unit_kinds[0] = UnitKind::of_word(4);
     let mut counts = vec![0u32; 50];
     counts[0] = units.len() as u32;
     let g = &mut t.groups.groups[0];
     g.desired_spacing = Distance::new(1.0);
-    g.unit_types = vec![UnitTypeStatistic {
+    g.unit_kinds = vec![UnitKindStatistic {
         formation_category: FormationCategory::named(1),
         units: units.to_vec(),
         desired_spacing: Distance::new(1.0),
-        number_unit_types: 1,
-        unit_types,
-        unit_type_counts: counts,
-        ..UnitTypeStatistic::default()
+        number_unit_kinds: 1,
+        unit_kinds,
+        unit_kind_counts: counts,
+        ..UnitKindStatistic::default()
     }];
 }
 
@@ -946,7 +946,7 @@ fn line_after_column_takes_its_units_in_the_column_order() {
 fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
     PathData {
         level: WaypointLevel::WALKED,
-        linked_type: LinkedPathType::of_data(0),
+        linked_kind: LinkedPathKind::of_data(0),
         points: points.to_vec(),
         has_path: !points.is_empty(),
         path_flags: PathFlags::from_bits_retain(flags),
@@ -967,7 +967,7 @@ fn level(points: &[BVector], waypoint: i32, flags: u32) -> PathData {
 
 /// Player 1 (minimum column distance 10, column-to-line 5) with unit 7 of a soldier master
 /// (type 70, category 1) in group 1 at the origin along `paths` (walked first).
-fn type_world(paths: Vec<PathData>) -> World {
+fn kind_world(paths: Vec<PathData>) -> World {
     let mut u = Unit {
         id: object_id(7),
         ..Unit::default()
@@ -1014,7 +1014,7 @@ fn type_world(paths: Vec<PathData>) -> World {
 }
 
 fn own(t: &World) -> FormationKind {
-    t.own_formation_type(t.groups.get(group_id(1)).unwrap())
+    t.own_formation_kind(t.groups.get(group_id(1)).unwrap())
         .unwrap()
 }
 
@@ -1047,7 +1047,7 @@ fn the_last_high_level_waypoint_is_the_top_levels_last_point() {
 /// the column-to-line distance.
 #[test]
 fn group_chooses_column_far_along_its_path_and_line_near_its_end() {
-    assert_eq!(own(&type_world(Vec::new())), FormationKind::LINE);
+    assert_eq!(own(&kind_world(Vec::new())), FormationKind::LINE);
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);
     let path_to = |x: f32, waypoint: i32, flags: u32| {
         vec![
@@ -1055,13 +1055,13 @@ fn group_chooses_column_far_along_its_path_and_line_near_its_end() {
             level(&[BVector::ZERO, BVector::new(x, 9.0, 0.0)], waypoint, flags),
         ]
     };
-    assert_eq!(own(&type_world(path_to(30.0, 0, 0))), FormationKind::COLUMN);
-    assert_eq!(own(&type_world(path_to(30.0, 1, 1))), FormationKind::COLUMN);
-    assert_eq!(own(&type_world(path_to(30.0, 1, 0))), FormationKind::COLUMN);
-    assert_eq!(own(&type_world(path_to(8.0, 1, 0))), FormationKind::LINE);
+    assert_eq!(own(&kind_world(path_to(30.0, 0, 0))), FormationKind::COLUMN);
+    assert_eq!(own(&kind_world(path_to(30.0, 1, 1))), FormationKind::COLUMN);
+    assert_eq!(own(&kind_world(path_to(30.0, 1, 0))), FormationKind::COLUMN);
+    assert_eq!(own(&kind_world(path_to(8.0, 1, 0))), FormationKind::LINE);
     // a column (whose type the game tests first) turns to a line within 10 too; at 12 it
     // stays one until a target's radius and range lengthen 5 past 12
-    let mut t = type_world(path_to(8.0, 1, 0));
+    let mut t = kind_world(path_to(8.0, 1, 0));
     let mut column = Formation::new();
     column.kind = FormationKind::COLUMN;
     t.groups.groups[0].current_formation = Some(column);
@@ -1074,7 +1074,7 @@ fn group_chooses_column_far_along_its_path_and_line_near_its_end() {
     g.current_target.range = Distance::new(2.5);
     assert_eq!(own(&t), FormationKind::LINE);
     // a lone level measures its own path; one point measures to the origin
-    let mut t = type_world(vec![level(&[BVector::new(30.0, 0.0, 0.0)], 0, 0)]);
+    let mut t = kind_world(vec![level(&[BVector::new(30.0, 0.0, 0.0)], 0, 0)]);
     t.groups.groups[0].motion.position[0] = BVector::new(40.0, 0.0, 0.0);
     assert_eq!(own(&t), FormationKind::COLUMN);
 }
@@ -1082,13 +1082,13 @@ fn group_chooses_column_far_along_its_path_and_line_near_its_end() {
 /// [`crate::groups::GroupFlags::LINE`] (`MinAutoDistanceLock`) chooses a line, horde units only a
 /// horde; given a type, or locked to one (not -1 or 0), the group takes it.
 #[test]
-fn lock_or_given_type_overrides_the_groups_own_choice() {
+fn lock_or_given_kind_overrides_the_groups_own_choice() {
     let walked = level(&[BVector::ZERO, BVector::new(1.0, 0.0, 0.0)], 0, 0);
     let far = vec![
         walked,
         level(&[BVector::ZERO, BVector::new(30.0, 0.0, 0.0)], 1, 0),
     ];
-    let mut t = type_world(far);
+    let mut t = kind_world(far);
     t.groups.groups[0].flags |= GroupFlags::LINE;
     assert_eq!(own(&t), FormationKind::LINE);
     t.model.masters[1] = Arc::new(Masters::new([Master {
@@ -1099,23 +1099,23 @@ fn lock_or_given_type_overrides_the_groups_own_choice() {
     assert_eq!(own(&t), FormationKind::HORDE);
     let g = t.groups.get(group_id(1)).unwrap().clone();
     assert_eq!(
-        t.formation_type(&g, Some(FormationKind::BOX)).unwrap(),
+        t.formation_kind(&g, Some(FormationKind::BOX)).unwrap(),
         FormationKind::BOX
     );
     let mut locked = g;
-    locked.formation_locked_type = Some(FormationKind::STAGGERED);
+    locked.formation_locked_kind = Some(FormationKind::STAGGERED);
     assert_eq!(
-        t.formation_type(&locked, None).unwrap(),
+        t.formation_kind(&locked, None).unwrap(),
         FormationKind::STAGGERED
     );
-    locked.formation_locked_type = Some(FormationKind::HORDE);
+    locked.formation_locked_kind = Some(FormationKind::HORDE);
     assert_eq!(
-        t.formation_type(&locked, None).unwrap(),
+        t.formation_kind(&locked, None).unwrap(),
         FormationKind::HORDE
     );
-    locked.formation_locked_type = None;
+    locked.formation_locked_kind = None;
     assert_eq!(
-        t.formation_type(&locked, None).unwrap(),
+        t.formation_kind(&locked, None).unwrap(),
         FormationKind::HORDE
     );
 }
@@ -1133,11 +1133,11 @@ fn line_is_twice_as_wide_as_deep_and_column_the_reverse() {
     assert_eq!(sizes(10, false), (5, 2));
 }
 
-fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> UnitGroup {
-    let mut unit_types = vec![UnitType::CLEARED; 50];
+fn group_of(category: i32, count: usize, spacing: f32, kinds: &[(u32, u32)]) -> UnitGroup {
+    let mut unit_kinds = vec![UnitKind::CLEARED; 50];
     let mut counts = vec![0u32; 50];
-    for (i, &(t, n)) in types.iter().enumerate() {
-        unit_types[i] = UnitType::of_word(t);
+    for (i, &(t, n)) in kinds.iter().enumerate() {
+        unit_kinds[i] = UnitKind::of_word(t);
         counts[i] = n;
     }
     UnitGroup {
@@ -1147,14 +1147,14 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
                 ..Member::default()
             })
             .collect(),
-        unit_types: vec![UnitTypeStatistic {
+        unit_kinds: vec![UnitKindStatistic {
             formation_category: FormationCategory::named(category),
             units: object_id_list(0..count as i32),
             desired_spacing: Distance::new(spacing),
-            number_unit_types: types.len() as i32,
-            unit_types,
-            unit_type_counts: counts,
-            ..UnitTypeStatistic::default()
+            number_unit_kinds: kinds.len() as i32,
+            unit_kinds,
+            unit_kind_counts: counts,
+            ..UnitKindStatistic::default()
         }],
         ..UnitGroup::default()
     }
@@ -1164,7 +1164,7 @@ fn group_of(category: i32, count: usize, spacing: f32, types: &[(u32, u32)]) -> 
 /// offsets forward), the types alternating with the second line starting on the type the
 /// first ended with.
 #[test]
-fn line_of_two_unit_types_alternates_its_slots() {
+fn line_of_two_unit_kinds_alternates_its_slots() {
     let g = group_of(3, 10, 1.0, &[(4, 5), (24, 5)]);
     let mut f = Formation::new();
     assert!(
@@ -1274,7 +1274,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
 fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
     let mut g = group_of(3, 10, 1.5, &[(4, 10)]);
     let narrow = group_of(0, 3, 1.0, &[(83, 3)]);
-    g.unit_types.insert(0, narrow.unit_types[0].clone());
+    g.unit_kinds.insert(0, narrow.unit_kinds[0].clone());
     g.members.extend((10..13).map(|id| Member {
         id: object_id(id),
         ..Member::default()
@@ -1313,9 +1313,9 @@ fn sub_formation_fits_the_widest_line() {
     let cat = |count, spacing| Category {
         count,
         spacing,
-        types: 1,
-        unit_types: Vec::new(),
-        unit_type_counts: Vec::new(),
+        kinds: 1,
+        unit_kinds: Vec::new(),
+        unit_kind_counts: Vec::new(),
     };
     assert_eq!(fit_to_widest(&cat(4, Distance::new(1.0)), 4.0), (1, 4));
     assert_eq!(fit_to_widest(&cat(9, Distance::new(1.0)), 8.0), (2, 5));

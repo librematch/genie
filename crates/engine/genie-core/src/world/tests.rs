@@ -170,7 +170,7 @@ use crate::orders::{Interact, MoveOrder, Sweep, Work};
 use crate::ownership::CaptureKind;
 use crate::ownership::artifact::Artifact;
 use crate::ownership::artifact::ArtifactState;
-use crate::ownership::artifact::{ARTIFACT_TYPE, ArtifactSub};
+use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::ownership::change::change_hands;
 use crate::ownership::change::dead_master_of;
 use crate::pathing::tile_path::{Path, PlanRect};
@@ -179,7 +179,7 @@ use crate::players::AmountRate;
 use crate::players::ByPlayer;
 use crate::players::ByRelation;
 use crate::players::CivId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::TributeFee;
 use crate::players::attribute::AttributeId;
@@ -209,7 +209,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::object_ids;
 use crate::test_ids::opt_master;
-use crate::test_ids::order_type;
+use crate::test_ids::order_kind;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::test_ids::task_id;
@@ -233,9 +233,9 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
-use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::StopOrder;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::DropSite;
 use crate::unit_ai::task_finder::DropTarget;
@@ -311,7 +311,7 @@ fn player(ids: &[i32]) -> Player {
 
 fn building() -> UnitAi {
     UnitAi {
-        ai_type: UnitAiType::BUILDING,
+        ai_kind: UnitAiKind::BUILDING,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -459,7 +459,7 @@ fn artifacts_of_every_player_start_updating_in_the_second_tick() {
 fn an_unsupported_unit_stops_and_is_recorded() {
     let mut odd = building();
     // a unit-AI type the slice does not model
-    odd.ai_type = UnitAiType::of_value(99);
+    odd.ai_kind = UnitAiKind::of_value(99);
     let mut t = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
@@ -629,8 +629,8 @@ fn dead_objects_unit_ai_draws_nothing() {
 /// from build 158041's save and `.dat`.
 pub(crate) fn builder_masters() -> Masters {
     use crate::objects::masters::{Master, Masters, Task};
-    let task = |action_type, object_group| Task {
-        action_kind: action_type,
+    let task = |action_kind, object_group| Task {
+        action_kind,
         object_group,
         ..Task::default()
     };
@@ -788,7 +788,7 @@ pub(crate) fn placeable_on(t: &mut World, map: GridSize) {
         vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN; players],
+        vec![PlayerKind::HUMAN; players],
     ));
 }
 
@@ -1117,7 +1117,7 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
             (
                 u.pasture,
                 u.life.amount,
-                u.life.attribute_type,
+                u.life.attribute_kind,
                 u.untargetable
             ),
             (
@@ -1689,7 +1689,7 @@ fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
             class,
             state,
             master_id: master,
-            attribute_type: None,
+            attribute_kind: None,
             master: Some(MasterData {
                 decay: AmountRate::ZERO,
                 undead: false,
@@ -2016,7 +2016,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_high_draw() {
 /// A villager's unit AI (type 8) without an order or action.
 fn villager_ai() -> UnitAi {
     UnitAi {
-        ai_type: UnitAiType::CIVILIAN,
+        ai_kind: UnitAiKind::CIVILIAN,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -2191,7 +2191,7 @@ fn direct_build_empties_its_builder_order_queue() {
         range: Distance::ZERO,
         shown: Point::new(19.760_416, 102.177_086),
         ready: true,
-        target_type: None,
+        target_kind: None,
     };
     for u in &t.players[1].objects {
         t.parts
@@ -2368,7 +2368,7 @@ pub(crate) fn sent_off_world(orders: Vec<QueuedOrder>) -> World {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -2398,9 +2398,9 @@ pub(crate) fn sent_off_world(orders: Vec<QueuedOrder>) -> World {
     t
 }
 
-fn task(action_type: ActionKind) -> Task {
+fn task(action_kind: ActionKind) -> Task {
     Task {
-        action_kind: action_type,
+        action_kind,
         object_group: None,
         ..Task::default()
     }
@@ -2670,7 +2670,7 @@ fn the_work_on_an_annex_goes_to_its_main_building_after_its_annexes_start() {
                 class: class::BUILDING,
                 player: PlayerId::new(1),
                 master: ids::HOUSE,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -3291,7 +3291,7 @@ fn queued_order_on_target_works_on_it_with_the_order_priority() {
         range: Distance::ZERO,
         shown: Point::ORIGIN,
         ready: true,
-        target_type: order_type(80),
+        target_kind: order_kind(80),
     };
     let mut t = sent_off_world(vec![]);
     t.order_on_target(
@@ -3380,7 +3380,7 @@ pub(crate) fn forage_world() -> World {
                     id: task_id(2),
                     action_kind: GATHER,
                     object_group: Some(class_id(7)),
-                    attribute_type: Some(AttributeId::named(17)),
+                    attribute_kind: Some(AttributeId::named(17)),
                     work_range: Distance::new(0.25),
                     work_val1: WorkValue::new(0.31),
                     ..Task::default()
@@ -3420,7 +3420,7 @@ pub(crate) fn forage_world() -> World {
             state: ObjectState::Alive,
             hp: HitPoints::new(1.0),
             master_id: master_id(59),
-            attribute_type: Some(AttributeId::named(17)),
+            attribute_kind: Some(AttributeId::named(17)),
             amount: Amount::new(125.0),
             ..Lifecycle::default()
         },
@@ -3718,7 +3718,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
     let loaded = || {
         let mut t = forage_world();
         let v = &mut t.players[1].objects[ListIndex::new(0)];
-        (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+        (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
         t
     };
     let carries = |t: &World| {
@@ -3902,7 +3902,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
         (WorkerCount::of_data(0), WorkerCount::of_data(0))
     );
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     assert_eq!(
         t.move_to_object_with(
             PlayerId::new(1),
@@ -3974,7 +3974,7 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
         .push_live(PlayerId::new(1), Object::with_building(far, layer))
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     let world = t.clone();
     t.unit_order(
         player_id(1),
@@ -4069,7 +4069,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
                 id: task_id(3),
                 action_kind: GATHER,
                 object_group: Some(class_id(49)),
-                attribute_type: Some(attribute::FOOD),
+                attribute_kind: Some(attribute::FOOD),
                 work_range: Distance::new(0.25),
                 ..Task::default()
             });
@@ -4097,7 +4097,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
                     state: ObjectState::Alive,
                     hp: HitPoints::new(480.0),
                     master_id: ids::FARM,
-                    attribute_type: Some(attribute::FOOD),
+                    attribute_kind: Some(attribute::FOOD),
                     amount: Amount::new(175.0),
                     ..Lifecycle::default()
                 },
@@ -4168,7 +4168,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
             range: Distance::ZERO,
             shown: Point::new(10.0, 10.0),
             ready: true,
-            target_type: None,
+            target_kind: None,
         });
     t.start_work(PlayerId::new(1)).unwrap();
     assert_eq!(
@@ -4371,7 +4371,7 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
         range: Distance::ZERO,
         shown: Point::ORIGIN,
         ready: true,
-        target_type: order_type(80),
+        target_kind: order_kind(80),
     };
     with_effects(&mut t, vec![Effect::OrderOnTarget(order)]).unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -4432,7 +4432,7 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
         range: Distance::ZERO,
         shown: Point::ORIGIN,
         ready: true,
-        target_type: order_type(80),
+        target_kind: order_kind(80),
     };
     let run = |orders| {
         let mut t = forage_world();
@@ -4519,7 +4519,7 @@ fn unit_sent_off_foundation_finds_the_spot_beside_it() {
             off.spot,
             off.class,
             off.player,
-            off.player_type.is_computer()
+            off.player_kind.is_computer()
         ),
         (None, class::VILLAGER, player_id(1), false)
     );
@@ -4539,7 +4539,7 @@ fn unit_sent_off_foundation_finds_the_spot_beside_it() {
             class: class::BUILDING,
             player: PlayerId::new(1),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -4772,7 +4772,7 @@ fn footprint_world() -> World {
             class: class::BUILDING,
             player: PlayerId::new(1),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -4956,7 +4956,7 @@ fn built_castle_death_takes_its_headroom_and_its_count() {
         .unwrap();
     assert_eq!(t.players[1].attributes[134], Amount::ZERO);
     let mut t = world(1.0);
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert!(
         t.set_state(PlayerId::new(1), object_id(900), ObjectState::Dying)
             .is_err()
@@ -4996,7 +4996,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                     hit_points: MasterHitPoints::of_data(550),
                     build_time: WholeSeconds::of_data(25),
                     record: Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -5043,7 +5043,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
         class: class::BUILDING,
         radius: Footprint::new(1.0, 1.0),
         height: Distance::new(1.0),
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         obstruction_class,
         ..Master::default()
     };
@@ -5061,7 +5061,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
                 class: class::BUILDING,
                 player: PlayerId::new(0),
                 master: ids::HOUSE,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -5305,7 +5305,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
         (WorkerCount::of_data(0), WorkerCount::of_data(0))
     );
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(6.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(attribute::MEAT), Amount::new(6.0));
     assert_eq!(
         t.move_to_object_with(
             PlayerId::new(1),
@@ -5449,7 +5449,7 @@ fn hunter_drop_off_waits_then_searches_its_drop_site_again() {
     );
     assert!((h.timer + Seconds::new(0.45)).get().abs() < 1e-6);
     let mut t = wait(Seconds::new(-0.01));
-    t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::MEAT);
+    t.players[1].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::MEAT);
     t.players[1].objects[ListIndex::new(0)].life.amount = Amount::new(5.0);
     t.players[1].objects[ListIndex::new(2)].workers = WorkerCount::of_data(1);
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
@@ -5495,7 +5495,7 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
             );
         });
         let v = &mut t.players[1].objects[ListIndex::new(0)];
-        (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
+        (v.life.attribute_kind, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
         v.place_for_test(Position::new(22.3, 89.5, 0.0));
         t.spatial
             .set_position(
@@ -5778,9 +5778,9 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         }
         let deer = &mut t.players[0].objects[ListIndex::new(0)];
         (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
-        (deer.life.attribute_type, deer.life.amount) = (Some(attribute::MEAT), Amount::new(100.0));
+        (deer.life.attribute_kind, deer.life.amount) = (Some(attribute::MEAT), Amount::new(100.0));
         let v = &mut t.players[1].objects[ListIndex::new(0)];
-        (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(held));
+        (v.life.attribute_kind, v.life.amount) = (Some(attribute::MEAT), Amount::new(held));
         v.place_for_test(Position::new(31.9, 89.5, 0.0));
         t.spatial
             .set_position(
@@ -5853,9 +5853,9 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
     }
     let deer = &mut t.players[0].objects[ListIndex::new(0)];
     (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
-    (deer.life.attribute_type, deer.life.amount) = (Some(attribute::MEAT), Amount::new(100.0));
+    (deer.life.attribute_kind, deer.life.amount) = (Some(attribute::MEAT), Amount::new(100.0));
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
     v.place_for_test(Position::new(31.9, 89.5, 0.0));
     t.spatial
         .set_position(
@@ -5972,7 +5972,7 @@ fn shepherd_world(x: f32) -> World {
                     state: ObjectState::Alive,
                     hp: HitPoints::new(7.0),
                     master_id: master_id(594),
-                    attribute_type: Some(attribute::MEAT),
+                    attribute_kind: Some(attribute::MEAT),
                     amount: Amount::new(100.0),
                     ..Lifecycle::default()
                 },
@@ -6157,7 +6157,7 @@ fn lumber_world(near: f32) -> World {
             state: ObjectState::Alive,
             hp: HitPoints::new(20.0),
             master_id: master_id(349),
-            attribute_type: Some(attribute::WOOD),
+            attribute_kind: Some(attribute::WOOD),
             amount: Amount::new(100.0),
             ..Lifecycle::default()
         },
@@ -6479,9 +6479,9 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
             let view = OwnerView::of(c, None).unwrap();
             let attacker = unit.attacker_of(
                 actions,
-                UnitAiType::SOLDIER,
+                UnitAiKind::SOLDIER,
                 None,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6496,7 +6496,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 |ai, side, _| {
                     side.release(by.id, by)?;
                     Ok((side.unit.workers.get(), ai.notifies.len()))
@@ -6538,9 +6538,9 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
             let view = OwnerView::of(c, None).unwrap();
             let attacker = unit.attacker_of(
                 actions,
-                UnitAiType::SOLDIER,
+                UnitAiKind::SOLDIER,
                 None,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6555,7 +6555,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 |ai, side, _| {
                     side.c.notify_own(side.unit, n)?;
                     Ok(ai.notifies.len())
@@ -6590,9 +6590,9 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                 let view = OwnerView::of(c, None).unwrap();
                 let attacker = unit.attacker_of(
                     actions,
-                    UnitAiType::SOLDIER,
+                    UnitAiKind::SOLDIER,
                     None,
-                    (PlayerId::new(1), PlayerType::HUMAN),
+                    (PlayerId::new(1), PlayerKind::HUMAN),
                     false,
                     (
                         CaptureKind::NONE,
@@ -6607,7 +6607,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     c,
                     &view,
                     attacker,
-                    (PlayerId::new(1), PlayerType::HUMAN),
+                    (PlayerId::new(1), PlayerKind::HUMAN),
                     |_, side, rng| {
                         if world_draws {
                             let _ = side.c.w.streams.get(Stream::Ai).rand15();
@@ -6809,7 +6809,7 @@ fn the_unit_ai_repair_order_switches_villager_to_the_repairer() {
         range: Distance::ZERO,
         shown: Point::new(30.0, 88.0),
         ready: true,
-        target_type: order_type(80),
+        target_kind: order_kind(80),
     };
     let world = |repairer: bool| repairer_world(vec![order], repairer);
     let mut t = world(true);
@@ -6864,9 +6864,9 @@ fn villager_side<R>(
             let view = OwnerView::of(c, None).unwrap();
             let attacker = unit.attacker_of(
                 actions,
-                UnitAiType::BOAR,
+                UnitAiKind::BOAR,
                 None,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 false,
                 (
                     CaptureKind::NONE,
@@ -6881,7 +6881,7 @@ fn villager_side<R>(
                 c,
                 &view,
                 attacker,
-                (PlayerId::new(1), PlayerType::HUMAN),
+                (PlayerId::new(1), PlayerKind::HUMAN),
                 |_, side, _| f(side),
             )?;
             Ok((answer, c.w.parts.unit_ai.get(unit.id).cloned()))
@@ -6902,7 +6902,7 @@ fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
         class: class::BUILDING,
         player: PlayerId::new(1),
         master: ids::HOUSE,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -6980,7 +6980,7 @@ fn enter_world(orders: Vec<QueuedOrder>, room: u8) -> World {
         let house = Arc::make_mut(masters).get_mut(ids::HOUSE).unwrap();
         house.garrison = GarrisonCapacity::of_data(room);
         // it takes villagers in (bit 0)
-        house.building.as_mut().unwrap().garrison_type = GarrisonKinds::VILLAGERS;
+        house.building.as_mut().unwrap().garrison_kind = GarrisonKinds::VILLAGERS;
     }
     t.parts
         .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(walker()));
@@ -6996,7 +6996,7 @@ fn enter_world(orders: Vec<QueuedOrder>, room: u8) -> World {
             class: class::BUILDING,
             player: PlayerId::new(1),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -7192,7 +7192,7 @@ fn livestock_enter_world() -> World {
             .building
             .as_mut()
             .unwrap()
-            .garrison_type = GarrisonKinds::HERDABLES;
+            .garrison_kind = GarrisonKinds::HERDABLES;
     }
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     v.life.master_id = master_id(594);
@@ -7219,7 +7219,7 @@ fn livestock_enter_command_becomes_its_artifact_sub_action() {
     assert_eq!(t.parts.actions_of(v.id).list.enter().copied(), None);
     assert_eq!(
         t.parts.actions_of(v.id).top_action_kind(),
-        Some(ARTIFACT_TYPE)
+        Some(ARTIFACT_KIND)
     );
     let sub = t
         .parts
@@ -7586,7 +7586,7 @@ fn the_unit_ai_enter_order_gives_the_unit_an_enter() {
         range: Distance::ZERO,
         shown: Point::new(30.0, 88.0),
         ready: true,
-        target_type: order_type(80),
+        target_kind: order_kind(80),
     };
     let mut t = enter_world(vec![order], 5);
     t.tick(Millis::new(50));
@@ -7640,7 +7640,7 @@ fn villager_sent_off_foundation_waits_for_it_as_builder() {
         range: Distance::ZERO,
         shown: Point::new(30.0, 0.0),
         ready: true,
-        target_type: order_type(70),
+        target_kind: order_kind(70),
     };
     let mut t = sent_off_world(vec![order]);
     t.tick(Millis::new(50));
@@ -7704,7 +7704,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
         range: Distance::ZERO,
         shown: Point::new(30.0, 88.0),
         ready: true,
-        target_type: order_type(70),
+        target_kind: order_kind(70),
     };
     let mut t = sent_off_world(vec![]);
     {
@@ -7725,7 +7725,7 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
         |ai, at, side, _, rng| {
             let r = ai.process_order(
                 &order,
-                Some((at, PlayerType::HUMAN)),
+                Some((at, PlayerKind::HUMAN)),
                 None,
                 rng,
                 side,
@@ -8032,7 +8032,7 @@ fn the_way_back_after_drop_off_queues_the_order_on_the_recorded_work() {
             range: Distance::ZERO,
             shown: Point::new(30.0, 88.0),
             ready: true,
-            target_type: order_type(70),
+            target_kind: order_kind(70),
         }]
     );
     // a recorded target the world no longer holds: the record as it is, in front
@@ -8052,13 +8052,13 @@ fn the_way_back_after_drop_off_queues_the_order_on_the_recorded_work() {
     assert_eq!(
         (
             first.target,
-            first.target_type,
+            first.target_kind,
             first.target_owner,
             first.point
         ),
         (
             Some(object_id(999)),
-            OrderTargetType::of_class(class::BUILDING),
+            OrderTargetKind::of_class(class::BUILDING),
             None,
             Position::new(1.0, 2.0, 0.0)
         )
@@ -8072,7 +8072,7 @@ fn the_way_back_after_drop_off_queues_the_order_on_the_recorded_work() {
 fn unit_order_drop_off_takes_any_player_unit() {
     let mut t = sent_off_world(vec![]);
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(attribute::WOOD), Amount::new(5.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(attribute::WOOD), Amount::new(5.0));
     let before = t.players[1].objects[ListIndex::new(0)].clone();
     t.unit_order(
         player_id(1),
@@ -8279,7 +8279,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
             vec![
                 Player {
                     attributes: attributes(250, [0.0, 100.0, 0.0, 0.0]),
-                    kind: PlayerType::COMPUTER,
+                    kind: PlayerKind::COMPUTER,
                     ..Player::default()
                 },
                 Player {
@@ -8329,7 +8329,7 @@ fn build_creates_foundation_whose_unit_ai_draws_before_the_turn_players_units() 
         position: Position::new(10.0, 10.0, 0.0),
         ..NewObject::default()
     };
-    let first = UnitAi::constructed(UnitAiType::BUILDING, &new, ai, &roles()).unwrap();
+    let first = UnitAi::constructed(UnitAiKind::BUILDING, &new, ai, &roles()).unwrap();
     assert_eq!(built.parts.unit_ai.get(foundation.id), Some(&first));
     let next = 750 + ai.rand15() % 500;
     stock_masters(&mut by_hand);
@@ -8477,8 +8477,8 @@ fn farm_master() -> Master {
             default_task: TaskIndex::of_data(0),
             tasks: vec![Task {
                 action_kind: MAKE,
-                attribute_type: Some(attribute::FARM_FOOD),
-                attribute_type2: Some(attribute::FOOD),
+                attribute_kind: Some(attribute::FARM_FOOD),
+                attribute_kind2: Some(attribute::FOOD),
                 work_val1: WorkValue::new(1.0),
                 ..Task::default()
             }],
@@ -8782,7 +8782,7 @@ fn farm_starts_its_make_in_its_first_update_and_fills_from_the_next() {
             id: object_id(40),
             life: Lifecycle {
                 master_id: ids::FARM,
-                attribute_type: Some(attribute::FOOD),
+                attribute_kind: Some(attribute::FOOD),
                 amount: Amount::new(15.0),
                 ..Lifecycle::default()
             },
@@ -9217,7 +9217,7 @@ fn gate_opens_for_its_allies_while_they_update() {
         id: master_id(64),
         kind: MasterKind::BUILDING,
         class: class::GATE,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         obstruction_class: ObstructionClass::GATE,
         building: Some(BuildingMaster {
             transform_unit: Some(master_id(63)),
@@ -9235,7 +9235,7 @@ fn gate_opens_for_its_allies_while_they_update() {
     );
     t.spatial.relations = t.players.iter().map(|p| p.relations.clone()).collect();
     let record = Obstruction {
-        kind: ObstructionKind::TYPE_2,
+        kind: ObstructionKind::KIND_2,
         class: ObstructionClass::GATE,
     };
     t.spatial.insert(
@@ -9246,7 +9246,7 @@ fn gate_opens_for_its_allies_while_they_update() {
             class: class::GATE,
             player: PlayerId::new(2),
             master: master_id(64),
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -9338,7 +9338,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
             class::GATE,
             PlayerId::new(1),
             Speed::ZERO,
-            ObstructionKind::TYPE_2,
+            ObstructionKind::KIND_2,
         ),
     );
     s.insert(
@@ -9348,7 +9348,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
             class::GATE,
             PlayerId::new(1),
             Speed::ZERO,
-            ObstructionKind::TYPE_2,
+            ObstructionKind::KIND_2,
         ),
     );
     s.insert(
@@ -9358,7 +9358,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
             class::GATE,
             PlayerId::new(1),
             Speed::ZERO,
-            ObstructionKind::TYPE_2,
+            ObstructionKind::KIND_2,
         ),
     );
     s.insert(
@@ -9406,7 +9406,7 @@ fn gate_counts_the_moving_units_between_its_posts() {
             class::WALL,
             PlayerId::new(1),
             Speed::ZERO,
-            ObstructionKind::TYPE_2,
+            ObstructionKind::KIND_2,
         ),
     );
     let (units, allied) = gate_units(
@@ -9546,15 +9546,15 @@ fn gate_world() -> World {
     };
     t.spatial.insert(
         object_id(27745),
-        placed(20.0, class::GATE, Speed::ZERO, ObstructionKind::TYPE_2),
+        placed(20.0, class::GATE, Speed::ZERO, ObstructionKind::KIND_2),
     );
     t.spatial.insert(
         object_id(27746),
-        placed(18.5, class::GATE, Speed::ZERO, ObstructionKind::TYPE_2),
+        placed(18.5, class::GATE, Speed::ZERO, ObstructionKind::KIND_2),
     );
     t.spatial.insert(
         object_id(27747),
-        placed(21.5, class::GATE, Speed::ZERO, ObstructionKind::TYPE_2),
+        placed(21.5, class::GATE, Speed::ZERO, ObstructionKind::KIND_2),
     );
     t.spatial.insert(
         object_id(1),
@@ -10339,7 +10339,7 @@ fn research_check_refuses_another_player_buildings() {
         Some(object_ids([-1, 10]))
     );
     // a computer's list left without one still runs
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(77)), 2, vec![9, 10]))
             .unwrap(),
@@ -10347,7 +10347,7 @@ fn research_check_refuses_another_player_buildings() {
     );
     // while players may order each other's
     t.settings.cheats_enabled = true;
-    t.players[1].kind = PlayerType::HUMAN;
+    t.players[1].kind = PlayerKind::HUMAN;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(9)), 1, vec![]))
             .unwrap(),
@@ -10574,7 +10574,7 @@ fn research_unmodelled_parts_fail() {
         "RESEARCH at another player's object"
     );
     assert_eq!(
-        fails(&|t| t.players[0].kind = PlayerType::COMPUTER),
+        fails(&|t| t.players[0].kind = PlayerKind::COMPUTER),
         "a computer player's RESEARCH (FUN_1411d5520, player+0x7a8)"
     );
     assert_eq!(
@@ -10633,7 +10633,7 @@ fn queue_takes_as_many_as_the_room_and_the_resources_allow() {
     assert_eq!(queued(&full), QueuedUnits::of_data(15));
     // a computer player fills to 2
     let mut computer = one_player(vec![centre(9)], [1000.0; 4]);
-    computer.players[0].kind = PlayerType::COMPUTER;
+    computer.players[0].kind = PlayerKind::COMPUTER;
     computer.tick_with(Millis::new(104), &[queue(9, 99, 5)]);
     assert_eq!(queued(&computer), QueuedUnits::of_data(2));
 }
@@ -10712,7 +10712,7 @@ fn queued_units_join_the_last_entry_and_full_buffer_grows() {
 #[test]
 fn computer_player_housed_building_cancels_its_queue() {
     let mut t = one_player(vec![centre(9)], [1000.0; 4]);
-    t.players[0].kind = PlayerType::COMPUTER;
+    t.players[0].kind = PlayerKind::COMPUTER;
     t.players[0].attributes[4] = Amount::new(0.5);
     t.tick_with(Millis::new(104), &[queue(9, 83, 1)]);
     let p = &t.players[0];
@@ -10869,7 +10869,7 @@ pub(crate) fn hands_world(
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN; 3],
+        vec![PlayerKind::HUMAN; 3],
     );
     let mut r = Registry::new(3, 65);
     r.entries
@@ -11638,9 +11638,9 @@ fn gaia_archer_player_sees_goes_to_that_player() {
                     objects: vec![live(500)].into(),
                     attributes: vec![Amount::ZERO; 300],
                     kind: if computer {
-                        PlayerType::COMPUTER
+                        PlayerKind::COMPUTER
                     } else {
-                        PlayerType::HUMAN
+                        PlayerKind::HUMAN
                     },
                     ..Player::default()
                 },
@@ -11770,7 +11770,7 @@ fn teardown_world() -> World {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -12050,7 +12050,7 @@ fn built_building_storage_leaves_its_owner_and_its_store() {
         ],
         ..Default::default()
     };
-    u.life.attribute_type = Some(attribute::HEADROOM);
+    u.life.attribute_kind = Some(attribute::HEADROOM);
     u.life.amount = Amount::new(3.0);
     let adds = storage_leaves((&mut u, &mut combat), &master, &roles(), slots());
     assert_eq!(
@@ -12180,7 +12180,7 @@ fn deaths_world() -> World {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -12604,7 +12604,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
         place: Static::at(Position::new(10.5, 10.5, 0.0)),
         life: Lifecycle {
             master_id: VILLAGER_MALE,
-            attribute_type: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FOOD),
             amount: Amount::new(10.0),
             ..Lifecycle::default()
         },
@@ -12680,7 +12680,7 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             pathing: &mut t.pathing,
             object: t.streams.get(Stream::Object),
             world_time: WorldTime::ZERO,
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             groups: &t.groups,
         };
         hunter.drop_off_in(
@@ -12771,7 +12771,7 @@ fn hunt_lets_its_drop_site_go_when_it_dies_or_the_hunter_does() {
             class: class::BUILDING,
             player: PlayerId::new(1),
             master: ids::HOUSE,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
@@ -13139,7 +13139,7 @@ fn an_artifact_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
                 class: class::TOWER,
                 player: PlayerId::new(1),
                 master: ids::TOWN_CENTRE,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -13210,7 +13210,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
             (None, Amount::ZERO, 0),
             (None, Amount::ZERO, 0),
         ],
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         obstruction_class: ObstructionClass::UNIT,
         building: Some(BuildingMaster {
             stack_unit: None,
@@ -13250,7 +13250,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
                 hit_points: MasterHitPoints::of_data(20000),
                 build_time: WholeSeconds::of_data(10),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -13290,7 +13290,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
     .with_ais([(
         object_id(7),
         UnitAi {
-            ai_type: ARTIFACT_AI,
+            ai_kind: ARTIFACT_AI,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -13463,7 +13463,7 @@ fn gaia_torch_goes_to_the_one_player_near_it() {
     .with_ais([(
         object_id(7),
         UnitAi {
-            ai_type: ARTIFACT_AI,
+            ai_kind: ARTIFACT_AI,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -13746,7 +13746,7 @@ fn an_object_changing_hands_takes_its_storage_and_class_counts_along() {
 /// saw it (an attacker the world does not hold then, out for its update or gone, counts too); a
 /// computer player's killed object (its AI is told) is not modelled.
 #[test]
-fn killed_villager_counts_its_attacker_kind_and_player_type() {
+fn killed_villager_counts_its_attacker_kind_and_player_kind() {
     let unit = |id, master_id| Unit {
         id,
         life: Lifecycle {
@@ -13769,11 +13769,11 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
             vec![Millis::ZERO; 3],
             vec![
                 player(
-                    PlayerType::GAIA,
+                    PlayerKind::GAIA,
                     vec![unit(object_id(50), master_id(126))].into(),
                 ),
                 player(
-                    PlayerType::HUMAN,
+                    PlayerKind::HUMAN,
                     vec![
                         unit(object_id(40), VILLAGER_MALE),
                         unit(object_id(41), VILLAGER_MALE),
@@ -13814,7 +13814,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
     };
     let counts = |t: &World| [226, 227, 228, 229].map(|i| t.players[1].attributes[i]);
     // Gaia's wolf: an animal, Gaia's type
-    let mut t = world(PlayerType::HUMAN);
+    let mut t = world(PlayerKind::HUMAN);
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -13824,9 +13824,9 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
     assert_eq!(counts(&t), amounts([1.0, 1.0, 0.0, 0.0]));
     // the archers of a human, a computer and the editor's phantom
     for (kind, seen) in [
-        (PlayerType::HUMAN, [0.0, 0.0, 0.0, 1.0]),
-        (PlayerType::COMPUTER, [0.0, 0.0, 1.0, 0.0]),
-        (PlayerType::PHANTOM, [0.0; 4]),
+        (PlayerKind::HUMAN, [0.0, 0.0, 0.0, 1.0]),
+        (PlayerKind::COMPUTER, [0.0, 0.0, 1.0, 0.0]),
+        (PlayerKind::PHANTOM, [0.0; 4]),
     ] {
         let mut t = world(kind);
         t.killed(
@@ -13837,7 +13837,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
         .unwrap();
         assert_eq!(counts(&t), amounts(seen));
     }
-    let mut t = world(PlayerType::HUMAN);
+    let mut t = world(PlayerKind::HUMAN);
     t.killed(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -13845,7 +13845,7 @@ fn killed_villager_counts_its_attacker_kind_and_player_type() {
     )
     .unwrap();
     assert_eq!(counts(&t), amounts([0.0, 1.0, 0.0, 1.0]));
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert!(
         t.killed(
             PlayerId::new(1),
@@ -14712,7 +14712,7 @@ fn command_queue_takes_the_gather_point_first_then_the_steps() {
     let mut tc = town_centre(9149);
     tc.life.master_id = ids::TOWN_CENTRE;
     let ai = UnitAi {
-        ai_type: UnitAiType::BUILDING,
+        ai_kind: UnitAiKind::BUILDING,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -15152,7 +15152,7 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                     hit_points: MasterHitPoints::of_data(1650),
                     build_time: WholeSeconds::of_data(100),
                     record: Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -15292,7 +15292,7 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
                     hit_points: MasterHitPoints::of_data(10),
                     build_time: WholeSeconds::of_data(70),
                     record: Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -15756,7 +15756,7 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
                 hit_points: MasterHitPoints::of_data(1200),
                 build_time: WholeSeconds::of_data(50),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::NONE,
                 },
                 snow: Snow::None,
@@ -16432,9 +16432,9 @@ fn on_side<R>(
                 unit,
                 actions,
                 attacker: Attacker {
-                    ai_type: UnitAiType::SOLDIER,
+                    ai_kind: UnitAiKind::SOLDIER,
                     player: PlayerId::new(1),
-                    player_type: PlayerType::HUMAN,
+                    player_kind: PlayerKind::HUMAN,
                     state: ObjectState::Alive,
                     held: None,
                     top_action: None,
@@ -16457,7 +16457,7 @@ fn on_side<R>(
                     capture: CaptureKind::NONE,
                 },
                 player: PlayerId::new(1),
-                player_type: PlayerType::HUMAN,
+                player_kind: PlayerKind::HUMAN,
                 new_owner: None,
                 civ: CivId::new(0),
                 ai_settings: AiSettings::default(),
@@ -16579,7 +16579,7 @@ fn scout_attack_on(
     let ai = UnitAi {
         stance: UnitStance::STAND_GROUND,
         current_order: None,
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         ..UnitAi::default()
     };
     let every = vec![Masters::new([wolf]), Masters::new([scout])];
@@ -16709,7 +16709,7 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
     let ai = UnitAi {
         stance: UnitStance::STAND_GROUND,
         current_order: None,
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         ..UnitAi::default()
     };
     let _ = scout;
@@ -16943,7 +16943,7 @@ fn helper_free_of(owner: PlayerId, helper: Object, groups: &UnitGroups) -> bool 
 #[test]
 fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
     let idle = UnitAi {
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -16982,7 +16982,7 @@ fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
 #[test]
 fn helper_in_group_answers_only_while_its_group_patrols() {
     let idle = UnitAi {
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -17196,7 +17196,7 @@ fn build_command_foundation_holds_its_movement_state() {
     .with_ais([(
         object_id(9175),
         UnitAi {
-            ai_type: UnitAiType::CIVILIAN,
+            ai_kind: UnitAiKind::CIVILIAN,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -17288,7 +17288,7 @@ fn build_command_foundation_draws_its_facing_before_its_powerup_offset() {
         .with_ais([(
             object_id(9175),
             UnitAi {
-                ai_type: UnitAiType::CIVILIAN,
+                ai_kind: UnitAiKind::CIVILIAN,
                 current_order: None,
                 current_action: None,
                 current_target: None,
@@ -17456,7 +17456,7 @@ fn reseed_world() -> World {
     .with_ais([(
         object_id(9175),
         UnitAi {
-            ai_type: UnitAiType::CIVILIAN,
+            ai_kind: UnitAiKind::CIVILIAN,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -17542,7 +17542,7 @@ fn without_farm_to_make_the_farmer_idles() {
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
     t.players[1].attributes[1] = Amount::new(59.0);
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
         .unwrap();
     let p = &t.players[1];
@@ -17686,7 +17686,7 @@ fn reseed_placement_passes_over_the_old_farm() {
                 class: class::FARM,
                 player: PlayerId::new(1),
                 master: ids::FARM,
-                obstruction_kind: ObstructionKind::TYPE_2,
+                obstruction_kind: ObstructionKind::KIND_2,
                 buildable_on: BuildableOn::NO,
                 tall: true,
                 moves: false,
@@ -17748,7 +17748,7 @@ fn committing_build_or_wall_to_busy_builder_readies_its_queue() {
     .with_ais([(
         object_id(9175),
         UnitAi {
-            ai_type: UnitAiType::CIVILIAN,
+            ai_kind: UnitAiKind::CIVILIAN,
             current_order: Some(OrderKind::Move),
             current_action: None,
             current_target: None,
@@ -18084,7 +18084,7 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
     assert_eq!(v.life.inside, Some(ContainerId::new(object_id(10028))));
     assert_eq!(
         t.parts.actions_of(v.id).top_action_kind(),
-        Some(ARTIFACT_TYPE)
+        Some(ARTIFACT_KIND)
     );
     // inside at the next update's start: no Artifact step, the inside update deletes it
     let before = t
@@ -18348,13 +18348,13 @@ pub(crate) fn archer_world(hit_chance: i16, max_volley: u8, spread: f32) -> Worl
             class: class::PREDATOR,
             player: PlayerId::new(0),
             master: master_id(65),
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::NONE,
             }),
         },
@@ -18760,7 +18760,7 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
             "a charged hit",
         ),
         (
-            |t| t.players[0].kind = PlayerType::COMPUTER,
+            |t| t.players[0].kind = PlayerKind::COMPUTER,
             "a hit on a computer player's object",
         ),
         (
@@ -19178,7 +19178,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
     );
     let t = dropped_without_bush(|t| {
         pointless(t);
-        t.players[1].kind = PlayerType::COMPUTER;
+        t.players[1].kind = PlayerKind::COMPUTER;
     });
     assert!(
         t.parts
@@ -19197,7 +19197,7 @@ fn forager_with_nothing_found_after_the_drop_idles_or_is_done() {
         range: Distance::ZERO,
         shown: Point::new(36.5, 89.5),
         ready: true,
-        target_type: order_type(7),
+        target_kind: order_kind(7),
     };
     // the Gather's state 8 after the deposit, its bush gone, two orders queued
     let mut t = foraging();
@@ -19464,7 +19464,7 @@ fn house_builder() -> World {
     );
     t.players[1].tracker.add(object_id(700), k);
     t.players[1].tracker.complete(object_id(700), k);
-    Arc::make_mut(&mut t.model.drop_sites)[0].resource_types = attribute::RESOURCES.to_vec();
+    Arc::make_mut(&mut t.model.drop_sites)[0].resource_kinds = attribute::RESOURCES.to_vec();
     t
 }
 
@@ -19475,7 +19475,7 @@ fn house_builder() -> World {
 fn drop_again_with(held: Held) -> (BuildState, Option<ObjectId>, f32, i32, Vec<NotifyKind>) {
     let mut t = house_builder();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (held.kind, held.amount);
+    (v.life.attribute_kind, v.life.amount) = (held.kind, held.amount);
     in_update(
         &mut t,
         (PlayerId::new(1), ListIndex::new(0)),
@@ -19587,7 +19587,7 @@ fn drop_site_sought(
         pathing: &mut t.pathing,
         object: t.streams.get(Stream::Object),
         world_time: WorldTime::ZERO,
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         groups: &t.groups,
     };
     let objects = OthersRef::of(&t.players, &t.index, PlayerId::new(1)).unwrap();
@@ -20175,7 +20175,7 @@ fn hunter_with_queued_order_after_the_drop_ends_its_hunt() {
         range: Distance::ZERO,
         shown: Point::new(36.5, 89.5),
         ready: true,
-        target_type: order_type(9),
+        target_kind: order_kind(9),
     };
     let held = hunted_without_deer(|_, ai| ai.orders = vec![order(501)]);
     assert_eq!(hunt_after(&held), (None, [0, 0]));
@@ -20417,7 +20417,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
         hit_points: MasterHitPoints::of_data(2400),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -21609,7 +21609,7 @@ fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     );
     t.build_mesh().unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     let here = v.position();
     let m = t.parts.mover_mut(v.id).unwrap();
     m.moved_at = here;
@@ -21706,7 +21706,7 @@ fn loaded_builder_drops_its_food_at_the_centre_and_builds_on() {
     );
     assert_eq!(t.players[1].attributes[0], Amount::new(6.0));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].life.attribute_type,
+        t.players[1].objects[ListIndex::new(0)].life.attribute_kind,
         None
     );
 }
@@ -22022,7 +22022,7 @@ fn step_that_fails_stops_what_follows_it() {
     use crate::map::spatial::Obstruction;
     use crate::objects::unit::Outcome;
     let record = Obstruction {
-        kind: ObstructionKind::TYPE_2,
+        kind: ObstructionKind::KIND_2,
         class: ObstructionClass::UNIT,
     };
     let mut t = house_builder();
@@ -22730,7 +22730,7 @@ fn an_order_units_are_capped_unless_its_comm_player_is_outside_the_world() {
         t.command_units(PlayerId::new(1), &UnitList::last_commanded()),
         Vec::<Option<ObjectId>>::new()
     );
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert_eq!(t.command_units(PlayerId::new(1), &listed), many[..500]);
     assert_eq!(t.most_units(outside), 0);
     t.set_last_commanded(PlayerId::new(0), object_ids([5]));
@@ -22884,7 +22884,7 @@ fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
     use crate::unit_ai::UnitSide;
     use crate::vision::registry::Record;
     let idle = UnitAi {
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -22950,7 +22950,7 @@ fn research_listed(t: &mut World, r: &ResearchCommand) -> Result<(), GenieError>
 fn explorer_world(open: &[[i32; 2]], slots: Vec<i32>) -> World {
     use crate::players::ai_module::{AiModule, InfoModule, TacticalModule};
     let mut t = forage_world();
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     let mut path_map = InfluenceMap::new(GridSize::new(120, 120), 0);
     for &[x, y] in open {
         path_map.set(Tile::new(x, y), 0xff);
@@ -23028,7 +23028,7 @@ fn computer_players_ai_detasks_an_explorer_with_nothing_left_to_explore() {
 #[test]
 fn only_computer_players_explorer_notify_reaches_the_ai() {
     let mut human = explorer_world(&[[31, 89]], vec![]);
-    human.players[1].kind = PlayerType::HUMAN;
+    human.players[1].kind = PlayerKind::HUMAN;
     let before = human.ai.clone();
     human
         .run_unit_ai((PlayerId::new(1), ListIndex::new(0)), |_, _, side, _, _| {

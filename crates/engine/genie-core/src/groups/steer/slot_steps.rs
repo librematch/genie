@@ -22,7 +22,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::MasterKind;
 use crate::pathing::tile_path::Path;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
@@ -98,10 +98,10 @@ impl World {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
-        let player_type = self
+        let player_kind = self
             .players
             .get(p.index())
-            .map_or(PlayerType::PHANTOM, |q| q.kind);
+            .map_or(PlayerKind::PHANTOM, |q| q.kind);
         let solid = mover.stats.radius.sized();
         let found = if solid {
             let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
@@ -110,7 +110,7 @@ impl World {
             let mut plan = Planning {
                 pathing: &mut self.pathing,
                 now: self.world_time,
-                player_type,
+                player_kind,
                 object: self.streams.get(Stream::Object),
                 groups: &self.groups,
             };
@@ -154,7 +154,7 @@ impl World {
                 &walker,
                 u.position().ground(),
                 &self.spatial,
-                player_type,
+                player_kind,
                 (to, 0.0),
                 None,
                 ObjectsRef::new(

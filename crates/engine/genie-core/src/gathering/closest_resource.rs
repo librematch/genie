@@ -19,7 +19,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
 use crate::objects::{ObjectState, WorkerCount};
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
 use crate::players::PlayerId;
 use crate::unit_ai::world_view::owner_view;
@@ -139,7 +139,7 @@ pub(crate) fn closest_resource_of(
             position,
             pasture: u.pasture,
             untargetable: u.untargetable,
-            attribute: u.life.attribute_type,
+            attribute: u.life.attribute_kind,
             amount: u.life.amount,
             auto_gather: m.auto_gather.is_on(),
             gather_group: m.gather_group,
@@ -206,7 +206,7 @@ pub(crate) fn closest_resource_of(
 /// action layer.
 pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
     by_id.actions(id).is_some_and(|a| {
-        a.top_action_kind() == Some(ARTIFACT_TYPE)
+        a.top_action_kind() == Some(ARTIFACT_KIND)
             && a.list
                 .artifact()
                 .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
@@ -247,7 +247,7 @@ impl UnitView<'_, '_> {
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
-                player_type: self.player_type,
+                player_kind: self.player_kind,
                 object: self.c.w.streams.get(Stream::Object),
                 groups: &self.c.w.groups,
             },
@@ -347,7 +347,7 @@ impl Unit {
             plan: Planning {
                 pathing: &mut c.w.pathing,
                 now: c.w.world_time,
-                player_type: c.w.players.player(c.player)?.kind,
+                player_kind: c.w.players.player(c.player)?.kind,
                 object: c.w.streams.get(Stream::Object),
                 groups: &c.w.groups,
             },

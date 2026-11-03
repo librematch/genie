@@ -46,7 +46,7 @@ impl HuntAction {
         r: &HuntReads,
     ) -> Result<HuntNext, GenieError> {
         let roles = &c.w.model.roles.clone();
-        if r.attack.player_type.is_computer() {
+        if r.attack.player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt (FUN_140fde4f0)",
             ));
@@ -174,7 +174,7 @@ impl HuntAction {
     ) -> Result<HuntNext, GenieError> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.attack.player_type.is_computer()
+            waits: !r.attack.player_kind.is_computer()
                 && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
             stance: r.attack.stance,
         };

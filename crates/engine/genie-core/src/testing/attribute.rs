@@ -159,11 +159,11 @@ pub const MILL_FOOD: AttributeId = AttributeId::named(254);
 /// A villager's death by a hunted animal (a prey or predator attacker).
 pub const VILLAGER_KILLED_BY_ANIMAL: AttributeId = AttributeId::named(227);
 /// A villager's death by a player of type 1.
-pub const VILLAGER_KILLED_BY_TYPE_1: AttributeId = AttributeId::named(229);
+pub const VILLAGER_KILLED_BY_KIND_1: AttributeId = AttributeId::named(229);
 /// A villager's death by a player of type 2.
-pub const VILLAGER_KILLED_BY_TYPE_2: AttributeId = AttributeId::named(226);
+pub const VILLAGER_KILLED_BY_KIND_2: AttributeId = AttributeId::named(226);
 /// A villager's death by a player of type 3.
-pub const VILLAGER_KILLED_BY_TYPE_3: AttributeId = AttributeId::named(228);
+pub const VILLAGER_KILLED_BY_KIND_3: AttributeId = AttributeId::named(228);
 /// A task whose `attribute_type4` is this (`0x124`) stops its target's decay under the attribute
 /// (`FUN_140ac44b0`).
 pub const DECAY_TASK: AttributeId = AttributeId::named(292);

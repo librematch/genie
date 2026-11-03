@@ -66,11 +66,11 @@ impl World {
             task: HuntTask {
                 id: task.id,
                 range: task.work_range,
-                resource: task.attribute_type,
+                resource: task.attribute_kind,
                 sprites: task.sprites,
                 work_value: task.work_val1,
-                productivity: task.attribute_type2,
-                kind4: task.attribute_type4,
+                productivity: task.attribute_kind2,
+                kind4: task.attribute_kind4,
             },
             point,
             clears: false,
@@ -366,7 +366,7 @@ impl World {
                 .of_class(tm.class)
                 .contains(ClassRoles::REPAIRED_AT_SHORE),
         );
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let repair = self
             .parts
             .actions_of(self.players.live(player, idx)?.id)
@@ -378,7 +378,7 @@ impl World {
         let same = repair.target == Some(RepairTargetId::new(target));
         let stays = same
             && (repair.state == RepairState::Face
-                || (matches!(repair.state, RepairState::Move { .. }) && player_type.is_computer()));
+                || (matches!(repair.state, RepairState::Move { .. }) && player_kind.is_computer()));
         if !stays {
             if !same && repair.counted {
                 self.leave_builders(repair.target)?;
@@ -533,7 +533,7 @@ impl World {
             build.retarget(foundation, target_at, walk, mover)?;
             return Ok(class);
         }
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let Some(Place::Live(fp, fi)) = self.place(target) else {
             return Err(GenieError::unsupported("a Build's foundation that sleeps"));
         };
@@ -558,7 +558,7 @@ impl World {
             walk,
             mover.as_mut(),
             builders,
-            player_type,
+            player_kind,
         );
         let unit = self.players.live_mut(player, idx)?;
         self.parts.actions.of_mut(unit.id)?.list.set_build(build);

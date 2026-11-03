@@ -105,7 +105,7 @@ impl Unit {
                 position,
                 pasture: u.pasture,
                 untargetable: u.untargetable,
-                attribute: u.life.attribute_type,
+                attribute: u.life.attribute_kind,
                 amount: u.life.amount,
                 auto_gather: m.auto_gather.is_on(),
                 gather_group: m.gather_group,

@@ -194,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn word_9_adds_action_type_state_byte_and_retarget_timer() {
+    fn word_9_adds_action_kind_state_byte_and_retarget_timer() {
         let o = CheckpointObject {
             top_action: Some(ActionTerm {
                 kind: Some(GATHER),

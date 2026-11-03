@@ -31,10 +31,10 @@ use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitAi;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::{Attacker, TopTarget};
@@ -117,18 +117,18 @@ impl Unit {
     pub(crate) fn attacker_of(
         &self,
         actions: &Action,
-        ai_type: UnitAiType,
+        ai_kind: UnitAiKind,
         master: Option<&Master>,
-        (player, player_type): (PlayerId, PlayerType),
+        (player, player_kind): (PlayerId, PlayerKind),
         scenario: bool,
         (capture, firepower, speed): (CaptureKind, Firepower, Speed),
     ) -> Attacker {
         Attacker {
-            ai_type,
+            ai_kind,
             player,
-            player_type,
+            player_kind,
             state: self.life.state,
-            held: self.life.attribute_type,
+            held: self.life.attribute_kind,
             top_action: actions.top_action_kind(),
             master: self.life.master_id,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),

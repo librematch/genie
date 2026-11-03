@@ -120,7 +120,7 @@ impl MasterAttribute {
     pub const OCCLUSION_MODE: Self = Self(29);
 
     /// "Garrison Type" (`+0x9bc`).
-    pub const GARRISON_TYPE: Self = Self(30);
+    pub const GARRISON_KIND: Self = Self(30);
 
     /// "Unit Size Z" (`+0x5e0`).
     pub const SIZE_Z: Self = Self(32);
@@ -192,7 +192,7 @@ impl MasterAttribute {
     pub const CHARGE_EVENT: Self = Self(61);
 
     /// "Charge Type" (`+0x922`).
-    pub const CHARGE_TYPE: Self = Self(62);
+    pub const CHARGE_KIND: Self = Self(62);
 
     /// "Combat Ability" (`+0x840`).
     pub const COMBAT_ABILITY: Self = Self(63);
@@ -240,7 +240,7 @@ impl MasterAttribute {
     pub const SPECIAL_GRAPHIC: Self = Self(77);
 
     /// "Obstruction Type" (`+0x651`).
-    pub const OBSTRUCTION_TYPE: Self = Self(78);
+    pub const OBSTRUCTION_KIND: Self = Self(78);
 
     /// "Blockage Class" (`+0x652`).
     pub const BLOCKAGE_CLASS: Self = Self(79);

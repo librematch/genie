@@ -33,7 +33,7 @@ use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::NearestAttacker;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::world::Mode680;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
@@ -102,9 +102,9 @@ fn harmless(master: Master) -> bool {
     .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
-        ai_type: UnitAiType::CIVILIAN,
+        ai_kind: UnitAiKind::CIVILIAN,
         player: PlayerId::new(1),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -214,9 +214,9 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
     ]
     .map(Arc::new);
     let attacker = Attacker {
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         player: PlayerId::new(1),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,
@@ -408,9 +408,9 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
     .map(Arc::new);
     let spatial = Spatial::new(GridSize::new(120, 120));
     let attacker = Attacker {
-        ai_type: UnitAiType::SOLDIER,
+        ai_kind: UnitAiKind::SOLDIER,
         player: PlayerId::new(1),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         state: ObjectState::Alive,
         held: None,
         top_action: None,

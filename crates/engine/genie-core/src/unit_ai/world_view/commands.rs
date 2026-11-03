@@ -18,7 +18,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -214,7 +214,7 @@ impl UnitView<'_, '_> {
         let Some((_, target_unit)) = find(target) else {
             return Ok(false);
         };
-        let under_artifact = self.actions.top_action_kind() == Some(ARTIFACT_TYPE);
+        let under_artifact = self.actions.top_action_kind() == Some(ARTIFACT_KIND);
         let masters = self
             .c
             .w
@@ -344,7 +344,7 @@ impl UnitView<'_, '_> {
             plan: Planning {
                 pathing: &mut self.c.w.pathing,
                 now: self.c.w.world_time,
-                player_type: self.player_type,
+                player_kind: self.player_kind,
                 object: self.c.w.streams.get(Stream::Object),
                 groups: &self.c.w.groups,
             },

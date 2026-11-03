@@ -1,7 +1,7 @@
 use crate::Result;
 use crate::reader::RecordingHeaderReader;
 use crate::unit::Unit;
-use crate::unit_type::CompactUnitType;
+use crate::unit_kind::CompactUnitKind;
 use genie_dat::CivilizationId;
 use genie_dat::tech_tree::TechTree;
 use genie_scx::VictoryConditions;
@@ -52,7 +52,7 @@ pub struct Player {
     /// Gaia's extra data (creature growth, wolf attacks); only for the Gaia player.
     pub gaia: Option<GaiaData>,
     /// The player's copy of each unit type, by unit type id; `None` for the ones it does not have.
-    pub unit_types: Vec<Option<CompactUnitType>>,
+    pub unit_kinds: Vec<Option<CompactUnitKind>>,
     /// Which tiles the player has explored and sees.
     pub visible_map: VisibleMap,
     /// The resource objects the player knows of.

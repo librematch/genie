@@ -39,7 +39,7 @@ use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::RoleId;
 use crate::objects::masters::ActionKind;
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::ownership::artifact::Artifact;
 use genie_diff::Diff;
 use std::mem::discriminant;
@@ -142,7 +142,7 @@ impl Action {
     #[must_use]
     pub const fn kind(&self) -> ActionKind {
         match self {
-            Self::Artifact(_) => ARTIFACT_TYPE,
+            Self::Artifact(_) => ARTIFACT_KIND,
             Self::Build(_) => ActionKind::BUILD,
             Self::Repair(_) => REPAIR,
             Self::MoveTo(_) => MOVE_TO,
@@ -331,12 +331,12 @@ mod tests {
     }
 
     #[test]
-    fn an_action_reads_its_type_and_state() {
+    fn an_action_reads_its_kind_and_state() {
         let a = Action::Artifact(artifact(ArtifactState::Check));
-        assert_eq!((a.kind(), a.state()), (ARTIFACT_TYPE, ActionState::new(6)));
+        assert_eq!((a.kind(), a.state()), (ARTIFACT_KIND, ActionState::new(6)));
         let list = ActionList::default().with_artifact(Some(artifact(ArtifactState::Check)));
-        assert_eq!(list.of_kind(ARTIFACT_TYPE), Some(&a));
-        assert!(list.holds(ARTIFACT_TYPE));
+        assert_eq!(list.of_kind(ARTIFACT_KIND), Some(&a));
+        assert!(list.holds(ARTIFACT_KIND));
         assert_eq!(list.of_kind(ATTACK), None);
         assert!(!list.holds(ATTACK));
     }

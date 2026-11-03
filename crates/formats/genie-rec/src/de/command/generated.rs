@@ -1445,7 +1445,7 @@ pub struct LockFormation {
     /// `+0x04`, formatter
     pub form_id: i32,
     /// `+0x08`, formatter
-    pub form_type: i32,
+    pub form_kind: i32,
     /// `+0x0c..`: the bytes after the fixed part, which no layout here splits
     pub rest: Vec<u8>,
 }
@@ -1463,7 +1463,7 @@ impl LockFormation {
         Some(Self {
             commp_id: get(p, 0x01)?,
             form_id: get(p, 0x04)?,
-            form_type: get(p, 0x08)?,
+            form_kind: get(p, 0x08)?,
             rest: bytes(p, Self::FIXED)?,
         })
     }
@@ -1476,7 +1476,7 @@ impl LockFormation {
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
         put(&mut out, self.form_id);
-        put(&mut out, self.form_type);
+        put(&mut out, self.form_kind);
         out.extend_from_slice(&self.rest);
         finish(out)
     }
@@ -1775,18 +1775,18 @@ impl Retreat {
 
 /// `0x25` `RGE_COMMAND_UNIT_TYPE_AI_STATE` (`GameCommand<RGE_Command_Unit_Type_AI_State>`, formatter `0x140e609c0`: `UnitTypeAiState(type=%d, state=%d, commID=%d)`).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct UnitTypeAiState {
+pub struct UnitKindAiState {
     /// `+0x01`, header
     pub commp_id: u8,
     /// `+0x04`, formatter
-    pub type_: i32,
+    pub kind: i32,
     /// `+0x08`, formatter
     pub state: u8,
     /// `+0x09..`: the bytes after the fixed part, which no layout here splits
     pub rest: Vec<u8>,
 }
 
-impl UnitTypeAiState {
+impl UnitKindAiState {
     /// The packet's first byte.
     pub const BYTE: u8 = 0x25;
     /// The length of the fixed part.
@@ -1798,7 +1798,7 @@ impl UnitTypeAiState {
         fits(p, Self::FIXED, Tail::Bytes).then_some(())?;
         Some(Self {
             commp_id: get(p, 0x01)?,
-            type_: get(p, 0x04)?,
+            kind: get(p, 0x04)?,
             state: get(p, 0x08)?,
             rest: bytes(p, Self::FIXED)?,
         })
@@ -1811,7 +1811,7 @@ impl UnitTypeAiState {
     /// [`Error::ValueOutOfRange`] when the packet is longer than its `u16` size holds.
     pub fn encode(&self) -> Result<Vec<u8>, Error> {
         let mut out = vec![Self::BYTE, self.commp_id, 0, 0];
-        put(&mut out, self.type_);
+        put(&mut out, self.kind);
         put(&mut out, self.state);
         out.extend_from_slice(&self.rest);
         finish(out)
@@ -2846,7 +2846,7 @@ pub struct Unload {
     /// `+0x0c`, formatter
     pub y: f32,
     /// `+0x10`, formatter
-    pub unit_type: i32,
+    pub unit_kind: i32,
     /// `+0x14`, formatter
     pub flag: u8,
     /// `+0x15`, gap
@@ -2873,7 +2873,7 @@ impl Unload {
             gap_0x06: get(p, 0x06)?,
             x: get(p, 0x08)?,
             y: get(p, 0x0c)?,
-            unit_type: get(p, 0x10)?,
+            unit_kind: get(p, 0x10)?,
             flag: get(p, 0x14)?,
             gap_0x15: get(p, 0x15)?,
             field_0x18: get(p, 0x18)?,
@@ -2892,7 +2892,7 @@ impl Unload {
         put(&mut out, self.gap_0x06);
         put(&mut out, self.x);
         put(&mut out, self.y);
-        put(&mut out, self.unit_type);
+        put(&mut out, self.unit_kind);
         put(&mut out, self.flag);
         put(&mut out, self.gap_0x15);
         put(&mut out, self.field_0x18);
@@ -4313,8 +4313,8 @@ pub enum Command {
     AttackMoveTarget(AttackMoveTarget),
     /// [`Retreat`].
     Retreat(Retreat),
-    /// [`UnitTypeAiState`].
-    UnitTypeAiState(UnitTypeAiState),
+    /// [`UnitKindAiState`].
+    UnitKindAiState(UnitKindAiState),
     /// [`AutoScout`].
     AutoScout(AutoScout),
     /// [`StopAll`].
@@ -4462,8 +4462,8 @@ impl Command {
                 AttackMoveTarget::decode(packet).map(Self::AttackMoveTarget)
             }
             Some(Retreat::BYTE) => Retreat::decode(packet).map(Self::Retreat),
-            Some(UnitTypeAiState::BYTE) => {
-                UnitTypeAiState::decode(packet).map(Self::UnitTypeAiState)
+            Some(UnitKindAiState::BYTE) => {
+                UnitKindAiState::decode(packet).map(Self::UnitKindAiState)
             }
             Some(AutoScout::BYTE) => AutoScout::decode(packet).map(Self::AutoScout),
             Some(StopAll::BYTE) => StopAll::decode(packet).map(Self::StopAll),
@@ -4576,7 +4576,7 @@ impl Command {
             Self::AttackMove(c) => c.encode(),
             Self::AttackMoveTarget(c) => c.encode(),
             Self::Retreat(c) => c.encode(),
-            Self::UnitTypeAiState(c) => c.encode(),
+            Self::UnitKindAiState(c) => c.encode(),
             Self::AutoScout(c) => c.encode(),
             Self::StopAll(c) => c.encode(),
             Self::TransformObject(c) => c.encode(),

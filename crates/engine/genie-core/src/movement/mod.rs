@@ -28,7 +28,7 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use genie_diff::Diff;
@@ -50,7 +50,7 @@ mod path_points;
 mod path_state;
 pub(crate) use self::levels::Levels;
 pub use self::move_algorithm::MoveAlgorithm;
-pub use self::path_counts::{LinkedPathType, PlanTries, StepPlans, SubstituteCount, WaitDelays};
+pub use self::path_counts::{LinkedPathKind, PlanTries, StepPlans, SubstituteCount, WaitDelays};
 pub use self::path_flags::{LevelFlags, PathFlags};
 pub use self::path_state::PathState;
 pub use self::waypoint_index::WaypointIndex;
@@ -149,7 +149,7 @@ pub struct PathData {
     /// `+0x14`, `mWaypointLevel`: 0 is the path the unit walks.
     pub level: WaypointLevel,
     /// `+0x10`, `mLinkedPathType`: what a finished level hands its parent.
-    pub linked_type: LinkedPathType,
+    pub linked_kind: LinkedPathKind,
     /// The path's waypoints (`+0x18`, the path's `+0x438`..`+0x440`).
     pub points: Vec<BVector>,
     /// The level holds a path (`+0x18`, or the one the world's table finds by its id `+0x20`): a
@@ -368,7 +368,7 @@ impl PathData {
     pub(crate) const fn new(now: WorldTime) -> Self {
         Self {
             level: WaypointLevel::WALKED,
-            linked_type: LinkedPathType::NONE,
+            linked_kind: LinkedPathKind::NONE,
             points: Vec::new(),
             has_path: true,
             path_flags: PathFlags::NEW,
@@ -393,7 +393,7 @@ impl PathData {
     pub const fn without_path() -> Self {
         Self {
             level: WaypointLevel::WALKED,
-            linked_type: LinkedPathType::NONE,
+            linked_kind: LinkedPathKind::NONE,
             points: Vec::new(),
             has_path: false,
             path_flags: PathFlags::NONE,
@@ -496,7 +496,7 @@ pub(crate) fn gate_gap(
 /// does not hold: neither pauses), any other two by id (slot 0x5f8).
 fn pause_rank(
     me: &Me,
-    (player, player_type): (PlayerId, PlayerType),
+    (player, player_kind): (PlayerId, PlayerKind),
     (id, other): (ObjectId, &Placed),
     groups: Option<&UnitGroups>,
     by_id: ObjectsRef<'_>,
@@ -504,7 +504,7 @@ fn pause_rank(
     let mine = me.human_order;
     let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
     Some(
-        if !player_type.is_computer() && (other.player != player || theirs != mine) {
+        if !player_kind.is_computer() && (other.player != player || theirs != mine) {
             theirs < mine
         } else if let Some(group) = me.group
             && by_id.gait(id).and_then(|g| g.group) == Some(group)

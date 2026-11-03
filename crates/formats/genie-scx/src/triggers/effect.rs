@@ -1,6 +1,6 @@
 //! A trigger effect ([`TriggerEffect`]): the response when a trigger fires.
 
-use crate::{Result, UnitTypeId};
+use crate::{Result, UnitKindId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadStringsExt, write_opt_i32_str};
 use std::convert::TryInto;
@@ -9,7 +9,7 @@ use std::io::{Read, Write};
 /// A trigger effect, describing the response when a trigger fires.
 #[derive(Debug, Default, Clone)]
 pub struct TriggerEffect {
-    pub(super) effect_type: i32,
+    pub(super) effect_kind: i32,
     pub(super) properties: Vec<i32>,
     pub(super) chat_text: Option<String>,
     pub(super) audio_file: Option<String>,
@@ -25,7 +25,7 @@ impl TriggerEffect {
     // The format stores the property count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
     pub fn read_from(mut input: impl Read, version: f64) -> Result<Self> {
-        let effect_type = input.read_i32::<LE>()?;
+        let effect_kind = input.read_i32::<LE>()?;
         let num_properties = if version > 1.0 {
             input.read_i32::<LE>()?
         } else {
@@ -54,7 +54,7 @@ impl TriggerEffect {
         }
 
         Ok(Self {
-            effect_type,
+            effect_kind,
             properties,
             chat_text,
             audio_file,
@@ -75,7 +75,7 @@ impl TriggerEffect {
         clippy::cast_sign_loss
     )]
     pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
-        output.write_i32::<LE>(self.effect_type)?;
+        output.write_i32::<LE>(self.effect_kind)?;
         output.write_i32::<LE>(self.properties.len() as i32)?;
         for value in &self.properties {
             output.write_i32::<LE>(*value)?;
@@ -163,13 +163,13 @@ impl TriggerEffect {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn unit_type(&self) -> Option<UnitTypeId> {
+    pub fn unit_kind(&self) -> Option<UnitKindId> {
         self.properties[6].try_into().ok()
     }
 
     /// Set the "Unit Type" value for this trigger effect.
-    pub fn set_unit_type(&mut self, unit_type: UnitTypeId) {
-        self.properties[6] = i32::from(unit_type);
+    pub fn set_unit_kind(&mut self, unit_kind: UnitKindId) {
+        self.properties[6] = i32::from(unit_kind);
     }
 
     /// Get the "Source Player" value for this trigger effect.
@@ -295,13 +295,13 @@ impl TriggerEffect {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn object_type(&self) -> Option<UnitTypeId> {
+    pub fn object_kind(&self) -> Option<UnitKindId> {
         self.properties[21].try_into().ok()
     }
 
     /// Set the "Object Type" value for this trigger effect.
-    pub fn set_object_type(&mut self, object_type: UnitTypeId) {
-        self.properties[21] = i32::from(object_type);
+    pub fn set_object_kind(&mut self, object_kind: UnitKindId) {
+        self.properties[21] = i32::from(object_kind);
     }
 
     /// Get the "Line ID" value for this trigger effect.

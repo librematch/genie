@@ -20,7 +20,7 @@ use genie_core::objects::masters::ActionKind;
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::technology::TechState;
-use genie_core::unit_ai::{Hunted, UnitAiType};
+use genie_core::unit_ai::{Hunted, UnitAiKind};
 use genie_core::world::GameState;
 use genie_core::world::Tick;
 use genie_core::world::{Player, World};
@@ -381,7 +381,7 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
                 .parts
                 .unit_ai
                 .get_mut(unit.id)
-                .filter(|ai| ai.ai_type == UnitAiType::HUNTED)
+                .filter(|ai| ai.ai_kind == UnitAiKind::HUNTED)
             else {
                 continue;
             };

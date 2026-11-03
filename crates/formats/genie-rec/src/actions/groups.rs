@@ -285,7 +285,7 @@ pub struct FormFormationCommand {
     /// The ID of the player issuing this command.
     pub player_id: PlayerId,
     /// The type of formation to form.
-    pub formation_type: i32,
+    pub formation_kind: i32,
     /// The objects to include in this formation.
     pub objects: ObjectsList,
 }
@@ -301,7 +301,7 @@ impl FormFormationCommand {
         let selected_count = input.read_i8()?;
         command.player_id = input.read_u8()?.into();
         let _padding = input.read_u8()?;
-        command.formation_type = input.read_i32::<LE>()?;
+        command.formation_kind = input.read_i32::<LE>()?;
         command.objects = ObjectsList::read_from(input, i32::from(selected_count))?;
         Ok(command)
     }
@@ -317,7 +317,7 @@ impl FormFormationCommand {
         output.write_i8(fits(self.objects.len())?)?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;
-        output.write_i32::<LE>(self.formation_type)?;
+        output.write_i32::<LE>(self.formation_kind)?;
         self.objects.write_to(output)?;
         Ok(())
     }

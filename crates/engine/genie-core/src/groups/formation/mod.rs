@@ -3,7 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::FormationCategory;
-use crate::groups::UnitType;
+use crate::groups::UnitKind;
 use crate::groups::{Formation, FormationLine, Slot};
 use crate::math::fmath::BVector;
 use crate::world::slots::CheckedIndex;
@@ -64,7 +64,7 @@ impl Formation {
         let fresh = Slot {
             unit_id: None,
             desired_category: FormationCategory::ANY,
-            desired_sub_category: UnitType::NONE,
+            desired_sub_category: UnitKind::NONE,
             ..Slot::default()
         };
         self.spare_slots = vec![fresh; n - self.slots.len()];

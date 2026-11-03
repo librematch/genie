@@ -97,9 +97,9 @@ impl GatherAction {
             self.gather_at = at.ground();
         }
         let kind = self.task.resource;
-        let held = unit.life.attribute_type;
+        let held = unit.life.attribute_kind;
         if held != kind && !both_food(kind, held) {
-            unit.life.attribute_type = kind;
+            unit.life.attribute_kind = kind;
             unit.life.amount = Amount::ZERO;
         }
         Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
@@ -155,7 +155,7 @@ impl GatherAction {
         if Amount::ZERO < r.food_sold
             && roles.of_class(target.class).contains(ClassRoles::FARM)
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
-            && roles.of_some_attribute(unit.life.attribute_type).contains(AttributeRoles::FARM_FOOD)
+            && roles.of_some_attribute(unit.life.attribute_kind).contains(AttributeRoles::FARM_FOOD)
         {
             let sold = mem_take(&mut unit.life.amount);
             c.give_load(c.w.model.slots.attribute.food, sold)?;
@@ -226,9 +226,9 @@ impl GatherAction {
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_type, attributes, c.w.model.slots);
+        let kind = resource_kind(unit.life.attribute_kind, attributes, c.w.model.slots);
         let amount = unit.life.amount;
-        unit.life.attribute_type = None;
+        unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
         Ok(Dropped::Load(kind, amount))
     }

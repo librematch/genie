@@ -10,9 +10,9 @@ use crate::math::image::unit_ai::{
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
     BOAR_AI, FISHING_AI, HUNTED_SIGHT_GROWTH, LION_AI, LIVESTOCK_AI, PREDATOR_AI, PRIEST_AI,
     SIEGE_AI, SIEGE_TOWER_AI, SOLDIER_AI, Surroundings, TOWER_AI, TRADE_AI,
@@ -51,7 +51,7 @@ pub const PRIEST_CARED: [ClassId; 30] = classes([
 ]);
 
 /// The civilian's factory type (`TribeCivilianUnitAIModule`, the villagers').
-pub const CIVILIAN: UnitAiType = UnitAiType::CIVILIAN;
+pub const CIVILIAN: UnitAiKind = UnitAiKind::CIVILIAN;
 
 /// The classes a civilian cares about (`+0x190`, `TribeCivilianUnitAIModule`'s constructor
 /// `FUN_140c115d0`).
@@ -125,7 +125,7 @@ pub const BUILDING_CARED: [ClassId; 39] = classes([
 /// The artifact's factory type (`TribeArtifactUnitAIModule`, class 1's: relic carts, the
 /// monument, the torches, the rock church, the emperor in a litter, the treasure chest); its
 /// slot 0x1e0 (`FUN_140c16de0`) answers it.
-pub const ARTIFACT_AI: UnitAiType = UnitAiType::ARTIFACT;
+pub const ARTIFACT_AI: UnitAiKind = UnitAiKind::ARTIFACT;
 
 /// The classes an artifact cares about (`+0x190`, `TribeArtifactUnitAIModule`'s constructor
 /// `FUN_140c11340`: the 0x84 bytes it copies from `DAT_142ef90f0` on, then 61).
@@ -170,18 +170,18 @@ pub const FISHING_CARED: [ClassId; 13] = classes([3, 22, 20, 2, 21, 5, 31, 33, 5
 ///
 /// Another type, whose list is not held here.
 pub(crate) fn cared_classes(
-    ai_type: UnitAiType,
+    ai_kind: UnitAiKind,
     class: Option<ClassId>,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
     roles: &Roles,
 ) -> Result<&'static [ClassId], GenieError> {
-    match ai_type {
-        UnitAiType::HUNTED => Ok(&HUNTED_CARED),
+    match ai_kind {
+        UnitAiKind::HUNTED => Ok(&HUNTED_CARED),
         PREDATOR_AI => Ok(&PREDATOR_CARED),
         // the boar's (`FUN_140c11720`), the ranged units' (`FUN_140c11f80`, `FUN_140c11f50`) and
         // the livestock's (`FUN_140c11d70`) constructors give none: the base's (`FUN_140c2e080`
         // with 0) alone
-        BOAR_AI | UnitAiType::RANGED_6 | UnitAiType::RANGED_7 | LIVESTOCK_AI => Ok(&[]),
+        BOAR_AI | UnitAiKind::RANGED_6 | UnitAiKind::RANGED_7 | LIVESTOCK_AI => Ok(&[]),
         LION_AI => Ok(&LION_CARED),
         PRIEST_AI => Ok(&PRIEST_CARED),
         CIVILIAN => Ok(&CIVILIAN_CARED),
@@ -197,7 +197,7 @@ pub(crate) fn cared_classes(
         FISHING_AI => Ok(&FISHING_CARED),
         ARTIFACT_AI => Ok(&ARTIFACT_CARED),
         TOWER_AI => Ok(&TOWER_CARED),
-        SOLDIER_AI if player_type.is_computer() => Ok(&SOLDIER_CARED_COMPUTER),
+        SOLDIER_AI if player_kind.is_computer() => Ok(&SOLDIER_CARED_COMPUTER),
         SOLDIER_AI => Ok(&SOLDIER_CARED),
         SIEGE_AI => Ok(&SIEGE_CARED),
         _ => Err(GenieError::unsupported(
@@ -215,15 +215,15 @@ pub(crate) fn cared_classes(
 ///
 /// A unit AI type whose classes are not held.
 pub(crate) fn search_area(
-    ai_type: UnitAiType,
+    ai_kind: UnitAiKind,
     class: Option<ClassId>,
     los: Distance,
     radius: Distance,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
     roles: &Roles,
 ) -> Result<(&'static [ClassId], Distance), GenieError> {
-    let classes = cared_classes(ai_type, class, player_type, roles)?;
-    let radius = if matches!(ai_type, CIVILIAN | FISHING_AI) {
+    let classes = cared_classes(ai_kind, class, player_kind, roles)?;
+    let radius = if matches!(ai_kind, CIVILIAN | FISHING_AI) {
         civilian_search_radius(los, radius)
     } else {
         search_radius(los, radius)
@@ -275,10 +275,10 @@ pub const TRANSPORT_CARED: [ClassId; 10] = classes([3, 22, 20, 2, 21, 53, 52, 27
 pub const SIEGE_TOWER_CARED: [ClassId; 2] = classes([27, 39]);
 
 /// The building unit AI's factory type (`TribeBuildingUnitAIModule`).
-pub(super) const BUILDING_AI: UnitAiType = UnitAiType::BUILDING;
+pub(super) const BUILDING_AI: UnitAiKind = UnitAiKind::BUILDING;
 
 /// The transport ship's factory type (`TribeTransportShipUnitAIModule`).
-pub(super) const TRANSPORT_AI: UnitAiType = UnitAiType::TRANSPORT;
+pub(super) const TRANSPORT_AI: UnitAiKind = UnitAiKind::TRANSPORT;
 
 /// A table of classes from the game's numbers, in the order its search takes them (a unit AI's
 /// cared list, the fishing ship's foundations).

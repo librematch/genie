@@ -74,8 +74,8 @@ impl MakeAction {
             task,
         };
         make.set_state(MakeState::Making, attributes, roles, slots);
-        if task.attribute_type.is_some() && life.attribute_type != task.attribute_type {
-            life.attribute_type = task.attribute_type;
+        if task.attribute_kind.is_some() && life.attribute_kind != task.attribute_kind {
+            life.attribute_kind = task.attribute_kind;
             life.amount = Amount::ZERO;
         }
         make
@@ -94,7 +94,7 @@ impl MakeAction {
         self.state = state;
         if state == MakeState::Making {
             let kind = if roles
-                .of_some_attribute(self.task.attribute_type)
+                .of_some_attribute(self.task.attribute_kind)
                 .contains(AttributeRoles::FARM_FOOD)
             {
                 slots.attribute.farm_food_amount
@@ -115,7 +115,7 @@ impl MakeAction {
     /// its powerup (slot 0x6e8, `+0xa30`) times the task's `work_val1` and the update's seconds,
     /// within its master's capacity (`+0x61c`; `FUN_14119d320` with 1 and 1), and what it gained
     /// is no longer left to make; a task with a work flag (`+0x34`) adds to its player's
-    /// attribute `task.attribute_type` instead (the player's slot 0xf8, `FUN_141616820` with 0
+    /// attribute `task.attribute_kind` instead (the player's slot 0xf8, `FUN_141616820` with 0
     /// and 1), so nothing is taken off. Once all is made, a farm that holds nothing (not a
     /// pasture) runs its slot 0xd8: a combat object's or building's (`FUN_141211340`) spares
     /// class 42, then `FUN_14118f580` takes its hit points to 0 (the object is in its list, so
@@ -154,7 +154,7 @@ impl MakeAction {
                         farm.life.amount = capacity;
                     }
                 } else {
-                    let attribute = self.task.attribute_type.ok_or(NO_ATTRIBUTE)?;
+                    let attribute = self.task.attribute_kind.ok_or(NO_ATTRIBUTE)?;
                     c.w.players
                         .player_mut(c.player)?
                         .add_attribute(attribute, Amount::new(rate))?;
@@ -230,8 +230,8 @@ mod tests {
     fn farm_task() -> Task {
         Task {
             action_kind: MAKE,
-            attribute_type: Some(attribute::FARM_FOOD),
-            attribute_type2: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FARM_FOOD),
+            attribute_kind2: Some(attribute::FOOD),
             work_val1: WorkValue::new(1.0),
             ..Task::default()
         }
@@ -270,7 +270,7 @@ mod tests {
                 state: ObjectState::Alive,
                 hp: HitPoints::new(480.0),
                 master_id: master,
-                attribute_type: Some(attribute::FARM_FOOD),
+                attribute_kind: Some(attribute::FARM_FOOD),
                 amount: Amount::new(amount),
                 ..Lifecycle::default()
             },
@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn the_start_takes_the_farm_food_and_holds_the_task_resource_from_nothing() {
         let mut life = Lifecycle {
-            attribute_type: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FOOD),
             amount: Amount::new(15.0),
             ..Lifecycle::default()
         };
@@ -338,7 +338,7 @@ mod tests {
             (MakeState::Making, Amount::new(175.0), Amount::new(175.0))
         );
         assert_eq!(
-            (life.attribute_type, life.amount),
+            (life.attribute_kind, life.amount),
             (Some(attribute::FARM_FOOD), Amount::ZERO)
         );
     }
@@ -346,17 +346,17 @@ mod tests {
     #[test]
     fn fish_trap_takes_the_fish_trap_food_and_keeps_holding_of_its_kind() {
         let task = Task {
-            attribute_type: Some(AttributeId::named(17)),
+            attribute_kind: Some(AttributeId::named(17)),
             ..farm_task()
         };
         let mut life = Lifecycle {
-            attribute_type: Some(AttributeId::named(17)),
+            attribute_kind: Some(AttributeId::named(17)),
             amount: Amount::new(15.0),
             ..Lifecycle::default()
         };
         let make = MakeAction::start(task, &attributes(), &mut life, &roles(), slots());
         assert_eq!(
-            (make.remaining, life.attribute_type, life.amount),
+            (make.remaining, life.attribute_kind, life.amount),
             (
                 Amount::new(225.0),
                 Some(AttributeId::named(17)),

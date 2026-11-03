@@ -15,7 +15,7 @@ use crate::movement::{EPSILON, Me, Motion, Mover, Next, UP, Velocity};
 use crate::objects::ObjectKey;
 use crate::objects::facing::{SpriteFacets, angle_of_facet, facet_of_forward};
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
@@ -39,7 +39,7 @@ impl Mover {
         me: &Me,
         world: &Spatial,
         hits: &[RecordId],
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         by_id: ObjectsRef<'_>,
     ) -> Result<Next, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
@@ -65,7 +65,7 @@ impl Mover {
             let outranks = if player == PlayerId::GAIA || other.player != PlayerId::GAIA {
                 let mine = me.human_order;
                 let theirs = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.human_order);
-                if !player_type.is_computer() && (other.player != player || theirs != mine) {
+                if !player_kind.is_computer() && (other.player != player || theirs != mine) {
                     theirs < mine
                 } else {
                     me.id < id

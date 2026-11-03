@@ -23,7 +23,7 @@ pub(crate) const fn group_id(value: i32) -> GroupId {
 }
 
 /// The action type `value` (0 or more).
-pub(crate) const fn action_type(value: i16) -> ActionKind {
+pub(crate) const fn action_kind(value: i16) -> ActionKind {
     match ActionKind::of_data(value) {
         Some(kind) => kind,
         None => panic!("a test's action type is 0 or more"),

@@ -6,14 +6,14 @@ use crate::sprite::SpriteId;
 use crate::terrain::TerrainId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{MapInto, TechId, UnitTypeId, read_opt_u16, read_opt_u32};
+use genie_support::{MapInto, TechId, UnitKindId, read_opt_u16, read_opt_u32};
 use std::io::{Read, Result, Write};
 
 /// Resource cost for a unit.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct AttributeCost {
     /// The player attribute type to give/take.
-    pub attribute_type: i16,
+    pub attribute_kind: i16,
     /// The amount of that attribute that should be taken/given.
     pub amount: i16,
     /// Flag determining how and when this cost is counted.
@@ -30,7 +30,7 @@ impl AttributeCost {
     /// Returns an error if reading from `input` fails.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let cost = Self {
-            attribute_type: input.read_i16::<LE>()?,
+            attribute_kind: input.read_i16::<LE>()?,
             amount: input.read_i16::<LE>()?,
             flag: input.read_u8()?,
         };
@@ -44,7 +44,7 @@ impl AttributeCost {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to(self, mut output: impl Write) -> Result<()> {
-        output.write_i16::<LE>(self.attribute_type)?;
+        output.write_i16::<LE>(self.attribute_kind)?;
         output.write_i16::<LE>(self.amount)?;
         output.write_u8(self.flag)?;
         output.write_u8(0)?;
@@ -54,13 +54,13 @@ impl AttributeCost {
 
 /// The attributes of combat unit types that players create (genieutils' `Creatable`).
 #[derive(Debug, Default, Clone)]
-pub struct CombatUnitTypeAttributes {
+pub struct CombatUnitKindAttributes {
     /// The costs of creating a unit of this type.
     pub costs: ArrayVec<AttributeCost, 3>,
     /// Time to create the unit.
     pub create_time: u16,
     /// Unit type ID of the building or unit where this unit can be created.
-    pub create_at_building: Option<UnitTypeId>,
+    pub create_at_building: Option<UnitKindId>,
     /// Button location index where the button to create this unit should be shown when a
     /// `create_at_building` unit is selected.
     pub create_button: i8,
@@ -85,7 +85,7 @@ pub struct CombatUnitTypeAttributes {
     /// `ProjectileSpawningArea`).
     pub volley_start_spread_adjustment: f32,
     /// Unit type of the extra projectiles (genieutils' `SecondaryProjectileUnit`), or `None`.
-    pub volley_missile: Option<UnitTypeId>,
+    pub volley_missile: Option<UnitKindId>,
     /// Sprite of the special attack (genieutils' `SpecialGraphic`), or `None`.
     pub special_attack_sprite: Option<SpriteId>,
     /// Kind of special ability (genieutils' `SpecialAbility`).
@@ -94,7 +94,7 @@ pub struct CombatUnitTypeAttributes {
     pub displayed_pierce_armor: i16,
 }
 
-impl CombatUnitTypeAttributes {
+impl CombatUnitKindAttributes {
     /// Read this unit type from an input stream.
     ///
     /// # Errors
@@ -106,7 +106,7 @@ impl CombatUnitTypeAttributes {
         let mut attrs = Self::default();
         for _ in 0..3 {
             let attr = AttributeCost::read_from(&mut input)?;
-            if attr.attribute_type >= 0 {
+            if attr.attribute_kind >= 0 {
                 attrs.costs.push(attr);
             }
         }
@@ -115,7 +115,7 @@ impl CombatUnitTypeAttributes {
         attrs.create_button = input.read_i8()?;
         attrs.rear_attack_modifier = input.read_f32::<LE>()?;
         attrs.flank_attack_modifier = input.read_f32::<LE>()?;
-        let _tribe_unit_type = input.read_u8()?;
+        let _tribe_unit_kind = input.read_u8()?;
         attrs.hero_flag = input.read_u8()?;
         attrs.garrison_sprite = {
             let n = input.read_i32::<LE>()?;
@@ -142,7 +142,7 @@ impl CombatUnitTypeAttributes {
             match self.costs.get(i) {
                 Some(cost) => cost.write_to(&mut output)?,
                 None => AttributeCost {
-                    attribute_type: -1,
+                    attribute_kind: -1,
                     amount: 0,
                     flag: 0,
                 }
@@ -176,7 +176,7 @@ impl CombatUnitTypeAttributes {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LinkedBuilding {
     /// Unit type ID for this linked building.
-    pub unit_id: UnitTypeId,
+    pub unit_id: UnitKindId,
     /// X offset in tiles from the centre of the "owner" building.
     pub offset_x: f32,
     /// Y offset in tiles from the centre of the "owner" building.
@@ -218,7 +218,7 @@ impl LinkedBuilding {
 
 /// Unit type class for buildings.
 #[derive(Debug, Default, Clone)]
-pub struct BuildingUnitTypeAttributes {
+pub struct BuildingUnitKindAttributes {
     /// Sprite to use during construction.
     pub construction_sprite: Option<SpriteId>,
     /// Sprite to use when this building is finished and built on snow.
@@ -230,7 +230,7 @@ pub struct BuildingUnitTypeAttributes {
     /// Whether the building should be immediately destroyed on completion.
     pub destroy_on_build: bool,
     /// Unit to spawn at the build site on completion.
-    pub on_build_make_unit: Option<UnitTypeId>,
+    pub on_build_make_unit: Option<UnitKindId>,
     /// Change the underlying terrain to this terrain ID on completion.
     pub on_build_make_tile: Option<TerrainId>,
     /// TODO document
@@ -244,27 +244,27 @@ pub struct BuildingUnitTypeAttributes {
     /// Annex buildings, at most 4; unused slots are dropped when reading.
     pub linked_buildings: ArrayVec<LinkedBuilding, 4>,
     /// The head unit of a building made of several units (genieutils' `HeadUnit`), or `None`.
-    pub construction_unit: Option<UnitTypeId>,
+    pub construction_unit: Option<UnitKindId>,
     /// Unit type the building transforms into (genieutils' `TransformUnit`), or `None`.
-    pub transform_unit: Option<UnitTypeId>,
+    pub transform_unit: Option<UnitKindId>,
     /// Sound played when the building transforms, or `None`.
     pub transform_sound: Option<SoundId>,
     /// Sound played while the building is built, or `None`.
     pub construction_sound: Option<SoundId>,
     /// Which kinds of unit can garrison inside (genieutils' `GarrisonType`, a bit mask).
-    pub garrison_type: i8,
+    pub garrison_kind: i8,
     /// Rate at which garrisoned units heal.
     pub garrison_heal_rate: f32,
     /// Rate at which the building is repaired by garrisoned units (genieutils'
     /// `GarrisonRepairRate`).
     pub garrison_repair_rate: f32,
     /// Unit type left behind when the building is destroyed (genieutils' `PileUnit`), or `None`.
-    pub salvage_unit: Option<UnitTypeId>,
+    pub salvage_unit: Option<UnitKindId>,
     /// The six values of genieutils' `LootingTable`: what is looted from the building.
     pub salvage_attributes: ArrayVec<i8, 6>,
 }
 
-impl BuildingUnitTypeAttributes {
+impl BuildingUnitKindAttributes {
     /// Read this unit type from an input stream.
     ///
     /// # Errors
@@ -299,7 +299,7 @@ impl BuildingUnitTypeAttributes {
         attrs.transform_unit = read_opt_u16(&mut input)?;
         attrs.transform_sound = read_opt_u16(&mut input)?;
         attrs.construction_sound = read_opt_u16(&mut input)?;
-        attrs.garrison_type = input.read_i8()?;
+        attrs.garrison_kind = input.read_i8()?;
         attrs.garrison_heal_rate = input.read_f32::<LE>()?;
         attrs.garrison_repair_rate = input.read_f32::<LE>()?;
         attrs.salvage_unit = read_opt_u16(&mut input)?;
@@ -338,7 +338,7 @@ impl BuildingUnitTypeAttributes {
         output.write_u16::<LE>(self.transform_unit.map_into().unwrap_or(0xFFFF))?;
         output.write_u16::<LE>(self.transform_sound.map_into().unwrap_or(0xFFFF))?;
         output.write_u16::<LE>(self.construction_sound.map_into().unwrap_or(0xFFFF))?;
-        output.write_i8(self.garrison_type)?;
+        output.write_i8(self.garrison_kind)?;
         output.write_f32::<LE>(self.garrison_heal_rate)?;
         output.write_f32::<LE>(self.garrison_repair_rate)?;
         output.write_u16::<LE>(self.salvage_unit.map_into().unwrap_or(0xFFFF))?;

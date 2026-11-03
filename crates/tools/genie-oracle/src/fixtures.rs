@@ -64,9 +64,9 @@ pub(crate) fn static_mut(object: &mut Object) -> &mut RgeStaticObject {
 /// Gaia, its live objects `objects`.
 pub(crate) fn gaia(objects: Vec<Object>) -> Player {
     let mut gaia = GaiaPlayer::default();
-    gaia.player_objects.objects.object_type_list = object_list(objects);
+    gaia.player_objects.objects.object_kind_list = object_list(objects);
     Player {
-        type_: 2,
+        kind: 2,
         gaia_player: Some(Box::new(gaia)),
         ..Player::default()
     }
@@ -75,9 +75,9 @@ pub(crate) fn gaia(objects: Vec<Object>) -> Player {
 /// A human player (type 1), its live objects `objects`.
 pub(crate) fn human(objects: Vec<Object>) -> Player {
     let mut human = HumanOrCoopPlayer::default();
-    human.player_objects.objects.object_type_list = object_list(objects);
+    human.player_objects.objects.object_kind_list = object_list(objects);
     Player {
-        type_: 1,
+        kind: 1,
         human_or_coop_player: Some(Box::new(human)),
         ..Player::default()
     }
@@ -101,7 +101,7 @@ pub(crate) fn object_list(objects: Vec<Object>) -> Vec<ObjectListEntry1> {
     objects
         .into_iter()
         .map(|object| ObjectListEntry1 {
-            object_type: if object.tribe_building_object.is_some() {
+            object_kind: if object.tribe_building_object.is_some() {
                 80
             } else {
                 70
@@ -283,10 +283,10 @@ pub(crate) fn building_mut(object: &mut Object) -> &mut TribeBuildingObject {
 /// An action list of `actions` (type, action), its end after them.
 pub(crate) fn action_list(actions: Vec<(ActionKind, Action)>) -> ActionList {
     ActionList {
-        action_type_list: actions
+        action_kind_list: actions
             .into_iter()
-            .map(|(action_type, action)| ActionListEntry1 {
-                action_type: action_type.get(),
+            .map(|(action_kind, action)| ActionListEntry1 {
+                action_kind: action_kind.get(),
                 action: Some(Box::new(action)),
             })
             .chain(once(ActionListEntry1::default()))
@@ -306,7 +306,7 @@ pub(crate) fn with_masters(masters: Vec<Master>) -> PlayerObjects {
             masters
                 .into_iter()
                 .map(|master| PlayerMaster {
-                    master_type: 70,
+                    master_kind: 70,
                     master,
                     end_marker: (),
                 })

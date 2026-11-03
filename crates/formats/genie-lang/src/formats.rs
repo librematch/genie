@@ -248,14 +248,14 @@ pub(super) fn escape(source: &str, quoted: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::LangFileType;
+    use crate::LangFileKind;
     use std::fs::File;
 
     /// The game's DLL's string tables: block n's strings take the ids from (n - 1) × 16 on.
     #[test]
     fn dll_string_tables_give_their_strings_by_id() {
         let f = File::open("test/dlls/language_x1_p1.dll").unwrap();
-        let lang = LangFileType::Dll.read_from(f).unwrap();
+        let lang = LangFileKind::Dll.read_from(f).unwrap();
         assert_eq!(
             lang.get(&StringKey::from(30177u32)).map(String::as_str),
             Some(

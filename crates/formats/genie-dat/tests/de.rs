@@ -53,7 +53,7 @@ fn the_installed_data_file_has_the_values_genieutils_reads() {
         ("Cow Black and White".into(), 0.25)
     );
     let bird = cow.bird.as_ref().unwrap();
-    assert_eq!(bird.default_task().map(|t| t.action_type), Some(107));
+    assert_eq!(bird.default_task().map(|t| t.action_kind), Some(107));
     // FLARE3: decay 1.0, a static object without the action part
     let flare = civ2.units[332].as_ref().unwrap();
     assert_eq!((flare.resource_decay, flare.bird.is_none()), (1.0, true));

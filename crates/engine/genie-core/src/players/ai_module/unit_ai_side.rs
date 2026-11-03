@@ -12,7 +12,7 @@ use crate::map::Point;
 use crate::map::Tile;
 use crate::math::rng::Stream;
 use crate::objects::masters::ObjectFlags;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::NotifyKind;
 use crate::world::WorldTime;
 
@@ -51,7 +51,7 @@ impl UnitView<'_, '_> {
     /// The tasking or detasking, and what the search does not model.
     pub(crate) fn hears(&mut self, n: Notify, roles: &Roles) -> Result<(), GenieError> {
         let player = self.player;
-        if !self.player_type.is_computer() || n.kind != NotifyKind::REQUIRES_SEARCH {
+        if !self.player_kind.is_computer() || n.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
         }
         let Some(mut module) = self.c.w.ai.take(player) else {
@@ -63,11 +63,11 @@ impl UnitView<'_, '_> {
         self.c.w.ai.put_back(player, module);
         match heard? {
             Heard::Nothing => Ok(()),
-            Heard::Task(t) => alert_owner(PlayerType::COMPUTER).map_err(|e| {
+            Heard::Task(t) => alert_owner(PlayerKind::COMPUTER).map_err(|e| {
                 e.with("tasks explorer", ObjectId::field(n.caller))
                     .with("to", format_args!("({}, {})", t.x(), t.y()))
             }),
-            Heard::Detask => alert_owner(PlayerType::COMPUTER)
+            Heard::Detask => alert_owner(PlayerKind::COMPUTER)
                 .map_err(|e| e.with("detasks explorer", ObjectId::field(n.caller))),
         }
     }
@@ -148,7 +148,7 @@ impl UnitView<'_, '_> {
         }
         let Some((at, centre_sight)) = centre else {
             // no town centre: the AI's own first civilian (`FUN_140b446f0`), not modelled
-            return alert_owner(PlayerType::COMPUTER).map(|()| Heard::Nothing);
+            return alert_owner(PlayerKind::COMPUTER).map(|()| Heard::Nothing);
         };
         let mut tile = info.top_point();
         if tile == Tile::new(-1, -1) {

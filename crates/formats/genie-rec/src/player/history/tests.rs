@@ -14,7 +14,7 @@ fn event() -> Bytes {
 #[test]
 fn an_event_reads_its_times_and_parameters() {
     let event = read_all::<HistoryEvent>(&event().0, 11.97);
-    assert_eq!(event.event_type, 3);
+    assert_eq!(event.event_kind, 3);
     assert_eq!((event.time_slice, event.world_time), (12, 3400));
     assert_eq!(event.params, (1.0, 2.0, 3.0));
 }

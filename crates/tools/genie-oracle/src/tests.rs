@@ -41,7 +41,7 @@ fn building_production_state_comes_before_its_top_action_s() {
         })),
         ..Production::default()
     };
-    let kind = ARTIFACT_TYPE;
+    let kind = ARTIFACT_KIND;
     let top = Action {
         list: ActionList::default().with_artifact(Some(artifact)),
         ..Default::default()

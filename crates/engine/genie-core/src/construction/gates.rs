@@ -191,7 +191,7 @@ impl World {
                 let id = self.players.live(q, i)?.id;
                 if self.spatial.get(id).is_some_and(|g| {
                     g.obstruction
-                        .is_some_and(|o| o.kind == ObstructionKind::TYPE_10)
+                        .is_some_and(|o| o.kind == ObstructionKind::KIND_10)
                 }) {
                     return Err(GenieError::unsupported(
                         "a gate of obstruction kind 10 opens (FUN_140f65580)",

@@ -27,7 +27,7 @@ pub(super) fn import_make(
     let base = saved.base;
     let make = saved
         .action
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref()
         .and_then(|t| t.rge_action_make.as_deref())
         .ok_or(GenieError::unsupported("a saved Make without its part"))?;
@@ -48,11 +48,11 @@ const fn hunt_task(t: &Task) -> HuntTask {
     HuntTask {
         id: t.id,
         range: t.work_range,
-        resource: t.attribute_type,
+        resource: t.attribute_kind,
         sprites: t.sprites,
         work_value: t.work_val1,
-        productivity: t.attribute_type2,
-        kind4: t.attribute_type4,
+        productivity: t.attribute_kind2,
+        kind4: t.attribute_kind4,
     }
 }
 
@@ -91,7 +91,7 @@ pub(super) fn import_hunt(
         ));
     }
     let task = hunt_task(&saved.task(task_at)?);
-    let target_class = ClassId::of_param(part.target_type)?;
+    let target_class = ClassId::of_param(part.target_kind)?;
     let (walk, attack) = match first_action(&base.sub_actions)? {
         None => (None, None),
         Some((ATTACK, sub)) => (None, Some(hunt_attack(saved, sub)?)),
@@ -156,7 +156,7 @@ pub(super) fn import_gather(
     let base = saved.base;
     let part = saved
         .action
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref()
         .and_then(|b| b.rge_action_gather.as_deref())
         .ok_or(GenieError::unsupported(
@@ -198,7 +198,7 @@ pub(super) fn import_gather(
         point: saved.point(),
         timer: Seconds::new(base.timer),
         task,
-        target_class: ClassId::of_param(part.target_type)?,
+        target_class: ClassId::of_param(part.target_kind)?,
         stops: FarmStops::of_data(part.number_stops),
         current_stop: StopIndex::of_data(part.current_stop),
         time_per_stop: Seconds::new(part.time_per_stop),

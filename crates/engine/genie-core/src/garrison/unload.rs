@@ -25,7 +25,7 @@ use crate::orders::set_stance;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{Issuer, NotifyKind, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -43,13 +43,13 @@ impl World {
     /// - A unit inside a building leaves it toward the point (with its sound, no work), its
     ///   orders gone and, of type 70 and up, no longer under the town bell.
     /// - A unit (below type 80) inside a transport (type 70 or more) or, with `flag` 3, the unit
-    ///   `unit_type` names inside this one, goes ashore ([`World::drop_out`]).
+    ///   `unit_kind` names inside this one, goes ashore ([`World::drop_out`]).
     /// - A siege unit (class 13) unloads its own way (`FUN_141225c40`, a siege tower's order 800),
     ///   which is not modelled ([`SIEGE_UNLOAD`]).
     /// - Any other unit takes the unload order at the point ([`World::unload_order`]): a transport
     ///   sails there and unloads (its Transport, [`crate::garrison::transport`]), any other walks there.
     /// - A building lets the units inside it out, from the last to come in, those `flag` and
-    ///   `unit_type` pick ([`World::unload_picks`](crate::world::World::unload_picks)): each
+    ///   `unit_kind` pick ([`World::unload_picks`](crate::world::World::unload_picks)): each
     ///   through [`World::let_out`], toward the point (or its unit AI's command queue location,
     ///   which is not modelled); each one out has its order queue emptied (`FUN_140c5e010`); a unit
     ///   (type 70) out is no longer under the town bell (`+0x9dc`).
@@ -335,13 +335,13 @@ impl World {
             range: Distance::new(self.model.tuning.garrison.unload_range),
             shown: to,
             ready: true,
-            target_type: Some(OrderTargetType::of_master(master.id)),
+            target_kind: Some(OrderTargetKind::of_master(master.id)),
         };
         if !self.parts.unit_ai.contains(unit.id) {
             return Ok(());
         }
-        self.run_unit_ai((player, idx), |ai, at, side, player_type, rng| {
-            ai.take_order_now_with(order, (at, side, player_type), rng)
+        self.run_unit_ai((player, idx), |ai, at, side, player_kind, rng| {
+            ai.take_order_now_with(order, (at, side, player_kind), rng)
         })
     }
 

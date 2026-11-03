@@ -10,7 +10,7 @@ use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::WaypointLevel;
 use crate::objects::{ObjectId, ObjectKey};
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -208,7 +208,7 @@ impl Mover {
                     .of_master(master)
                     .contains(MasterRoles::LONG_PATH_MOVER),
             mask: self.stats.restriction_mask,
-            player_type: plan.player_type,
+            player_kind: plan.player_kind,
             lowered,
             within_range: false,
             near_player: false,
@@ -523,7 +523,7 @@ impl Mover {
         hits: &[RecordId],
         projected: BVector,
         dt: Seconds,
-        (now, player_type): (WorldTime, PlayerType),
+        (now, player_kind): (WorldTime, PlayerKind),
     ) -> Result<Avoided, GenieError> {
         let roles = by_id.roles();
         let level = self.paths.walked()?;
@@ -597,7 +597,7 @@ impl Mover {
                     continue;
                 }
                 if (player == PlayerId::GAIA || other.player != PlayerId::GAIA)
-                    && pause_rank(me, (player, player_type), (id, other), groups, by_id)
+                    && pause_rank(me, (player, player_kind), (id, other), groups, by_id)
                         != Some(true)
                 {
                     continue;

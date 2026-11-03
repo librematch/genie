@@ -1,20 +1,20 @@
 //! A unit AI's factory type as one type: which `Tribe…UnitAIModule` a master's unit AI is
-//! ([`crate::unit_ai::unit_ai_type`]), the value the module's constructor takes.
+//! ([`crate::unit_ai::unit_ai_kind`]), the value the module's constructor takes.
 
 use genie_diff::{Diff, Differ};
 use std::fmt::{Display, Error, Formatter};
 
-/// A unit AI's factory type (`UnitAi::ai_type`), 0 to 0x13 in the game's switch
+/// A unit AI's factory type (`UnitAi::ai_kind`), 0 to 0x13 in the game's switch
 /// (`FUN_140c5c170`'s constructor). The simulation tells some apart (the boar, the soldier, the
 /// siege unit, the civilian ...), which this module names; the others are values of the type
 /// too, so it is a newtype with named constants, as [`crate::objects::masters::ClassId`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnitAiType(
+pub struct UnitAiKind(
     /// Its value, as the factory switch holds it.
     u32,
 );
 
-impl UnitAiType {
+impl UnitAiKind {
     /// Its value, for the constructor's switch, a packet and the checkpoint's words.
     #[must_use]
     pub const fn get(self) -> u32 {
@@ -31,7 +31,7 @@ impl UnitAiType {
     pub const HUNTED: Self = Self(2);
     /// The ranged units' first factory type (6, the base's behaviour: stance 3, no cared list).
     pub const RANGED_6: Self = Self(6);
-    /// The ranged units' second factory type (7, as [`UnitAiType::RANGED_6`]).
+    /// The ranged units' second factory type (7, as [`UnitAiKind::RANGED_6`]).
     pub const RANGED_7: Self = Self(7);
     /// The predator's factory type (`TribePreditorUnitAIModule`, `FUN_140c11da0`).
     pub const PREDATOR: Self = Self(3);
@@ -65,13 +65,13 @@ impl UnitAiType {
     pub const LIVESTOCK: Self = Self(0x13);
 }
 
-impl Display for UnitAiType {
+impl Display for UnitAiKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
 
-impl Diff for UnitAiType {
+impl Diff for UnitAiKind {
     fn diff(&self, other: &Self, d: &mut Differ) {
         d.equal(self, other);
     }
@@ -79,13 +79,13 @@ impl Diff for UnitAiType {
 
 #[cfg(test)]
 mod tests {
-    use crate::unit_ai::UnitAiType;
+    use crate::unit_ai::UnitAiKind;
 
     /// Any value is a type, and the named ones keep the game's values.
     #[test]
-    fn type_is_any_value_and_the_named_ones_keep_the_games() {
-        assert_eq!(UnitAiType::of_value(13), UnitAiType::SOLDIER);
-        assert_eq!(UnitAiType::BOAR.get(), 4);
-        assert_eq!(UnitAiType::of_value(99).get(), 99);
+    fn kind_is_any_value_and_the_named_ones_keep_the_games() {
+        assert_eq!(UnitAiKind::of_value(13), UnitAiKind::SOLDIER);
+        assert_eq!(UnitAiKind::BOAR.get(), 4);
+        assert_eq!(UnitAiKind::of_value(99).get(), 99);
     }
 }

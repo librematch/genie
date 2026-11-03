@@ -4,14 +4,14 @@ use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-pub use genie_dat::unit_type::{AttributeCost, ParseUnitBaseClassError, UnitBaseClass};
-pub use genie_support::{StringKey, UnitTypeId};
+pub use genie_dat::unit_kind::{AttributeCost, ParseUnitBaseClassError, UnitBaseClass};
+pub use genie_support::{StringKey, UnitKindId};
 use std::io::{Read, Write};
 
 /// A player's copy of a unit type as the recording header stores it: only the attributes that can
 /// change during a game, grouped by the base class that introduces them.
 #[derive(Debug, Clone)]
-pub struct CompactUnitType {
+pub struct CompactUnitKind {
     /// The unit type's base class; it decides which of the attribute groups below are present.
     pub unit_base_class: UnitBaseClass,
     /// The attributes every unit type has.
@@ -32,7 +32,7 @@ pub struct CompactUnitType {
     pub building: Option<BuildingUnitAttributes>,
 }
 
-impl ReadableHeaderElement for CompactUnitType {
+impl ReadableHeaderElement for CompactUnitKind {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let unit_base_class = fits(input.read_u8()?)?;
         let static_ = StaticUnitAttributes::read_from(input)?;
@@ -78,13 +78,13 @@ impl ReadableHeaderElement for CompactUnitType {
 #[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Default, Clone)]
 pub struct StaticUnitAttributes {
-    id: UnitTypeId,
-    copy_id: UnitTypeId,
-    base_id: UnitTypeId,
+    id: UnitKindId,
+    copy_id: UnitKindId,
+    base_id: UnitKindId,
     unit_class: u16,
     hotkey_id: u32,
     available: bool,
-    death_object_id: Option<UnitTypeId>,
+    death_object_id: Option<UnitKindId>,
     string_id: Option<StringKey>,
     description_id: Option<StringKey>,
     flags: Option<u32>,
@@ -222,18 +222,18 @@ impl WritableHeaderElement for ActionUnitAttributes {
 
 /// One attack or armour value and the attack/armour class it applies to.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct HitType {
+pub struct HitKind {
     /// The attack/armour class.
-    pub hit_type: u16,
+    pub hit_kind: u16,
     /// The attack or armour value for that class.
     pub amount: i16,
 }
 
-impl ReadableHeaderElement for HitType {
+impl ReadableHeaderElement for HitKind {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        let hit_type = input.read_u16::<LE>()?;
+        let hit_kind = input.read_u16::<LE>()?;
         let amount = input.read_i16::<LE>()?;
-        Ok(Self { hit_type, amount })
+        Ok(Self { hit_kind, amount })
     }
 }
 
@@ -244,9 +244,9 @@ pub struct BaseCombatUnitAttributes {
     /// before save version 11.52.
     pub base_armor: u16,
     /// The attack values, one per attack class.
-    pub attacks: Vec<HitType>,
+    pub attacks: Vec<HitKind>,
     /// The armour values, one per armour class.
-    pub armors: Vec<HitType>,
+    pub armors: Vec<HitKind>,
     /// The time between two attacks (reload time).
     pub attack_speed: f32,
     /// The maximum attack range.
@@ -254,7 +254,7 @@ pub struct BaseCombatUnitAttributes {
     /// The chance to hit, in percent.
     pub base_hit_chance: u16,
     /// The unit type of the projectile it fires, if any.
-    pub projectile_object_id: Option<UnitTypeId>,
+    pub projectile_object_id: Option<UnitKindId>,
     /// The terrain table that changes its armour by the terrain it stands on, if any.
     pub defense_terrain_bonus: Option<u16>,
     /// A second maximum attack range. Not known yet how it differs from `weapon_range_max`.
@@ -277,11 +277,11 @@ impl ReadableHeaderElement for BaseCombatUnitAttributes {
         };
         let num_attacks = input.read_u16::<LE>()?;
         for _ in 0..num_attacks {
-            attrs.attacks.push(HitType::read_from(input)?);
+            attrs.attacks.push(HitKind::read_from(input)?);
         }
         let num_armors = input.read_u16::<LE>()?;
         for _ in 0..num_armors {
-            attrs.armors.push(HitType::read_from(input)?);
+            attrs.armors.push(HitKind::read_from(input)?);
         }
         attrs.attack_speed = input.read_f32::<LE>()?;
         attrs.weapon_range_max = input.read_f32::<LE>()?;
@@ -305,19 +305,19 @@ impl ReadableHeaderElement for BaseCombatUnitAttributes {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct MissileUnitAttributes {
     /// How the projectile aims at its target.
-    pub targeting_type: u8,
+    pub targeting_kind: u8,
 }
 
 impl ReadableHeaderElement for MissileUnitAttributes {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        let targeting_type = input.read_u8()?;
-        Ok(Self { targeting_type })
+        let targeting_kind = input.read_u8()?;
+        Ok(Self { targeting_kind })
     }
 }
 
 impl WritableHeaderElement for MissileUnitAttributes {
     fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        output.write_u8(self.targeting_type)?;
+        output.write_u8(self.targeting_kind)?;
         Ok(())
     }
 }
@@ -342,7 +342,7 @@ pub struct CombatUnitAttributes {
     /// `UserPatch` only: the delay of the attack within its animation.
     pub frame_delay: Option<u16>,
     /// `UserPatch` only: the building that trains the unit.
-    pub create_at_building: Option<UnitTypeId>,
+    pub create_at_building: Option<UnitKindId>,
     /// `UserPatch` only: the unit's button position in that building's menu.
     pub create_button: Option<i8>,
     /// `UserPatch` only: the damage multiplier for attacks from behind.
@@ -360,7 +360,7 @@ impl ReadableHeaderElement for CombatUnitAttributes {
         let mut attrs = Self::default();
         for _ in 0..3 {
             let attr = AttributeCost::read_from(&mut *input)?;
-            if attr.attribute_type >= 0 {
+            if attr.attribute_kind >= 0 {
                 attrs.costs.push(attr);
             }
         }
@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn static_unit_type_reads_its_hidden_flag() {
+    fn static_unit_kind_reads_its_hidden_flag() {
         let unit = read_all::<StaticUnitAttributes>(&static_tail(static_head(2)).0, 11.97);
         assert_eq!(u16::from(unit.id), 83);
         assert_eq!((unit.unit_class, unit.hotkey_id), (4, 16000));
@@ -475,7 +475,7 @@ mod tests {
 
     /// A hidden flag of -16 is `UserPatch`'s: its fields, then the real hidden flags.
     #[test]
-    fn user_patch_unit_type_reads_its_fields_before_the_hidden_flags() {
+    fn user_patch_unit_kind_reads_its_fields_before_the_hidden_flags() {
         let bytes = static_head(0xF0)
             .u16(3)
             .u16(5001)
@@ -510,13 +510,13 @@ mod tests {
     }
 
     #[test]
-    fn combat_unit_type_keeps_its_real_costs() {
+    fn combat_unit_kind_keeps_its_real_costs() {
         let bytes = costs(21).floats(&[1.5]).u8(2).0;
         let unit = read_all::<CombatUnitAttributes>(&bytes, 11.97);
         assert_eq!(
             unit.costs
                 .iter()
-                .map(|cost| (cost.attribute_type, cost.amount))
+                .map(|cost| (cost.attribute_kind, cost.amount))
                 .collect::<Vec<_>>(),
             [(0, 60), (3, 20)]
         );
@@ -528,7 +528,7 @@ mod tests {
 
     /// A create time of 65520 is `UserPatch`'s: its fields, then the real create time.
     #[test]
-    fn user_patch_combat_unit_type_reads_its_fields_before_the_create_time() {
+    fn user_patch_combat_unit_kind_reads_its_fields_before_the_create_time() {
         let bytes = costs(u16::MAX - 15)
             .u16(1)
             .u16(2)

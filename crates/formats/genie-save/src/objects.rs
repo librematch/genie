@@ -278,7 +278,7 @@ const fn own_tribe_combat_master(c: &OwnTribeMasterCombatObject) -> &OwnRgeMaste
 impl ObjectList {
     /// The objects in list order, without the entry of type 0 that ends the list.
     pub fn objects(&self) -> impl Iterator<Item = &Object> {
-        self.object_type_list
+        self.object_kind_list
             .iter()
             .filter_map(|e| e.object.as_deref())
     }
@@ -431,9 +431,9 @@ impl Object {
 impl ActionList {
     /// The actions with their types, without the entry of type 0 that ends the list.
     pub fn entries(&self) -> impl Iterator<Item = (i16, &Action)> {
-        self.action_type_list
+        self.action_kind_list
             .iter()
-            .filter_map(|e| e.action.as_deref().map(|a| (e.action_type, a)))
+            .filter_map(|e| e.action.as_deref().map(|a| (e.action_kind, a)))
     }
 }
 
@@ -441,7 +441,7 @@ impl Action {
     /// A `MoveTo`'s range (`+0x68`), for an action of that class.
     #[must_use]
     pub fn move_to_range(&self) -> Option<f32> {
-        self.rge_action_by_type
+        self.rge_action_by_kind
             .as_deref()
             .and_then(|b| b.rge_action_move_to.as_deref())
             .map(|m| m.range)
@@ -469,7 +469,7 @@ impl Action {
                     }))
             };
         }
-        first!(rge_action_by_type;
+        first!(rge_action_by_kind;
             rge_action_enter, tribe_action_build, tribe_action_make_obj, tribe_action_make_tech,
             tribe_action_convert, tribe_action_repair, tribe_action_artifact,
             tribe_action_discovery_artifact, tribe_action_hunt, tribe_action_trade,

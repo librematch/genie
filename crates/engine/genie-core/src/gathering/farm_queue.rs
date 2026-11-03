@@ -27,7 +27,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::CostCount;
 use crate::production::{cost_test, pay, refund_master};
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::unit_ai_kind;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -279,7 +279,7 @@ impl World {
     /// [`pay`]), else it takes one from the queue, which must hold one (else the interface's
     /// event 0x7e); without the automatic queue it takes one from the queue. The master's slot
     /// 0x108 makes the foundation there ([`World::make_building`], its unit AI by
-    /// [`crate::unit_ai::factory_type`]), the queue loses the one it gave (`FUN_14163c5b0`,
+    /// [`crate::unit_ai::factory_kind`]), the queue loses the one it gave (`FUN_14163c5b0`,
     /// `FUN_14163c590`: only while above 0); the target's workers (slot 0x790, a building's
     /// `+0xcb8`, which only a pasture fills: a farm's is empty, and a pasture's gather is not
     /// modelled) would build it too; then the gatherer's ignore list empties (`FUN_141197da0`)
@@ -327,7 +327,7 @@ impl World {
             return Ok(false);
         };
         let made = self.master(p, master)?;
-        let ai = Ok(unit_ai_type(made, master, &self.model.roles));
+        let ai = Ok(unit_ai_kind(made, master, &self.model.roles));
         let at = farm.with_height(0.0);
         let (foundation, _) = self.make_building(p, master, ai, at)?;
         if from_queue {
@@ -447,7 +447,7 @@ impl World {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
-        let player_type = self.players.player(p)?.kind;
+        let player_kind = self.players.player(p)?.kind;
         let unit = self.players.live_mut(p, idx)?;
         let Some(gather) = self.parts.actions.of_mut(unit.id)?.list.gather_mut() else {
             return Ok(());
@@ -460,7 +460,7 @@ impl World {
         );
         let released = gather.after_reseed(
             arrived,
-            player_type,
+            player_kind,
             self.parts.motion.mover_mut(unit.id),
             Stand {
                 graphic: stand,

@@ -56,7 +56,7 @@ pub enum DefaultAction {
     /// The master has no default task.
     None,
     /// The default task's action type (107 is the Artifact action).
-    Type(ActionKind),
+    Kind(ActionKind),
     /// The default task id names no task in the master's list; what the game starts then is not
     /// read yet.
     NoSuchTask,
@@ -74,7 +74,7 @@ pub fn default_action(
     tasks
         .find(|&(id, _)| id == default_task_id)
         .map_or(DefaultAction::NoSuchTask, |(_, action)| {
-            DefaultAction::Type(action)
+            DefaultAction::Kind(action)
         })
 }
 
@@ -121,7 +121,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
             let tasks = b
                 .tasks
                 .iter()
-                .map(|t| Ok((t.id, ActionKind::try_from(t.action_type)?)))
+                .map(|t| Ok((t.id, ActionKind::try_from(t.action_kind)?)))
                 .collect::<Result<Vec<_>, GenieError>>()?;
             default_action(b.default_task_id, tasks.into_iter())
         }
@@ -140,7 +140,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
         projectile_kind: unit
             .projectile
             .as_ref()
-            .map(|p| ProjectileKind::of_data(p.projectile_type)),
+            .map(|p| ProjectileKind::of_data(p.projectile_kind)),
         fly_mode: FlyMode::of_data(unit.fly_mode),
     })
 }
@@ -402,7 +402,7 @@ impl MasterTable {
                         speed_multiplier: SpeedMultiplier::of_data(g.speed_multiplier),
                         frame_duration: Seconds::new(g.frame_duration),
                         replay_delay: Seconds::new(g.replay_delay),
-                        flags: SpriteFlags::from_bits_retain(g.sequence_type),
+                        flags: SpriteFlags::from_bits_retain(g.sequence_kind),
                     },
                 ))
             })
@@ -472,7 +472,7 @@ impl MasterTable {
 
     /// A missile master's `projectile_type` (`+0x880`).
     #[must_use]
-    pub fn projectile_type(&self, civ: CivId, master: MasterId) -> Option<ProjectileKind> {
+    pub fn projectile_kind(&self, civ: CivId, master: MasterId) -> Option<ProjectileKind> {
         self.rows
             .get(&(civ, master))
             .and_then(|r| r.projectile_kind)
@@ -595,8 +595,8 @@ mod tests {
     #[cfg(test)]
     use std::iter::empty;
 
-    /// The Artifact action's type (genie-core's `ownership::artifact::ARTIFACT_TYPE`).
-    const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
+    /// The Artifact action's type (genie-core's `ownership::artifact::ARTIFACT_KIND`).
+    const ARTIFACT_KIND: ActionKind = ActionKind::named(107);
 
     /// The fields' −1 is no attribute and any other value 0 or more its attribute, in their
     /// order; a value below −1 fails the parse.
@@ -647,17 +647,17 @@ mod tests {
     }
 
     #[test]
-    fn the_default_action_is_the_action_type_of_the_default_task() {
+    fn the_default_action_is_the_action_kind_of_the_default_task() {
         // the cow: default task 0, whose action type is 107 (the Artifact action)
         assert_eq!(
             default_action(
                 0,
-                [(0, ARTIFACT_TYPE), (1, ActionKind::HUNT_RANGE)].into_iter()
+                [(0, ARTIFACT_KIND), (1, ActionKind::HUNT_RANGE)].into_iter()
             ),
-            DefaultAction::Type(ARTIFACT_TYPE)
+            DefaultAction::Kind(ARTIFACT_KIND)
         );
         assert_eq!(
-            default_action(-1, [(0, ARTIFACT_TYPE)].into_iter()),
+            default_action(-1, [(0, ARTIFACT_KIND)].into_iter()),
             DefaultAction::None
         );
         // FARMDROP and two others name task 0 but list no task
@@ -681,7 +681,7 @@ mod tests {
                     decay: AmountRate::new(0.25),
                     undead: false,
                 },
-                DefaultAction::Type(ARTIFACT_TYPE),
+                DefaultAction::Kind(ARTIFACT_KIND),
             ),
         ]);
         assert_eq!(
@@ -691,7 +691,7 @@ mod tests {
         );
         assert_eq!(
             t.default_action(CivId::new(2), MasterId::of_data(705).unwrap()),
-            Some(DefaultAction::Type(ARTIFACT_TYPE))
+            Some(DefaultAction::Kind(ARTIFACT_KIND))
         );
         assert_eq!(
             (

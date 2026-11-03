@@ -8,7 +8,7 @@ use crate::objects::ListIndex;
 use crate::objects::layers::Action;
 use crate::objects::unit::{Outcome, Unit};
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::trace::Watch;
 use crate::unit_ai::{Surroundings, UnitAi, UnitSide};
 use crate::world::Millis;
@@ -149,7 +149,7 @@ impl World {
             &mut UnitAi,
             &Surroundings,
             &mut dyn UnitSide,
-            PlayerType,
+            PlayerKind,
             &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {

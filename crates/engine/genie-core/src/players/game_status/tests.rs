@@ -40,7 +40,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, WorkerCount};
-use crate::ownership::artifact::{ARTIFACT_TYPE, Artifact, ArtifactState};
+use crate::ownership::artifact::{ARTIFACT_KIND, Artifact, ArtifactState};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
@@ -392,7 +392,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
     );
     assert_eq!(t.halt_other(PlayerId::new(1), repair, REPAIR), Ok(true));
     assert_eq!(t.halt_other(PlayerId::new(1), attack, ATTACK), Ok(true));
-    let kind = ARTIFACT_TYPE;
+    let kind = ARTIFACT_KIND;
     assert_eq!(t.halt_other(PlayerId::new(1), artifact, kind), Ok(true));
     let objects = &t.players[1].objects;
     assert_eq!(

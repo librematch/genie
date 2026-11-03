@@ -175,12 +175,12 @@ impl World {
             return Ok(());
         }
         let player = self.players.player_mut(owner)?;
-        let multiplier = (task.attribute_type2)
+        let multiplier = (task.attribute_kind2)
             .and_then(|a| player.attribute(a))
             .unwrap_or(Amount::ZERO);
         let amount = generated(self.dt_seconds, task, multiplier);
         // no store without the task's attribute: nothing reaches the player
-        let Some(out) = task.attribute_type3 else {
+        let Some(out) = task.attribute_kind3 else {
             return Ok(());
         };
         let Some(give) = store(amount, out, &mut player.generated) else {

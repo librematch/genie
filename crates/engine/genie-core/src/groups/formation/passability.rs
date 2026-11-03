@@ -3,7 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupId;
-use crate::groups::TransformType;
+use crate::groups::TransformKind;
 use crate::groups::formation::{RIGHT_ANGLE, find_point_from_front, transform_slot};
 use crate::groups::{Formation, Slot};
 use crate::map::Distance;
@@ -83,7 +83,7 @@ impl World {
         let old = g
             .motion
             .calculate_yaw_angle(canon, formation.transform_orientation, dt, false);
-        let flips = RIGHT_ANGLE < (yaw - old).get().abs() && g.unit_types.len() < 2;
+        let flips = RIGHT_ANGLE < (yaw - old).get().abs() && g.unit_kinds.len() < 2;
         let rotation = rotation(yaw.get(), up);
         formation.transform_orientation = forward;
         for s in formation.every_slot_mut() {
@@ -91,8 +91,8 @@ impl World {
         }
         formation.number_transformed_slots = 0;
         let capacity = formation.slot_capacity() as i32;
-        match formation.transform_type {
-            TransformType::BY_LINES => {
+        match formation.transform_kind {
+            TransformKind::BY_LINES => {
                 for i in 0..formation.number_lines.max(0) {
                     if capacity <= formation.number_transformed_slots {
                         break;
@@ -121,7 +121,7 @@ impl World {
                             &rotation,
                             point,
                             k as i32,
-                            TransformType::BY_LINES,
+                            TransformKind::BY_LINES,
                             world,
                             &self.model.tuning.group,
                         );
@@ -131,8 +131,8 @@ impl World {
                     }
                 }
             }
-            kind @ (TransformType::TURNED | TransformType::AT_TARGET | TransformType::UNTURNED) => {
-                let point = if kind == TransformType::AT_TARGET {
+            kind @ (TransformKind::TURNED | TransformKind::AT_TARGET | TransformKind::UNTURNED) => {
+                let point = if kind == TransformKind::AT_TARGET {
                     g.current_target.original_position
                 } else {
                     position

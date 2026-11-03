@@ -1,8 +1,8 @@
 //! The tech tree's nodes: ages, buildings, units and techs, read and written.
 
 use crate::conv::invalid_data;
-use crate::tech_tree::{TechTreeDependencies, TechTreeStatus, TechTreeType};
-use crate::unit_type::UnitTypeId;
+use crate::tech_tree::{TechTreeDependencies, TechTreeKind, TechTreeStatus};
+use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{TechId, read_opt_u32};
 use std::convert::{TryFrom, TryInto};
@@ -14,11 +14,11 @@ use std::io::{Read, Result, Write};
 pub struct TechTreeAge {
     pub(super) age_id: i32,
     pub(super) status: TechTreeStatus,
-    pub(super) node_type: TechTreeType,
+    pub(super) node_kind: TechTreeKind,
     /// The buildings that become available in this age.
-    pub dependent_buildings: Vec<UnitTypeId>,
+    pub dependent_buildings: Vec<UnitKindId>,
     /// The units that become available in this age.
-    pub dependent_units: Vec<UnitTypeId>,
+    pub dependent_units: Vec<UnitKindId>,
     /// The techs that become available in this age.
     pub dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
@@ -31,16 +31,16 @@ pub struct TechTreeAge {
 /// A building node of the tech tree.
 #[derive(Debug, Default, Clone)]
 pub struct TechTreeBuilding {
-    pub(super) building_id: UnitTypeId,
+    pub(super) building_id: UnitKindId,
     pub(super) status: TechTreeStatus,
-    pub(super) node_type: TechTreeType,
+    pub(super) node_kind: TechTreeKind,
     /// The tech ID that makes this building available. `None` if the building is available without
     /// requiring any techs.
     pub depends_tech_id: Option<TechId>,
     /// The buildings that become available by building this building.
-    pub dependent_buildings: Vec<UnitTypeId>,
+    pub dependent_buildings: Vec<UnitKindId>,
     /// The units that become available by building this building.
-    pub dependent_units: Vec<UnitTypeId>,
+    pub dependent_units: Vec<UnitKindId>,
     /// The techs that become available by building this building.
     pub dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
@@ -57,13 +57,13 @@ pub struct TechTreeBuilding {
 /// A unit node of the tech tree.
 #[derive(Debug, Default, Clone)]
 pub struct TechTreeUnit {
-    pub(super) unit_id: UnitTypeId,
+    pub(super) unit_id: UnitKindId,
     pub(super) status: TechTreeStatus,
-    pub(super) node_type: TechTreeType,
+    pub(super) node_kind: TechTreeKind,
     pub(super) depends_tech_id: Option<TechId>,
-    pub(super) building: UnitTypeId,
+    pub(super) building: UnitKindId,
     pub(super) requires_tech_id: Option<TechId>,
-    pub(super) dependent_units: Vec<UnitTypeId>,
+    pub(super) dependent_units: Vec<UnitKindId>,
     pub(super) prerequisites: TechTreeDependencies,
     pub(super) group_id: i32,
     pub(super) level_no: i32,
@@ -74,10 +74,10 @@ pub struct TechTreeUnit {
 pub struct TechTreeTech {
     pub(super) tech_id: TechId,
     pub(super) status: TechTreeStatus,
-    pub(super) node_type: TechTreeType,
-    pub(super) building: UnitTypeId,
-    pub(super) dependent_buildings: Vec<UnitTypeId>,
-    pub(super) dependent_units: Vec<UnitTypeId>,
+    pub(super) node_kind: TechTreeKind,
+    pub(super) building: UnitKindId,
+    pub(super) dependent_buildings: Vec<UnitKindId>,
+    pub(super) dependent_units: Vec<UnitKindId>,
     pub(super) dependent_techs: Vec<TechId>,
     pub(super) prerequisites: TechTreeDependencies,
     pub(super) group_id: i32,
@@ -109,7 +109,7 @@ impl TechTreeAge {
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
     ///
     /// Also fails if the node has more than 10 building levels or is not of type
-    /// [`TechTreeType::Age`].
+    /// [`TechTreeKind::Age`].
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mut age = Self {
             age_id: input.read_i32::<LE>()?,
@@ -131,8 +131,8 @@ impl TechTreeAge {
             *group_length = input.read_u8()?;
         }
         age.max_age_length = input.read_u8()?;
-        age.node_type = input.read_i32::<LE>()?.try_into().map_err(invalid_data)?;
-        if age.node_type != TechTreeType::Age {
+        age.node_kind = input.read_i32::<LE>()?.try_into().map_err(invalid_data)?;
+        if age.node_kind != TechTreeKind::Age {
             return Err(invalid_data("an age node of another node type"));
         }
         Ok(age)
@@ -165,7 +165,7 @@ impl TechTreeAge {
         output.write_all(&self.buildings_per_zone)?;
         output.write_all(&self.group_length_per_zone)?;
         output.write_u8(self.max_age_length)?;
-        output.write_u32::<LE>(self.node_type.into())?;
+        output.write_u32::<LE>(self.node_kind.into())?;
         Ok(())
     }
 }
@@ -193,7 +193,7 @@ impl TechTreeBuilding {
         for children in &mut building.initial_children_by_age {
             *children = input.read_u8()?;
         }
-        building.node_type = input.read_i32::<LE>()?.try_into().map_err(invalid_data)?;
+        building.node_kind = input.read_i32::<LE>()?.try_into().map_err(invalid_data)?;
         building.depends_tech_id = read_opt_u32(&mut input)?;
         Ok(building)
     }
@@ -224,7 +224,7 @@ impl TechTreeBuilding {
         output.write_u8(self.level_no)?;
         output.write_all(&self.total_children_by_age)?;
         output.write_all(&self.initial_children_by_age)?;
-        output.write_u32::<LE>(self.node_type.into())?;
+        output.write_u32::<LE>(self.node_kind.into())?;
         output.write_u32::<LE>(
             self.depends_tech_id
                 .map_or(0xFFFF_FFFF, |tech_id| u32::from(u16::from(tech_id))),
@@ -249,7 +249,7 @@ impl TechTreeUnit {
             dependent_units: read_dependents(&mut input)?,
             level_no: input.read_i32::<LE>()?,
             requires_tech_id: read_opt_u32(&mut input)?,
-            node_type: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            node_kind: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
             depends_tech_id: read_opt_u32(&mut input)?,
         })
     }
@@ -276,7 +276,7 @@ impl TechTreeUnit {
             self.requires_tech_id
                 .map_or(0xFFFF_FFFF, |tech_id| u32::from(u16::from(tech_id))),
         )?;
-        output.write_u32::<LE>(self.node_type.into())?;
+        output.write_u32::<LE>(self.node_kind.into())?;
         output.write_u32::<LE>(
             self.depends_tech_id
                 .map_or(0xFFFF_FFFF, |tech_id| u32::from(u16::from(tech_id))),
@@ -302,7 +302,7 @@ impl TechTreeTech {
             prerequisites: TechTreeDependencies::read_from(input)?,
             group_id: input.read_i32::<LE>()?,
             level_no: input.read_i32::<LE>()?,
-            node_type: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
+            node_kind: input.read_i32::<LE>()?.try_into().map_err(invalid_data)?,
         })
     }
 
@@ -332,7 +332,7 @@ impl TechTreeTech {
         self.prerequisites.write_to(&mut output)?;
         output.write_i32::<LE>(self.group_id)?;
         output.write_i32::<LE>(self.level_no)?;
-        output.write_u32::<LE>(self.node_type.into())?;
+        output.write_u32::<LE>(self.node_kind.into())?;
         Ok(())
     }
 }

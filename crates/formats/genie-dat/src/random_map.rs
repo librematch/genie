@@ -1,7 +1,7 @@
 //! Types related to the random map data from Age of Empires 1.
 
 use crate::conv::fits;
-use crate::unit_type::UnitTypeId;
+use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::ReadSkipExt;
 use std::io::{Read, Result, Write};
@@ -185,7 +185,7 @@ pub struct RandomMapLand {
     /// ID of the land.
     pub id: i32,
     /// Terrain of the land.
-    pub terrain_type: u8,
+    pub terrain_kind: u8,
     /// Distance kept from other lands, in tiles (genieutils' `LandSpacing`).
     pub land_avoidance_tiles: i32,
     /// Radius of the square the land grows from (genieutils' `BaseSize`).
@@ -193,7 +193,7 @@ pub struct RandomMapLand {
     /// Zone the land belongs to.
     pub zone: i8,
     /// How the land is placed (genieutils' `PlacementType`).
-    pub placement_type: i8,
+    pub placement_kind: i8,
     /// X position of the land's base (genieutils' `BaseX`).
     pub x: i32,
     /// Y position of the land's base (genieutils' `BaseY`).
@@ -219,7 +219,7 @@ impl RandomMapLand {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mut land = Self {
             id: input.read_i32::<LE>()?,
-            terrain_type: input.read_u8()?,
+            terrain_kind: input.read_u8()?,
             ..Default::default()
         };
         let _padding = input.read_u16::<LE>()?;
@@ -227,7 +227,7 @@ impl RandomMapLand {
         land.land_avoidance_tiles = input.read_i32::<LE>()?;
         land.base_square_radius = input.read_i32::<LE>()?;
         land.zone = input.read_i8()?;
-        land.placement_type = input.read_i8()?;
+        land.placement_kind = input.read_i8()?;
         let _padding = input.read_u16::<LE>()?;
         land.x = input.read_i32::<LE>()?;
         land.y = input.read_i32::<LE>()?;
@@ -247,13 +247,13 @@ impl RandomMapLand {
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_i32::<LE>(self.id)?;
-        output.write_u8(self.terrain_type)?;
+        output.write_u8(self.terrain_kind)?;
         output.write_u16::<LE>(0)?;
         output.write_u8(0)?;
         output.write_i32::<LE>(self.land_avoidance_tiles)?;
         output.write_i32::<LE>(self.base_square_radius)?;
         output.write_i8(self.zone)?;
-        output.write_i8(self.placement_type)?;
+        output.write_i8(self.placement_kind)?;
         output.write_u16::<LE>(0)?;
         output.write_i32::<LE>(self.x)?;
         output.write_i32::<LE>(self.y)?;
@@ -273,13 +273,13 @@ pub struct RandomMapTerrain {
     /// Share of the map covered, in percent (genieutils' `Proportion`).
     pub percent: i32,
     /// The terrain placed.
-    pub terrain_type: i32,
+    pub terrain_kind: i32,
     /// Number of clumps.
     pub clumps: i32,
     /// Distance kept from the edges of other terrains (genieutils' `EdgeSpacing`).
     pub spacing: i32,
     /// The terrain on which the clumps are placed (genieutils' `PlacementTerrain`).
-    pub base_terrain_type: i32,
+    pub base_terrain_kind: i32,
     /// How clumpy the clumps are.
     pub clumpiness_factor: i32,
 }
@@ -293,10 +293,10 @@ impl RandomMapTerrain {
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         Ok(Self {
             percent: input.read_i32::<LE>()?,
-            terrain_type: input.read_i32::<LE>()?,
+            terrain_kind: input.read_i32::<LE>()?,
             clumps: input.read_i32::<LE>()?,
             spacing: input.read_i32::<LE>()?,
-            base_terrain_type: input.read_i32::<LE>()?,
+            base_terrain_kind: input.read_i32::<LE>()?,
             clumpiness_factor: input.read_i32::<LE>()?,
         })
     }
@@ -308,10 +308,10 @@ impl RandomMapTerrain {
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_i32::<LE>(self.percent)?;
-        output.write_i32::<LE>(self.terrain_type)?;
+        output.write_i32::<LE>(self.terrain_kind)?;
         output.write_i32::<LE>(self.clumps)?;
         output.write_i32::<LE>(self.spacing)?;
-        output.write_i32::<LE>(self.base_terrain_type)?;
+        output.write_i32::<LE>(self.base_terrain_kind)?;
         output.write_i32::<LE>(self.clumpiness_factor)?;
         Ok(())
     }
@@ -321,9 +321,9 @@ impl RandomMapTerrain {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RandomMapObject {
     /// The unit type placed.
-    pub unit_type: UnitTypeId,
+    pub unit_kind: UnitKindId,
     /// The terrain the objects are placed on (genieutils' `HostTerrain`).
-    pub terrain_type: i32,
+    pub terrain_kind: i32,
     /// How the group is placed (genieutils' `GroupPlacing`).
     pub group_flag: i8,
     /// genieutils' `ScaleFlag`: whether the count scales with the map size.
@@ -353,11 +353,11 @@ impl RandomMapObject {
     ///
     /// Returns an error if reading from `input` fails.
     ///
-    /// Also fails if the unit type ID does not fit a [`UnitTypeId`].
+    /// Also fails if the unit type ID does not fit a [`UnitKindId`].
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         let mut object = Self {
-            unit_type: fits(input.read_u32::<LE>()?)?,
-            terrain_type: input.read_i32::<LE>()?,
+            unit_kind: fits(input.read_u32::<LE>()?)?,
+            terrain_kind: input.read_i32::<LE>()?,
             group_flag: input.read_i8()?,
             scale_flag: input.read_i8()?,
             ..Default::default()
@@ -380,8 +380,8 @@ impl RandomMapObject {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        output.write_u32::<LE>(self.unit_type.into())?;
-        output.write_i32::<LE>(self.terrain_type)?;
+        output.write_u32::<LE>(self.unit_kind.into())?;
+        output.write_i32::<LE>(self.terrain_kind)?;
         output.write_i8(self.group_flag)?;
         output.write_i8(self.scale_flag)?;
         output.write_u16::<LE>(0)?;
@@ -412,7 +412,7 @@ pub struct RandomMapElevation {
     /// genieutils reads this value as `BaseTerrain`.
     pub spacing: i32,
     /// genieutils reads this value as `BaseElevation`.
-    pub base_terrain_type: i32,
+    pub base_terrain_kind: i32,
     /// genieutils reads this value as `TileSpacing`.
     pub base_elevation: i32,
 }
@@ -431,7 +431,7 @@ impl RandomMapElevation {
             height: input.read_i32::<LE>()?,
             clumps: input.read_i32::<LE>()?,
             spacing: input.read_i32::<LE>()?,
-            base_terrain_type: input.read_i32::<LE>()?,
+            base_terrain_kind: input.read_i32::<LE>()?,
             base_elevation: input.read_i32::<LE>()?,
         })
     }
@@ -446,7 +446,7 @@ impl RandomMapElevation {
         output.write_i32::<LE>(self.height)?;
         output.write_i32::<LE>(self.clumps)?;
         output.write_i32::<LE>(self.spacing)?;
-        output.write_i32::<LE>(self.base_terrain_type)?;
+        output.write_i32::<LE>(self.base_terrain_kind)?;
         output.write_i32::<LE>(self.base_elevation)?;
         Ok(())
     }
@@ -470,7 +470,7 @@ mod tests {
                 elevation.height,
                 elevation.clumps,
                 elevation.spacing,
-                elevation.base_terrain_type,
+                elevation.base_terrain_kind,
                 elevation.base_elevation
             ),
             (30, 2, 5, 3, -1, 0)

@@ -312,7 +312,7 @@ impl Unit {
         {
             // the building takes food for the foods a unit carries (15 to 17), the four resources
             // and the ore themselves, nothing else
-            let resource = self.life.attribute_type.and_then(|kind| {
+            let resource = self.life.attribute_kind.and_then(|kind| {
                 if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
                     Some(c.w.model.slots.attribute.food)
                 } else {
@@ -333,7 +333,7 @@ impl Unit {
                     c.w.model.slots,
                 )?;
                 c.w.players.player_mut(c.player)?.add_attributes(adds)?;
-                self.life.attribute_type = None;
+                self.life.attribute_kind = None;
                 self.life.amount = Amount::ZERO;
             }
         }
@@ -567,7 +567,7 @@ impl Unit {
             && state == ObjectState::Alive
             && bm
                 .building
-                .is_some_and(|b| b.garrison_type.contains(GarrisonKinds::VILLAGERS))
+                .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS))
         {
             bell.flag = true;
         }

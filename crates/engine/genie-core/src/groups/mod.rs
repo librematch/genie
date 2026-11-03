@@ -40,8 +40,8 @@ mod motion_flags;
 mod move_reason;
 mod objects;
 mod slot_state;
-mod transform_type;
-mod unit_type;
+mod transform_kind;
+mod unit_kind;
 
 pub use self::command_kind::GroupCommandKind;
 pub use self::differentiator::Differentiator;
@@ -56,8 +56,8 @@ pub(crate) use self::objects::WorldObject;
 pub use self::objects::sub_formation;
 pub use self::slot_state::SlotState;
 pub use self::target::GroupTarget;
-pub use self::transform_type::TransformType;
-pub use self::unit_type::UnitType;
+pub use self::transform_kind::TransformKind;
+pub use self::unit_kind::UnitKind;
 
 mod attack;
 mod command;
@@ -176,7 +176,7 @@ pub struct Slot {
     /// `mActive`.
     pub active: u32,
     /// `mDesiredSubCategory`: the unit type the slot takes, none for any.
-    pub desired_sub_category: UnitType,
+    pub desired_sub_category: UnitKind,
     /// `+0x44` (not saved): the formation's transform took the slot.
     pub transformed: u32,
 }
@@ -212,7 +212,7 @@ pub struct Formation {
     /// The lines (`tempMaxLines` of them).
     pub lines: Vec<FormationLine>,
     /// `mTransformType`.
-    pub transform_type: TransformType,
+    pub transform_kind: TransformKind,
     /// `mNumberLines`.
     pub number_lines: i32,
     /// `mTransformOrientation`.
@@ -295,7 +295,7 @@ fn stretch(a: &LinePoint, b: &LinePoint) -> Distance {
 
 /// The members of one formation category (`FUN_141023570`).
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct UnitTypeStatistic {
+pub struct UnitKindStatistic {
     /// `mFormationCategory`.
     pub formation_category: FormationCategory,
     /// `mUnits` (as many as `mNumberUnits`).
@@ -307,11 +307,11 @@ pub struct UnitTypeStatistic {
     /// `mDesiredSpacing`.
     pub desired_spacing: Distance,
     /// `mNumberUnitTypes`.
-    pub number_unit_types: i32,
+    pub number_unit_kinds: i32,
     /// `mUnitTypes`: the 200 bytes the save writes (`+0x38`), as 50 words.
-    pub unit_types: Vec<UnitType>,
+    pub unit_kinds: Vec<UnitKind>,
     /// `mUnitTypeCounts`: the 200 bytes the save writes (`+0x100`), as 50 words.
-    pub unit_type_counts: Vec<u32>,
+    pub unit_kind_counts: Vec<u32>,
 }
 
 /// The group's target (`mCurrentTarget`, `FUN_14101c7d0`).
@@ -388,7 +388,7 @@ pub struct UnitGroup {
     /// The word the save writes after the formations (`garbage`).
     pub garbage: u32,
     /// `mFormationLockedType`: none for the constructor's −1; a horde (0) is no lock either.
-    pub formation_locked_type: Option<FormationKind>,
+    pub formation_locked_kind: Option<FormationKind>,
     /// `mGroupFlags`.
     pub flags: GroupFlags,
     /// `mCentroid`.
@@ -412,7 +412,7 @@ pub struct UnitGroup {
     /// `mStoredPositions`.
     pub stored_positions: PointLine,
     /// `mUnitTypes`: the members by formation category.
-    pub unit_types: Vec<UnitTypeStatistic>,
+    pub unit_kinds: Vec<UnitKindStatistic>,
     /// `mWaypoints`.
     pub waypoints: Vec<BVector>,
     /// `mCurrentCommand`.
@@ -420,7 +420,7 @@ pub struct UnitGroup {
     /// `mCurrentTarget`.
     pub current_target: TargetData,
     /// `mAttackPlanType`.
-    pub attack_plan_type: i32,
+    pub attack_plan_kind: i32,
     /// `mIdleTimer`.
     pub idle_timer: Millis,
     /// The order queue.

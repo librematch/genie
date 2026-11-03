@@ -42,7 +42,7 @@ fn drop_sites_read_their_targets() {
         (
             s.building_id,
             s.target_list[0].object_state,
-            s.update_ai_resource_types.as_ref().unwrap()[0].resource_type
+            s.update_ai_resource_kinds.as_ref().unwrap()[0].resource_kind
         ),
         (109, Some(5), 0)
     );

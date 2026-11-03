@@ -151,7 +151,7 @@ use self::top_actions::saved_actions;
 #[cfg(test)]
 use genie_core::objects::unit::Unit;
 #[cfg(test)]
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
 use genie_import::save::parts::combat_master;

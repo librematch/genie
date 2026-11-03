@@ -5,17 +5,21 @@ genie's Rust code follows RFC 430.
     scripts/c_case.py        fails on a name that breaks it, as `file:line: name: why`
 
 It reads the code, not the comments or the strings, of every `.rs` file git knows of, the
-generated ones too (their generators follow the rule), and checks three rules:
+generated ones too (their generators follow the rule), and checks four rules:
 
 - A type or a variant (`struct`, `enum`, `trait`, `type`, `union`, an enum's variant) holds no
   acronym in capitals: no run of three capitals (`AIModule`) and no two at the end
-  (`UnitTypeID`). A single letter is a word in `UpperCamelCase` (`XAxis`, `BVector`), so a
+  (`UnitKindID`). A single letter is a word in `UpperCamelCase` (`XAxis`, `BVector`), so a
   plural acronym (`IDs`) passes: the review catches it.
 - In a `snake_case` or `SCREAMING_SNAKE_CASE` name a single letter is a word only at the end:
   `map_x`, not `t_master` or `a_build_s_walk`. A digit is no letter (`state_6_goes_on`).
 - An enum's values are its variants: no associated constant of the enum's own type
   (`const MOVE: Self = Self::Move`) in its crate. A constant of another type (`ALL: [Self;
   4]`) stays, and so do a newtype's constants (`GameMode::REGICIDE`).
+- Kind, not Type (FD-043-D33): no name holds the word `type`, a Rust keyword, nor `types` or a
+  numbered `type4`: `PlayerKind`, `unit_kind`, `KIND_2`. The keyword itself passes, and so do
+  the names other crates and published formats define (`TypeId`, `type_name`, syn's `Type`,
+  clippy's `type_complexity`, genieutils' `Type50`).
 
 Python 3.11 or later, no packages.
 """
@@ -33,6 +37,27 @@ IDENT = re.compile(r"\b[A-Za-z_][A-Za-z0-9_]*\b")
 IMPL = re.compile(r"\bimpl(?:\s*<[^>]*>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:<[^>]*>)?\s*\{")
 SELF_CONST = r"\bconst\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:Self|{name})\s*="
 CAPITALS = re.compile(r"[A-Z]{3,}|[a-z0-9][A-Z]{2,}$|^[A-Z]{2,}$")
+# the word `type` in a snake or screaming name, or in an UpperCamelCase one
+TYPE_WORD = re.compile(r"(?:^|_)(?:type|TYPE)(?:s|S|\d+)?(?=_|$)|Type(?:s|\d+)?(?![a-z])")
+OUTSIDE_TYPE_NAMES = {
+    "type",  # the keyword (`type Output = …`, `r#type`)
+    "Type",  # syn's
+    "TypeId",
+    "TypePath",
+    "TypeParam",
+    "TypeGenerics",
+    "TypeReference",
+    "TypeTuple",
+    "type_name",
+    "type_name_of_val",
+    "type_params",
+    "type_params_mut",
+    "type_generics",
+    "type_complexity",
+    "type_repetition_in_bounds",
+    "Type50",  # genieutils' name of the `.dat` unit's combat part
+    "type50",
+}
 
 
 def camel_problem(name: str) -> str | None:
@@ -42,6 +67,13 @@ def camel_problem(name: str) -> str | None:
     if CAPITALS.search(name) and len(name) > 1:
         return "an acronym in capitals: it is one word (`UnitTypeId`, `AiModule`)"
     return None
+
+
+def kind_problem(name: str) -> str | None:
+    """Why `name` breaks Kind, not Type (FD-043-D33), or None."""
+    if name in OUTSIDE_TYPE_NAMES or not TYPE_WORD.search(name):
+        return None
+    return "the word `type`: it is `kind` (FD-043-D33: `PlayerKind`, `unit_kind`, `KIND_2`)"
 
 
 def snake_problem(name: str) -> str | None:
@@ -113,6 +145,7 @@ def problems(src: str, enums: set[str]) -> list[tuple[int, str, str]]:
     for m in IDENT.finditer(code):
         if "_" in m.group(0):
             add(m.start(), m.group(0), snake_problem(m.group(0)))
+        add(m.start(), m.group(0), kind_problem(m.group(0)))
     for m in IMPL.finditer(code):
         name = m.group(1)
         if name not in enums:

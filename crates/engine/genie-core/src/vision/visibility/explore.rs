@@ -52,7 +52,7 @@ impl Visibility {
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
                     if self
-                        .player_types
+                        .player_kinds
                         .get(player.index())
                         .is_some_and(|t| t.is_computer())
                     {

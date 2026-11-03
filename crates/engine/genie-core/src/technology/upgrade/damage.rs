@@ -151,7 +151,7 @@ fn share_of(u: &Unit, master: &Master, roles: &Roles) -> Option<(HpPercent, f32)
             .storage
             .iter()
             .take(3)
-            .find(|&&(kind, _, _)| kind == u.life.attribute_type);
+            .find(|&&(kind, _, _)| kind == u.life.attribute_kind);
         let share = held.map_or(HpPercent::of_data(0), |&(_, amount, _)| {
             HpPercent::of_data(cvttss2si(WHOLE - u.life.amount.get() * WHOLE / amount.get()) as u8)
         });
@@ -219,12 +219,12 @@ mod tests {
             },
             ..Unit::default()
         };
-        (u.life.attribute_type, u.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
+        (u.life.attribute_kind, u.life.amount) = (Some(attribute::WOOD), Amount::new(25.0));
         assert_eq!(
             super::share_of(&u, &tree, &roles()),
             Some((HpPercent::of_data(75), 20.0))
         );
-        u.life.attribute_type = Some(attribute::STONE);
+        u.life.attribute_kind = Some(attribute::STONE);
         assert_eq!(
             super::share_of(&u, &tree, &roles()),
             Some((HpPercent::of_data(0), 20.0))

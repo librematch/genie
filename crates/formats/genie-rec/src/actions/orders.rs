@@ -4,7 +4,7 @@ use crate::actions::{Location2, Location3, ObjectsList};
 use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeId, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitKindId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Task an object to a target object or a target location.
@@ -199,7 +199,7 @@ pub struct CreateCommand {
     /// The ID of the player issuing this command.
     pub player_id: PlayerId,
     /// The type of unit to create.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// The location.
     pub location: Location3,
 }
@@ -213,7 +213,7 @@ impl CreateCommand {
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let mut command = Self::default();
         let _padding = input.read_u8()?;
-        command.unit_type_id = input.read_u16::<LE>()?.into();
+        command.unit_kind_id = input.read_u16::<LE>()?.into();
         command.player_id = input.read_u8()?.into();
         let _padding = input.read_u8()?;
         command.location = (
@@ -231,7 +231,7 @@ impl CreateCommand {
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_u8(0)?;
-        output.write_u16::<LE>(self.unit_type_id.into())?;
+        output.write_u16::<LE>(self.unit_kind_id.into())?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;
         output.write_f32::<LE>(self.location.0)?;
@@ -297,7 +297,7 @@ pub struct AiOrderCommand {
     /// command, more than one in a list after it.
     pub objects: ObjectsList,
     /// The kind of order.
-    pub order_type: u16,
+    pub order_kind: u16,
     /// The priority of the order.
     pub order_priority: i8,
     /// The target object, if any.
@@ -328,7 +328,7 @@ impl AiOrderCommand {
         command.player_id = input.read_u8()?.into();
         command.issuer = input.read_u8()?.into();
         let object_id = input.read_u32::<LE>()?;
-        command.order_type = input.read_u16::<LE>()?;
+        command.order_kind = input.read_u16::<LE>()?;
         command.order_priority = input.read_i8()?;
         let _padding = input.read_u8()?;
         command.target_id = read_opt_u32(&mut input)?;
@@ -372,7 +372,7 @@ impl AiOrderCommand {
             }
             _ => output.write_i32::<LE>(-1)?,
         }
-        output.write_u16::<LE>(self.order_type)?;
+        output.write_u16::<LE>(self.order_kind)?;
         output.write_i8(self.order_priority)?;
         output.write_u8(0)?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;

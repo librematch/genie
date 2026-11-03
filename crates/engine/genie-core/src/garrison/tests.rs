@@ -80,7 +80,7 @@ use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
@@ -102,8 +102,8 @@ use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::OrderTargetType;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::OrderTargetKind;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{NotifyKind, OrderPriority, QueuedOrder, UnitAi};
@@ -136,9 +136,9 @@ pub(crate) const ARCHER: MasterId = MasterId::named(4);
 const SHIP: MasterId = MasterId::named(545);
 const GATE: MasterId = MasterId::named(88);
 
-fn task(action_type: ActionKind, object_group: i16) -> Task {
+fn task(action_kind: ActionKind, object_group: i16) -> Task {
     Task {
-        action_kind: action_type,
+        action_kind,
         object_group: class_of(object_group),
         ..Task::default()
     }
@@ -155,7 +155,7 @@ fn garrison_masters() -> Masters {
             hit_points: MasterHitPoints::of_data(2400),
             garrison: GarrisonCapacity::of_data(15),
             building: Some(BuildingMaster {
-                garrison_type: (GarrisonKinds::VILLAGERS
+                garrison_kind: (GarrisonKinds::VILLAGERS
                     | GarrisonKinds::INFANTRY
                     | GarrisonKinds::MONKS),
                 ..BuildingMaster::default()
@@ -1165,28 +1165,28 @@ fn the_reach_tile_test_counts_buildings_where_the_unit_cannot_stand() {
 #[test]
 fn town_center_takes_villagers_infantry_cavalry_and_monks() {
     // a town center's garrison_type 11: bits 0, 1 and 3
-    assert!(garrison_type_takes(
+    assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::VILLAGER,
         ids::VILLAGER_MALE,
         true,
         &roles()
     ));
-    assert!(garrison_type_takes(
+    assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         master_id(74),
         true,
         &roles()
     ));
-    assert!(!garrison_type_takes(
+    assert!(!garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_12,
         master_id(38),
         true,
         &roles()
     ));
-    assert!(garrison_type_takes(
+    assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::MONK,
         master_id(125),
@@ -1194,14 +1194,14 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         &roles()
     ));
     // master 1811 is no infantry, but a monk
-    assert!(garrison_type_takes(
+    assert!(garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY | GarrisonKinds::MONKS,
         class::CLASS_6,
         ids::WARRIOR_PRIEST,
         true,
         &roles()
     ));
-    assert!(!garrison_type_takes(
+    assert!(!garrison_kind_takes(
         GarrisonKinds::INFANTRY,
         class::CLASS_6,
         ids::WARRIOR_PRIEST,
@@ -1209,21 +1209,21 @@ fn town_center_takes_villagers_infantry_cavalry_and_monks() {
         &roles()
     ));
     // a tower's 3 takes no monk; the task finder takes no class 42
-    assert!(!garrison_type_takes(
+    assert!(!garrison_kind_takes(
         GarrisonKinds::VILLAGERS | GarrisonKinds::INFANTRY,
         class::MONK,
         master_id(125),
         true,
         &roles()
     ));
-    assert!(garrison_type_takes(
+    assert!(garrison_kind_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
         true,
         &roles()
     ));
-    assert!(!garrison_type_takes(
+    assert!(!garrison_kind_takes(
         GarrisonKinds::MONKS,
         class::RELIC,
         master_id(1),
@@ -1715,7 +1715,7 @@ fn garrison_task_compares_the_bytes_the_game_passes_widened() {
 }
 
 #[test]
-fn building_takes_unit_in_by_its_player_state_hit_points_room_and_garrison_type() {
+fn building_takes_unit_in_by_its_player_state_hit_points_room_and_garrison_kind() {
     // FUN_14120eb10
     let mut t = garrison_world();
     let takes = |t: &World, b, p, m, others, unchecked| {
@@ -1997,7 +1997,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
         vec![VisionBits::from_bits_retain(seen); n],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN; 4],
+        vec![PlayerKind::HUMAN; 4],
     ));
     let tc = &mut t.players[1].objects[ListIndex::new(0)];
     tc.place_for_test(Position::new(10.0, 10.0, 0.0));
@@ -2011,13 +2011,13 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
             class: class::TOWER,
             player: PlayerId::new(1),
             master: TC,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -2142,7 +2142,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
     walker.stats = standing();
     t.parts.put_mover(v.id, Some(walker));
     let villager_ai = UnitAi {
-        ai_type: UnitAiType::CIVILIAN,
+        ai_kind: UnitAiKind::CIVILIAN,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -2192,7 +2192,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
 fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let with_food = |t: &mut World| {
         let v = t.players[1].objects.last_mut().unwrap();
-        (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+        (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     };
     let drop_site = |t: &mut World| {
         t.model.drop_sites = Arc::new(vec![DropSite {
@@ -2462,7 +2462,7 @@ pub(crate) fn walker(t: &mut World, p: PlayerId, id: i32, m: MasterId, at: Point
     let mut v = unit(id, m, HitPoints::new(25.0));
     v.place_for_test(at.with_height(0.0));
     let villager_ai = UnitAi {
-        ai_type: UnitAiType::CIVILIAN,
+        ai_kind: UnitAiKind::CIVILIAN,
         current_order: None,
         current_action: None,
         current_target: None,
@@ -2536,13 +2536,13 @@ pub(crate) fn building_at(
             class: class::TOWER,
             player: PlayerId::new(1),
             master: m,
-            obstruction_kind: ObstructionKind::TYPE_2,
+            obstruction_kind: ObstructionKind::KIND_2,
             buildable_on: BuildableOn::NO,
             tall: true,
             moves: false,
             unknown: None,
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::UNIT,
             }),
         },
@@ -2689,7 +2689,7 @@ fn garrison_through_the_unit_ais_queues_their_enter_orders() {
             range: Distance::ZERO,
             shown: Point::new(10.0, 10.0),
             ready: true,
-            target_type: Some(OrderTargetType::of_master(TC)),
+            target_kind: Some(OrderTargetKind::of_master(TC)),
         }]
     );
 }
@@ -3123,7 +3123,7 @@ fn coast_world(ship: Point) -> World {
     t.parts.set_unit_ai(
         object_id(200),
         Some(UnitAi {
-            ai_type: UnitAiType::TRANSPORT,
+            ai_kind: UnitAiKind::TRANSPORT,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -3831,7 +3831,7 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
             .get_mut(TC)
             .and_then(|tc| tc.building.as_mut())
         {
-            b.garrison_type = GarrisonKinds::INFANTRY;
+            b.garrison_kind = GarrisonKinds::INFANTRY;
         }
     }
     walker(
@@ -4198,7 +4198,7 @@ fn transport_update_unloads_beside_the_shore_and_ends_when_done_or_failed() {
     // a computer player's AI would hear it, which is not modelled
     let mut t = coast_world(Point::new(10.5, 10.5));
     t.build_mesh().unwrap();
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     UnloadCommand {
         player: player_id(1),
         units: unit_list(object_ids([200])),
@@ -4482,7 +4482,7 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
 /// computer's tile list); a computer's market, or a human ally, hears nothing.
 #[test]
 fn market_tells_computer_ally_of_its_tile() {
-    let market = |ally: PlayerType, own: PlayerType| {
+    let market = |ally: PlayerKind, own: PlayerKind| {
         let mut t = let_out_world();
         for m in &mut t.model.masters {
             let mut market = m.get(TC).unwrap().clone();
@@ -4512,7 +4512,7 @@ fn market_tells_computer_ally_of_its_tile() {
         .unwrap();
         t.spatial.sight.unwrap().new_tiles[2].clone()
     };
-    let (human, computer) = (PlayerType::HUMAN, PlayerType::COMPUTER);
+    let (human, computer) = (PlayerKind::HUMAN, PlayerKind::COMPUTER);
     assert_eq!(market(computer, human), [Tile::new(10, 12)]);
     assert_eq!(market(human, human), Vec::<Tile>::new());
     assert_eq!(market(computer, computer), Vec::<Tile>::new());

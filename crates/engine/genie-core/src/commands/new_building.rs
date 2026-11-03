@@ -46,8 +46,8 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::trace::player_unsupported;
 use crate::unit_ai::UnitAi;
-use crate::unit_ai::UnitAiType;
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::UnitAiKind;
+use crate::unit_ai::unit_ai_kind;
 use crate::world::NO_ATTRIBUTE;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
@@ -62,7 +62,7 @@ use crate::world::{Gate, World};
 impl World {
     /// The new foundation of BUILD and of `BUILD_WALL`'s tiles (the master's slot 0x108,
     /// [`World::make_building`], with the unit AI type the factory gives its master,
-    /// [`unit_ai_type`]), then the player pays the master's cost (each entry flagged
+    /// [`unit_ai_kind`]), then the player pays the master's cost (each entry flagged
     /// paid). Its id, which takes the foundation's role here, and position.
     pub(crate) fn found(
         &mut self,
@@ -70,7 +70,7 @@ impl World {
         master: MasterId,
         position: Position,
     ) -> Result<(FoundationId, Position), GenieError> {
-        let unit_ai = unit_ai_type(self.master(player, master)?, master, &self.model.roles);
+        let unit_ai = unit_ai_kind(self.master(player, master)?, master, &self.model.roles);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
         let cost = self.master(player, master)?.creatable_part().cost;
         let owner = self.players.player_mut(player)?;
@@ -166,7 +166,7 @@ impl World {
         &mut self,
         player: PlayerId,
         master: MasterId,
-        unit_ai: Result<Option<UnitAiType>, GenieError>,
+        unit_ai: Result<Option<UnitAiKind>, GenieError>,
         position: Position,
     ) -> Result<(ObjectId, Position), GenieError> {
         let made = self.master(player, master)?.clone();
@@ -319,7 +319,7 @@ impl World {
                 state: ObjectState::Foundation,
                 hp: HitPoints::new(hp),
                 master_id: master,
-                attribute_type: held.kind,
+                attribute_kind: held.kind,
                 amount: held.amount,
                 dying_sprite: death.0,
                 death_spawn: death.1,
@@ -403,7 +403,7 @@ impl World {
             };
             // the .dat's annexes are buildings (type 80): another type's master has no building
             // part, which the constructor below refuses
-            let ai = Ok(unit_ai_type(&am, annex, &self.model.roles));
+            let ai = Ok(unit_ai_kind(&am, annex, &self.model.roles));
             let at = Position::new(position.x() + off.x(), position.y() + off.y(), given_z);
             let (aid, at) = self.make_building(player, annex, ai, at)?;
             self.link_annex(player, (id, slot), aid, &made, &am)?;

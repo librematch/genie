@@ -53,7 +53,7 @@ use genie_core::pathing::{Pathing, PlanBudget, PlanCap, PlanCount};
 use genie_core::players::PlayerId;
 use genie_core::players::tracker::Tracker;
 use genie_core::players::world_player::VictoryTimes;
-use genie_core::players::{PlayerSet, PlayerType, Posture, Relations, Stance};
+use genie_core::players::{PlayerKind, PlayerSet, Posture, Relations, Stance};
 use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::parts::ObjectParts;
@@ -155,7 +155,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
             Player {
                 objects: live.into(),
                 sleeping: sleeping.into(),
-                kind: PlayerType::from(p.player.type_),
+                kind: PlayerKind::from(p.player.kind),
                 attributes: attributes.iter().map(|&a| Amount::new(a)).collect(),
                 // the second attribute array (+0x658), floats as their bits
                 generated: p
@@ -337,10 +337,10 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
         GridSize::new(map.map_width, map.map_height),
         map.rows
             .iter()
-            .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
+            .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_kind)))
             .collect(),
         terrain.passable().to_vec(),
-        header.world.game_type,
+        header.world.game_kind,
     );
     // the zone maps (`map+0x5e28`) as the save holds them, their adjacency built by the load
     turns.zones = Zones::from_saved(
@@ -517,7 +517,7 @@ pub const fn settings(o: &GameOptions) -> Settings {
     Settings {
         game_mode: GameMode::of_data(o.game_mode),
         ending_age: Age::of_data(o.ending_age),
-        visibility_type: Visibility::of_data(o.visibility_type),
+        visibility_kind: Visibility::of_data(o.visibility_kind),
         sub_game_mode_flag: SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
         full_tech_tree: o.full_tech_tree_enabled != 0,
         walkable_farms: o.walkable_farms != 0,

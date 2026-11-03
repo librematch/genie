@@ -98,7 +98,7 @@ fn palette(bytes: &[u8]) -> Outcome {
 }
 
 fn strings_keyvalue(bytes: &[u8]) -> Outcome {
-    match genie_lang::LangFileType::KeyValue.read_from(Cursor::new(bytes)) {
+    match genie_lang::LangFileKind::KeyValue.read_from(Cursor::new(bytes)) {
         Ok(lang) => {
             let mut out = Vec::new();
             let written = lang.write_to_keyval(&mut out);

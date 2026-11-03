@@ -7,7 +7,7 @@ use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{GroupState, Surroundings, UnitAi, UnitSide, group_lets_idle};
@@ -27,7 +27,7 @@ impl UnitAi {
         busy: bool,
         group: Option<GroupState>,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
@@ -44,11 +44,11 @@ impl UnitAi {
         {
             // slot 0x240 with 1; the idle part reads no result
             self.idle_timer = Millis::ZERO;
-            let _ = self.process_idle(at, player_type, ai, side)?;
+            let _ = self.process_idle(at, player_kind, ai, side)?;
             return Ok(());
         }
         if self.patrols(group) {
-            return self.patrol_idle_part(at, player_type, ai, side);
+            return self.patrol_idle_part(at, player_kind, ai, side);
         }
         // Classes whose actions `0x26b`, `0x26c` take another branch of the idle part (`-0xea9`,
         // `-0xe78` raw).
@@ -62,7 +62,7 @@ impl UnitAi {
                 Some(AiAction::Make | AiAction::Research)
             )
         {
-            return self.making_idle_part(at, player_type, ai, side);
+            return self.making_idle_part(at, player_kind, ai, side);
         }
         self.idle_part_end(at.class, at.player, group, roles)
     }
@@ -76,7 +76,7 @@ impl UnitAi {
     pub(super) fn patrol_idle_part(
         &mut self,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
@@ -90,7 +90,7 @@ impl UnitAi {
         if Self::top_target_live(at, side)?.is_some_and(|t| t.kind == MasterKind::BUILDING) {
             return Ok(());
         }
-        let _ = self.process_idle(at, player_type, ai, side)?;
+        let _ = self.process_idle(at, player_kind, ai, side)?;
         Ok(())
     }
 
@@ -112,7 +112,7 @@ impl UnitAi {
     pub(super) fn making_idle_part(
         &mut self,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
@@ -128,7 +128,7 @@ impl UnitAi {
             return Ok(());
         }
         self.idle_timer = Millis::ZERO;
-        self.process_idle(at, player_type, ai, side).map(|_| ())
+        self.process_idle(at, player_kind, ai, side).map(|_| ())
     }
 
     /// The idle part past slot 72: the patrol branch ([`UnitAi::patrols`]) and class 3's and

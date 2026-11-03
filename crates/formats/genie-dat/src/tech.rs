@@ -1,6 +1,6 @@
 use crate::civ::CivilizationId;
 use crate::conv::invalid_data;
-use crate::unit_type::UnitTypeId;
+use crate::unit_kind::UnitKindId;
 use arrayvec::{ArrayString, ArrayVec};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
@@ -12,7 +12,7 @@ use std::io::{Read, Result, Write};
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EffectCommand {
     /// The command.
-    pub command_type: u8,
+    pub command_kind: u8,
     /// Command-dependent parameters.
     pub params: (i16, i16, i16, f32),
 }
@@ -37,7 +37,7 @@ pub struct TechEffect {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TechEffectRef {
     /// The resource type paid; 0xFFFF marks an unused slot.
-    pub effect_type: u16,
+    pub effect_kind: u16,
     /// The amount of that resource.
     pub amount: u16,
     /// Whether the cost is deducted from the player's stockpile.
@@ -52,12 +52,12 @@ pub struct Tech {
     effects: ArrayVec<TechEffectRef, 3>,
     civilization_id: Option<CivilizationId>,
     full_tech_mode: u16,
-    location: Option<UnitTypeId>,
+    location: Option<UnitKindId>,
     language_dll_name: Option<StringKey>,
     language_dll_description: Option<StringKey>,
     time: u16,
     time2: u16,
-    type_: u16,
+    kind: u16,
     icon_id: Option<u16>,
     button_id: u8,
     language_dll_help: Option<StringKey>,
@@ -73,7 +73,7 @@ impl EffectCommand {
     ///
     /// Returns an error if reading from `input` fails.
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        let command_type = input.read_u8()?;
+        let command_kind = input.read_u8()?;
         let params = (
             input.read_i16::<LE>()?,
             input.read_i16::<LE>()?,
@@ -81,7 +81,7 @@ impl EffectCommand {
             input.read_f32::<LE>()?,
         );
         Ok(Self {
-            command_type,
+            command_kind,
             params,
         })
     }
@@ -92,7 +92,7 @@ impl EffectCommand {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
-        output.write_u8(self.command_type)?;
+        output.write_u8(self.command_kind)?;
         output.write_i16::<LE>(self.params.0)?;
         output.write_i16::<LE>(self.params.1)?;
         output.write_i16::<LE>(self.params.2)?;
@@ -169,7 +169,7 @@ impl TechEffectRef {
     /// Returns an error if reading from `input` fails.
     pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
         Ok(Self {
-            effect_type: input.read_u16::<LE>()?,
+            effect_kind: input.read_u16::<LE>()?,
             amount: input.read_u16::<LE>()?,
             enabled: input.read_u8()? != 0,
         })
@@ -181,7 +181,7 @@ impl TechEffectRef {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to<W: Write>(self, output: &mut W) -> Result<()> {
-        output.write_u16::<LE>(self.effect_type)?;
+        output.write_u16::<LE>(self.effect_kind)?;
         output.write_u16::<LE>(self.amount)?;
         output.write_u8(u8::from(self.enabled))?;
         Ok(())
@@ -210,7 +210,7 @@ impl Tech {
         }
         for _ in 0..3 {
             let effect = TechEffectRef::read_from(&mut input)?;
-            if effect.effect_type != 0xFFFF {
+            if effect.effect_kind != 0xFFFF {
                 tech.effects.push(effect);
             }
         }
@@ -222,7 +222,7 @@ impl Tech {
         tech.language_dll_description = read_opt_u16(&mut input)?;
         tech.time = input.read_u16::<LE>()?;
         tech.time2 = input.read_u16::<LE>()?;
-        tech.type_ = input.read_u16::<LE>()?;
+        tech.kind = input.read_u16::<LE>()?;
         tech.icon_id = read_opt_u16(&mut input)?;
         tech.button_id = input.read_u8()?;
         tech.language_dll_help = read_opt_u32(&mut input)?;
@@ -257,7 +257,7 @@ impl Tech {
         output.write_u16::<LE>(dll_id_u16(self.language_dll_description.as_ref())?)?;
         output.write_u16::<LE>(self.time)?;
         output.write_u16::<LE>(self.time2)?;
-        output.write_u16::<LE>(self.type_)?;
+        output.write_u16::<LE>(self.kind)?;
         output.write_u16::<LE>(self.icon_id.map_into().unwrap_or(0xFFFF))?;
         output.write_u8(self.button_id)?;
         output.write_u32::<LE>(match self.language_dll_help {
@@ -288,7 +288,7 @@ impl Tech {
             match self.effects.get(i) {
                 Some(effect) => effect.write_to(&mut output)?,
                 None => TechEffectRef {
-                    effect_type: 0xFFFF,
+                    effect_kind: 0xFFFF,
                     amount: 0,
                     enabled: false,
                 }

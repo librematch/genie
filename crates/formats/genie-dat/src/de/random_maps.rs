@@ -119,7 +119,7 @@ pub struct MapLand {
     /// Zone the land belongs to; lands of one zone may touch.
     pub zone: u8,
     /// How the land is placed; its values are not known yet.
-    pub placement_type: u8,
+    pub placement_kind: u8,
     /// Padding; kept to write the file back.
     pub padding1: i16,
     /// Fixed x position of the base.

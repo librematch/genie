@@ -349,7 +349,7 @@ impl World {
             let kind = master.kind;
             let unrecorded = match attribute {
                 // a char compare of the new type with the object's master's
-                MasterAttribute::OBSTRUCTION_TYPE => {
+                MasterAttribute::OBSTRUCTION_KIND => {
                     ObstructionKind::from(cvttss2si(v) as u8) != master.obstruction_kind
                 }
                 MasterAttribute::SIZE_Z => true,
@@ -386,7 +386,7 @@ impl World {
                         self.give_record(id, &master);
                     }
                 }
-                MasterAttribute::OBSTRUCTION_TYPE => self.give_record(id, &master),
+                MasterAttribute::OBSTRUCTION_KIND => self.give_record(id, &master),
                 _ => {
                     if self.object(id).is_some_and(|(_, u)| u.group.id.is_some()) {
                         return Err(GenieError::unsupported(
@@ -530,7 +530,7 @@ impl World {
                     | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
                         c.build_time = master.creatable_part().build_time;
                     }
-                    MasterAttribute::OBSTRUCTION_TYPE | MasterAttribute::BLOCKAGE_CLASS => {
+                    MasterAttribute::OBSTRUCTION_KIND | MasterAttribute::BLOCKAGE_CLASS => {
                         c.record = Obstruction {
                             kind: master.obstruction_kind,
                             class: master.obstruction_class,

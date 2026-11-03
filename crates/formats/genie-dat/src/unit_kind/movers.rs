@@ -5,17 +5,17 @@ use crate::sound::SoundId;
 use crate::sprite::SpriteId;
 use crate::task::TaskList;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{UnitTypeId, read_opt_u16};
+use genie_support::{UnitKindId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// The attribute of animated unit types.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct AnimatedUnitTypeAttributes {
+pub struct AnimatedUnitKindAttributes {
     /// Movement speed.
     pub speed: f32,
 }
 
-impl AnimatedUnitTypeAttributes {
+impl AnimatedUnitKindAttributes {
     /// Read the animated attributes from an input stream.
     ///
     /// # Errors
@@ -40,7 +40,7 @@ impl AnimatedUnitTypeAttributes {
 
 /// The attributes of moving unit types.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct MovingUnitTypeAttributes {
+pub struct MovingUnitKindAttributes {
     /// Sprite shown while walking, or `None`.
     pub move_sprite: Option<SpriteId>,
     /// Sprite shown while running, or `None`.
@@ -51,7 +51,7 @@ pub struct MovingUnitTypeAttributes {
     pub size_class: u8,
     /// Unit type left behind as a trail while moving (e.g. footprints; genieutils' `TrackingUnit`),
     /// or `None`.
-    pub trailing_unit: Option<UnitTypeId>,
+    pub trailing_unit: Option<UnitKindId>,
     /// When the trailing unit is left (genieutils' `TrackingUnitMode`).
     pub trailing_options: u8,
     /// Spacing of the trailing units (genieutils' `TrackingUnitDensity`).
@@ -70,7 +70,7 @@ pub struct MovingUnitTypeAttributes {
     pub maximum_yaw_per_second_stationary: f32,
 }
 
-impl MovingUnitTypeAttributes {
+impl MovingUnitKindAttributes {
     /// Read the moving attributes from an input stream.
     ///
     /// # Errors
@@ -121,7 +121,7 @@ impl MovingUnitTypeAttributes {
 
 /// The attributes of unit types that can be given tasks.
 #[derive(Debug, Default, Clone)]
-pub struct ActionUnitTypeAttributes {
+pub struct ActionUnitKindAttributes {
     /// Index of the task the unit does by default, or `None`.
     pub default_task: Option<u16>,
     /// How far the unit searches for targets.
@@ -129,9 +129,9 @@ pub struct ActionUnitTypeAttributes {
     /// Base rate of the unit's work (gathering, building, …).
     pub work_rate: f32,
     /// Unit type at which the unit drops off resources, or `None`.
-    pub drop_site: Option<UnitTypeId>,
+    pub drop_site: Option<UnitKindId>,
     /// A second drop site, or `None`.
-    pub backup_drop_site: Option<UnitTypeId>,
+    pub backup_drop_site: Option<UnitKindId>,
     /// Task swap group (genieutils' `TaskSwapGroup`): units of one group turn into each other with
     /// the task, like the kinds of villager.
     pub task_by_group: u8,
@@ -140,13 +140,13 @@ pub struct ActionUnitTypeAttributes {
     /// Sound played when the unit is ordered to move, or `None`.
     pub move_sound: Option<SoundId>,
     /// Task list for older versions; newer game versions store the task list at the root of the
-    /// dat file, and use `unit_type.copy_id` to refer to one of those task lists.
+    /// dat file, and use `unit_kind.copy_id` to refer to one of those task lists.
     pub tasks: Option<TaskList>,
     /// genieutils' `RunPattern`; its use is not known yet.
     pub run_pattern: u8,
 }
 
-impl ActionUnitTypeAttributes {
+impl ActionUnitKindAttributes {
     /// Read the action attributes from an input stream.
     ///
     /// # Errors

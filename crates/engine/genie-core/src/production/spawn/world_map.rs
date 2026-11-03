@@ -136,7 +136,7 @@ impl PlaceMap for WorldMap<'_> {
                     holds: Amount::ZERO < unit.life.amount
                         && unit
                             .life
-                            .attribute_type
+                            .attribute_kind
                             .is_some_and(|k| k.is_resource() || k.is_food_load()),
                     hp: unit.life.hp,
                     outline: master.outline.with_height(master.outline_height.get()),

@@ -186,7 +186,7 @@ impl HuntAction {
         self.state = HuntState::Face;
         self.timer = Seconds::ZERO;
         let carrying = self.task.resource.is_some()
-            && unit.life.attribute_type == self.task.resource
+            && unit.life.attribute_kind == self.task.resource
             && 1 <= unit.life.amount.get() as i32;
         let g = match (carrying, r.sprites.carrying) {
             (true, Some(g)) => Some(g),
@@ -217,14 +217,14 @@ impl HuntAction {
     ) {
         self.state = HuntState::Gather;
         let kind = self.task.resource;
-        let keeps = both_food(kind, unit.life.attribute_type);
-        if unit.life.attribute_type != kind {
+        let keeps = both_food(kind, unit.life.attribute_kind);
+        if unit.life.attribute_kind != kind {
             unit.life.amount = if keeps {
                 unit.life.amount
             } else {
                 Amount::ZERO
             };
-            unit.life.attribute_type = kind;
+            unit.life.attribute_kind = kind;
         }
         if let Some(g) = r.sprites.working.or(r.sprites.standing) {
             new_sprite(
@@ -285,7 +285,7 @@ impl HuntAction {
             .of_class(victim.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
             && roles
-                .of_some_attribute(unit.life.attribute_type)
+                .of_some_attribute(unit.life.attribute_kind)
                 .contains(AttributeRoles::GOLD)
             && roles
                 .of_some_attribute(self.task.resource)

@@ -84,10 +84,10 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
 /// A negative action type, or an attribute below −1.
 fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
     let [
-        attribute_type,
-        attribute_type2,
-        attribute_type3,
-        attribute_type4,
+        attribute_kind,
+        attribute_kind2,
+        attribute_kind3,
+        attribute_kind4,
     ] = attributes([
         t.resource_in,
         t.resource_multiplier,
@@ -96,23 +96,23 @@ fn dat_task(t: &Task, sounds: &[Sound]) -> Result<work::Task, GenieError> {
     ])?;
     Ok(work::Task {
         id: TaskId::of_task(t.id),
-        action_kind: ActionKind::try_from(t.action_type)?,
+        action_kind: ActionKind::try_from(t.action_kind)?,
         object_group: ClassId::of_field(t.class_id)?,
         object_id: MasterId::of_data(t.unit_id),
         combat_level: t.enable_targeting,
         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
         terrain: TaskTerrain::of_data(t.terrain_id),
-        owner_type: TargetOwner::of_data(t.target_diplomacy),
+        owner_kind: TargetOwner::of_data(t.target_diplomacy),
         holding_attr: t.carry_check,
-        attribute_type,
-        attribute_type2,
-        attribute_type3,
-        attribute_type4,
+        attribute_kind,
+        attribute_kind2,
+        attribute_kind3,
+        attribute_kind4,
         wait_time: Seconds::new(t.search_wait_time),
         work_val1: work::WorkValue::new(t.work_value1),
         work_val2: work::WorkValue::new(t.work_value2),
         work_range: Distance::new(t.work_range),
-        work_flag: t.gather_type,
+        work_flag: t.gather_kind,
         enablement: t.enabled.map(AttributeId::of_field).transpose()?.flatten(),
         sprites: TaskSprites::of_data([
             t.moving_graphic_id,
@@ -157,14 +157,14 @@ pub(super) fn dat_work(
 ) -> Result<work::Master, GenieError> {
     Ok(work::Master {
         id,
-        kind: MasterKind::of_data(unit.unit_type),
+        kind: MasterKind::of_data(unit.unit_kind),
         copy_id: MasterId::of_data(unit.copy_id),
         base_id: MasterId::of_data(base_id(unit.base_id)),
         class: ClassId::of_master(unit.class),
         terrain_restriction: RestrictionId::of_field(unit.terrain_restriction)?,
         radius: Radii::from(unit.collision_size).ground(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
-        obstruction_kind: ObstructionKind::from(unit.obstruction_type),
+        obstruction_kind: ObstructionKind::from(unit.obstruction_kind),
         buildable_on: BuildableOn::of_data(unit.can_be_built_on),
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,
@@ -182,7 +182,7 @@ pub(super) fn dat_work(
             stack_unit: MasterId::of_data(b.stack_unit_id),
             foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
             tech: TechId::of_data(b.tech_id),
-            garrison_type: GarrisonKinds::from_bits_retain(b.garrison_type),
+            garrison_kind: GarrisonKinds::from_bits_retain(b.garrison_kind),
             garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
             garrison_repair_rate: HitPoints::new(b.garrison_repair_rate),
             annexes: b.annexes.map(|a| MasterId::of_data(a.unit_id)),
@@ -245,7 +245,7 @@ const fn dat_moving(d: &DeadFish) -> work::MovingPart {
 /// `Projectile`): its projectile type, smart, hit and vanish modes and its arc.
 const fn dat_missile(p: &Projectile) -> work::MissilePart {
     work::MissilePart {
-        projectile_kind: ProjectileKind::of_data(p.projectile_type),
+        projectile_kind: ProjectileKind::of_data(p.projectile_kind),
         smart_mode: SmartMode::from_bits_retain(p.smart_mode),
         hit_mode: HitMode::of_data(p.hit_mode),
         vanish_mode: VanishMode::from_bits_retain(p.vanish_mode),
@@ -422,7 +422,7 @@ mod tests {
     /// The action layer holds the type-40 section's values: the search radius and the run
     /// pattern as well, which the save holds too; a drop site of −1 is none.
     #[test]
-    fn the_action_layer_holds_the_type_40_sections_values() {
+    fn the_action_layer_holds_the_kind_40_sections_values() {
         let part = dat_action(&bird(), &[]).unwrap();
         assert_eq!(part.default_task, TaskIndex::of_data(1));
         assert_eq!(part.task_by_group, TaskGroup::of_data(1));
@@ -460,7 +460,7 @@ mod tests {
     /// The moving layer holds the type-30 section's sprites, turn speed and trail; a running
     /// sprite of −1 is none.
     #[test]
-    fn the_moving_layer_holds_the_type_30_sections_values() {
+    fn the_moving_layer_holds_the_kind_30_sections_values() {
         let part = dat_moving(&dead_fish());
         assert_eq!(part.move_sprite, SpriteId::of_data(640));
         assert_eq!(part.run_sprite, None);
@@ -479,7 +479,7 @@ mod tests {
     #[test]
     fn the_missile_layer_holds_the_projectile_sections_values() {
         let part = dat_missile(&Projectile {
-            projectile_type: 1,
+            projectile_kind: 1,
             smart_mode: 1,
             hit_mode: 2,
             vanish_mode: 1,

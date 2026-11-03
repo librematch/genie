@@ -67,7 +67,7 @@ impl World {
         let target = quarry.id;
         let engagement = self.engagement(player, idx, target)?;
         let arms = self.arms(player, idx, &task)?;
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -87,7 +87,7 @@ impl World {
                 task,
                 target: quarry,
                 player,
-                player_type,
+                player_kind,
                 carry_rule,
                 held: &mut held,
                 walks,
@@ -103,7 +103,7 @@ impl World {
             &self.model.tuning.hunt,
         )?;
         Held {
-            kind: unit.life.attribute_type,
+            kind: unit.life.attribute_kind,
             amount: unit.life.amount,
         } = held;
         // an Attack whose MoveTo started arrived: the unit shows the idle sprite (slot 0x68) and

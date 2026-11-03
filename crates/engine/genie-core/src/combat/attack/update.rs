@@ -91,7 +91,7 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
-            waits: !r.player_type.is_computer()
+            waits: !r.player_kind.is_computer()
                 && roles.of_class(master_class).contains(ClassRoles::VILLAGER),
             stance: r.stance,
         };
@@ -539,7 +539,7 @@ impl Attack {
         if matches!(self.state, AttackState::GotoSeen { .. })
             && f.own.player != PlayerId::new(0)
             && c.w.model.tuning.attack.seen_range <= self.range.get()
-            && !r.player_type.is_computer()
+            && !r.player_kind.is_computer()
         {
             self.enter(
                 AttackState::GotoPoint { move_to: None },

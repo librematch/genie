@@ -2,7 +2,7 @@
 
 use crate::GameVersion;
 use crate::conv::{fits, invalid_data};
-use crate::unit_type::{UnitType, UnitTypeId};
+use crate::unit_kind::{UnitKind, UnitKindId};
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
@@ -64,7 +64,7 @@ pub struct Civilization {
     civ_effect: u16,
     bonus_effect: Option<u16>,
     culture: u8,
-    unit_types: Vec<Option<UnitType>>,
+    unit_kinds: Vec<Option<UnitKind>>,
 }
 
 impl Civilization {
@@ -99,21 +99,21 @@ impl Civilization {
 
         civ.culture = input.read_u8()?;
 
-        let num_unit_types = input.read_u16::<LE>()?;
-        let have_unit_types = {
+        let num_unit_kinds = input.read_u16::<LE>()?;
+        let have_unit_kinds = {
             let mut list = vec![];
-            for _ in 0..num_unit_types {
+            for _ in 0..num_unit_kinds {
                 list.push(input.read_u32::<LE>()? != 0);
             }
             list
         };
-        for do_read in have_unit_types {
+        for do_read in have_unit_kinds {
             if !do_read {
-                civ.unit_types.push(None);
+                civ.unit_kinds.push(None);
                 continue;
             }
-            civ.unit_types
-                .push(Some(UnitType::read_from(&mut input, version.as_f32())?));
+            civ.unit_kinds
+                .push(Some(UnitKind::read_from(&mut input, version.as_f32())?));
         }
 
         Ok(civ)
@@ -138,23 +138,23 @@ impl Civilization {
         }
         output.write_u8(self.culture)?;
 
-        output.write_u16::<LE>(fits(self.unit_types.len())?)?;
-        for opt in &self.unit_types {
+        output.write_u16::<LE>(fits(self.unit_kinds.len())?)?;
+        for opt in &self.unit_kinds {
             output.write_u32::<LE>(match opt {
                 Some(_) => 1,
                 None => 0,
             })?;
         }
-        for unit_type in self.unit_types.iter().flatten() {
-            unit_type.write_to(&mut output, version.as_f32())?;
+        for unit_kind in self.unit_kinds.iter().flatten() {
+            unit_kind.write_to(&mut output, version.as_f32())?;
         }
         Ok(())
     }
 
     /// Get a unit type by its ID.
-    pub fn get_unit_type(&self, id: impl Into<UnitTypeId>) -> Option<&UnitType> {
-        let id: UnitTypeId = id.into();
-        self.unit_types
+    pub fn get_unit_kind(&self, id: impl Into<UnitKindId>) -> Option<&UnitKind> {
+        let id: UnitKindId = id.into();
+        self.unit_kinds
             .get(usize::from(id))
             .and_then(Option::as_ref)
     }

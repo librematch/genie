@@ -693,13 +693,13 @@ pub struct AttributeSlots {
     /// The town centres a player may have (`FUN_141625a20`).
     pub town_centre_limit: AttributeId,
     /// A villager's death by a player of type 2.
-    pub villager_killed_by_type_2: AttributeId,
+    pub villager_killed_by_kind_2: AttributeId,
     /// A villager's death by a hunted animal (a prey or predator attacker).
     pub villager_killed_by_animal: AttributeId,
     /// A villager's death by a player of type 3.
-    pub villager_killed_by_type_3: AttributeId,
+    pub villager_killed_by_kind_3: AttributeId,
     /// A villager's death by a player of type 1.
-    pub villager_killed_by_type_1: AttributeId,
+    pub villager_killed_by_kind_1: AttributeId,
     /// The first of the trickles a minute of food, wood, stone and gold (230 to 233).
     pub trickles: AttributeId,
     /// The paid cost of the units a player makes while the telemetry's match runs (`FUN_140982ff0()`'s `+0x921`): a new unit's combat setup adds it beside 98 and 164.

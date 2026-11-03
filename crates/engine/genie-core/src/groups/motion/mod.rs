@@ -17,7 +17,7 @@ use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
@@ -70,7 +70,7 @@ pub(crate) struct Lead {
     pub(crate) ignore_units: Vec<ObjectId>,
     /// Its owner's index and type (`FUN_141659cf0` tests it for a computer player).
     pub(crate) player: PlayerId,
-    pub(crate) player_type: PlayerType,
+    pub(crate) player_kind: PlayerKind,
     /// Its group (`+0x6d0`), when the world holds it.
     pub(crate) group: Option<LeadGroup>,
 }
@@ -111,7 +111,7 @@ impl World {
 /// None for a member the world does not hold.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct GroupView {
-    pub(crate) player_type: PlayerType,
+    pub(crate) player_kind: PlayerKind,
     pub(crate) members: Vec<Option<(Option<ObjectId>, BVector)>>,
 }
 
@@ -271,10 +271,10 @@ impl World {
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
             player: p,
-            player_type: self
+            player_kind: self
                 .players
                 .get(p.index())
-                .map_or(PlayerType::PHANTOM, |q| q.kind),
+                .map_or(PlayerKind::PHANTOM, |q| q.kind),
             group,
         })
     }

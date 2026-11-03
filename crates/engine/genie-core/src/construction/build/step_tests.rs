@@ -117,7 +117,7 @@ const fn placed(at: Position, r: f32, class: ClassId, master: MasterId) -> Place
         class,
         player: PlayerId::new(1),
         master,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -135,7 +135,7 @@ const fn construction(progress: f32, builders: u8, desolid: bool) -> Constructio
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -174,7 +174,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
                 state: ObjectState::Alive,
                 hp: HitPoints::new(25.0),
                 master_id: ids::VILLAGER_MALE,
-                attribute_type: None,
+                attribute_kind: None,
                 ..Lifecycle::default()
             },
             sprite: Some(ActiveSprite::start(
@@ -233,7 +233,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
     .with_ais([(
         BUILDER,
         UnitAi {
-            ai_type: CIVILIAN,
+            ai_kind: CIVILIAN,
             current_target: None,
             last_target: None,
             ..UnitAi::default()
@@ -447,7 +447,7 @@ fn builder_on_an_annex_counts_among_its_main_building_builders() {
         None,
         None,
         Some(&mut main.builders),
-        PlayerType::HUMAN,
+        PlayerKind::HUMAN,
     )
     .unwrap();
     assert_eq!(
@@ -468,7 +468,7 @@ fn builder_drops_its_load_at_drop_site_it_completes() {
         };
         let mut t = site_world(class::VILLAGER, Position::new(12.0, 10.5, 0.0), b);
         let v = own(&mut t, BUILDER);
-        (v.life.attribute_type, v.life.amount) = (held.kind, held.amount);
+        (v.life.attribute_kind, v.life.amount) = (held.kind, held.amount);
         own(&mut t, HOUSE).life.master_id = site;
         let state = on_build(&mut t, |b, c, u, reads| {
             b.finish(c, u, reads)?;
@@ -989,7 +989,7 @@ fn stump(t: &mut World) {
         Placed {
             player: PlayerId::new(0),
             obstruction: Some(Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::NONE,
             }),
             ..placed(
@@ -1054,8 +1054,8 @@ fn builder_set_state_7_clears_stump_and_joins() {
 #[test]
 fn another_player_marks_on_the_footprint_halt_the_build() {
     for (kind, kept) in [
-        (PlayerType::HUMAN, ObjectState::Removed),
-        (PlayerType::COMPUTER, ObjectState::Foundation),
+        (PlayerKind::HUMAN, ObjectState::Removed),
+        (PlayerKind::COMPUTER, ObjectState::Foundation),
     ] {
         let mut t = site_world(class::VILLAGER, Position::new(12.5, 10.5, 0.0), placing());
         t.players[1].kind = kind;
@@ -1151,7 +1151,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     });
     layer.stack_made = Some(object_id(10031));
     let v = own(&mut t, BUILDER);
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(7.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(7.0));
     let ai = t.parts.unit_ai.get_mut(BUILDER).unwrap();
     (ai.current_order, ai.current_action) = (Some(OrderKind::Build), Some(AiAction::Build));
     assert_eq!(code(&mut t, 20), HeadCode::Deletes);
@@ -1169,7 +1169,7 @@ fn human_builder_of_built_pasture_hands_it_over() {
     assert_eq!((ai.current_order, ai.current_action), (None, None));
     assert_eq!((house(&t).0, house(&t).1), (0, 0));
     assert_eq!(t.players[1].attributes[0], Amount::new(7.0));
-    assert_eq!(builder(&t).life.attribute_type, None);
+    assert_eq!(builder(&t).life.attribute_kind, None);
     assert!(stands(&t));
 }
 
@@ -1368,7 +1368,7 @@ fn with_mill(t: &mut World) {
             state: None,
             attribute: Some(attribute::WOOD),
         }],
-        resource_types: vec![attribute::WOOD],
+        resource_kinds: vec![attribute::WOOD],
         ..DropSite::default()
     }]);
 }
@@ -1517,7 +1517,7 @@ fn drop_world(at: Position, b: BuildAction) -> World {
     let mut t = site_world(class::VILLAGER, at, b);
     with_mill(&mut t);
     let v = own(&mut t, BUILDER);
-    (v.life.attribute_type, v.life.amount) = (Some(attribute::WOOD), Amount::new(10.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(attribute::WOOD), Amount::new(10.0));
     t
 }
 

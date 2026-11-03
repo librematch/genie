@@ -24,7 +24,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::unit::{Unit, object_master};
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitStance;
@@ -441,8 +441,8 @@ pub struct Seeker {
     pub order: Option<OrderKind>,
     /// The unit AI's target point (`+0x50`, `+0x54`; x is −1 without one).
     pub target_point: Point,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
 }
 
 /// `FUN_140c4bd40`, the unit AI's slot 0x90 (`closestUndiscoveredTile`, "the closest
@@ -461,7 +461,7 @@ pub fn closest_undiscovered(
     map: GridSize,
     ai: &mut Well512,
 ) -> Result<Option<Tile>, GenieError> {
-    if seeker.player_type.is_computer() {
+    if seeker.player_kind.is_computer() {
         return Ok(None);
     }
     let (ux, uy) = (seeker.at.x(), seeker.at.y());
@@ -1063,7 +1063,7 @@ mod tests {
             line_of_sight: Distance::new(4.0),
             order: None,
             target_point: Point::new(NO_POINT, NO_POINT),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
         };
         let seeded = || {
             let mut r = Well512::default();
@@ -1090,7 +1090,7 @@ mod tests {
         );
         // a computer player's unit searches nothing
         let computer = Seeker {
-            player_type: PlayerType::COMPUTER,
+            player_kind: PlayerKind::COMPUTER,
             ..seeker
         };
         let mut untouched = seeded();

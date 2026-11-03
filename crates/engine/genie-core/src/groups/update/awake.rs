@@ -94,7 +94,7 @@ impl World {
             self.groups.held_mut(group)?.flags &= !GroupFlags::PLACE_AGAIN;
         }
         let g = self.groups.held_mut(group)?;
-        g.unit_types.retain(|s| !s.units.is_empty());
+        g.unit_kinds.retain(|s| !s.units.is_empty());
         let budget = !g.flags.contains(GroupFlags::TURN);
         let forward = g.motion.position[1];
         self.motion_update(group, budget)?;
@@ -427,7 +427,7 @@ impl World {
             if g.current_command == ATTACK
                 && g.current_formation
                     .as_ref()
-                    .is_some_and(|f| f.kind == FormationKind::TYPE_6)
+                    .is_some_and(|f| f.kind == FormationKind::KIND_6)
             {
                 refill = true;
             } else if at_most_or_unordered(

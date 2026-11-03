@@ -60,7 +60,7 @@ mod tests {
     /// A task's action type is its command's value; none is −1, a move 1, a follow 2, and a
     /// zeroed command 0.
     #[test]
-    fn task_command_is_its_action_type() {
+    fn task_command_is_its_action_kind() {
         assert_eq!(
             GroupCommandKind::of_action(ActionKind::named(0x84)),
             GroupCommandKind::named(0x84)

@@ -103,7 +103,7 @@ mod tests {
     use crate::objects::ObjectId;
     use crate::players::PlayerId;
     #[cfg(test)]
-    use crate::players::PlayerType;
+    use crate::players::PlayerKind;
     use crate::test_ids::master_id;
     use crate::test_ids::object_ids;
     use crate::test_ids::player_id;
@@ -126,9 +126,9 @@ mod tests {
             PlayerId::new(1),
             vec![Millis::ZERO; 3],
             vec![
-                player(PlayerType::default()),
-                player(PlayerType::HUMAN),
-                player(PlayerType::COMPUTER),
+                player(PlayerKind::default()),
+                player(PlayerKind::HUMAN),
+                player(PlayerKind::COMPUTER),
             ],
         )
     }

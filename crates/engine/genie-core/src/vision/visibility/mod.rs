@@ -36,7 +36,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::registry::Registry;
@@ -242,7 +242,7 @@ pub struct Visibility {
     pub extents_capacity: i32,
     /// Each player's type: a computer player's (type 3) map tells its AI of a newly explored
     /// tile (its slot 0x88, [`crate::players::ai_module`]).
-    pub player_types: Vec<PlayerType>,
+    pub player_kinds: Vec<PlayerKind>,
     /// The tiles a computer player's map explored that its AI module has not heard of yet, in
     /// order ([`Visibility::take_ai_tiles`]).
     ai_tiles: Vec<(PlayerId, Tile)>,
@@ -313,7 +313,7 @@ impl Visibility {
         unified: Vec<VisionBits>,
         extents: Vec<Extent>,
         extents_capacity: i32,
-        player_types: Vec<PlayerType>,
+        player_kinds: Vec<PlayerKind>,
     ) -> Self {
         let n = (size.width().max(0) * size.height().max(0)) as usize;
         let players = maps.len();
@@ -324,7 +324,7 @@ impl Visibility {
             links: vec![(0, 0); n],
             extents,
             extents_capacity,
-            player_types,
+            player_kinds,
             ai_tiles: Vec::new(),
             seers: IdTable::new(),
             registry: None,

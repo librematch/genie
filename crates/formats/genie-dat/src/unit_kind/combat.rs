@@ -3,14 +3,14 @@
 use crate::conv::fits;
 use crate::sprite::SpriteId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{MapInto, UnitTypeId, read_opt_u16};
+use genie_support::{MapInto, UnitKindId, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// One attack or armour value: a class and the amount for it.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WeaponInfo {
     /// The attack or armour class.
-    pub weapon_type: i16,
+    pub weapon_kind: i16,
     /// The amount for that class.
     pub value: i16,
 }
@@ -23,7 +23,7 @@ impl WeaponInfo {
     /// Returns an error if reading from `input` fails.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         Ok(Self {
-            weapon_type: input.read_i16::<LE>()?,
+            weapon_kind: input.read_i16::<LE>()?,
             value: input.read_i16::<LE>()?,
         })
     }
@@ -34,7 +34,7 @@ impl WeaponInfo {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to(self, mut output: impl Write) -> Result<()> {
-        output.write_i16::<LE>(self.weapon_type)?;
+        output.write_i16::<LE>(self.weapon_kind)?;
         output.write_i16::<LE>(self.value)?;
         Ok(())
     }
@@ -42,7 +42,7 @@ impl WeaponInfo {
 
 /// The attributes of unit types that fight.
 #[derive(Debug, Default, Clone)]
-pub struct BaseCombatUnitTypeAttributes {
+pub struct BaseCombatUnitKindAttributes {
     /// Base armour; stored as a u8 before data version 11.52.
     pub base_armor: u16,
     /// Attack values, one per class.
@@ -59,7 +59,7 @@ pub struct BaseCombatUnitTypeAttributes {
     /// Time between attacks (reload time).
     pub attack_speed: f32,
     /// Projectile unit type fired, or `None`.
-    pub missile_id: Option<UnitTypeId>,
+    pub missile_id: Option<UnitKindId>,
     /// Chance to hit, in percent (genieutils' `AccuracyPercent`).
     pub base_hit_chance: i16,
     /// genieutils' `BreakOffCombat`; its use is not known yet.
@@ -86,7 +86,7 @@ pub struct BaseCombatUnitTypeAttributes {
     pub displayed_reload_time: f32,
 }
 
-impl BaseCombatUnitTypeAttributes {
+impl BaseCombatUnitKindAttributes {
     /// Read the combat attributes from an input stream.
     ///
     /// # Errors
@@ -187,11 +187,11 @@ impl BaseCombatUnitTypeAttributes {
 
 /// The attributes of projectiles.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct MissileUnitTypeAttributes {
+pub struct MissileUnitKindAttributes {
     /// Projectile type (genieutils' `ProjectileType`).
-    pub missile_type: u8,
+    pub missile_kind: u8,
     /// Whether the projectile aims ahead of moving targets (genieutils' `SmartMode`).
-    pub targetting_type: u8,
+    pub targetting_kind: u8,
     /// What the projectile hits (genieutils' `HitMode`).
     pub missile_hit_info: u8,
     /// Whether the projectile vanishes when it hits (genieutils' `VanishMode`).
@@ -202,7 +202,7 @@ pub struct MissileUnitTypeAttributes {
     pub ballistics_ratio: f32,
 }
 
-impl MissileUnitTypeAttributes {
+impl MissileUnitKindAttributes {
     /// Read this unit type from an input stream.
     ///
     /// # Errors
@@ -210,8 +210,8 @@ impl MissileUnitTypeAttributes {
     /// Returns an error if reading from `input` fails.
     pub fn read_from(mut input: impl Read, _version: f32) -> Result<Self> {
         Ok(Self {
-            missile_type: input.read_u8()?,
-            targetting_type: input.read_u8()?,
+            missile_kind: input.read_u8()?,
+            targetting_kind: input.read_u8()?,
             missile_hit_info: input.read_u8()?,
             missile_die_info: input.read_u8()?,
             area_effect_specials: input.read_u8()?,
@@ -225,8 +225,8 @@ impl MissileUnitTypeAttributes {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to(&self, mut output: impl Write, _version: f32) -> Result<()> {
-        output.write_u8(self.missile_type)?;
-        output.write_u8(self.targetting_type)?;
+        output.write_u8(self.missile_kind)?;
+        output.write_u8(self.targetting_kind)?;
         output.write_u8(self.missile_hit_info)?;
         output.write_u8(self.missile_die_info)?;
         output.write_u8(self.area_effect_specials)?;

@@ -29,7 +29,7 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
-use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{AiMove, Issuer, Notify, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -117,8 +117,8 @@ impl World {
             let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
                 return Ok(());
             };
-            let (target_type, target_owner) = target.map_or((None, None), |(m, o)| {
-                (Some(OrderTargetType::of_master(m)), Some(o))
+            let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
+                (Some(OrderTargetKind::of_master(m)), Some(o))
             });
             let queued = QueuedOrder {
                 issuer: Some(Issuer::Player(issuer)),
@@ -130,7 +130,7 @@ impl World {
                 range: Distance::ZERO,
                 shown: order.point,
                 ready: order.direct,
-                target_type,
+                target_kind,
             };
             let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
             if !order.queued && !order.direct {

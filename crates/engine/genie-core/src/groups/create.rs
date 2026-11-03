@@ -8,10 +8,10 @@ use crate::groups::GroupId;
 use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
-use crate::groups::UnitType;
+use crate::groups::UnitKind;
 use crate::groups::WorldObject;
 use crate::groups::group_list::member_gone;
-use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
+use crate::groups::{Member, SpecificMove, UnitGroup, UnitKindStatistic};
 use crate::map::Distance;
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
@@ -111,34 +111,34 @@ impl UnitGroup {
 
     /// `FUN_141008d90` on the statistic of sub-formation `sub` (a new one at the list's end when
     /// none has it, `FUN_1410083c0`): the unit joins its units, the statistic's spacing is the
-    /// widest member's two radii, and its unit types are counted again ([`count_unit_types`]).
+    /// widest member's two radii, and its unit types are counted again ([`count_unit_kinds`]).
     fn join_statistic(
         &mut self,
         sub: FormationCategory,
         id: ObjectId,
         unit: FormationUnit,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-        scratch: &mut Vec<UnitType>,
+        scratch: &mut Vec<UnitKind>,
         group_tuning: &GroupTuning,
     ) -> Result<(), GenieError> {
         let at = self
-            .unit_types
+            .unit_kinds
             .iter()
             .position(|s| s.formation_category == sub)
             .unwrap_or_else(|| {
-                self.unit_types.push(UnitTypeStatistic {
+                self.unit_kinds.push(UnitKindStatistic {
                     formation_category: sub,
-                    ..UnitTypeStatistic::default()
+                    ..UnitKindStatistic::default()
                 });
-                self.unit_types.len() - 1
+                self.unit_kinds.len() - 1
             });
-        let stat = self.unit_types.checked_mut(at)?;
+        let stat = self.unit_kinds.checked_mut(at)?;
         let spacing = unit.radius * group_tuning.spacing_factor;
         if stat.desired_spacing < spacing {
             stat.desired_spacing = spacing;
         }
         stat.units.push(id);
-        count_unit_types(stat, masters_of, scratch);
+        count_unit_kinds(stat, masters_of, scratch);
         Ok(())
     }
 }
@@ -148,30 +148,30 @@ impl UnitGroup {
     /// (None for a unit the world does not hold): it leaves the first statistic of that category
     /// (none for -1), or, for a unit the world does not hold, the first statistic that holds it
     /// (`FUN_14102c320`: its units close up and its unit types are counted again,
-    /// [`count_unit_types`]). False when none held it.
+    /// [`count_unit_kinds`]). False when none held it.
     fn drop_from_statistic(
         &mut self,
         id: ObjectId,
         category: Option<FormationCategory>,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-        scratch: &mut Vec<UnitType>,
+        scratch: &mut Vec<UnitKind>,
     ) -> bool {
-        let leave = |stat: &mut UnitTypeStatistic, scratch: &mut Vec<UnitType>| {
+        let leave = |stat: &mut UnitKindStatistic, scratch: &mut Vec<UnitKind>| {
             let Some(i) = stat.units.iter().position(|&u| u == id) else {
                 return false;
             };
             let _ = stat.units.remove(i);
-            count_unit_types(stat, masters_of, scratch);
+            count_unit_kinds(stat, masters_of, scratch);
             true
         };
         match category {
             Some(FormationCategory::ANY) => false,
             Some(c) => self
-                .unit_types
+                .unit_kinds
                 .iter_mut()
                 .find(|s| s.formation_category == c)
                 .is_some_and(|stat| leave(stat, scratch)),
-            None => self.unit_types.iter_mut().any(|stat| leave(stat, scratch)),
+            None => self.unit_kinds.iter_mut().any(|stat| leave(stat, scratch)),
         }
     }
 }
@@ -272,14 +272,14 @@ impl World {
             .map(|u| (u.id, u.life.master_id))
             .collect();
         let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
-        let mut scratch = take(&mut self.groups.unit_types_scratch);
+        let mut scratch = take(&mut self.groups.unit_kinds_scratch);
         let left = self.groups.held_mut(group)?.drop_from_statistic(
             id,
             category,
             &masters_of,
             &mut scratch,
         );
-        self.groups.unit_types_scratch = scratch;
+        self.groups.unit_kinds_scratch = scratch;
         Ok(left)
     }
 }
@@ -288,19 +288,19 @@ impl World {
 /// its count, counted in the process's scratch arrays (`DAT_143f23b70`, `DAT_143f23c40`: the counts
 /// are cleared first, the types not), whose 50 words each the statistic takes whole. A unit the
 /// world does not hold is passed over; past 51 types the count stops.
-pub(crate) fn count_unit_types(
-    stat: &mut UnitTypeStatistic,
+pub(crate) fn count_unit_kinds(
+    stat: &mut UnitKindStatistic,
     masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
-    scratch: &mut Vec<UnitType>,
+    scratch: &mut Vec<UnitKind>,
 ) {
-    scratch.resize(50, UnitType::CLEARED);
+    scratch.resize(50, UnitKind::CLEARED);
     let mut counts = vec![0u32; 50];
     let mut n = 0usize;
     for &id in &stat.units {
         let Some(master) = masters_of(id) else {
             continue;
         };
-        let master = UnitType::of(master);
+        let master = UnitKind::of(master);
         if let Some(k) = scratch.iter().take(n).position(|&t| t == master) {
             // k < n <= 50, the counts' length
             if let Some(count) = counts.get_mut(k) {
@@ -309,9 +309,9 @@ pub(crate) fn count_unit_types(
             continue;
         }
         if n < 50
-            && let (Some(unit_type), Some(count)) = (scratch.get_mut(n), counts.get_mut(n))
+            && let (Some(unit_kind), Some(count)) = (scratch.get_mut(n), counts.get_mut(n))
         {
-            *unit_type = master;
+            *unit_kind = master;
             *count = 1;
         }
         n += 1;
@@ -319,9 +319,9 @@ pub(crate) fn count_unit_types(
             break;
         }
     }
-    stat.unit_types.clone_from(scratch);
-    stat.unit_type_counts = counts;
-    stat.number_unit_types = n as i32;
+    stat.unit_kinds.clone_from(scratch);
+    stat.unit_kind_counts = counts;
+    stat.number_unit_kinds = n as i32;
 }
 
 impl World {
@@ -399,7 +399,7 @@ impl World {
             .map(|u| (u.id, u.life.master_id))
             .collect();
         let masters_of = |id: ObjectId| masters.iter().find(|(u, _)| *u == id).map(|&(_, m)| m);
-        let mut scratch = take(&mut self.groups.unit_types_scratch);
+        let mut scratch = take(&mut self.groups.unit_kinds_scratch);
         let g = self.groups.held_mut(group)?;
         let seconds = g.next_seconds();
         g.members.push(Member {
@@ -427,7 +427,7 @@ impl World {
         if !g.motion.flags.contains(MotionFlags::NEW) {
             g.flags |= GroupFlags::STATISTICS | GroupFlags::RELAYOUT;
         }
-        self.groups.unit_types_scratch = scratch;
+        self.groups.unit_kinds_scratch = scratch;
         Ok(true)
     }
 }
@@ -438,7 +438,7 @@ mod tests {
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
     use crate::groups::MotionFlags;
-    use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
+    use crate::groups::{Member, UnitGroup, UnitGroups, UnitKindStatistic};
     use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
@@ -546,16 +546,16 @@ mod tests {
             })
             .collect();
         g.spare_seconds = vec![Seconds::MAX];
-        g.unit_types = vec![
-            UnitTypeStatistic {
+        g.unit_kinds = vec![
+            UnitKindStatistic {
                 formation_category: FormationCategory::named(1),
                 units: vec![object_id(10), object_id(11)],
-                ..UnitTypeStatistic::default()
+                ..UnitKindStatistic::default()
             },
-            UnitTypeStatistic {
+            UnitKindStatistic {
                 formation_category: FormationCategory::named(3),
                 units: vec![object_id(12)],
-                ..UnitTypeStatistic::default()
+                ..UnitKindStatistic::default()
             },
         ];
         g.motion.lead = Some(object_id(11));
@@ -614,7 +614,7 @@ mod tests {
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(g.members.last().map(|m| m.id), Some(object_id(13)));
         assert_eq!(
-            g.unit_types[0].units,
+            g.unit_kinds[0].units,
             [object_id(10), object_id(11), object_id(13)]
         );
         // an object the world's table does not hold, or of no sub-formation, joins nothing
@@ -661,16 +661,16 @@ mod tests {
             ];
             *masters = Arc::new(Masters::new(masters.iter().cloned().chain(extra)));
         }
-        t.groups.groups[0].unit_types[0].units.push(object_id(14));
+        t.groups.groups[0].unit_kinds[0].units.push(object_id(14));
         assert!(!t.leave_statistic(group_id(1), object_id(14)).unwrap());
         assert!(!t.leave_statistic(group_id(1), object_id(15)).unwrap());
         assert_eq!(
-            t.groups.get(group_id(1)).unwrap().unit_types[0].units,
+            t.groups.get(group_id(1)).unwrap().unit_kinds[0].units,
             [object_id(10), object_id(11), object_id(14)]
         );
         assert!(t.leave_statistic(group_id(1), object_id(12)).unwrap());
         assert_eq!(
-            t.groups.get(group_id(1)).unwrap().unit_types[1].units,
+            t.groups.get(group_id(1)).unwrap().unit_kinds[1].units,
             Vec::new()
         );
     }
@@ -699,15 +699,15 @@ mod tests {
             ]
         );
         assert_eq!(g.spare_seconds, [Seconds::new(3.0), Seconds::MAX]);
-        assert_eq!(g.unit_types[0].units, [object_id(10)]);
+        assert_eq!(g.unit_kinds[0].units, [object_id(10)]);
         assert_eq!(
             (
-                g.unit_types[0].number_unit_types,
-                g.unit_types[0].unit_type_counts[0]
+                g.unit_kinds[0].number_unit_kinds,
+                g.unit_kinds[0].unit_kind_counts[0]
             ),
             (1, 1)
         );
-        assert_eq!(g.unit_types[1].units, [object_id(12)]);
+        assert_eq!(g.unit_kinds[1].units, [object_id(12)]);
         assert_eq!(
             (
                 g.motion.lead,
@@ -734,13 +734,13 @@ mod tests {
     /// `FUN_14100bcb0`'s closing `CalcFormationType` is gated on [`MotionFlags::NEW`]
     /// (`+0xb8`, `SHR EAX, 1; TEST AL, 1` at 0x14100c657), not the group flags'.
     #[test]
-    fn the_statistics_call_for_the_formation_type_by_the_motion_flags() {
+    fn the_statistics_call_for_the_formation_kind_by_the_motion_flags() {
         let mut t = three();
         for u in &mut t.players[1].objects {
             t.parts.set_unit_ai(
                 u.id,
                 Some(UnitAi {
-                    ai_type: SOLDIER_AI,
+                    ai_kind: SOLDIER_AI,
                     ..UnitAi::default()
                 }),
             );
@@ -778,7 +778,7 @@ mod tests {
                 .unit_ai
                 .get(t.players[1].sleeping[ListIndex::new(0)].id)
                 .unwrap()
-                .formation_type,
+                .formation_kind,
             FormationKind::USER_DEFINED
         );
         assert_eq!(
@@ -786,7 +786,7 @@ mod tests {
                 .unit_ai
                 .get(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
-                .formation_type,
+                .formation_kind,
             FormationKind::USER_DEFINED
         );
     }
@@ -876,7 +876,7 @@ mod tests {
         );
         let g = t.groups.get(group_id(1)).unwrap();
         assert_eq!(
-            (g.unit_types[0].units.len(), g.unit_types[1].units.len()),
+            (g.unit_kinds[0].units.len(), g.unit_kinds[1].units.len()),
             (2, 0)
         );
     }

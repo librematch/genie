@@ -20,7 +20,7 @@ use crate::orders::{
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
-use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::slots::PlayerSlots;
@@ -160,8 +160,8 @@ impl World {
             };
             return self.order_work(player, idx, &work);
         }
-        let (target_type, target_owner) = target.map_or((None, None), |(m, o)| {
-            (Some(OrderTargetType::of_master(m)), Some(o))
+        let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
+            (Some(OrderTargetKind::of_master(m)), Some(o))
         });
         let queued = QueuedOrder {
             issuer: Some(Issuer::Player(issuer)),
@@ -173,7 +173,7 @@ impl World {
             range: Distance::ZERO,
             shown: order.point,
             ready: order.direct,
-            target_type,
+            target_kind,
         };
         let state = unit.life.state;
         let ai = self

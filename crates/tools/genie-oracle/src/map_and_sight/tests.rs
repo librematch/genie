@@ -132,7 +132,7 @@ mod spatial {
         let s = master_static_mut(&mut m);
         (s.radius_x, s.radius_y, s.radius_z) = (radius.x(), radius.y(), radius.z());
         s.los = 4.0;
-        s.obstruction_type = kind;
+        s.obstruction_kind = kind;
         s.obstruction_class = 3;
         s.read_temp_5 = 6;
         m
@@ -181,7 +181,7 @@ mod spatial {
             master(70, Radii::new(1.0, 1.0, 2.0), 5),
         ]);
         objects.masters = masters.masters;
-        objects.doppleganger_objects.object_type_list =
+        objects.doppleganger_objects.object_kind_list =
             object_list(vec![at(combat_object(20, 83), 3.5, 3.5)]);
         human_mut(&mut player).base.unit_diplomacy = vec![0, 1];
         let mut save = header(vec![gaia(Vec::new()), player]);
@@ -207,7 +207,7 @@ mod spatial {
         let obstruction = unit.obstruction.unwrap();
         assert_eq!(
             (obstruction.kind, obstruction.class),
-            (ObstructionKind::TYPE_2, ObstructionClass::BUILDING)
+            (ObstructionKind::KIND_2, ObstructionClass::BUILDING)
         );
         assert_eq!(out.tile_list(Tile::new(1, 1)), [object_id(10)]);
         let seer = out.sight.as_ref().unwrap().seer(object_id(10)).unwrap();

@@ -15,7 +15,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     ARTIFACT_AI, ARTIFACT_IDLE_TIMEOUT, AiMove, BOAR_AI, COMPUTER_SOLDIER_IDLE_TIMEOUT,
@@ -77,17 +77,17 @@ impl UnitAi {
     /// [`TOWER_CARED`]: crate::unit_ai::TOWER_CARED
     #[must_use]
     pub fn constructed(
-        ai_type: UnitAiType,
+        ai_kind: UnitAiKind,
         new: &NewObject,
         ai: &mut Well512,
         roles: &Roles,
     ) -> Option<Self> {
-        if !matches!(ai_type.get(), 2..=0x13) {
+        if !matches!(ai_kind.get(), 2..=0x13) {
             return None;
         }
-        let mut made = Self::base_constructed(ai_type, new.position, ai);
-        match ai_type {
-            UnitAiType::HUNTED => {
+        let mut made = Self::base_constructed(ai_kind, new.position, ai);
+        match ai_kind {
+            UnitAiKind::HUNTED => {
                 made.set_idle_timeout(HUNTED_IDLE_TIMEOUT, ai);
                 made.hunted = Some(Hunted {
                     origin: new.position,
@@ -105,18 +105,18 @@ impl UnitAi {
                     go_home: false,
                 });
             }
-            UnitAiType::LION => {
+            UnitAiKind::LION => {
                 made.stance = UnitStance::AGGRESSIVE;
                 made.set_idle_timeout(LION_IDLE_TIMEOUT, ai);
             }
             // the base's stance 3
-            UnitAiType::RANGED_6 | UnitAiType::RANGED_7 => {}
-            UnitAiType::PRIEST => {
+            UnitAiKind::RANGED_6 | UnitAiKind::RANGED_7 => {}
+            UnitAiKind::PRIEST => {
                 made.stance = UnitStance::DEFENSIVE;
                 made.set_idle_timeout(PRIEST_IDLE_TIMEOUT, ai);
             }
             SOLDIER_AI => {
-                let timeout = if new.player_type.is_computer() {
+                let timeout = if new.player_kind.is_computer() {
                     COMPUTER_SOLDIER_IDLE_TIMEOUT
                 } else {
                     SOLDIER_IDLE_TIMEOUT
@@ -132,11 +132,11 @@ impl UnitAi {
                 made.stance = UnitStance::AGGRESSIVE;
                 made.set_idle_timeout(TOWER_IDLE_TIMEOUT, ai);
             }
-            UnitAiType::SIEGE => {
+            UnitAiKind::SIEGE => {
                 made.stance = siege_stance(new, roles);
                 made.set_idle_timeout(SIEGE_IDLE_TIMEOUT, ai);
             }
-            UnitAiType::LIVESTOCK => made.stance = UnitStance::DEFENSIVE,
+            UnitAiKind::LIVESTOCK => made.stance = UnitStance::DEFENSIVE,
             // 3, 8, 0xa, 0xb, 0xc, 0x11 and 0x12
             _ => made.stance = UnitStance::AGGRESSIVE,
         }
@@ -147,7 +147,7 @@ impl UnitAi {
     /// stance (`+0x1a9`) 3 of the two bytes at `+0x1a8` (0x300) and the state position the
     /// object's place.
     pub(super) fn base_constructed(
-        ai_type: UnitAiType,
+        ai_kind: UnitAiKind,
         position: Position,
         ai: &mut Well512,
     ) -> Self {
@@ -155,7 +155,7 @@ impl UnitAi {
         let adjusted_idle_timeout = adjusted_idle_timeout(IDLE_TIMEOUT, ai);
         let retarget_timer = Millis::new(750 + ai.rand15() % 500);
         Self {
-            ai_type,
+            ai_kind,
             current_order: None,
             order_priority: OrderPriority::NONE,
             current_action: None,
@@ -178,7 +178,7 @@ impl UnitAi {
             retarget_timer,
             stance: UnitStance::NO_ATTACK,
             // the constructor's word at +0x1d4 (0x140c2e080)
-            formation_type: FormationKind::HORDE,
+            formation_kind: FormationKind::HORDE,
             // the object's place
             state_position: position.ground(),
             retarget_disabled: 0,
@@ -193,7 +193,7 @@ impl UnitAi {
             orders: Vec::new(),
             building_orders: Vec::new(),
             notifies: Vec::new(),
-            notify_capacity: notify_capacity(ai_type, 0),
+            notify_capacity: notify_capacity(ai_kind, 0),
             processing: false,
             buffered: Vec::new(),
             ordered_on_target: false,
@@ -371,7 +371,7 @@ impl UnitAi {
     /// `UpdateAdjustedIdleTimeout` (slot 0x1a8): the base draws around the idle timeout
     /// (`0x140c41e00`); a deer's or fox's (factory type 2, `FUN_140c17170`) is 5/4 of it.
     pub(super) fn update_adjusted_idle_timeout(&mut self, ai: &mut Well512) {
-        self.adjusted_idle_timeout = if self.ai_type == UnitAiType::HUNTED {
+        self.adjusted_idle_timeout = if self.ai_kind == UnitAiKind::HUNTED {
             Millis::new(self.idle_timeout.get().wrapping_mul(5) >> 2)
         } else {
             adjusted_idle_timeout(self.idle_timeout, ai)

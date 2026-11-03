@@ -19,13 +19,13 @@ use genie_core::objects::layers::{UnreadDefault, Unstartable};
 use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::FlyMode;
 use genie_core::objects::masters::MasterId;
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::production::{MakeObjState, MakeTechState, Making};
 use genie_core::technology::TechId;
 use genie_save::generated::world::{
-    Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByType, RgeActionMoveTo, RgeObject,
+    Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionMoveTo, RgeObject,
     TribeActionMakeObj, TribeActionMakeTech, TribeBuildingObjectEntry1,
 };
 
@@ -210,24 +210,24 @@ fn the_default_task_starts_what_the_table_names() {
         .with_default_action(CivId::GAIA, MasterId::of_data(83).unwrap(), action)
         .unwrap()
     };
-    let artifact = ARTIFACT_TYPE;
+    let artifact = ARTIFACT_KIND;
     assert!(matches!(
-        start(&table(DefaultAction::Type(artifact))),
+        start(&table(DefaultAction::Kind(artifact))),
         Ok(Some(DefaultStart::Artifact(a))) if a.gaia
     ));
     let make = MAKE;
     assert!(matches!(
-        start(&table(DefaultAction::Type(make))),
+        start(&table(DefaultAction::Kind(make))),
         Ok(Some(DefaultStart::Make))
     ));
     assert!(matches!(start(&table(DefaultAction::None)), Ok(None)));
     assert!(matches!(
-        start(&table(DefaultAction::Type(ActionKind::HUNT_RANGE))),
+        start(&table(DefaultAction::Kind(ActionKind::HUNT_RANGE))),
         Ok(None)
     ));
     let enter = ENTER;
     assert!(matches!(
-        start(&table(DefaultAction::Type(enter))),
+        start(&table(DefaultAction::Kind(enter))),
         Err(Unstartable::Unported(t)) if t == enter
     ));
     assert!(matches!(
@@ -237,7 +237,7 @@ fn the_default_task_starts_what_the_table_names() {
     // a bird's Fly reads its master's default task as it starts, not at the load
     let fly = FLY;
     assert!(matches!(
-        start(&table(DefaultAction::Type(fly))),
+        start(&table(DefaultAction::Kind(fly))),
         Ok(Some(DefaultStart::Fly))
     ));
     // a master the table does not have
@@ -274,7 +274,7 @@ fn static_object_has_no_default_task() {
 /// An Attack (type 9) of range 5 in state `state`, its sub-actions `subs`.
 fn attack(state: u8, subs: Vec<(ActionKind, Action)>) -> Action {
     Action {
-        rge_action_by_type: Some(Box::new(RgeActionByType {
+        rge_action_by_kind: Some(Box::new(RgeActionByKind {
             rge_action_attack: Some(Box::new(RgeActionAttack {
                 rge_action: RgeAction {
                     state,
@@ -285,7 +285,7 @@ fn attack(state: u8, subs: Vec<(ActionKind, Action)>) -> Action {
                 range: 5.0,
                 ..RgeActionAttack::default()
             })),
-            ..RgeActionByType::default()
+            ..RgeActionByKind::default()
         })),
         ..Action::default()
     }
@@ -294,7 +294,7 @@ fn attack(state: u8, subs: Vec<(ActionKind, Action)>) -> Action {
 /// A `MoveTo` (type 1) in state 4 toward (3, 4).
 fn move_to() -> Action {
     Action {
-        rge_action_by_type: Some(Box::new(RgeActionByType {
+        rge_action_by_kind: Some(Box::new(RgeActionByKind {
             rge_action_move_to: Some(Box::new(RgeActionMoveTo {
                 rge_action: RgeAction {
                     state: 4,
@@ -305,7 +305,7 @@ fn move_to() -> Action {
                 },
                 ..RgeActionMoveTo::default()
             })),
-            ..RgeActionByType::default()
+            ..RgeActionByKind::default()
         })),
         ..Action::default()
     }

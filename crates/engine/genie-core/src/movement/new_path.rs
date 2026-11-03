@@ -11,7 +11,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si_64;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
-use crate::movement::LinkedPathType;
+use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::PlanTries;
@@ -123,10 +123,10 @@ impl Mover {
             new.points = path.points;
             new.state = PathState::WantsPath;
             new.level = WaypointLevel::PLANNED;
-            new.linked_type = if found {
-                LinkedPathType::REACHES_WAYPOINT
+            new.linked_kind = if found {
+                LinkedPathKind::REACHES_WAYPOINT
             } else {
-                LinkedPathType::MOVES_ON
+                LinkedPathKind::MOVES_ON
             };
             self.paths.insert(0, new);
             return Ok(if SHORT_PATHER || LONG_PATHER {
@@ -152,10 +152,10 @@ impl Mover {
         new.points = path.points;
         new.state = PathState::Walking;
         new.level = WaypointLevel::WALKED;
-        new.linked_type = if !found || partial {
-            LinkedPathType::MOVES_ON
+        new.linked_kind = if !found || partial {
+            LinkedPathKind::MOVES_ON
         } else {
-            LinkedPathType::REACHES_WAYPOINT
+            LinkedPathKind::REACHES_WAYPOINT
         };
         if !solid {
             // the walked level lets its path go (FUN_140f95b70): it holds none (path id -1),
@@ -472,7 +472,7 @@ impl Mover {
         radii: Distance,
         tile_path_tuning: &TilePathTuning,
     ) -> Result<Option<(Found, Distance)>, GenieError> {
-        let full = !plan.player_type.is_computer();
+        let full = !plan.player_kind.is_computer();
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
             return Ok(None);
         };

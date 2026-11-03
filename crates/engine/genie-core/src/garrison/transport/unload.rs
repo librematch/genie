@@ -242,7 +242,7 @@ impl World {
             Some(shore.zone(t.point.tile())?)
         };
         let count = self.unload_all(p, i, zone)?;
-        let player_type = self.players.player(p)?.kind;
+        let player_kind = self.players.player(p)?.kind;
         let ship = {
             let unit = self.players.live(p, i)?;
             let master = unit.master(self.master_tables(), p)?;
@@ -290,10 +290,10 @@ impl World {
                 )?);
                 t.retarget = true;
             } else {
-                alert_owner(player_type)?;
+                alert_owner(player_kind)?;
             }
         } else if ship.loaded {
-            alert_owner(player_type)?;
+            alert_owner(player_kind)?;
         }
         let mut shore = MapShore::new(
             &self.spatial,

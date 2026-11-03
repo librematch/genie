@@ -3,7 +3,7 @@
 use crate::Result;
 use crate::format::RgeScen;
 use crate::player::PlayerStartResources;
-use crate::types::{DiplomaticStance, StartingAge};
+use crate::values::{DiplomaticStance, StartingAge};
 use crate::victory::{LegacyVictoryInfo, VictoryInfo};
 use byteorder::{LE, ReadBytesExt};
 use genie_support::{ReadStringsExt, f32_eq};
@@ -31,7 +31,7 @@ pub struct TribeScen {
     /// Whether all victory conditions need to be met for victory to occur.
     pub(super) victory_all_flag: bool,
     /// Type of victory condition to use in multiplayer games.
-    pub(super) mp_victory_type: i32,
+    pub(super) mp_victory_kind: i32,
     /// Required score to attain multiplayer victory.
     pub(super) victory_score: i32,
     /// Time at which the highest-scoring player will win the multiplayer match.
@@ -84,7 +84,7 @@ pub struct TribeScen {
     /// The initial camera location.
     pub(super) view: (i32, i32),
     /// The map type.
-    pub(super) map_type: Option<i32>,
+    pub(super) map_kind: Option<i32>,
     pub(super) base_priorities: Vec<i8>,
     /// The water definition type used. (DE2 and up)
     pub(super) water_definition: Option<String>,
@@ -120,8 +120,8 @@ impl TribeScen {
         read_separator(&mut input, version)?;
         let victory = VictoryInfo::read_from(&mut input)?;
         let victory_all_flag = input.read_i32::<LE>()? != 0;
-        let (mp_victory_type, victory_score, victory_time) = read_mp_victory(&mut input, version)?;
-        log::debug!("Victory values: {mp_victory_type} {victory_score} {victory_time}");
+        let (mp_victory_kind, victory_score, victory_time) = read_mp_victory(&mut input, version)?;
+        log::debug!("Victory values: {mp_victory_kind} {victory_score} {victory_time}");
         let diplomacy = read_diplomacy(&mut input)?;
         let legacy_victory_info = read_legacy_victory_info(&mut input)?;
         read_separator(&mut input, version)?;
@@ -137,7 +137,7 @@ impl TribeScen {
         log::debug!("starting ages: {player_start_ages:?}");
         read_separator(&mut input, version)?;
         let view = read_view(&mut input, version)?;
-        let map_type = read_map_type(&mut input, version)?;
+        let map_kind = read_map_kind(&mut input, version)?;
         let base_priorities = read_base_priorities(&mut input, version)?;
         let options = DeOptions::read_from(&mut input, version)?;
         Ok(Self {
@@ -145,7 +145,7 @@ impl TribeScen {
             player_start_resources,
             victory,
             victory_all_flag,
-            mp_victory_type,
+            mp_victory_kind,
             victory_score,
             victory_time,
             diplomacy,
@@ -166,7 +166,7 @@ impl TribeScen {
             all_techs,
             player_start_ages,
             view,
-            map_type,
+            map_kind,
             base_priorities,
             water_definition: options.water_definition,
             color_mood: options.color_mood,
@@ -202,7 +202,7 @@ fn read_players(mut input: impl Read, base: &mut RgeScen) -> Result<Vec<PlayerSt
         {
             properties.active = input.read_i32::<LE>()?;
             *start_resources = PlayerStartResources::read_from(&mut input, version)?;
-            properties.player_type = input.read_i32::<LE>()?;
+            properties.player_kind = input.read_i32::<LE>()?;
             properties.civilization = input.read_i32::<LE>()?;
             properties.posture = input.read_i32::<LE>()?;
         }
@@ -302,7 +302,7 @@ fn read_view(mut input: impl Read, version: f32) -> Result<(i32, i32)> {
 }
 
 /// The map type from 1.21 on, -1 and -2 none.
-fn read_map_type(mut input: impl Read, version: f32) -> Result<Option<i32>> {
+fn read_map_kind(mut input: impl Read, version: f32) -> Result<Option<i32>> {
     if version >= 1.21 {
         match input.read_i32::<LE>()? {
             // HD Edition uses -2 instead of -1?
@@ -540,18 +540,18 @@ mod tests {
     /// The view from 1.19 on, the map type from 1.21 on (-1 and -2 none), the base priorities
     /// from 1.24 on.
     #[test]
-    fn the_view_map_type_and_priorities_follow_their_version() {
+    fn the_view_map_kind_and_priorities_follow_their_version() {
         let view = words(&[10, 20]);
         assert_eq!(read_view(view.as_slice(), 1.18).unwrap(), (-1, -1));
         assert_eq!(read_view(view.as_slice(), 1.19).unwrap(), (10, 20));
-        assert_eq!(read_map_type(words(&[7]).as_slice(), 1.20).unwrap(), None);
+        assert_eq!(read_map_kind(words(&[7]).as_slice(), 1.20).unwrap(), None);
         assert_eq!(
-            read_map_type(words(&[7]).as_slice(), 1.21).unwrap(),
+            read_map_kind(words(&[7]).as_slice(), 1.21).unwrap(),
             Some(7)
         );
         for none in [-1, -2] {
             assert_eq!(
-                read_map_type(words(&[none]).as_slice(), 1.21).unwrap(),
+                read_map_kind(words(&[none]).as_slice(), 1.21).unwrap(),
                 None
             );
         }

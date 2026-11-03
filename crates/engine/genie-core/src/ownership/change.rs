@@ -147,7 +147,7 @@ impl World {
         };
         let u = self.players.player(old)?.objects.checked(idx)?;
         let master = u.master(self.master_tables(), old)?.clone();
-        let (state, held, amount) = (u.life.state, u.life.attribute_type, u.life.amount);
+        let (state, held, amount) = (u.life.state, u.life.attribute_kind, u.life.amount);
         let built = self
             .parts
             .building_of(u.id)
@@ -515,7 +515,7 @@ impl World {
 
 /// The master types whose death-spawn master an ownership change copies (`FUN_14120f800`'s
 /// switch on the master's `+0x8`): static to moving objects, combat units and buildings.
-pub(crate) const DEAD_COPY_TYPES: [MasterKind; 6] = [
+pub(crate) const DEAD_COPY_KINDS: [MasterKind; 6] = [
     MasterKind::STATIC,
     MasterKind::ANIMATED,
     MasterKind::MOVING,
@@ -545,7 +545,7 @@ pub(crate) fn dead_master_of(
     let spawn = reads.death_spawns.first().copied().flatten()?;
     old_table
         .get(spawn)
-        .filter(|d| DEAD_COPY_TYPES.contains(&d.kind))
+        .filter(|d| DEAD_COPY_KINDS.contains(&d.kind))
         .cloned()
 }
 

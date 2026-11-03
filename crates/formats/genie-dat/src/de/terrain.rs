@@ -35,8 +35,8 @@ pub struct TerrainPassGraphic {
     pub walk_sprite_rate: i32,
 }
 
-/// genieutils' `SharedTerrain::TILE_TYPE_COUNT`.
-pub(super) const TILE_TYPES: usize = 19;
+/// genieutils' `SharedTerrain::TILE_KIND_COUNT`.
+pub(super) const TILE_KINDS: usize = 19;
 /// genieutils' `Terrain::getTerrainCount` for `GV_C8` and later.
 pub(super) const TERRAINS: usize = 200;
 /// genieutils' `Terrain::TERRAIN_UNITS_SIZE`.
@@ -62,7 +62,7 @@ pub struct TerrainBlock {
     /// World height (saved map state).
     pub world_height: i32,
     /// The size of each of the 19 tile shapes: flat and the slopes.
-    pub tile_sizes: [TileSize; TILE_TYPES],
+    pub tile_sizes: [TileSize; TILE_KINDS],
     /// Padding after the tile sizes; kept to write the file back.
     pub padding_ts: i16,
     /// The 200 terrain slots, indexed by terrain id.
@@ -178,7 +178,7 @@ pub struct Terrain {
     /// Blend priority: where two terrains meet, the higher one blends over the other.
     pub blend_priority: i32,
     /// Blend type: which set of blending masks the terrain uses.
-    pub blend_type: i32,
+    pub blend_kind: i32,
     /// Name of the terrain's overlay mask texture.
     pub overlay_mask_name: DebugString,
     /// Minimap palette indices: high, medium and low.
@@ -210,7 +210,7 @@ pub struct Terrain {
     /// Whether the terrain was drawn (saved map state).
     pub drawn: u8,
     /// The frames of each of the 19 tile shapes.
-    pub elevation_graphics: [FrameData; TILE_TYPES],
+    pub elevation_graphics: [FrameData; TILE_KINDS],
     /// Terrain whose graphic is drawn in this one's place; -1 for its own.
     pub terrain_to_draw: i16,
     /// Rows and columns of the terrain's texture.

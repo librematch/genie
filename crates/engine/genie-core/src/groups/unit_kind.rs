@@ -4,12 +4,12 @@ use crate::objects::masters::MasterId;
 
 /// A unit type as a group holds it (`mUnitTypes`, `mDesiredSubCategory`): a master's id in a
 /// word, −1 for none. The statistic's 50 words are the shared scratch array's
-/// ([`crate::groups::UnitGroups::unit_types_scratch`]), so the words past its types are an
+/// ([`crate::groups::UnitGroups::unit_kinds_scratch`]), so the words past its types are an
 /// earlier count's types, or the 0 the array starts with; every word is kept as it is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct UnitType(i32);
+pub struct UnitKind(i32);
 
-impl UnitType {
+impl UnitKind {
     /// None (−1): a slot that takes any unit type.
     pub const NONE: Self = Self(-1);
     /// The word the scratch array starts with (0).
@@ -48,21 +48,21 @@ impl UnitType {
 
 #[cfg(test)]
 mod tests {
-    use crate::groups::UnitType;
+    use crate::groups::UnitKind;
     use crate::objects::masters::MasterId;
 
     /// A master's id widens to the word and back; −1 is all bits.
     #[test]
-    fn unit_type_is_master_id_in_word() {
+    fn unit_kind_is_master_id_in_word() {
         let archer = MasterId::of_data(4).unwrap();
-        assert_eq!(UnitType::of(archer).word(), 4);
-        assert_eq!(UnitType::of_word(4), UnitType::of(archer));
+        assert_eq!(UnitKind::of(archer).word(), 4);
+        assert_eq!(UnitKind::of_word(4), UnitKind::of(archer));
         assert_eq!(
-            (UnitType::NONE.word(), UnitType::NONE.get()),
+            (UnitKind::NONE.word(), UnitKind::NONE.get()),
             (u32::MAX, -1)
         );
-        assert!(UnitType::of_word(u32::MAX).is_none());
-        assert!(!UnitType::CLEARED.is_none());
-        assert_eq!(UnitType::default(), UnitType::CLEARED);
+        assert!(UnitKind::of_word(u32::MAX).is_none());
+        assert!(!UnitKind::CLEARED.is_none());
+        assert_eq!(UnitKind::default(), UnitKind::CLEARED);
     }
 }

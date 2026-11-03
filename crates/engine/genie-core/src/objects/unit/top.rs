@@ -20,7 +20,7 @@ use crate::math::fmath::length;
 use crate::movement::Me;
 use crate::objects::WorkerCount;
 use crate::objects::layers::{Action, Building};
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::unit_ai::{AiAction, OrderKind, UnitAi};
 use crate::world::Unread;
 use crate::world::checkpoint::TopAction;
@@ -163,7 +163,7 @@ impl Action {
             }
             (_, 0 | 1 | 3 | 0xd | 0xe) => true,
             (_, 2) => kind != ATTACK,
-            (ARTIFACT_TYPE, _) => self
+            (ARTIFACT_KIND, _) => self
                 .list
                 .artifact()
                 .is_some_and(|a| a.goal.is_none_or(|g| g.x() == -1.0)),

@@ -25,7 +25,7 @@ impl FormationKind {
     pub const USER_DEFINED: Self = Self(5);
     /// Type 6, which the layout's switch does not know (only transformed); an attacking group
     /// of it refills its slots when its members change.
-    pub const TYPE_6: Self = Self(6);
+    pub const KIND_6: Self = Self(6);
     /// A staggered line (`FUN_141012280` staggered).
     pub const STAGGERED: Self = Self(7);
     /// A flanking formation (`FUN_141012280` flanked).
@@ -109,7 +109,7 @@ mod tests {
 
     /// −1 is no type; a unit AI's byte round-trips; only the types 0 to 8 vote.
     #[test]
-    fn type_reads_its_field_byte_and_vote() {
+    fn kind_reads_its_field_byte_and_vote() {
         assert_eq!(FormationKind::of_field(-1), None);
         assert_eq!(FormationKind::of_field(4), Some(FormationKind::BOX));
         assert_eq!(FormationKind::field(None), -1);

@@ -14,7 +14,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::Notify;
 use crate::unit_ai::task_finder::world::{SideWorld, TaskWorld};
 use crate::world::World;
@@ -509,9 +509,9 @@ impl World {
                 )?;
             }
             let by_kind = match self.players.player(ap)?.kind {
-                PlayerType::HUMAN => Some(self.model.slots.attribute.villager_killed_by_type_1),
-                PlayerType::GAIA => Some(self.model.slots.attribute.villager_killed_by_type_2),
-                PlayerType::COMPUTER => Some(self.model.slots.attribute.villager_killed_by_type_3),
+                PlayerKind::HUMAN => Some(self.model.slots.attribute.villager_killed_by_kind_1),
+                PlayerKind::GAIA => Some(self.model.slots.attribute.villager_killed_by_kind_2),
+                PlayerKind::COMPUTER => Some(self.model.slots.attribute.villager_killed_by_kind_3),
                 _ => None,
             };
             if let Some(kind) = by_kind {

@@ -31,7 +31,7 @@ use crate::objects::layers::MotionMut;
 use crate::objects::masters::{Master, TaskId};
 use crate::objects::sprite::{Graphic, new_sprite};
 use crate::objects::unit::Unit;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::{AiAction, UnitAi};
 use crate::unit_ai::{NotifyKind, alert_owner};
 use crate::world::World;
@@ -256,7 +256,7 @@ impl TransportAction {
         r: &TransportReads,
     ) -> Result<UpdateCode, GenieError> {
         let walked = self.walk(c, unit, me)?;
-        let player_type = c.w.players.player(c.player)?.kind;
+        let player_kind = c.w.players.player(c.player)?.kind;
         let World {
             spatial,
             zones,
@@ -290,7 +290,7 @@ impl TransportAction {
             (&ship, &mut shore),
             posts,
             look,
-            player_type,
+            player_kind,
             tuning,
         )? {
             Updated::Code(code) => Ok(code),
@@ -349,7 +349,7 @@ impl TransportAction {
         (ship, shore): (&Ship<'_>, &mut impl Shore),
         (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         tuning: &Tuning,
     ) -> Result<Updated, GenieError> {
         let (transport_tuning, move_to_tuning, sprite_tuning) =
@@ -410,7 +410,7 @@ impl TransportAction {
                 let changed = self.unloaded(ship, shore, transport_tuning, move_to_tuning)?;
                 stand((unit, motion.reborrow()), changed, look, sprite_tuning)?;
                 if cannot_unload {
-                    alert_owner(player_type)?;
+                    alert_owner(player_kind)?;
                 }
                 return Ok(Updated::Code(UpdateCode::UNDER_WAY));
             }

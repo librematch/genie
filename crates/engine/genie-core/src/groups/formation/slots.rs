@@ -5,7 +5,7 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
-use crate::groups::UnitType;
+use crate::groups::UnitKind;
 use crate::groups::{Formation, UnitGroup, sub_formation};
 use crate::map::Distance;
 use crate::objects::ObjectId;
@@ -77,7 +77,7 @@ impl World {
         g: &UnitGroup,
         point: BVector,
         category: FormationCategory,
-        sub_category: UnitType,
+        sub_category: UnitKind,
         used: &[Option<ObjectId>],
     ) -> Result<Option<ObjectId>, GenieError> {
         let mut best = FARTHEST;
@@ -90,7 +90,7 @@ impl World {
                 continue;
             }
             if !sub_category.is_none()
-                && UnitType::of(
+                && UnitKind::of(
                     self.master(object.player(), object.master_id(self.model.slots))?
                         .id,
                 ) != sub_category
@@ -142,7 +142,7 @@ impl World {
         g: &UnitGroup,
     ) -> Result<(), GenieError> {
         // what the slots ask for (the assignments change only their units)
-        let asks: Vec<(BVector, FormationCategory, UnitType)> = formation
+        let asks: Vec<(BVector, FormationCategory, UnitKind)> = formation
             .slots
             .iter()
             .map(|s| {
@@ -263,7 +263,7 @@ impl World {
                 continue;
             }
             let category = self.unit_category(Some(object))?;
-            let master = UnitType::of(object.master_id(self.model.slots));
+            let master = UnitKind::of(object.master_id(self.model.slots));
             let at = object.moved_vector();
             for (j, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
@@ -338,7 +338,7 @@ impl World {
                     continue;
                 }
                 if !sub_category.is_none()
-                    && UnitType::of(
+                    && UnitKind::of(
                         self.master(object.player(), object.master_id(self.model.slots))?
                             .id,
                     ) != sub_category

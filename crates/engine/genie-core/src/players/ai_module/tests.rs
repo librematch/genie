@@ -9,7 +9,7 @@ use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
 use crate::pathing::zones::ZoneId;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::ai_module::search::{DEAD_END, EXPLORED, PUNTED, UNEXPLORED};
 use crate::players::ai_module::{
     AiModule, AiModules, InfoModule, SLOTS, SearchArea, SearchUnit, TacticalModule,
@@ -109,7 +109,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![VisionBits::NONE; n],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN, PlayerType::COMPUTER, PlayerType::HUMAN],
+        vec![PlayerKind::HUMAN, PlayerKind::COMPUTER, PlayerKind::HUMAN],
     );
     assert_eq!(
         v.explore(

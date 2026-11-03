@@ -412,14 +412,14 @@ fn attack_move(c: &AttackMoveCommand) -> Result<Packet, GenieError> {
 
 /// UNLOAD (0x6f).
 fn unload(c: &UnloadCommand) -> Result<Packet, GenieError> {
-    let (flag, unit_type) = c.pick.packet();
+    let (flag, unit_kind) = c.pick.packet();
     Ok(Packet::Unload(packets::Unload {
         commp_id: c.player.get(),
         num: c.units.count,
         gap_0x06: [0; 2],
         x: c.point.x(),
         y: c.point.y(),
-        unit_type,
+        unit_kind,
         flag,
         gap_0x15: [0; 3],
         field_0x18: u8::from(c.sound),

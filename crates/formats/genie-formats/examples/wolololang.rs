@@ -4,7 +4,7 @@
 //! The order in which string keys are written to the output file is currently
 //! unspecified.
 
-use genie_formats::lang::LangFileType::KeyValue;
+use genie_formats::lang::LangFileKind::KeyValue;
 use std::fs::File;
 use std::path::PathBuf;
 use structopt::StructOpt;

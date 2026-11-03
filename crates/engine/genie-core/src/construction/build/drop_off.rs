@@ -107,7 +107,7 @@ impl BuildAction {
                 c.w.players.player(c.player)?.civ,
                 &c.w.players.player(c.player)?.tracker,
             ),
-            (at, builder.life.attribute_type, own.class),
+            (at, builder.life.attribute_kind, own.class),
             look,
             &c.w.model.tuning.order,
         );
@@ -295,7 +295,7 @@ impl BuildAction {
             return Ok(HeadCode::Keeps);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(builder.life.attribute_type, attributes, slots);
+        let kind = resource_kind(builder.life.attribute_kind, attributes, slots);
         let amount = builder.life.amount;
         Self::drop_load(c, builder, kind, amount)?;
         self.after_deposit(c, builder, reads, roles)

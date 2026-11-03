@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::types::VictoryCondition;
+use crate::values::VictoryCondition;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use std::convert::TryFrom;
@@ -10,12 +10,12 @@ use std::io::{Read, Write};
 /// This was replaced by `VictoryConditions` in `AoE2`.
 #[derive(Debug, Clone, Default)]
 pub struct LegacyVictoryInfo {
-    pub object_type: i32,
+    pub object_kind: i32,
     pub all_flag: bool,
     pub player_id: i32,
     pub dest_object_id: i32,
     pub area: (f32, f32, f32, f32),
-    pub victory_type: i32,
+    pub victory_kind: i32,
     pub amount: i32,
     pub attribute: i32,
     pub object_id: i32,
@@ -25,7 +25,7 @@ pub struct LegacyVictoryInfo {
 impl LegacyVictoryInfo {
     /// Read old-tyle victory settings from an input stream.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
-        let object_type = input.read_i32::<LE>()?;
+        let object_kind = input.read_i32::<LE>()?;
         let all_flag = input.read_i32::<LE>()? != 0;
         let player_id = input.read_i32::<LE>()?;
         let dest_object_id = input.read_i32::<LE>()?;
@@ -35,7 +35,7 @@ impl LegacyVictoryInfo {
             input.read_f32::<LE>()?,
             input.read_f32::<LE>()?,
         );
-        let victory_type = input.read_i32::<LE>()?;
+        let victory_kind = input.read_i32::<LE>()?;
         let amount = input.read_i32::<LE>()?;
         let attribute = input.read_i32::<LE>()?;
         let object_id = input.read_i32::<LE>()?;
@@ -45,12 +45,12 @@ impl LegacyVictoryInfo {
         let _dest_object = input.read_u32::<LE>()?;
 
         Ok(Self {
-            object_type,
+            object_kind,
             all_flag,
             player_id,
             dest_object_id,
             area,
-            victory_type,
+            victory_kind,
             amount,
             attribute,
             object_id,
@@ -60,7 +60,7 @@ impl LegacyVictoryInfo {
 
     /// Write old-tyle victory settings to an output stream.
     pub fn write_to(&self, mut output: impl Write) -> Result<()> {
-        output.write_i32::<LE>(self.object_type)?;
+        output.write_i32::<LE>(self.object_kind)?;
         output.write_i32::<LE>(i32::from(self.all_flag))?;
         output.write_i32::<LE>(self.player_id)?;
         output.write_i32::<LE>(self.dest_object_id)?;
@@ -68,7 +68,7 @@ impl LegacyVictoryInfo {
         output.write_f32::<LE>(self.area.1)?;
         output.write_f32::<LE>(self.area.2)?;
         output.write_f32::<LE>(self.area.3)?;
-        output.write_i32::<LE>(self.victory_type)?;
+        output.write_i32::<LE>(self.victory_kind)?;
         output.write_i32::<LE>(self.amount)?;
         output.write_i32::<LE>(self.attribute)?;
         output.write_i32::<LE>(self.object_id)?;
@@ -84,7 +84,7 @@ impl LegacyVictoryInfo {
 #[derive(Debug, Clone, Copy)]
 pub struct VictoryEntry {
     command: VictoryCondition,
-    object_type: i32,
+    object_kind: i32,
     player_id: i32,
     x0: f32,
     y0: f32,
@@ -107,7 +107,7 @@ impl VictoryEntry {
     /// Returns an error if reading fails.
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let command = input.read_u8()?.into();
-        let object_type = input.read_i32::<LE>()?;
+        let object_kind = input.read_i32::<LE>()?;
         let player_id = input.read_i32::<LE>()?;
         let x0 = input.read_f32::<LE>()?;
         let y0 = input.read_f32::<LE>()?;
@@ -123,7 +123,7 @@ impl VictoryEntry {
 
         Ok(Self {
             command,
-            object_type,
+            object_kind,
             player_id,
             x0,
             y0,
@@ -146,7 +146,7 @@ impl VictoryEntry {
     /// Returns an error if writing fails.
     pub fn write_to(&self, mut output: impl Write) -> Result<()> {
         output.write_u8(self.command.into())?;
-        output.write_i32::<LE>(self.object_type)?;
+        output.write_i32::<LE>(self.object_kind)?;
         output.write_i32::<LE>(self.player_id)?;
         output.write_f32::<LE>(self.x0)?;
         output.write_f32::<LE>(self.y0)?;

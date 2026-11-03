@@ -31,13 +31,13 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::{OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -138,7 +138,7 @@ impl World {
             range: Distance::new(self.model.tuning.order.guard_range),
             shown: Point::new(x, y),
             ready: true,
-            target_type: Some(OrderTargetType::of_master(tm.id)),
+            target_kind: Some(OrderTargetKind::of_master(tm.id)),
         };
         let cap = if self.players.player(player)?.kind.is_computer() {
             500
@@ -172,8 +172,8 @@ impl World {
                 issuer: Some(Issuer::Player(p)),
                 ..order
             };
-            self.run_unit_ai((p, idx), |ai, at, side, player_type, rng| {
-                ai.take_order_now_with(order, (at, side, player_type), rng)
+            self.run_unit_ai((p, idx), |ai, at, side, player_kind, rng| {
+                ai.take_order_now_with(order, (at, side, player_kind), rng)
             })?;
         }
         Ok(())
@@ -518,7 +518,7 @@ impl World {
                 | MAKE
                 | WAIT_SOLIDIFY,
             ) => Ok(false),
-            Some(ARTIFACT_TYPE) => {
+            Some(ARTIFACT_KIND) => {
                 self.artifact_take_object(player, idx, target)?;
                 Ok(true)
             }

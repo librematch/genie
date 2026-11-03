@@ -15,7 +15,7 @@
 use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::construction::repair::REPAIR;
-use crate::garrison::{ENTER, garrison_type_takes, is_garrison_task};
+use crate::garrison::{ENTER, garrison_kind_takes, is_garrison_task};
 use crate::gathering::PastureId;
 use crate::gathering::hunt::HUNT;
 use crate::map::TerrainId;
@@ -50,7 +50,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 
 /// The task types the general search leaves out (`FUN_14109f8c0`: 151, 152, 154, 155, 157, 160).
-const fn special_type(t: ActionKind) -> bool {
+const fn special_kind(t: ActionKind) -> bool {
     let d = t.get().wrapping_sub(0x97) as u16;
     d < 10 && (0x25bu32 >> d) & 1 != 0
 }
@@ -185,10 +185,10 @@ pub fn table_drop_buildings(
     table
         .iter()
         .filter(|e| class.is_none_or(|c| e.worker_class == Some(c)))
-        .filter(|e| !e.resource_types.is_empty())
+        .filter(|e| !e.resource_kinds.is_empty())
         .filter(|e| e.civs.is_empty() || e.civs.contains(&civ))
         .filter(|e| match kind {
-            Some(basic) if basic.is_resource() => e.resource_types.contains(&basic),
+            Some(basic) if basic.is_resource() => e.resource_kinds.contains(&basic),
             _ => e.targets.iter().any(|t| t.attribute == kind),
         })
         .map(|e| e.building)
@@ -224,9 +224,9 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
         if kind.is_none() || amount <= Amount::ZERO {
             return false;
         }
-        if task.attribute_type != kind
-            && task.attribute_type3 != kind
-            && (task.attribute_type.is_some() || task.attribute_type3.is_some())
+        if task.attribute_kind != kind
+            && task.attribute_kind3 != kind
+            && (task.attribute_kind.is_some() || task.attribute_kind3.is_some())
         {
             return false;
         }
@@ -237,7 +237,7 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
         _ => {}
     }
     let (me, them) = (actor.player, target.player);
-    let ok = match task.owner_type {
+    let ok = match task.owner_kind {
         TargetOwner::OWN => them == me,
         TargetOwner::ENEMY => them != me && them != PlayerId::GAIA && !dip.allied(me, them, true),
         TargetOwner::GAIA => them == PlayerId::GAIA,
@@ -278,7 +278,7 @@ fn general<'m>(
     }
     if let Some(t) = target {
         let usable = |task: &Task| {
-            !special_type(task.action_kind) && applies(task, actor, t, dip) && wanted(filter, task)
+            !special_kind(task.action_kind) && applies(task, actor, t, dip) && wanted(filter, task)
         };
         if t.state < ObjectState::Dying
             && t.master.combat_level.is_some()
@@ -306,7 +306,7 @@ fn general<'m>(
 /// player's or a mutually allied player's building in state 2 that garrisons, for a unit master
 /// of type 70 or master 1808, the first garrison task on buildings
 /// ([`crate::garrison::is_garrison_task`]) when the building's `garrison_type` takes the master
-/// ([`crate::garrison::garrison_type_takes`], class 42 left out); none on a building whose top
+/// ([`crate::garrison::garrison_kind_takes`], class 42 left out); none on a building whose top
 /// action is `0x7c` or `0x7d` (`FUN_1411e8630`; a computer player's production comes first,
 /// `FUN_1411d5520`), which is not modelled. Else none: the caller goes on to the rest of the
 /// finder for a target whose master has object flag 0 (a transport, [`find_task`]).
@@ -330,11 +330,11 @@ fn garrison_task<'m>(
         && (list.kind == MasterKind::COMBAT || roles.of_master(list.id).contains(MasterRoles::MULE_CART))
         && t.master.garrison.holds()
     {
-        let garrison_type = t
+        let garrison_kind = t
             .master
             .building
-            .map_or(GarrisonKinds::NONE, |b| b.garrison_type);
-        let takes = garrison_type_takes(garrison_type, list.class, list.id, false, roles);
+            .map_or(GarrisonKinds::NONE, |b| b.garrison_kind);
+        let takes = garrison_kind_takes(garrison_kind, list.class, list.id, false, roles);
         if let Some(task) = first(list, |t| is_garrison_task(t, roles)).filter(|_| takes) {
             if matches!(t.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
                 return Err(GenieError::unsupported(
@@ -610,9 +610,9 @@ mod tests {
         }
     }
 
-    fn task(action_type: ActionKind, object_group: i16, object_id: i16, work_val1: f32) -> Task {
+    fn task(action_kind: ActionKind, object_group: i16, object_id: i16, work_val1: f32) -> Task {
         Task {
-            action_kind: action_type,
+            action_kind,
             object_group: class_of(object_group),
             object_id: opt_master(object_id),
             work_val1: WorkValue::new(work_val1),
@@ -691,8 +691,8 @@ mod tests {
             player: PlayerId::new(1),
             ..actor(master, carrying(None, 0.0))
         };
-        let of = |owner_type| Task {
-            owner_type,
+        let of = |owner_kind| Task {
+            owner_kind,
             ..Task::default()
         };
         let at = |player, held| TaskTarget {
@@ -704,10 +704,10 @@ mod tests {
         };
         // the holder's test (−1 for no attribute)
         let kind = AttributeId::of_data;
-        let holder = |attribute_type, attribute_type3| Task {
+        let holder = |attribute_kind, attribute_kind3| Task {
             holding_attr: 1,
-            attribute_type,
-            attribute_type3,
+            attribute_kind,
+            attribute_kind3,
             ..of(TargetOwner::ANY)
         };
         for (task, held, takes) in [
@@ -725,7 +725,7 @@ mod tests {
             );
         }
         // the types that never apply, and the attacks on what cannot be attacked
-        for (action_type, attackable, takes) in [
+        for (action_kind, attackable, takes) in [
             (ENTER, true, false),
             (REPAIR, true, false),
             (ActionKind::COMBAT, false, false),
@@ -733,17 +733,17 @@ mod tests {
             (ATTACK, true, true),
         ] {
             let task = Task {
-                action_kind: action_type,
+                action_kind,
                 ..of(TargetOwner::ANY)
             };
             let target = TaskTarget {
                 attackable,
                 ..at(PlayerId::new(1), carrying(None, 0.0))
             };
-            assert_eq!(applies_to(&task, &own, &target), takes, "{action_type}");
+            assert_eq!(applies_to(&task, &own, &target), takes, "{action_kind}");
         }
         // the owner types, by the target's player
-        for (owner_type, player, master, takes) in [
+        for (owner_kind, player, master, takes) in [
             (1, 1, &own, true),
             (1, 2, &own, false),
             (2, 2, &own, true),
@@ -766,8 +766,8 @@ mod tests {
             (0, 1, &own, true),
         ] {
             let target = at(PlayerId::new(player), carrying(None, 0.0));
-            let got = applies_to(&of(TargetOwner::of_data(owner_type)), master, &target);
-            assert_eq!(got, takes, "type {owner_type} on player {player}");
+            let got = applies_to(&of(TargetOwner::of_data(owner_kind)), master, &target);
+            assert_eq!(got, takes, "type {owner_kind} on player {player}");
         }
         // the unit itself: only type 4 takes it
         let itself = TaskTarget {
@@ -803,11 +803,11 @@ mod tests {
     /// basic resources or targets take the kind.
     #[test]
     fn the_table_gives_the_buildings_that_take_kind_from_class() {
-        let entry = |building, class, types: Vec<AttributeId>, civs: Vec<u8>, attribute| DropSite {
+        let entry = |building, class, kinds: Vec<AttributeId>, civs: Vec<u8>, attribute| DropSite {
             building,
             worker_class: class,
             civs: civs.into_iter().map(CivId::new).collect(),
-            resource_types: types,
+            resource_kinds: kinds,
             targets: vec![DropTarget {
                 class: class::TREE,
                 workers: WorkerCount::NO_CAP,
@@ -970,7 +970,7 @@ mod tests {
             vec![],
         );
         let chop = Task {
-            attribute_type: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FOOD),
             ..task(GATHER, 15, -1, 0.6)
         };
         let lumberjack = master(
@@ -1113,7 +1113,7 @@ mod tests {
         // no task on its class: none with the garrison filter, and none with any filter (the
         // finder ends before the general search, which would give the militia's attack)
         let attack = Task {
-            owner_type: TargetOwner::ANY,
+            owner_kind: TargetOwner::ANY,
             ..task(ActionKind::COMBAT, class::TRANSPORT.get(), -1, 0.0)
         };
         let militia = master(
@@ -1193,10 +1193,10 @@ mod tests {
     }
 
     #[test]
-    fn the_general_search_takes_task_for_the_target_class_whose_owner_type_fits() {
+    fn the_general_search_takes_task_for_the_target_class_whose_owner_kind_fits() {
         let house = master(ids::HOUSE, MasterKind::BUILDING, class::BUILDING, vec![]);
         let attack = Task {
-            owner_type: TargetOwner::ENEMY,
+            owner_kind: TargetOwner::ENEMY,
             ..task(ActionKind::COMBAT, class::BUILDING.get(), -1, 0.0)
         };
         let militia = master(
@@ -1515,7 +1515,7 @@ mod tests {
             vec![],
         );
         let chop = Task {
-            attribute_type: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FOOD),
             ..task(GATHER, 15, -1, 0.6)
         };
         let lumberjack = master(

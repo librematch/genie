@@ -18,15 +18,15 @@ class Types(unittest.TestCase):
     def test_an_acronym_in_capitals_is_one_word(self):
         self.assertEqual(
             names(
-                "struct UnitTypeID;\nstruct AIModule;\ntrait DRSReader {}\ntype ObjectID = u8;\n"
+                "struct UnitKindID;\nstruct AIModule;\ntrait DRSReader {}\ntype ObjectID = u8;\n"
             ),
-            ["UnitTypeID", "AIModule", "DRSReader", "ObjectID"],
+            ["UnitKindID", "AIModule", "DRSReader", "ObjectID"],
         )
 
     def test_an_acronym_as_a_word_and_a_single_letter_pass(self):
         self.assertEqual(
             names(
-                "struct UnitTypeId;\nstruct AiModule;\nstruct XAxis;\nstruct T;\n"
+                "struct UnitKindId;\nstruct AiModule;\nstruct XAxis;\nstruct T;\n"
                 "enum Command7a {}\n"
             ),
             [],
@@ -87,6 +87,31 @@ class EnumConstants(unittest.TestCase):
     def test_an_enum_of_another_crate_does_not_count(self):
         src = "impl GameMode {\n    pub const REGICIDE: Self = Self(1);\n}\n"
         self.assertEqual(names(src, set()), [])
+
+
+class Kind(unittest.TestCase):
+    def test_no_name_holds_the_word_type(self):
+        src = """
+            struct PlayerType;
+            enum UnitAiTypes {}
+            const TYPE_2: u8 = 2;
+            fn f(unit_type: u8, attribute_type4: u8, types: u8) {}
+        """
+        self.assertEqual(
+            names(src),
+            ["PlayerType", "UnitAiTypes", "TYPE_2", "attribute_type4", "types", "unit_type"],
+        )
+
+    def test_the_keyword_kinds_and_outside_names_pass(self):
+        src = """
+            type Kind = u8;
+            struct PlayerKind { r#type: u8, typeface: u8 }
+            fn f() -> std::any::TypeId { std::any::type_name::<u8>(); }
+            #[allow(clippy::type_complexity)]
+            struct Typed(Type50);
+            const S: &str = "unit_type";
+        """
+        self.assertEqual(names(src), [])
 
 
 if __name__ == "__main__":

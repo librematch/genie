@@ -2,7 +2,7 @@ use crate::element::{OptionalReadableElement, WritableHeaderElement};
 use crate::test_support::{Bytes, header_reader, read_all};
 use crate::unit::Unit;
 use crate::unit::statics::StaticUnitAttributes;
-use crate::unit_type::UnitBaseClass;
+use crate::unit_kind::UnitBaseClass;
 
 /// An object up to its offsets.
 fn identity() -> Bytes {
@@ -38,7 +38,7 @@ fn rest(bytes: Bytes) -> Bytes {
 fn an_object_before_11_58_has_selected_group() {
     let object = read_all::<StaticUnitAttributes>(&rest(identity().u8(4)).0, 11.57);
     assert_eq!(u8::from(object.owner_id), 2);
-    assert_eq!(u16::from(object.unit_type_id), 83);
+    assert_eq!(u16::from(object.unit_kind_id), 83);
     assert_eq!(u16::from(object.sprite_id), 1000);
     assert_eq!(object.garrisoned_in_id, None);
     assert_eq!(object.hit_points.to_bits(), 25.0_f32.to_bits());
@@ -59,7 +59,7 @@ fn an_object_before_11_58_has_selected_group() {
         ((1, 2), (3, 4))
     );
     assert_eq!(object.selected_group, Some(4));
-    assert_eq!(object.attribute_type_held, 7);
+    assert_eq!(object.attribute_kind_held, 7);
     assert_eq!(object.attribute_amount_held.to_bits(), 50.0_f32.to_bits());
     assert_eq!(
         (

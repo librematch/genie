@@ -259,7 +259,7 @@ fn the_clearing_reads_the_objects_on_its_tiles() {
 /// one whose record went (`+0x686`); a unit below state 3 loses it in its destroy's death
 /// part whatever the call; a building only when it is tall and not desolid.
 #[test]
-fn cleared_object_loses_its_record_by_its_type_and_the_call() {
+fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
     use crate::map::spatial::Tiles;
     let mut world = Spatial::with_tiles(
         GridSize::new(20, 20),
@@ -376,7 +376,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::new(near),
             },
             masters: Some(&masters),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             ai: false,
         }
         .first_part(c, &roles())
@@ -428,7 +428,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
                 near: Amount::ZERO,
             },
             masters: None,
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             ai,
         }
         .first_part(&built, &roles())
@@ -535,7 +535,7 @@ fn house() -> Placed {
         class: class::BUILDING,
         player: PlayerId::new(2),
         master: ids::HOUSE,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -661,7 +661,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         hit_points: MasterHitPoints::of_data(25),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -681,7 +681,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         walk,
         None,
         Some(&mut c.builders),
-        PlayerType::HUMAN,
+        PlayerKind::HUMAN,
     )
     .unwrap();
     assert_eq!(c.builders, BuilderCount::of_data(1));
@@ -704,7 +704,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
             walk,
             None,
             Some(&mut c.builders),
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
         )
         .unwrap();
     assert_eq!(working, before);
@@ -767,7 +767,7 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
             stack_unit: None,
             foundation_terrain: None,
             tech: None,
-            garrison_type: GarrisonKinds::NONE,
+            garrison_kind: GarrisonKinds::NONE,
             garrison_heal_rate: HitPoints::ZERO,
             garrison_repair_rate: HitPoints::ZERO,
             annexes: [None; 4],
@@ -874,7 +874,7 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -944,7 +944,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             hit_points: MasterHitPoints::of_data(100),
             build_time: WholeSeconds::of_data(100),
             record: Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::UNIT,
             },
             snow: Snow::None,
@@ -1037,7 +1037,7 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -1094,7 +1094,7 @@ fn the_work_starts_the_desolid_annexes_first() {
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -1187,7 +1187,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -1223,7 +1223,7 @@ fn an_annex_work_goes_to_its_main_building() {
         hit_points: MasterHitPoints::of_data(550),
         build_time: WholeSeconds::of_data(25),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,

@@ -151,7 +151,7 @@ impl Attack {
         let target = self.target.take();
         let_go(c, unit, target)?;
         self.point = Position::from([NONE; 3]);
-        let human = f.own.player != PlayerId::new(0) && !r.player_type.is_computer();
+        let human = f.own.player != PlayerId::new(0) && !r.player_kind.is_computer();
         let waits = match r.ai_order {
             AiOrder::Absent => true,
             AiOrder::Idle => false,
@@ -233,7 +233,7 @@ impl Attack {
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
         // The lion's unit-AI type, whose slot 0x1f0 (`FUN_140c16d60`) does nothing.
         if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && !matches!(r.ai_type, Some(BOAR_AI | LION_AI) | None)
+            && !matches!(r.ai_kind, Some(BOAR_AI | LION_AI) | None)
         {
             return Err(GenieError::unsupported(
                 "a predator's failed Attack whose unit AI is not a boar's or a lion's (slot 0x1f0)",
@@ -247,7 +247,7 @@ impl Attack {
             forget_target(c.w.parts.unit_ai.get_mut(unit.id));
         }
         if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && r.ai_type == Some(BOAR_AI)
+            && r.ai_kind == Some(BOAR_AI)
             && let Some(home) =
                 c.w.parts
                     .unit_ai

@@ -8,7 +8,7 @@ use crate::{ObjectId, Result};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::terrain::TerrainId;
-use genie_support::{UnitTypeId, read_opt_u32};
+use genie_support::{UnitKindId, read_opt_u32};
 use std::io::Read;
 
 /// Where a building sends the units it trains.
@@ -28,7 +28,7 @@ pub enum GatherPoint {
         /// The object.
         id: ObjectId,
         /// The object's unit type.
-        unit_type: UnitTypeId,
+        unit_kind: UnitKindId,
     },
 }
 
@@ -36,17 +36,17 @@ pub enum GatherPoint {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ProductionQueueEntry {
     /// The unit type to train.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// How many to train.
     pub count: u16,
 }
 
 impl ReadableHeaderElement for ProductionQueueEntry {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        let unit_type_id = input.read_u16::<LE>()?.into();
+        let unit_kind_id = input.read_u16::<LE>()?.into();
         let count = input.read_u16::<LE>()?;
         Ok(Self {
-            unit_type_id,
+            unit_kind_id,
             count,
         })
     }
@@ -113,7 +113,7 @@ pub struct BuildingUnitAttributes {
     /// The gate's close timer.
     pub close_timer: u32,
     /// A terrain, probably the one under the building; stored from save version 10.67 on.
-    pub terrain_type: Option<TerrainId>,
+    pub terrain_kind: Option<TerrainId>,
     /// Whether the building is semi-asleep (updated less often); stored from save version
     /// 11.43 on.
     pub semi_asleep: bool,
@@ -156,13 +156,13 @@ impl GatherPoint {
             z: input.read_f32::<LE>()?,
         };
         let object_id = input.read_i32::<LE>()?;
-        let unit_type_id = input.read_i16::<LE>()?;
-        Ok(match (exists, object_id, unit_type_id) {
+        let unit_kind_id = input.read_i16::<LE>()?;
+        Ok(match (exists, object_id, unit_kind_id) {
             (false, _, _) => None,
             (true, -1, -1) => Some(location),
-            (true, id, unit_type_id) => Some(Self::Object {
+            (true, id, unit_kind_id) => Some(Self::Object {
                 id: fits(id)?,
-                unit_type: fits(unit_type_id)?,
+                unit_kind: fits(unit_kind_id)?,
             }),
         })
     }
@@ -215,7 +215,7 @@ impl BuildingUnitAttributes {
             self.close_timer = input.read_u32::<LE>()?;
         }
         if input.version() >= 10.67 {
-            self.terrain_type = Some(input.read_u8()?.into());
+            self.terrain_kind = Some(input.read_u8()?.into());
         }
         if input.version() >= 11.43 {
             self.semi_asleep = input.read_u8()? != 0;

@@ -6,7 +6,7 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
@@ -77,7 +77,7 @@ impl UnitAi {
         &mut self,
         dt: Millis,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -87,7 +87,7 @@ impl UnitAi {
             let mut i = 0;
             while i < self.notifies.len() {
                 let n = *self.notifies.checked(i)?;
-                result = self.handle(n, dt, at, player_type, ai_rng, side)?;
+                result = self.handle(n, dt, at, player_kind, ai_rng, side)?;
                 if result == DEAD {
                     // "I'm dead, purging notifyQueue and returning FALSE.": the full update ends
                     self.processing = false;

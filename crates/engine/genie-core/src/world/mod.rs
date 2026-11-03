@@ -169,7 +169,7 @@ pub(crate) const BLOCKS_RESEARCH: [ActionKind; 3] =
     [ActionKind::ACTION_123, ActionKind::PACK, ActionKind::UNPACK];
 /// The first master type whose slot 0x128 (a work at an object) does something: the action
 /// objects' (`FUN_14106c590`) and up; below it `FUN_141071bd0` returns at once.
-pub(crate) const STATIC_TYPES_END: MasterKind = MasterKind::ACTION;
+pub(crate) const STATIC_KINDS_END: MasterKind = MasterKind::ACTION;
 
 /// The foundation terrain a building's death covers with terrain 1 (`FUN_1411dbb70`: `0x1c`).
 pub(crate) const RESTORED_FOUNDATION: TerrainId = TerrainId::named(28);

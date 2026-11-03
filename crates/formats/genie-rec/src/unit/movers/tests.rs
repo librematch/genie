@@ -50,7 +50,7 @@ fn path_has_disable_flags_before_10_25_and_enable_flags_from_10_20() {
     assert_eq!(
         [
             new.id,
-            new.linked_path_type,
+            new.linked_path_kind,
             new.waypoint_level,
             new.path_id
         ],

@@ -304,7 +304,7 @@ impl World {
                 position,
                 pasture: u.pasture,
                 untargetable: u.untargetable,
-                attribute: u.life.attribute_type,
+                attribute: u.life.attribute_kind,
                 amount: u.life.amount,
                 auto_gather: m.auto_gather.is_on(),
                 gather_group: m.gather_group,
@@ -319,7 +319,7 @@ impl World {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            player_type: owner.kind,
+            player_kind: owner.kind,
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };

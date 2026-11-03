@@ -30,7 +30,7 @@ mod task;
 mod tech;
 pub mod tech_tree;
 pub mod terrain;
-pub mod unit_type;
+pub mod unit_kind;
 
 pub use crate::civ::{Civilization, CivilizationId};
 pub use crate::color_table::{ColorTable, PaletteIndex};

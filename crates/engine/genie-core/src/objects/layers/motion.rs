@@ -166,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn motion_holds_the_layers_its_type_has() {
+    fn motion_holds_the_layers_its_kind_has() {
         let a = Animated::new(Speed::new(0.5));
         assert_eq!(Motion::of(None, None), None, "a static object has none");
         assert_eq!(

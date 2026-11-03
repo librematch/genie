@@ -113,7 +113,7 @@ const DEFEAT_IDS: usize = 25;
 /// The first of the attributes a defeat's event reads (300 + a player's id).
 const KILLS_OF: usize = 300;
 /// The action types whose stop keeps a value of the unit's (`+0x88a`, `FUN_14106fa60`).
-const KEEPING_TYPES: [ActionKind; 2] = [ActionKind::PACK, ActionKind::UNPACK];
+const KEEPING_KINDS: [ActionKind; 2] = [ActionKind::PACK, ActionKind::UNPACK];
 
 /// That attribute's bound (`DAT_14330eb8c`).
 const ONE_UNIT_AGE: f32 = GAME_STATUS_ONE_UNIT_AGE;

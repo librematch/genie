@@ -35,7 +35,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::sprite::new_sprite;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::layer::generated::SpriteTuning;
 use genie_diff::Diff;
@@ -235,7 +235,7 @@ pub(crate) struct GatherReads {
     pub(crate) farm_stops: bool,
     /// The gatherer's player's type (`player+0x10`): a computer player's (`FUN_141659cf0`)
     /// moved gatherer is done at the point.
-    pub(crate) player_type: PlayerType,
+    pub(crate) player_kind: PlayerKind,
     /// The player's attribute the task's `attribute_type2` names (none: 1.0), as the time per
     /// stop reads it.
     pub(crate) stop_productivity: Amount,

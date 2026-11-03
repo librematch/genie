@@ -89,13 +89,13 @@ pub fn facing_offset(at: Position, facing: Facing, other: Position) -> f32 {
 #[must_use]
 pub fn charge_works(
     charge_target: ChargeTarget,
-    charge_type: ChargeKind,
+    charge_kind: ChargeKind,
     class: ClassId,
     kind: MasterKind,
     roles: &Roles,
 ) -> bool {
     if charge_target == ChargeTarget::EVERY
-        || charge_type == ChargeKind::EVERY_TARGET
+        || charge_kind == ChargeKind::EVERY_TARGET
         || (charge_target == ChargeTarget::ALL_BUT_BUILDINGS
             && !(MasterKind::BUILDING <= kind
                 && !roles.of_class(class).contains(ClassRoles::PACKED_TREBUCHET)

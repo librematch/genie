@@ -45,7 +45,7 @@ pub mod unit;
 /// Unit actions (their current tasks) in the header.
 pub mod unit_action;
 /// Unit types (the per-player copies of the data file's units) in the header.
-pub mod unit_type;
+pub mod unit_kind;
 /// Game variant and version detection.
 pub mod version;
 
@@ -317,7 +317,7 @@ pub enum MapSize {}
 
 /// The map type (random map script) setting. Placeholder: no variants are modelled yet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum MapType {}
+pub enum MapKind {}
 
 /// The map visibility setting (normal, explored, all visible). Placeholder: no variants are
 /// modelled yet.
@@ -354,7 +354,7 @@ pub struct HdGameOptions {
     /// The map size.
     pub map_size: MapSize,
     /// The map type.
-    pub map_type: MapType,
+    pub map_kind: MapKind,
     /// The map visibility.
     pub visibility: Visibility,
     /// The starting resources.

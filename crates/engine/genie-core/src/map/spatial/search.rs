@@ -84,7 +84,7 @@ impl Spatial {
             self.visits_cell(level, x >> shift, y >> shift, query)
                 && !ignore.contains(&tile_record_id(Tile::new(x, y)))
                 && meets(
-                    ObstructionKind::TYPE_3,
+                    ObstructionKind::KIND_3,
                     Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0),
                 )
         });

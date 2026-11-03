@@ -220,7 +220,7 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
                 auto_work: e.get("auto_work").and_then(serde_json::Value::as_bool) != Some(false),
                 targets,
                 livestock: e.get("accepts_livestock").is_some(),
-                resource_types: e["update_ai_resource_types"]
+                resource_kinds: e["update_ai_resource_types"]
                     .as_array()
                     .map_or_else(Vec::new, Vec::clone)
                     .iter()

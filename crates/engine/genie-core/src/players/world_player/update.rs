@@ -7,7 +7,7 @@ use crate::objects::ObjectState;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::game_status::GameStatus;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{
@@ -33,7 +33,7 @@ impl World {
     pub fn update_world_player(&mut self, p: PlayerId) -> Result<(), GenieError> {
         let dt = self.dt_seconds;
         let player = self.players.player_mut(p)?;
-        if player.kind == PlayerType::GAIA {
+        if player.kind == PlayerKind::GAIA {
             player.gaia_update_time += dt;
             return Ok(());
         }
@@ -108,7 +108,7 @@ impl World {
                 Amount::ZERO,
             );
         }
-        if !matches!(player.kind, PlayerType::HUMAN | PlayerType::COMPUTER) {
+        if !matches!(player.kind, PlayerKind::HUMAN | PlayerKind::COMPUTER) {
             return Ok(());
         }
         self.defeat_check(p)?;

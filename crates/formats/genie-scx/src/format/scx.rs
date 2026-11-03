@@ -6,7 +6,7 @@ use crate::header::ScxHeader;
 use crate::map::Map;
 use crate::player::{ScenarioPlayerData, WorldPlayerData};
 use crate::triggers::TriggerSystem;
-use crate::types::ScxVersion;
+use crate::values::ScxVersion;
 use crate::{Error, Result, VersionBundle};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use flate2::Compression;

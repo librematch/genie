@@ -89,7 +89,7 @@ pub struct Lifecycle {
     /// The masked hit points (`+0x278`).
     pub hp: HitPoints,
     /// `+0x308`: the attribute of what the object holds, none for −1.
-    pub attribute_type: Option<AttributeId>,
+    pub attribute_kind: Option<AttributeId>,
     /// `+0x310`: how much it holds.
     pub amount: Amount,
     /// The master's death sprite (`+0x480`, the slot 0x7a0's): an animated object with one plays
@@ -119,7 +119,7 @@ impl Default for Lifecycle {
             class: Class::Static,
             state: ObjectState::Alive,
             hp: HitPoints::new(1.0),
-            attribute_type: None,
+            attribute_kind: None,
             amount: Amount::ZERO,
             dying_sprite: None,
             death_spawn: false,
@@ -137,7 +137,7 @@ impl Lifecycle {
     #[must_use]
     pub const fn held(&self) -> Held {
         Held {
-            kind: self.attribute_type,
+            kind: self.attribute_kind,
             amount: self.amount,
         }
     }
@@ -241,7 +241,7 @@ impl Lifecycle {
         let master = self
             .master
             .ok_or(GenieError::unsupported("no master data for a dead object"))?;
-        if self.attribute_type.is_none() || self.amount <= Amount::ZERO {
+        if self.attribute_kind.is_none() || self.amount <= Amount::ZERO {
             if master.undead {
                 return Err(GenieError::unsupported("an undead object (state 6)"));
             }
@@ -304,7 +304,7 @@ mod tests {
         // FLARE3 (MarvinBlue/426048731 object 10025): 1.0 of attribute 12, decay 1.0 per second;
         // the game's states after updates 1 to 13, then it is gone in update 14
         let flare = Lifecycle {
-            attribute_type: Some(AttributeId::named(12)),
+            attribute_kind: Some(AttributeId::named(12)),
             amount: Amount::new(1.0),
             master: Some(MasterData {
                 decay: AmountRate::new(1.0),
@@ -335,7 +335,7 @@ mod tests {
     fn the_decayed_amount_never_drops_below_zero() {
         let mut life = Lifecycle {
             state: ObjectState::Dying,
-            attribute_type: Some(AttributeId::named(12)),
+            attribute_kind: Some(AttributeId::named(12)),
             amount: Amount::new(0.05),
             master: Some(MasterData {
                 decay: AmountRate::new(1.0),
@@ -358,7 +358,7 @@ mod tests {
     fn an_animated_object_in_state_3_goes_on_to_4_or_5() {
         let held = |class, dying_sprite| Lifecycle {
             state: ObjectState::Dying,
-            attribute_type: Some(attribute::MEAT),
+            attribute_kind: Some(attribute::MEAT),
             amount: Amount::new(100.0),
             dying_sprite,
             ..dead(class)
@@ -449,7 +449,7 @@ mod tests {
         // MarvinBlue/426048731's Gaia objects 0, 1, 43, 44 and 47 in the header's state 7
         let mut life = Lifecycle {
             state: ObjectState::Removed,
-            attribute_type: Some(attribute::FOOD),
+            attribute_kind: Some(attribute::FOOD),
             ..dead(Class::Animated)
         };
         let mut object = Well512::default();
@@ -469,7 +469,7 @@ mod tests {
         // MarvinBlue/426048731's tree 9357 in update 1128: its second hit left 0 hit points; it
         // dies (state 3) and its falling sprite takes a random facet from the Object stream
         let mut tree = Lifecycle {
-            attribute_type: Some(attribute::WOOD),
+            attribute_kind: Some(attribute::WOOD),
             amount: Amount::new(100.0),
             death_spawn: true,
             death_facets: Some(FacetCount::of_data(8)),

@@ -137,7 +137,7 @@ mod tests {
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::{Master, Masters};
     #[cfg(test)]
-    use crate::players::PlayerType;
+    use crate::players::PlayerKind;
     #[cfg(test)]
     use crate::players::tracker::Key;
     use crate::test_ids::object_id;
@@ -280,7 +280,7 @@ mod tests {
     #[test]
     fn computer_player_receipt_is_not_modelled() {
         let mut t = world(true);
-        t.players[2].kind = PlayerType::COMPUTER;
+        t.players[2].kind = PlayerKind::COMPUTER;
         assert!(
             t.tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
                 .is_err()

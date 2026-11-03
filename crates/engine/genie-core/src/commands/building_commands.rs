@@ -23,7 +23,7 @@ use crate::technology::TechId;
 use crate::technology::{Attributes, TechKind, TechState, factors};
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::GameMode;
 use crate::world::index::Place;
 use crate::world::parts::Part;
@@ -188,7 +188,7 @@ impl World {
                     Some((tp, u)) => (
                         t,
                         Some(tp),
-                        OrderTargetType::of_class(u.master(turns.master_tables(), tp)?.class),
+                        OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
                     ),
                     None => (None, None, None),
                 };
@@ -207,7 +207,7 @@ impl World {
                     range: Distance::ZERO,
                     shown: Point::new(-1.0, -1.0),
                     ready: false,
-                    target_type: class,
+                    target_kind: class,
                 })
             };
         for &id in ids {

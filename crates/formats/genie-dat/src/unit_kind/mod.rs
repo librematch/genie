@@ -2,7 +2,7 @@
 
 use byteorder::{LE, WriteBytesExt};
 use genie_support::StringKey;
-pub use genie_support::UnitTypeId;
+pub use genie_support::UnitKindId;
 use std::cmp::{Ordering, PartialOrd};
 use std::convert::{TryFrom, TryInto};
 use std::io;
@@ -14,15 +14,15 @@ mod movers;
 mod statics;
 mod unit;
 
-pub use self::combat::{BaseCombatUnitTypeAttributes, MissileUnitTypeAttributes, WeaponInfo};
+pub use self::combat::{BaseCombatUnitKindAttributes, MissileUnitKindAttributes, WeaponInfo};
 pub use self::creatables::{
-    AttributeCost, BuildingUnitTypeAttributes, CombatUnitTypeAttributes, LinkedBuilding,
+    AttributeCost, BuildingUnitKindAttributes, CombatUnitKindAttributes, LinkedBuilding,
 };
 pub use self::movers::{
-    ActionUnitTypeAttributes, AnimatedUnitTypeAttributes, MovingUnitTypeAttributes,
+    ActionUnitKindAttributes, AnimatedUnitKindAttributes, MovingUnitKindAttributes,
 };
-pub use self::statics::{DamageSprite, StaticUnitTypeAttributes, UnitAttribute};
-pub use self::unit::UnitType;
+pub use self::statics::{DamageSprite, StaticUnitKindAttributes, UnitAttribute};
+pub use self::unit::UnitKind;
 use std::result::Result as StdResult;
 
 /// The base class of a unit indicates which data is available for that unit type.
@@ -34,7 +34,7 @@ use std::result::Result as StdResult;
 /// `Doppelganger`. Therefore, it compares like this:
 ///
 /// ```rust
-/// # use genie_dat::unit_type::UnitBaseClass;
+/// # use genie_dat::unit_kind::UnitBaseClass;
 /// assert!(UnitBaseClass::Doppelganger > UnitBaseClass::Animated);
 /// assert!(UnitBaseClass::Doppelganger == UnitBaseClass::Doppelganger);
 /// assert_eq!(UnitBaseClass::Doppelganger < UnitBaseClass::Moving, false);

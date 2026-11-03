@@ -25,7 +25,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::world_view::DropWorld;
 use crate::unit_ai::{Notify, NotifyKind, OrderPriority, QueuedOrder};
@@ -57,7 +57,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let (kind, class, at) = (master.kind, master.class, unit.position().ground());
-        let held = unit.life.attribute_type;
+        let held = unit.life.attribute_kind;
         let mut site = None;
         if !master.action_part().drop_sites.is_empty() {
             site = self.ordered_drop_site(p, idx)?;
@@ -151,7 +151,7 @@ impl World {
             pathing: &mut self.pathing,
             object: self.streams.get(Stream::Object),
             world_time: self.world_time,
-            player_type: player.kind,
+            player_kind: player.kind,
             groups: &self.groups,
         };
         let others = OthersRef::of(&self.players, &self.index, p)?;
@@ -218,7 +218,7 @@ impl World {
             .range;
         let (amount, held, at) = (
             unit.life.amount,
-            unit.life.attribute_type,
+            unit.life.attribute_kind,
             unit.position().ground(),
         );
         let class = unit.master(self.master_tables(), p)?.class;
@@ -318,7 +318,7 @@ impl World {
                 range: Distance::ZERO,
                 shown: place.ground(),
                 ready: true,
-                target_type: Some(OrderTargetType::of_master(master)),
+                target_kind: Some(OrderTargetKind::of_master(master)),
             };
             let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
         }
@@ -357,14 +357,14 @@ impl World {
                 let master = o.master(self.master_tables(), op)?.id;
                 (
                     Some(f.id),
-                    Some(OrderTargetType::of_master(master)),
+                    Some(OrderTargetKind::of_master(master)),
                     Some(op),
                     o.position().ground(),
                 )
             }
             None => (
                 record.target,
-                record.target_class.and_then(OrderTargetType::of_class),
+                record.target_class.and_then(OrderTargetKind::of_class),
                 None,
                 record.point,
             ),
@@ -374,7 +374,7 @@ impl World {
         let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
             return Ok(());
         };
-        let (id, target_type, owner, at) = target;
+        let (id, target_kind, owner, at) = target;
         let (x, y) = (at.x(), at.y());
         ai.insert_order(
             QueuedOrder {
@@ -387,7 +387,7 @@ impl World {
                 range: Distance::ZERO,
                 shown: Point::new(x, y),
                 ready: true,
-                target_type,
+                target_kind,
             },
             QueueEnd::Front,
         );

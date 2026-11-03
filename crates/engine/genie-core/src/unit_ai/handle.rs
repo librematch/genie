@@ -6,12 +6,12 @@ use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterKind;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
     ARTIFACT_AI, ARTIFACT_CARED, Effect, FISHING_AI, GO_ON, Memory, Notify, Pick, SIEGE_AI,
     SIEGE_TOWER_AI, Search, Surroundings, TRADE_AI, UnitAi, UnitSide, search_radius,
@@ -19,33 +19,33 @@ use crate::unit_ai::{
 use crate::world::Millis;
 
 impl UnitAi {
-    /// Slot 0x238 per factory type: each type's handler (`type_notifies.rs`), most of which pass
+    /// Slot 0x238 per factory type: each type's handler (`kind_notifies.rs`), most of which pass
     /// the notify on to the base handler ([`UnitAi::base_notify`]).
     pub(super) fn handle(
         &mut self,
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
-        match self.ai_type {
-            UnitAiType::HUNTED => self.hunted_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::BOAR => self.boar_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::LION => self.lion_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::CIVILIAN => self.villager_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::TRANSPORT | SIEGE_TOWER_AI => {
-                self.transport_notify(n, time, at, player_type, ai_rng, side)
+        match self.ai_kind {
+            UnitAiKind::HUNTED => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::BOAR => self.boar_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::LION => self.lion_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::CIVILIAN => self.villager_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::TRANSPORT | SIEGE_TOWER_AI => {
+                self.transport_notify(n, time, at, player_kind, ai_rng, side)
             }
-            TRADE_AI => self.trader_notify(n, time, at, player_type, ai_rng, side),
-            FISHING_AI => self.fishing_notify(n, time, at, player_type, ai_rng, side),
-            SIEGE_AI => self.siege_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::SOLDIER => self.soldier_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::TOWER => self.tower_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::BUILDING => self.building_notify(n, time, at, player_type, ai_rng, side),
-            UnitAiType::LIVESTOCK => self.livestock_notify(n, time, at, player_type, ai_rng, side),
-            ARTIFACT_AI => self.artifact_notify(n, time, at, player_type, ai_rng, side),
+            TRADE_AI => self.trader_notify(n, time, at, player_kind, ai_rng, side),
+            FISHING_AI => self.fishing_notify(n, time, at, player_kind, ai_rng, side),
+            SIEGE_AI => self.siege_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::SOLDIER => self.soldier_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::TOWER => self.tower_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::BUILDING => self.building_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::LIVESTOCK => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
+            ARTIFACT_AI => self.artifact_notify(n, time, at, player_kind, ai_rng, side),
             _ => Err(GenieError::unsupported(
                 "the notify handler of a unit-AI type not modelled",
             )),
@@ -67,7 +67,7 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -92,7 +92,7 @@ impl UnitAi {
                 .target
                 .is_some_and(|t| self.current_target.is_some() && t.sight.seen()),
             NotifyKind::SENT_OFF | NotifyKind::SENT_OFF_GROUP => {
-                return self.base_notify(n, time, at, player_type, ai_rng, side);
+                return self.base_notify(n, time, at, player_kind, ai_rng, side);
             }
             NotifyKind::ATTACKED => {
                 let _ = self.attackers.add(n.caller);
@@ -178,20 +178,20 @@ impl UnitAi {
         n: Notify,
         time: Millis,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         match n.kind {
-            NotifyKind::ACTION_COMPLETED => self.action_completed(n, at, player_type, ai_rng, side),
-            NotifyKind::ACTION_FAILED => self.action_failed(n, at, player_type, ai_rng, side),
+            NotifyKind::ACTION_COMPLETED => self.action_completed(n, at, player_kind, ai_rng, side),
+            NotifyKind::ACTION_FAILED => self.action_failed(n, at, player_kind, ai_rng, side),
             NotifyKind::ACTION_INVALIDATED => {
-                self.action_invalidated(n, at, player_type, ai_rng, side)
+                self.action_invalidated(n, at, player_kind, ai_rng, side)
             }
             NotifyKind::REQUIRES_SEARCH if self.explorer() => {
-                self.seek_unexplored(n, at, player_type, ai_rng, side)
+                self.seek_unexplored(n, at, player_kind, ai_rng, side)
             }
             NotifyKind::OWNER_CHANGED => {
                 side.effect_now(Effect::Stop, self, ai_rng)?;
@@ -204,7 +204,7 @@ impl UnitAi {
             // a MoveTo's moved target: with a saved patrol processIdle runs (slot 0x240 with 1),
             // its result unread
             NotifyKind::TARGET_MOVED if self.patrol_path.is_some() => {
-                let _ = self.process_idle(at, player_type, ai_rng, side)?;
+                let _ = self.process_idle(at, player_kind, ai_rng, side)?;
                 Ok(GO_ON)
             }
             // a moved target, then the kinds "I'm ignoring that." and the action values
@@ -223,7 +223,7 @@ impl UnitAi {
                 Ok(GO_ON)
             }
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.damaged(n, time, at, player_type, ai_rng, side)
+                self.damaged(n, time, at, player_kind, ai_rng, side)
             }
             NotifyKind::IN_THE_WAY => self.in_the_way(n, at, side, ai_rng),
             NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),

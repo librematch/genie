@@ -126,7 +126,7 @@ impl ActionKind {
 
 /// The types of `values`, in their order: a table the game holds by number.
 #[must_use]
-pub const fn types<const N: usize>(values: [i16; N]) -> [ActionKind; N] {
+pub const fn kinds<const N: usize>(values: [i16; N]) -> [ActionKind; N] {
     let mut out = [ActionKind(0); N];
     let mut i = 0;
     while i < N {

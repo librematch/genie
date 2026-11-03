@@ -600,7 +600,7 @@ mod tests {
                 attribute: Some(attribute::WOOD),
             }],
             livestock: false,
-            resource_types: vec![attribute::WOOD],
+            resource_kinds: vec![attribute::WOOD],
         }
     }
 

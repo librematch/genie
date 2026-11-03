@@ -29,7 +29,7 @@ use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
-use crate::unit_ai::{Issuer, OrderPriority, OrderTargetType, QueuedOrder};
+use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -192,7 +192,7 @@ impl World {
             let m = b.master(self.master_tables(), player)?;
             let takes_villagers = m
                 .building
-                .is_some_and(|x| x.garrison_type.contains(GarrisonKinds::VILLAGERS));
+                .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
             if b.life.state == ObjectState::Alive
                 && b.life.inside.is_none()
                 && m.kind == MasterKind::BUILDING
@@ -438,7 +438,7 @@ impl World {
                     range: Distance::ZERO,
                     shown: point.ground(),
                     ready: true,
-                    target_type: Some(OrderTargetType::of_master(master)),
+                    target_kind: Some(OrderTargetKind::of_master(master)),
                 };
                 let ai = self
                     .parts

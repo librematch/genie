@@ -5,7 +5,7 @@ use crate::fixtures::{
     action_list, combat_master, combat_mut, combat_object, missile_tuning, with_masters,
 };
 use crate::saved_unit::saved_missile;
-use crate::test_ids::action_type;
+use crate::test_ids::action_kind;
 use crate::test_ids::attribute;
 use crate::test_ids::class_id;
 use crate::test_ids::object_id;
@@ -44,10 +44,10 @@ use genie_core::objects::masters::TaskTerrain;
 use genie_core::objects::masters::WorkValue;
 use genie_core::objects::sprite::Graphic;
 use genie_core::objects::{Graphics, SpeedMultiplier};
-use genie_core::ownership::artifact::{ARTIFACT_TYPE, ArtifactState};
+use genie_core::ownership::artifact::{ARTIFACT_KIND, ArtifactState};
 use genie_core::world::Seconds;
 use genie_save::generated::world::{
-    Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByType, RgeActionEnter,
+    Action, PlayerObjects, RgeAction, RgeActionAttack, RgeActionByKind, RgeActionEnter,
     RgeActionGather, RgeActionMake, RgeActionMissile, RgeActionMoveTo, RgeMissileObject, RgeObject,
     TribeActionArtifact, TribeActionBuild, TribeActionHunt, TribeActionRepair,
     TribeActionWaitSolidify,
@@ -57,18 +57,18 @@ use genie_save::generated::world::{
 fn task(id: i16, range: f32) -> Task {
     Task {
         id: TaskId::of_task(id),
-        action_kind: action_type(0),
+        action_kind: action_kind(0),
         object_group: Some(class_id(3)),
         object_id: None,
         combat_level: 0,
         combat_level_flag: TaskFlags::NONE,
         terrain: TaskTerrain::NONE,
-        owner_type: TargetOwner::ANY,
+        owner_kind: TargetOwner::ANY,
         holding_attr: 0,
-        attribute_type: Some(attribute::WOOD),
-        attribute_type2: Some(attribute::STONE),
-        attribute_type3: Some(attribute::GOLD),
-        attribute_type4: Some(attribute::HEADROOM),
+        attribute_kind: Some(attribute::WOOD),
+        attribute_kind2: Some(attribute::STONE),
+        attribute_kind3: Some(attribute::GOLD),
+        attribute_kind4: Some(attribute::HEADROOM),
         wait_time: Seconds::ZERO,
         work_val1: WorkValue::new(0.5),
         work_val2: WorkValue::ZERO,
@@ -94,24 +94,24 @@ fn base(state: u8) -> RgeAction {
 }
 
 /// An action of the base factory's classes, its part set by `set`.
-fn by_type(set: impl FnOnce(&mut RgeActionByType)) -> Action {
-    let mut parts = RgeActionByType::default();
+fn by_kind(set: impl FnOnce(&mut RgeActionByKind)) -> Action {
+    let mut parts = RgeActionByKind::default();
     set(&mut parts);
     Action {
-        rge_action_by_type: Some(Box::new(parts)),
+        rge_action_by_kind: Some(Box::new(parts)),
         ..Action::default()
     }
 }
 
 /// An Explore (its base alone) of `b`.
 fn explore(b: RgeAction) -> Action {
-    by_type(|t| t.rge_action_explore = Some(Box::new(b)))
+    by_kind(|t| t.rge_action_explore = Some(Box::new(b)))
 }
 
 /// A `MoveTo` in state `state` to its base's point, its range `range`, asked again after its
 /// wait (wait state 2, timer 0.25, delay 0.5).
 fn move_to(state: u8, range: f32) -> Action {
-    by_type(|t| {
+    by_kind(|t| {
         t.rge_action_move_to = Some(Box::new(RgeActionMoveTo {
             // no sprite (`+0x58` null)
             rge_action: RgeAction {
@@ -209,7 +209,7 @@ fn second_target_or_an_unknown_action_is_unsupported() {
         GenieError::unsupported("a saved action with a second target")
     );
     assert_eq!(
-        imported(action_type(99), explore(base(0))).unwrap_err(),
+        imported(action_kind(99), explore(base(0))).unwrap_err(),
         GenieError::unsupported("a saved action the slice does not import")
     );
 }
@@ -296,7 +296,7 @@ fn move_to_takes_its_state_point_range_and_wait() {
 fn move_to_wait_state_of_none_fails() {
     let mut walk = move_to(4, 0.5);
     if let Some(m) = walk
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref_mut()
         .and_then(|t| t.rge_action_move_to.as_deref_mut())
     {
@@ -321,7 +321,7 @@ fn move_to_takes_its_sprite_from_the_sprites_table() {
     let graphics = Graphics::from([(walking.id, walking)]);
     let mut action = move_to(4, 0.5);
     let mut shown = |sprite: i16, graphics| {
-        let parts = action.rge_action_by_type.as_deref_mut().unwrap();
+        let parts = action.rge_action_by_kind.as_deref_mut().unwrap();
         parts
             .rge_action_move_to
             .as_deref_mut()
@@ -361,7 +361,7 @@ fn artifact(b: RgeAction) -> Action {
 /// to 6.
 #[test]
 fn an_artifact_waits_or_walks_to_its_target() {
-    let a = imported(ARTIFACT_TYPE, artifact(base(ArtifactState::Wait.get())))
+    let a = imported(ARTIFACT_KIND, artifact(base(ArtifactState::Wait.get())))
         .unwrap()
         .list
         .artifact()
@@ -376,7 +376,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     b.target_id = 9;
     b.target_x = 4.0;
     let a = imported(
-        ARTIFACT_TYPE,
+        ARTIFACT_KIND,
         artifact(with_sub(b.clone(), MOVE_TO, move_to(4, 0.5))),
     )
     .unwrap()
@@ -393,7 +393,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!(walk.range.get().to_bits(), 0.5_f32.to_bits());
     let mut to_object = move_to(4, 0.5);
     to_object
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref_mut()
         .unwrap()
         .rge_action_move_to
@@ -402,7 +402,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .rge_action
         .target_id = 9;
     let a = imported(
-        ARTIFACT_TYPE,
+        ARTIFACT_KIND,
         artifact(with_sub(b.clone(), MOVE_TO, to_object)),
     )
     .unwrap()
@@ -417,7 +417,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     // the target's place is its goal however near the origin; an unset place (-1) is none
     let mut near = base(ArtifactState::Check.get());
     near.target_id = 9;
-    let a = imported(ARTIFACT_TYPE, artifact(near.clone()))
+    let a = imported(ARTIFACT_KIND, artifact(near.clone()))
         .unwrap()
         .list
         .artifact()
@@ -425,7 +425,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .unwrap();
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
     near.target_x = -1.0;
-    let a = imported(ARTIFACT_TYPE, artifact(near))
+    let a = imported(ARTIFACT_KIND, artifact(near))
         .unwrap()
         .list
         .artifact()
@@ -434,7 +434,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!(a.goal, None);
     // without a target the goal is the MoveTo's point, the action's own
     let a = imported(
-        ARTIFACT_TYPE,
+        ARTIFACT_KIND,
         artifact(with_sub(
             base(ArtifactState::Check.get()),
             MOVE_TO,
@@ -451,7 +451,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!(a.move_to().copied().map(|m| m.voice), Some(Voice::Loud));
     assert_eq!(
         imported(
-            ARTIFACT_TYPE,
+            ARTIFACT_KIND,
             artifact(with_sub(b.clone(), MOVE_TO, explore(base(4))))
         )
         .unwrap_err(),
@@ -459,7 +459,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     );
     assert_eq!(
         imported(
-            ARTIFACT_TYPE,
+            ARTIFACT_KIND,
             artifact(with_sub(b, EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
@@ -476,7 +476,7 @@ fn missile() -> genie_save::Object {
 fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
     let mut b = base(MissileState::Flying.get());
     b.target2_id = 900;
-    let action = by_type(|t| {
+    let action = by_kind(|t| {
         t.rge_action_missile = Some(Box::new(RgeActionMissile {
             rge_action: b,
             distance,
@@ -540,7 +540,7 @@ fn missile_flies_with_its_actions_course() {
         imported(MISSILE, explore(base(2))).unwrap_err(),
         GenieError::unsupported("a saved missile action without its part")
     );
-    let not_missile = by_type(|t| t.rge_action_missile = Some(Box::default()));
+    let not_missile = by_kind(|t| t.rge_action_missile = Some(Box::default()));
     assert_eq!(
         imported(MISSILE, not_missile).unwrap_err(),
         GenieError::unsupported("a missile action of an object that is not a missile")
@@ -551,7 +551,7 @@ fn missile_flies_with_its_actions_course() {
 fn farms_make_takes_its_timers_and_task() {
     use genie_core::gathering::make::{MAKE, MakeState};
     let make = |b: RgeAction| {
-        by_type(|t| {
+        by_kind(|t| {
             t.rge_action_make = Some(Box::new(RgeActionMake {
                 rge_action: b,
                 work_timer: 9.0,
@@ -584,7 +584,7 @@ fn farms_make_takes_its_timers_and_task() {
 #[test]
 fn birds_fly_takes_its_home_and_move_to() {
     use genie_core::movement::fly::{FLY, FlyState};
-    let bird = |b: RgeAction| by_type(|t| t.rge_action_bird = Some(Box::new(b)));
+    let bird = |b: RgeAction| by_kind(|t| t.rge_action_bird = Some(Box::new(b)));
     let f = imported(FLY, bird(base(3)))
         .unwrap()
         .list
@@ -673,7 +673,7 @@ fn build_takes_its_task_move_to_and_site() {
     // the drop-off's MoveTo with the carrying sprite 12 (its `+0x58`)
     let mut carrying = move_to(4, 0.75);
     carrying
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_mut()
         .and_then(|t| t.rge_action_move_to.as_mut())
         .expect("a MoveTo")
@@ -780,7 +780,7 @@ fn hunt(b: RgeAction) -> Action {
     Action {
         tribe_action_hunt: Some(Box::new(TribeActionHunt {
             rge_action: b,
-            target_type: 4,
+            target_kind: 4,
             moved_sheep: 1,
             sheep_still_time: 3,
             sheep_start_x: 6.0_f32.to_bits(),
@@ -846,7 +846,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
             MoveWaitState::AskedAgain
         )
     );
-    let attack = by_type(|t| {
+    let attack = by_kind(|t| {
         t.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(4),
             ..RgeActionAttack::default()
@@ -897,10 +897,10 @@ fn hunt_takes_its_task_lead_and_move_to() {
 }
 
 fn gather(b: RgeAction) -> Action {
-    by_type(|t| {
+    by_kind(|t| {
         t.rge_action_gather = Some(Box::new(RgeActionGather {
             rge_action: b,
-            target_type: 5,
+            target_kind: 5,
             number_stops: 2,
             farm_x: 3.0,
             ..RgeActionGather::default()
@@ -1149,7 +1149,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
 
 #[test]
 fn an_attack_needs_the_sprites_table() {
-    let attack = by_type(|t| {
+    let attack = by_kind(|t| {
         t.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(4),
             ..RgeActionAttack::default()
@@ -1218,7 +1218,7 @@ fn swing_sprites() -> Graphics {
 /// An Attack in state `state` that walks with sprite `walk` (`short_val`) and swings sprite 21
 /// (`short_val_2`), with a hit to come (`need_to_attack`) for `pending`.
 fn attack(state: u8, walk: u16, pending: bool) -> Action {
-    by_type(|t| {
+    by_kind(|t| {
         t.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(state),
             short_val: walk,

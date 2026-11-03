@@ -26,7 +26,7 @@ use crate::players::PlayerId;
 use crate::production::QueuedUnits;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::QueueEnd;
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
 use crate::vision::SightShape;
@@ -39,7 +39,7 @@ use crate::objects::layers::{Action, Combat, DefaultTask, Motion, Static};
 use crate::objects::lifecycle::death_parts::count_class;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::technology::Attributes;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::{NewObject, Notify, UnitAi};
@@ -214,7 +214,7 @@ impl World {
         // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`): an order
         // whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
         let relic_order = |q: &QueuedOrder| {
-            q.target_type.is_some_and(|t| {
+            q.target_kind.is_some_and(|t| {
                 self.model
                     .roles
                     .of_class(t.class())
@@ -258,7 +258,7 @@ impl World {
     ) -> Result<NewObject, GenieError> {
         let owner = self.players.player(p)?;
         Ok(NewObject {
-            player_type: owner.kind,
+            player_kind: owner.kind,
             posture: owner.posture,
             // The player's attribute a new soldier's unit AI reads: the current age (`player+0x100` at
             // `+0x30`, `FUN_140c12300`).
@@ -346,7 +346,7 @@ impl World {
                 )
             })
         });
-        let ai_type = unit_ai_type(made, master, &self.model.roles).ok_or(
+        let ai_kind = unit_ai_kind(made, master, &self.model.roles).ok_or(
             GenieError::unsupported("a new combat unit without a unit AI"),
         )?;
         let new_object = self.new_object(p, master, made, position)?;
@@ -359,7 +359,7 @@ impl World {
         let id = self.take_object_id(p, master);
         let (sprite, facets, angle) = self.setup_draws(standing);
         let ai = UnitAi::constructed(
-            ai_type,
+            ai_kind,
             &new_object,
             self.streams.get(Stream::Ai),
             &self.model.roles,
@@ -467,7 +467,7 @@ impl World {
                 class: Class::Animated,
                 state: ObjectState::Alive,
                 hp: HitPoints::of_master(made.hit_points),
-                attribute_type: None,
+                attribute_kind: None,
                 amount: Amount::ZERO,
                 dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),
@@ -489,7 +489,7 @@ impl World {
                 // livestock's default task, the Artifact, starts once its action list is empty
                 default_task: if made
                     .default_task()
-                    .is_some_and(|t| t.action_kind == ARTIFACT_TYPE)
+                    .is_some_and(|t| t.action_kind == ARTIFACT_KIND)
                 {
                     DefaultTask::Artifact
                 } else {

@@ -7,16 +7,16 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
-use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
     ARTIFACT_AI, CIVILIAN, Notify, QueuedOrder, SIEGE_AI, SIEGE_TOWER_AI, Surroundings, UnitAi,
     UnitSide, civilian_may_attack, lion_may_attack,
@@ -53,7 +53,7 @@ impl UnitAi {
     pub(super) fn order_now(
         &mut self,
         now: OrderNow,
-        world: Option<(&Surroundings, PlayerType)>,
+        world: Option<(&Surroundings, PlayerKind)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
         layer: AiLayer<'_>,
@@ -77,7 +77,7 @@ impl UnitAi {
                 range: self.desired_distance,
                 shown: order.shown,
                 ready: order.ready,
-                target_type: self.target_class.and_then(OrderTargetType::of_class),
+                target_kind: self.target_class.and_then(OrderTargetKind::of_class),
             };
             self.insert_order(kept, QueueEnd::Front);
         }
@@ -154,31 +154,31 @@ impl UnitAi {
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
         let roles = &at.roles;
         if matches!(
-            self.ai_type,
-            UnitAiType::SOLDIER | UnitAiType::TOWER | SIEGE_AI
+            self.ai_kind,
+            UnitAiKind::SOLDIER | UnitAiKind::TOWER | SIEGE_AI
         ) {
             return side.may_attack(target, &self.seeker(at));
         }
         let Some(t) = Self::world_object(target, at, side)? else {
             return Ok(None);
         };
-        let may = match self.ai_type {
+        let may = match self.ai_kind {
             // FUN_140c48400, the base's: the boar's, the ranged units' (6, 7), the trade
             // ship's, the transport ship's, the fishing ship's, the artifact's, the siege
             // tower's and the livestock's
-            UnitAiType::BOAR
-            | UnitAiType::RANGED_6
-            | UnitAiType::RANGED_7
-            | UnitAiType::TRADE
-            | UnitAiType::TRANSPORT
-            | UnitAiType::FISHING
+            UnitAiKind::BOAR
+            | UnitAiKind::RANGED_6
+            | UnitAiKind::RANGED_7
+            | UnitAiKind::TRADE
+            | UnitAiKind::TRANSPORT
+            | UnitAiKind::FISHING
             | ARTIFACT_AI
             | SIEGE_TOWER_AI
-            | UnitAiType::LIVESTOCK => true,
-            UnitAiType::LION => any || lion_may_attack(at.attack_priority, t.class, roles),
+            | UnitAiKind::LIVESTOCK => true,
+            UnitAiKind::LION => any || lion_may_attack(at.attack_priority, t.class, roles),
             CIVILIAN => civilian_may_attack(at.attack_priority, t.class, roles),
             // FUN_140c18b60
-            UnitAiType::BUILDING => false,
+            UnitAiKind::BUILDING => false,
             _ => {
                 return Err(GenieError::unsupported(
                     "AttackObject's slot 0xa0 of a unit AI type not modelled",

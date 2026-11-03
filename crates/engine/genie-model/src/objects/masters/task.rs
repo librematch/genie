@@ -40,19 +40,19 @@ pub struct Task {
     /// `+0x16`: the terrain the task is for, -1 for none.
     pub terrain: TaskTerrain,
     /// `+0x18`, `owner_type` (`target_diplomacy`): whose targets.
-    pub owner_type: TargetOwner,
+    pub owner_kind: TargetOwner,
     /// `+0x19`, `holding_attr` (`carry_check`): 1 wants a target holding the task's resource.
     pub holding_attr: u8,
     /// `+0x20` to `+0x26`, `attribute_type` to `attribute_type4` (`resource_in`,
     /// `resource_multiplier`: the attribute that scales the gathering, `resource_out`,
     /// `unused_resource`).
-    pub attribute_type: Option<AttributeId>,
+    pub attribute_kind: Option<AttributeId>,
     /// `+0x22`, `attribute_type2` (`resource_multiplier`): the attribute that scales the gathering.
-    pub attribute_type2: Option<AttributeId>,
+    pub attribute_kind2: Option<AttributeId>,
     /// `+0x24`, `attribute_type3` (`resource_out`).
-    pub attribute_type3: Option<AttributeId>,
+    pub attribute_kind3: Option<AttributeId>,
     /// `+0x26`, `attribute_type4` (`unused_resource`).
-    pub attribute_type4: Option<AttributeId>,
+    pub attribute_kind4: Option<AttributeId>,
     /// `+0x1c`, `search_wait_time`: a Fly task's rest between flights.
     pub wait_time: Seconds,
     /// `+0x28`, the save's `work_val1`; `+0x2c`, `work_val2`.
@@ -94,12 +94,12 @@ impl Default for Task {
             combat_level: 0,
             combat_level_flag: TaskFlags::NONE,
             terrain: TaskTerrain::NONE,
-            owner_type: TargetOwner::ANY,
+            owner_kind: TargetOwner::ANY,
             holding_attr: 0,
-            attribute_type: None,
-            attribute_type2: None,
-            attribute_type3: None,
-            attribute_type4: None,
+            attribute_kind: None,
+            attribute_kind2: None,
+            attribute_kind3: None,
+            attribute_kind4: None,
             wait_time: Seconds::ZERO,
             work_val1: WorkValue::ZERO,
             work_val2: WorkValue::ZERO,

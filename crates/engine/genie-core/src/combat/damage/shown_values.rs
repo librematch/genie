@@ -99,7 +99,7 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
             target
         };
         // the task's `+0x26` read as a flag: other than 0 (none, −1, is other too)
-        let share = whose.hp_share(AttributeId::field(t.attribute_type4) != 0);
+        let share = whose.hp_share(AttributeId::field(t.attribute_kind4) != 0);
         if fmath::at_most_or_unordered(t.work_val2.get(), 0.0)
             || fmath::at_most_or_unordered(target.shown_hp().get(), 0.0)
         {

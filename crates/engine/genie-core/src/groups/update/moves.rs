@@ -422,7 +422,7 @@ impl World {
         let Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
-        let player_type = self.players.player(p)?.kind;
+        let player_kind = self.players.player(p)?.kind;
         // the member is out of its slot for its step, as the updating object is
         let mut unit = self.take_out(p, idx)?;
         let me = unit.me(self.parts.actions_of(unit.id));
@@ -434,7 +434,7 @@ impl World {
                 let mut plan = Planning {
                     pathing: &mut self.pathing,
                     now: self.world_time,
-                    player_type,
+                    player_kind,
                     object: self.streams.get(Stream::Object),
                     groups: &self.groups,
                 };

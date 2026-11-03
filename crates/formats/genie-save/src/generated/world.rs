@@ -288,16 +288,16 @@ pub struct GameOptions {
     pub map_size: u32,
     /// game: `&mUserChosenMapType`
     /// read by 0x140c949d0, a routine of one read
-    pub user_chosen_map_type: i32,
+    pub user_chosen_map_kind: i32,
     /// game: `&mResolvedMapType`
     /// read by 0x140c949d0, a routine of one read
-    pub resolved_map_type: i32,
+    pub resolved_map_kind: i32,
     /// game: `&mVisibilityType`
     /// read by 0x1412de4f0, a routine of one read
-    pub visibility_type: i32,
+    pub visibility_kind: i32,
     /// game: `&mVictory.getType()`
     /// read by 0x1412de2d0, a routine of one read
-    pub victory_get_type: i32,
+    pub victory_get_kind: i32,
     /// game: `&mResourceLevel`
     /// read by 0x1412de0b0, a routine of one read
     pub resource_level: i32,
@@ -486,7 +486,7 @@ pub struct GameOptions {
     pub game_title: SigString,
     /// game: `&mMatchType`
     /// read by 0x1412dd5e0, a routine of one read
-    pub match_type: u64,
+    pub match_kind: u64,
     /// game: `&mModdedDatasetTitle`
     /// read by 0x1412dd030, a routine of one read
     pub modded_dataset_title: SigString,
@@ -517,7 +517,7 @@ pub struct GameOptions {
     pub campaign_key: SigString,
     /// game: `&mMapStyleType`
     /// read by 0x1412dd3e0, a routine of one read
-    pub map_style_type: u32,
+    pub map_style_kind: u32,
     /// game: `&mCollideAndCorrecting`
     /// read by 0x1412dd820, a routine of one read
     pub collide_and_correcting: u8,
@@ -592,10 +592,10 @@ impl Default for GameOptions {
             game_options_dlcs: Default::default(),
             difficulty: Default::default(),
             map_size: Default::default(),
-            user_chosen_map_type: Default::default(),
-            resolved_map_type: Default::default(),
-            visibility_type: Default::default(),
-            victory_get_type: Default::default(),
+            user_chosen_map_kind: Default::default(),
+            resolved_map_kind: Default::default(),
+            visibility_kind: Default::default(),
+            victory_get_kind: Default::default(),
             resource_level: Default::default(),
             starting_age: Default::default(),
             ending_age: Default::default(),
@@ -655,7 +655,7 @@ impl Default for GameOptions {
             custom_xs_files: Default::default(),
             game_id: Default::default(),
             game_title: Default::default(),
-            match_type: Default::default(),
+            match_kind: Default::default(),
             modded_dataset_title: Default::default(),
             modded_dataset_workshop_id: Default::default(),
             modded_dataset_crc: Default::default(),
@@ -665,7 +665,7 @@ impl Default for GameOptions {
             player_info_get_in_lobby: Default::default(),
             start_button_pressed: Default::default(),
             campaign_key: Default::default(),
-            map_style_type: Default::default(),
+            map_style_kind: Default::default(),
             collide_and_correcting: Default::default(),
             villager_force_drop: Default::default(),
             block_humanity_team_change: Default::default(),
@@ -783,7 +783,7 @@ pub struct TribePlayerTechEntry1 {
     pub tech_player_tree_cost_amount_override: u16,
     /// game: `(tech_player_tree[index].mCostAttributeTypeOverride[j])`
     /// read at 0x1413c38ae; named by the save's write in the same place (0x1413d1a60, write at 0x1413d22bf)
-    pub tech_player_tree_cost_attribute_type_override: u16,
+    pub tech_player_tree_cost_attribute_kind_override: u16,
     /// game: `(tech_player_tree[index].mCostAttributeUsedOverride[j])`
     /// read at 0x1413c3965; named by the save's write in the same place (0x1413d1a60, write at 0x1413d2358)
     pub tech_player_tree_cost_attribute_used_override: u16,
@@ -1100,7 +1100,7 @@ pub struct TechTreeEntry1 {
     pub tech_tree_ages_max_age_len: u8,
     /// game: `(mTech_tree_ages[cntr1].node_type)`
     /// read at 0x1413eaa84
-    pub tech_tree_ages_node_type: u32,
+    pub tech_tree_ages_node_kind: u32,
 }
 
 impl Default for TechTreeEntry1 {
@@ -1119,7 +1119,7 @@ impl Default for TechTreeEntry1 {
             tech_tree_ages_bld_per_zone: vec![Default::default(); 10],
             tech_tree_ages_grp_len_per_zone: vec![Default::default(); 10],
             tech_tree_ages_max_age_len: Default::default(),
-            tech_tree_ages_node_type: Default::default(),
+            tech_tree_ages_node_kind: Default::default(),
         }
     }
 }
@@ -1169,7 +1169,7 @@ pub struct TechTreeEntry2 {
     pub tech_tree_buildings_num_unit_tech_zones_per_ages: [u8; 5],
     /// game: `(mTech_tree_buildings[cntr1].node_type)`
     /// read at 0x1413eca18
-    pub tech_tree_buildings_node_type: u32,
+    pub tech_tree_buildings_node_kind: u32,
     /// game: `(mTech_tree_buildings[cntr1].inabling_tech_id)`
     /// read at 0x1413eca81
     pub tech_tree_buildings_inabling_tech_id: i32,
@@ -1190,7 +1190,7 @@ impl Default for TechTreeEntry2 {
             tech_tree_buildings_level_no: Default::default(),
             tech_tree_buildings_dep_units_tech_per_ages: Default::default(),
             tech_tree_buildings_num_unit_tech_zones_per_ages: Default::default(),
-            tech_tree_buildings_node_type: Default::default(),
+            tech_tree_buildings_node_kind: Default::default(),
             tech_tree_buildings_inabling_tech_id: Default::default(),
         }
     }
@@ -1230,7 +1230,7 @@ pub struct TechTreeEntry3 {
     pub tech_tree_units_trigger_tech_id: i32,
     /// game: `(mTech_tree_units[cntr1].node_type)`
     /// read at 0x1413ee5ca
-    pub tech_tree_units_node_type: u32,
+    pub tech_tree_units_node_kind: u32,
     /// game: `(mTech_tree_units[cntr1].inabling_tech_id)`
     /// read at 0x1413ee632
     pub tech_tree_units_inabling_tech_id: i32,
@@ -1248,7 +1248,7 @@ impl Default for TechTreeEntry3 {
             tech_tree_units_dependent_unit_ids: Default::default(),
             tech_tree_units_level_no: Default::default(),
             tech_tree_units_trigger_tech_id: Default::default(),
-            tech_tree_units_node_type: Default::default(),
+            tech_tree_units_node_kind: Default::default(),
             tech_tree_units_inabling_tech_id: Default::default(),
         }
     }
@@ -1299,7 +1299,7 @@ pub struct TechTreeEntry4 {
     pub tech_tree_techs_level_no: i32,
     /// game: `(mTech_tree_techs[cntr1].node_type)`
     /// read at 0x1413efc73
-    pub tech_tree_techs_node_type: u32,
+    pub tech_tree_techs_node_kind: u32,
 }
 
 impl Default for TechTreeEntry4 {
@@ -1317,7 +1317,7 @@ impl Default for TechTreeEntry4 {
             tech_tree_techs_tech_preregs: [Default::default(); 84],
             tech_tree_techs_grp_id: Default::default(),
             tech_tree_techs_level_no: Default::default(),
-            tech_tree_techs_node_type: Default::default(),
+            tech_tree_techs_node_kind: Default::default(),
         }
     }
 }
@@ -2754,7 +2754,7 @@ pub struct TribeTacticalRecord {
     pub target_value: i32,
     /// game: `targetTypeValue`
     /// read at 0x140bd47a0
-    pub target_type_value: i32,
+    pub target_kind_value: i32,
     /// game: `targetLocationValue`
     /// read at 0x140bd4950
     pub target_location_value: [u8; 16],
@@ -2769,13 +2769,13 @@ pub struct TribeTacticalRecord {
     pub assist_group_id_value: i32,
     /// game: `assistGroupTypeValue`
     /// read at 0x140bd51ed
-    pub assist_group_type_value: i32,
+    pub assist_group_kind_value: i32,
     /// game: `typeValue`
     /// read at 0x140bd533d
-    pub type_value: i32,
+    pub kind_value: i32,
     /// game: `subTypeValue`
     /// read at 0x140bd545b
-    pub sub_type_value: i32,
+    pub sub_kind_value: i32,
     /// game: `mIdleTimer`
     /// read at 0x140bd55ad
     pub idle_timer: u32,
@@ -2830,14 +2830,14 @@ impl Default for TribeTacticalRecord {
             desired_number_units_value: Default::default(),
             action_value: Default::default(),
             target_value: Default::default(),
-            target_type_value: Default::default(),
+            target_kind_value: Default::default(),
             target_location_value: Default::default(),
             gather_location_value: Default::default(),
             priority_value: Default::default(),
             assist_group_id_value: Default::default(),
-            assist_group_type_value: Default::default(),
-            type_value: Default::default(),
-            sub_type_value: Default::default(),
+            assist_group_kind_value: Default::default(),
+            kind_value: Default::default(),
+            sub_kind_value: Default::default(),
             idle_timer: Default::default(),
             consecutive_gather_attempts_value: Default::default(),
             number_objects_to_destroy_value: Default::default(),
@@ -3538,7 +3538,7 @@ pub struct XsVariableEntry {
     pub symbol_id: i32,
     /// game: `&mType`
     /// helper 0x140a91060
-    pub type_: i32,
+    pub kind: i32,
     /// game: `&mModifiers`
     /// helper 0x140c94e10
     pub modifiers: u8,
@@ -3547,11 +3547,11 @@ pub struct XsVariableEntry {
     pub data_length: i32,
     /// game: `(BYTE*)(mData+sizeof(int32_t))`
     /// helper 0x140c94660
-    #[br(if((type_ == 16) || (type_ == 64)), count = data_length.max(0) as usize)]
+    #[br(if((kind == 16) || (kind == 64)), count = data_length.max(0) as usize)]
     pub datasizeofint32_t: Option<Vec<u8>>,
     /// game: `(BYTE*)mData`
     /// helper 0x140c94660
-    #[br(if(!((type_ == 16) || (type_ == 64))), count = data_length.max(0) as usize)]
+    #[br(if(!((kind == 16) || (kind == 64))), count = data_length.max(0) as usize)]
     pub data: Option<Vec<u8>>,
 }
 
@@ -3569,7 +3569,7 @@ pub struct BxsSyscallEntry {
     pub symbol_id: i32,
     /// game: `&mReturnType`
     /// read at 0x14173a1b1
-    pub return_type: u8,
+    pub return_kind: u8,
     /// game: `&mContext`
     /// read at 0x14173a673
     pub context: u8,
@@ -3600,7 +3600,7 @@ pub struct BxsSymbol {
     pub symbol: Option<Vec<u8>>,
     /// game: `&mType`
     /// helper 0x140c94e10
-    pub type_: u8,
+    pub kind: u8,
     /// game: `&mValue`
     /// helper 0x140a91060
     pub value: i32,
@@ -3643,7 +3643,7 @@ pub struct BxsSymbolTable {
     pub invalid_value: i32,
     /// game: `&mInvalidType`
     /// helper 0x140c94e10
-    pub invalid_type: u8,
+    pub invalid_kind: u8,
     /// a loop of 2 reads; named after its count `hash_table_size`
     #[br(count = hash_table_size.max(0) as usize, args { inner: (ver,) })]
     pub hash_table: Vec<BxsSymbolTableEntry1>,
@@ -3935,7 +3935,7 @@ pub struct BxsFunctionEntry {
     pub line_number: i32,
     /// game: `&mReturnType`
     /// helper 0x140c94e10
-    pub return_type: u8,
+    pub return_kind: u8,
     /// game: `&mCodeOffset`
     /// helper 0x140a91060
     pub code_offset: i32,
@@ -4062,7 +4062,7 @@ pub struct BxsDataEntry2 {
     pub info_array_id: i32,
     /// game: `&info->mArrayType`
     /// helper 0x140a91060
-    pub info_array_type: i32,
+    pub info_array_kind: i32,
 }
 
 #[binrw]
@@ -4136,7 +4136,7 @@ pub struct BxsDataEntry7 {
 pub struct BxsDataEntry8 {
     /// game: `&type`
     /// helper 0x140a91060
-    pub type_: i32,
+    pub kind: i32,
     /// game: `&size`
     /// helper 0x140a91060
     pub size: i32,
@@ -4490,7 +4490,7 @@ pub struct WorldPlayer {
     /// game: `&type`
     /// helper 0x1415073f0
     #[brw(magic = b"\x0b")]
-    pub type_: u8,
+    pub kind: u8,
     /// game: `update_count`
     /// read at 0x1415f1514; named by the save's write of this member at 0x141631947
     pub update_count: i32,
@@ -4661,10 +4661,10 @@ pub struct WorldPlayer {
     pub tech_tree_help: TechTree,
     /// game: `&mIsScoutMapEnabled`
     /// helper 0x140a91060
-    #[br(if(type_ == 1))]
+    #[br(if(kind == 1))]
     pub is_scout_map_enabled: Option<i32>,
     /// read by 0x140f4c080; named by the save's write in the same place (0x141631420)
-    #[br(if(type_ == 1 && is_scout_map_enabled.unwrap_or_default() != 0), args(ver))]
+    #[br(if(kind == 1 && is_scout_map_enabled.unwrap_or_default() != 0), args(ver))]
     pub scout_map: Option<Box<TribeInformationAiModule>>,
     /// game: `&mFinalBattleRoyalePosition`
     /// helper 0x140b4b760
@@ -4684,18 +4684,18 @@ pub struct WorldPlayer {
     pub marker: (),
     /// game: `temp`
     /// read at 0x1415f3df2; named by the save's write in the same place (0x141631420, write at 0x141635b45)
-    #[br(if(type_ == 3))]
+    #[br(if(kind == 3))]
     pub temp: Option<i32>,
     /// read by 0x140b9cae0
-    #[br(if(type_ == 3 && !(temp.unwrap_or_default() != 1)), args(ver, num_players))]
+    #[br(if(kind == 3 && !(temp.unwrap_or_default() != 1)), args(ver, num_players))]
     pub tribe_main_decision_ai_module: Option<Box<TribeMainDecisionAi>>,
     /// game: `usingXS`
     /// read at 0x1415f3f03; named by the save's write in the same place (0x141631420, write at 0x141635c9a)
-    #[br(if(type_ == 3 && !(temp.unwrap_or_default() != 1)))]
+    #[br(if(kind == 3 && !(temp.unwrap_or_default() != 1)))]
     pub using_xs: Option<u8>,
     /// unnamed in the binary
     /// read by 0x141613020
-    #[br(if(type_ == 3 && !(temp.unwrap_or_default() != 1) && using_xs.unwrap_or_default() != 0), args(ver))]
+    #[br(if(kind == 3 && !(temp.unwrap_or_default() != 1) && using_xs.unwrap_or_default() != 0), args(ver))]
     pub bxs_runtime: Option<Box<BxsRuntime>>,
     /// unnamed in the binary
     /// the routine's closing marker
@@ -4707,7 +4707,7 @@ impl Default for WorldPlayer {
     fn default() -> Self {
         Self {
             base: Default::default(),
-            type_: Default::default(),
+            kind: Default::default(),
             update_count: Default::default(),
             update_count_need_help: Default::default(),
             enemy_alert_count: Default::default(),
@@ -4798,7 +4798,7 @@ pub struct OverrideDescription {
 pub struct RgeMasterStaticObjectEntry1 {
     /// game: `attribute_type_held[index]`
     /// read at 0x141133867
-    pub attribute_type_held: i16,
+    pub attribute_kind_held: i16,
     /// game: `attribute_amount_held[index]`
     /// read at 0x1411338d2
     pub attribute_amount_held: f32,
@@ -4908,7 +4908,7 @@ pub struct RgeMasterStaticObject {
     pub radius_z: f32,
     /// game: `obstruction_type`
     /// read at 0x141134ae7
-    pub obstruction_type: u8,
+    pub obstruction_kind: u8,
     /// game: `obstruction_class`
     /// read at 0x141134c66
     pub obstruction_class: u8,
@@ -5010,7 +5010,7 @@ impl Default for RgeMasterStaticObject {
             object_flags: Default::default(),
             death_spawn_obj_id2: Default::default(),
             radius_z: Default::default(),
-            obstruction_type: Default::default(),
+            obstruction_kind: Default::default(),
             obstruction_class: Default::default(),
             can_be_built_on: Default::default(),
             idle_sprite_id: Default::default(),
@@ -5095,7 +5095,7 @@ pub struct Task {
     pub is_default: u8,
     /// game: `action_type`
     /// read at 0x141062821
-    pub action_type: i16,
+    pub action_kind: i16,
     /// game: `object_group`
     /// read at 0x14106297f
     pub object_group: i16,
@@ -5107,16 +5107,16 @@ pub struct Task {
     pub terrain_id: i16,
     /// game: `attribute_type`
     /// read at 0x141062e3b
-    pub attribute_type: i16,
+    pub attribute_kind: i16,
     /// game: `attribute_type2`
     /// read at 0x141062fb0
-    pub attribute_type2: i16,
+    pub attribute_kind2: i16,
     /// game: `attribute_type3`
     /// read at 0x141063160
-    pub attribute_type3: i16,
+    pub attribute_kind3: i16,
     /// game: `attribute_type4`
     /// read at 0x141063310
-    pub attribute_type4: i16,
+    pub attribute_kind4: i16,
     /// game: `work_val1`
     /// read at 0x1410634b1
     pub work_val1: f32,
@@ -5146,7 +5146,7 @@ pub struct Task {
     pub work_flag2: i16,
     /// game: `owner_type`
     /// read at 0x1410643e0
-    pub owner_type: u8,
+    pub owner_kind: u8,
     /// game: `holding_attr`
     /// read at 0x14106458e
     pub holding_attr: u8,
@@ -5189,7 +5189,7 @@ pub struct Task {
 pub struct TaskListEntry1 {
     /// game: `task_type`
     /// read at 0x1411a9235
-    pub task_type: i16,
+    pub task_kind: i16,
     /// unnamed in the binary
     /// read by 0x141062470
     #[br(args(ver))]
@@ -5434,7 +5434,7 @@ pub struct TribeMasterCombatObject {
     pub charge_event: i16,
     /// game: `mChargeType`
     /// read at 0x14127165a
-    pub charge_type: i16,
+    pub charge_kind: i16,
     /// game: `mChargeTarget`
     /// read at 0x1412717bb
     pub charge_target: i16,
@@ -5519,7 +5519,7 @@ impl Default for TribeMasterCombatObject {
             max_charge: Default::default(),
             recharge_rate: Default::default(),
             charge_event: Default::default(),
-            charge_type: Default::default(),
+            charge_kind: Default::default(),
             charge_target: Default::default(),
             charge_projectile_unit: Default::default(),
             attack_priority: Default::default(),
@@ -5557,7 +5557,7 @@ pub struct RgeMasterMissileObject {
     pub rge_master_combat_object: RgeMasterCombatObject,
     /// game: `targetting_type`
     /// read at 0x1410d75d1
-    pub targetting_type: u8,
+    pub targetting_kind: u8,
     /// game: `missile_hit_info`
     /// read at 0x1410d7776
     pub missile_hit_info: u8,
@@ -5573,28 +5573,28 @@ pub struct RgeMasterMissileObject {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, master_type: u8))]
+#[br(import(ver: u32, master_kind: u8))]
 pub struct RgeMaster {
     /// read by 0x1410ee760
-    #[br(if((10..61).contains(&master_type) && master_type == 10), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 10), args(ver))]
     pub rge_master_static_object: Option<Box<RgeMasterStaticObject>>,
     /// read by 0x1410a6b70
-    #[br(if((10..61).contains(&master_type) && master_type == 20), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 20), args(ver))]
     pub rge_master_animated_object: Option<Box<RgeMasterAnimatedObject>>,
     /// read by 0x1410cf320
-    #[br(if((10..61).contains(&master_type) && master_type == 25), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 25), args(ver))]
     pub rge_master_doppleganger_object: Option<Box<RgeMasterAnimatedObject>>,
     /// read by 0x1410d9790
-    #[br(if((10..61).contains(&master_type) && master_type == 30), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 30), args(ver))]
     pub rge_master_moving_object: Option<Box<RgeMasterMovingObject>>,
     /// read by 0x141094d30
-    #[br(if((10..61).contains(&master_type) && master_type == 40), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 40), args(ver))]
     pub rge_master_action_object: Option<Box<RgeMasterActionObject>>,
     /// read by 0x1410ab7c0
-    #[br(if((10..61).contains(&master_type) && master_type == 50), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 50), args(ver))]
     pub rge_master_combat_object: Option<Box<RgeMasterCombatObject>>,
     /// read by 0x1410d11e0
-    #[br(if((10..61).contains(&master_type) && master_type == 60), args(ver))]
+    #[br(if((10..61).contains(&master_kind) && master_kind == 60), args(ver))]
     pub rge_master_missile_object: Option<Box<RgeMasterMissileObject>>,
 }
 
@@ -5658,20 +5658,20 @@ pub struct TribeMasterBuildingObject {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, master_type: u8))]
+#[br(import(ver: u32, master_kind: u8))]
 pub struct Master {
     /// read by 0x141277b70
-    #[br(if(master_type == 15), args(ver))]
+    #[br(if(master_kind == 15), args(ver))]
     pub tribe_master_tree_object: Option<Box<RgeMasterStaticObject>>,
     /// read by 0x14124b140
-    #[br(if(!(master_type == 15) && master_type == 70), args(ver))]
+    #[br(if(!(master_kind == 15) && master_kind == 70), args(ver))]
     pub tribe_master_combat_object: Option<Box<TribeMasterCombatObject>>,
     /// unnamed in the binary
     /// read by 0x141665db0
-    #[br(if(!(master_type == 15) && !(master_type == 70) && master_type != 80), args(ver, master_type))]
+    #[br(if(!(master_kind == 15) && !(master_kind == 70) && master_kind != 80), args(ver, master_kind))]
     pub rge_master: Option<Box<RgeMaster>>,
     /// read by 0x141229be0
-    #[br(if(!(master_type == 15) && !(master_type == 70) && !(master_type != 80)), args(ver))]
+    #[br(if(!(master_kind == 15) && !(master_kind == 70) && !(master_kind != 80)), args(ver))]
     pub tribe_master_building_object: Option<Box<TribeMasterBuildingObject>>,
 }
 
@@ -5779,7 +5779,7 @@ pub struct VisibleResourceManager {
 pub struct OwnRgeMasterStaticObjectEntry1 {
     /// game: `attribute_type_held[index]`
     /// read at 0x14113088a
-    pub attribute_type_held: i16,
+    pub attribute_kind_held: i16,
     /// game: `attribute_amount_held[index]`
     /// read at 0x1411308e5
     pub attribute_amount_held: f32,
@@ -5919,7 +5919,7 @@ pub struct OwnRgeMasterStaticObject {
     pub terrain_restriction_mask_id: i16,
     /// game: `movement_type`
     /// read at 0x14112f4f8
-    pub movement_type: u8,
+    pub movement_kind: u8,
     /// game: `attribute_max_amount`
     /// read at 0x14112f5a6
     pub attribute_max_amount: i16,
@@ -5970,7 +5970,7 @@ pub struct OwnRgeMasterStaticObject {
     pub occlusion_flag: u8,
     /// game: `obstruction_type`
     /// read at 0x14113018b
-    pub obstruction_type: u8,
+    pub obstruction_kind: u8,
     /// game: `obstruction_class`
     /// read at 0x14113029d
     pub obstruction_class: u8,
@@ -6078,7 +6078,7 @@ impl Default for OwnRgeMasterStaticObject {
             elevation_flag: Default::default(),
             fog_flag: Default::default(),
             terrain_restriction_mask_id: Default::default(),
-            movement_type: Default::default(),
+            movement_kind: Default::default(),
             attribute_max_amount: Default::default(),
             attribute_rot: Default::default(),
             area_effect_object_level: Default::default(),
@@ -6095,7 +6095,7 @@ impl Default for OwnRgeMasterStaticObject {
             create_doppleganger_on_death: Default::default(),
             resource_group: Default::default(),
             occlusion_flag: Default::default(),
-            obstruction_type: Default::default(),
+            obstruction_kind: Default::default(),
             obstruction_class: Default::default(),
             object_flags: Default::default(),
             draw_flag: Default::default(),
@@ -6354,10 +6354,10 @@ pub struct OwnRgeMasterMissileObject {
     pub own_rge_master_combat_object: OwnRgeMasterCombatObject,
     /// game: `missile_type`
     /// read at 0x1410d696c
-    pub missile_type: u8,
+    pub missile_kind: u8,
     /// game: `targetting_type`
     /// read at 0x1410d6b08
-    pub targetting_type: u8,
+    pub targetting_kind: u8,
     /// game: `missile_hit_info`
     /// read at 0x1410d6ca4
     pub missile_hit_info: u8,
@@ -6448,7 +6448,7 @@ pub struct OwnTribeMasterCombatObject {
     pub charge_event: i16,
     /// game: `mChargeType`
     /// read at 0x14126d53a
-    pub charge_type: i16,
+    pub charge_kind: i16,
     /// game: `mChargeTarget`
     /// read at 0x14126d6a9
     pub charge_target: i16,
@@ -6530,7 +6530,7 @@ impl Default for OwnTribeMasterCombatObject {
             max_charge: Default::default(),
             recharge_rate: Default::default(),
             charge_event: Default::default(),
-            charge_type: Default::default(),
+            charge_kind: Default::default(),
             charge_target: Default::default(),
             charge_projectile_unit: Default::default(),
             attack_priority: Default::default(),
@@ -6753,37 +6753,37 @@ pub struct RgeActiveAnimatedSprite {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, sprite_type: u8))]
+#[br(import(ver: u32, sprite_kind: u8))]
 pub struct ActiveSprite {
     /// read by 0x1413b0c50
-    #[br(if(sprite_type == 1), args(ver))]
+    #[br(if(sprite_kind == 1), args(ver))]
     pub rge_active_sprite: Option<Box<RgeActiveSprite>>,
     /// game: `node->order`
     /// read at 0x1413b977e
-    #[br(if(sprite_type == 1))]
+    #[br(if(sprite_kind == 1))]
     pub node_order: Option<u8>,
     /// game: `node->flag`
     /// read at 0x1413b9930
-    #[br(if(sprite_type == 1))]
+    #[br(if(sprite_kind == 1))]
     pub node_flag: Option<u8>,
     /// game: `node->count`
     /// read at 0x1413b9ae0
-    #[br(if(sprite_type == 1))]
+    #[br(if(sprite_kind == 1))]
     pub node_count: Option<u8>,
     /// read by 0x1413b07d0
-    #[br(if(!(sprite_type == 1) && sprite_type == 2), args(ver))]
+    #[br(if(!(sprite_kind == 1) && sprite_kind == 2), args(ver))]
     pub rge_active_animated_sprite: Option<Box<RgeActiveAnimatedSprite>>,
     /// game: `node->order`
     /// read at 0x1413b8ea4
-    #[br(if(!(sprite_type == 1) && sprite_type == 2))]
+    #[br(if(!(sprite_kind == 1) && sprite_kind == 2))]
     pub node_order_2: Option<u8>,
     /// game: `node->flag`
     /// read at 0x1413b9071
-    #[br(if(!(sprite_type == 1) && sprite_type == 2))]
+    #[br(if(!(sprite_kind == 1) && sprite_kind == 2))]
     pub node_flag_2: Option<u8>,
     /// game: `node->count`
     /// read at 0x1413b920d
-    #[br(if(!(sprite_type == 1) && sprite_type == 2))]
+    #[br(if(!(sprite_kind == 1) && sprite_kind == 2))]
     pub node_count_2: Option<u8>,
 }
 
@@ -6794,11 +6794,11 @@ pub struct ActiveSprite {
 pub struct ActiveSpriteListEntry1 {
     /// game: `type`
     /// the type the node factory (param_4) switches on; a type of 0 ends the list (the factory's error result)
-    pub sprite_type: u8,
+    pub sprite_kind: u8,
     /// game: `type`
     /// read by 0x1413b8a90
-    #[br(if(sprite_type != 0), args(ver, sprite_type))]
-    pub type_: Option<Box<ActiveSprite>>,
+    #[br(if(sprite_kind != 0), args(ver, sprite_kind))]
+    pub kind: Option<Box<ActiveSprite>>,
 }
 
 /// Read by `FUN_1413b87c0` of the build.
@@ -6808,15 +6808,15 @@ pub struct ActiveSpriteListEntry1 {
 #[br(import(ver: u32))]
 pub struct ActiveSpriteList {
     /// unnamed in the binary
-    /// entries until a sprite_type of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_type == 0), args(ver))]
-    pub sprite_type_list: Vec<ActiveSpriteListEntry1>,
+    /// entries until a sprite_kind of 0, that one included
+    #[br(parse_with = binrw::helpers::until(|e: &ActiveSpriteListEntry1| e.sprite_kind == 0), args(ver))]
+    pub sprite_kind_list: Vec<ActiveSpriteListEntry1>,
 }
 
 impl Default for ActiveSpriteList {
     fn default() -> Self {
         Self {
-            sprite_type_list: vec![Default::default()],
+            sprite_kind_list: vec![Default::default()],
         }
     }
 }
@@ -6874,7 +6874,7 @@ pub struct Particle {
 pub struct RgeStaticObjectEntry1 {
     /// game: `&attributeType`
     /// read at 0x1411a02cc
-    pub attribute_type: u16,
+    pub attribute_kind: u16,
     /// game: `&amount`
     /// read at 0x1411a0399
     pub amount: u32,
@@ -6942,7 +6942,7 @@ pub struct RgeStaticObject {
     pub shadow_yoffset: i16,
     /// game: `attribute_type_held`
     /// read at 0x14119fdfb
-    pub attribute_type_held: i16,
+    pub attribute_kind_held: i16,
     /// game: `attribute_amount_held`
     /// read at 0x14119ff4b
     pub attribute_amount_held: f32,
@@ -6998,52 +6998,52 @@ pub struct RgeStaticObject {
     /// game: `masterType`
     /// read at 0x1411a222a
     #[br(if(has_own_master_object != 0))]
-    pub master_type: Option<u8>,
+    pub master_kind: Option<u8>,
     /// read by 0x1410ed770
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 10), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 10), args(ver))]
     pub rge_master_static_object: Option<Box<OwnRgeMasterStaticObject>>,
     /// read by 0x1410a69e0
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 20), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 20), args(ver))]
     pub rge_master_animated_object: Option<Box<OwnRgeMasterAnimatedObject>>,
     /// read by 0x1410d95b0
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 30), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 30), args(ver))]
     pub rge_master_moving_object: Option<Box<OwnRgeMasterMovingObject>>,
     /// read by 0x141094b50
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 40), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 40), args(ver))]
     pub rge_master_action_object: Option<Box<OwnRgeMasterActionObject>>,
     /// read by 0x1410d1050
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 60), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 60), args(ver))]
     pub rge_master_missile_object: Option<Box<OwnRgeMasterMissileObject>>,
     /// read by 0x14124aec0
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 70), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 70), args(ver))]
     pub tribe_master_combat_object: Option<Box<OwnTribeMasterCombatObject>>,
     /// read by 0x141229a30
-    #[br(if(has_own_master_object != 0 && master_type.unwrap_or_default() == 80), args(ver))]
+    #[br(if(has_own_master_object != 0 && master_kind.unwrap_or_default() == 80), args(ver))]
     pub tribe_master_building_object: Option<Box<OwnTribeMasterBuildingObject>>,
     /// game: `masterType`
     /// read at 0x1411a2714
     #[br(if(has_successor_master_obj != 0))]
-    pub master_type_2: Option<u8>,
+    pub master_kind_2: Option<u8>,
     /// read by 0x1410ed770
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 10), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 10), args(ver))]
     pub rge_master_static_object_2: Option<Box<OwnRgeMasterStaticObject>>,
     /// read by 0x1410a69e0
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 20), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 20), args(ver))]
     pub rge_master_animated_object_2: Option<Box<OwnRgeMasterAnimatedObject>>,
     /// read by 0x1410d95b0
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 30), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 30), args(ver))]
     pub rge_master_moving_object_2: Option<Box<OwnRgeMasterMovingObject>>,
     /// read by 0x141094b50
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 40), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 40), args(ver))]
     pub rge_master_action_object_2: Option<Box<OwnRgeMasterActionObject>>,
     /// read by 0x1410d1050
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 60), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 60), args(ver))]
     pub rge_master_missile_object_2: Option<Box<OwnRgeMasterMissileObject>>,
     /// read by 0x14124aec0
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 70), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 70), args(ver))]
     pub tribe_master_combat_object_2: Option<Box<OwnTribeMasterCombatObject>>,
     /// read by 0x141229a30
-    #[br(if(has_successor_master_obj != 0 && master_type_2.unwrap_or_default() == 80), args(ver))]
+    #[br(if(has_successor_master_obj != 0 && master_kind_2.unwrap_or_default() == 80), args(ver))]
     pub tribe_master_building_object_2: Option<Box<OwnTribeMasterBuildingObject>>,
     /// game: `temp_load_sprite_list`
     /// read at 0x1411a2c56
@@ -7111,7 +7111,7 @@ pub struct RgeStaticObject {
     pub my_pasture_id: i32,
     /// game: `transient_attribute_type_held`
     /// read at 0x1411a3e73
-    pub transient_attribute_type_held: i16,
+    pub transient_attribute_kind_held: i16,
     /// game: `transient_attribute_amount_held`
     /// read at 0x1411a3f26
     pub transient_attribute_amount_held: f32,
@@ -7152,7 +7152,7 @@ pub struct PathData {
     pub id: i32,
     /// game: `mLinkedPathType`
     /// read at 0x140f9756d
-    pub linked_path_type: i32,
+    pub linked_path_kind: i32,
     /// game: `mWaypointLevel`
     /// read at 0x140f9766b
     pub waypoint_level: u8,
@@ -7393,7 +7393,7 @@ pub struct RgeActionGather {
     pub rge_action: RgeAction,
     /// game: `mTargetType`
     /// read at 0x140a889be; named by the save's write of this member at 0x140a8baf4
-    pub target_type: i32,
+    pub target_kind: i32,
     /// game: `mNumberStops`
     /// read at 0x140a88a6b; named by the save's write of this member at 0x140a8bc87
     pub number_stops: u8,
@@ -7551,10 +7551,10 @@ pub struct ActionHeroPower {
     pub rge_action: RgeAction,
     /// game: `&mChargeType`
     /// read at 0x140a91771
-    pub charge_type: u16,
+    pub charge_kind: u16,
     /// game: `&mChargeType`
     /// helper 0x140a90f60
-    pub charge_type_2: i16,
+    pub charge_kind_2: i16,
     /// game: `&mChargeEvent`
     /// helper 0x140a91160
     pub charge_event: f32,
@@ -7588,37 +7588,37 @@ pub struct ActionHeroPower {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, action_type: i16, num_players: usize))]
-pub struct RgeActionByType {
+#[br(import(ver: u32, action_kind: i16, num_players: usize))]
+pub struct RgeActionByKind {
     /// read by 0x140aa1240
-    #[br(if(action_type == 1), args(ver, num_players))]
+    #[br(if(action_kind == 1), args(ver, num_players))]
     pub rge_action_move_to: Option<Box<RgeActionMoveTo>>,
     /// read by 0x140a85700
-    #[br(if(action_type == 3), args(ver, num_players))]
+    #[br(if(action_kind == 3), args(ver, num_players))]
     pub rge_action_enter: Option<Box<RgeActionEnter>>,
     /// read by 0x140a87da0
-    #[br(if(action_type == 4), args(ver, num_players))]
+    #[br(if(action_kind == 4), args(ver, num_players))]
     pub rge_action_explore: Option<Box<RgeAction>>,
     /// read by 0x140a88940
-    #[br(if(action_type == 5), args(ver, num_players))]
+    #[br(if(action_kind == 5), args(ver, num_players))]
     pub rge_action_gather: Option<Box<RgeActionGather>>,
     /// read by 0x140a9a4d0
-    #[br(if(action_type == 8), args(ver, num_players))]
+    #[br(if(action_kind == 8), args(ver, num_players))]
     pub rge_action_missile: Option<Box<RgeActionMissile>>,
     /// read by 0x140a7c880
-    #[br(if(action_type == 9), args(ver, num_players))]
+    #[br(if(action_kind == 9), args(ver, num_players))]
     pub rge_action_attack: Option<Box<RgeActionAttack>>,
     /// read by 0x140a84700
-    #[br(if(action_type == 10), args(ver, num_players))]
+    #[br(if(action_kind == 10), args(ver, num_players))]
     pub rge_action_bird: Option<Box<RgeAction>>,
     /// read by 0x140a90c60
-    #[br(if(action_type == 13), args(ver, num_players))]
+    #[br(if(action_kind == 13), args(ver, num_players))]
     pub rge_action_guard: Option<Box<RgeAction>>,
     /// read by 0x140a99480
-    #[br(if(action_type == 21), args(ver, num_players))]
+    #[br(if(action_kind == 21), args(ver, num_players))]
     pub rge_action_make: Option<Box<RgeActionMake>>,
     /// read by 0x140a916c0
-    #[br(if(action_type == 126), args(ver, num_players))]
+    #[br(if(action_kind == 126), args(ver, num_players))]
     pub action_hero_power: Option<Box<ActionHeroPower>>,
 }
 
@@ -7779,7 +7779,7 @@ pub struct TribeActionHunt {
     pub rge_action: RgeAction,
     /// game: `targetType`
     /// read at 0x140ac3159; named by the save's write of this member at 0x140ac5765
-    pub target_type: i32,
+    pub target_kind: i32,
     /// game: `moved_sheep`
     /// read at 0x140ac31f7; named by the save's write in the same place (0x140ac5580, write at 0x140ac58f5)
     pub moved_sheep: u32,
@@ -7857,7 +7857,7 @@ pub struct TribeActionGather {
     pub rge_action: RgeAction,
     /// game: `targetType`
     /// read at 0x140abdc88; named by the save's write of this member at 0x140abe9e9
-    pub target_type: i32,
+    pub target_kind: i32,
 }
 
 /// Read by `FUN_140ac1bc0` of the build.
@@ -7966,92 +7966,92 @@ pub struct TribeActionWaitSolidify {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, action_type: i16, num_players: usize))]
+#[br(import(ver: u32, action_kind: i16, num_players: usize))]
 pub struct Action {
     /// read by 0x140a85700
-    #[br(if(action_type == 3), args(ver, num_players))]
+    #[br(if(action_kind == 3), args(ver, num_players))]
     pub rge_action_enter: Option<Box<RgeActionEnter>>,
     /// unnamed in the binary
     /// read by 0x140a97a10
-    #[br(if(!(action_type == 3 || action_type == 12 || action_type == 14 || action_type == 101 || action_type == 102 || action_type == 103 || action_type == 104 || action_type == 105 || action_type == 106 || action_type == 107 || action_type == 108 || action_type == 110 || action_type == 111 || action_type == 120 || action_type == 121 || action_type == 122 || action_type == 123 || action_type == 124 || action_type == 125 || action_type == 131 || action_type == 132 || action_type == 133 || action_type == 134 || action_type == 135 || action_type == 136 || action_type == 149 || action_type == 154)), args(ver, action_type, num_players))]
-    pub rge_action_by_type: Option<Box<RgeActionByType>>,
+    #[br(if(!(action_kind == 3 || action_kind == 12 || action_kind == 14 || action_kind == 101 || action_kind == 102 || action_kind == 103 || action_kind == 104 || action_kind == 105 || action_kind == 106 || action_kind == 107 || action_kind == 108 || action_kind == 110 || action_kind == 111 || action_kind == 120 || action_kind == 121 || action_kind == 122 || action_kind == 123 || action_kind == 124 || action_kind == 125 || action_kind == 131 || action_kind == 132 || action_kind == 133 || action_kind == 134 || action_kind == 135 || action_kind == 136 || action_kind == 149 || action_kind == 154)), args(ver, action_kind, num_players))]
+    pub rge_action_by_kind: Option<Box<RgeActionByKind>>,
     /// read by 0x140aa3b20
-    #[br(if(action_type == 12), args(ver, num_players))]
+    #[br(if(action_kind == 12), args(ver, num_players))]
     pub rge_action_transport: Option<Box<RgeAction>>,
     /// read by 0x140aa4b90
-    #[br(if(action_type == 14), args(ver, num_players))]
+    #[br(if(action_kind == 14), args(ver, num_players))]
     pub rge_action_transport_over_wall: Option<Box<RgeAction>>,
     /// read by 0x140aad670
-    #[br(if(action_type == 101), args(ver, num_players))]
+    #[br(if(action_kind == 101), args(ver, num_players))]
     pub tribe_action_build: Option<Box<TribeActionBuild>>,
     /// read by 0x140acb1e0
-    #[br(if(action_type == 102), args(ver, num_players))]
+    #[br(if(action_kind == 102), args(ver, num_players))]
     pub tribe_action_make_obj: Option<Box<TribeActionMakeObj>>,
     /// read by 0x140ad0840
-    #[br(if(action_type == 103), args(ver, num_players))]
+    #[br(if(action_kind == 103), args(ver, num_players))]
     pub tribe_action_make_tech: Option<Box<TribeActionMakeTech>>,
     /// read by 0x140ab3b70
-    #[br(if(action_type == 104), args(ver, num_players))]
+    #[br(if(action_kind == 104), args(ver, num_players))]
     pub tribe_action_convert: Option<Box<TribeActionConvert>>,
     /// read by 0x140ac07e0
-    #[br(if(action_type == 105), args(ver, num_players))]
+    #[br(if(action_kind == 105), args(ver, num_players))]
     pub tribe_action_heal: Option<Box<RgeAction>>,
     /// read by 0x140ad8110
-    #[br(if(action_type == 106), args(ver, num_players))]
+    #[br(if(action_kind == 106), args(ver, num_players))]
     pub tribe_action_repair: Option<Box<TribeActionRepair>>,
     /// read by 0x140aa8a10
-    #[br(if(action_type == 107), args(ver, num_players))]
+    #[br(if(action_kind == 107), args(ver, num_players))]
     pub tribe_action_artifact: Option<Box<TribeActionArtifact>>,
     /// read by 0x140abc4d0
-    #[br(if(action_type == 108), args(ver, num_players))]
+    #[br(if(action_kind == 108), args(ver, num_players))]
     pub tribe_action_discovery_artifact: Option<Box<TribeActionDiscoveryArtifact>>,
     /// read by 0x140ac3010
-    #[br(if(action_type == 110), args(ver, num_players))]
+    #[br(if(action_kind == 110), args(ver, num_players))]
     pub tribe_action_hunt: Option<Box<TribeActionHunt>>,
     /// read by 0x140adea70
-    #[br(if(action_type == 111), args(ver, num_players))]
+    #[br(if(action_kind == 111), args(ver, num_players))]
     pub tribe_action_trade: Option<Box<TribeActionTrade>>,
     /// read by 0x140ae8fa0
-    #[br(if(action_type == 120), args(ver, num_players))]
+    #[br(if(action_kind == 120), args(ver, num_players))]
     pub tribe_action_wonder: Option<Box<TribeActionWonder>>,
     /// read by 0x140abd5c0
-    #[br(if(action_type == 121), args(ver, num_players))]
+    #[br(if(action_kind == 121), args(ver, num_players))]
     pub tribe_action_farm: Option<Box<RgeAction>>,
     /// read by 0x140abdba0
-    #[br(if(action_type == 122), args(ver, num_players))]
+    #[br(if(action_kind == 122), args(ver, num_players))]
     pub tribe_action_gather: Option<Box<TribeActionGather>>,
     /// read by 0x140ac1bc0
-    #[br(if(action_type == 123), args(ver, num_players))]
+    #[br(if(action_kind == 123), args(ver, num_players))]
     pub tribe_action_housing: Option<Box<TribeActionHousing>>,
     /// read by 0x140ad5090
-    #[br(if(action_type == 124), args(ver, num_players))]
+    #[br(if(action_kind == 124), args(ver, num_players))]
     pub tribe_action_pack: Option<Box<TribeActionPack>>,
     /// read by 0x140ae59d0
-    #[br(if(action_type == 125), args(ver, num_players))]
+    #[br(if(action_kind == 125), args(ver, num_players))]
     pub tribe_action_unpack: Option<Box<TribeActionUnpack>>,
     /// read by 0x140ad3080
-    #[br(if(action_type == 131), args(ver, num_players))]
+    #[br(if(action_kind == 131), args(ver, num_players))]
     pub tribe_action_offboard_trade: Option<Box<TribeActionOffboardTrade>>,
     /// read by 0x140ad70c0
-    #[br(if(action_type == 132), args(ver, num_players))]
+    #[br(if(action_kind == 132), args(ver, num_players))]
     pub tribe_action_pickup_relic: Option<Box<RgeAction>>,
     /// read by 0x140ab2f40
-    #[br(if(action_type == 133), args(ver, num_players))]
+    #[br(if(action_kind == 133), args(ver, num_players))]
     pub tribe_action_charge: Option<Box<RgeAction>>,
     /// read by 0x140ae4820
-    #[br(if(action_type == 134), args(ver, num_players))]
+    #[br(if(action_kind == 134), args(ver, num_players))]
     pub tribe_action_unit_transform: Option<Box<TribeActionUnitTransform>>,
     /// read by 0x140ab1c20
-    #[br(if(action_type == 135), args(ver, num_players))]
+    #[br(if(action_kind == 135), args(ver, num_players))]
     pub tribe_action_capture: Option<Box<RgeAction>>,
     /// read by 0x140abb720
-    #[br(if(action_type == 136), args(ver, num_players))]
+    #[br(if(action_kind == 136), args(ver, num_players))]
     pub tribe_action_deliver_relic: Option<Box<RgeAction>>,
     /// read by 0x140adb7a0
-    #[br(if(action_type == 149), args(ver, num_players))]
+    #[br(if(action_kind == 149), args(ver, num_players))]
     pub tribe_action_shepherd: Option<Box<RgeAction>>,
     /// read by 0x140ae8220
-    #[br(if(action_type == 154), args(ver, num_players))]
+    #[br(if(action_kind == 154), args(ver, num_players))]
     pub tribe_action_wait_solidify: Option<Box<TribeActionWaitSolidify>>,
 }
 
@@ -8061,10 +8061,10 @@ pub struct Action {
 #[br(import(ver: u32, num_players: usize))]
 pub struct ActionListEntry1 {
     /// the type the action factory (param_4) switches on
-    pub action_type: i16,
+    pub action_kind: i16,
     /// unnamed in the binary
     /// read by 0x140ac9b40
-    #[br(if(action_type != 0), args(ver, action_type, num_players))]
+    #[br(if(action_kind != 0), args(ver, action_kind, num_players))]
     pub action: Option<Box<Action>>,
 }
 
@@ -8075,15 +8075,15 @@ pub struct ActionListEntry1 {
 #[br(import(ver: u32, num_players: usize))]
 pub struct ActionList {
     /// unnamed in the binary
-    /// entries until a action_type of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ActionListEntry1| e.action_type == 0), args(ver, num_players))]
-    pub action_type_list: Vec<ActionListEntry1>,
+    /// entries until a action_kind of 0, that one included
+    #[br(parse_with = binrw::helpers::until(|e: &ActionListEntry1| e.action_kind == 0), args(ver, num_players))]
+    pub action_kind_list: Vec<ActionListEntry1>,
 }
 
 impl Default for ActionList {
     fn default() -> Self {
         Self {
-            action_type_list: vec![Default::default()],
+            action_kind_list: vec![Default::default()],
         }
     }
 }
@@ -8284,7 +8284,7 @@ pub struct UnitAiModule {
     pub current_target_value: i32,
     /// game: `currentTargetTypeValue`
     /// read at 0x140c4f770
-    pub current_target_type_value: i32,
+    pub current_target_kind_value: i32,
     /// game: `currentTargetXValue`
     /// read at 0x140c4f920
     pub current_target_xvalue: f32,
@@ -8308,7 +8308,7 @@ pub struct UnitAiModule {
     pub last_target_value: i32,
     /// game: `lastTargetTypeValue`
     /// read at 0x140c504a0
-    pub last_target_type_value: i32,
+    pub last_target_kind_value: i32,
     /// game: `lastUpdateTimeValue`
     /// read at 0x140c50653
     pub last_update_time_value: u32,
@@ -8414,7 +8414,7 @@ pub struct UnitAiModule {
     pub best_unit_to_attack_this_update: i32,
     /// game: `mFormationType`
     /// read at 0x140c53840
-    pub formation_type: u8,
+    pub formation_kind: u8,
     /// game: `timeSinceLastSearchValue`
     /// read at 0x140c5390b
     pub time_since_last_search_value: u32,
@@ -8568,7 +8568,7 @@ pub struct TribeCombatObject {
     pub back_to_work1_town_bell_target_id2: i32,
     /// game: `mBackToWork1.town_bell_target_type`
     /// read at 0x14122111b
-    pub back_to_work1_town_bell_target_type: i32,
+    pub back_to_work1_town_bell_target_kind: i32,
     /// game: `mBackToWork1.town_bell_action`
     /// read at 0x14122127f
     pub back_to_work1_town_bell_action: i32,
@@ -8586,7 +8586,7 @@ pub struct TribeCombatObject {
     pub back_to_work2_town_bell_target_id2: i32,
     /// game: `mBackToWork2.town_bell_target_type`
     /// read at 0x1412218ad
-    pub back_to_work2_town_bell_target_type: i32,
+    pub back_to_work2_town_bell_target_kind: i32,
     /// game: `mBackToWork2.town_bell_action`
     /// read at 0x141221a1b
     pub back_to_work2_town_bell_action: i32,
@@ -8696,13 +8696,13 @@ impl Default for TribeCombatObject {
             back_to_work1_town_bell_target_x: Default::default(),
             back_to_work1_town_bell_target_y: Default::default(),
             back_to_work1_town_bell_target_id2: Default::default(),
-            back_to_work1_town_bell_target_type: Default::default(),
+            back_to_work1_town_bell_target_kind: Default::default(),
             back_to_work1_town_bell_action: Default::default(),
             back_to_work2_town_bell_target_id: Default::default(),
             back_to_work2_town_bell_target_x: Default::default(),
             back_to_work2_town_bell_target_y: Default::default(),
             back_to_work2_town_bell_target_id2: Default::default(),
-            back_to_work2_town_bell_target_type: Default::default(),
+            back_to_work2_town_bell_target_kind: Default::default(),
             back_to_work2_town_bell_action: Default::default(),
             berserker_timer: Default::default(),
             num_builders: Default::default(),
@@ -8865,7 +8865,7 @@ pub struct TribeBuildingObject {
     pub close_timer: f32,
     /// game: `buildingTerrainType`
     /// read at 0x1411e358f
-    pub building_terrain_type: u8,
+    pub building_terrain_kind: u8,
     /// game: `temp_semi_asleep`
     /// read at 0x1411e36e3
     pub temp_semi_asleep: u8,
@@ -8901,7 +8901,7 @@ pub struct TribeBuildingObject {
     /// game: `masterType`
     /// read at 0x1411e44e3
     #[br(if(has_open_closed_master_object != 0))]
-    pub master_type: Option<u8>,
+    pub master_kind: Option<u8>,
     /// read by 0x141229a30
     #[br(if(has_open_closed_master_object != 0), args(ver))]
     pub tribe_master_building_object: Option<Box<OwnTribeMasterBuildingObject>>,
@@ -8974,7 +8974,7 @@ impl Default for TribeBuildingObject {
             gate_locked: Default::default(),
             first_update: Default::default(),
             close_timer: Default::default(),
-            building_terrain_type: Default::default(),
+            building_terrain_kind: Default::default(),
             temp_semi_asleep: Default::default(),
             snow_flag: Default::default(),
             original_owner: Default::default(),
@@ -8985,7 +8985,7 @@ impl Default for TribeBuildingObject {
             pasture_worker_num: Default::default(),
             pasture_worker_id: Default::default(),
             has_open_closed_master_object: Default::default(),
-            master_type: Default::default(),
+            master_kind: Default::default(),
             tribe_master_building_object: Default::default(),
             attacking_units_count: Default::default(),
             unit_id: Default::default(),
@@ -9056,28 +9056,28 @@ pub struct RgeMissileObject {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, object_type: u8, num_players: usize))]
+#[br(import(ver: u32, object_kind: u8, num_players: usize))]
 pub struct RgeObject {
     /// read by 0x14116a500
-    #[br(if(object_type == 10), args(ver))]
+    #[br(if(object_kind == 10), args(ver))]
     pub rge_static_object: Option<Box<RgeStaticObject>>,
     /// read by 0x141070e10
-    #[br(if(object_type == 20), args(ver))]
+    #[br(if(object_kind == 20), args(ver))]
     pub rge_animated_object: Option<Box<RgeAnimatedObject>>,
     /// read by 0x14108dda0
-    #[br(if(object_type == 25), args(ver))]
+    #[br(if(object_kind == 25), args(ver))]
     pub rge_doppleganger_object: Option<Box<RgeDopplegangerObject>>,
     /// read by 0x141141b10
-    #[br(if(object_type == 30), args(ver))]
+    #[br(if(object_kind == 30), args(ver))]
     pub rge_moving_object: Option<Box<RgeMovingObject>>,
     /// read by 0x141068160
-    #[br(if(object_type == 40), args(ver, num_players))]
+    #[br(if(object_kind == 40), args(ver, num_players))]
     pub rge_action_object: Option<Box<RgeActionObject>>,
     /// read by 0x141072d20
-    #[br(if(object_type == 50), args(ver, num_players))]
+    #[br(if(object_kind == 50), args(ver, num_players))]
     pub rge_combat_object: Option<Box<RgeCombatObject>>,
     /// read by 0x14113c660
-    #[br(if(object_type == 60), args(ver, num_players))]
+    #[br(if(object_kind == 60), args(ver, num_players))]
     pub rge_missile_object: Option<Box<RgeMissileObject>>,
 }
 
@@ -9085,17 +9085,17 @@ pub struct RgeObject {
 #[binrw]
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
-#[br(import(ver: u32, object_type: u8, num_players: usize))]
+#[br(import(ver: u32, object_kind: u8, num_players: usize))]
 pub struct Object {
     /// read by 0x1411ea960
-    #[br(if(object_type == 70), args(ver, num_players))]
+    #[br(if(object_kind == 70), args(ver, num_players))]
     pub tribe_combat_object: Option<Box<TribeCombatObject>>,
     /// read by 0x1411ac170
-    #[br(if(!(object_type == 70) && object_type == 80), args(ver, num_players))]
+    #[br(if(!(object_kind == 70) && object_kind == 80), args(ver, num_players))]
     pub tribe_building_object: Option<Box<TribeBuildingObject>>,
     /// unnamed in the binary
     /// read by 0x141165e30
-    #[br(if(!(object_type == 70) && !(object_type == 80)), args(ver, object_type, num_players))]
+    #[br(if(!(object_kind == 70) && !(object_kind == 80)), args(ver, object_kind, num_players))]
     pub rge_object: Option<Box<RgeObject>>,
 }
 
@@ -9105,10 +9105,10 @@ pub struct Object {
 #[br(import(ver: u32, num_players: usize))]
 pub struct ObjectListEntry1 {
     /// the type the object factory (param_3) switches on
-    pub object_type: u8,
+    pub object_kind: u8,
     /// unnamed in the binary
     /// read by 0x141278040
-    #[br(if(object_type != 0), args(ver, object_type, num_players))]
+    #[br(if(object_kind != 0), args(ver, object_kind, num_players))]
     pub object: Option<Box<Object>>,
 }
 
@@ -9125,9 +9125,9 @@ pub struct ObjectList {
     /// read at 0x141168486
     pub grow_size: u32,
     /// unnamed in the binary
-    /// entries until a object_type of 0, that one included
-    #[br(parse_with = binrw::helpers::until(|e: &ObjectListEntry1| e.object_type == 0), args(ver, num_players))]
-    pub object_type_list: Vec<ObjectListEntry1>,
+    /// entries until a object_kind of 0, that one included
+    #[br(parse_with = binrw::helpers::until(|e: &ObjectListEntry1| e.object_kind == 0), args(ver, num_players))]
+    pub object_kind_list: Vec<ObjectListEntry1>,
 }
 
 impl Default for ObjectList {
@@ -9135,7 +9135,7 @@ impl Default for ObjectList {
         Self {
             list_size: Default::default(),
             grow_size: Default::default(),
-            object_type_list: vec![Default::default()],
+            object_kind_list: vec![Default::default()],
         }
     }
 }
@@ -9148,10 +9148,10 @@ pub struct PlayerMaster {
     /// game: `obj_type`
     /// the type the master factory (param_5) switches on
     #[brw(magic = b"\x16")]
-    pub master_type: u8,
+    pub master_kind: u8,
     /// unnamed in the binary
     /// read by 0x14162bef0
-    #[br(args(ver, master_type))]
+    #[br(args(ver, master_kind))]
     pub master: Master,
     /// unnamed in the binary
     /// the entry's closing marker
@@ -9440,22 +9440,22 @@ pub struct ComputerPlayer {
 pub struct Player {
     /// game: `&type`
     /// helper 0x1415073f0
-    pub type_: u8,
+    pub kind: u8,
     /// unnamed in the binary
     /// read by 0x14167b2d0; the creator FUN_141679be0 registers for the type; its vtable slot 1 constructs the player
-    #[br(if(type_ == 0), args(ver, num_players))]
+    #[br(if(kind == 0), args(ver, num_players))]
     pub scenario_editor_phantom_player: Option<Box<ScenarioEditorPhantomPlayer>>,
     /// unnamed in the binary
     /// read by 0x14167aca0; the creator FUN_141679be0 registers for the type; its vtable slot 1 constructs the player
-    #[br(if(type_ == 1), args(ver, num_players))]
+    #[br(if(kind == 1), args(ver, num_players))]
     pub human_or_coop_player: Option<Box<HumanOrCoopPlayer>>,
     /// unnamed in the binary
     /// read by 0x14167a670; the creator FUN_141679be0 registers for the type; its vtable slot 1 constructs the player
-    #[br(if(type_ == 2), args(ver, num_players))]
+    #[br(if(kind == 2), args(ver, num_players))]
     pub gaia_player: Option<Box<GaiaPlayer>>,
     /// unnamed in the binary
     /// read by 0x14167a040; the creator FUN_141679be0 registers for the type; its vtable slot 1 constructs the player
-    #[br(if(type_ == 3), args(ver, num_players))]
+    #[br(if(kind == 3), args(ver, num_players))]
     pub computer_player: Option<Box<ComputerPlayer>>,
 }
 
@@ -10016,19 +10016,19 @@ pub struct UnifiedVisibleMap {
 pub struct RgeTile {
     /// game: `terrainType`
     /// read at 0x140f6b3f7
-    pub terrain_type: u8,
+    pub terrain_kind: u8,
     /// game: `restoreTerrainType`
     /// read at 0x140f6b4a9
-    pub restore_terrain_type: u8,
+    pub restore_terrain_kind: u8,
     /// game: `terrainType`
     /// read at 0x140f6b546
-    pub terrain_type_2: u8,
+    pub terrain_kind_2: u8,
     /// game: `t->m_elevation`
     /// read at 0x140f6b5e6
     pub elevation: u8,
     /// game: `t->mask_type`
     /// read at 0x140f6b8a1
-    pub mask_type: i16,
+    pub mask_kind: i16,
     /// game: `layer`
     /// read at 0x140f6b902
     pub layer: i16,
@@ -10162,7 +10162,7 @@ pub struct RgeVictoryConditionsEntry1 {
     pub temp_command: u8,
     /// game: `(temp->obj_type)`
     /// read at 0x1414e68cf; named by the save's write in the same place (0x1414f00b0, write at 0x1414f06df)
-    pub temp_obj_type: u32,
+    pub temp_obj_kind: u32,
     /// game: `(target_player)`
     /// read at 0x1414e698a; named by the save's write in the same place (0x1414f00b0, write at 0x1414f076b)
     pub target_player: u32,
@@ -10351,7 +10351,7 @@ pub struct BaseScenarioEntry2 {
     pub player_active_array: u32,
     /// game: `&mPlayerType[i]`
     /// read at 0x140ca7abe
-    pub player_type: u32,
+    pub player_kind: u32,
     /// game: `&mPlayerCivilization[i]`
     /// helper 0x140932010
     pub player_civilization: SigString,
@@ -10508,7 +10508,7 @@ pub struct BaseScenario {
     /// game: `mAiRulesType.data()`
     /// helper 0x140c94660
     #[br(count = max_players.max(0) as usize)]
-    pub ai_rules_type: Vec<u8>,
+    pub ai_rules_kind: Vec<u8>,
     /// game: `&val`
     /// helper 0x140a91060
     pub val: i32,
@@ -10551,7 +10551,7 @@ impl Default for BaseScenario {
             city_plan_file_name: Default::default(),
             ai_rules_file_name: Default::default(),
             file_data: Default::default(),
-            ai_rules_type: Default::default(),
+            ai_rules_kind: Default::default(),
             val: Default::default(),
         }
     }
@@ -10664,7 +10664,7 @@ pub struct TribeScenario {
     pub victory_all_flag: i32,
     /// game: `&mp_victory_type`
     /// helper 0x140a91060
-    pub mp_victory_type: i32,
+    pub mp_victory_kind: i32,
     /// game: `&victory_score`
     /// helper 0x140a91060
     pub victory_score: i32,
@@ -10737,7 +10737,7 @@ pub struct TribeScenario {
     pub view_y: i32,
     /// game: `mMapTypeForAI`
     /// read at 0x140ceb989
-    pub map_type_for_ai: i32,
+    pub map_kind_for_ai: i32,
     /// game: `bases_priorities.data()`
     /// helper 0x140c94660
     #[br(count = base_scenario.max_players as usize)]
@@ -10747,10 +10747,10 @@ pub struct TribeScenario {
     pub trigger_count: i32,
     /// game: `mWaterDefType`
     /// helper 0x140932010
-    pub water_def_type: SigString,
+    pub water_def_kind: SigString,
     /// game: `mColorCorrectionType`
     /// helper 0x140932010
-    pub color_correction_type: SigString,
+    pub color_correction_kind: SigString,
     /// game: `mXSFilename`
     /// helper 0x140932010
     pub xs_filename: SigString,
@@ -10784,7 +10784,7 @@ impl Default for TribeScenario {
             checksum: Default::default(),
             victory: Default::default(),
             victory_all_flag: Default::default(),
-            mp_victory_type: Default::default(),
+            mp_victory_kind: Default::default(),
             victory_score: Default::default(),
             victory_time: Default::default(),
             opponent: Default::default(),
@@ -10806,11 +10806,11 @@ impl Default for TribeScenario {
             checksum_3: Default::default(),
             view_x: Default::default(),
             view_y: Default::default(),
-            map_type_for_ai: Default::default(),
+            map_kind_for_ai: Default::default(),
             bases_priorities: Default::default(),
             trigger_count: Default::default(),
-            water_def_type: Default::default(),
-            color_correction_type: Default::default(),
+            water_def_kind: Default::default(),
+            color_correction_kind: Default::default(),
             xs_filename: Default::default(),
             collide_and_correcting: Default::default(),
             villager_force_drop: Default::default(),
@@ -11017,7 +11017,7 @@ pub struct FormationEntry1 {
 pub struct Formation {
     /// game: `mType`
     /// read at 0x141018118
-    pub type_: i32,
+    pub kind: i32,
     /// game: `mNumberSlots`
     /// read at 0x1410182b9
     pub number_slots: i32,
@@ -11045,7 +11045,7 @@ pub struct Formation {
     pub lines: Vec<FormationLine>,
     /// game: `mTransformType`
     /// read at 0x14101ad11
-    pub transform_type: i32,
+    pub transform_kind: i32,
     /// game: `mNumberLines`
     /// read at 0x14101ae4d
     pub number_lines: i32,
@@ -11097,7 +11097,7 @@ pub struct PointLine {
 #[derive(Debug, Clone, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct UnitTypeStatistic {
+pub struct UnitKindStatistic {
     /// game: `mFormationCategory`
     /// read at 0x1410237bb
     #[brw(magic = b"\xd2\x04\x00\x00")]
@@ -11120,20 +11120,20 @@ pub struct UnitTypeStatistic {
     pub desired_spacing: f32,
     /// game: `mNumberUnitTypes`
     /// read at 0x141024214
-    pub number_unit_types: i32,
+    pub number_unit_kinds: i32,
     /// game: `mUnitTypes`
     /// read at 0x1410243c0
-    pub unit_types: [u8; 200],
+    pub unit_kinds: [u8; 200],
     /// game: `mUnitTypeCounts`
     /// read at 0x141024573
-    pub unit_type_counts: [u8; 200],
+    pub unit_kind_counts: [u8; 200],
     /// unnamed in the binary
     /// the routine's closing marker
     #[brw(magic = b"\xd2\x04\x00\x00")]
     pub end_marker: (),
 }
 
-impl Default for UnitTypeStatistic {
+impl Default for UnitKindStatistic {
     fn default() -> Self {
         Self {
             formation_category: Default::default(),
@@ -11142,9 +11142,9 @@ impl Default for UnitTypeStatistic {
             used: Default::default(),
             attack_range: Default::default(),
             desired_spacing: Default::default(),
-            number_unit_types: Default::default(),
-            unit_types: [Default::default(); 200],
-            unit_type_counts: [Default::default(); 200],
+            number_unit_kinds: Default::default(),
+            unit_kinds: [Default::default(); 200],
+            unit_kind_counts: [Default::default(); 200],
             end_marker: Default::default(),
         }
     }
@@ -11155,14 +11155,14 @@ impl Default for UnitTypeStatistic {
 #[derive(Debug, Clone, Default, PartialEq)]
 #[brw(little)]
 #[br(import(ver: u32))]
-pub struct UnitTypeStatisticManager {
+pub struct UnitKindStatisticManager {
     /// game: `mNumberCategories`
     /// read at 0x141024a3e
     pub number_categories: i32,
     /// unnamed in the binary
     /// read by 0x141023570
     #[br(count = number_categories.max(0) as usize, args { inner: (ver,) })]
-    pub unit_type_statistic: Vec<UnitTypeStatistic>,
+    pub unit_kind_statistic: Vec<UnitKindStatistic>,
 }
 
 /// Read by `FUN_14101c7d0` of the build.
@@ -11176,7 +11176,7 @@ pub struct TargetData {
     pub target: i32,
     /// game: `mType`
     /// read at 0x14101c9d5
-    pub type_: i32,
+    pub kind: i32,
     /// game: `mOriginalPosition`
     /// read at 0x14101cb65
     pub original_position: [u8; 12],
@@ -11321,7 +11321,7 @@ pub struct UnitGroup {
     pub garbage: u32,
     /// game: `mFormationLockedType`
     /// read at 0x14101f826
-    pub formation_locked_type: i32,
+    pub formation_locked_kind: i32,
     /// game: `mGroupFlags.m_bits`
     /// read at 0x14101faa7
     pub group_flags_bits: u32,
@@ -11359,7 +11359,7 @@ pub struct UnitGroup {
     /// game: `mUnitTypes`
     /// read by 0x141024960
     #[br(args(ver))]
-    pub unit_types: UnitTypeStatisticManager,
+    pub unit_kinds: UnitKindStatisticManager,
     /// game: `mNumberWaypoints`
     /// read at 0x141020a75
     pub number_waypoints: i32,
@@ -11376,7 +11376,7 @@ pub struct UnitGroup {
     pub current_target: TargetData,
     /// game: `mAttackPlanType`
     /// read at 0x141021238
-    pub attack_plan_type: i32,
+    pub attack_plan_kind: i32,
     /// game: `mIdleTimer`
     /// read at 0x14102139e
     pub idle_timer: u32,
@@ -11617,7 +11617,7 @@ pub struct BaseWorld {
     pub unit_groups: UnitGroups,
     /// game: `&colorCorrectionType`
     /// read by 0x1415082d0, a routine of one read
-    pub color_correction_type: SigString,
+    pub color_correction_kind: SigString,
     /// game: `Game::Get()->IsUnitDeletionAllowed()`
     /// helper 0x140ccd170; read into the temporary `&yes`; named by the save's write in the same place (0x141546db0, write at 0x140ccd2d8)
     pub game_get_is_unit_deletion_allowed: u8,
@@ -11694,7 +11694,7 @@ impl Default for BaseWorld {
             temp_path_count: Default::default(),
             path: Default::default(),
             unit_groups: Default::default(),
-            color_correction_type: Default::default(),
+            color_correction_kind: Default::default(),
             game_get_is_unit_deletion_allowed: Default::default(),
             trigger_count: Default::default(),
             trigger_id: Default::default(),
@@ -11890,7 +11890,7 @@ pub struct TriggerSystemEntry4 {
     pub attacked_data_attacker_object_group: u32,
     /// game: `attackedData.mAttackerObjectType`
     /// read at 0x14156f77a; named by the save's write in the same place (0x141587990, write at 0x14158a075)
-    pub attacked_data_attacker_object_type: u32,
+    pub attacked_data_attacker_object_kind: u32,
     /// game: `attackedData.mAttackerUnitLevel`
     /// read at 0x14156f802; named by the save's write in the same place (0x141587990, write at 0x14158a0d2)
     pub attacked_data_attacker_unit_level: u32,
@@ -12115,7 +12115,7 @@ pub struct World {
     pub base_world: BaseWorld,
     /// game: `victory_type`
     /// read at 0x1415d0d9e
-    pub victory_type: i32,
+    pub victory_kind: i32,
     /// game: `artifact_count`
     /// read at 0x1415d0ece
     pub artifact_count: i32,
@@ -12238,7 +12238,7 @@ pub struct World {
     pub captured_first_castle: u8,
     /// game: `mGuardStateIdType`
     /// read at 0x1415d3b40
-    pub guard_state_id_type: i16,
+    pub guard_state_id_kind: i16,
     /// game: `mGuardStateResource`
     /// read at 0x1415d3bf0
     pub guard_state_resource: i16,
@@ -12288,7 +12288,7 @@ pub struct World {
     pub pop_limit: i32,
     /// game: `game_type`
     /// read at 0x1415d47da
-    pub game_type: u8,
+    pub game_kind: u8,
     /// game: `teams_locked`
     /// read at 0x1415d48bd
     pub teams_locked: u8,
@@ -12345,7 +12345,7 @@ impl Default for World {
             ai_scripts: Default::default(),
             ai_state: Default::default(),
             base_world: Default::default(),
-            victory_type: Default::default(),
+            victory_kind: Default::default(),
             artifact_count: Default::default(),
             ruin_count: Default::default(),
             countdown_victory: Default::default(),
@@ -12386,7 +12386,7 @@ impl Default for World {
             ruinwarned1000years: Default::default(),
             global_ruin_countdown_clock: Default::default(),
             captured_first_castle: Default::default(),
-            guard_state_id_type: Default::default(),
+            guard_state_id_kind: Default::default(),
             guard_state_resource: Default::default(),
             guard_state_delta: Default::default(),
             guard_state_flags: Default::default(),
@@ -12402,7 +12402,7 @@ impl Default for World {
             fog_set: Default::default(),
             map_size: Default::default(),
             pop_limit: Default::default(),
-            game_type: Default::default(),
+            game_kind: Default::default(),
             teams_locked: Default::default(),
             gb_force_nomad_treaty: Default::default(),
             treaty_length: Default::default(),

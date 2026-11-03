@@ -14,9 +14,9 @@ use crate::objects::masters::{ClassId, MasterId};
 /// master id there, as the game does. So the type holds the number, 0 or more, with both
 /// readings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct OrderTargetType(i16);
+pub struct OrderTargetKind(i16);
 
-impl OrderTargetType {
+impl OrderTargetKind {
     /// The value a field takes for none.
     const NONE: i32 = -1;
 
@@ -70,7 +70,7 @@ impl OrderTargetType {
     }
 }
 
-impl genie_diff::Diff for OrderTargetType {
+impl genie_diff::Diff for OrderTargetKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         d.equal(self, other);
     }
@@ -81,20 +81,20 @@ mod tests {
     use crate::ErrorKind;
     use crate::test_ids::master_id;
     use crate::testing::class;
-    use crate::unit_ai::OrderTargetType;
+    use crate::unit_ai::OrderTargetKind;
 
     /// A saved −1 is no type, any other number 0 or more a type that reads as the master and the
     /// class of that number; a negative number or one past `i16` is an error.
     #[test]
-    fn saved_target_type_reads_as_master_and_class() {
-        assert_eq!(OrderTargetType::of_field(-1), Ok(None));
-        let t = OrderTargetType::of_field(42).unwrap().unwrap();
+    fn saved_target_kind_reads_as_master_and_class() {
+        assert_eq!(OrderTargetKind::of_field(-1), Ok(None));
+        let t = OrderTargetKind::of_field(42).unwrap().unwrap();
         assert_eq!((t.master(), t.class()), (master_id(42), class::RELIC));
-        assert_eq!(OrderTargetType::field(Some(t)), 42);
-        assert_eq!(OrderTargetType::field(None), -1);
+        assert_eq!(OrderTargetKind::field(Some(t)), 42);
+        assert_eq!(OrderTargetKind::field(None), -1);
         for bad in [-2, 40_000] {
             assert_eq!(
-                OrderTargetType::of_field(bad).map_err(|e| e.kind()),
+                OrderTargetKind::of_field(bad).map_err(|e| e.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
@@ -102,15 +102,15 @@ mod tests {
 
     /// A target's master gives its number; a class gives its number, and a master's −1 none.
     #[test]
-    fn type_is_made_of_master_or_class() {
+    fn kind_is_made_of_master_or_class() {
         assert_eq!(
-            OrderTargetType::field(Some(OrderTargetType::of_master(master_id(285)))),
+            OrderTargetKind::field(Some(OrderTargetKind::of_master(master_id(285)))),
             285
         );
         assert_eq!(
-            OrderTargetType::of_class(class::FARM).map(OrderTargetType::class),
+            OrderTargetKind::of_class(class::FARM).map(OrderTargetKind::class),
             Some(class::FARM)
         );
-        assert_eq!(OrderTargetType::of_class(class::NO_CLASS), None);
+        assert_eq!(OrderTargetKind::of_class(class::NO_CLASS), None);
     }
 }

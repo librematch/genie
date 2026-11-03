@@ -14,8 +14,8 @@
   "crates/formats/genie-dat/src/tech_tree/mod.rs": 2,
   "crates/formats/genie-dat/src/tech_tree/nodes.rs": 4,
   "crates/formats/genie-dat/src/terrain.rs": 1,
-  "crates/formats/genie-dat/src/unit_type/combat.rs": 1,
-  "crates/formats/genie-dat/src/unit_type/statics.rs": 1,
+  "crates/formats/genie-dat/src/unit_kind/combat.rs": 1,
+  "crates/formats/genie-dat/src/unit_kind/statics.rs": 1,
   "crates/formats/genie-drs/src/write.rs": 1,
   "crates/formats/genie-hki/src/file.rs": 1,
   "crates/formats/genie-hki/src/group.rs": 1,
@@ -127,7 +127,7 @@
   "crates/tools/genie-oracle/src/lib.rs": 1
  },
  "clippy::neg_cmp_op_on_partial_ord": {
-  "crates/formats/genie-rec/src/unit_type.rs": 1
+  "crates/formats/genie-rec/src/unit_kind.rs": 1
  },
  "clippy::redundant_pub_crate": {
   "Cargo.toml": 1
@@ -143,11 +143,11 @@
  "clippy::struct_excessive_bools": {
   "crates/engine/genie-core/src/lib.rs": 1,
   "crates/engine/genie-model/src/lib.rs": 1,
-  "crates/formats/genie-dat/src/unit_type/statics.rs": 1,
+  "crates/formats/genie-dat/src/unit_kind/statics.rs": 1,
   "crates/formats/genie-rec/src/lib.rs": 1,
   "crates/formats/genie-rec/src/unit/building.rs": 1,
   "crates/formats/genie-rec/src/unit/statics.rs": 1,
-  "crates/formats/genie-rec/src/unit_type.rs": 1,
+  "crates/formats/genie-rec/src/unit_kind.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
   "crates/formats/genie-scx/src/triggers/trigger.rs": 1,
   "crates/tools/genie-oracle/src/lib.rs": 1
@@ -209,7 +209,7 @@
   "crates/formats/genie-rec/src/player/sight.rs": 1,
   "crates/formats/genie-rec/src/unit/unit_ai.rs": 3,
   "crates/formats/genie-rec/src/unit_action.rs": 1,
-  "crates/formats/genie-rec/src/unit_type.rs": 1,
+  "crates/formats/genie-rec/src/unit_kind.rs": 1,
   "crates/formats/genie-scx/src/format/rge.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_read.rs": 2
  },
@@ -222,7 +222,7 @@
   "Cargo.toml": 1
  },
  "trivial_casts": {
-  "crates/formats/genie-save/src/layout_types.rs": 1
+  "crates/formats/genie-save/src/layout_shapes.rs": 1
  },
  "unreachable_pub": {
   "Cargo.toml": 1
@@ -232,6 +232,6 @@
   "crates/formats/genie-scx/src/bitmap.rs": 3
  },
  "unused_qualifications": {
-  "crates/formats/genie-save/src/layout_types.rs": 1
+  "crates/formats/genie-save/src/layout_shapes.rs": 1
  }
 }

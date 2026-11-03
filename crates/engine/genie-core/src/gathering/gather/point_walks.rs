@@ -21,7 +21,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -275,7 +275,7 @@ impl GatherAction {
     pub(crate) fn after_reseed(
         &mut self,
         arrived: bool,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         mover: Option<&mut Mover>,
         stand: Stand<'_>,
     ) -> Result<[Option<ObjectId>; 2], GenieError> {
@@ -283,7 +283,7 @@ impl GatherAction {
         self.tear_down(mover.as_deref_mut())?;
         self.timer = Seconds::ZERO;
         stand.show(mover.map(|m| &mut m.stats));
-        if arrived && player_type.is_computer() {
+        if arrived && player_kind.is_computer() {
             // State 1: done; its update returns 1 and the action list removes it.
             self.state = GatherState::Done;
             return Ok([None; 2]);
@@ -348,7 +348,7 @@ impl GatherAction {
             0 => Ok(Next::Stay),
             code @ (1 | 2 | 3 | 5) => {
                 self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                if code != 3 && r.player_type.is_computer() {
+                if code != 3 && r.player_kind.is_computer() {
                     self.set_done(c, unit, r);
                 } else {
                     self.set_idle(c, unit, r);

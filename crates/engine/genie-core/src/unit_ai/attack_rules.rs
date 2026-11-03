@@ -22,7 +22,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     Attacker, BUILDING_AI, CIVILIAN, LION_AI, PREDATOR_AI, PRIEST_AI, SIEGE_AI, SOLDIER_AI, Seeker,
@@ -142,7 +142,7 @@ pub fn can_convert(
         }
     }
     if let Some(k) = task
-        && let Some(i) = k.attribute_type4
+        && let Some(i) = k.attribute_kind4
         && let Some(&a) = p.attributes.get(i.index())
         && at_most_or_unordered(a.get(), 0.0)
     {
@@ -159,7 +159,7 @@ pub fn can_convert(
 ///
 /// A computer player's unit.
 pub fn attack_sight(me: &Attacker) -> Result<Distance, GenieError> {
-    if me.player_type.is_computer() {
+    if me.player_kind.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's bestUnitToAttack",
         ));
@@ -167,11 +167,11 @@ pub fn attack_sight(me: &Attacker) -> Result<Distance, GenieError> {
     Ok(me.los + me.los)
 }
 
-/// The unit AI's slot 0xa8 (`me`'s type, [`type_attacks_neutral`]) on a neutral object of
+/// The unit AI's slot 0xa8 (`me`'s type, [`kind_attacks_neutral`]) on a neutral object of
 /// `class`.
 #[must_use]
 pub fn attacks_neutral(me: &Attacker, class: ClassId, roles: &Roles) -> bool {
-    type_attacks_neutral(me.ai_type, me.attack_priority, class, roles)
+    kind_attacks_neutral(me.ai_kind, me.attack_priority, class, roles)
 }
 
 /// Slot 0xa8 of the unit AI of factory type `ai_type` (`FUN_141215560`'s modules), whether it
@@ -184,13 +184,13 @@ pub fn attacks_neutral(me: &Attacker, class: ClassId, roles: &Roles) -> bool {
 /// priority 3 to
 /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 #[must_use]
-pub fn type_attacks_neutral(
-    ai_type: UnitAiType,
+pub fn kind_attacks_neutral(
+    ai_kind: UnitAiKind,
     attack_priority: AttackPriority,
     class: ClassId,
     roles: &Roles,
 ) -> bool {
-    match ai_type {
+    match ai_kind {
         CIVILIAN | BUILDING_AI => false,
         PREDATOR_AI | LION_AI => {
             !roles.of_class(class).intersects(
@@ -391,7 +391,7 @@ pub fn siege_can_attack(
     if (t.kind == MasterKind::BUILDING && t.desolid) || me.state < ObjectState::Alive {
         return Ok(false);
     }
-    if !me.player_type.is_computer()
+    if !me.player_kind.is_computer()
         && !any
         && roles
             .of_some_class(me.class)

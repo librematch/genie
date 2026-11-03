@@ -95,7 +95,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{Effect, Notify, OrderPriority, PatrolPath};
 use crate::vision::VisionBits;
@@ -254,7 +254,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         DropSite {
             building: ids::PASTURE,
             worker_class: Some(class::LIVESTOCK),
-            resource_types: vec![attribute::FOOD],
+            resource_kinds: vec![attribute::FOOD],
             ..DropSite::default()
         },
     ]);
@@ -277,7 +277,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
             ..Master::default()
         },
     ]));
-    t.players[0].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::FOOD);
+    t.players[0].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::FOOD);
     t.players[0].objects[ListIndex::new(0)].place_for_test(Position::new(10.0, 10.0, 0.0));
     for (id, x, state) in [
         (500, 30.0, ObjectState::Alive),
@@ -338,7 +338,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         class: class::BUILDING,
         player: PlayerId::new(0),
         master,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         buildable_on: BuildableOn::NO,
         tall: true,
         moves: false,
@@ -351,7 +351,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
             life: Lifecycle {
                 master_id: ids::VILLAGER_MALE,
                 state: ObjectState::Alive,
-                attribute_type: Some(attribute::WOOD),
+                attribute_kind: Some(attribute::WOOD),
                 amount: Amount::new(5.0),
                 ..Lifecycle::default()
             },
@@ -397,7 +397,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                 hit_points: MasterHitPoints::of_data(550),
                 build_time: WholeSeconds::of_data(25),
                 record: Obstruction {
-                    kind: ObstructionKind::TYPE_2,
+                    kind: ObstructionKind::KIND_2,
                     class: ObstructionClass::UNIT,
                 },
                 snow: Snow::None,
@@ -494,7 +494,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     t.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
-        resource_types: vec![attribute::WOOD],
+        resource_kinds: vec![attribute::WOOD],
         ..DropSite::default()
     }]);
     t.unit_order(
@@ -590,7 +590,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
     t.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(68),
         worker_class: Some(class::VILLAGER),
-        resource_types: vec![attribute::WOOD],
+        resource_kinds: vec![attribute::WOOD],
         ..DropSite::default()
     }]);
     t.unit_order(player_id(0), &object_ids([10]), UnitOrderAction::DropOff)
@@ -1084,7 +1084,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
     t.parts.set_unit_ai(
         unit.id,
         Some(UnitAi {
-            ai_type: UnitAiType::RANGED_6,
+            ai_kind: UnitAiKind::RANGED_6,
             current_order: None,
             current_action: None,
             current_target: None,
@@ -1272,13 +1272,13 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
             .unwrap(),
         None
     );
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert_eq!(
         t.command_check(PlayerId::new(1), &object_ids([30, 99]))
             .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerType::HUMAN;
+    t.players[1].kind = PlayerKind::HUMAN;
     // past the first 60 nothing is checked
     let mut ids = vec![99; 60];
     ids.push(30);
@@ -1348,7 +1348,7 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         .unwrap(),
         None
     );
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert_eq!(
         t.unload_check(
             PlayerId::new(1),
@@ -1358,7 +1358,7 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerType::HUMAN;
+    t.players[1].kind = PlayerKind::HUMAN;
     // past the first 60 nothing goes on
     let mut ids = vec![11; 60];
     ids.push(12);
@@ -1420,7 +1420,7 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
         range: Distance::ZERO,
         shown: Point::new(1.0, 1.0),
         ready: true,
-        target_type: None,
+        target_kind: None,
     };
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
@@ -1763,7 +1763,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
                     record: Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -2039,9 +2039,9 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
 /// are one); an attack task (7 or 9) turns a unit's retargeting off unless it is a villager.
 #[test]
 fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargeting() {
-    let task = |action_type, attribute_type| Task {
-        action_kind: action_type,
-        attribute_type,
+    let task = |action_kind, attribute_kind| Task {
+        action_kind,
+        attribute_kind,
         ..Task::default()
     };
     let run = |master: MasterId, held: Held, task: Task| {
@@ -2052,13 +2052,13 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
             }
         }
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
-        (unit.life.attribute_type, unit.life.amount) = (held.kind, held.amount);
+        (unit.life.attribute_kind, unit.life.amount) = (held.kind, held.amount);
         t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
         t.carried_resource_test(PlayerId::new(1), ListIndex::new(0), &task)
             .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
         (
-            unit.life.attribute_type,
+            unit.life.attribute_kind,
             unit.life.amount,
             t.parts.unit_ai.get(unit.id).unwrap().retarget_disabled,
         )
@@ -2122,7 +2122,7 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
         range: Distance::ZERO,
         shown: Point::new(1.0, 1.0),
         ready: true,
-        target_type: None,
+        target_kind: None,
     };
     t.parts.set_unit_ai(
         t.players[1].objects[ListIndex::new(0)].id,
@@ -2539,7 +2539,7 @@ fn switch_masters() -> (Master, Master) {
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(AttributeId::named(14)), Amount::new(1.0), 16),
         ],
-        obstruction_kind: ObstructionKind::TYPE_3,
+        obstruction_kind: ObstructionKind::KIND_3,
         obstruction_class: ObstructionClass::RESOURCE,
         creatable: Some(CreatablePart {
             volley_fire: Firepower::new(3.0),
@@ -2608,13 +2608,13 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
         (
             master_id(5),
             Footprint::new(0.3, 0.3),
-            ObstructionKind::TYPE_3
+            ObstructionKind::KIND_3
         )
     );
     assert_eq!(
         record.obstruction,
         Some(Obstruction {
-            kind: ObstructionKind::TYPE_3,
+            kind: ObstructionKind::KIND_3,
             class: ObstructionClass::RESOURCE
         })
     );
@@ -3088,7 +3088,7 @@ fn builder_leaves_the_main_building_of_an_annex() {
         hit_points: MasterHitPoints::of_data(100),
         build_time: WholeSeconds::of_data(10),
         record: Obstruction {
-            kind: ObstructionKind::TYPE_2,
+            kind: ObstructionKind::KIND_2,
             class: ObstructionClass::UNIT,
         },
         snow: Snow::None,
@@ -3153,7 +3153,7 @@ fn unit_own_queued_order_names_its_target() {
         range: Distance::ZERO,
         shown: Point::new(1.0, 1.0),
         ready: true,
-        target_type: None,
+        target_kind: None,
     };
     let mut ai = UnitAi {
         orders: vec![
@@ -3299,7 +3299,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
                     hit_points: MasterHitPoints::of_data(100),
                     build_time: WholeSeconds::of_data(10),
                     record: Obstruction {
-                        kind: ObstructionKind::TYPE_2,
+                        kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::UNIT,
                     },
                     snow: Snow::None,
@@ -3459,8 +3459,8 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
 fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     let units = [(11, 83, Point::new(20.0, 20.0))];
     let mut t = soldiers(&units, &[]);
-    let task = |action_type, object_id| Task {
-        action_kind: action_type,
+    let task = |action_kind, object_id| Task {
+        action_kind,
         object_group: None,
         object_id,
         work_val1: WorkValue::new(1.0),
@@ -4190,7 +4190,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         t.parts.set_unit_ai(
             u.id,
             Some(UnitAi {
-                ai_type: UnitAiType::SOLDIER,
+                ai_kind: UnitAiKind::SOLDIER,
                 current_order: None,
                 current_action: None,
                 current_target: None,
@@ -4211,7 +4211,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
 /// differentiator the command count, its formation locked to the command's type (5), the group
 /// listed as its own differentiator group and the command count one higher.
 #[test]
-fn formation_of_soldiers_makes_one_group_locked_to_its_type() {
+fn formation_of_soldiers_makes_one_group_locked_to_its_kind() {
     let units = [
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
@@ -4229,7 +4229,7 @@ fn formation_of_soldiers_makes_one_group_locked_to_its_type() {
     let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
     assert_eq!(
-        g[0].formation_locked_type,
+        g[0].formation_locked_kind,
         Some(FormationKind::USER_DEFINED)
     );
     assert_eq!(g[0].differentiator_id, Differentiator::of_data(0));
@@ -4239,13 +4239,13 @@ fn formation_of_soldiers_makes_one_group_locked_to_its_type() {
     t.form_formation(
         player_id(1),
         &object_ids([11, 12, 13]),
-        FormationKind::TYPE_6,
+        FormationKind::KIND_6,
     )
     .unwrap();
     assert_eq!(t.groups.groups.len(), 1);
     assert_eq!(
-        t.groups.groups[0].formation_locked_type,
-        Some(FormationKind::TYPE_6)
+        t.groups.groups[0].formation_locked_kind,
+        Some(FormationKind::KIND_6)
     );
     assert_eq!(
         t.groups.groups[0].differentiator_id,
@@ -4567,7 +4567,7 @@ fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
         range: Distance::ZERO,
         shown: Point::ORIGIN,
         ready: false,
-        target_type: None,
+        target_kind: None,
     };
     let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))]);
     t.parts
@@ -5097,7 +5097,7 @@ fn foraging() -> World {
         .unwrap();
     t.players[1].attributes = vec![Amount::ZERO; 10];
     let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
     t
 }
 
@@ -5120,7 +5120,7 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
             .unwrap(),
         None
     );
-    t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::WOOD);
+    t.players[1].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::WOOD);
     assert_eq!(
         t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
             .unwrap(),
@@ -5224,7 +5224,7 @@ fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
         WorkerCount::of_data(1)
     );
     let mut t = foraging();
-    t.players[1].objects[ListIndex::new(0)].life.attribute_type = Some(attribute::WOOD);
+    t.players[1].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::WOOD);
     let before = t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -5734,7 +5734,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         action: Some(ActionPart {
             tasks: vec![Task {
                 action_kind: ActionKind::COMBAT,
-                owner_type: TargetOwner::ENEMY,
+                owner_kind: TargetOwner::ENEMY,
                 object_group: Some(class::BUILDING),
                 ..Task::default()
             }],

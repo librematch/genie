@@ -233,7 +233,7 @@ impl World {
             for task in &tasks {
                 if task.action_kind == REMOVAL_REWARD && task.work_range < Distance::new(EPSILON) {
                     let held = self.players.player(owner)?;
-                    let multiplier = (task.attribute_type2).and_then(|a| held.attribute(a));
+                    let multiplier = (task.attribute_kind2).and_then(|a| held.attribute(a));
                     let cost = player_master(&self.model.masters, owner, own.id)
                         .map_or(&[][..], |m| &m.creatable_part().cost[..]);
                     rewards.push(reward(task, owner, multiplier, cost));

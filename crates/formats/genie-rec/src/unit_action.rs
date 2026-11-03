@@ -4,7 +4,7 @@ use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 pub use genie_dat::sprite::SpriteId;
-pub use genie_support::UnitTypeId;
+pub use genie_support::UnitKindId;
 use genie_support::{read_opt_u16, read_opt_u32};
 use std::io::{Read, Write};
 
@@ -33,20 +33,20 @@ pub struct UnitAction {
     /// The sprite the unit shows during the action, if any.
     pub sprite_id: Option<SpriteId>,
     /// The data specific to the action type.
-    pub params: ActionType,
+    pub params: ActionKind,
 }
 
 impl ReadableHeaderElement for UnitAction {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        let action_type = input.read_u16::<LE>()?;
-        Self::read_from_inner(input, action_type)
+        let action_kind = input.read_u16::<LE>()?;
+        Self::read_from_inner(input, action_kind)
     }
 }
 
 impl UnitAction {
     fn read_from_inner<R: Read>(
         input: &mut RecordingHeaderReader<R>,
-        action_type: u16,
+        action_kind: u16,
     ) -> Result<Self> {
         // TODO this is different between AoC 1.0 and AoC 1.0c. This version check is a guess
         // and may not actually be when it changed. May have to become more specific in the
@@ -71,7 +71,7 @@ impl UnitAction {
         let sub_action_value = input.read_u8()?;
         let sub_actions = Self::read_list_from(input)?;
         let sprite_id = read_opt_u16(input)?;
-        let params = ActionType::read_from(input, action_type)?;
+        let params = ActionKind::read_from(input, action_kind)?;
 
         Ok(Self {
             state,
@@ -94,15 +94,15 @@ impl UnitAction {
     ///
     /// Returns an error if reading fails.
     ///
-    /// Also fails on an action type the reader does not know yet (see [`ActionType::read_from`]).
+    /// Also fails on an action type the reader does not know yet (see [`ActionKind::read_from`]).
     pub fn read_list_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Vec<Self>> {
         let mut list = vec![];
         loop {
-            let action_type = input.read_u16::<LE>()?;
-            if action_type == 0 {
+            let action_kind = input.read_u16::<LE>()?;
+            if action_kind == 0 {
                 return Ok(list);
             }
-            let action = Self::read_from_inner(input, action_type)?;
+            let action = Self::read_from_inner(input, action_kind)?;
             list.push(action);
         }
     }
@@ -110,7 +110,7 @@ impl UnitAction {
 
 /// The action types the reader knows, with the data specific to each.
 #[derive(Debug, Clone, Copy)]
-pub enum ActionType {
+pub enum ActionKind {
     /// Move to a position or object (type 1).
     MoveTo(ActionMoveTo),
     /// Enter (garrison in) an object (type 3).
@@ -131,7 +131,7 @@ pub enum ActionType {
     Artifact,
 }
 
-impl ActionType {
+impl ActionKind {
     /// Read the data of an action of type `action_type`.
     ///
     /// # Errors
@@ -142,9 +142,9 @@ impl ActionType {
     /// ([`crate::Error::UnsupportedUnitAction`]).
     pub fn read_from<R: Read>(
         input: &mut RecordingHeaderReader<R>,
-        action_type: u16,
+        action_kind: u16,
     ) -> Result<Self> {
-        let data = match action_type {
+        let data = match action_kind {
             1 => Self::MoveTo(ActionMoveTo::read_from(input)?),
             3 => Self::Enter(ActionEnter::read_from(input)?),
             4 => Self::Explore,
@@ -154,7 +154,7 @@ impl ActionType {
             13 => Self::Guard,
             21 => Self::Make(ActionMake::read_from(input)?),
             107 => Self::Artifact,
-            _ => return Err(crate::Error::UnsupportedUnitAction(action_type)),
+            _ => return Err(crate::Error::UnsupportedUnitAction(action_kind)),
         };
         Ok(data)
     }
@@ -208,7 +208,7 @@ impl WritableHeaderElement for ActionEnter {
 pub struct ActionAttack {
     range: f32,
     min_range: f32,
-    missile_id: UnitTypeId,
+    missile_id: UnitKindId,
     frame_delay: u16,
     need_to_attack: u16,
     was_same_owner: u16,

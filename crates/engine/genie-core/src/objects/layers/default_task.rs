@@ -4,7 +4,7 @@
 
 use crate::GenieError;
 use crate::gathering::make::MAKE;
-use crate::objects::masters::ACTION_FACTORY_TYPES;
+use crate::objects::masters::ACTION_FACTORY_KINDS;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use genie_diff::{Diff, Differ};
@@ -124,7 +124,7 @@ impl DefaultTask {
 pub fn default_start(master: &Master) -> DefaultTask {
     match master.default_task() {
         Some(t) if t.action_kind == MAKE => DefaultTask::Make,
-        Some(t) if ACTION_FACTORY_TYPES.contains(&t.action_kind) => {
+        Some(t) if ACTION_FACTORY_KINDS.contains(&t.action_kind) => {
             DefaultTask::Fails(Unstartable::Unported(t.action_kind))
         }
         _ => DefaultTask::Nothing,

@@ -80,7 +80,7 @@ use crate::groups::UnitGroups;
 use crate::map::spatial::Placed;
 use crate::map::spatial::{Obstruction, Tiles};
 use crate::math::rng::Well512;
-use crate::movement::LinkedPathType;
+use crate::movement::LinkedPathKind;
 use crate::objects::layers::Action;
 use crate::pathing::Pathing;
 use crate::testing::tuning;
@@ -470,7 +470,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -498,7 +498,7 @@ fn lead() -> Lead {
         solid: true,
         ignore_units: Vec::new(),
         player: PlayerId::new(1),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         group: None,
     }
 }
@@ -558,7 +558,7 @@ fn an_arrived_level_hands_over_and_pause_waits() {
         1,
         PathState::Arrived,
     );
-    walked.linked_type = LinkedPathType::of_data(1);
+    walked.linked_kind = LinkedPathKind::of_data(1);
     let parent = level(
         2,
         &[Point::new(5.0, 5.0), Point::new(5.0, 9.0)],
@@ -598,7 +598,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -726,7 +726,7 @@ fn top_level_without_planner_plans_the_straight_way() {
         (
             new.level.get(),
             new.state,
-            new.linked_type.get(),
+            new.linked_kind.get(),
             new.waypoint.get()
         ),
         (1, PathState::WantsPath, 1, 1)
@@ -817,7 +817,7 @@ fn near_target_takes_the_straight_way() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type.get()),
+        (new.level.get(), new.state, new.linked_kind.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(
@@ -850,7 +850,7 @@ fn near_waypoint_takes_the_short_pather_path() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type.get()),
+        (new.level.get(), new.state, new.linked_kind.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(new.points.first(), Some(&BVector::new(5.0, 0.0, 5.0)));
@@ -870,7 +870,7 @@ fn far_waypoint_takes_the_long_pather_path() {
     );
     let new = &m.paths[0];
     assert_eq!(
-        (new.level.get(), new.state, new.linked_type.get()),
+        (new.level.get(), new.state, new.linked_kind.get()),
         (0, PathState::Walking, 1)
     );
     assert_eq!(
@@ -1066,7 +1066,7 @@ impl Fixture {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: WorldTime::from_millis(100),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut self.object,
             groups: &self.groups,
         };
@@ -1101,7 +1101,7 @@ fn an_arrived_level_hands_over_by_its_link() {
             2,
             PathState::Arrived,
         );
-        walked.linked_type = linked;
+        walked.linked_kind = linked;
         let mut parent = level(2, &three, waypoint, PathState::Idle);
         parent.path_flags = path_flags;
         m.paths = vec![walked, parent];
@@ -1112,7 +1112,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            LinkedPathType::of_data(2),
+            LinkedPathKind::of_data(2),
             PathFlags::LOOPS,
             &lead(),
             1
@@ -1122,7 +1122,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            LinkedPathType::of_data(2),
+            LinkedPathKind::of_data(2),
             PathFlags::NONE,
             &grouped(0x800),
             1
@@ -1132,7 +1132,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            LinkedPathType::of_data(2),
+            LinkedPathKind::of_data(2),
             PathFlags::NONE,
             &grouped(0x800),
             2
@@ -1142,7 +1142,7 @@ fn an_arrived_level_hands_over_by_its_link() {
     assert_eq!(
         handed(
             &mut fx,
-            LinkedPathType::of_data(3),
+            LinkedPathKind::of_data(3),
             PathFlags::LOOPS,
             &grouped(0x800),
             1
@@ -1282,13 +1282,13 @@ fn the_members_centre_pulls_group_whose_members_all_act() {
         m.paths[0].state = PathState::Walking;
         m.new_position[0] = BVector::new(5.0, 0.0, 5.0);
         let group = GroupView {
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             members,
         };
         let mut plan = Planning {
             pathing: &mut fx.pathing,
             now: WorldTime::from_millis(100),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut fx.object,
             groups: &fx.groups,
         };

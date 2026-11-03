@@ -13,13 +13,13 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::GatherGroup;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::StopOrder;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
     AiMove, CIVILIAN, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
@@ -238,7 +238,7 @@ impl UnitAi {
         (at, side): (&Surroundings, &mut dyn UnitSide),
     ) -> Result<bool, GenieError> {
         let held = Self::world_object(target, at, side)?;
-        if self.ai_type == CIVILIAN && held.is_none() {
+        if self.ai_kind == CIVILIAN && held.is_none() {
             return Ok(false);
         }
         if !force && self.current_action.is_some() {
@@ -381,11 +381,11 @@ impl UnitAi {
             self.ordered_on_target = true;
             return Ok(OrderOutcome::Taken);
         }
-        if let Some(target_type) = o.target_type {
+        if let Some(target_kind) = o.target_kind {
             // the class of the target's type: its owner's master's, else the type itself
             let class = match o.target_owner {
-                None => target_type.class(),
-                Some(owner) => match side.master_class(owner, target_type.master())? {
+                None => target_kind.class(),
+                Some(owner) => match side.master_class(owner, target_kind.master())? {
                     Some(class) => class,
                     None => return Ok(OrderOutcome::NotTaken),
                 },
@@ -438,8 +438,8 @@ impl UnitAi {
     /// [`civilian_kind`]); the fishing ship's (`FUN_140c1c580`): fish for classes 5, 31 and 33,
     /// gold for 63; the base's (`FUN_140c4cc00`) none. None for the byte 0xff.
     pub(super) fn resource_kind(&self, class: ClassId, roles: &Roles) -> Option<GatherGroup> {
-        match self.ai_type {
-            CIVILIAN | UnitAiType::BUILDING => civilian_kind(class, roles),
+        match self.ai_kind {
+            CIVILIAN | UnitAiKind::BUILDING => civilian_kind(class, roles),
             FISHING_AI => {
                 let held = roles.of_class(class);
                 if held.intersects(
@@ -538,7 +538,7 @@ impl UnitAi {
     pub fn take_order_now_with(
         &mut self,
         order: QueuedOrder,
-        (at, side, player_type): (&Surroundings, &mut dyn UnitSide, PlayerType),
+        (at, side, player_kind): (&Surroundings, &mut dyn UnitSide, PlayerKind),
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -554,7 +554,7 @@ impl UnitAi {
         };
         self.order_now(
             now,
-            Some((at, player_type)),
+            Some((at, player_kind)),
             ai,
             side,
             AiLayer {

@@ -94,7 +94,7 @@ impl Master {
             | MasterAttribute::UNDEAD_GRAPHIC => {
                 self.set_static_sprite(attribute, v, world);
             }
-            MasterAttribute::OBSTRUCTION_TYPE => {
+            MasterAttribute::OBSTRUCTION_KIND => {
                 self.obstruction_kind = ObstructionKind::set(low8(v));
             }
             MasterAttribute::BLOCKAGE_CLASS => {

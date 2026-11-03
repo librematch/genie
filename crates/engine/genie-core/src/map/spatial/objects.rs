@@ -141,7 +141,7 @@ impl Spatial {
         }
         if kind.marks_tiles() {
             self.unmark(&p, id);
-            if kind == ObstructionKind::TYPE_1 {
+            if kind == ObstructionKind::KIND_1 {
                 return true;
             }
         }
@@ -503,9 +503,9 @@ impl Spatial {
                 matches!(
                     kind,
                     Some(
-                        ObstructionKind::TYPE_2
-                            | ObstructionKind::TYPE_11
-                            | ObstructionKind::TYPE_13
+                        ObstructionKind::KIND_2
+                            | ObstructionKind::KIND_11
+                            | ObstructionKind::KIND_13
                     )
                 ) && !ignore.contains(&RecordId::from(id))
                     && test.meets(p.bounds())

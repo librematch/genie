@@ -7,9 +7,9 @@ use crate::pathing::DelayCount;
 /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it ask
 /// again; any other value hands nothing over.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct LinkedPathType(i32);
+pub struct LinkedPathKind(i32);
 
-impl LinkedPathType {
+impl LinkedPathKind {
     /// No link (0).
     pub const NONE: Self = Self(0);
     /// The parent's waypoint is reached (1).
@@ -32,7 +32,7 @@ impl LinkedPathType {
     }
 }
 
-impl genie_diff::Diff for LinkedPathType {
+impl genie_diff::Diff for LinkedPathKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         self.0.diff(&other.0, d);
     }

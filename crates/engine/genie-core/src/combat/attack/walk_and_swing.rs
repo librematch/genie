@@ -62,7 +62,7 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.player_type.is_computer()
+            waits: !r.player_kind.is_computer()
                 && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
             stance: r.stance,
         };

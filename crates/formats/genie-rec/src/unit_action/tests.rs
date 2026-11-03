@@ -1,12 +1,12 @@
 use crate::element::ReadableHeaderElement;
 use crate::test_support::{Bytes, header_reader, read_all};
-use crate::unit_action::{ActionAttack, ActionType, UnitAction};
+use crate::unit_action::{ActionAttack, ActionKind, UnitAction};
 
 /// An action's head at a version up to 11.76 (a one-byte state): no targets, no task, no
 /// sub-actions and no sprite.
-fn head(action_type: u16) -> Bytes {
+fn head(action_kind: u16) -> Bytes {
     Bytes::default()
-        .u16(action_type)
+        .u16(action_kind)
         .u8(2)
         .words(&[0, 0, -1, 650])
         .floats(&[1.0, 2.0, 0.0, 0.5])
@@ -56,9 +56,9 @@ fn an_attack_reads_its_ranges_sprites_and_last_target() {
 
 /// Every action type the reader knows, behind its head, ends a list at type 0.
 #[test]
-fn list_reads_every_known_action_type() {
+fn list_reads_every_known_action_kind() {
     let mut bytes = Bytes::default();
-    for (action_type, params) in [
+    for (action_kind, params) in [
         (1, Bytes::default().floats(&[2.0])),
         (3, Bytes::default().i32(77)),
         (4, Bytes::default()),
@@ -69,25 +69,25 @@ fn list_reads_every_known_action_type() {
         (21, Bytes::default().floats(&[0.25])),
         (107, Bytes::default()),
     ] {
-        bytes = bytes.raw(&head(action_type).0).raw(&params.0);
+        bytes = bytes.raw(&head(action_kind).0).raw(&params.0);
     }
     let bytes = bytes.u16(0).0;
     let mut reader = header_reader(&bytes, 11.76);
     let list = UnitAction::read_list_from(&mut reader).unwrap();
     assert_eq!(list.len(), 9);
     assert!(
-        matches!(list[0].params, ActionType::MoveTo(to) if to.range.to_bits() == 2.0_f32.to_bits())
+        matches!(list[0].params, ActionKind::MoveTo(to) if to.range.to_bits() == 2.0_f32.to_bits())
     );
-    assert!(matches!(list[1].params, ActionType::Enter(enter) if enter.first_time == 77));
-    assert!(matches!(list[2].params, ActionType::Explore));
-    assert!(matches!(list[3].params, ActionType::Attack(_)));
-    assert!(matches!(list[4].params, ActionType::Bird));
-    assert!(matches!(list[5].params, ActionType::Transport));
-    assert!(matches!(list[6].params, ActionType::Guard));
+    assert!(matches!(list[1].params, ActionKind::Enter(enter) if enter.first_time == 77));
+    assert!(matches!(list[2].params, ActionKind::Explore));
+    assert!(matches!(list[3].params, ActionKind::Attack(_)));
+    assert!(matches!(list[4].params, ActionKind::Bird));
+    assert!(matches!(list[5].params, ActionKind::Transport));
+    assert!(matches!(list[6].params, ActionKind::Guard));
     assert!(
-        matches!(list[7].params, ActionType::Make(make) if make.work_timer.to_bits() == 0.25_f32.to_bits())
+        matches!(list[7].params, ActionKind::Make(make) if make.work_timer.to_bits() == 0.25_f32.to_bits())
     );
-    assert!(matches!(list[8].params, ActionType::Artifact));
+    assert!(matches!(list[8].params, ActionKind::Artifact));
     let first = &list[0];
     assert_eq!(first.state, 2);
     assert_eq!(first.target_object_id, None);
@@ -118,7 +118,7 @@ fn an_action_after_11_76_has_word_state() {
 }
 
 #[test]
-fn an_unknown_action_type_is_an_error() {
+fn an_unknown_action_kind_is_an_error() {
     let e = UnitAction::read_from(&mut header_reader(&head(2).0, 11.76)).unwrap_err();
     assert!(matches!(e, crate::Error::UnsupportedUnitAction(2)));
 }

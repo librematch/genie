@@ -24,8 +24,8 @@ use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::Chance;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
-use crate::unit_ai::UnitAiType;
+use crate::players::PlayerKind;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
@@ -263,7 +263,7 @@ impl Unit {
         c: &mut Step<'_>,
         view: &OwnerView,
         attacker: Attacker,
-        (player, player_type): (PlayerId, PlayerType),
+        (player, player_kind): (PlayerId, PlayerKind),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
         let mut ai = c.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
@@ -277,7 +277,7 @@ impl Unit {
             actions,
             attacker,
             player,
-            player_type,
+            player_kind,
             new_owner: view.new_owner,
             civ: view.civ,
             ai_settings: view.ai_settings,
@@ -315,11 +315,11 @@ impl Unit {
             &mut UnitAi,
             &Surroundings,
             &mut dyn UnitSide,
-            PlayerType,
+            PlayerKind,
             &mut Well512,
         ) -> Result<(), GenieError>,
     ) -> Result<(), GenieError> {
-        let Some(ai_type) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_type) else {
+        let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one",
             ));
@@ -327,7 +327,7 @@ impl Unit {
         let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
         let master = Some(self.master(c.w.master_tables(), c.player)?);
         let class = master.map(|ms| ms.class);
-        let (player, player_type) = (c.player, c.w.players.player(c.player)?.kind);
+        let (player, player_kind) = (c.player, c.w.players.player(c.player)?.kind);
         let view = OwnerView::of(c, None)?;
         let interruptible = actions.interruptible(c.w.parts.unread.get(self.id))?;
         let at = self.surroundings(
@@ -339,9 +339,9 @@ impl Unit {
         )?;
         let attacker = self.attacker_of(
             actions,
-            ai_type,
+            ai_kind,
             master,
-            (player, player_type),
+            (player, player_kind),
             c.w.settings.game_mode.scenario(),
             (
                 at.capture,
@@ -356,8 +356,8 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, player_type),
-            |ai, side, rng| f(ai, &at, side, player_type, rng),
+            (player, player_kind),
+            |ai, side, rng| f(ai, &at, side, player_kind, rng),
         )
     }
 
@@ -375,19 +375,19 @@ impl Unit {
         c: &mut Step<'_>,
         f: impl FnOnce(&mut UnitAi, &mut dyn UnitSide, &mut Well512) -> Result<R, GenieError>,
     ) -> Result<R, GenieError> {
-        let Some(ai_type) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_type) else {
+        let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one",
             ));
         };
         let master = Some(self.master(c.w.master_tables(), c.player)?);
-        let (player, player_type) = (c.player, c.w.players.player(c.player)?.kind);
+        let (player, player_kind) = (c.player, c.w.players.player(c.player)?.kind);
         let view = OwnerView::of(c, None)?;
         let attacker = self.attacker_of(
             actions,
-            ai_type,
+            ai_kind,
             master,
-            (player, player_type),
+            (player, player_kind),
             c.w.settings.game_mode.scenario(),
             (
                 self.capture_kind(c),
@@ -402,7 +402,7 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, player_type),
+            (player, player_kind),
             |ai, side, rng| f(ai, side, rng),
         )
     }
@@ -443,7 +443,7 @@ impl Unit {
         let class = master.map(|ms| ms.class);
         // a captured unit's unit AI runs as its new owner's (RGE_Combat_Object::update reads the
         // owner then): on that player's turn, with its time as it stands
-        let (turn, player, player_type) = match captured {
+        let (turn, player, player_kind) = match captured {
             Some(k) if k.main => (
                 (k.new == c.w.player_turn)
                     .then(|| c.w.player_time.get(k.new.index()).copied())
@@ -451,7 +451,7 @@ impl Unit {
                 k.new,
                 c.w.players
                     .get(k.new.index())
-                    .map_or(PlayerType::PHANTOM, |q| q.kind),
+                    .map_or(PlayerKind::PHANTOM, |q| q.kind),
             ),
             _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
         };
@@ -495,16 +495,16 @@ impl Unit {
         )?;
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
         let world_time = c.w.world_time;
-        let ai_type =
+        let ai_kind =
             c.w.parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitAiType::of_value(0), |ai| ai.ai_type);
+                .map_or(UnitAiKind::of_value(0), |ai| ai.ai_kind);
         let attacker = self.attacker_of(
             actions,
-            ai_type,
+            ai_kind,
             master,
-            (player, player_type),
+            (player, player_kind),
             c.w.settings.game_mode.scenario(),
             (
                 at.capture,
@@ -519,18 +519,18 @@ impl Unit {
             c,
             &view,
             attacker,
-            (player, player_type),
+            (player, player_kind),
             |ai, side, ai_stream| {
                 // an order on a target comes only from a full update, on the owner's turn
                 match (turn, after) {
                     (Some(_), Some(after)) => ai
-                        .after_order(after, world_time, player_type, &at, ai_stream, side)
+                        .after_order(after, world_time, player_kind, &at, ai_stream, side)
                         .map(|()| None),
                     (Some(dt), None) => {
-                        ai.update(dt, world_time, player_type, &at, ai_stream, side)
+                        ai.update(dt, world_time, player_kind, &at, ai_stream, side)
                     }
                     (None, _) => ai
-                        .off_turn(&at, side, player_type, ai_stream)
+                        .off_turn(&at, side, player_kind, ai_stream)
                         .map(|()| None),
                 }
             },

@@ -25,7 +25,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::UnitRelation;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::{Memory, Pick, Search, search_area, type_attacks_neutral};
+use crate::unit_ai::{Memory, Pick, Search, kind_attacks_neutral, search_area};
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
@@ -73,7 +73,7 @@ impl World {
     /// object stops ([`World::stop_if_inside`]); each sub-formation's spacing is twice its widest
     /// unit's radius and its attack range its units' largest against the group's target
     /// ([`World::range_against`]), its units looked up in the world's table; with
-    /// [`MotionFlags::NEW`] the formation type follows ([`World::calc_formation_type`]). Without
+    /// [`MotionFlags::NEW`] the formation type follows ([`World::calc_formation_kind`]). Without
     /// one the smallest radius, the spacing and the smallest ranges are 0.
     ///
     /// Not modelled: `+0x478` (a member's `+0x30c`; the group holds no such field), a charge's
@@ -81,7 +81,7 @@ impl World {
     /// target the world holds.
     pub fn group_statistics(&mut self, group: GroupId, far: bool) -> Result<(), GenieError> {
         if self.statistics_only(group, far)? {
-            self.calc_formation_type(group)?;
+            self.calc_formation_kind(group)?;
         }
         Ok(())
     }
@@ -130,8 +130,8 @@ impl World {
         } else {
             g.seconds_not_under_attack += dt;
         }
-        let old_plan = g.attack_plan_type;
-        g.attack_plan_type = 0;
+        let old_plan = g.attack_plan_kind;
+        g.attack_plan_kind = 0;
         // the readers look the target's integer up as an object, whatever its kind
         let target = g.current_target.target.key();
         // each sub-formation with units: its attack range the largest of its units' slot 0x238
@@ -230,7 +230,7 @@ impl World {
         target: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
-        let stats: Vec<Vec<ObjectId>> = g.unit_types.iter().map(|u| u.units.clone()).collect();
+        let stats: Vec<Vec<ObjectId>> = g.unit_kinds.iter().map(|u| u.units.clone()).collect();
         for (n, units) in stats.iter().enumerate() {
             if units.is_empty() {
                 continue;
@@ -266,8 +266,8 @@ impl World {
                 }
             }
             let g = self.groups.held_mut(group)?;
-            g.unit_types.checked_mut(n)?.attack_range = range;
-            g.unit_types.checked_mut(n)?.desired_spacing = widest + widest;
+            g.unit_kinds.checked_mut(n)?.attack_range = range;
+            g.unit_kinds.checked_mut(n)?.desired_spacing = widest + widest;
         }
         Ok(())
     }
@@ -283,7 +283,7 @@ impl World {
     /// not modelled). Then the objects of the search's lists 4, 3 and 2 in that order
     /// ([`crate::map::spatial::Spatial::searched`]) that the world's table holds in a state below 3
     /// (`+0x640`), of any owner, the third list's only of a class the unit AI attacks among
-    /// neutrals (slot 0xa8, [`crate::unit_ai::type_attacks_neutral`]), join the list: each
+    /// neutrals (slot 0xa8, [`crate::unit_ai::kind_attacks_neutral`]), join the list: each
     /// once when it held any on entry (the duplicate test runs only then), and the list stops at
     /// [`MOST_OBJECTS`].
     ///
@@ -308,9 +308,9 @@ impl World {
             .unit_ai
             .get(u.id)
             .ok_or(GenieError::unsupported("a group member without a unit AI"))?;
-        let ai_type = ai.ai_type;
-        let player_type = self.players.player(p)?.kind;
-        if player_type.is_computer() {
+        let ai_kind = ai.ai_kind;
+        let player_kind = self.players.player(p)?.kind;
+        if player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's group member's search (its cared classes)",
             ));
@@ -318,11 +318,11 @@ impl World {
         let master = u.master(self.master_tables(), p)?;
         let attack_priority = master.creatable_part().attack_priority;
         let (classes, radius) = search_area(
-            ai_type,
+            ai_kind,
             Some(master.class),
             master.line_of_sight,
             master.action_part().search_radius,
-            player_type,
+            player_kind,
             &self.model.roles,
         )?;
         let search = Search {
@@ -371,7 +371,7 @@ impl World {
                     let class = self
                         .master(object.player(), object.master_id(self.model.slots))?
                         .class;
-                    if !type_attacks_neutral(ai_type, attack_priority, class, &self.model.roles) {
+                    if !kind_attacks_neutral(ai_kind, attack_priority, class, &self.model.roles) {
                         continue;
                     }
                 }
@@ -596,7 +596,7 @@ mod tests {
     use crate::combat::Charge;
     use crate::groups::FormationCategory;
     use crate::groups::GroupTarget;
-    use crate::groups::{Member, UnitGroup, UnitGroups, UnitTypeStatistic};
+    use crate::groups::{Member, UnitGroup, UnitGroups, UnitKindStatistic};
     use crate::map::Footprint;
     use crate::map::GridSize;
     use crate::map::Point;
@@ -638,7 +638,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::test_ids::object_id_list;
-    use crate::unit_ai::UnitAiType;
+    use crate::unit_ai::UnitAiKind;
     #[cfg(test)]
     use crate::unit_ai::{CIVILIAN, SOLDIER_AI, UnitAi};
     #[cfg(test)]
@@ -655,15 +655,15 @@ mod tests {
     /// another type, on no target (and no action's) or on a class outside its groups, the
     /// weapon range alone.
     #[test]
-    fn ready_charge_of_type_6_adds_its_charge_event_to_the_range() {
+    fn ready_charge_of_kind_6_adds_its_charge_event_to_the_range() {
         let mut t = searched_world();
-        let charging = |t: &mut World, charge_type: i16, charge_target: i16| {
+        let charging = |t: &mut World, charge_kind: i16, charge_target: i16| {
             let m = Arc::make_mut(&mut t.model.masters[1])
                 .get_mut(master_id(4))
                 .unwrap();
             let c = m.creatable.get_or_insert_with(Default::default);
             (c.charge_kind, c.charge_target, c.charge_event) = (
-                ChargeKind::of_data(charge_type),
+                ChargeKind::of_data(charge_kind),
                 ChargeTarget::of_data(charge_target),
                 ChargeEvent::of_data(2),
             );
@@ -709,7 +709,7 @@ mod tests {
         };
         let soldier = unit(10, master_id(4), 5.0, 5.0);
         let soldier_ai = UnitAi {
-            ai_type: SOLDIER_AI,
+            ai_kind: SOLDIER_AI,
             ..UnitAi::default()
         };
         let mut dying = unit(21, master_id(4), 5.0, 6.0);
@@ -815,10 +815,10 @@ mod tests {
             id: object_id(10),
             ..Member::default()
         }];
-        g.unit_types = vec![UnitTypeStatistic {
+        g.unit_kinds = vec![UnitKindStatistic {
             formation_category: FormationCategory::named(1),
             units: vec![object_id(10)],
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         }];
         t.groups = UnitGroups {
             groups: vec![g],
@@ -863,8 +863,8 @@ mod tests {
     /// its enemies within its grown radius (22, 8 tiles off: its line of sight 4 plus 1 plus 7)
     /// but no neutral (its slot 0xa8 never attacks one); a soldier the near ones only.
     #[test]
-    fn member_search_takes_its_type_classes_radius_and_neutral_test() {
-        let world = |ai_type: UnitAiType| {
+    fn member_search_takes_its_kind_classes_radius_and_neutral_test() {
+        let world = |ai_kind: UnitAiKind| {
             let mut t = searched_world();
             let mut far = t.object_of(&t.players[2].objects[ListIndex::new(0)]);
             far.unit.id = object_id(22);
@@ -889,11 +889,11 @@ mod tests {
                 .unit_ai
                 .get_mut(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
-                .ai_type = ai_type;
+                .ai_kind = ai_kind;
             t
         };
-        let found = |ai_type: UnitAiType| {
-            let mut t = world(ai_type);
+        let found = |ai_kind: UnitAiKind| {
+            let mut t = world(ai_kind);
             let mut objects = Vec::new();
             t.member_objects(object_id(10), &mut objects).unwrap();
             (
@@ -905,7 +905,7 @@ mod tests {
                     .alert_mode,
             )
         };
-        assert_eq!(found(UnitAiType::TRANSPORT), (vec![], false));
+        assert_eq!(found(UnitAiKind::TRANSPORT), (vec![], false));
         assert_eq!(found(CIVILIAN), (vec![object_id(20), object_id(22)], true));
         assert_eq!(
             found(SOLDIER_AI),
@@ -941,24 +941,24 @@ mod tests {
             *masters = Arc::new(Masters::new(masters.iter().cloned().chain([archer])));
         }
         let g = t.groups.get_mut(group_id(1)).unwrap();
-        g.unit_types[0].units.push(object_id(50));
+        g.unit_kinds[0].units.push(object_id(50));
         g.current_target.target = GroupTarget::of_saved(99, -1);
-        g.attack_plan_type = 1;
+        g.attack_plan_kind = 1;
         g.current_command = GroupCommandKind::ATTACK;
         g.objects = vec![object_id(77)];
         let _ = t.statistics_only(group_id(1), false).unwrap();
         let g = t.groups.get(group_id(1)).unwrap();
-        assert_eq!(g.unit_types[0].attack_range, Distance::new(6.0));
+        assert_eq!(g.unit_kinds[0].attack_range, Distance::new(6.0));
         // the searches fill their own list (+0x49c), not the units kept apart (+0x458)
         assert_eq!(
             (&g.sighted[..], &g.objects[..]),
             (&[object_id(20), object_id(30)][..], &[object_id(77)][..])
         );
-        assert_eq!(g.attack_plan_type, 0);
+        assert_eq!(g.attack_plan_kind, 0);
         // a target the world holds: the re-attack is not modelled
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_target.target = GroupTarget::of_saved(20, -1);
-        g.attack_plan_type = 1;
+        g.attack_plan_kind = 1;
         assert!(t.statistics_only(group_id(1), false).is_err());
     }
 
@@ -996,7 +996,7 @@ mod tests {
                     ..Member::default()
                 })
                 .to_vec();
-            g.unit_types[0].units = object_id_list(order);
+            g.unit_kinds[0].units = object_id_list(order);
             g.current_formation = Some(Formation {
                 slots: vec![
                     Slot {

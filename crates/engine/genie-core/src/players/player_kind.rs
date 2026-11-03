@@ -5,9 +5,9 @@ use std::fmt::{Display, Error, Formatter};
 /// A player's type (`player+0x10`, the save's `type`): which `WorldPlayer` class the game made
 /// for it. Every byte is a type (a save may hold types the slice does not name).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct PlayerType(u8);
+pub struct PlayerKind(u8);
 
-impl PlayerType {
+impl PlayerKind {
     /// Type 0: the scenario editor's phantom player.
     pub const PHANTOM: Self = Self(0);
     /// Type 1: a human player.
@@ -30,20 +30,20 @@ impl PlayerType {
     }
 }
 
-impl From<u8> for PlayerType {
+impl From<u8> for PlayerKind {
     /// The type a saved player's byte holds: every value is one.
     fn from(value: u8) -> Self {
         Self(value)
     }
 }
 
-impl Display for PlayerType {
+impl Display for PlayerKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         self.0.fmt(f)
     }
 }
 
-impl genie_diff::Diff for PlayerType {
+impl genie_diff::Diff for PlayerKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
         d.equal(self, other);
     }
@@ -51,13 +51,13 @@ impl genie_diff::Diff for PlayerType {
 
 #[cfg(test)]
 mod tests {
-    use crate::players::PlayerType;
+    use crate::players::PlayerKind;
 
     /// A saved byte is its type; the default is the phantom's 0.
     #[test]
-    fn saved_byte_is_its_type() {
-        assert_eq!(PlayerType::from(3), PlayerType::COMPUTER);
-        assert_eq!(PlayerType::GAIA.get(), 2);
-        assert_eq!(PlayerType::default(), PlayerType::PHANTOM);
+    fn saved_byte_is_its_kind() {
+        assert_eq!(PlayerKind::from(3), PlayerKind::COMPUTER);
+        assert_eq!(PlayerKind::GAIA.get(), 2);
+        assert_eq!(PlayerKind::default(), PlayerKind::PHANTOM);
     }
 }

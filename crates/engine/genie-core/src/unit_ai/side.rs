@@ -18,7 +18,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::{
     Attacked, Duel, Effect, Found, Notify, PatrolPath, Search, Seeker, UnitAi, UnitSeen,
 };
@@ -503,8 +503,8 @@ pub struct OffFootprint {
     pub z: f32,
     /// Its master's class.
     pub class: ClassId,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// Its owner's id.
     pub player: PlayerId,
     /// The foundation, while the world holds it.

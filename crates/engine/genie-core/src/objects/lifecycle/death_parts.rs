@@ -18,7 +18,7 @@ use crate::objects::masters::{OwnerMasters, cost_entries};
 use crate::objects::unit::Unit;
 use crate::pathing::Pathing;
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
@@ -210,14 +210,14 @@ pub(crate) fn built_death(
     (u, combat): (&mut Unit, &mut Combat),
     annex_of: Option<MainBuildingId>,
     master: &Master,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
     roles: &Roles,
     slots: Slots,
 ) -> Result<BuiltDeath, GenieError> {
     let building = master.building.ok_or(GenieError::unsupported(
         "a dying building of a master without its building part",
     ))?;
-    if player_type.is_computer()
+    if player_kind.is_computer()
         || u.pasture.is_some()
         || u.my_pasture.is_some()
         || !u.garrison.is_empty()
@@ -275,11 +275,11 @@ pub(crate) fn storage_leaves(
         }
     }
     if roles
-        .of_some_attribute(u.life.attribute_type)
+        .of_some_attribute(u.life.attribute_kind)
         .contains(AttributeRoles::HEADROOM)
     {
         adds.push((slots.attribute.headroom, -u.life.amount));
-        u.life.attribute_type = None;
+        u.life.attribute_kind = None;
         u.life.amount = Amount::ZERO;
     }
     // FUN_1411e6580: each entry of mode 16 leaves its own store, when the store holds it

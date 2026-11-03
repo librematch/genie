@@ -1,10 +1,10 @@
-//! A unit type ([`UnitType`]): its base class and the parts it has, read and written.
+//! A unit type ([`UnitKind`]): its base class and the parts it has, read and written.
 
 use crate::conv::invalid_data;
-use crate::unit_type::{
-    ActionUnitTypeAttributes, AnimatedUnitTypeAttributes, BaseCombatUnitTypeAttributes,
-    BuildingUnitTypeAttributes, CombatUnitTypeAttributes, MissileUnitTypeAttributes,
-    MovingUnitTypeAttributes, StaticUnitTypeAttributes, UnitBaseClass,
+use crate::unit_kind::{
+    ActionUnitKindAttributes, AnimatedUnitKindAttributes, BaseCombatUnitKindAttributes,
+    BuildingUnitKindAttributes, CombatUnitKindAttributes, MissileUnitKindAttributes,
+    MovingUnitKindAttributes, StaticUnitKindAttributes, UnitBaseClass,
 };
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::convert::TryInto;
@@ -21,34 +21,34 @@ use std::io::{Read, Result, Write};
 ///
 /// [base class]: ./enum.UnitBaseClass.html
 #[derive(Debug, Clone)]
-pub struct UnitType {
+pub struct UnitKind {
     /// The base class for this unit type.
     pub unit_base_class: UnitBaseClass,
     /// The static unit type attributes: these are always available.
-    pub static_: StaticUnitTypeAttributes,
+    pub static_: StaticUnitKindAttributes,
     /// Animated unit type attributes, available if `self.unit_base_class >= UnitBaseClass::Animated`.
-    pub animated: Option<AnimatedUnitTypeAttributes>,
+    pub animated: Option<AnimatedUnitKindAttributes>,
     /// Moving unit type attributes, available if `self.unit_base_class >= UnitBaseClass::Moving`.
-    pub moving: Option<MovingUnitTypeAttributes>,
+    pub moving: Option<MovingUnitKindAttributes>,
     /// Action unit type attributes, available if `self.unit_base_class >= UnitBaseClass::Action`.
-    pub action: Option<ActionUnitTypeAttributes>,
+    pub action: Option<ActionUnitKindAttributes>,
     /// `BaseCombat` unit type attributes, available if `self.unit_base_class >=
     /// UnitBaseClass::BaseCombat`.
-    pub base_combat: Option<BaseCombatUnitTypeAttributes>,
+    pub base_combat: Option<BaseCombatUnitKindAttributes>,
     /// Missile unit type attributes, available if `self.unit_base_class >= UnitBaseClass::Missile`.
-    pub missile: Option<MissileUnitTypeAttributes>,
+    pub missile: Option<MissileUnitKindAttributes>,
     /// Combat unit type attributes, available if `self.unit_base_class >= UnitBaseClass::Combat`.
-    pub combat: Option<CombatUnitTypeAttributes>,
+    pub combat: Option<CombatUnitKindAttributes>,
     /// Building unit type attributes, available if `self.unit_base_class >=
     /// UnitBaseClass::Building`.
-    pub building: Option<BuildingUnitTypeAttributes>,
+    pub building: Option<BuildingUnitKindAttributes>,
 }
 
 /// The unit type's attributes do not match its base class: a class it has lacks them, or a class
 /// it lacks has them.
 const ATTRIBUTES_MISMATCH: &str = "a unit type whose attributes do not match its base class";
 
-impl UnitType {
+impl UnitKind {
     /// Read a unit type from an input stream.
     ///
     /// # Errors
@@ -61,7 +61,7 @@ impl UnitType {
     /// [`SpriteId`]: crate::sprite::SpriteId
     pub fn read_from(mut input: impl Read, version: f32) -> Result<Self> {
         let unit_base_class = input.read_u8()?.try_into().map_err(invalid_data)?;
-        let static_ = StaticUnitTypeAttributes::read_from(&mut input, version)?;
+        let static_ = StaticUnitKindAttributes::read_from(&mut input, version)?;
         let mut unit = Self {
             unit_base_class,
             static_,
@@ -74,27 +74,27 @@ impl UnitType {
             building: None,
         };
         if unit_base_class >= UnitBaseClass::Animated {
-            unit.animated = Some(AnimatedUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.animated = Some(AnimatedUnitKindAttributes::read_from(&mut input, version)?);
         }
         if unit_base_class >= UnitBaseClass::Moving {
-            unit.moving = Some(MovingUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.moving = Some(MovingUnitKindAttributes::read_from(&mut input, version)?);
         }
         if unit_base_class >= UnitBaseClass::Action {
-            unit.action = Some(ActionUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.action = Some(ActionUnitKindAttributes::read_from(&mut input, version)?);
         }
         if unit_base_class >= UnitBaseClass::BaseCombat {
-            unit.base_combat = Some(BaseCombatUnitTypeAttributes::read_from(
+            unit.base_combat = Some(BaseCombatUnitKindAttributes::read_from(
                 &mut input, version,
             )?);
         }
         if unit_base_class >= UnitBaseClass::Missile {
-            unit.missile = Some(MissileUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.missile = Some(MissileUnitKindAttributes::read_from(&mut input, version)?);
         }
         if unit_base_class >= UnitBaseClass::Combat {
-            unit.combat = Some(CombatUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.combat = Some(CombatUnitKindAttributes::read_from(&mut input, version)?);
         }
         if unit_base_class >= UnitBaseClass::Building {
-            unit.building = Some(BuildingUnitTypeAttributes::read_from(&mut input, version)?);
+            unit.building = Some(BuildingUnitKindAttributes::read_from(&mut input, version)?);
         }
         Ok(unit)
     }

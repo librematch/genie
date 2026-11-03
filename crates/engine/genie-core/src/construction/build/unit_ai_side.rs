@@ -272,7 +272,7 @@ impl UnitView<'_, '_> {
             spot,
             z: unit.position().z(),
             class: master.class,
-            player_type: self.player_type,
+            player_kind: self.player_kind,
             player,
             site: named(site.id()),
             action_target: target.and_then(named),

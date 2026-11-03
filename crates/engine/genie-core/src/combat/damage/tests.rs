@@ -474,7 +474,7 @@ fn bonus_damage_counts_whole_steps_of_hit_point_share() {
             object_group: class_of(object_group),
             object_id,
             work_range: range,
-            attribute_type4: AttributeId::of_data(lacking),
+            attribute_kind4: AttributeId::of_data(lacking),
             work_val1: WorkValue::new(2.0),
             work_val2: WorkValue::new(0.25),
             ..Task::default()
@@ -561,7 +561,7 @@ fn combat_object_shows_its_attack_armor_and_range() {
     // the bonus against its attack's target
     v.bonus_tasks = vec![Task {
         action_kind: BONUS_DAMAGE,
-        attribute_type4: Some(attribute::FOOD),
+        attribute_kind4: Some(attribute::FOOD),
         work_val1: WorkValue::new(1.5),
         work_val2: WorkValue::new(0.5),
         ..Task::default()

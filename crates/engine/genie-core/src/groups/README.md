@@ -54,8 +54,8 @@ The world runs the update of each group that a player owns, before the player's 
 | [`target.rs`](target.rs) | A group's target: an object, none, or a target of another kind. |
 | [`task.rs`](task.rs) | The task a group's member takes on a target (FD-036): the unit's slot 0x130 (`RGE_Action_Object::slot38`, `FUN_14106b8b0`), which `BUnitGroup::command` asks of its first member that can act to choose the command a group's order runs. |
 | [`tests.rs`](tests.rs) | Tests. |
-| [`transform_type.rs`](transform_type.rs) | How a formation's transform places its slots (`mTransformType`). |
-| [`unit_type.rs`](unit_type.rs) | A group's unit type: a master's id as the statistics' and the slots' words hold it. |
+| [`transform_kind.rs`](transform_kind.rs) | How a formation's transform places its slots (`mTransformType`). |
+| [`unit_kind.rs`](unit_kind.rs) | A group's unit type: a master's id as the statistics' and the slots' words hold it. |
 | [`formation/`](formation/) | A group's formation (FD-036): `BFormation`, its slots and lines, and the layouts that fill them (createColumnLine `FUN_141012280`, ...). |
 | [`motion/`](motion/) | A group's motion (FD-036): `BMotion`'s update (`FUN_14104a090`, motion.cpp): its path step (`FUN_14104a270`) over the path levels a unit's motion step keeps alike, planned for the group's lead from the group's place, the walk toward the walked level's waypoint with its turn (`FUN_141046270`, `FUN_14104c150`), then the velocity along the vectors. |
 | [`steer/`](steer/) | The members' moves to their slots (FD-036): the part of `BUnitGroup::update` (`FUN_14103d910`, `0x14103e8e8`..`0x14103efba`) that brings each member of a formation to its slot, with the member's steering (`FUN_141025fb0`) and the setter of a member's own move (`FUN_141039f60`). |

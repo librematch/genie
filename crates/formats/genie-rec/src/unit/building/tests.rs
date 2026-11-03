@@ -12,12 +12,12 @@ fn head() -> Bytes {
 }
 
 /// A gather point: its flag, a location, an object and the object's type.
-fn gather_point(exists: i32, object: i32, unit_type: u16) -> Bytes {
+fn gather_point(exists: i32, object: i32, unit_kind: u16) -> Bytes {
     Bytes::default()
         .i32(exists)
         .floats(&[4.0, 5.0, 0.0])
         .i32(object)
-        .u16(unit_type)
+        .u16(unit_kind)
 }
 
 /// The rest of an old building: the links (an owner and two children), no actions, a queue
@@ -51,8 +51,8 @@ fn gather_point_is_none_location_or_an_object() {
     ));
     assert!(matches!(
         read_gather_point(&gather_point(1, 640, 83)),
-        Some(GatherPoint::Object { id, unit_type })
-            if u32::from(id) == 640 && u16::from(unit_type) == 83
+        Some(GatherPoint::Object { id, unit_kind })
+            if u32::from(id) == 640 && u16::from(unit_kind) == 83
     ));
 }
 
@@ -88,11 +88,11 @@ fn an_old_building_reads_its_links_and_queue() {
     );
     assert_eq!(building.captured_unit_count, 1);
     assert_eq!(building.production_queue.len(), 1);
-    assert_eq!(u16::from(building.production_queue[0].unit_type_id), 83);
+    assert_eq!(u16::from(building.production_queue[0].unit_kind_id), 83);
     assert_eq!(building.production_queue[0].count, 2);
     assert_eq!(building.production_queue_total_units, 2);
     assert!(building.production_queue_enabled);
-    assert!(building.terrain_type.is_none());
+    assert!(building.terrain_kind.is_none());
 }
 
 /// From 11.54 on the building has the pending order, the gate's fields, the terrain and both
@@ -116,6 +116,6 @@ fn building_of_11_54_reads_every_later_field() {
         ),
         (1, 2, 3)
     );
-    assert_eq!(building.terrain_type.map(u16::from), Some(7));
+    assert_eq!(building.terrain_kind.map(u16::from), Some(7));
     assert!(building.semi_asleep && building.snow_flag);
 }

@@ -119,7 +119,7 @@ impl HuntAction {
             return Ok(Dropped::Again);
         }
         let gives_up = GiveUp {
-            waits: !who.player_type.is_computer() && who.villager,
+            waits: !who.player_kind.is_computer() && who.villager,
             stance: who.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {
@@ -147,9 +147,9 @@ impl HuntAction {
             return Ok(Dropped::Going);
         }
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_type, attributes, c.w.model.slots);
+        let kind = resource_kind(unit.life.attribute_kind, attributes, c.w.model.slots);
         let amount = unit.life.amount;
-        unit.life.attribute_type = None;
+        unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
         Ok(Dropped::Load(kind, amount))
     }
@@ -237,7 +237,7 @@ impl Unit {
             pathing: &mut c.w.pathing,
             object: c.w.streams.get(Stream::Object),
             world_time: c.w.world_time,
-            player_type: c.w.players.player(c.player)?.kind,
+            player_kind: c.w.players.player(c.player)?.kind,
             groups: &c.w.groups,
         };
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;

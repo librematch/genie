@@ -516,7 +516,7 @@ fn unload_and_unit_order_keep_their_lists_and_counts() {
             gap_0x06: [0; 2],
             x: 1.0,
             y: 1.0,
-            unit_type: -1,
+            unit_kind: -1,
             flag: 1,
             gap_0x15: [0; 3],
             field_0x18: 1,
@@ -983,7 +983,7 @@ fn packet_its_command_does_not_write_back_stays_raw() {
 /// deleted, a FOLLOW's target). Where the command works without one, an object id's −1 is none
 /// and decodes: in a unit list (a computer's BUILD without builders lists −1), as a target.
 #[test]
-fn packet_of_value_its_types_refuse_stays_raw() {
+fn packet_of_value_its_kinds_refuse_stays_raw() {
     let build = |oid| {
         packets::Build {
             commp_id: 1,

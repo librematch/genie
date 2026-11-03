@@ -24,7 +24,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn calc_formation_type(&mut self, group: GroupId) -> Result<(), GenieError> {
+    pub fn calc_formation_kind(&mut self, group: GroupId) -> Result<(), GenieError> {
         let ids: Vec<ObjectId> = self
             .groups
             .held(group)?
@@ -38,7 +38,7 @@ impl World {
                 .parts
                 .unit_ai
                 .get(id)
-                .and_then(|ai| ai.formation_type.vote())
+                .and_then(|ai| ai.formation_kind.vote())
             {
                 *counts.checked_mut(vote)? += 1;
             }
@@ -53,14 +53,14 @@ impl World {
             return self.lock_formation(group, FormationKind::of_vote(best));
         }
         if let Some(g) = self.groups.get_mut(group) {
-            g.formation_locked_type = Some(FormationKind::HORDE);
+            g.formation_locked_kind = Some(FormationKind::HORDE);
         }
         self.update_desired_positions(group, None)?;
         self.stances_state(group, FormationKind::HORDE)?;
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-                ai.formation_type = FormationKind::HORDE;
+                ai.formation_kind = FormationKind::HORDE;
             }
         }
         Ok(())
@@ -110,7 +110,7 @@ impl World {
         } else {
             kind
         };
-        self.groups.held_mut(group)?.formation_locked_type = Some(locked);
+        self.groups.held_mut(group)?.formation_locked_kind = Some(locked);
         self.update_desired_positions(group, (!own_choice).then_some(kind))?;
         self.stances_state(group, locked)?;
         Ok(())
@@ -123,7 +123,7 @@ impl World {
     pub fn stances_state(
         &mut self,
         group: GroupId,
-        formation_type: FormationKind,
+        formation_kind: FormationKind,
     ) -> Result<(), GenieError> {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
@@ -155,7 +155,7 @@ impl World {
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-                ai.formation_type = formation_type.unit_byte();
+                ai.formation_kind = formation_kind.unit_byte();
             }
         }
         Ok(())

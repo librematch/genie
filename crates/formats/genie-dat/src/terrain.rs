@@ -5,7 +5,7 @@ use crate::conv::invalid_data;
 use crate::conv::opt_fits;
 use crate::sound::SoundId;
 use crate::sprite::{GraphicId, SpriteId};
-use crate::unit_type::UnitTypeId;
+use crate::unit_kind::UnitKindId;
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{
@@ -109,7 +109,7 @@ pub struct TerrainSpriteFrame {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TerrainObject {
     /// The unit type placed.
-    pub object_id: UnitTypeId,
+    pub object_id: UnitKindId,
     /// How densely it is placed.
     pub density: i16,
     /// Whether the object is centred on its tile (genieutils' `TerrainUnitCentering`).

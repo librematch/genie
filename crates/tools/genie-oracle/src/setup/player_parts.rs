@@ -167,7 +167,7 @@ pub(crate) fn tech_state(t: &TechPlayerTree) -> Result<TechState, GenieError> {
             .map_or(CostOverride::UNSET, |e| CostOverride {
                 amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
                 attribute: AttributeId::of_data(
-                    e.tech_player_tree_cost_attribute_type_override as i16,
+                    e.tech_player_tree_cost_attribute_kind_override as i16,
                 ),
                 used: OverrideUse::of_data(e.tech_player_tree_cost_attribute_used_override as i16),
             })

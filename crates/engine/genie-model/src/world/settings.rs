@@ -17,7 +17,7 @@ pub struct Settings {
     /// ([`Settings::last_age`]).
     pub ending_age: Age,
     /// `mVisibilityType` (`+0x48`): 0 normal, 1 explored, 2 all visible.
-    pub visibility_type: Visibility,
+    pub visibility_kind: Visibility,
     /// `mSubGameModeFlag` (`+0x94`): the rules a mode adds to another (bit 1 sudden death, bit 2
     /// regicide), read as an int (`FUN_141324b60` on `+0x18` reads `+0x18 + 0x7c`).
     pub sub_game_mode_flag: SubModeFlags,
@@ -170,7 +170,7 @@ impl Settings {
     /// (`WorldPlayer::update`, `0x14163b100`).
     #[must_use]
     pub const fn explored_all(&self) -> bool {
-        self.visibility_type.explored_all()
+        self.visibility_kind.explored_all()
     }
 
     /// `FUN_141302520`: the regicide rule holds, the game mode Regicide (1) or the sub-mode's
@@ -234,9 +234,9 @@ mod tests {
     /// `mVisibilityType` 1 (explored) and 2 (all visible) explore the whole map; 0 (normal) and
     /// the others do not.
     #[test]
-    fn the_explored_and_all_visible_types_explore_the_whole_map() {
-        let with = |visibility_type: i32| Settings {
-            visibility_type: Visibility::of_data(visibility_type),
+    fn the_explored_and_all_visible_kinds_explore_the_whole_map() {
+        let with = |visibility_kind: i32| Settings {
+            visibility_kind: Visibility::of_data(visibility_kind),
             ..Settings::default()
         };
         assert!(with(1).explored_all() && with(2).explored_all());

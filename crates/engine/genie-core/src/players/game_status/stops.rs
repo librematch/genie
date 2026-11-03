@@ -25,9 +25,9 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionKind;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
-use crate::ownership::artifact::ARTIFACT_TYPE;
+use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
-use crate::players::game_status::KEEPING_TYPES;
+use crate::players::game_status::KEEPING_KINDS;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::StopOrder;
 use crate::world::Seconds;
@@ -113,7 +113,7 @@ impl World {
             .parts
             .actions_of(unit.id)
             .top_action_kind()
-            .is_some_and(|k| KEEPING_TYPES.contains(&k))
+            .is_some_and(|k| KEEPING_KINDS.contains(&k))
         {
             return Err(GenieError::unsupported(
                 "a stop of an action of type 0x7c or 0x7d",
@@ -145,7 +145,7 @@ impl World {
         // JNC at 0x14108c11e: a NaN load counts) keeps the unit AI going
         let trading = self.parts.actions_of(unit.id).top_action_kind() == Some(ActionKind::TRADE)
             && below_or_unordered(0.0, unit.life.amount.get())
-            && unit.life.attribute_type.is_some();
+            && unit.life.attribute_kind.is_some();
         let Some(ai) = self.parts.unit_ai.get(unit.id) else {
             return Ok(());
         };
@@ -182,7 +182,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<bool, GenieError> {
-        let player_type = self.players.player(p)?.kind;
+        let player_kind = self.players.player(p)?.kind;
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
@@ -197,7 +197,7 @@ impl World {
             HUNT => {}
             _ => return self.halt_other(p, idx, kind),
         }
-        if player_type.is_computer() {
+        if player_kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's hunt stopped (set_state 1)",
             ));
@@ -280,7 +280,7 @@ impl World {
                     self.model.tuning.sprite,
                 )?;
             }
-            ARTIFACT_TYPE => self.halt_artifact(p, idx, by)?,
+            ARTIFACT_KIND => self.halt_artifact(p, idx, by)?,
             _ => {
                 return Err(GenieError::unsupported(
                     "a stop of an action whose slot 0x38 is not modelled",

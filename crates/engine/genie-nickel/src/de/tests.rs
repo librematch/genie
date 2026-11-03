@@ -86,7 +86,7 @@ fn values_that_do_not_fit_fail_with_the_field_path() {
 /// A field of any type takes each kind of value: null, a bool, an integer, a fraction, a
 /// string, an enum tag, an array and a record; an enum variant with a value has no such form.
 #[test]
-fn any_value_deserializes_into_fields_of_any_type() {
+fn any_value_deserializes_into_fields_of_any_kind() {
     let expr = evaluate(
         "{ a = null, b = true, c = -3, d = 1.5, e = \"x\", f = 'Gate, g = [1, 2], h = { i = 0 } }",
         "any.ncl",

@@ -3,9 +3,9 @@
 /// How a formation's transform places its slots (`mTransformType`, `FormationTransform`'s
 /// switch, `FUN_14103a1f0`); every value is kept, one not named here places none.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct TransformType(i32);
+pub struct TransformKind(i32);
 
-impl TransformType {
+impl TransformKind {
     /// 0: line by line, each at its distance back along the group's stored positions (the
     /// phalanx's lines).
     pub const BY_LINES: Self = Self(0);
@@ -38,17 +38,17 @@ impl TransformType {
 
 #[cfg(test)]
 mod tests {
-    use crate::groups::TransformType;
+    use crate::groups::TransformKind;
 
     /// Types 2 and 3 leave the offsets unturned; any value is kept.
     #[test]
-    fn the_unturned_types_are_2_and_3() {
+    fn the_unturned_kinds_are_2_and_3() {
         let unturned: Vec<i32> = (0..5)
-            .map(TransformType::of_data)
+            .map(TransformKind::of_data)
             .filter(|t| t.unturned())
-            .map(TransformType::get)
+            .map(TransformKind::get)
             .collect();
         assert_eq!(unturned, [2, 3]);
-        assert_eq!(TransformType::default(), TransformType::BY_LINES);
+        assert_eq!(TransformKind::default(), TransformKind::BY_LINES);
     }
 }

@@ -44,7 +44,7 @@ const HALF: f32 = WALL_HALF;
 const ONE: f32 = WALL_ONE;
 
 /// A builder's master type is above this (`FUN_141262270`: `0x27`).
-const BUILDER_TYPE: MasterKind = MasterKind::of_data(0x27);
+const BUILDER_KIND: MasterKind = MasterKind::of_data(0x27);
 
 /// The builders the game's sort (`FUN_140e6eee0`) orders by insertion: 0x100 bytes of 8-byte
 /// entries. More go to its quicksort, which is not stable.
@@ -242,9 +242,9 @@ impl World {
             return Ok(());
         }
         let (radius, trained_at) = (site.radius, site.creatable_part().trained_at.clone());
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let builders: &[Option<ObjectId>] =
-            if player_type.is_computer() && builders.first() == Some(&None) {
+            if player_kind.is_computer() && builders.first() == Some(&None) {
                 &[]
             } else {
                 builders
@@ -255,7 +255,7 @@ impl World {
                 capable += 1;
             }
         }
-        if !player_type.is_computer() && capable == 0 {
+        if !player_kind.is_computer() && capable == 0 {
             return Ok(());
         }
         let placed = self.wall_foundations(w, radius)?;
@@ -404,7 +404,7 @@ impl World {
             return Ok(false);
         };
         let m = u.master(self.master_tables(), owner)?;
-        if m.kind <= BUILDER_TYPE {
+        if m.kind <= BUILDER_KIND {
             return Ok(false);
         }
         if !self

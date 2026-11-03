@@ -313,7 +313,7 @@ mod tests {
     use crate::pathing::Pathing;
     use crate::pathing::zones::ZoneMap;
     use crate::players::PlayerId;
-    use crate::players::PlayerType;
+    use crate::players::PlayerKind;
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
@@ -436,7 +436,7 @@ mod tests {
         let mut plan = Planning {
             pathing: &mut pathing,
             now: WorldTime::ZERO,
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             object: &mut object,
             groups: &groups,
         };

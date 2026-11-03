@@ -72,7 +72,7 @@ impl UnitSide for UnitView<'_, '_> {
                 self.civ,
                 &self.c.w.players.player(self.c.player)?.tracker,
             ),
-            (at, self.unit.life.attribute_type, class),
+            (at, self.unit.life.attribute_kind, class),
             look,
             &self.c.w.model.tuning.order,
         ))
@@ -286,7 +286,7 @@ impl UnitSide for UnitView<'_, '_> {
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
             now: self.c.w.world_time,
-            player_type: self.player_type,
+            player_kind: self.player_kind,
             object: self.c.w.streams.get(Stream::Object),
             groups: &self.c.w.groups,
         };
@@ -377,7 +377,7 @@ impl UnitSide for UnitView<'_, '_> {
         let mut plan = Planning {
             pathing: &mut self.c.w.pathing,
             now: self.c.w.world_time,
-            player_type: self.player_type,
+            player_kind: self.player_kind,
             object: self.c.w.streams.get(Stream::Object),
             groups: &self.c.w.groups,
         };
@@ -527,7 +527,7 @@ impl UnitSide for UnitView<'_, '_> {
             )?,
             self.c.w.model.slots.master,
         )?;
-        let (at, player_type) = (self.unit.position(), self.player_type);
+        let (at, player_kind) = (self.unit.position(), self.player_kind);
         // the search about the town centre only while the player has no scout map
         let scout_map = self.c.w.spatial.scout_map(self.player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
@@ -540,7 +540,7 @@ impl UnitSide for UnitView<'_, '_> {
             line_of_sight,
             order: ai.current_order,
             target_point: ai.target_point.ground(),
-            player_type,
+            player_kind,
         };
         closest_undiscovered(&mut area, seeker, map, rng)
     }

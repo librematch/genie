@@ -703,7 +703,7 @@ mod tests {
     use crate::objects::unit::Unit;
     use crate::ownership::CaptureKind;
     #[cfg(test)]
-    use crate::players::{ByPlayer, PlayerType};
+    use crate::players::{ByPlayer, PlayerKind};
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
@@ -875,7 +875,7 @@ mod tests {
         // FUN_14118e990: player 1 explored and sees the mine's tile, player 2 explored it only;
         // Gaia gets none; the bit of a fourth player ends the walk
         let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].kind = PlayerType::COMPUTER;
+        t.players[2].kind = PlayerKind::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_000f_0000_0002);
         t.recycling.ghosts = vec![object_id(-3)];
         t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
@@ -1268,7 +1268,7 @@ mod tests {
         );
         // a computer viewer gets its ghost, then its AI's notify is not modelled
         let mut t = world(RecycleMode::RECYCLED);
-        t.players[2].kind = PlayerType::COMPUTER;
+        t.players[2].kind = PlayerKind::COMPUTER;
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0005);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
@@ -1380,7 +1380,7 @@ mod tests {
             hit_points: MasterHitPoints::of_data(0),
             build_time: WholeSeconds::ZERO,
             record: Obstruction {
-                kind: ObstructionKind::TYPE_2,
+                kind: ObstructionKind::KIND_2,
                 class: ObstructionClass::UNIT,
             },
             snow: Snow::None,

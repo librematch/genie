@@ -2,7 +2,7 @@
 
 use crate::civ::CivilizationId;
 use crate::conv::invalid_data;
-use crate::unit_type::UnitTypeId;
+use crate::unit_kind::UnitKindId;
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::TechId;
@@ -74,7 +74,7 @@ impl From<TechTreeStatus> for u8 {
 
 /// Kinds of tech tree nodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TechTreeType {
+pub enum TechTreeKind {
     /// No kind.
     #[default]
     None = 0,
@@ -97,10 +97,10 @@ pub enum TechTreeType {
 /// A tech tree node type that is not one of the known values.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("invalid tech tree node type {} (must be 0-7)", .0)]
-pub struct ParseTechTreeTypeError(i32);
+pub struct ParseTechTreeKindError(i32);
 
-impl TryFrom<i32> for TechTreeType {
-    type Error = ParseTechTreeTypeError;
+impl TryFrom<i32> for TechTreeKind {
+    type Error = ParseTechTreeKindError;
 
     fn try_from(n: i32) -> StdResult<Self, Self::Error> {
         match n {
@@ -112,19 +112,19 @@ impl TryFrom<i32> for TechTreeType {
             5 => Ok(Self::BuildingTech),
             6 => Ok(Self::BuildingNonTech),
             7 => Ok(Self::UniqueUnit),
-            n => Err(ParseTechTreeTypeError(n)),
+            n => Err(ParseTechTreeKindError(n)),
         }
     }
 }
 
-impl From<TechTreeType> for u32 {
-    fn from(ty: TechTreeType) -> Self {
+impl From<TechTreeKind> for u32 {
+    fn from(ty: TechTreeKind) -> Self {
         ty as Self
     }
 }
 
-impl From<TechTreeType> for i32 {
-    fn from(ty: TechTreeType) -> Self {
+impl From<TechTreeKind> for i32 {
+    fn from(ty: TechTreeKind) -> Self {
         ty as Self
     }
 }
@@ -153,20 +153,20 @@ pub enum TechTreeDependency {
     /// in the wild contain incorrect data with much higher "age" IDs, so we have to follow suit.
     Age(i32),
     /// A dependency on a building.
-    Building(UnitTypeId),
+    Building(UnitKindId),
     /// A dependency on a unit.
-    Unit(UnitTypeId),
+    Unit(UnitKindId),
     /// A dependency on a research/tech.
     Research(TechId),
 }
 
 impl TechTreeDependency {
-    const fn dependency_type(self) -> TechTreeDependencyType {
+    const fn dependency_kind(self) -> TechTreeDependencyKind {
         match self {
-            Self::Age(_) => TechTreeDependencyType::Age,
-            Self::Building(_) => TechTreeDependencyType::Building,
-            Self::Unit(_) => TechTreeDependencyType::Unit,
-            Self::Research(_) => TechTreeDependencyType::Research,
+            Self::Age(_) => TechTreeDependencyKind::Age,
+            Self::Building(_) => TechTreeDependencyKind::Building,
+            Self::Unit(_) => TechTreeDependencyKind::Unit,
+            Self::Research(_) => TechTreeDependencyKind::Research,
         }
     }
 
@@ -183,7 +183,7 @@ impl TechTreeDependency {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum TechTreeDependencyType {
+enum TechTreeDependencyKind {
     Age = 0,
     Building = 1,
     Unit = 2,
@@ -193,10 +193,10 @@ enum TechTreeDependencyType {
 /// A tech tree dependency type that is not one of the known values.
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("invalid tech tree dependency type {} (must be 0-3)", .0)]
-pub struct ParseTechTreeDependencyTypeError(i32);
+pub struct ParseTechTreeDependencyKindError(i32);
 
-impl TryFrom<i32> for TechTreeDependencyType {
-    type Error = ParseTechTreeDependencyTypeError;
+impl TryFrom<i32> for TechTreeDependencyKind {
+    type Error = ParseTechTreeDependencyKindError;
 
     fn try_from(n: i32) -> StdResult<Self, Self::Error> {
         match n {
@@ -204,14 +204,14 @@ impl TryFrom<i32> for TechTreeDependencyType {
             1 => Ok(Self::Building),
             2 => Ok(Self::Unit),
             3 => Ok(Self::Research),
-            n => Err(ParseTechTreeDependencyTypeError(n)),
+            n => Err(ParseTechTreeDependencyKindError(n)),
         }
     }
 }
 
-impl From<TechTreeDependencyType> for i32 {
-    fn from(tech_tree_dependency_type: TechTreeDependencyType) -> Self {
-        tech_tree_dependency_type as Self
+impl From<TechTreeDependencyKind> for i32 {
+    fn from(tech_tree_dependency_kind: TechTreeDependencyKind) -> Self {
+        tech_tree_dependency_kind as Self
     }
 }
 
@@ -227,7 +227,7 @@ impl TechTree {
     /// Returns an error if reading from `input` fails, or if a value is not valid for its field.
     ///
     /// Also fails if an age node has more than 10 building levels or is not of type
-    /// [`TechTreeType::Age`].
+    /// [`TechTreeKind::Age`].
     pub fn read_from(mut input: impl Read) -> Result<Self> {
         let num_ages = input.read_u8()?;
         let num_buildings = input.read_u8()?;
@@ -312,22 +312,22 @@ impl TechTreeDependencies {
         for id in &mut ids {
             *id = input.read_i32::<LE>()?;
         }
-        let mut types = [-1i32; 10];
-        for ty in &mut types {
+        let mut kinds = [-1i32; 10];
+        for ty in &mut kinds {
             *ty = input.read_i32::<LE>()?;
         }
 
-        for (&id, &ty) in ids.iter().zip(types.iter()).take(num as usize) {
-            let dep_type: TechTreeDependencyType = ty.try_into().map_err(invalid_data)?;
-            deps.0.push(match dep_type {
-                TechTreeDependencyType::Age => TechTreeDependency::Age(id),
-                TechTreeDependencyType::Building => {
+        for (&id, &ty) in ids.iter().zip(kinds.iter()).take(num as usize) {
+            let dep_kind: TechTreeDependencyKind = ty.try_into().map_err(invalid_data)?;
+            deps.0.push(match dep_kind {
+                TechTreeDependencyKind::Age => TechTreeDependency::Age(id),
+                TechTreeDependencyKind::Building => {
                     TechTreeDependency::Building(id.try_into().map_err(invalid_data)?)
                 }
-                TechTreeDependencyType::Unit => {
+                TechTreeDependencyKind::Unit => {
                     TechTreeDependency::Unit(id.try_into().map_err(invalid_data)?)
                 }
-                TechTreeDependencyType::Research => {
+                TechTreeDependencyKind::Research => {
                     TechTreeDependency::Research(id.try_into().map_err(invalid_data)?)
                 }
             });
@@ -359,7 +359,7 @@ impl TechTreeDependencies {
                 self.0
                     .get(i)
                     .copied()
-                    .map(TechTreeDependency::dependency_type)
+                    .map(TechTreeDependency::dependency_kind)
                     .map_or(0, Into::into),
             )?;
         }
@@ -393,20 +393,20 @@ impl From<ParseTechTreeStatusError> for genie_error::GenieError {
     }
 }
 
-impl From<ParseTechTreeTypeError> for genie_error::GenieError {
+impl From<ParseTechTreeKindError> for genie_error::GenieError {
     /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
     /// source.
     #[track_caller]
-    fn from(e: ParseTechTreeTypeError) -> Self {
+    fn from(e: ParseTechTreeKindError) -> Self {
         Self::invalid_input("a tech tree node type this reader does not know").with_source(e)
     }
 }
 
-impl From<ParseTechTreeDependencyTypeError> for genie_error::GenieError {
+impl From<ParseTechTreeDependencyKindError> for genie_error::GenieError {
     /// The error as a [`genie_error::GenieError`]: its kind and reason, the original as the
     /// source.
     #[track_caller]
-    fn from(e: ParseTechTreeDependencyTypeError) -> Self {
+    fn from(e: ParseTechTreeDependencyKindError) -> Self {
         Self::invalid_input("a tech tree dependency type this reader does not know").with_source(e)
     }
 }
@@ -430,7 +430,7 @@ mod genie_error_tests {
             )
         );
         assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = ParseTechTreeTypeError(9).into();
+        let e: genie_error::GenieError = ParseTechTreeKindError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (
@@ -439,7 +439,7 @@ mod genie_error_tests {
             )
         );
         assert!(StdError::source(&e).is_some());
-        let e: genie_error::GenieError = ParseTechTreeDependencyTypeError(9).into();
+        let e: genie_error::GenieError = ParseTechTreeDependencyKindError(9).into();
         assert_eq!(
             (e.kind(), e.reason()),
             (

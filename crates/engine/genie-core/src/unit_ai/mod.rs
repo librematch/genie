@@ -17,8 +17,8 @@
 
 mod actions;
 mod ai_action;
+mod ai_kind;
 pub mod ai_kinds;
-mod ai_type;
 mod attack_orders;
 mod attack_pick;
 mod attack_picker;
@@ -35,6 +35,7 @@ mod idle_animals;
 mod idle_part;
 mod ids;
 mod issuer;
+mod kind_notifies;
 mod life;
 mod notifies;
 mod notify_kind;
@@ -48,16 +49,15 @@ mod retarget;
 mod side;
 mod stop_order;
 mod surroundings;
-mod target_type;
+mod target_kind;
 pub mod task_finder;
-mod type_notifies;
 pub(crate) mod unit;
 mod unit_stance;
 mod update;
 pub(crate) mod world_view;
 
 pub use self::ai_action::AiAction;
-pub use self::ai_type::UnitAiType;
+pub use self::ai_kind::UnitAiKind;
 use self::attack_pick::point_gap_squared;
 pub(crate) use self::attack_pick::spares_friends;
 pub use self::attack_pick::{
@@ -68,8 +68,8 @@ pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
     Attacked, Convertee, Converter, attack_sight, attacks_neutral, can_convert,
-    priest_attacks_neutral, siege_attacks_neutral, siege_can_attack, soldier_attacks_neutral,
-    type_attacks_neutral,
+    kind_attacks_neutral, priest_attacks_neutral, siege_attacks_neutral, siege_can_attack,
+    soldier_attacks_neutral,
 };
 #[cfg(test)]
 use self::attack_rules::{PATROL_FARTHEST, line_distance};
@@ -99,7 +99,7 @@ use self::ids::{
     TOWER_IDLE_TIMEOUT, VILLAGER_NOTIFY, WALK_BACK, closest_undiscovered_tile, dodges,
     held_action_state, order_move, retarget_kind, siege_stance, soldier_stance,
 };
-pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_type, unit_ai_type};
+pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_kind, unit_ai_kind};
 pub(crate) use self::ids::{alert_owner, helper_answers, searches_on_class};
 pub use self::issuer::Issuer;
 pub use self::notifies::{AiLayer, Inbox};
@@ -119,7 +119,7 @@ pub use self::surroundings::{
     no_search,
 };
 use self::surroundings::{LiveTop, group_lets_idle};
-pub use self::target_type::OrderTargetType;
+pub use self::target_kind::OrderTargetKind;
 pub use self::unit_stance::UnitStance;
 use crate::groups::FormationKind;
 use crate::map::Distance;
@@ -191,31 +191,31 @@ const DEAD: u32 = 4;
 /// "`ProcessIdle` produced an action."
 const PRODUCED: u32 = 0xd;
 /// The boar's unit-AI type (`TribePreditorUnitAIModule`).
-pub(crate) const BOAR_AI: UnitAiType = UnitAiType::BOAR;
+pub(crate) const BOAR_AI: UnitAiKind = UnitAiKind::BOAR;
 /// The soldier's factory type (`TribeSoldierUnitAIModule`).
-pub(crate) const SOLDIER_AI: UnitAiType = UnitAiType::SOLDIER;
+pub(crate) const SOLDIER_AI: UnitAiKind = UnitAiKind::SOLDIER;
 /// The tower's factory type (`TribeTowerUnitAIModule`, the town centre's too).
-const TOWER_AI: UnitAiType = UnitAiType::TOWER;
+const TOWER_AI: UnitAiKind = UnitAiKind::TOWER;
 /// The siege tower's factory type (`TribeSiegeTowerUnitAIModule`, master 1105's).
-const SIEGE_TOWER_AI: UnitAiType = UnitAiType::SIEGE_TOWER;
+const SIEGE_TOWER_AI: UnitAiKind = UnitAiKind::SIEGE_TOWER;
 /// The priest's factory type (`TribePriestUnitAIModule`: classes 18, 43 and 53), whose slot 72,
 /// notify handler and attack checks (its conversions and heals, `FUN_140c1feb0`,
 /// `FUN_140c26f60`, `FUN_140c19020`, `FUN_140c1af00`) are not modelled.
-pub(crate) const PRIEST_AI: UnitAiType = UnitAiType::PRIEST;
+pub(crate) const PRIEST_AI: UnitAiKind = UnitAiKind::PRIEST;
 /// The siege unit's factory type (`TribeSiegeUnitAIModule`: classes 13, 51, 54, 55, masters 1744
 /// and 1746).
-const SIEGE_AI: UnitAiType = UnitAiType::SIEGE;
+const SIEGE_AI: UnitAiKind = UnitAiKind::SIEGE;
 /// The predator's factory type (`TribePreditorUnitAIModule`, `FUN_140c11da0`).
-const PREDATOR_AI: UnitAiType = UnitAiType::PREDATOR;
+const PREDATOR_AI: UnitAiKind = UnitAiKind::PREDATOR;
 /// The lion's factory type (`TribeLionUnitAIModule`, `FUN_140c11bd0`).
-pub(crate) const LION_AI: UnitAiType = UnitAiType::LION;
+pub(crate) const LION_AI: UnitAiKind = UnitAiKind::LION;
 /// The livestock's factory type (`TribeLivestockUnitAIModule`, `FUN_140c11d70`).
-const LIVESTOCK_AI: UnitAiType = UnitAiType::LIVESTOCK;
+const LIVESTOCK_AI: UnitAiKind = UnitAiKind::LIVESTOCK;
 /// The trade ship's and the trade cart's factory type (`TribeTradeShipUnitAIModule`, classes 2
 /// and 19).
-const TRADE_AI: UnitAiType = UnitAiType::TRADE;
+const TRADE_AI: UnitAiKind = UnitAiKind::TRADE;
 /// The fishing ship's factory type (`TribeFishingShipUnitAIModule`, class 21).
-const FISHING_AI: UnitAiType = UnitAiType::FISHING;
+const FISHING_AI: UnitAiKind = UnitAiKind::FISHING;
 /// The classes of the foundations a fishing ship's builder looks for (`FUN_140c25ca0`, in its
 /// order): buildings, walls, gates, towers and farms.
 const FISHING_BUILDS: [ClassId; 5] = classes([3, 27, 39, 52, 49]);
@@ -227,8 +227,8 @@ const FISHING_BUILD_FAR: WholeDistance = WholeDistance::of_data(9999);
 /// factory's (`FUN_141215560`: 5 for the artifact's and the livestock's, types 14 and 19; 10
 /// for the others), doubled until they fit.
 #[must_use]
-pub const fn notify_capacity(ai_type: UnitAiType, count: usize) -> usize {
-    let mut c = if matches!(ai_type, UnitAiType::ARTIFACT | UnitAiType::LIVESTOCK) {
+pub const fn notify_capacity(ai_kind: UnitAiKind, count: usize) -> usize {
+    let mut c = if matches!(ai_kind, UnitAiKind::ARTIFACT | UnitAiKind::LIVESTOCK) {
         5
     } else {
         10
@@ -262,8 +262,8 @@ pub struct QueuedOrder {
     pub shown: Point,
     /// `+0x2c` (a byte): 0 leaves the order in the queue.
     pub ready: bool,
-    /// `+0x30`: the target's type, its master id or its class ([`OrderTargetType`]).
-    pub target_type: Option<OrderTargetType>,
+    /// `+0x30`: the target's type, its master id or its class ([`OrderTargetKind`]).
+    pub target_kind: Option<OrderTargetKind>,
 }
 
 /// The four bytes at offset `i` of a saved record.
@@ -300,7 +300,7 @@ impl QueuedOrder {
             range: Distance::new(f(32)?),
             shown: Point::new(f(36)?, f(40)?),
             ready: le_word(b, 44)?[0] != 0,
-            target_type: OrderTargetType::of_field(w(48)?)?,
+            target_kind: OrderTargetKind::of_field(w(48)?)?,
         })
     }
 }
@@ -417,7 +417,7 @@ pub struct PatrolPath {
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct UnitAi {
     /// The factory's type (`has_ai` in the save), which picks the class.
-    pub ai_type: UnitAiType,
+    pub ai_kind: UnitAiKind,
     /// `+0x3c`, −1 for none.
     pub current_order: Option<OrderKind>,
     /// `+0x40`, the current order's priority (−1 for none): a queued order sets it.
@@ -464,7 +464,7 @@ pub struct UnitAi {
     pub stance: UnitStance,
     /// `+0x1d4`, `mFormationType`: the formation the unit's group last took for it, which its
     /// next group's type counts (`FUN_14100b940`).
-    pub formation_type: FormationKind,
+    pub formation_kind: FormationKind,
     /// `+0x1ac`, `+0x1b0`, `state_position`: where a unit with an order last updated, which a
     /// stance's leash measures from.
     pub state_position: Point,

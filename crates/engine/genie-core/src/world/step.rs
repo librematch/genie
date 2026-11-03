@@ -15,7 +15,7 @@ use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
@@ -67,7 +67,7 @@ pub(crate) struct Step<'a> {
 pub(crate) struct Pace {
     pub(crate) dt: Seconds,
     pub(crate) now: WorldTime,
-    pub(crate) player_type: PlayerType,
+    pub(crate) player_kind: PlayerKind,
 }
 
 /// The world's parts beside a walk ([`World::walk_beside`]), which an update reads and changes
@@ -116,7 +116,7 @@ impl World {
             plan: Some(Planning {
                 pathing,
                 now: pace.now,
-                player_type: pace.player_type,
+                player_kind: pace.player_kind,
                 object,
                 groups,
             }),
@@ -266,7 +266,7 @@ impl Step<'_> {
         Ok(Pace {
             dt: self.dt.seconds(),
             now: self.w.world_time,
-            player_type: self.w.players.player(self.player)?.kind,
+            player_kind: self.w.players.player(self.player)?.kind,
         })
     }
 }
@@ -282,7 +282,7 @@ impl Step<'_> {
         place: &'b mut Static,
         me: Me,
     ) -> Result<(Walk<'b>, &'b mut Well512), GenieError> {
-        let player_type = self.w.players.player(self.player)?.kind;
+        let player_kind = self.w.players.player(self.player)?.kind;
         let (object, sprite) = self.w.streams.object_and_sprite();
         let parts = &mut self.w.parts;
         let (motion, motions) = parts.motion.lend(me.id);
@@ -296,7 +296,7 @@ impl Step<'_> {
                 plan: Some(Planning {
                     pathing: &mut self.w.pathing,
                     now: self.w.world_time,
-                    player_type,
+                    player_kind,
                     object,
                     groups: &self.w.groups,
                 }),

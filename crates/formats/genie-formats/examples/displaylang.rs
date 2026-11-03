@@ -1,6 +1,6 @@
 //! Displays the key value pairs in a language file.
 
-use genie_formats::lang::LangFileType;
+use genie_formats::lang::LangFileKind;
 use std::fs::File;
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -17,14 +17,14 @@ struct DisplayLang {
     ///
     /// One of "dll", "ini", or "key-value".
     #[structopt(name = "file-type")]
-    file_type: LangFileType,
+    file_kind: LangFileKind,
 }
 
 /// Prints the key value pairs of an input language file to `stdout`.
 fn main() -> anyhow::Result<()> {
     let cli_input = DisplayLang::from_args();
     let mut f = File::open(&cli_input.file_name)?;
-    let lang_file = cli_input.file_type.read_from(&mut f)?;
+    let lang_file = cli_input.file_kind.read_from(&mut f)?;
     println!("{lang_file}");
     Ok(())
 }

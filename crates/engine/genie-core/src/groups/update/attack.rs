@@ -10,7 +10,7 @@ use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
 use crate::groups::stats::weapon_range;
 use crate::groups::update::{ATTACK, NO_COMMAND};
-use crate::groups::{GroupTarget, UnitTypeStatistic, WorldObject};
+use crate::groups::{GroupTarget, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -196,11 +196,11 @@ impl World {
             let Some((units, range)) = self
                 .groups
                 .held(group)?
-                .unit_types
+                .unit_kinds
                 .iter()
                 .find(|s| s.formation_category == category)
                 .filter(|s| !s.units.is_empty())
-                .map(|s: &UnitTypeStatistic| (s.units.clone(), s.attack_range))
+                .map(|s: &UnitKindStatistic| (s.units.clone(), s.attack_range))
             else {
                 continue;
             };

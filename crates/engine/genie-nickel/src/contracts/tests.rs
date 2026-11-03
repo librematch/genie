@@ -78,7 +78,7 @@ fn structs_become_record_contracts_and_enums_tag_contracts() {
 }
 
 #[test]
-fn the_contracts_accept_values_of_the_type_and_reject_values_that_break_it() {
+fn the_contracts_accept_values_of_the_kind_and_reject_values_that_break_it() {
     assert!(passes(GOOD, "Gate"));
     let other = "{ class = 39, opens = true, kind = 'Right, speed = 0, names = [], by_name = {}, tower = 'Empty, id = 0 }";
     assert!(passes(other, "Gate"));
@@ -96,7 +96,7 @@ fn the_contracts_accept_values_of_the_type_and_reject_values_that_break_it() {
 }
 
 #[test]
-fn values_the_contracts_accept_deserialize_into_the_type() {
+fn values_the_contracts_accept_deserialize_into_the_kind() {
     let gate: Gate = from_expr(&evaluate(GOOD, "gate.ncl").unwrap()).unwrap();
     let expected = Gate {
         class: 39,

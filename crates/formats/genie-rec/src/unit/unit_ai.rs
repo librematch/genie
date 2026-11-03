@@ -13,7 +13,7 @@ use std::io::Read;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct UnitAiOrder {
     pub(super) issuer: u32,
-    pub(super) order_type: u32,
+    pub(super) order_kind: u32,
     pub(super) priority: u32,
     pub(super) target_id: ObjectId,
     pub(super) target_player: PlayerId,
@@ -25,7 +25,7 @@ impl ReadableHeaderElement for UnitAiOrder {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             issuer: input.read_u32::<LE>()?,
-            order_type: input.read_u32::<LE>()?,
+            order_kind: input.read_u32::<LE>()?,
             priority: input.read_u32::<LE>()?,
             target_id: input.read_u32::<LE>()?.into(),
             target_player: fits(input.read_u32::<LE>()?)?,
@@ -47,7 +47,7 @@ pub struct UnitAiNotification {
     /// The object the notification is for.
     pub recipient: u32,
     /// The kind of notification.
-    pub notification_type: u32,
+    pub notification_kind: u32,
     /// The notification's three parameters.
     pub params: (u32, u32, u32),
 }
@@ -57,7 +57,7 @@ impl ReadableHeaderElement for UnitAiNotification {
         Ok(Self {
             caller: input.read_u32::<LE>()?,
             recipient: input.read_u32::<LE>()?,
-            notification_type: input.read_u32::<LE>()?,
+            notification_kind: input.read_u32::<LE>()?,
             params: (
                 input.read_u32::<LE>()?,
                 input.read_u32::<LE>()?,
@@ -171,14 +171,14 @@ pub struct UnitAi {
     pub(super) current_order_priority: Option<u32>,
     pub(super) current_action: Option<u32>,
     pub(super) current_target: Option<u32>,
-    pub(super) current_target_type: Option<u32>,
+    pub(super) current_target_kind: Option<u32>,
     pub(super) current_target_location: (f32, f32, f32),
     pub(super) desired_target_distance: f32,
     pub(super) last_action: Option<u32>,
     pub(super) last_order: Option<u32>,
     pub(super) last_target: Option<u32>,
-    pub(super) last_target_type: Option<u32>,
-    pub(super) last_update_type: Option<u32>,
+    pub(super) last_target_kind: Option<u32>,
+    pub(super) last_update_kind: Option<u32>,
     pub(super) idle_timer: u32,
     pub(super) idle_timeout: u32,
     pub(super) adjusted_idle_timeout: u32,
@@ -204,7 +204,7 @@ pub struct UnitAi {
     pub(super) randomized_retarget_timer: u32,
     pub(super) retarget_entries: Vec<UnitAiRetargetEntry>,
     pub(super) best_unit_to_attack: Option<u32>,
-    pub(super) formation_type: u8,
+    pub(super) formation_kind: u8,
 }
 
 impl ReadableHeaderElement for UnitAi {
@@ -228,7 +228,7 @@ impl UnitAi {
             current_order_priority: read_opt_u32(input)?,
             current_action: read_opt_u32(input)?,
             current_target: read_opt_u32(input)?,
-            current_target_type: match input.read_u16::<LE>()? {
+            current_target_kind: match input.read_u16::<LE>()? {
                 0xFFFF => None,
                 id => Some(id.into()),
             },
@@ -253,8 +253,8 @@ impl UnitAi {
         self.last_action = read_opt_u32(input)?;
         self.last_order = read_opt_u32(input)?;
         self.last_target = read_opt_u32(input)?;
-        self.last_target_type = read_opt_u32(input)?;
-        self.last_update_type = read_opt_u32(input)?;
+        self.last_target_kind = read_opt_u32(input)?;
+        self.last_update_kind = read_opt_u32(input)?;
         self.idle_timer = input.read_u32::<LE>()?;
         self.idle_timeout = input.read_u32::<LE>()?;
         self.adjusted_idle_timeout = input.read_u32::<LE>()?;
@@ -319,7 +319,7 @@ impl UnitAi {
             self.best_unit_to_attack = read_opt_u32(input)?;
         }
         if input.version() >= 11.44 {
-            self.formation_type = input.read_u8()?;
+            self.formation_kind = input.read_u8()?;
         }
         Ok(())
     }

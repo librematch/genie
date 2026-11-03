@@ -36,7 +36,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
@@ -50,7 +50,7 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{OrderPriority, QueuedOrder};
 use crate::vision::VisionBits;
 use crate::vision::VisionMasks;
@@ -346,7 +346,7 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::Alive,
@@ -540,7 +540,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         t.parts.set_unit_ai(
             p.objects[ListIndex::new(2)].id,
             Some(UnitAi {
-                ai_type: UnitAiType::PREDATOR,
+                ai_kind: UnitAiKind::PREDATOR,
                 current_order: None,
                 current_action: None,
                 current_target: None,
@@ -587,7 +587,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         range: Distance::new(2.0),
         shown: Point::new(40.0, 80.0),
         ready: false,
-        target_type: None,
+        target_kind: None,
     };
     t.parts
         .unit_ai
@@ -623,7 +623,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         )]
     );
     let mut t = world();
-    t.players[1].kind = PlayerType::COMPUTER;
+    t.players[1].kind = PlayerKind::COMPUTER;
     assert!(
         t.spawn(
             PlayerId::new(1),
@@ -727,7 +727,7 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
         t.parts.set_unit_ai(
             p.objects[ListIndex::new(2)].id,
             Some(UnitAi {
-                ai_type: UnitAiType::PREDATOR,
+                ai_kind: UnitAiKind::PREDATOR,
                 current_order: None,
                 current_action: None,
                 current_target: None,
@@ -886,7 +886,7 @@ fn queued_move() -> QueuedOrder {
         range: Distance::new(2.0),
         shown: Point::new(40.0, 80.0),
         ready: false,
-        target_type: None,
+        target_kind: None,
     }
 }
 
@@ -1075,7 +1075,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         .unwrap();
     let u = &t.players[1].objects[i];
     assert_eq!(
-        (u.life.class, u.life.attribute_type, u.life.amount),
+        (u.life.class, u.life.attribute_kind, u.life.amount),
         (Class::Static, Some(attribute::POPULATION), Amount::new(5.0))
     );
     assert_eq!(
@@ -1493,7 +1493,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
         master: ids::HOUSE,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::Alive,
@@ -1550,7 +1550,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
     // a negative height, passes; a height of 0 counts as 1 for a building
     let outlined = |outline| Near {
         position: Position::new(22.6, 21.0, 0.0),
-        obstruction_kind: ObstructionKind::TYPE_11,
+        obstruction_kind: ObstructionKind::KIND_11,
         outline,
         ..house
     };
@@ -1574,7 +1574,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         moving: false,
         player: PlayerId::new(2),
         state: ObjectState::DyingSprite,
-        obstruction_kind: ObstructionKind::TYPE_2,
+        obstruction_kind: ObstructionKind::KIND_2,
         ..sheep(ObjectState::Alive)
     };
     let build_values = Restriction::new(vec![1.0]);

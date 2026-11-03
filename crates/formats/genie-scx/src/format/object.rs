@@ -1,16 +1,16 @@
 //! An object placed in the scenario ([`ScenarioObject`]).
 
 use crate::Result;
-use crate::types::ScxVersion;
+use crate::values::ScxVersion;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::UnitTypeId;
+use genie_support::UnitKindId;
 use std::io::{Read, Write};
 
 // pub enum LostInformation {
 //     DisabledTechs(i32, i32),
 //     DisabledUnits(i32, i32),
 //     DisabledBuildings(i32, i32),
-//     MapType,
+//     MapKind,
 // }
 
 /// An object placed in the scenario.
@@ -21,7 +21,7 @@ pub struct ScenarioObject {
     /// This object's unique ID.
     pub id: i32,
     /// The type ID of this object.
-    pub object_type: UnitTypeId,
+    pub object_kind: UnitKindId,
     /// State value.
     pub state: u8,
     /// Radian angle this unit is facing.
@@ -46,7 +46,7 @@ impl ScenarioObject {
             input.read_f32::<LE>()?,
         );
         let id = input.read_i32::<LE>()?;
-        let object_type = input.read_u16::<LE>()?.into();
+        let object_kind = input.read_u16::<LE>()?.into();
         let state = input.read_u8()?;
         let angle = input.read_f32::<LE>()?;
         let frame = if version < ScxVersion(*b"1.15") {
@@ -72,7 +72,7 @@ impl ScenarioObject {
         Ok(Self {
             position,
             id,
-            object_type,
+            object_kind,
             state,
             angle,
             frame,
@@ -90,7 +90,7 @@ impl ScenarioObject {
         output.write_f32::<LE>(self.position.1)?;
         output.write_f32::<LE>(self.position.2)?;
         output.write_i32::<LE>(self.id)?;
-        output.write_u16::<LE>(self.object_type.into())?;
+        output.write_u16::<LE>(self.object_kind.into())?;
         output.write_u8(self.state)?;
         output.write_f32::<LE>(self.angle)?;
         if version > ScxVersion(*b"1.14") {

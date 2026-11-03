@@ -30,7 +30,7 @@ use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
 use crate::pathing::tile_path::Found;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
@@ -150,7 +150,7 @@ fn packs(
     class: ClassId,
     reach: Option<(bool, bool)>,
     targetless: bool,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
     roles: &Roles,
 ) -> bool {
     match reach {
@@ -161,7 +161,7 @@ fn packs(
                 && roles
                     .of_class(class)
                     .contains(ClassRoles::UNPACKED_TREBUCHET)
-                && player_type.is_computer()
+                && player_kind.is_computer()
         }
         Some((within, _)) => {
             (roles

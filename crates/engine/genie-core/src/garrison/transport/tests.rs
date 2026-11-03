@@ -23,7 +23,7 @@ use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::pathing::zones::ZoneId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::test_ids::object_id;
 use crate::test_ids::task_id;
 use crate::testing::tuning;
@@ -149,7 +149,7 @@ fn run_on(
     s: &Ship<'_>,
     c: &mut Coast,
     hull: (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
-    player_type: PlayerType,
+    player_kind: PlayerKind,
 ) -> Result<Updated, GenieError> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
         Some(MoveTo::Failed) => UpdateCode::FAILED,
@@ -157,7 +157,7 @@ fn run_on(
         None | Some(MoveTo::Arrived) => UpdateCode::DONE,
     };
     let look = (Some(STANDING), &mut Well512::default());
-    t.state_update(walked, (s, c), hull, look, player_type, tuning())
+    t.state_update(walked, (s, c), hull, look, player_kind, tuning())
 }
 
 /// [`run_on`] on a fresh [`hull`] of a human player: the update's answer and what it left.
@@ -172,7 +172,7 @@ fn run(
         s,
         c,
         (&mut unit, motion.lent(), &mut ais),
-        PlayerType::HUMAN,
+        PlayerKind::HUMAN,
     );
     (r, left((&unit, &motion, &ais)))
 }
@@ -186,7 +186,7 @@ fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
         s,
         c,
         (&mut unit, motion.lent(), &mut ais),
-        PlayerType::COMPUTER,
+        PlayerKind::COMPUTER,
     )
     .is_err_and(|e| {
         e.reason()
@@ -690,7 +690,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
             (&s, &mut c),
             (&mut unit, motion.lent(), &mut ais),
             look,
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
             tuning()
         )
         .is_err()

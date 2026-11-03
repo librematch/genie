@@ -38,7 +38,7 @@ impl<'a> PlayerSection<'a> {
     pub fn new(start: usize, player: &'a Player) -> Result<Self, GenieError> {
         let (Some(world_player), Some(objects)) = (player.world_player(), player.objects()) else {
             return Err(GenieError::invalid_input("InvalidPlayerType")
-                .with("type", player.type_)
+                .with("type", player.kind)
                 .with("at", start));
         };
         Ok(Self {

@@ -4,7 +4,7 @@
 use super::*;
 use crate::test_support::{floats, words};
 use arrayvec::ArrayVec;
-use genie_support::UnitTypeId;
+use genie_support::UnitKindId;
 
 /// A command's frame: its length (the id and the body), the id, the body, a world time.
 fn framed(id: u8, body: &[u8]) -> Vec<u8> {
@@ -87,7 +87,7 @@ fn the_orders_write_back_what_they_read() {
         Create,
         CreateCommand {
             player_id: 1.into(),
-            unit_type_id: UnitTypeId::from(83u16),
+            unit_kind_id: UnitKindId::from(83u16),
             location: (1.0, 2.0, 3.0),
         }
     );
@@ -108,7 +108,7 @@ fn the_orders_write_back_what_they_read() {
                 player_id: 4.into(),
                 issuer: 4.into(),
                 objects: objects.clone(),
-                order_type: 0x2d9,
+                order_kind: 0x2d9,
                 order_priority: 100,
                 target_id: Some(ObjectId::from(77u32)),
                 target_player_id: Some(2.into()),
@@ -186,7 +186,7 @@ fn the_group_commands_write_back_what_they_read() {
         FormFormation,
         FormFormationCommand {
             player_id: 1.into(),
-            formation_type: 7,
+            formation_kind: 7,
             objects: two(),
         }
     );
@@ -214,7 +214,7 @@ fn the_building_commands_write_back_what_they_read() {
         MakeCommand {
             player_id: 1.into(),
             building_id: ObjectId::from(700u32),
-            unit_type_id: UnitTypeId::from(83u16),
+            unit_kind_id: UnitKindId::from(83u16),
             target_id: None,
         }
     );
@@ -257,7 +257,7 @@ fn the_building_commands_write_back_what_they_read() {
         Queue,
         QueueCommand {
             building_id: ObjectId::from(700u32),
-            unit_type_id: UnitTypeId::from(4u16),
+            unit_kind_id: UnitKindId::from(4u16),
             amount: 5,
         }
     );
@@ -267,7 +267,7 @@ fn the_building_commands_write_back_what_they_read() {
         SetGatherPointCommand {
             buildings: two(),
             target_id: None,
-            target_type_id: Some(UnitTypeId::from(59u16)),
+            target_kind_id: Some(UnitKindId::from(59u16)),
             location: Some((7.0, 8.0)),
         }
     );
@@ -332,7 +332,7 @@ fn the_commands_without_writers_read_their_fields() {
     };
     assert_eq!(
         (
-            ungarrison.ungarrison_type,
+            ungarrison.ungarrison_kind,
             ungarrison.location,
             ungarrison.objects.len()
         ),

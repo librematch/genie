@@ -197,7 +197,7 @@ impl World {
                 range: Distance::new(1.0),
                 shown: Point::new(-1.0, -1.0),
                 ready: true,
-                target_type: None,
+                target_kind: None,
             };
             // the order at once, its calls on the unit at once
             let roles = self.model.roles.clone();
@@ -315,10 +315,10 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let checked = ids
             .len()
-            .min(if player_type.is_computer() { 500 } else { 60 });
+            .min(if player_kind.is_computer() { 500 } else { 60 });
         let mut ids = ids.to_vec();
         let mut dropped = 0;
         for id in ids.iter_mut().take(checked) {
@@ -330,7 +330,7 @@ impl World {
                 dropped += 1;
             }
         }
-        if checked <= dropped && !player_type.is_computer() {
+        if checked <= dropped && !player_kind.is_computer() {
             return Ok(None);
         }
         Ok(Some(ids))
@@ -355,10 +355,10 @@ impl World {
         ids: &[Option<ObjectId>],
         pick: UnloadPick,
     ) -> Result<Option<Vec<Option<ObjectId>>>, GenieError> {
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let mut ids: Vec<Option<ObjectId>> = ids
             .iter()
-            .take(if player_type.is_computer() { 500 } else { 60 })
+            .take(if player_kind.is_computer() { 500 } else { 60 })
             .copied()
             .collect();
         let tied = |owner: PlayerId| {
@@ -384,7 +384,7 @@ impl World {
                 dropped += 1;
             }
         }
-        if ids.len() <= dropped && !player_type.is_computer() {
+        if ids.len() <= dropped && !player_kind.is_computer() {
             return Ok(None);
         }
         Ok(Some(ids))

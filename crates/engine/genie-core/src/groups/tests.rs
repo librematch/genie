@@ -331,15 +331,15 @@ fn new_group_holds_the_constructor_values() {
         (
             g.hibernating,
             g.replaces_queue,
-            g.attack_plan_type,
+            g.attack_plan_kind,
             g.idle_timer
         ),
         (0, 1, 0, Millis::ZERO)
     );
     assert_eq!((g.previous_formation, g.current_formation), (None, None));
-    assert!(g.members.is_empty() && g.unit_types.is_empty() && g.command_queue.is_empty());
+    assert!(g.members.is_empty() && g.unit_kinds.is_empty() && g.command_queue.is_empty());
     assert_eq!(
-        (g.formation_locked_type, g.desired_spacing),
+        (g.formation_locked_kind, g.desired_spacing),
         (None, Distance::ZERO)
     );
     assert_eq!(g.motion, Motion::new());
@@ -441,9 +441,9 @@ fn building_master() -> Master {
     }
 }
 
-fn plain_task(action_type: ActionKind, range: Distance) -> Task {
+fn plain_task(action_kind: ActionKind, range: Distance) -> Task {
     Task {
-        action_kind: action_type,
+        action_kind,
         work_range: range,
         work_val1: WorkValue::new(1.0),
         ..Task::default()
@@ -871,7 +871,7 @@ fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
 /// action type (the conversion's adds attribute 280); no such task -1; a master the player does
 /// not have 0.
 #[test]
-fn filter_takes_the_range_of_the_members_task_of_that_type() {
+fn filter_takes_the_range_of_the_members_task_of_that_kind() {
     let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
     for master in t
         .model
@@ -1085,23 +1085,23 @@ fn the_special_units_follow_the_target_class() {
 #[test]
 fn the_categories_attack_ranges_rise_to_their_members_ranges() {
     let mut t = attack_world(&[(7, 4, 0.0, 0.0), (8, 4, 0.0, 0.0)]);
-    t.groups.get_mut(group_id(1)).unwrap().unit_types = vec![
-        UnitTypeStatistic {
+    t.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
+        UnitKindStatistic {
             formation_category: FormationCategory::named(1),
             units: vec![object_id(7), object_id(8)],
             attack_range: Distance::new(1.0),
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         },
-        UnitTypeStatistic {
+        UnitKindStatistic {
             formation_category: FormationCategory::named(2),
             units: vec![object_id(7)],
             attack_range: Distance::new(9.0),
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         },
-        UnitTypeStatistic {
+        UnitKindStatistic {
             formation_category: FormationCategory::named(3),
             attack_range: Distance::new(0.5),
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         },
     ];
     t.raise_attack_ranges(group_id(1), object_id(60)).unwrap();
@@ -1109,7 +1109,7 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
         .groups
         .get(group_id(1))
         .unwrap()
-        .unit_types
+        .unit_kinds
         .iter()
         .map(|s| s.attack_range.get())
         .collect();
@@ -1120,7 +1120,7 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
 fn attack_task() -> Task {
     Task {
         action_kind: ActionKind::COMBAT,
-        owner_type: TargetOwner::ENEMY,
+        owner_kind: TargetOwner::ENEMY,
         object_group: Some(class_id(3)),
         work_range: Distance::new(1.5),
         ..Task::default()
@@ -1365,16 +1365,16 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
         [object_id(8), object_id(10)]
     );
     let mut t = world(class::VILLAGER, ids::HOUSE);
-    t.groups.get_mut(group_id(1)).unwrap().unit_types = vec![
-        UnitTypeStatistic {
+    t.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
+        UnitKindStatistic {
             formation_category: FormationCategory::named(2),
             units: vec![object_id(9), object_id(10)],
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         },
-        UnitTypeStatistic {
+        UnitKindStatistic {
             formation_category: FormationCategory::named(1),
             units: vec![object_id(7), object_id(8), object_id(11)],
-            ..UnitTypeStatistic::default()
+            ..UnitKindStatistic::default()
         },
     ];
     t.refill_special_units(group_id(1), object_id(60)).unwrap();

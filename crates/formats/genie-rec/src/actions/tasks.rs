@@ -5,7 +5,7 @@ use crate::actions::{Location2, ObjectsList};
 use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeId, f32_neq, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitKindId, f32_neq, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Task an object to attack ground.
@@ -95,10 +95,10 @@ impl RepairCommand {
 pub struct UngarrisonCommand {
     /// Which objects to ungarrison. aoc-mgz names the values 0 (all), 3 (selected), 4 (same
     /// type), 5 (not selected) and 6 (inverse type).
-    pub ungarrison_type: i8,
+    pub ungarrison_kind: i8,
     /// The unit type to ungarrison, for the kinds that select by type; read as an optional ID
     /// (-1 for none).
-    pub unit_type_id: Option<ObjectId>,
+    pub unit_kind_id: Option<ObjectId>,
     /// Where the ungarrisoned objects go, if a location was given (it is stored as -1, -1 if
     /// not).
     pub location: Option<Location2>,
@@ -118,9 +118,9 @@ impl UngarrisonCommand {
         } else {
             None
         };
-        command.ungarrison_type = input.read_i8()?;
+        command.ungarrison_kind = input.read_i8()?;
         input.skip(3)?;
-        command.unit_type_id = read_opt_u32(&mut input)?;
+        command.unit_kind_id = read_opt_u32(&mut input)?;
         command.objects = ObjectsList::read_from(input, i32::from(selected_count))?;
         Ok(command)
     }
@@ -215,7 +215,7 @@ pub struct QueueCommand {
     /// The ID of the building where this unit is being queued.
     pub building_id: ObjectId,
     /// The ID of the unit type being queued.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// The amount of units to queue.
     pub amount: u16,
 }
@@ -230,7 +230,7 @@ impl QueueCommand {
         let mut command = Self::default();
         input.skip(3)?;
         command.building_id = input.read_u32::<LE>()?.into();
-        command.unit_type_id = input.read_u16::<LE>()?.into();
+        command.unit_kind_id = input.read_u16::<LE>()?.into();
         command.amount = input.read_u16::<LE>()?;
         Ok(command)
     }
@@ -243,7 +243,7 @@ impl QueueCommand {
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_all(&[0, 0, 0])?;
         output.write_u32::<LE>(self.building_id.into())?;
-        output.write_u16::<LE>(self.unit_type_id.into())?;
+        output.write_u16::<LE>(self.unit_kind_id.into())?;
         output.write_u16::<LE>(self.amount)?;
         Ok(())
     }
@@ -257,7 +257,7 @@ pub struct SetGatherPointCommand {
     /// The ID of the object being targeted, if the gather point is set to an object.
     pub target_id: Option<ObjectId>,
     /// The type ID of the unit being targeted, if the gather point is set to an object.
-    pub target_type_id: Option<UnitTypeId>,
+    pub target_kind_id: Option<UnitKindId>,
     /// The location of the new gather point, if the gather point is not set to an object.
     pub location: Option<Location2>,
 }
@@ -273,7 +273,7 @@ impl SetGatherPointCommand {
         let selected_count = i32::from(input.read_i8()?);
         input.skip(2)?;
         command.target_id = read_opt_u32(&mut input)?;
-        command.target_type_id = match input.read_u16::<LE>()? {
+        command.target_kind_id = match input.read_u16::<LE>()? {
             0xFFFF => None,
             id => Some(id.into()),
         };
@@ -294,7 +294,7 @@ impl SetGatherPointCommand {
         output.write_u8(fits(self.buildings.len())?)?;
         output.write_all(&[0, 0])?;
         output.write_u32::<LE>(self.target_id.map_or(0xFFFF_FFFF, Into::into))?;
-        output.write_u16::<LE>(self.target_type_id.map_or(0xFFFF, Into::into))?;
+        output.write_u16::<LE>(self.target_kind_id.map_or(0xFFFF, Into::into))?;
         output.write_all(&[0, 0])?;
         if let Some((x, y)) = self.location {
             output.write_f32::<LE>(x)?;

@@ -13,7 +13,7 @@ pub struct BuildItem {
     /// The item's name.
     pub name: Option<String>,
     /// The unit type to build.
-    pub type_id: u32,
+    pub kind_id: u32,
     /// The ID of the item's object in the game, as the reader names it; not verified.
     pub game_id: u32,
     /// The item's size along x, y and z.
@@ -45,7 +45,7 @@ impl ReadableHeaderElement for BuildItem {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut item = Self {
             name: input.read_u32_length_prefixed_str()?,
-            type_id: input.read_u32::<LE>()?,
+            kind_id: input.read_u32::<LE>()?,
             ..Default::default()
         };
 
@@ -136,7 +136,7 @@ pub struct ConstructionItem {
     /// The lot's name.
     pub name: Option<String>,
     /// The unit type planned for the lot.
-    pub type_id: u32,
+    pub kind_id: u32,
     /// The lot's X position.
     pub x: f32,
     /// The lot's Y position.
@@ -161,7 +161,7 @@ impl ReadableHeaderElement for ConstructionItem {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut item = Self {
             name: input.read_u32_length_prefixed_str()?,
-            type_id: input.read_u32::<LE>()?,
+            kind_id: input.read_u32::<LE>()?,
             ..Default::default()
         };
 

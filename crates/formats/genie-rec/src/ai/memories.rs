@@ -6,7 +6,7 @@ use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
-use genie_support::{ReadSkipExt, UnitTypeId, read_opt_u16, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitKindId, read_opt_u16, read_opt_u32};
 use std::io::Read;
 
 /// What the information AI remembers about an important object.
@@ -15,7 +15,7 @@ pub struct ImportantObjectMemory {
     /// The object's ID; `None` marks an empty slot.
     pub id: Option<ObjectId>,
     /// The object's unit type.
-    pub unit_type_id: Option<UnitTypeId>,
+    pub unit_kind_id: Option<UnitKindId>,
     /// The object's unit class.
     pub unit_class: Option<u16>,
     /// The object's last known tile position (x, y, z).
@@ -44,7 +44,7 @@ impl ReadableHeaderElement for ImportantObjectMemory {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             id: read_opt_u32(input)?,
-            unit_type_id: read_opt_u16(input)?,
+            unit_kind_id: read_opt_u16(input)?,
             unit_class: read_opt_u16(input)?,
             location: (input.read_u8()?, input.read_u8()?, input.read_u8()?),
             owner: input.read_u8()?.into(),
@@ -64,7 +64,7 @@ impl ReadableHeaderElement for ImportantObjectMemory {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BuildingLot {
     /// The building type planned for the lot; `None` marks an empty slot.
-    pub unit_type_id: Option<UnitTypeId>,
+    pub unit_kind_id: Option<UnitKindId>,
     /// The lot's status.
     pub status: u8,
     /// The lot's tile position (x, y).
@@ -73,13 +73,13 @@ pub struct BuildingLot {
 
 impl ReadableHeaderElement for BuildingLot {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
-        let unit_type_id = read_opt_u32(input)?;
+        let unit_kind_id = read_opt_u32(input)?;
         let status = input.read_u8()?;
         let x = input.read_u8()?;
         let y = input.read_u8()?;
         input.skip(1)?;
         Ok(Self {
-            unit_type_id,
+            unit_kind_id,
             status,
             location: (x, y),
         })
@@ -90,9 +90,9 @@ impl ReadableHeaderElement for BuildingLot {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WallLine {
     /// The kind of line. Stored from version 10.78, 0 before.
-    pub line_type: u32,
+    pub line_kind: u32,
     /// The wall unit type, if set.
-    pub wall_type: Option<u32>,
+    pub wall_kind: Option<u32>,
     /// The number of gates in the line. Stored from version 10.78, 0 before.
     pub gate_count: u32,
     /// The number of wall segments in the line.
@@ -111,9 +111,9 @@ impl ReadableHeaderElement for WallLine {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut line = Self::default();
         if input.version() >= 10.78 {
-            line.line_type = input.read_u32::<LE>()?;
+            line.line_kind = input.read_u32::<LE>()?;
         }
-        line.wall_type = read_opt_u32(input)?;
+        line.wall_kind = read_opt_u32(input)?;
         if input.version() >= 10.78 {
             line.gate_count = input.read_u32::<LE>()?;
         }
@@ -268,7 +268,7 @@ pub struct ResourceMemory {
     /// The distance to the drop site.
     pub drop_distance: u8,
     /// The resource type.
-    pub resource_type: u8,
+    pub resource_kind: u8,
     /// The ID of the drop site used for the resource.
     pub dropsite_id: ObjectId,
     /// The game time when gatherers at the resource were last attacked, if they were. Stored
@@ -286,7 +286,7 @@ impl ReadableHeaderElement for ResourceMemory {
             valid: input.read_u8()? != 0,
             gone: input.read_u8()? != 0,
             drop_distance: input.read_u8()?,
-            resource_type: input.read_u8()?,
+            resource_kind: input.read_u8()?,
             dropsite_id: input.read_u32::<LE>()?.into(),
             ..Default::default()
         };

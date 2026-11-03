@@ -18,7 +18,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::cost_resource;
 use crate::objects::masters::player_master;
 use crate::objects::unit::Unit;
-use crate::ownership::change::DEAD_COPY_TYPES;
+use crate::ownership::change::DEAD_COPY_KINDS;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::UpgradeMode;
@@ -229,7 +229,7 @@ impl World {
         }
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()
-            && let Some(d) = dead.filter(|d| DEAD_COPY_TYPES.contains(&d.kind))
+            && let Some(d) = dead.filter(|d| DEAD_COPY_KINDS.contains(&d.kind))
         {
             self.set_part(id, Part::DeadMaster(Box::new(d)))?;
         }

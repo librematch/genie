@@ -86,7 +86,7 @@ impl Spatial {
             let bx = Rect::new(x as f32, y as f32, x as f32 + 1.0, y as f32 + 1.0);
             if self.visits_cell(level, x >> shift, y >> shift, grown)
                 && !ignore.contains(&id)
-                && meets(ObstructionKind::TYPE_3, bx)
+                && meets(ObstructionKind::KIND_3, bx)
             {
                 hits.push(Hit { id, bounds: bx });
                 if first || MOST_HITS <= hits.len() {
@@ -110,7 +110,7 @@ impl Spatial {
             if !meets(kind, bx) {
                 continue;
             }
-            if kind == ObstructionKind::TYPE_11 {
+            if kind == ObstructionKind::KIND_11 {
                 return Err(GenieError::unsupported(
                     "a pather query meeting a record of kind 11 (its own radii)",
                 ));

@@ -14,9 +14,9 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::Posture;
-use crate::unit_ai::UnitAiType;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     ARTIFACT_AI, AiAction, AiMove, BOAR_AI, CIVILIAN, FISHING_AI, PRIEST_AI, QueuedOrder, SIEGE_AI,
@@ -50,11 +50,11 @@ pub(super) enum Retarget {
     Priest,
 }
 
-pub(super) const fn retarget_kind(ai_type: UnitAiType) -> Result<Retarget, GenieError> {
-    match ai_type {
+pub(super) const fn retarget_kind(ai_kind: UnitAiKind) -> Result<Retarget, GenieError> {
+    match ai_kind {
         // villagers (0x140c21da0) and livestock (0x140c21f20) return 9 from slot 73
-        UnitAiType::CIVILIAN => Ok(Retarget::Civilian),
-        UnitAiType::LIVESTOCK => Ok(Retarget::Never),
+        UnitAiKind::CIVILIAN => Ok(Retarget::Civilian),
+        UnitAiKind::LIVESTOCK => Ok(Retarget::Never),
         ARTIFACT_AI => Ok(Retarget::Artifact),
         PRIEST_AI => Ok(Retarget::Priest),
         // hunted animal (2, slot 72 FUN_140c1eea0), boar (4, slot 72 FUN_140c1e630), lion (5,
@@ -63,16 +63,16 @@ pub(super) const fn retarget_kind(ai_type: UnitAiType) -> Result<Retarget, Genie
         // FUN_140c20db0), tower (15, the base's slot 72 FUN_140c564c0), building (17, slot 72
         // 0x140c1e600, which does nothing), siege unit (0x10, slot 72 FUN_140c206b0), siege tower
         // (0x12, slot 72 FUN_140c20690)
-        UnitAiType::HUNTED
-        | UnitAiType::BOAR
-        | UnitAiType::LION
+        UnitAiKind::HUNTED
+        | UnitAiKind::BOAR
+        | UnitAiKind::LION
         | TRADE_AI
-        | UnitAiType::TRANSPORT
+        | UnitAiKind::TRANSPORT
         | FISHING_AI
-        | UnitAiType::SOLDIER
-        | UnitAiType::TOWER
+        | UnitAiKind::SOLDIER
+        | UnitAiKind::TOWER
         | SIEGE_AI
-        | UnitAiType::BUILDING
+        | UnitAiKind::BUILDING
         | SIEGE_TOWER_AI => Ok(Retarget::Base),
         _ => Err(GenieError::unsupported("unit-AI type not modelled")),
     }
@@ -178,10 +178,10 @@ pub(super) struct RetargetSearch {
 }
 
 /// The unit AI type the factory (`FUN_141215a90`) gives a new object of master `master`, by
-/// the master's id `id` ([`factory_type`]).
+/// the master's id `id` ([`factory_kind`]).
 #[must_use]
-pub fn unit_ai_type(master: &Master, id: MasterId, roles: &Roles) -> Option<UnitAiType> {
-    factory_type(
+pub fn unit_ai_kind(master: &Master, id: MasterId, roles: &Roles) -> Option<UnitAiKind> {
+    factory_kind(
         master.class,
         id,
         master.creatable_part().volley_missile,
@@ -202,19 +202,19 @@ pub fn unit_ai_type(master: &Master, id: MasterId, roles: &Roles) -> Option<Unit
 /// boar's (4, `FUN_140c11720`) when its master is of class 10 and combat level 1
 /// (`FUN_140fde4f0`), else the lion's (5, `FUN_140c11bd0`).
 #[must_use]
-pub fn factory_type(
+pub fn factory_kind(
     class: ClassId,
     master: MasterId,
     missile: Option<MasterId>,
     combat_level: CombatLevel,
     roles: &Roles,
-) -> Option<UnitAiType> {
+) -> Option<UnitAiKind> {
     {
         let held = roles.of_master(master);
         if held.contains(MasterRoles::SIEGE_TOWER) {
-            return Some(UnitAiType::SIEGE_TOWER);
+            return Some(UnitAiKind::SIEGE_TOWER);
         } else if held.intersects(MasterRoles::ARMORED_ELEPHANT | MasterRoles::SIEGE_ELEPHANT) {
-            return Some(UnitAiType::SIEGE);
+            return Some(UnitAiKind::SIEGE);
         }
     }
     Some({
@@ -239,9 +239,9 @@ pub fn factory_type(
         ) {
             return None;
         } else if held.contains(ClassRoles::ARTIFACT) {
-            UnitAiType::ARTIFACT
+            UnitAiKind::ARTIFACT
         } else if held.intersects(ClassRoles::TRADE_BOAT | ClassRoles::TRADE_CART) {
-            UnitAiType::TRADE
+            UnitAiKind::TRADE
         } else if held.intersects(
             ClassRoles::BUILDING
                 | ClassRoles::WALL
@@ -250,7 +250,7 @@ pub fn factory_type(
                 | ClassRoles::MISC_BUILDING,
         ) && (missile.is_none())
         {
-            UnitAiType::BUILDING
+            UnitAiKind::BUILDING
         } else if held.intersects(
             ClassRoles::BUILDING
                 | ClassRoles::WALL
@@ -263,30 +263,30 @@ pub fn factory_type(
         } else if held.contains(ClassRoles::VILLAGER) {
             CIVILIAN
         } else if held.intersects(ClassRoles::PREY | ClassRoles::KING) {
-            UnitAiType::HUNTED
+            UnitAiKind::HUNTED
         } else if held.contains(ClassRoles::PREDATOR)
             && (combat_level.get() == CombatLevel::ANIMAL.get())
         {
             BOAR_AI
         } else if held.contains(ClassRoles::PREDATOR) {
-            UnitAiType::LION
+            UnitAiKind::LION
         } else if held.intersects(
             ClassRoles::SIEGE
                 | ClassRoles::PACKED_TREBUCHET
                 | ClassRoles::UNPACKED_TREBUCHET
                 | ClassRoles::SCORPION,
         ) {
-            UnitAiType::SIEGE
+            UnitAiKind::SIEGE
         } else if held
             .intersects(ClassRoles::MONK | ClassRoles::MONK_WITH_RELIC | ClassRoles::BOARDING_SHIP)
         {
-            UnitAiType::PRIEST
+            UnitAiKind::PRIEST
         } else if held.contains(ClassRoles::TRANSPORT) {
-            UnitAiType::TRANSPORT
+            UnitAiKind::TRANSPORT
         } else if held.contains(ClassRoles::FISHING_SHIP) {
-            UnitAiType::FISHING
+            UnitAiKind::FISHING
         } else if held.intersects(ClassRoles::DOMESTIC_ANIMAL | ClassRoles::LIVESTOCK) {
-            UnitAiType::LIVESTOCK
+            UnitAiKind::LIVESTOCK
         } else {
             SOLDIER_AI
         }
@@ -315,8 +315,8 @@ pub struct NewObject {
     /// through slot 0x8a8, `FUN_141206d50`: the work range of its master's last task of action
     /// type 6, else 0): the hunted animal's leash.
     pub hunt_range: Distance,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The owner's posture (`+0x71c`, its slot 0x90 `FUN_1416224f0`).
     pub posture: Posture,
     /// The owner's attribute 6, the current age (`player+0x100` at `+0x30`).
@@ -325,7 +325,7 @@ pub struct NewObject {
 
 impl NewObject {
     /// The object at `position` of master `made` (id `master`), its owner's fields left at a
-    /// human player's in the Dark Age with posture 0 ([`NewObject::player_type`],
+    /// human player's in the Dark Age with posture 0 ([`NewObject::player_kind`],
     /// [`NewObject::posture`], [`NewObject::age`] are the caller's).
     #[must_use]
     pub fn of(position: Position, master: MasterId, made: &Master) -> Self {
@@ -344,7 +344,7 @@ impl NewObject {
                 .rev()
                 .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             posture: Posture::AGGRESSIVE,
             age: Amount::ZERO,
         }
@@ -370,21 +370,21 @@ pub(super) const SIEGE_IDLE_TIMEOUT: Millis = Millis::new(1000);
 /// else the owner's posture (slot 0x90, `+0x71c`, its low byte).
 pub(super) fn soldier_stance(new: &NewObject, roles: &Roles) -> UnitStance {
     // UCOMISS with JP, JNZ: the age equals 0 (a NaN does not)
-    if !new.player_type.is_computer()
+    if !new.player_kind.is_computer()
         && new.object_flags.contains(ObjectFlags::SCOUT)
         && new.copy_id == Some(new.master)
         && new.age == Amount::ZERO
     {
         return UnitStance::STAND_GROUND;
     }
-    if !new.player_type.is_computer()
+    if !new.player_kind.is_computer()
         && roles
             .of_master(new.master)
             .contains(MasterRoles::DEFENSIVE_SOLDIER)
     {
         return UnitStance::DEFENSIVE;
     }
-    if !new.player_type.is_computer() && roles.of_class(new.class).contains(ClassRoles::NO_ATTACK) {
+    if !new.player_kind.is_computer() && roles.of_class(new.class).contains(ClassRoles::NO_ATTACK) {
         return UnitStance::NO_ATTACK;
     }
     // TEST 9, then a signed byte at least 0 or bit 3 clear
@@ -404,7 +404,7 @@ pub(super) fn soldier_stance(new: &NewObject, roles: &Roles) -> UnitStance {
 /// for a computer player's and for classes 51 and 54 (`-0xe79`, `-0xe76` raw); the owner's
 /// posture (slot 0x90, its low byte) for class 55 (`-0xe75`); 1 for any other.
 pub(super) fn siege_stance(new: &NewObject, roles: &Roles) -> UnitStance {
-    if new.player_type.is_computer()
+    if new.player_kind.is_computer()
         || roles
             .of_class(new.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
@@ -428,8 +428,8 @@ pub(super) fn dodges(at: &Surroundings, ai: &mut Well512) -> bool {
 /// and 0x207 from a transport, units left inside or no unload there; `FUN_14162dab0`): a human
 /// player's alert list or interface message and the old pather's hulled-area reset, not held;
 /// a computer player's AI hears it (slot 0x3c8), which is not modelled.
-pub(crate) const fn alert_owner(player_type: PlayerType) -> Result<(), GenieError> {
-    if player_type.is_computer() {
+pub(crate) const fn alert_owner(player_kind: PlayerKind) -> Result<(), GenieError> {
+    if player_kind.is_computer() {
         return Err(GenieError::unsupported(
             "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)",
         ));

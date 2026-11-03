@@ -31,7 +31,7 @@ use crate::players::PlayerId;
 use crate::technology::effect::{MasterSprites, follow_master};
 use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
 use crate::unit_ai::UnitAi;
-use crate::unit_ai::unit_ai_type;
+use crate::unit_ai::unit_ai_kind;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
 use crate::vision::SightShape;
@@ -247,7 +247,7 @@ impl World {
             // The villager class (4), whose load an upgrade without its master kept goes to its player.
             && self.model.roles.of_class(old.class).contains(ClassRoles::VILLAGER)
             && Amount::ZERO < u.life.amount
-            && let Some(kind) = u.life.attribute_type
+            && let Some(kind) = u.life.attribute_kind
         {
             // the foods a unit carries (15 to 17) as food
             let kind = if kind.is_food_load() {
@@ -270,7 +270,7 @@ impl World {
                 self.players.player_mut(p)?.add_attribute(k, v)?;
             }
             let u = self.object_at_mut(place)?;
-            u.life.attribute_type = None;
+            u.life.attribute_kind = None;
             u.life.amount = Amount::ZERO;
         }
         Ok(())
@@ -449,12 +449,12 @@ impl World {
     }
 
     /// `FUN_141215a90` on the object at `place`, whose master became `new`: its unit AI goes and
-    /// the factory's type for `new` makes another ([`crate::unit_ai::factory_type`],
+    /// the factory's type for `new` makes another ([`crate::unit_ai::factory_kind`],
     /// [`crate::unit_ai::UnitAi::constructed`] on the AI stream), none for a class without.
     fn new_unit_ai(&mut self, p: PlayerId, place: Place, new: &Master) -> Result<(), GenieError> {
         let position = self.object_at(place)?.position();
         let made = self.new_object(p, new.id, new, position)?;
-        let ai = unit_ai_type(new, new.id, &self.model.roles).and_then(|t| {
+        let ai = unit_ai_kind(new, new.id, &self.model.roles).and_then(|t| {
             UnitAi::constructed(t, &made, self.streams.get(Stream::Ai), &self.model.roles)
         });
         let id = self.object_at(place)?.id;
@@ -625,7 +625,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame, Graphics};
     use crate::ownership::CaptureKind;
-    use crate::players::PlayerType;
+    use crate::players::PlayerKind;
     use crate::players::attribute::AttributeId;
     use crate::players::tracker::ListKey;
     use crate::technology::UpgradeMode;
@@ -1036,7 +1036,7 @@ mod tests {
             ObjectState::Alive,
             HitPoints::new(25.0),
         );
-        (v.life.attribute_type, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(10.0));
+        (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(10.0));
         let player = Player {
             objects: vec![v].into(),
             attributes: vec![Amount::ZERO; 300],
@@ -1094,13 +1094,13 @@ mod tests {
         use crate::gathering::gather::GATHER;
         use crate::gathering::hunt::HuntTask;
         use crate::objects::masters::Task;
-        let task = |id, action_type, object_group, work_range| Task {
+        let task = |id, action_kind, object_group, work_range| Task {
             id,
-            action_kind: action_type,
+            action_kind,
             object_group,
             work_range,
             work_val1: WorkValue::new((work_range * 2.0).get()),
-            attribute_type: Some(AttributeId::named(17)),
+            attribute_kind: Some(AttributeId::named(17)),
             ..Task::default()
         };
         let mut t = forage_world();
@@ -1554,7 +1554,7 @@ mod tests {
         };
         let load = |master: &Master, kind, amount| {
             let mut v = object(10, master.id, ObjectState::Alive, HitPoints::new(25.0));
-            (v.life.attribute_type, v.life.amount) = (kind, amount);
+            (v.life.attribute_kind, v.life.amount) = (kind, amount);
             let mut t = one_player(vec![v], vec![master.clone()], &[]);
             t.players[0].attributes[37] = Amount::new(1.0);
             t.hand_in_load(
@@ -1646,7 +1646,7 @@ mod tests {
                 vec![VisionBits::NONE; 400],
                 Vec::new(),
                 0,
-                vec![PlayerType::HUMAN],
+                vec![PlayerKind::HUMAN],
             );
             v.add_seer(
                 object_id(10),

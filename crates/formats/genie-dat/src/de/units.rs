@@ -3,7 +3,7 @@
 
 use crate::de::{
     Bird, Building, Creatable, DeadFish, DebugString, Projectile, Type50, Version, read_present,
-    unit_type, write_present,
+    unit_kind, write_present,
 };
 use binrw::binrw;
 
@@ -30,13 +30,13 @@ pub struct UnitHeader {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Task {
     /// Task type: 0 generic, 1 tribe (the kind Age of Kings and later use).
-    pub task_type: i16,
+    pub task_kind: i16,
     /// The task's id, unique within its unit's task list.
     pub id: i16,
     /// Non-zero for the unit's default task.
     pub is_default: u8,
     /// Action the task performs (gather, build, attack, convert, …).
-    pub action_type: i16,
+    pub action_kind: i16,
     /// Class of the targets; -1 for any.
     pub class_id: i16,
     /// Target unit; -1 for any.
@@ -66,7 +66,7 @@ pub struct Task {
     /// Combat level flag; its values are not known yet.
     pub combat_level_flag: u8,
     /// Gather type; its values are not known yet.
-    pub gather_type: i16,
+    pub gather_kind: i16,
     /// Second work flag; its values are not known yet.
     pub work_flag2: i16,
     /// Which owners' objects may be targeted (own, allied, enemy, …).
@@ -103,7 +103,7 @@ pub struct Task {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Civ {
     /// Player type; its values are not known yet.
-    pub player_type: u8,
+    pub player_kind: u8,
     /// Internal name.
     pub name: DebugString,
     /// Number of entries in `resources`.
@@ -129,14 +129,14 @@ pub struct Civ {
     pub units: Vec<Option<Unit>>,
 }
 
-/// A unit definition: the part every unit type has, then the parts its `unit_type` reaches.
+/// A unit definition: the part every unit type has, then the parts its `unit_kind` reaches.
 #[binrw]
 #[brw(little)]
 #[br(import(v: Version))]
 #[derive(Clone, Debug, PartialEq)]
 pub struct Unit {
-    /// Unit type (see [`unit_type`]); it decides which of the optional parts follow.
-    pub unit_type: u8,
+    /// Unit type (see [`unit_kind`]); it decides which of the optional parts follow.
+    pub unit_kind: u8,
     /// The unit's id.
     pub id: i16,
     /// Language string id of the name; from VER 7.2 (`GV_C15`).
@@ -241,7 +241,7 @@ pub struct Unit {
     /// Bit flags for how the unit is masked behind other objects.
     pub occlusion_mode: u8,
     /// Shape of the unit's obstruction (none, square, round, …).
-    pub obstruction_type: u8,
+    pub obstruction_kind: u8,
     /// Obstruction class; its values are not known yet.
     pub obstruction_class: u8,
     /// Bit flags of the unit's traits; not all known yet.
@@ -288,25 +288,25 @@ pub struct Unit {
     /// Base unit; its exact role is not known yet.
     pub base_id: i16,
     /// Movement speed; for unit types 20 and up, except 90.
-    #[br(if(unit_type >= unit_type::FLAG && unit_type != unit_type::AOE_TREES))]
+    #[br(if(unit_kind >= unit_kind::FLAG && unit_kind != unit_kind::AOE_TREES))]
     pub speed: Option<f32>,
     /// Movement part; for unit types 30 and up, except 90.
-    #[br(if(unit_type >= unit_type::DEAD_FISH && unit_type != unit_type::AOE_TREES))]
+    #[br(if(unit_kind >= unit_kind::DEAD_FISH && unit_kind != unit_kind::AOE_TREES))]
     pub dead_fish: Option<DeadFish>,
     /// Action part; for unit types 40 and up, except 90.
-    #[br(if(unit_type >= unit_type::BIRD && unit_type != unit_type::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::BIRD && unit_kind != unit_kind::AOE_TREES), args(v))]
     pub bird: Option<Bird>,
     /// Combat part; for unit types 50 and up, except 90.
-    #[br(if(unit_type >= unit_type::COMBATANT && unit_type != unit_type::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::COMBATANT && unit_kind != unit_kind::AOE_TREES), args(v))]
     pub type50: Option<Type50>,
     /// Projectile part; for unit type 60 only.
-    #[br(if(unit_type == unit_type::PROJECTILE))]
+    #[br(if(unit_kind == unit_kind::PROJECTILE))]
     pub projectile: Option<Projectile>,
     /// Creation part; for unit types 70 and up, except 90.
-    #[br(if(unit_type >= unit_type::CREATABLE && unit_type != unit_type::AOE_TREES), args(v))]
+    #[br(if(unit_kind >= unit_kind::CREATABLE && unit_kind != unit_kind::AOE_TREES), args(v))]
     pub creatable: Option<Creatable>,
     /// Building part; for unit type 80 only.
-    #[br(if(unit_type == unit_type::BUILDING))]
+    #[br(if(unit_kind == unit_kind::BUILDING))]
     pub building: Option<Building>,
 }
 

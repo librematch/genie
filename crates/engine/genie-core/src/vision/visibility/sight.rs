@@ -156,12 +156,12 @@ impl Visibility {
                 // The master whose sight the AI players' market lists follow (`FUN_1411d0190`: id 84).
                 if roles.of_master(s.master).contains(MasterRoles::MARKET)
                     && !self
-                        .player_types
+                        .player_kinds
                         .get(s.player.index())
                         .is_some_and(|t| t.is_computer())
                 {
                     // its tile goes to the allied computer players' lists (player +0x180)
-                    if self.player_types.iter().any(|t| t.is_computer()) {
+                    if self.player_kinds.iter().any(|t| t.is_computer()) {
                         self.unsupported("a market's sight with computer players");
                     }
                 }

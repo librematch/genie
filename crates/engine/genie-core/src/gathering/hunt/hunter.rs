@@ -247,7 +247,7 @@ impl Unit {
             None => None,
         };
         let who = PointWalker {
-            player_type: c.w.players.player(c.player)?.kind,
+            player_kind: c.w.players.player(c.player)?.kind,
             villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: c
                 .w
@@ -318,7 +318,7 @@ impl Unit {
             c.w.model.masters.of(c.player),
         )?;
         let who = PointWalker {
-            player_type: c.w.players.player(c.player)?.kind,
+            player_kind: c.w.players.player(c.player)?.kind,
             villager: roles.of_class(master.class).contains(ClassRoles::VILLAGER),
             stance: c
                 .w

@@ -18,7 +18,7 @@ use genie_core::objects::Voice;
 use genie_core::objects::layers;
 use genie_core::objects::masters::{ActionKind, Task};
 use genie_core::objects::sprite::Graphic;
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::world::Seconds;
 use genie_save::generated::world::{Action, PlayerObjects, RgeAction, RgeStaticObject};
 
@@ -95,7 +95,7 @@ pub(super) fn saved_actions(
         graphics,
     };
     match kind {
-        ARTIFACT_TYPE => import_artifact(&saved, &task_at, actions),
+        ARTIFACT_KIND => import_artifact(&saved, &task_at, actions),
         MOVE_TO => import_move_to(&saved, actions),
         MISSILE => import_missile(&saved, actions),
         MAKE => import_make(&saved, &task_at, actions),
@@ -297,7 +297,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> Result<(),
     let (base, object) = (saved.base, saved.object);
     let ma = saved
         .action
-        .rge_action_by_type
+        .rge_action_by_kind
         .as_deref()
         .and_then(|t| t.rge_action_missile.as_deref())
         .ok_or(GenieError::unsupported(

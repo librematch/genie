@@ -82,11 +82,11 @@ impl HuntTask {
         Self {
             id: t.id,
             range: t.work_range,
-            resource: t.attribute_type,
+            resource: t.attribute_kind,
             sprites: t.sprites,
             work_value: t.work_val1,
-            productivity: t.attribute_type2,
-            kind4: t.attribute_type4,
+            productivity: t.attribute_kind2,
+            kind4: t.attribute_kind4,
         }
     }
 

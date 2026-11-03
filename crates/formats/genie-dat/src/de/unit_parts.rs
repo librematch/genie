@@ -176,7 +176,7 @@ pub struct AttackOrArmor {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Projectile {
     /// Projectile type (e.g. falling straight down); its values are not all known yet.
-    pub projectile_type: u8,
+    pub projectile_kind: u8,
     /// Whether the projectile aims at the target's predicted position.
     pub smart_mode: u8,
     /// Whether the projectile vanishes on hitting.
@@ -246,7 +246,7 @@ pub struct Creatable {
     pub flank_attack_modifier: f32,
     /// Kind of creatable unit; DE's `mFormationCategory` (`+0x8bc`): the sub-formation of a
     /// group the unit joins, 0 for units the order splitter never groups (villagers).
-    pub creatable_type: u8,
+    pub creatable_kind: u8,
     /// Hero bit flags (e.g. no conversion, healing); DE's `hero_flag` (`+0x8d9`).
     pub hero_mode: u8,
     /// Graphic shown while units are garrisoned.
@@ -272,7 +272,7 @@ pub struct Creatable {
     pub charge_event: Option<i16>,
     /// What the charge does (e.g. a charged attack); from VER 7.3 (`GV_C16`).
     #[br(if(v.at_least(16)))]
-    pub charge_type: Option<i16>,
+    pub charge_kind: Option<i16>,
     /// What a charged ability targets; from VER 8.0 (`GV_C23`).
     #[br(if(v.at_least(23)))]
     pub charge_target: Option<i16>,
@@ -381,7 +381,7 @@ pub struct Building {
     /// Wwise event id of the construction sound.
     pub wwise_construction_sound_id: u32,
     /// Bit flags of the unit kinds that can garrison (villagers, infantry, …).
-    pub garrison_type: u8,
+    pub garrison_kind: u8,
     /// Rate at which garrisoned units heal.
     pub garrison_heal_rate: f32,
     /// Rate at which the building repairs itself with units garrisoned.

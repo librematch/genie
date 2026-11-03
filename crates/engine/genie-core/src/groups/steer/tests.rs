@@ -38,7 +38,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -734,7 +734,7 @@ fn rounder(at: BVector) -> detour::Rounder<'static> {
             restriction: RestrictionId::named(0),
             mask: TerrainMask::of_bits(2),
         },
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         at,
         here: at.position(),
         mask: TerrainMask::of_bits(2),

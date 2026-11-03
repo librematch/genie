@@ -9,7 +9,7 @@ use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
 use crate::movement::LevelFlags;
-use crate::movement::LinkedPathType;
+use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
 use crate::movement::WaypointLevel;
@@ -73,7 +73,7 @@ pub(crate) fn path_step(
     if motion.paths.is_empty() {
         return Ok(false);
     }
-    let budget = budget && group.player_type.is_computer();
+    let budget = budget && group.player_kind.is_computer();
     let dt = world.dt;
     let level = motion.paths.checked_mut(0)?;
     if Seconds::ZERO < level.pause_time {
@@ -139,17 +139,17 @@ pub(super) fn pass(
             motion.stand();
             return Ok(Pass::Done(true));
         }
-        let linked = motion.paths.checked(0)?.linked_type;
-        if linked == LinkedPathType::REACHES_WAYPOINT || flags.contains(LevelFlags::MET_TARGET) {
+        let linked = motion.paths.checked(0)?.linked_kind;
+        if linked == LinkedPathKind::REACHES_WAYPOINT || flags.contains(LevelFlags::MET_TARGET) {
             let _ = motion.paths.remove(0);
             return Ok(Pass::Reached);
         }
-        if linked == LinkedPathType::MOVES_ON || linked == LinkedPathType::ASKS_AGAIN {
+        if linked == LinkedPathKind::MOVES_ON || linked == LinkedPathKind::ASKS_AGAIN {
             let _ = motion.paths.remove(0);
             let patrols = lead.group.as_ref().is_some_and(LeadGroup::patrols);
             let parent = motion.paths.checked_mut(0)?;
             parent.state = PathState::WantsPath;
-            if linked == LinkedPathType::MOVES_ON && parent.has_path {
+            if linked == LinkedPathKind::MOVES_ON && parent.has_path {
                 if parent.path_flags.contains(PathFlags::LOOPS) {
                     let w = parent.waypoint;
                     parent.waypoint = parent.looping_next(w);

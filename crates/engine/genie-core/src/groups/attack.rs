@@ -208,7 +208,7 @@ impl World {
         range: &mut f32,
     ) -> Result<(), GenieError> {
         let g = self.groups.held(group)?;
-        let Some(player_type) = g
+        let Some(player_kind) = g
             .owner
             .and_then(|o| self.players.get(o.index()))
             .map(|p| p.kind)
@@ -218,7 +218,7 @@ impl World {
         let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
         for id in ids {
             if self.in_reach_of(id, target, order, range)? {
-                self.send_in_reach(group, id, target, (order, player_type))?;
+                self.send_in_reach(group, id, target, (order, player_kind))?;
             }
         }
         Ok(())
@@ -378,7 +378,7 @@ impl World {
                     break;
                 }
                 if let Some(stat) = g
-                    .unit_types
+                    .unit_kinds
                     .iter()
                     .find(|s| s.formation_category == category)
                 {
@@ -405,7 +405,7 @@ impl World {
         let mut raised = Vec::new();
         for category in CATEGORIES {
             let Some((at, stat)) = g
-                .unit_types
+                .unit_kinds
                 .iter()
                 .enumerate()
                 .find(|(_, s)| s.formation_category == category)
@@ -428,7 +428,7 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         for (at, largest) in raised {
-            if let Some(stat) = g.unit_types.get_mut(at) {
+            if let Some(stat) = g.unit_kinds.get_mut(at) {
                 stat.attack_range = largest;
             }
         }

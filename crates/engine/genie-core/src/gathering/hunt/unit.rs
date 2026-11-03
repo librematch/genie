@@ -178,7 +178,7 @@ impl Unit {
                 pathing: &mut c.w.pathing,
                 object: c.w.streams.get(Stream::Object),
                 world_time: c.w.world_time,
-                player_type: c.w.players.player(c.player)?.kind,
+                player_kind: c.w.players.player(c.player)?.kind,
                 groups: &c.w.groups,
             };
             let (site, _) = self.drop_site(
@@ -413,7 +413,7 @@ impl Unit {
                     "a hunt without a unit AI after its drop-off",
                 ))?;
         let class = ai.target_class.or(hunt.target_class);
-        if ai.ai_type != CIVILIAN {
+        if ai.ai_kind != CIVILIAN {
             return Err(GenieError::unsupported(
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
@@ -488,7 +488,7 @@ impl Unit {
         let mut plan = Planning {
             pathing: &mut c.w.pathing,
             now: c.w.world_time,
-            player_type: c.w.players.player(c.player)?.kind,
+            player_kind: c.w.players.player(c.player)?.kind,
             object: c.w.streams.get(Stream::Object),
             groups: &c.w.groups,
         };

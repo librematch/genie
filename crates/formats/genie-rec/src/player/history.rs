@@ -131,7 +131,7 @@ fn skip_old_battle_values<R: Read>(input: &mut RecordingHeaderReader<R>) -> Resu
 #[derive(Debug, Default, Clone, Copy)]
 pub struct HistoryEvent {
     /// The kind of event.
-    pub event_type: i8,
+    pub event_kind: i8,
     /// The history update the event falls into.
     pub time_slice: u32,
     /// The game time of the event.
@@ -143,7 +143,7 @@ pub struct HistoryEvent {
 impl ReadableHeaderElement for HistoryEvent {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
-            event_type: input.read_i8()?,
+            event_kind: input.read_i8()?,
             time_slice: input.read_u32::<LE>()?,
             world_time: input.read_u32::<LE>()?,
             params: (

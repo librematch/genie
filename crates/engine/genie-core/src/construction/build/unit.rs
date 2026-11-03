@@ -144,7 +144,7 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player);
         // FUN_140aadc50 drops only a kind the player has (FUN_140efe5b0)
         let attributes = c.w.players.player(c.player)?.attributes.len();
-        let has_kind = (self.life.attribute_type).is_some_and(|k| k.index() < attributes);
+        let has_kind = (self.life.attribute_kind).is_some_and(|k| k.index() < attributes);
         Ok(BuildReads {
             site,
             built,

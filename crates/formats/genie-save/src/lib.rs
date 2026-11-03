@@ -28,7 +28,7 @@
 )]
 
 pub mod generated;
-mod layout_types;
+mod layout_shapes;
 mod objects;
 mod player;
 
@@ -36,10 +36,10 @@ pub use generated::world::{
     BaseWorld, GameOptions, Object, ObjectList, Player, PlayerInfo, PlayerObjects, RgeMap, RgeTile,
     SaveGameFileHeader, World, WorldPlayer,
 };
-pub use layout_types::{
+pub use layout_shapes::{
     LenString16, LenString32, LenVec32, Positioned, STRING_SIGNATURE, SigString,
 };
-pub use layout_types::{Unsupported, UnsupportedFeature, unsupported_in};
+pub use layout_shapes::{Unsupported, UnsupportedFeature, unsupported_in};
 pub use player::{PlayerEnds, PlayerSection};
 
 use binrw::BinRead;
@@ -347,7 +347,7 @@ mod tests {
 
     /// A player whose type has no class is the game's own error.
     #[test]
-    fn player_of_no_known_type_is_invalid() {
+    fn player_of_no_known_kind_is_invalid() {
         let mut h = default_save();
         let world = &mut h.world.base_world;
         world.num_players = 1;
@@ -356,7 +356,7 @@ mod tests {
         world.players = vec![Positioned {
             pos: 0,
             val: Player {
-                type_: 4,
+                kind: 4,
                 ..Player::default()
             },
         }];

@@ -47,7 +47,7 @@ mod tests {
 
     /// Types 0 to 2 meet the objects on the way; type 3 does not.
     #[test]
-    fn types_up_to_two_meet_the_objects_on_the_way() {
+    fn kinds_up_to_two_meet_the_objects_on_the_way() {
         assert!(ProjectileKind::STRAIGHT.meets_on_the_way());
         assert!(ProjectileKind::of_data(2).meets_on_the_way());
         assert!(!ProjectileKind::WHOLE_WAY.meets_on_the_way());

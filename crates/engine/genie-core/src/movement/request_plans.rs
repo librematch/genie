@@ -88,7 +88,7 @@ impl Mover {
     ) -> Result<Option<AfterRequest>, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
         // FUN_141158210 is 1 only on an `E` tile in game type 12
-        if plan.pathing.game_type == 12 {
+        if plan.pathing.game_kind == 12 {
             return Err(GenieError::unsupported(
                 "a path request in game type 12 (its tile escape)",
             ));

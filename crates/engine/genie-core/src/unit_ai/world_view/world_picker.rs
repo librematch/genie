@@ -153,7 +153,7 @@ impl WorldPicker<'_> {
             .parts
             .unit_ai
             .get(p.id)
-            .is_none_or(|a| a.ai_type != PRIEST_AI)
+            .is_none_or(|a| a.ai_kind != PRIEST_AI)
         {
             return Ok(false);
         }
@@ -445,7 +445,7 @@ impl AttackPicker for WorldPicker<'_> {
             class: a.class,
             kind: a.kind,
             attack_priority: a.attack_priority,
-            player_type: a.player_type,
+            player_kind: a.player_kind,
             walls_allowed: self.ai_settings.may_attack_walls,
             can_move: seeker.can_move(),
             sight: attack_sight(a)?,

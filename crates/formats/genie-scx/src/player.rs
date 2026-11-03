@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 #[derive(Debug, Default, Clone)]
 pub struct PlayerBaseProperties {
     pub(crate) posture: i32,
-    pub(crate) player_type: i32,
+    pub(crate) player_kind: i32,
     pub(crate) civilization: i32,
     pub(crate) active: i32,
 }

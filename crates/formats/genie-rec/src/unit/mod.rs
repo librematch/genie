@@ -2,12 +2,12 @@ use crate::Result;
 use crate::element::{OptionalReadableElement, ReadableHeaderElement, WritableHeaderElement};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
-use crate::unit_type::UnitBaseClass;
+use crate::unit_kind::UnitBaseClass;
 use byteorder::ReadBytesExt;
 pub use genie_dat::sprite::SpriteId;
 pub use genie_dat::terrain::TerrainId;
-pub use genie_dat::unit_type::AttributeCost;
-pub use genie_support::{StringKey, UnitTypeId};
+pub use genie_dat::unit_kind::AttributeCost;
+pub use genie_support::{StringKey, UnitKindId};
 use std::io::Read;
 
 mod building;

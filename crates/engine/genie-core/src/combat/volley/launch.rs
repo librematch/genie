@@ -245,7 +245,7 @@ impl Unit {
                 class: Class::Animated,
                 state: ObjectState::Alive,
                 hp: HitPoints::of_master(made.hit_points),
-                attribute_type: held.kind,
+                attribute_kind: held.kind,
                 amount: held.amount,
                 dying_sprite: made.death_sprite,
                 death_spawn: made.death_spawns[0].is_some(),

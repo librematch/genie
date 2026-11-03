@@ -32,8 +32,8 @@ use crate::objects::masters::MasterId;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
-use crate::unit_ai::UnitAiType;
+use crate::players::PlayerKind;
+use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{OrderKind, UnitAi};
 use crate::world::Seconds;
@@ -283,9 +283,9 @@ pub(crate) struct AttackReads {
     /// The swing's own sprites ([`Attack::set_swing`]): its terrain look's attack sprite and its
     /// master's special graphic.
     pub(crate) swing_sprites: SwingSprites,
-    /// The unit's player's type (`player+0x10`; [`PlayerType::is_computer`] is
+    /// The unit's player's type (`player+0x10`; [`PlayerKind::is_computer`] is
     /// `FUN_141659cf0`).
-    pub(crate) player_type: PlayerType,
+    pub(crate) player_kind: PlayerKind,
     /// The world's time (`FUN_1415300d0`), which a facing over time and the reload read.
     pub(crate) world_time: WorldTime,
     /// The unit AI's canMoveToAttack (slot 0x1d0, `FUN_140c48420`), which readyToAttack reads
@@ -300,7 +300,7 @@ pub(crate) struct AttackReads {
     /// The unit AI's order (`+0x3c`, `FUN_140c4cc20`).
     pub(crate) ai_order: AiOrder,
     /// The unit AI's factory type, None without a unit AI.
-    pub(crate) ai_type: Option<UnitAiType>,
+    pub(crate) ai_kind: Option<UnitAiKind>,
     /// `FUN_1412161a0`: a volley is under way (`next_volley`, `+0xa04`, not 0).
     pub(crate) volley_under_way: bool,
     /// The sprites a `MoveTo` of the Attack takes when the Attack gives none: the defaults of the
@@ -317,7 +317,7 @@ impl AttackReads {
         master: &Master,
         (masters, graphics): (OwnerMasters<'_>, &Graphics),
         ai: Option<&UnitAi>,
-        (player_type, now): (PlayerType, WorldTime),
+        (player_kind, now): (PlayerKind, WorldTime),
         roles: &Roles,
         turn_tuning: &TurnTuning,
     ) -> Self {
@@ -331,7 +331,7 @@ impl AttackReads {
             hit_chance: master.combat_part().hit_chance,
             armed: armed(master, combat.firepower, roles, turn_tuning),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
-            player_type,
+            player_kind,
             world_time: now,
             can_move: ai
                 .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE),
@@ -339,7 +339,7 @@ impl AttackReads {
             state_position: ai.map_or(Point::ORIGIN, |ai| ai.state_position),
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
-            ai_type: ai.map(|ai| ai.ai_type),
+            ai_kind: ai.map(|ai| ai.ai_kind),
             volley_under_way: combat.next_volley != MissileCount::ZERO,
             move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref(), roles),
         }

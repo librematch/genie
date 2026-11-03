@@ -7,7 +7,7 @@ use genie_core::GenieError;
 use genie_core::commands::Command;
 use genie_core::objects::ListIndex;
 use genie_core::objects::layers::Action;
-use genie_core::ownership::artifact::ARTIFACT_TYPE;
+use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::production::Production;
 use genie_core::vision::registry::{CLASSES, Registry};
 use genie_core::world::Tick;
@@ -237,7 +237,7 @@ pub fn word9_terms(
                 .actions_of(unit.id)
                 .list
                 .artifact()
-                .map_or(-1, |_| i32::from(ARTIFACT_TYPE.get())),
+                .map_or(-1, |_| i32::from(ARTIFACT_KIND.get())),
             state: turns
                 .parts
                 .actions_of(unit.id)

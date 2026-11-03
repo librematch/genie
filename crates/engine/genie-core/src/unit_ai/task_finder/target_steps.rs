@@ -125,7 +125,7 @@ pub(super) fn drop_off_finding<'m>(
         if let Some(task) = first(list, |task| {
             let gathers = matches!(task.action_kind, GATHER | HUNT);
             !(farm_at_work && gathers)
-                && task.attribute_type == held_kind
+                && task.attribute_kind == held_kind
                 && matches!(task.action_kind, GATHER | HUNT | ActionKind::TRADE)
                 && wanted(filter, task)
         }) {

@@ -115,7 +115,7 @@ pub(super) fn saved_missile(
         .actions()
         .and_then(|a| a.entries().next())
         .filter(|&(kind, _)| ActionKind::try_from(kind).ok() == Some(MISSILE))
-        .and_then(|(_, action)| action.rge_action_by_type.as_deref())
+        .and_then(|(_, action)| action.rge_action_by_kind.as_deref())
         .and_then(|t| t.rge_action_missile.as_deref())
         .map(|ma| ma.distance);
     Some(Missile {
@@ -511,7 +511,7 @@ pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
         flag: c.town_bell_flag != 0,
         work: BackToWork {
             target: ObjectId::of_field(c.back_to_work1_town_bell_target_id),
-            target_class: ClassId::of_param(c.back_to_work1_town_bell_target_type)?,
+            target_class: ClassId::of_param(c.back_to_work1_town_bell_target_kind)?,
             action: AiAction::of_field(c.back_to_work1_town_bell_action)?,
             target2: ObjectId::of_field(c.back_to_work1_town_bell_target_id2),
             point: Point::new(
@@ -521,7 +521,7 @@ pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
         },
         before_building: BackToWork {
             target: ObjectId::of_field(c.back_to_work2_town_bell_target_id),
-            target_class: ClassId::of_param(c.back_to_work2_town_bell_target_type)?,
+            target_class: ClassId::of_param(c.back_to_work2_town_bell_target_kind)?,
             action: AiAction::of_field(c.back_to_work2_town_bell_action)?,
             target2: ObjectId::of_field(c.back_to_work2_town_bell_target_id2),
             point: Point::new(
@@ -584,7 +584,7 @@ pub(super) fn construction(
         hit_points: MasterHitPoints::of_data(ms.read_temp_6),
         build_time,
         record: Obstruction {
-            kind: ObstructionKind::from(ms.obstruction_type),
+            kind: ObstructionKind::from(ms.obstruction_kind),
             class: ObstructionClass::from(ms.obstruction_class),
         },
         snow: Snow::of_byte(b.snow_flag)?,

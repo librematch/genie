@@ -137,7 +137,7 @@ pub struct BuildingMaster {
     /// `+0x98c`, `tech_id`: the technology its completion researches (−1 for none).
     pub tech: Option<TechId>,
     /// `+0x9bc`, `garrison_type`: the kinds of units it takes in (`FUN_14120eb10`).
-    pub garrison_type: GarrisonKinds,
+    pub garrison_kind: GarrisonKinds,
     /// `+0x9c0`, `garrison_heal_rate`: the hit points a second it gives the units inside.
     pub garrison_heal_rate: HitPoints,
     /// `+0x9c4`, `garrison_repair_rate`: its repair a second per villager inside.

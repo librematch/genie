@@ -18,7 +18,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::ATTACKER_MASTER;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -109,10 +109,10 @@ impl Unit {
     ) -> Result<HeadCode, GenieError> {
         let mut attack = *actions.list.attack().ok_or(NO_ATTACK)?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let player_type =
+        let player_kind =
             c.w.players
                 .get(c.player.index())
-                .map_or(PlayerType::PHANTOM, |q| q.kind);
+                .map_or(PlayerKind::PHANTOM, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -121,7 +121,7 @@ impl Unit {
                 &c.w.model.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
-            (player_type, c.w.world_time),
+            (player_kind, c.w.world_time),
             roles,
             &c.w.model.tuning.turn,
         );
@@ -150,10 +150,10 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.model.masters.of(c.player),
         )?;
-        let player_type =
+        let player_kind =
             c.w.players
                 .get(c.player.index())
-                .map_or(PlayerType::PHANTOM, |q| q.kind);
+                .map_or(PlayerKind::PHANTOM, |q| q.kind);
         let r = AttackReads::of(
             c.w.parts.combat_of(self.id),
             master,
@@ -162,7 +162,7 @@ impl Unit {
                 &c.w.model.graphics,
             ),
             c.w.parts.unit_ai.get(self.id),
-            (player_type, c.w.world_time),
+            (player_kind, c.w.world_time),
             roles,
             &c.w.model.tuning.turn,
         );

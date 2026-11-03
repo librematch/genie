@@ -42,14 +42,14 @@ pub fn class_has_flags(class: ClassId, flags: ClassFlags) -> bool {
 /// 775, 1715 and 1822 and monks for masters 1811 and 1808, whatever their class. The task
 /// finder's copy of the switch (`FUN_1412784d0`) leaves class 42 out (`with_42` false).
 #[must_use]
-pub fn garrison_type_takes(
-    garrison_type: GarrisonKinds,
+pub fn garrison_kind_takes(
+    garrison_kind: GarrisonKinds,
     class: ClassId,
     id: MasterId,
     with_42: bool,
     roles: &Roles,
 ) -> bool {
-    let bit = |kind| garrison_type.contains(kind);
+    let bit = |kind| garrison_kind.contains(kind);
     let by_class = {
         let held = roles.of_class(class);
         if held.intersects(ClassRoles::ARCHERY | ClassRoles::ARCHERY_CANNON) {
@@ -176,7 +176,7 @@ impl World {
     /// other takes a unit of type 70 or more when it is of type 80
     /// (an annex asks its main building, `+0xbb8`), above `GarrisonTuning::least_hp_share` of its master's hit
     /// points, with a capacity (`obj_max`), the unit's master with a garrison task on buildings
-    /// and of a kind the building's `garrison_type` takes ([`garrison_type_takes`]). Either then
+    /// and of a kind the building's `garrison_type` takes ([`garrison_kind_takes`]). Either then
     /// needs room for one more (slot 0x198 with no unit, [`World::has_room`]) unless `unchecked`
     /// (`param_5` not 0).
     pub(crate) fn takes_in_as(
@@ -241,8 +241,8 @@ impl World {
         ) {
             return Ok(false);
         }
-        let garrison_type = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_type);
-        if !garrison_type_takes(garrison_type, unit.class, unit.id, true, &self.model.roles) {
+        let garrison_kind = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_kind);
+        if !garrison_kind_takes(garrison_kind, unit.class, unit.id, true, &self.model.roles) {
             return Ok(false);
         }
         Ok(unchecked || self.has_room(bp, b, None)?)

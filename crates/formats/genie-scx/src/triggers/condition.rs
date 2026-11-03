@@ -1,6 +1,6 @@
 //! A trigger condition ([`TriggerCondition`]): when a trigger can fire.
 
-use crate::{Result, UnitTypeId};
+use crate::{Result, UnitKindId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use std::convert::TryInto;
 use std::io::{Read, Write};
@@ -8,7 +8,7 @@ use std::io::{Read, Write};
 /// A trigger condition, describing when a trigger can fire.
 #[derive(Debug, Default, Clone)]
 pub struct TriggerCondition {
-    pub(super) condition_type: i32,
+    pub(super) condition_kind: i32,
     pub(super) properties: Vec<i32>,
 }
 
@@ -21,7 +21,7 @@ impl TriggerCondition {
     // The format stores the property count as an i32; valid files never make it negative.
     #[allow(clippy::cast_sign_loss)]
     pub fn read_from(mut input: impl Read, version: f64) -> Result<Self> {
-        let condition_type = input.read_i32::<LE>()?;
+        let condition_kind = input.read_i32::<LE>()?;
         let num_properties = if version > 1.0 {
             input.read_i32::<LE>()?
         } else {
@@ -37,7 +37,7 @@ impl TriggerCondition {
         }
 
         Ok(Self {
-            condition_type,
+            condition_kind,
             properties,
         })
     }
@@ -50,7 +50,7 @@ impl TriggerCondition {
     // The format stores the property count as an i32.
     #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
     pub fn write_to(&self, mut output: impl Write, version: f64) -> Result<()> {
-        output.write_i32::<LE>(self.condition_type)?;
+        output.write_i32::<LE>(self.condition_kind)?;
         if version > 1.0 {
             output.write_i32::<LE>(self.properties.len() as i32)?;
             for value in &self.properties {
@@ -111,26 +111,26 @@ impl TriggerCondition {
 
     /// Get the raw "unit type" value for this trigger condition.
     #[must_use]
-    pub fn raw_unit_type(&self) -> i32 {
+    pub fn raw_unit_kind(&self) -> i32 {
         self.properties[4]
     }
 
     /// Set the raw "unit type" value for this trigger condition.
-    pub fn set_raw_unit_type(&mut self, unit_type: i32) {
-        self.properties[4] = unit_type;
+    pub fn set_raw_unit_kind(&mut self, unit_kind: i32) {
+        self.properties[4] = unit_kind;
     }
 
     /// Get the "unit type" value for this trigger condition.
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn unit_type(&self) -> Option<UnitTypeId> {
+    pub fn unit_kind(&self) -> Option<UnitKindId> {
         self.properties[4].try_into().ok()
     }
 
     /// Set the "unit type" value for this trigger condition.
-    pub fn set_unit_type(&mut self, unit_type: UnitTypeId) {
-        self.properties[4] = unit_type.into();
+    pub fn set_unit_kind(&mut self, unit_kind: UnitKindId) {
+        self.properties[4] = unit_kind.into();
     }
 
     /// Get the "player ID" value for this trigger condition.
@@ -215,13 +215,13 @@ impl TriggerCondition {
     ///
     /// None if the stored value is not a unit type ID, e.g. -1 when none is set.
     #[must_use]
-    pub fn object_type(&self) -> Option<UnitTypeId> {
+    pub fn object_kind(&self) -> Option<UnitKindId> {
         self.properties[14].try_into().ok()
     }
 
     /// Set the "Object Type" value for this trigger condition.
-    pub fn set_object_type(&mut self, object_type: UnitTypeId) {
-        self.properties[14] = i32::from(object_type);
+    pub fn set_object_kind(&mut self, object_kind: UnitKindId) {
+        self.properties[14] = i32::from(object_kind);
     }
 
     /// Get the "AI Signal" value for this trigger condition.

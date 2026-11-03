@@ -7,7 +7,7 @@ use crate::unit::SpriteList;
 use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_dat::sprite::SpriteId;
-use genie_support::{UnitTypeId, read_opt_u32};
+use genie_support::{UnitKindId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// The attributes every object has.
@@ -18,7 +18,7 @@ pub struct StaticUnitAttributes {
     /// The player who owns the object.
     pub owner_id: PlayerId,
     /// The object's unit type.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// The sprite the object shows.
     pub sprite_id: SpriteId,
     /// The object it is garrisoned in, if any.
@@ -47,7 +47,7 @@ pub struct StaticUnitAttributes {
     pub selected_group: Option<u8>,
     /// The attribute (resource) the object holds: the food of a sheep, the gold a villager
     /// carries.
-    pub attribute_type_held: u16,
+    pub attribute_kind_held: u16,
     /// The amount of that attribute.
     pub attribute_amount_held: f32,
     /// The number of units working on the object (gatherers, builders …).
@@ -84,7 +84,7 @@ impl StaticUnitAttributes {
     fn read_identity<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         Ok(Self {
             owner_id: input.read_u8()?.into(),
-            unit_type_id: input.read_u16::<LE>()?.into(),
+            unit_kind_id: input.read_u16::<LE>()?.into(),
             sprite_id: input.read_u16::<LE>()?.into(),
             garrisoned_in_id: read_opt_u32(input)?,
             hit_points: input.read_f32::<LE>()?,
@@ -113,7 +113,7 @@ impl StaticUnitAttributes {
                 id => Some(fits(id)?),
             };
         }
-        self.attribute_type_held = input.read_u16::<LE>()?;
+        self.attribute_kind_held = input.read_u16::<LE>()?;
         self.attribute_amount_held = input.read_f32::<LE>()?;
         self.worker_count = input.read_u8()?;
         self.current_damage = input.read_u8()?;

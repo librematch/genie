@@ -43,7 +43,7 @@ pub use self::unit_parts::{
 pub use self::units::{Civ, DamageGraphic, ResourceStorage, Task, Unit, UnitHeader};
 
 /// genieutils' unit types (`UT_*`).
-pub mod unit_type {
+pub mod unit_kind {
     /// Flags and other objects that move: the first type with a `speed`.
     pub const FLAG: u8 = 20;
     /// Dead units and fish: the first type with a movement part (`dead_fish`).

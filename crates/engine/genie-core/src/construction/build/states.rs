@@ -13,7 +13,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::{AiAction, OrderKind};
@@ -124,7 +124,7 @@ impl BuildAction {
         amount: Amount,
     ) -> Result<(), GenieError> {
         c.give_load(kind, amount)?;
-        builder.life.attribute_type = None;
+        builder.life.attribute_kind = None;
         builder.life.amount = Amount::ZERO;
         Ok(())
     }
@@ -144,7 +144,7 @@ impl BuildAction {
     ) -> Result<(), GenieError> {
         self.leave(c, builder)?;
         self.state = BuildState::Finished;
-        let (amount, kind) = (builder.life.amount, builder.life.attribute_type);
+        let (amount, kind) = (builder.life.amount, builder.life.attribute_kind);
         let Some(kind) = kind.filter(|_| reads.drop_site && Amount::ZERO < amount) else {
             return Ok(());
         };
@@ -404,10 +404,10 @@ impl BuildAction {
         walk: Option<MoveToAction>,
         mover: Option<&mut Mover>,
         builders: Option<&mut BuilderCount>,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
     ) -> Result<(), GenieError> {
         if self.state == BuildState::Work
-            || (matches!(self.state, BuildState::Move { .. }) && player_type.is_computer())
+            || (matches!(self.state, BuildState::Move { .. }) && player_kind.is_computer())
         {
             return Ok(());
         }

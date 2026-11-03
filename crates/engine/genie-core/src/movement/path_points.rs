@@ -15,7 +15,7 @@ use crate::movement::{EPSILON, Motion, PathData};
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use crate::pathing::tile_path::Path;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::generated::MovementTuning;
@@ -153,7 +153,7 @@ pub struct Planning<'a> {
     pub now: WorldTime,
     /// The owner's type (`player+0x10`): a computer player's (`FUN_141659cf0`) plans may stop
     /// near the goal.
-    pub player_type: PlayerType,
+    pub player_kind: PlayerKind,
     /// The Object stream (`DAT_143f07160`), which a long new path's repath time draws from.
     pub object: &'a mut Well512,
     /// The world's unit groups as they are now, which the long pather reads for a unit in a
@@ -167,7 +167,7 @@ impl Planning<'_> {
         Planning {
             pathing: &mut *self.pathing,
             now: self.now,
-            player_type: self.player_type,
+            player_kind: self.player_kind,
             object: &mut *self.object,
             groups: self.groups,
         }

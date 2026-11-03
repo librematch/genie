@@ -81,9 +81,9 @@ pub fn reward(
     multiplier: Option<Amount>,
     cost: &[CostSlot],
 ) -> Reward {
-    let out = task.attribute_type3;
+    let out = task.attribute_kind3;
     let mut rate = task.work_val1.get();
-    if task.attribute_type2.is_some()
+    if task.attribute_kind2.is_some()
         && let Some(m) = multiplier
     {
         rate *= m.get();

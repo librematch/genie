@@ -5,8 +5,8 @@ use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::SlotState;
-use crate::groups::TransformType;
-use crate::groups::UnitType;
+use crate::groups::TransformKind;
+use crate::groups::UnitKind;
 use crate::groups::formation::{CATEGORIES, EPSILON};
 use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
@@ -27,9 +27,9 @@ const CATEGORY_COUNT: usize = CATEGORIES as usize;
 pub(super) struct Category {
     pub(super) count: i32,
     pub(super) spacing: Distance,
-    pub(super) types: i32,
-    pub(super) unit_types: Vec<UnitType>,
-    pub(super) unit_type_counts: Vec<u32>,
+    pub(super) kinds: i32,
+    pub(super) unit_kinds: Vec<UnitKind>,
+    pub(super) unit_kind_counts: Vec<u32>,
 }
 
 /// The line and column counts of a sub-formation of `count` units for a line (`by_line`, the
@@ -126,7 +126,7 @@ pub(crate) fn column_line_slots(
     } else {
         FormationKind::LINE
     };
-    formation.transform_type = TransformType::BY_LINES;
+    formation.transform_kind = TransformKind::BY_LINES;
     formation.maximum_width = max_width;
     formation.maximum_depth = depth;
     formation.number_lines = depth;
@@ -139,7 +139,7 @@ pub(crate) fn column_line_slots(
     };
     let mut at = Cursor::default();
     for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
-        let Some(cat) = category(group, c).filter(|cat| 0 < cat.types) else {
+        let Some(cat) = category(group, c).filter(|cat| 0 < cat.kinds) else {
             continue;
         };
         lay_category(
@@ -158,15 +158,15 @@ pub(crate) fn column_line_slots(
 /// The statistic of the group's sub-formation of formation category `c`, none without one.
 fn category(group: &UnitGroup, c: FormationCategory) -> Option<Category> {
     let stat = group
-        .unit_types
+        .unit_kinds
         .iter()
         .find(|s| s.formation_category == c)?;
     Some(Category {
         count: stat.units.len() as i32,
         spacing: stat.desired_spacing,
-        types: stat.number_unit_types,
-        unit_types: stat.unit_types.clone(),
-        unit_type_counts: stat.unit_type_counts.clone(),
+        kinds: stat.number_unit_kinds,
+        unit_kinds: stat.unit_kinds.clone(),
+        unit_kind_counts: stat.unit_kind_counts.clone(),
     })
 }
 
@@ -258,30 +258,30 @@ struct Cursor {
 
 /// The unit type the next slot asks for (-1 for any: one unit type, or none left) and the slots
 /// each type has had in this category (`DAT_143f20640`, starting over per category).
-struct SubTypes {
+struct SubKinds {
     next: i32,
     used: [u32; 50],
 }
 
-impl SubTypes {
+impl SubKinds {
     /// The type after a slot of type `next` at column `col` of a line of `actual`: the next type
     /// round robin (with two types the last slot of a line keeps it for the next line); one whose
     /// units the slots used up passes to the next with units left, else to none.
     fn advance(&mut self, cat: &Category, col: i32, actual: i32) -> Result<(), GenieError> {
         *self.used.checked_mut(self.next as usize)? += 1;
-        let mut sub_type = self.next;
-        if cat.types != 2 || col < actual - 1 {
-            sub_type += 1;
+        let mut sub_kind = self.next;
+        if cat.kinds != 2 || col < actual - 1 {
+            sub_kind += 1;
         }
-        let next = if sub_type < cat.types { sub_type } else { 0 };
+        let next = if sub_kind < cat.kinds { sub_kind } else { 0 };
         self.next = next;
-        if *cat.unit_type_counts.checked(next as usize)? <= *self.used.checked(next as usize)? {
+        if *cat.unit_kind_counts.checked(next as usize)? <= *self.used.checked(next as usize)? {
             // out of units for that sub type: the next with units left, else none
-            let mut j = if next + 1 < cat.types { next + 1 } else { 0 };
+            let mut j = if next + 1 < cat.kinds { next + 1 } else { 0 };
             while j != next
-                && *cat.unit_type_counts.checked(j as usize)? <= *self.used.checked(j as usize)?
+                && *cat.unit_kind_counts.checked(j as usize)? <= *self.used.checked(j as usize)?
             {
-                j = if j + 1 < cat.types { j + 1 } else { 0 };
+                j = if j + 1 < cat.kinds { j + 1 } else { 0 };
             }
             self.next = if j == next { -1 } else { j };
         }
@@ -303,8 +303,8 @@ fn lay_category(
     at: &mut Cursor,
 ) -> Result<(), GenieError> {
     let group_tuning = style.group_tuning;
-    let mut subs = SubTypes {
-        next: if cat.types == 1 { -1 } else { 0 },
+    let mut subs = SubKinds {
+        next: if cat.kinds == 1 { -1 } else { 0 },
         used: [0u32; 50],
     };
     let mut single: BVector = scale(cat.spacing.get(), BVector::new(0.0, 0.0, -1.0));
@@ -393,7 +393,7 @@ fn line_start(
 
 /// The slots of one line from `total` on, a `single` step each: a flanked line's apart
 /// ([`flank_offset`]); each takes no unit, its offset, the time, the line as its depth, the
-/// category, its unit type ([`SubTypes`]), active, and keeps its transformed mark; the line
+/// category, its unit type ([`SubKinds`]), active, and keeps its transformed mark; the line
 /// takes its index, counted on over every line.
 fn lay_line(
     formation: &mut Formation,
@@ -402,14 +402,14 @@ fn lay_line(
     (actual, mut total, single): (i32, BVector, BVector),
     style: Style<'_>,
     at: &mut Cursor,
-    subs: &mut SubTypes,
+    subs: &mut SubKinds,
 ) -> Result<(), GenieError> {
     for col in 0..actual.max(0) {
         let i = at.used_slots + col as usize;
         let desired_sub_category = if subs.next < 0 {
-            UnitType::NONE
+            UnitKind::NONE
         } else {
-            *cat.unit_types.checked(subs.next as usize)?
+            *cat.unit_kinds.checked(subs.next as usize)?
         };
         *formation.slot_mut(i)? = Slot {
             unit_id: None,

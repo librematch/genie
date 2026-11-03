@@ -16,7 +16,7 @@ use crate::players::history::History;
 use crate::players::tracker::Tracker;
 use crate::players::world_player::VictoryTimes;
 use crate::players::{
-    ByPlayer, Chance, CivId, EscrowShare, LotVolume, PlayerType, Relations, Stance,
+    ByPlayer, Chance, CivId, EscrowShare, LotVolume, PlayerKind, Relations, Stance,
 };
 use crate::technology::{Attributes, TechState};
 use crate::trace::{player_stops, player_unsupported};
@@ -92,7 +92,7 @@ pub struct Player {
     pub objects: ObjectList,
     /// `player+0x10`, the player's type (the save's class byte): 1 human, 2 Gaia, 3 computer
     /// (0 the scenario editor's phantom).
-    pub kind: PlayerType,
+    pub kind: PlayerKind,
     /// Every attribute (`player+0x100`, count `+0x90`): the first four are food, wood, stone and
     /// gold ([`Player::resources`]).
     pub attributes: Vec<Amount>,

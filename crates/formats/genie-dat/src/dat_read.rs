@@ -241,8 +241,8 @@ fn read_civilizations(
 ) -> Result<Vec<Civilization>> {
     let num_civilizations = input.read_u16::<LE>()?;
     read_array(num_civilizations.into(), || {
-        let player_type = input.read_i8()?;
-        if player_type != 1 {
+        let player_kind = input.read_i8()?;
+        if player_kind != 1 {
             return Err(invalid_data("a civilization whose player type is not 1"));
         }
         Civilization::read_from(&mut input, game_version)

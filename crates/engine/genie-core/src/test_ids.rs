@@ -14,7 +14,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::technology::TechId;
-use crate::unit_ai::OrderTargetType;
+use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::best_target::AttackCategory;
 
 /// The object id `value` (not −1); const, so a test's constants name objects too.
@@ -75,8 +75,8 @@ pub(crate) fn class_of(value: i16) -> Option<ClassId> {
 }
 
 /// A queued order's target type `value`, or none for −1.
-pub(crate) fn order_type(value: i32) -> Option<OrderTargetType> {
-    OrderTargetType::of_field(value).expect("a test's target type is −1 or more")
+pub(crate) fn order_kind(value: i32) -> Option<OrderTargetKind> {
+    OrderTargetKind::of_field(value).expect("a test's target type is −1 or more")
 }
 
 /// A queued order's target owner `value`, or none for −1.

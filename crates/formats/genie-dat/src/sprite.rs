@@ -128,7 +128,7 @@ pub struct Sprite {
     /// Time to wait until the animation sequence is started again.
     pub replay_delay: f32,
     /// Animation sequence type (genieutils' `SequenceType`); not decoded here.
-    pub sequence_type: u8,
+    pub sequence_kind: u8,
     /// How the angles that are not stored are mirrored (genieutils' `MirroringMode`).
     pub mirror_flag: i8,
     /// editor flag?
@@ -277,7 +277,7 @@ impl Sprite {
         sprite.base_speed = input.read_f32::<LE>()?;
         sprite.frame_rate = input.read_f32::<LE>()?;
         sprite.replay_delay = input.read_f32::<LE>()?;
-        sprite.sequence_type = input.read_u8()?;
+        sprite.sequence_kind = input.read_u8()?;
         sprite.id = input.read_u16::<LE>()?.into();
         sprite.mirror_flag = input.read_i8()?;
         sprite.other_flag = input.read_i8()?;
@@ -322,7 +322,7 @@ impl Sprite {
         output.write_f32::<LE>(self.base_speed)?;
         output.write_f32::<LE>(self.frame_rate)?;
         output.write_f32::<LE>(self.replay_delay)?;
-        output.write_u8(self.sequence_type)?;
+        output.write_u8(self.sequence_kind)?;
         output.write_u16::<LE>(self.id.into())?;
         output.write_i8(self.mirror_flag)?;
         output.write_i8(self.other_flag)?;

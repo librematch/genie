@@ -1,4 +1,4 @@
-use crate::{DrsHeader, DrsResource, DrsTable, IntoResourceType, ResourceType};
+use crate::{DrsHeader, DrsResource, DrsTable, IntoResourceKind, ResourceKind};
 use byteorder::{LE, WriteBytesExt};
 use std::fmt::{Debug, Error, Formatter};
 use std::io::{self, Read, Seek, SeekFrom, Write};
@@ -38,7 +38,7 @@ where
     fn add_resource(
         &mut self,
         drs: &mut InnerDrsWriter<W>,
-        table: ResourceType,
+        table: ResourceKind,
         resource: DrsResource,
         data: &mut dyn Read,
     ) -> Result<DrsResource, io::Error>;
@@ -56,7 +56,7 @@ where
 /// This works best for archives with small files.
 #[derive(Debug, Default)]
 pub struct InMemoryStrategy {
-    resources: Vec<(ResourceType, Vec<u8>)>,
+    resources: Vec<(ResourceKind, Vec<u8>)>,
 }
 
 impl<W> Strategy<W> for InMemoryStrategy
@@ -70,7 +70,7 @@ where
     fn add_resource(
         &mut self,
         _drs: &mut InnerDrsWriter<W>,
-        table: ResourceType,
+        table: ResourceKind,
         mut resource: DrsResource,
         data: &mut dyn Read,
     ) -> Result<DrsResource, io::Error> {
@@ -117,7 +117,7 @@ where
 
         for table in &drs.tables {
             let mut data = self.resources.iter().filter_map(|(t, bytes)| {
-                if table.resource_type == *t {
+                if table.resource_kind == *t {
                     Some(bytes)
                 } else {
                     None
@@ -177,7 +177,7 @@ where
     fn add_resource(
         &mut self,
         drs: &mut InnerDrsWriter<W>,
-        _table: ResourceType,
+        _table: ResourceKind,
         mut resource: DrsResource,
         data: &mut dyn Read,
     ) -> Result<DrsResource, io::Error> {
@@ -203,7 +203,7 @@ where
 
         // Update the resource type count
         let _ = drs.output.seek(SeekFrom::Start(56))?;
-        drs.output.write_u32::<LE>(drs.header.num_resource_types)?;
+        drs.output.write_u32::<LE>(drs.header.num_resource_kinds)?;
         let _ = drs.output.seek(SeekFrom::Current(4))?;
 
         // Assign table offsets
@@ -339,11 +339,11 @@ where
     /// the file is 4 GiB or larger, or, with [`ReserveDirectoryStrategy`], if more files are
     /// added than were reserved.
     #[inline]
-    pub fn add(&mut self, t: impl IntoResourceType, id: u32, data: impl Read) -> io::Result<()> {
-        self.add_inner(t.into_resource_type()?, id, data)
+    pub fn add(&mut self, t: impl IntoResourceKind, id: u32, data: impl Read) -> io::Result<()> {
+        self.add_inner(t.into_resource_kind()?, id, data)
     }
 
-    fn add_inner(&mut self, t: ResourceType, id: u32, mut data: impl Read) -> io::Result<()> {
+    fn add_inner(&mut self, t: ResourceKind, id: u32, mut data: impl Read) -> io::Result<()> {
         let res = DrsResource {
             id,
             offset: 0, // TBD
@@ -358,7 +358,7 @@ where
             .inner
             .tables
             .iter_mut()
-            .find(|table| table.resource_type == t)
+            .find(|table| table.resource_kind == t)
         {
             table.add(res);
         } else {
@@ -378,7 +378,7 @@ where
     /// if there are `u32::MAX` or more tables or resources, or, with
     /// [`ReserveDirectoryStrategy`], more tables than were reserved.
     pub fn flush(mut self) -> io::Result<W> {
-        self.inner.header.num_resource_types = u32::try_from(self.inner.tables.len())
+        self.inner.header.num_resource_kinds = u32::try_from(self.inner.tables.len())
             .ok()
             .filter(|&n| n < u32::MAX)
             .ok_or_else(|| invalid("too many tables"))?;
@@ -430,7 +430,7 @@ mod test {
 
     /// A resource type of more than 4 bytes or of bytes that are no UTF-8 fails to add.
     #[test]
-    fn bad_resource_type_fails_to_add() -> anyhow::Result<()> {
+    fn bad_resource_kind_fails_to_add() -> anyhow::Result<()> {
         let mut drs = DrsWriter::new(Cursor::new(vec![]), InMemoryStrategy::default())?;
         assert!(invalid(&drs.add("toolong", 1, &b"a"[..]).unwrap_err()));
         assert!(invalid(&drs.add(&[0xff_u8][..], 1, &b"a"[..]).unwrap_err()));
@@ -441,10 +441,10 @@ mod test {
     /// A resource type reads back as the text it was given, and one stored as no UTF-8 does not
     /// read.
     #[test]
-    fn resource_type_reads_back_or_does_not_read() {
-        let slp = ResourceType::try_from(*b" pls").unwrap();
+    fn resource_kind_reads_back_or_does_not_read() {
+        let slp = ResourceKind::try_from(*b" pls").unwrap();
         assert_eq!(slp.to_string(), "slp");
-        assert!(ResourceType::try_from([0xff, 0, 0, 0]).is_err());
+        assert!(ResourceKind::try_from([0xff, 0, 0, 0]).is_err());
         let mut table = [0_u8; 12];
         table[..4].copy_from_slice(&[0xff, 0, 0, 0]);
         assert!(invalid(&DrsTable::from(&mut &table[..]).unwrap_err()));

@@ -109,7 +109,7 @@ fn group_lines(out: &mut String, u: &UnitGroup) {
         "  command {} target {} type {} range {} waypoints {waypoints:?} orders {} commands {} spacing {}",
         u.current_command,
         u.current_target.target,
-        u.current_target.type_,
+        u.current_target.kind,
         u.current_target.range,
         u.order_queue.len(),
         u.command_queue.len(),
@@ -123,10 +123,10 @@ fn formation_lines(out: &mut String, name: &str, f: &Formation) {
     let _ = writeln!(
         out,
         "  {name} formation type {} slots {} lines {} transform {} orientation {:?}",
-        f.type_,
+        f.kind,
         f.number_slots,
         f.number_lines,
-        f.transform_type,
+        f.transform_kind,
         vec3(&f.transform_orientation)
     );
     for slot in &f.slots {
@@ -173,7 +173,7 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> Result
         if actions_of == Some(s.id) {
             let _ = writeln!(out, "{:#?}", action_object(object).map(|a| &a.actions));
         }
-        let top = action_object(object).and_then(|a| a.actions.action_type_list.first());
+        let top = action_object(object).and_then(|a| a.actions.action_kind_list.first());
         let (action, state) = top.map_or((-1, String::new()), |e| {
             let debug = format!("{:?}", e.action);
             let state = debug
@@ -182,7 +182,7 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> Result
                 .and_then(|r| r.split([',', ' ']).next())
                 .unwrap_or("")
                 .to_string();
-            (e.action_type, state)
+            (e.action_kind, state)
         });
         let retarget = object
             .combat()
@@ -213,8 +213,8 @@ fn sprite_column(s: &RgeStaticObject) -> String {
     let nodes = || {
         s.active_sprite_list
             .iter()
-            .flat_map(|l| l.sprite_type_list.iter())
-            .filter_map(|e| e.type_.as_deref())
+            .flat_map(|l| l.sprite_kind_list.iter())
+            .filter_map(|e| e.kind.as_deref())
     };
     let node = nodes()
         .filter_map(|n| n.rge_active_animated_sprite.as_deref())
@@ -374,14 +374,14 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> Result<String, Er
             ai.current_order_value,
             ai.current_action_value,
             ai.current_target_value,
-            ai.current_target_type_value,
+            ai.current_target_kind_value,
             ai.current_target_xvalue,
             ai.current_target_yvalue,
             ai.current_target_zvalue,
             ai.last_order_value,
             ai.last_action_value,
             ai.last_target_value,
-            ai.last_target_type_value
+            ai.last_target_kind_value
         );
         let _ = writeln!(
             out,

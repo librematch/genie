@@ -9,7 +9,7 @@ use crate::math::rng::Well512;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::orders::Dispatch;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderKind;
@@ -44,7 +44,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -59,11 +59,11 @@ impl UnitAi {
         }
         let attack = AiAction::Attack.value();
         if p0 == attack && (order == Some(OrderKind::Attack) || action == Some(AiAction::Attack)) {
-            let produced = self.process_idle(at, player_type, ai, side)?;
+            let produced = self.process_idle(at, player_kind, ai, side)?;
             if produced {
                 return Ok(PRODUCED);
             }
-            if player_type.is_computer() {
+            if player_kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's failed attack without a new action",
                 ));
@@ -113,7 +113,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -125,11 +125,11 @@ impl UnitAi {
                     "an invalidated attack with retargeting off (+0x1d6)",
                 ));
             }
-            let produced = self.process_idle(at, player_type, ai, side)?;
+            let produced = self.process_idle(at, player_kind, ai, side)?;
             if produced {
                 return Ok(GO_ON);
             }
-            if player_type.is_computer() {
+            if player_kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "a computer player's invalidated attack (slot 0x130)",
                 ));
@@ -169,7 +169,7 @@ impl UnitAi {
         &mut self,
         n: Notify,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
@@ -188,7 +188,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         if order == Some(OrderKind::Attack) && p1 == attack {
-            if self.process_idle(at, player_type, ai_rng, side)? {
+            if self.process_idle(at, player_kind, ai_rng, side)? {
                 return Ok(PRODUCED);
             }
             self.remove_target();
@@ -446,7 +446,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         if !self.notifies.is_empty() || self.orders.is_empty() {
@@ -456,7 +456,7 @@ impl UnitAi {
             return Ok(());
         }
         if self.can_order(at, false) {
-            self.run_orders(at, side, player_type, ai)?;
+            self.run_orders(at, side, player_kind, ai)?;
         }
         Ok(())
     }
@@ -512,7 +512,7 @@ impl UnitAi {
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
@@ -525,7 +525,7 @@ impl UnitAi {
             let order = *self.orders.checked(k)?;
             let r = self.process_order(
                 &order,
-                Some((at, player_type)),
+                Some((at, player_kind)),
                 None,
                 ai,
                 side,

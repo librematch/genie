@@ -1,5 +1,5 @@
 use crate::Result;
-use crate::types::{DataSet, DlcPackage, ScxVersion};
+use crate::values::{DataSet, DlcPackage, ScxVersion};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{ReadStringsExt, write_opt_i32_str};
 use std::convert::TryFrom;

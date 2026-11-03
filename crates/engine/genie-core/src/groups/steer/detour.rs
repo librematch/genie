@@ -24,7 +24,7 @@ use crate::objects::ObjectId;
 use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Request;
 use crate::pathing::tile_path::{Found, Path};
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterRoles;
@@ -180,10 +180,10 @@ impl World {
                 radius: Distance::new(grow),
                 ..mover.walker(id)
             },
-            player_type: self
+            player_kind: self
                 .players
                 .get(p.index())
-                .map_or(PlayerType::PHANTOM, |q| q.kind),
+                .map_or(PlayerKind::PHANTOM, |q| q.kind),
             at: u.moved_vector(self.parts.mover_of(u.id)),
             here: u.position(),
             mask: mover.stats.restriction_mask,
@@ -231,7 +231,7 @@ impl World {
             let from = r.at.ground();
             let res = self.round_short(
                 r.walker,
-                r.player_type,
+                r.player_kind,
                 from,
                 to,
                 r.differentiators,
@@ -278,7 +278,7 @@ impl World {
             let from = r.at.ground();
             way.result = self.round_short(
                 r.walker,
-                r.player_type,
+                r.player_kind,
                 from,
                 step,
                 r.differentiators,
@@ -326,7 +326,7 @@ impl World {
             let from = r.at.ground();
             way.result = self.round_short(
                 r.walker,
-                r.player_type,
+                r.player_kind,
                 from,
                 place,
                 r.differentiators,
@@ -373,7 +373,7 @@ impl World {
     pub(super) fn round_short(
         &mut self,
         walker: Walker,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         from: Point,
         to: BVector,
         ignore: &[ObjectId],
@@ -390,7 +390,7 @@ impl World {
         let mut plan = Planning {
             pathing: &mut self.pathing,
             now: self.world_time,
-            player_type,
+            player_kind,
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
@@ -418,10 +418,10 @@ impl World {
     ) -> Result<(bool, Path), GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
-        let player_type = self
+        let player_kind = self
             .players
             .get(p.index())
-            .map_or(PlayerType::PHANTOM, |q| q.kind);
+            .map_or(PlayerKind::PHANTOM, |q| q.kind);
         let walker = LongWalker {
             id,
             position: u.position(),
@@ -440,7 +440,7 @@ impl World {
             &walker,
             from,
             &self.spatial,
-            player_type,
+            player_kind,
             (to, 0.0),
             None,
             ObjectsRef::new(
@@ -491,7 +491,7 @@ impl World {
 pub(super) struct Rounder<'d> {
     pub(super) id: ObjectId,
     pub(super) walker: Walker,
-    pub(super) player_type: PlayerType,
+    pub(super) player_kind: PlayerKind,
     pub(super) at: BVector,
     pub(super) here: Position,
     pub(super) mask: TerrainMask,

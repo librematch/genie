@@ -13,12 +13,12 @@ use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
-use crate::groups::TransformType;
-use crate::groups::UnitType;
+use crate::groups::TransformKind;
+use crate::groups::UnitKind;
 use crate::groups::update::TRADE_CART_SPRITES;
 use crate::groups::{
     Formation, FormationLine, GroupCommand, GroupOrder, Slot, SpecificMove, TargetData,
-    UnitTypeStatistic,
+    UnitKindStatistic,
 };
 use crate::groups::{GroupTarget, Member, UnitGroup, UnitGroups};
 use crate::map::Distance;
@@ -930,7 +930,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::ATTACK;
     g.current_formation = Some(Formation {
-        kind: FormationKind::TYPE_6,
+        kind: FormationKind::KIND_6,
         ..Formation::default()
     });
     set(&mut t, 0, 6.0);
@@ -1770,7 +1770,7 @@ fn grounded() -> World {
     t.spatial.sight.as_mut().unwrap().registry = Some(Registry::new(4, 65));
     for p in PlayerId::each(4).skip(1) {
         for u in &mut t.players[p.index()].objects {
-            t.parts.unit_ai.get_mut(u.id).unwrap().ai_type = SOLDIER_AI;
+            t.parts.unit_ai.get_mut(u.id).unwrap().ai_kind = SOLDIER_AI;
             t.parts.put_mover(
                 u.id,
                 Some(Mover {
@@ -1858,7 +1858,7 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
             offset: BVector::new(x - 2.0, 0.0, 0.0),
             transform_position: BVector::new(x + 2.0, 0.0, 4.0),
             desired_category: FormationCategory::named(1),
-            desired_sub_category: UnitType::NONE,
+            desired_sub_category: UnitKind::NONE,
             active: 1,
             transformed: 1,
             ..Slot::default()
@@ -1866,7 +1866,7 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_formation = Some(Formation {
             kind: FormationKind::LINE,
-            transform_type: TransformType::TURNED,
+            transform_kind: TransformKind::TURNED,
             transform_orientation: BVector::new(0.0, 0.0, 1.0),
             slots: vec![slot(1.0), slot(2.0), slot(3.0)],
             ..Formation::new()
@@ -1947,10 +1947,10 @@ fn attacking(t: &mut World) {
         original_position: BVector::new(3.5, 0.0, 3.5),
         ..TargetData::default()
     };
-    g.unit_types = vec![UnitTypeStatistic {
+    g.unit_kinds = vec![UnitKindStatistic {
         formation_category: FormationCategory::named(1),
         units: vec![object_id(10), object_id(11), object_id(12)],
-        ..UnitTypeStatistic::default()
+        ..UnitKindStatistic::default()
     }];
     g.flags = GroupFlags::NONE;
     g.motion.maximum_velocity_forward = Speed::new(1.0);
@@ -2091,7 +2091,7 @@ fn an_attack_releases_category_in_reach_or_arrived() {
     for m in &mut t.groups.get_mut(group_id(1)).unwrap().members {
         m.specific_move.reason = MoveReason::of_data(5);
     }
-    t.groups.get_mut(group_id(1)).unwrap().unit_types.clear();
+    t.groups.get_mut(group_id(1)).unwrap().unit_kinds.clear();
     t.groups.get_mut(group_id(1)).unwrap().flags = GroupFlags::ATTACKING;
     assert!(t.attack_update(group_id(1), &mut relayout).unwrap());
     assert_eq!(

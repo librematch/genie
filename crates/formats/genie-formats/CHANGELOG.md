@@ -17,7 +17,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 * **(breaking)** cpx: update genie-scx to v3.0.0.
 * cpx: support reading and writing AoE1: Definitive Edition campaign files. (#18)
 * dat: Add a `.dat` file reader with support for The Conquerors and the HD Edition. It has some writing support but makes no guarantees yet.
-* drs: make `ResourceType` act more like a `&str`. (#15)
+* drs: make `ResourceKind` act more like a `&str`. (#15)
 * lang: disable unused `pelite` features for leaner DLL reading.
 * rec: Add a recorded game file reader with support for Age of Kings and The Conquerors. (#8)
 * scx: support writing embedded AI information and triggers. (#17, #28)

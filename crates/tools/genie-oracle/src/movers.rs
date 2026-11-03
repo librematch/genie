@@ -12,7 +12,7 @@ use genie_core::map::{Position, Radii};
 use genie_core::math::Angle;
 use genie_core::math::fmath::BVector;
 use genie_core::movement::LevelFlags;
-use genie_core::movement::LinkedPathType;
+use genie_core::movement::LinkedPathKind;
 use genie_core::movement::PathFlags;
 use genie_core::movement::PlanTries;
 use genie_core::movement::Speed;
@@ -53,7 +53,7 @@ pub(super) fn path_level(d: &PathData, paths: &[Path]) -> Result<MovementPathDat
     };
     Ok(MovementPathData {
         level: WaypointLevel::of_byte(d.waypoint_level),
-        linked_type: LinkedPathType::of_data(d.linked_path_type),
+        linked_kind: LinkedPathKind::of_data(d.linked_path_kind),
         points: path.map_or_else(Vec::new, |p| p.waypoints.iter().map(vec3).collect()),
         has_path: path.is_some(),
         path_flags: PathFlags::from_bits_retain(path.map_or(0, |p| p.flags_bits)),

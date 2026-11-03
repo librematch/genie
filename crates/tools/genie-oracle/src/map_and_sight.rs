@@ -18,7 +18,7 @@ use genie_core::objects::masters::ObstructionKind;
 use genie_core::objects::masters::{MasterId, MasterKind};
 use genie_core::ownership::CaptureKind;
 use genie_core::players::PlayerId;
-use genie_core::players::{PlayerType, UnitRelation};
+use genie_core::players::{PlayerKind, UnitRelation};
 use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::vision::visibility::{
@@ -46,7 +46,7 @@ pub(super) fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
         .flat_map(|r| {
             r.tiles
                 .iter()
-                .map(|t| TileTerrain::of_save(t.terrain_type, t.restore_terrain_type, t.layer))
+                .map(|t| TileTerrain::of_save(t.terrain_kind, t.restore_terrain_kind, t.layer))
         })
         .collect();
     let mut t = Terrain::new(
@@ -86,7 +86,7 @@ pub(super) fn saved_terrain(header: &Header) -> (usize, Vec<(u8, u8, i16)>) {
         .flat_map(|r| {
             r.tiles
                 .iter()
-                .map(|t| (t.terrain_type, t.restore_terrain_type, t.layer))
+                .map(|t| (t.terrain_kind, t.restore_terrain_kind, t.layer))
         })
         .collect();
     (map.map_width as usize, tiles)
@@ -166,7 +166,7 @@ pub(super) fn spatial(
     let classes = map
         .rows
         .iter()
-        .flat_map(|r| r.tiles.iter().map(|t| terrain.class(t.terrain_type)))
+        .flat_map(|r| r.tiles.iter().map(|t| terrain.class(t.terrain_kind)))
         .collect();
     let tiles = Tiles::new(GridSize::new(map.map_width, map.map_height), classes);
     let mut out = Spatial::with_tiles(GridSize::new(map.map_width, map.map_height), tiles);
@@ -343,7 +343,7 @@ pub(super) fn saved_sight(header: &Header) -> Result<Visibility, genie_core::Gen
         umv.umv_data_list_size,
         players
             .iter()
-            .map(|p| PlayerType::from(p.world_player().type_))
+            .map(|p| PlayerKind::from(p.world_player().kind))
             .collect(),
     );
     sight.resources = players

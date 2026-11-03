@@ -41,7 +41,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::sprite::new_sprite;
 use crate::objects::{Graphics, ObjectState};
-use crate::ownership::artifact::{ARTIFACT_TYPE, SubActionsGone};
+use crate::ownership::artifact::{ARTIFACT_KIND, SubActionsGone};
 use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitStance;
 use crate::world::layer::ClassRoles;
@@ -265,7 +265,7 @@ impl Unit {
                 | MAKE
                 | WAIT_SOLIDIFY,
             ) => Ok(PointMove::Declined),
-            Some(ARTIFACT_TYPE) => {
+            Some(ARTIFACT_KIND) => {
                 let sprites = self.point_sprites(sprites)?;
                 self.artifact_takes_point(
                     actions,

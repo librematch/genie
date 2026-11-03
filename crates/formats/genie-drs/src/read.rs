@@ -1,4 +1,4 @@
-use super::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceType};
+use super::{DrsHeader, DrsResource, DrsTable, DrsTableIterator, ResourceKind};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom};
 
 /// A DRS archive reader.
@@ -31,7 +31,7 @@ impl DrsReader {
 
     /// Read the list of tables the header counts.
     fn read_tables<R: Read + Seek>(&mut self, handle: &mut R) -> Result<(), Error> {
-        for _ in 0..self.header.num_resource_types {
+        for _ in 0..self.header.num_resource_kinds {
             let table = DrsTable::from(handle)?;
             self.tables.push(table);
         }
@@ -48,26 +48,26 @@ impl DrsReader {
 
     /// Get the table for the given resource type.
     #[must_use]
-    pub fn get_table(&self, resource_type: ResourceType) -> Option<&DrsTable> {
+    pub fn get_table(&self, resource_kind: ResourceKind) -> Option<&DrsTable> {
         self.tables
             .iter()
-            .find(|table| table.resource_type == resource_type)
+            .find(|table| table.resource_kind == resource_kind)
     }
 
     /// Get a resource of a given type and ID.
     #[must_use]
-    pub fn get_resource(&self, resource_type: ResourceType, id: u32) -> Option<&DrsResource> {
-        self.get_table(resource_type)
+    pub fn get_resource(&self, resource_kind: ResourceKind, id: u32) -> Option<&DrsResource> {
+        self.get_table(resource_kind)
             .and_then(|table| table.get_resource(id))
     }
 
     /// Get the type of a resource with the given ID.
     #[must_use]
-    pub fn get_resource_type(&self, id: u32) -> Option<ResourceType> {
+    pub fn get_resource_kind(&self, id: u32) -> Option<ResourceKind> {
         self.tables
             .iter()
             .find(|table| table.get_resource(id).is_some())
-            .map(|table| table.resource_type)
+            .map(|table| table.resource_kind)
     }
 
     /// Get a `Read`er for the given resource.
@@ -82,11 +82,11 @@ impl DrsReader {
     pub fn get_resource_reader<R: Read + Seek>(
         &self,
         mut handle: R,
-        resource_type: ResourceType,
+        resource_kind: ResourceKind,
         id: u32,
     ) -> Result<impl Read, Error> {
         let &DrsResource { size, offset, .. } = self
-            .get_resource(resource_type, id)
+            .get_resource(resource_kind, id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, "Resource not found in this archive"))?;
 
         let _ = handle.seek(SeekFrom::Start(u64::from(offset)))?;
@@ -103,14 +103,14 @@ impl DrsReader {
     pub fn read_resource<R: Read + Seek>(
         &self,
         handle: &mut R,
-        resource_type: ResourceType,
+        resource_kind: ResourceKind,
         id: u32,
     ) -> Result<Box<[u8]>, Error> {
         let mut buf = vec![];
 
         // The byte count is `buf.len()`.
         let _ = self
-            .get_resource_reader(handle, resource_type, id)?
+            .get_resource_reader(handle, resource_kind, id)?
             .read_to_end(&mut buf)?;
 
         Ok(buf.into_boxed_slice())

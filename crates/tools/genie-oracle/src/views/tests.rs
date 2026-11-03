@@ -10,7 +10,7 @@ use genie_core::players::CivId;
 use genie_rec::de::{Chapter, Checkpoint, Op};
 use genie_save::generated::world::{
     Action, ActionListEntry1, Formation, FormationEntry1, Path, PathData, RgeAction,
-    RgeActionByType, TribeElephantUnitAiModule, UnitAiModule, UnitGroup, UnitGroupEntry1,
+    RgeActionByKind, TribeElephantUnitAiModule, UnitAiModule, UnitGroup, UnitGroupEntry1,
 };
 use std::iter::once;
 
@@ -26,12 +26,12 @@ fn vec3(v: [f32; 3]) -> [u8; 12] {
 /// An Explore action (type 4) in state `state`.
 fn explore(state: u8) -> Action {
     Action {
-        rge_action_by_type: Some(Box::new(RgeActionByType {
+        rge_action_by_kind: Some(Box::new(RgeActionByKind {
             rge_action_explore: Some(Box::new(RgeAction {
                 state,
                 ..RgeAction::default()
             })),
-            ..RgeActionByType::default()
+            ..RgeActionByKind::default()
         })),
         ..Action::default()
     }
@@ -44,10 +44,10 @@ fn with_actions(id: i32, actions: Vec<(i16, Action)>) -> genie_save::Object {
         .rge_combat_object
         .rge_action_object
         .actions
-        .action_type_list = actions
+        .action_kind_list = actions
         .into_iter()
-        .map(|(action_type, action)| ActionListEntry1 {
-            action_type,
+        .map(|(action_kind, action)| ActionListEntry1 {
+            action_kind,
             action: Some(Box::new(action)),
         })
         .chain(once(ActionListEntry1::default()))
@@ -70,7 +70,7 @@ fn group_view_lists_its_units_formations_and_command() {
             ..UnitGroupEntry1::default()
         }],
         previous_formation: Some(Box::new(Formation {
-            type_: 4,
+            kind: 4,
             slots: vec![FormationEntry1 {
                 slots_unit_id: 700,
                 ..FormationEntry1::default()
@@ -140,7 +140,7 @@ fn an_object_view_has_row_per_live_object() {
     // an idle object's list holds its end entry alone (type 0), as a save's does
     assert_eq!(rows[2], "6\t4\t0\t0\t0\t0\t0\t0\t\t\t0 -");
     let with_list = objects_of(&save, 0, Some(5)).unwrap();
-    assert!(with_list.contains("action_type_list"), "{with_list}");
+    assert!(with_list.contains("action_kind_list"), "{with_list}");
     assert!(matches!(
         objects_of(&save, 1, None),
         Err(Error::NoPlayer(1))

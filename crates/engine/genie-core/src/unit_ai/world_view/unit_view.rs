@@ -14,7 +14,7 @@ use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{UnitView, WorldPicker};
 use crate::unit_ai::{Seeker, can_attack};
@@ -156,8 +156,8 @@ impl UnitView<'_, '_> {
                 return Ok(false);
             }
         }
-        let player_type = if owner == self.player {
-            self.player_type
+        let player_kind = if owner == self.player {
+            self.player_kind
         } else {
             owner_view(
                 &self.c.w.players,
@@ -167,7 +167,7 @@ impl UnitView<'_, '_> {
             )?
             .players()
             .player(owner)
-            .map_or(PlayerType::PHANTOM, |q| q.kind)
+            .map_or(PlayerKind::PHANTOM, |q| q.kind)
         };
         let capture = self
             .c
@@ -179,9 +179,9 @@ impl UnitView<'_, '_> {
             .map_or(CaptureKind::NONE, |s| s.capture);
         let me = u.attacker_of(
             actions,
-            ai.ai_type,
+            ai.ai_kind,
             Some(m),
-            (owner, player_type),
+            (owner, player_kind),
             self.attacker.scenario,
             (
                 capture,

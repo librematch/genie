@@ -618,14 +618,14 @@ pub(crate) fn reads() -> AttackReads {
         hit_chance: HitChance::of_data(100),
         armed: true,
         swing_sprites: SwingSprites::default(),
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         world_time: WorldTime::ZERO,
         can_move: true,
         stance: UnitStance::AGGRESSIVE,
         state_position: Point::ORIGIN,
         queue_empty: true,
         ai_order: AiOrder::Idle,
-        ai_type: None,
+        ai_kind: None,
         volley_under_way: false,
     }
 }
@@ -1267,9 +1267,9 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
 /// Another predator's unit AI is not modelled.
 #[test]
 fn an_attack_on_target_out_of_sight_fails() {
-    let run = |a: &mut Attack, class, ai_type, queue_empty| {
+    let run = |a: &mut Attack, class, ai_kind, queue_empty| {
         let mut rig = Rig::on_the_path(Victim::default()).holding(77, PlayerId::new(1));
-        (rig.f.own.class, rig.r.ai_type, rig.r.queue_empty) = (class, ai_type, queue_empty);
+        (rig.f.own.class, rig.r.ai_kind, rig.r.queue_empty) = (class, ai_kind, queue_empty);
         let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(Home::default());
@@ -1286,7 +1286,7 @@ fn an_attack_on_target_out_of_sight_fails() {
         a
     };
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
-    let got = run(&mut a, class::CLASS_6, Some(UnitAiType::SOLDIER), true);
+    let got = run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true);
     assert_eq!(got, (Ok(UpdateCode::FAILED), true, true, false, failed));
     assert_eq!((a.target, a.state), (None, AttackState::Failed));
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
@@ -1302,12 +1302,12 @@ fn an_attack_on_target_out_of_sight_fails() {
         ..own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0))
     };
     assert_eq!(
-        run(&mut a, class::CLASS_6, Some(UnitAiType::SOLDIER), true),
+        run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true),
         (Ok(UpdateCode::FAILED), false, false, false, vec![])
     );
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(
-        run(&mut a, class::PREDATOR, Some(UnitAiType::SOLDIER), true)
+        run(&mut a, class::PREDATOR, Some(UnitAiKind::SOLDIER), true)
             .0
             .is_err()
     );
@@ -1451,7 +1451,7 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
 #[test]
 fn an_attack_arrived_where_it_saw_its_target_looks_again() {
     let at = Position::new(13.0, 10.0, 0.0);
-    let run = |state: AttackState, seen: bool, range: Distance, player_type: PlayerType| {
+    let run = |state: AttackState, seen: bool, range: Distance, player_kind: PlayerKind| {
         let mut world = world_with(7, PlayerId::new(2), class::CLASS_6, at);
         world.sight = Some(sight(seen));
         let victim = Victim {
@@ -1462,7 +1462,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
             ..Victim::default()
         };
         let mut rig = Rig::on(world, 0.8, victim).holding(7, PlayerId::new(2));
-        rig.r.player_type = player_type;
+        rig.r.player_kind = player_kind;
         rig.f.own.source.weapon_range = Distance::new(4.0);
         let mut a = soldier_attack(7, range, 0.0, at);
         (a.state, a.seen) = (state, at);
@@ -1479,7 +1479,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         true,
         Distance::new(2.0),
-        PlayerType::HUMAN,
+        PlayerKind::HUMAN,
     );
     assert_eq!(code, UpdateCode::UNDER_WAY);
     assert!(
@@ -1494,7 +1494,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         AttackState::GotoSeen { move_to: None },
         false,
         Distance::new(1.0),
-        PlayerType::HUMAN,
+        PlayerKind::HUMAN,
     );
     assert_eq!(
         (
@@ -1512,29 +1512,29 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
             vec![]
         )
     );
-    for (state, range, player_type) in [
+    for (state, range, player_kind) in [
         (
             AttackState::GotoSeen { move_to: None },
             0.9,
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
         ),
         (
             AttackState::GotoSeen { move_to: None },
             f32::NAN,
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
         ),
         (
             AttackState::GotoSeen { move_to: None },
             2.0,
-            PlayerType::COMPUTER,
+            PlayerKind::COMPUTER,
         ),
         (
             AttackState::GotoPoint { move_to: None },
             2.0,
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
         ),
     ] {
-        let (code, a, posted, let_go) = run(state, false, Distance::new(range), player_type);
+        let (code, a, posted, let_go) = run(state, false, Distance::new(range), player_kind);
         assert_eq!(
             (code, a.state.bare(), a.target, let_go, posted),
             (
@@ -1544,7 +1544,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
                 true,
                 vec![(NotifyKind::ACTION_FAILED, [600, 0, 0])]
             ),
-            "{state} {range} {player_type}"
+            "{state} {range} {player_kind}"
         );
     }
 }
@@ -3688,7 +3688,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
     let posted_1fb = vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])];
     assert_eq!(lost(AiOrder::Idle, |_| {}).1, posted_1fb);
     assert_eq!(
-        lost(order, |rig| rig.r.player_type = PlayerType::COMPUTER).1,
+        lost(order, |rig| rig.r.player_kind = PlayerKind::COMPUTER).1,
         posted_1fb
     );
     let queued = lost(order, |rig| rig.r.queue_empty = false);

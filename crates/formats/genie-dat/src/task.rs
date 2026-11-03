@@ -1,7 +1,7 @@
 use crate::conv::{fits, invalid_data, opt_fits};
 use crate::sound::SoundId;
 use crate::sprite::SpriteId;
-use crate::unit_type::UnitTypeId;
+use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::read_opt_u16;
 use std::io::{Read, Result, Write};
@@ -17,11 +17,11 @@ pub struct TaskList(Vec<Task>);
 pub struct Task {
     id: u16,
     is_default: bool,
-    action_type: u16,
+    action_kind: u16,
     object_class: i16,
-    object_id: Option<UnitTypeId>,
+    object_id: Option<UnitKindId>,
     terrain_id: i16,
-    attribute_types: (i16, i16, i16, i16),
+    attribute_kinds: (i16, i16, i16, i16),
     work_values: (f32, f32),
     work_range: f32,
     auto_search_targets: bool,
@@ -29,7 +29,7 @@ pub struct Task {
     enable_targeting: bool,
     combat_level: u8,
     work_flags: (u16, u16),
-    owner_type: u8,
+    owner_kind: u8,
     holding_attribute: u8,
     state_building: u8,
     move_sprite: Option<SpriteId>,
@@ -59,8 +59,8 @@ impl TaskList {
         let num_tasks = input.read_u16::<LE>()?;
         let mut tasks = vec![];
         for _ in 0..num_tasks {
-            let task_type = input.read_u16::<LE>()?;
-            if task_type != 1 {
+            let task_kind = input.read_u16::<LE>()?;
+            if task_kind != 1 {
                 return Err(invalid_data("a task whose type is not 1"));
             }
             tasks.push(Task::read_from(&mut input)?);
@@ -97,11 +97,11 @@ impl Task {
         Ok(Self {
             id: input.read_u16::<LE>()?,
             is_default: input.read_u8()? != 0,
-            action_type: input.read_u16::<LE>()?,
+            action_kind: input.read_u16::<LE>()?,
             object_class: input.read_i16::<LE>()?,
             object_id: read_opt_u16(&mut input)?,
             terrain_id: input.read_i16::<LE>()?,
-            attribute_types: (
+            attribute_kinds: (
                 input.read_i16::<LE>()?,
                 input.read_i16::<LE>()?,
                 input.read_i16::<LE>()?,
@@ -114,7 +114,7 @@ impl Task {
             enable_targeting: input.read_u8()? != 0,
             combat_level: input.read_u8()?,
             work_flags: (input.read_u16::<LE>()?, input.read_u16::<LE>()?),
-            owner_type: input.read_u8()?,
+            owner_kind: input.read_u8()?,
             holding_attribute: input.read_u8()?,
             state_building: input.read_u8()?,
             move_sprite: read_opt_u16(&mut input)?,
@@ -136,14 +136,14 @@ impl Task {
     pub fn write_to<W: Write>(&self, output: &mut W) -> Result<()> {
         output.write_u16::<LE>(self.id)?;
         output.write_u8(u8::from(self.is_default))?;
-        output.write_u16::<LE>(self.action_type)?;
+        output.write_u16::<LE>(self.action_kind)?;
         output.write_i16::<LE>(self.object_class)?;
         output.write_i16::<LE>(opt_fits(self.object_id, -1)?)?;
         output.write_i16::<LE>(self.terrain_id)?;
-        output.write_i16::<LE>(self.attribute_types.0)?;
-        output.write_i16::<LE>(self.attribute_types.1)?;
-        output.write_i16::<LE>(self.attribute_types.2)?;
-        output.write_i16::<LE>(self.attribute_types.3)?;
+        output.write_i16::<LE>(self.attribute_kinds.0)?;
+        output.write_i16::<LE>(self.attribute_kinds.1)?;
+        output.write_i16::<LE>(self.attribute_kinds.2)?;
+        output.write_i16::<LE>(self.attribute_kinds.3)?;
         output.write_f32::<LE>(self.work_values.0)?;
         output.write_f32::<LE>(self.work_values.1)?;
         output.write_f32::<LE>(self.work_range)?;
@@ -153,7 +153,7 @@ impl Task {
         output.write_u8(self.combat_level)?;
         output.write_u16::<LE>(self.work_flags.0)?;
         output.write_u16::<LE>(self.work_flags.1)?;
-        output.write_u8(self.owner_type)?;
+        output.write_u8(self.owner_kind)?;
         output.write_u8(self.holding_attribute)?;
         output.write_u8(self.state_building)?;
         let ids = [

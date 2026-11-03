@@ -11,7 +11,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::NearestAttacker;
@@ -54,7 +54,7 @@ impl UnitAi {
     pub(super) fn retarget_check(
         &mut self,
         world_time: WorldTime,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
@@ -65,7 +65,7 @@ impl UnitAi {
         let order = self
             .current_order
             .or_else(|| self.current_action.and_then(AiAction::order));
-        if order == Some(OrderKind::Defend) && self.defend_misc(at, player_type, ai, side)? {
+        if order == Some(OrderKind::Defend) && self.defend_misc(at, player_kind, ai, side)? {
             return Ok(false);
         }
         if order == Some(OrderKind::Follow) && self.follow(at, side, ai)? {
@@ -87,7 +87,7 @@ impl UnitAi {
         if let Some(search) = self.retarget_outcome(
             target,
             at.weapon_range,
-            player_type,
+            player_kind,
             at.action_state,
             listed,
             AiLayer {
@@ -96,7 +96,7 @@ impl UnitAi {
                 unit_ai_tuning,
             },
         )? {
-            let _ = self.retarget_search(search, player_type, at, side, ai)?;
+            let _ = self.retarget_search(search, player_kind, at, side, ai)?;
         }
         Ok(true)
     }
@@ -196,7 +196,7 @@ impl UnitAi {
     pub(super) fn retarget_search(
         &mut self,
         search: RetargetSearch,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
@@ -213,14 +213,14 @@ impl UnitAi {
                     search.work_state,
                 )
             });
-        let (classes, radius) = self.search_area(at, player_type)?;
+        let (classes, radius) = self.search_area(at, player_kind)?;
         let found = side.closest(&Search {
             at: from.ground(),
             radius,
             classes,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !player_type.is_computer() {
+                lowest: if at.scenario && !player_kind.is_computer() {
                     2
                 } else {
                     0
@@ -238,9 +238,9 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
+        self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
         let keeps =
-            search.building && player_type.is_computer() && self.stance == UnitStance::AGGRESSIVE;
+            search.building && player_kind.is_computer() && self.stance == UnitStance::AGGRESSIVE;
         let new = Self::world_object(found.id, at, side)?;
         if !keeps
             && self.current_order == Some(OrderKind::Attack)
@@ -293,7 +293,7 @@ impl UnitAi {
         &self,
         target: Option<(PlayerId, ClassId)>,
         weapon_range: Distance,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         action_state: Option<ActionState>,
         attack_listed: Option<bool>,
         layer: AiLayer<'_>,
@@ -306,7 +306,7 @@ impl UnitAi {
         let attack_order = self.current_order == Some(OrderKind::Attack);
         if attack_order
             && unit_ai_tuning.retarget_range < weapon_range.get()
-            && !player_type.is_computer()
+            && !player_kind.is_computer()
         {
             return Ok(None);
         }
@@ -315,7 +315,7 @@ impl UnitAi {
             match target {
                 Some((PlayerId::GAIA, _)) => return Ok(None),
                 Some((_, class)) if searches_on_class(class, roles) => {
-                    if attack_order && !player_type.is_computer() {
+                    if attack_order && !player_kind.is_computer() {
                         return Ok(None);
                     }
                     search = true;
@@ -387,7 +387,7 @@ impl UnitAi {
     pub(super) fn defend_misc(
         &mut self,
         at: &Surroundings,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
@@ -457,7 +457,7 @@ impl UnitAi {
                     return Ok(true);
                 }
                 NearestAttacker::NoAttacker => {
-                    return self.process_idle(at, player_type, ai, side);
+                    return self.process_idle(at, player_kind, ai, side);
                 }
                 NearestAttacker::NoUnitAi => {}
             }
@@ -569,12 +569,12 @@ impl UnitAi {
     /// timeout restarts with a timeout drawn around 5 s.
     pub(super) fn look_around(
         &mut self,
-        player_type: PlayerType,
+        player_kind: PlayerKind,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         if self.look_around_timer > self.look_around_timeout {
             // the human branch; `FUN_14152b470` sends players allied with a computer elsewhere
-            if player_type.is_computer() {
+            if player_kind.is_computer() {
                 return Err(GenieError::unsupported(
                     "look-around timer of a computer player",
                 ));

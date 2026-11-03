@@ -38,7 +38,7 @@ pub(crate) const fn unmodelled_command(p: &Packet) -> &'static str {
         Chapter,
         AttackMove,
         AttackMoveTarget,
-        UnitTypeAiState,
+        UnitKindAiState,
         AutoScout,
         StopAll,
         TransformObject,

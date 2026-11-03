@@ -60,7 +60,7 @@ fn reads() -> GatherReads {
         master: ids::VILLAGER_MALE,
         stance: UnitStance::AGGRESSIVE,
         farm_stops: false,
-        player_type: PlayerType::HUMAN,
+        player_kind: PlayerKind::HUMAN,
         stop_productivity: Amount::new(1.0),
         food_sold: Amount::ZERO,
     }
@@ -135,7 +135,7 @@ impl Rig {
         rig.mover_mut().animated.speed = Speed::new(1.0);
         let unit = rig.unit_mut();
         unit.life.master_id = ids::VILLAGER_MALE;
-        (unit.life.attribute_type, unit.life.amount) =
+        (unit.life.attribute_kind, unit.life.amount) =
             (Some(AttributeId::named(17)), Amount::new(3.0));
         rig
     }
@@ -187,7 +187,7 @@ impl Rig {
     /// It carries `held` of resource `kind`.
     fn set_load(&mut self, kind: Option<AttributeId>, held: f32) {
         let life = &mut self.unit_mut().life;
-        (life.attribute_type, life.amount) = (kind, Amount::new(held));
+        (life.attribute_kind, life.amount) = (kind, Amount::new(held));
     }
 
     /// Its animation stopped (`+0x7b8` 0).
@@ -644,7 +644,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
 
 #[test]
 fn at_its_point_human_moved_gatherer_idles_and_computer_is_done() {
-    let run = |player_type: PlayerType| {
+    let run = |player_kind: PlayerKind| {
         let mut g = GatherAction {
             state: GatherState::Moved {
                 move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
@@ -654,7 +654,7 @@ fn at_its_point_human_moved_gatherer_idles_and_computer_is_done() {
         };
         let mut rig = Rig::on_the_path();
         let r = GatherReads {
-            player_type,
+            player_kind,
             farm_stops: true,
             ..reads()
         };
@@ -665,10 +665,10 @@ fn at_its_point_human_moved_gatherer_idles_and_computer_is_done() {
         (g.state, g.point, g.state.move_to().copied())
     };
     assert_eq!(
-        run(PlayerType::HUMAN),
+        run(PlayerKind::HUMAN),
         (GatherState::Idle, Position::from([-1.0; 3]), None)
     );
-    assert_eq!(run(PlayerType::COMPUTER).0, GatherState::Done);
+    assert_eq!(run(PlayerKind::COMPUTER).0, GatherState::Done);
 }
 
 #[test]
@@ -718,13 +718,13 @@ fn farm_update(
     g: &mut GatherAction,
     target: Option<&mut Victim>,
     dt: u32,
-    player_type: PlayerType,
+    player_kind: PlayerKind,
 ) -> Result<Next, GenieError> {
     let mut rig = Rig::on_the_path();
     rig.set_load(None, 0.0);
     let r = GatherReads {
         master: master_id(259),
-        player_type,
+        player_kind,
         ..reads()
     };
     rig.run(g.state, dt, |c, u, _, me| {
@@ -1070,11 +1070,11 @@ fn walk_to_point_ends_on_its_target_let_go_as_on_its_arrival() {
         });
         g
     };
-    let run = |g: &mut GatherAction, player_type: PlayerType| {
+    let run = |g: &mut GatherAction, player_kind: PlayerKind| {
         let mut rig = Rig::on_the_path().with_house(ObjectState::Removed);
         rig.set_load(None, 0.0);
         let r = GatherReads {
-            player_type,
+            player_kind,
             ..reads()
         };
         rig.run(g.state, 100, |c, u, _, me| match g.state {
@@ -1084,42 +1084,42 @@ fn walk_to_point_ends_on_its_target_let_go_as_on_its_arrival() {
         })
     };
     let mut g = at(GatherState::WalkBack { move_to: None }, 10028);
-    assert_eq!(run(&mut g, PlayerType::HUMAN), Ok(Next::Search));
+    assert_eq!(run(&mut g, PlayerKind::HUMAN), Ok(Next::Search));
     assert_eq!(
         (g.state, g.state.move_to().copied()),
         (GatherState::Search, None)
     );
     let mut g = at(GatherState::Moved { move_to: None }, 10028);
-    assert_eq!(run(&mut g, PlayerType::HUMAN), Ok(Next::Stay));
+    assert_eq!(run(&mut g, PlayerKind::HUMAN), Ok(Next::Stay));
     assert_eq!(
         (g.state, g.state.move_to().copied()),
         (GatherState::Idle, None)
     );
     let mut g = at(GatherState::Moved { move_to: None }, 10028);
-    assert_eq!(run(&mut g, PlayerType::COMPUTER), Ok(Next::Stay));
+    assert_eq!(run(&mut g, PlayerKind::COMPUTER), Ok(Next::Stay));
     assert_eq!(g.state, GatherState::Done);
     let mut g = at(GatherState::ReseedWalk { move_to: None }, 10028);
     assert_eq!(
-        run(&mut g, PlayerType::HUMAN),
+        run(&mut g, PlayerKind::HUMAN),
         Ok(Next::Reseed { arrived: true })
     );
     assert_eq!(g.state.move_to().copied(), None);
     // a failed walk: state 15 idles a computer's too
-    for (state, player_type, then) in [
+    for (state, player_kind, then) in [
         (
             GatherState::WalkBack { move_to: None },
-            PlayerType::HUMAN,
+            PlayerKind::HUMAN,
             GatherState::Search,
         ),
         (
             GatherState::Moved { move_to: None },
-            PlayerType::COMPUTER,
+            PlayerKind::COMPUTER,
             GatherState::Idle,
         ),
     ] {
         let mut g = at(state, -1);
         *g.state.walk_mut().unwrap() = Some(MoveToAction::sub_in(MoveTo::Failed));
-        let _ = run(&mut g, player_type);
+        let _ = run(&mut g, player_kind);
         assert_eq!(g.state, then);
     }
 }
@@ -1192,7 +1192,7 @@ fn waiting(worked: bool) -> GatherAction {
 fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
     let mut g = waiting(true);
     assert_eq!(
-        farm_update(&mut g, None, 600, PlayerType::HUMAN),
+        farm_update(&mut g, None, 600, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(
@@ -1200,7 +1200,7 @@ fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
         (GatherState::FarmWait, Seconds::new(-1.0 + 0.6))
     );
     assert_eq!(
-        farm_update(&mut g, None, 600, PlayerType::HUMAN),
+        farm_update(&mut g, None, 600, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(g.state.bare(), GatherState::ReseedWalk { move_to: None });
@@ -1213,7 +1213,7 @@ fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
     g.gather_at = Point::new(-1.0, -1.0);
     g.point = Position::new(5.0, 6.0, 0.0);
     assert_eq!(
-        farm_update(&mut g, None, 1000, PlayerType::HUMAN),
+        farm_update(&mut g, None, 1000, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(
@@ -1226,7 +1226,7 @@ fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
     // a farmer that never gathered idles
     let mut g = waiting(false);
     assert_eq!(
-        farm_update(&mut g, None, 1000, PlayerType::HUMAN),
+        farm_update(&mut g, None, 1000, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(
@@ -1237,7 +1237,7 @@ fn farmer_without_its_farm_waits_second_then_walks_back_to_reseed() {
     let mut g = waiting(true);
     g.timer = Seconds::ZERO;
     assert_eq!(
-        farm_update(&mut g, None, 1000, PlayerType::HUMAN),
+        farm_update(&mut g, None, 1000, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(g.state.bare(), GatherState::FarmWait);
@@ -1260,7 +1260,7 @@ fn farmer_at_farm_another_works_walks_back_to_search() {
         ..Victim::default()
     };
     assert_eq!(
-        farm_update(&mut g, Some(&mut farm), 1000, PlayerType::HUMAN),
+        farm_update(&mut g, Some(&mut farm), 1000, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(
@@ -1286,13 +1286,13 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     };
     let mut g = walking(MoveTo::Arrived);
     assert_eq!(
-        farm_update(&mut g, None, 100, PlayerType::HUMAN),
+        farm_update(&mut g, None, 100, PlayerKind::HUMAN),
         Ok(Next::Reseed { arrived: true })
     );
     assert_eq!(g.state.move_to().copied(), None);
     let mut g = walking(MoveTo::Failed);
     assert_eq!(
-        farm_update(&mut g, None, 100, PlayerType::HUMAN),
+        farm_update(&mut g, None, 100, PlayerKind::HUMAN),
         Ok(Next::Reseed { arrived: false })
     );
     // the farm still standing: the farmer faces it (set_state 6)
@@ -1300,7 +1300,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     g.target = Some(GatherTargetId::new(object_id(28222)));
     let mut bush = target(10.0);
     assert_eq!(
-        farm_update(&mut g, Some(&mut bush), 100, PlayerType::HUMAN),
+        farm_update(&mut g, Some(&mut bush), 100, PlayerKind::HUMAN),
         Ok(Next::Stay)
     );
     assert_eq!(g.state, GatherState::Face);
@@ -1312,7 +1312,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
         ..target(10.0)
     };
     assert_eq!(
-        farm_update(&mut g, Some(&mut dying), 100, PlayerType::HUMAN),
+        farm_update(&mut g, Some(&mut dying), 100, PlayerKind::HUMAN),
         Ok(Next::Reseed { arrived: true })
     );
 }
@@ -1321,7 +1321,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
 /// lets its targets go.
 #[test]
 fn without_reseed_the_farmer_idles_or_computer_is_done() {
-    let after = |arrived: bool, player_type: PlayerType| {
+    let after = |arrived: bool, player_kind: PlayerKind| {
         let mut g = GatherAction {
             state: GatherState::ReseedWalk {
                 move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
@@ -1335,7 +1335,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         let released = g
             .after_reseed(
                 arrived,
-                player_type,
+                player_kind,
                 Some(&mut mover),
                 Stand {
                     graphic: None,
@@ -1348,7 +1348,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         (g.state, released, g.target, g.state.move_to().copied())
     };
     assert_eq!(
-        after(true, PlayerType::COMPUTER),
+        after(true, PlayerKind::COMPUTER),
         (
             GatherState::Done,
             [None, None],
@@ -1357,7 +1357,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         )
     );
     assert_eq!(
-        after(true, PlayerType::HUMAN),
+        after(true, PlayerKind::HUMAN),
         (
             GatherState::Idle,
             [Some(object_id(5)), Some(object_id(6))],
@@ -1366,7 +1366,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         )
     );
     assert_eq!(
-        after(false, PlayerType::COMPUTER),
+        after(false, PlayerKind::COMPUTER),
         (
             GatherState::Idle,
             [Some(object_id(5)), Some(object_id(6))],
@@ -1390,7 +1390,7 @@ fn forager_walks_to_its_bush() {
         GatherStart {
             target: &bush(),
             player: PlayerId::new(7),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             carry_rule: false,
             held: &mut held,
             walks: carried,
@@ -1425,7 +1425,7 @@ fn forager_walks_to_its_bush() {
         GatherStart {
             target: &bush(),
             player: PlayerId::new(7),
-            player_type: PlayerType::HUMAN,
+            player_kind: PlayerKind::HUMAN,
             carry_rule: false,
             held: &mut held,
             walks: carried,
@@ -1464,7 +1464,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             GatherRetarget {
                 target: &bush(),
                 player: PlayerId::new(7),
-                player_type: PlayerType::HUMAN,
+                player_kind: PlayerKind::HUMAN,
                 walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
                 farm_stops: true,
                 rate: rate()
@@ -1503,10 +1503,10 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
     );
     // the gathering is not started any more (+0x80 cleared first)
     assert!(!g.worked);
-    for (state, player_type) in [
-        (GatherState::Face, PlayerType::HUMAN),
-        (GatherState::Work, PlayerType::HUMAN),
-        (GatherState::Walk { move_to: None }, PlayerType::COMPUTER),
+    for (state, player_kind) in [
+        (GatherState::Face, PlayerKind::HUMAN),
+        (GatherState::Work, PlayerKind::HUMAN),
+        (GatherState::Walk { move_to: None }, PlayerKind::COMPUTER),
     ] {
         let mut g = walking(state);
         assert_eq!(
@@ -1514,7 +1514,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                 GatherRetarget {
                     target: &bush(),
                     player: PlayerId::new(7),
-                    player_type,
+                    player_kind,
                     walks: walks(carrying(Some(AttributeId::named(17)), 0.0)),
                     farm_stops: true,
                     rate: rate()
@@ -1545,7 +1545,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             GatherRetarget {
                 target: &mill,
                 player: PlayerId::new(7),
-                player_type: PlayerType::HUMAN,
+                player_kind: PlayerKind::HUMAN,
                 walks: walks(carrying(Some(AttributeId::named(17)), 3.0)),
                 farm_stops: true,
                 rate: rate()

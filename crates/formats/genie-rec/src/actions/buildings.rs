@@ -4,7 +4,7 @@ use crate::actions::{Location2, ObjectsList};
 use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, TechId, UnitTypeId, read_opt_u32};
+use genie_support::{ReadSkipExt, TechId, UnitKindId, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Train a unit at a building (command `0x64`; aoc-mgz calls it the AI queue command).
@@ -15,7 +15,7 @@ pub struct MakeCommand {
     /// The building that trains the unit.
     pub building_id: ObjectId,
     /// The type of unit to train.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// Not known yet; read as an optional object ID (-1 for none).
     pub target_id: Option<ObjectId>,
 }
@@ -31,12 +31,12 @@ impl MakeCommand {
         let building_id = input.read_u32::<LE>()?.into();
         let player_id = input.read_u8()?.into();
         let _padding = input.read_u8()?;
-        let unit_type_id = input.read_u16::<LE>()?.into();
+        let unit_kind_id = input.read_u16::<LE>()?.into();
         let target_id = read_opt_u32(&mut input)?;
         Ok(Self {
             player_id,
             building_id,
-            unit_type_id,
+            unit_kind_id,
             target_id,
         })
     }
@@ -53,7 +53,7 @@ impl MakeCommand {
         output.write_u32::<LE>(self.building_id.into())?;
         output.write_u8(self.player_id.into())?;
         output.write_u8(0)?;
-        output.write_u16::<LE>(self.unit_type_id.into())?;
+        output.write_u16::<LE>(self.unit_kind_id.into())?;
         output.write_i32::<LE>(opt_fits(self.target_id, -1)?)?;
         Ok(())
     }
@@ -117,7 +117,7 @@ pub struct BuildCommand {
     /// The ID of the player issuing this command.
     pub player_id: PlayerId,
     /// The type of building to place.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// The location of the new building foundation.
     pub location: Location2,
     /// The index of the frame to use, for buildings with multiple graphics like houses.
@@ -142,7 +142,7 @@ impl BuildCommand {
         let x = input.read_f32::<LE>()?;
         let y = input.read_f32::<LE>()?;
         command.location = (x, y);
-        command.unit_type_id = input.read_u16::<LE>()?.into();
+        command.unit_kind_id = input.read_u16::<LE>()?.into();
         let _padding = input.read_u16::<LE>()?;
         command.unique_id = read_opt_u32(&mut input)?;
         command.frame = input.read_u8()?;
@@ -162,7 +162,7 @@ pub struct BuildWallCommand {
     /// The tile (x, y) where the wall ends.
     pub end: (u8, u8),
     /// The type of wall to build.
-    pub unit_type_id: UnitTypeId,
+    pub unit_kind_id: UnitKindId,
     /// The villagers that are tasked to build the wall.
     pub builders: ObjectsList,
 }
@@ -174,7 +174,7 @@ impl BuildWallCommand {
         let start = (input.read_u8()?, input.read_u8()?);
         let end = (input.read_u8()?, input.read_u8()?);
         let _padding = input.read_u8()?;
-        let unit_type_id = input.read_u16::<LE>()?.into();
+        let unit_kind_id = input.read_u16::<LE>()?.into();
         let _padding = input.read_u16::<LE>()?;
         assert_eq!(
             input.read_u32::<LE>()?,
@@ -195,7 +195,7 @@ impl BuildWallCommand {
             player_id,
             start,
             end,
-            unit_type_id,
+            unit_kind_id,
             builders,
         })
     }

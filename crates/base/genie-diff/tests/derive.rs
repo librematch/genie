@@ -183,7 +183,7 @@ fn an_eq_field_is_one_value() {
 
 /// A generic type takes its parameters' differences.
 #[test]
-fn generic_type_compares_its_parameter() {
+fn generic_kind_compares_its_parameter() {
     #[derive(Debug, Diff)]
     struct Held<T> {
         value: T,

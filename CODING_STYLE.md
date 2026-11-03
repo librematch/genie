@@ -73,7 +73,7 @@ data-oriented architect makes it.
     None }`, never an alias constant on the enum (`BuildState::MOVE`). A newtype over a value
     that the game holds as any integer (`GameMode`, `NotifyKind`) names its known values as
     associated constants, and those are `SCREAMING_SNAKE_CASE`.
-  - An acronym or a contraction is one word: `ScxVersion`, `AiModule`, `UnitTypeId`,
+  - An acronym or a contraction is one word: `ScxVersion`, `AiModule`, `UnitKindId`,
     `DrsReader`, `AocToWk`, not `SCXVersion`, `AIModule`, `UnitTypeID`, `AoCToWK`.
   - In `snake_case` and `SCREAMING_SNAKE_CASE`, a single letter is a word only at the end:
     `btree_map`, `PI_2`, `kernel_sin`, `target_master`, not `b_tree_map`, `k_sin`,
@@ -274,7 +274,7 @@ fn command(raw: i32) -> Result<(), GenieError> {
   update's "done" or "found") becomes an enum of its outcomes, or an `Option` or a `Result`
   where it carries a value.
 - A `bool` that stands for a value genie types becomes that type, and is never a copy of it:
-  a player is a computer by its `PlayerType` (`PlayerType::is_computer`, the game's
+  a player is a computer by its `PlayerKind` (`PlayerKind::is_computer`, the game's
   `FUN_141659cf0`).
 - A predicate stays a `bool`: a function named `is_`, `has_` or `can_`, and a field whose name
   answers yes or no at every use (`allied`, `tall`, `desolid`; a game flag with its offset in

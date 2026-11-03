@@ -212,7 +212,7 @@ mod tests {
 
     /// A class a constant names is a value of the type, equal to the data's.
     #[test]
-    fn the_named_classes_are_values_of_the_type() {
+    fn the_named_classes_are_values_of_the_kind() {
         assert_eq!(ClassId::named(4), ClassId::try_from(4).unwrap());
         assert_ne!(ClassId::named(4), ClassId::named(3));
         assert!(ClassId::named(3) < ClassId::named(4));

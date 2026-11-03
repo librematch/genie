@@ -58,7 +58,7 @@ impl TribeScen {
             {
                 output.write_i32::<LE>(properties.active)?;
                 resources.write_to(&mut output, version)?;
-                output.write_i32::<LE>(properties.player_type)?;
+                output.write_i32::<LE>(properties.player_kind)?;
                 output.write_i32::<LE>(properties.civilization)?;
                 output.write_i32::<LE>(properties.posture)?;
             }
@@ -75,7 +75,7 @@ impl TribeScen {
     /// each player's legacy victory entries.
     fn write_victory_settings(&self, mut output: impl Write, version: f32) -> Result<()> {
         if version >= 1.13 {
-            output.write_i32::<LE>(self.mp_victory_type)?;
+            output.write_i32::<LE>(self.mp_victory_kind)?;
             output.write_i32::<LE>(self.victory_score)?;
             output.write_i32::<LE>(self.victory_time)?;
         }
@@ -209,7 +209,7 @@ impl TribeScen {
             output.write_i32::<LE>(self.view.1)?;
         }
         if version >= 1.21 {
-            output.write_i32::<LE>(self.map_type.unwrap_or(-1))?;
+            output.write_i32::<LE>(self.map_kind.unwrap_or(-1))?;
         }
         if version >= 1.24 {
             assert_eq!(self.base_priorities.len(), 16);
@@ -292,7 +292,7 @@ fn write_padded(mut output: impl Write, list: &[i32], size: usize) -> Result<()>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::StartingAge;
+    use crate::values::StartingAge;
 
     /// Little-endian words.
     fn words(ws: &[i32]) -> Vec<u8> {

@@ -191,32 +191,32 @@ pub fn task_at(
 /// A negative action type, or an attribute below −1.
 pub fn core_task(t: &WorldTask) -> Result<Task, GenieError> {
     let [
-        attribute_type,
-        attribute_type2,
-        attribute_type3,
-        attribute_type4,
+        attribute_kind,
+        attribute_kind2,
+        attribute_kind3,
+        attribute_kind4,
         enablement,
     ] = attributes([
-        t.attribute_type,
-        t.attribute_type2,
-        t.attribute_type3,
-        t.attribute_type4,
+        t.attribute_kind,
+        t.attribute_kind2,
+        t.attribute_kind3,
+        t.attribute_kind4,
         t.enablement_resource_id,
     ])?;
     Ok(Task {
         id: TaskId::of_task(t.id),
-        action_kind: ActionKind::try_from(t.action_type)?,
+        action_kind: ActionKind::try_from(t.action_kind)?,
         object_group: ClassId::of_field(t.object_group)?,
         object_id: MasterId::of_data(t.object_id),
         combat_level: t.combat_level,
         combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
         terrain: TaskTerrain::of_data(t.terrain_id),
-        owner_type: TargetOwner::of_data(t.owner_type),
+        owner_kind: TargetOwner::of_data(t.owner_kind),
         holding_attr: t.holding_attr,
-        attribute_type,
-        attribute_type2,
-        attribute_type3,
-        attribute_type4,
+        attribute_kind,
+        attribute_kind2,
+        attribute_kind3,
+        attribute_kind4,
         wait_time: Seconds::new(t.search_wait_time),
         work_val1: WorkValue::new(t.work_val1),
         work_val2: WorkValue::new(t.work_val2),
@@ -249,7 +249,7 @@ pub fn work_masters(
         work.class = ClassId::of_master(s.read_temp_5);
         work.radius = Footprint::new(s.radius_x, s.radius_y);
         work.height = Distance::new(s.radius_z);
-        work.obstruction_kind = ObstructionKind::from(s.obstruction_type);
+        work.obstruction_kind = ObstructionKind::from(s.obstruction_kind);
         work.buildable_on = BuildableOn::of_data(s.can_be_built_on);
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
         work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
@@ -289,7 +289,7 @@ pub fn work_masters(
                 .train_location
                 .first()
                 .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-            p.charge_kind = ChargeKind::of_data(c.charge_type);
+            p.charge_kind = ChargeKind::of_data(c.charge_kind);
             p.formation_category = FormationClass::of_data(c.temp_formation_category);
             p.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
             p.volley_fire = Firepower::new(c.volley_fire_amount);
@@ -374,7 +374,7 @@ pub fn work_masters(
             .iter()
             .map(|e| {
                 (
-                    AttributeId::of_data(e.attribute_type_held),
+                    AttributeId::of_data(e.attribute_kind_held),
                     Amount::new(e.attribute_amount_held),
                     e.attribute_flag,
                 )
@@ -388,7 +388,7 @@ pub fn work_masters(
             m.tribe_master_building_object.as_deref(),
         ) {
             b.facet = saved.building_facet.cast_signed();
-            b.garrison_type = GarrisonKinds::from_bits_retain(saved.garrison_units);
+            b.garrison_kind = GarrisonKinds::from_bits_retain(saved.garrison_units);
             b.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
             b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
             b.foundation_terrain = TerrainId::of_data(saved.on_build_make_tile);
@@ -405,9 +405,9 @@ pub fn work_masters(
             .and_then(|r| r.rge_master_missile_object.as_deref())
             .map(|mm| MissilePart {
                 projectile_kind: MasterId::of_data(s.copy_id())
-                    .and_then(|m| table.projectile_type(civ, m))
+                    .and_then(|m| table.projectile_kind(civ, m))
                     .unwrap_or_default(),
-                smart_mode: SmartMode::from_bits_retain(mm.targetting_type),
+                smart_mode: SmartMode::from_bits_retain(mm.targetting_kind),
                 hit_mode: HitMode::of_data(mm.missile_hit_info),
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
                 arc: ArcRatio::new(mm.ballistics_ratio),
@@ -578,7 +578,7 @@ pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placeme
         return Some(Placement {
             radius: Radii::new(own.radius_x, own.radius_y, own.radius_z),
             class: ClassId::of_master(own.read_temp_2),
-            obstruction_kind: ObstructionKind::from(own.obstruction_type),
+            obstruction_kind: ObstructionKind::from(own.obstruction_kind),
             obstruction_class: ObstructionClass::from(own.obstruction_class),
             buildable_on: BuildableOn::of_data(own.can_be_built_on),
             los: Distance::new(own.los),
@@ -588,7 +588,7 @@ pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placeme
     Some(Placement {
         radius: Radii::new(m.radius_x, m.radius_y, m.radius_z),
         class: ClassId::of_master(m.read_temp_5),
-        obstruction_kind: ObstructionKind::from(m.obstruction_type),
+        obstruction_kind: ObstructionKind::from(m.obstruction_kind),
         obstruction_class: ObstructionClass::from(m.obstruction_class),
         buildable_on: BuildableOn::of_data(m.can_be_built_on),
         los: Distance::new(m.los),

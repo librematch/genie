@@ -108,7 +108,7 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
     let captured = MasterKind::COMBAT <= t.kind && t.capture;
     // nothing held (`+0x310` at most 0) and not taken by sight
     let free = t.held <= Amount::ZERO && !captured;
-    if me.player_type.is_computer() && t.owner == PlayerId::GAIA && !free {
+    if me.player_kind.is_computer() && t.owner == PlayerId::GAIA && !free {
         return false;
     }
     let boat_free = roles.of_some_class(me.class).contains(ClassRoles::TOWER)
@@ -119,7 +119,7 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
     let is_boat = me
         .class
         .is_some_and(|c| roles.of_class(c).contains(ClassRoles::BOAT));
-    !(me.player_type.is_computer() && !boat_free && !is_boat)
+    !(me.player_kind.is_computer() && !boat_free && !is_boat)
 }
 
 /// The ranges the statistics' walks test an object at `gap` by: at least the least range,
@@ -358,7 +358,7 @@ impl Walked {
             roles,
             best_target_tuning,
         } = layer;
-        let lowest = if me.scenario && !me.player_type.is_computer() {
+        let lowest = if me.scenario && !me.player_kind.is_computer() {
             UnitRelation::ALLY
         } else {
             UnitRelation::GAIA

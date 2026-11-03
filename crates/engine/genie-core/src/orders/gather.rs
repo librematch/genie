@@ -91,7 +91,7 @@ impl World {
             state: t.life.state,
             radius: tm.radius,
         };
-        let player_type = owner.kind;
+        let player_kind = owner.kind;
         let farm_stops = self.settings.walkable_farms;
         let by = self.releaser(player, idx)?;
         // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
@@ -137,7 +137,7 @@ impl World {
             GatherRetarget {
                 target: &resource,
                 player,
-                player_type,
+                player_kind,
                 walks,
                 farm_stops,
                 rate,
@@ -400,11 +400,11 @@ impl World {
         let task = HuntTask {
             id: task.id,
             range: task.work_range,
-            resource: task.attribute_type,
+            resource: task.attribute_kind,
             sprites: task.sprites,
             work_value: task.work_val1,
-            productivity: task.attribute_type2,
-            kind4: task.attribute_type4,
+            productivity: task.attribute_kind2,
+            kind4: task.attribute_kind4,
         };
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
@@ -429,7 +429,7 @@ impl World {
             self.notify_gather(player, idx, (target, resource.class), notify)?;
         }
         self.clear_actions(player, idx)?;
-        let player_type = self.players.player(player)?.kind;
+        let player_kind = self.players.player(player)?.kind;
         let carry_rule = self.settings.carry_rule();
         let unit = self.players.live_mut(player, idx)?;
         let walks = unit.move_walks(
@@ -452,7 +452,7 @@ impl World {
             GatherStart {
                 target: &resource,
                 player,
-                player_type,
+                player_kind,
                 carry_rule,
                 held: &mut held,
                 walks,
@@ -463,7 +463,7 @@ impl World {
             &self.model.tuning,
         )?;
         Held {
-            kind: unit.life.attribute_type,
+            kind: unit.life.attribute_kind,
             amount: unit.life.amount,
         } = held;
         let drops = gather.target.is_none() && gather.carry_to.key() == Some(target);

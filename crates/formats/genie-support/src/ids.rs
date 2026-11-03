@@ -5,47 +5,47 @@ use std::num::TryFromIntError;
 
 /// An ID identifying a unit type.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]
-pub struct UnitTypeId(u16);
+pub struct UnitKindId(u16);
 
-impl From<u16> for UnitTypeId {
+impl From<u16> for UnitKindId {
     #[inline]
     fn from(n: u16) -> Self {
         Self(n)
     }
 }
 
-impl From<UnitTypeId> for u16 {
+impl From<UnitKindId> for u16 {
     #[inline]
-    fn from(n: UnitTypeId) -> Self {
+    fn from(n: UnitKindId) -> Self {
         n.0
     }
 }
 
-impl From<UnitTypeId> for i32 {
+impl From<UnitKindId> for i32 {
     #[inline]
-    fn from(n: UnitTypeId) -> Self {
+    fn from(n: UnitKindId) -> Self {
         n.0.into()
     }
 }
 
-impl From<UnitTypeId> for u32 {
+impl From<UnitKindId> for u32 {
     #[inline]
-    fn from(n: UnitTypeId) -> Self {
+    fn from(n: UnitKindId) -> Self {
         n.0.into()
     }
 }
 
-impl From<UnitTypeId> for usize {
+impl From<UnitKindId> for usize {
     #[inline]
-    fn from(n: UnitTypeId) -> Self {
+    fn from(n: UnitKindId) -> Self {
         n.0.into()
     }
 }
 
-fallible_try_into!(UnitTypeId, i16);
-fallible_try_from!(UnitTypeId, i16);
-fallible_try_from!(UnitTypeId, i32);
-fallible_try_from!(UnitTypeId, u32);
+fallible_try_into!(UnitKindId, i16);
+fallible_try_from!(UnitKindId, i16);
+fallible_try_from!(UnitKindId, i32);
+fallible_try_from!(UnitKindId, u32);
 
 /// An ID identifying a tech.
 #[derive(Debug, Hash, Default, Clone, Copy, PartialEq, Eq)]

@@ -93,7 +93,8 @@ pub struct DropSite {
     pub target_list: Vec<DropSiteTarget>,
     /// The resource types for which the building updates the AI's drop site data, if given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub update_ai_resource_types: Option<Vec<AiResourceType>>,
+    #[serde(rename = "update_ai_resource_types")]
+    pub update_ai_resource_kinds: Option<Vec<AiResourceKind>>,
     /// Unit ids of the workers that may drop resources here, if given (e.g. the farmers of a
     /// Farm).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -122,7 +123,8 @@ pub struct DropSiteTarget {
     pub object_state_forced_return_state: Option<i32>,
     /// The resource (attribute) id the worker carries back from the target, if given.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub attribute_type: Option<i32>,
+    #[serde(rename = "attribute_type")]
+    pub attribute_kind: Option<i32>,
     /// Not known yet; 0 on farms, left out elsewhere.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worker_num: Option<i32>,
@@ -132,12 +134,13 @@ pub struct DropSiteTarget {
     pub allow_resource_distance_update: Option<bool>,
 }
 
-/// A resource type, as [`DropSite::update_ai_resource_types`] lists it.
+/// A resource type, as [`DropSite::update_ai_resource_kinds`] lists it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AiResourceType {
+pub struct AiResourceKind {
     /// The resource type id: 0 food, 1 wood, 2 stone, 3 gold.
-    pub resource_type: i32,
+    #[serde(rename = "resource_type")]
+    pub resource_kind: i32,
 }
 
 /// `futuravailableunits.json` (and `paphosfutureavailableunits.json`): per civilization, in the
@@ -264,11 +267,14 @@ pub struct FutureUnit {
 #[serde(deny_unknown_fields)]
 pub struct Maps {
     /// [`MapEntry::storage_id`] of the map selected by default.
-    pub default_map_type: i32,
+    #[serde(rename = "default_map_type")]
+    pub default_map_kind: i32,
     /// [`MapEntry::storage_id`] of the map selected by default for Nomad games.
-    pub default_nomad_map_type: i32,
+    #[serde(rename = "default_nomad_map_type")]
+    pub default_nomad_map_kind: i32,
     /// [`MapEntry::storage_id`] of the map selected by default for Battle Royale games.
-    pub default_battle_royale_map_type: i32,
+    #[serde(rename = "default_battle_royale_map_type")]
+    pub default_battle_royale_map_kind: i32,
     /// The maps, in the file's order.
     pub map_list: Vec<MapEntry>,
 }

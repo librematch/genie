@@ -27,7 +27,7 @@ use crate::objects::masters::WorkValue;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -46,8 +46,8 @@ pub struct GatherStart<'a> {
     pub target: &'a Resource,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// The game settings' test `FUN_141302150`.
     pub carry_rule: bool,
     /// What the gatherer carries, its resource kind and amount.
@@ -64,8 +64,8 @@ pub struct GatherRetarget<'a> {
     pub target: &'a Resource,
     /// The owner.
     pub player: PlayerId,
-    /// The owner's type (`player+0x10`; [`PlayerType::is_computer`] is `FUN_141659cf0`).
-    pub player_type: PlayerType,
+    /// The owner's type (`player+0x10`; [`PlayerKind::is_computer`] is `FUN_141659cf0`).
+    pub player_kind: PlayerKind,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
     pub walks: Walks<'a>,
     /// The game's farm setting: a stop farm or a fish trap keeps its place as the farm's.
@@ -119,11 +119,11 @@ pub struct MoveTarget {
 /// attribute the task's `attribute_type2` names, as it is, or 1.0 for none (`DAT_14330eb8c`).
 #[must_use]
 pub fn productivity_of(
-    attribute_type2: Option<AttributeId>,
+    attribute_kind2: Option<AttributeId>,
     attributes: &[Amount],
     gather_tuning: &GatherTuning,
 ) -> Amount {
-    let Some(attribute) = attribute_type2 else {
+    let Some(attribute) = attribute_kind2 else {
         return Amount::new(gather_tuning.default_productivity);
     };
     attributes
@@ -244,14 +244,14 @@ impl GatherAction {
         let GatherStart {
             target,
             player,
-            player_type,
+            player_kind,
             carry_rule,
             held,
             walks,
         } = start;
         let kind = self.task.resource;
         let both_food = both_food(kind, held.kind);
-        let drops = player_type.is_computer() && held.amount == Amount::ZERO;
+        let drops = player_kind.is_computer() && held.amount == Amount::ZERO;
         if (!carry_rule && !drops) || held.kind == kind || both_food {
             if held.kind != kind && both_food {
                 held.kind = kind;
@@ -326,7 +326,7 @@ impl GatherAction {
         let GatherRetarget {
             target,
             player,
-            player_type,
+            player_kind,
             walks,
             farm_stops,
             rate,
@@ -339,7 +339,7 @@ impl GatherAction {
                     return Ok(true);
                 }
                 GatherState::Walk { .. } | GatherState::WalkBack { .. }
-                    if player_type.is_computer() =>
+                    if player_kind.is_computer() =>
                 {
                     return Ok(true);
                 }

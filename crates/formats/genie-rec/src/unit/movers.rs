@@ -15,7 +15,7 @@ pub struct PathData {
     /// The path's id.
     pub id: u32,
     /// Not known yet; the type of a linked path.
-    pub linked_path_type: u32,
+    pub linked_path_kind: u32,
     /// Not known yet.
     pub waypoint_level: u32,
     /// Not known yet.
@@ -44,7 +44,7 @@ impl ReadableHeaderElement for PathData {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let mut path = Self {
             id: input.read_u32::<LE>()?,
-            linked_path_type: input.read_u32::<LE>()?,
+            linked_path_kind: input.read_u32::<LE>()?,
             waypoint_level: input.read_u32::<LE>()?,
             path_id: input.read_u32::<LE>()?,
             waypoint: input.read_u32::<LE>()?,

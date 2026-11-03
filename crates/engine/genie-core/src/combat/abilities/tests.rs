@@ -25,7 +25,7 @@ use crate::objects::masters::TaskSprites;
 use crate::objects::masters::TaskTerrain;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
-use crate::players::PlayerType;
+use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::class_id;
 use crate::test_ids::costs;
@@ -40,9 +40,9 @@ use crate::world::Millis;
 use crate::world::WorldTime;
 use std::sync::Arc;
 
-fn task(action_type: ActionKind) -> Task {
+fn task(action_kind: ActionKind) -> Task {
     Task {
-        action_kind: action_type,
+        action_kind,
         ..Task::default()
     }
 }
@@ -51,8 +51,8 @@ fn task(action_type: ActionKind) -> Task {
 fn feitoria_food() -> Task {
     Task {
         object_group: None,
-        attribute_type2: Some(AttributeId::named(205)),
-        attribute_type3: Some(attribute::FOOD),
+        attribute_kind2: Some(AttributeId::named(205)),
+        attribute_kind3: Some(attribute::FOOD),
         work_val1: WorkValue::new(1.6),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
@@ -63,8 +63,8 @@ fn feitoria_food() -> Task {
 fn keshik_gold() -> Task {
     Task {
         object_group: Some(class_id(0)),
-        attribute_type2: Some(AttributeId::named(213)),
-        attribute_type3: Some(attribute::GOLD),
+        attribute_kind2: Some(AttributeId::named(213)),
+        attribute_kind3: Some(attribute::GOLD),
         work_val1: WorkValue::new(0.01),
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..task(GENERATE)
@@ -81,7 +81,7 @@ fn the_living_path_takes_at_least_1_hit_point_or_nan() {
 }
 
 #[test]
-fn task_with_its_type_flag_bit_generates_always() {
+fn task_with_its_kind_flag_bit_generates_always() {
     // bit 1 for an object of type 70, bit 2 for one of type 80
     let mut t = feitoria_food();
     t.combat_level_flag = TaskFlags::UNITS_ALWAYS;
@@ -579,8 +579,8 @@ fn terrain_look_gives_the_task_sprites_on_its_terrains() {
 /// A removal reward task: 10 gold (3) a removal, by attribute 7's rate.
 fn bounty() -> Task {
     Task {
-        attribute_type2: Some(attribute::RELICS_HELD),
-        attribute_type3: Some(attribute::GOLD),
+        attribute_kind2: Some(attribute::RELICS_HELD),
+        attribute_kind3: Some(attribute::GOLD),
         work_val1: WorkValue::new(10.0),
         ..task(REMOVAL_REWARD)
     }
@@ -605,7 +605,7 @@ fn removal_reward_pays_the_rate_times_the_attribute() {
     // the player lacks the attribute, or the task names none
     assert_eq!(reward(&t, PlayerId::new(2), None, &[]).amount, 10);
     let none = Task {
-        attribute_type2: None,
+        attribute_kind2: None,
         ..bounty()
     };
     assert_eq!(
@@ -784,7 +784,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
         vec![VisionBits::NONE; 400],
         Vec::new(),
         0,
-        vec![PlayerType::HUMAN; 3],
+        vec![PlayerKind::HUMAN; 3],
     );
     v.add_seer(
         object_id(id),
@@ -1207,7 +1207,7 @@ fn dead_object_that_leaves_issues_its_removal_rewards() {
 }
 
 #[test]
-fn an_object_of_another_type_has_no_abilities() {
+fn an_object_of_another_kind_has_no_abilities() {
     let mut t = world();
     give_master(
         &mut t,
