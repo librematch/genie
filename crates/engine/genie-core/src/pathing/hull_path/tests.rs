@@ -21,10 +21,12 @@ use crate::players::PlayerId;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::roles;
 use crate::testing::tuning;
 use crate::vision::visibility::Visibility;
 use crate::world::WorldTime;
 use crate::world::index::TestObjects;
+use crate::world::layer::{ClassRoles, Roles};
 
 /// The unit square as `addShapeToHulls` makes a hull of it: high right, low right, low left,
 /// high left.
@@ -3151,4 +3153,45 @@ fn goal_in_the_start_hull_is_walked_to_within_it() {
     assert_eq!(p.round_start(&q, true, &mut rounds, &mut path), Ok(None));
     assert!(rounds.within);
     assert_eq!(path.points, [Point::new(4.9, 5.5), side]);
+}
+
+/// The gate's role moves with the layer (FD-046-D23): under a layer that gives the stand-in class
+/// 99 the gate's role and class 39 none, the player passes the class-99 object and the class-39
+/// one goes into the hull; under build 158041's layer it is the other way round.
+#[test]
+fn the_gate_role_moves_to_another_class() {
+    let objects = TestObjects::default();
+    let moved = Roles::from_ids(&[(99, ClassRoles::GATE)], &[], &[], &[]);
+    let stock = roles();
+    let hulls = |roles: &Roles| {
+        let mut w = open_world();
+        w.insert(object_id(10), tall(5.3, 5.3, 0.2, class::PREDATOR)); // the unit: ignored
+        w.insert(object_id(3), tall(5.5, 5.4, 0.5, ClassId::named(99)));
+        w.insert(object_id(4), tall(5.5, 5.6, 0.5, class::GATE));
+        let passes = BTreeSet::from([object_id(3), object_id(4)]);
+        let mut p = HullPather::new(
+            (&mut w, objects.view_with(roles)),
+            object_id(10),
+            Some(object_id(11)),
+            TerrainMask::of_bits(6),
+            Distance::new(0.2),
+        )
+        .with_gates(&passes);
+        p.hulls = vec![Hull {
+            points: vec![Point::new(1.0, 1.0), Point::new(0.0, 0.0)],
+            entrances: vec![None; 2],
+            min: Point::new(0.0, 0.0),
+            max: Point::new(1.0, 1.0),
+            objects: Vec::new(),
+        }];
+        p.add_tile_objects(
+            Tile::new(5, 5),
+            Some(HullIndex::new(0)),
+            Some(PlayerId::from(1)),
+        )
+        .unwrap();
+        hull_ids(&p)
+    };
+    assert_eq!(hulls(&moved), [vec![RecordId::from(object_id(4))]]);
+    assert_eq!(hulls(&stock), [vec![RecordId::from(object_id(3))]]);
 }

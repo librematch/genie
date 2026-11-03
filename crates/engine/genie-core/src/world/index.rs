@@ -571,12 +571,17 @@ impl TestObjects {
 
     /// The units by id.
     pub(crate) fn view(&self) -> ObjectsRef<'_> {
+        self.view_with(static_roles())
+    }
+
+    /// The units by id under the layer's `roles` in place of build 158041's.
+    pub(crate) fn view_with<'a>(&'a self, roles: &'a Roles) -> ObjectsRef<'a> {
         ObjectsRef::new(
             &self.players,
             &self.index,
             &self.masters,
             &self.parts,
-            static_roles(),
+            roles,
             tuning(),
         )
     }

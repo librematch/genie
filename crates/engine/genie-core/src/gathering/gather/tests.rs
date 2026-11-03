@@ -42,6 +42,7 @@ use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
+use crate::world::layer::{ClassRoles, MasterRoles, Roles};
 use crate::world::step::Step;
 use crate::world::tests::in_update;
 use crate::world::{Player, World};
@@ -325,6 +326,38 @@ fn under_the_farm_setting_farm_gather_goes_in_four_timed_stops() {
         (one.stops, one.time_per_stop, trap.stops),
         (FarmStops::ONE, Seconds::ZERO, FarmStops::ONE)
     );
+}
+
+/// The farm's roles move with the layer (FD-046-D23): under a layer that names the stand-in
+/// class 99 a farm and master 99 a farm of stops, a gather on master 99 goes in the four timed
+/// stops of master 50's; under build 158041's layer the same target is one stop.
+#[test]
+fn second_farm_masters_farm() {
+    let rate = StopRate {
+        work_rate: WorkRate::new(0.33),
+        capacity: Amount::new(10.0),
+        productivity: Amount::new(1.0),
+    };
+    let stand_in = Resource {
+        class: ClassId::named(99),
+        master: master_id(99),
+        ..farm()
+    };
+    let moved = Roles::from_ids(
+        &[(99, ClassRoles::FARM)],
+        &[(99, MasterRoles::STOP_FARM)],
+        &[],
+        &[],
+    );
+    let second = GatherAction::new(task(), &stand_in, true, rate, &moved).unwrap();
+    let first = GatherAction::new(task(), &farm(), true, rate, &roles()).unwrap();
+    assert_eq!(
+        (second.stops, second.time_per_stop, second.farm),
+        (first.stops, first.time_per_stop, first.farm)
+    );
+    assert_eq!(first.stops, FarmStops::of_data(4));
+    let stock = GatherAction::new(task(), &stand_in, true, rate, &roles()).unwrap();
+    assert_eq!((stock.stops, stock.farm), (FarmStops::ONE, Point::ORIGIN));
 }
 
 /// Slot 0x38 (`FUN_140a8e1b0`, `set_state(2)`): the `MoveTo` goes and stops the unit, the
