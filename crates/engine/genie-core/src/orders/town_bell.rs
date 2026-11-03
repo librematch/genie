@@ -31,10 +31,9 @@ use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
-use crate::unit_ai::AiMove;
-use crate::unit_ai::OrderForce;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
+use crate::unit_ai::{AiMove, OrderForce, Pace};
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -543,7 +542,7 @@ impl World {
                     point: Position::new(x, y, 0.0),
                     range: Distance::ZERO,
                     force: OrderForce::Forced,
-                    walk: false,
+                    pace: Pace::Run,
                 },
             )?,
             Some(target) => self.order_work(

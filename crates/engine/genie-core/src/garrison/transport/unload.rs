@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::SIEGE_UNLOAD;
+use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{
@@ -121,7 +122,7 @@ impl World {
         } else {
             let mut t = TransportAction::new(ship.position);
             let started = t.start(
-                true,
+                StartCall::Added,
                 &ship,
                 &mut shore,
                 &self.model.tuning.transport,

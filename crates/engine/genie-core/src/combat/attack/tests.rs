@@ -3,6 +3,7 @@ use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
 use crate::combat::attack::AtOnce;
 use crate::combat::damage::Allied;
+use crate::combat::damage::HitKind;
 use crate::combat::missile::StrikeResult;
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
@@ -963,7 +964,7 @@ fn strike_on_an_annex_hits_its_main_building() {
     let hit = Hit {
         at: own.position,
         from_z: Some(0.0),
-        missile: false,
+        kind: HitKind::Melee,
         chance: HitChance::of_data(100),
     };
     let struck = strike(
@@ -1018,7 +1019,7 @@ fn building_relic_raises_its_missile_hit() {
         let hit = Hit {
             at: target.position,
             from_z: Some(2.0),
-            missile: true,
+            kind: HitKind::Missile,
             chance: HitChance::of_data(100),
         };
         let _ = strike(

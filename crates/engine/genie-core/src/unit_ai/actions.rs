@@ -16,6 +16,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
@@ -343,7 +344,7 @@ impl UnitAi {
                 point: Position::new(x, y, at.position.z()),
                 range: Distance::new(WALK_BACK),
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             }),
             self,
             rng,

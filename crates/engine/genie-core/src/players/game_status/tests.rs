@@ -2,6 +2,7 @@ use super::*;
 use crate::combat::attack::ATTACK;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::tests::own_attack;
+use crate::commands::Departure;
 use crate::construction::build::BuildState;
 use crate::construction::build::BuildTask;
 use crate::construction::build::tests::started_on;
@@ -1107,7 +1108,7 @@ fn cancel_in_game_mode_16_clears_the_military_flag() {
 #[test]
 fn resignation_cancels_the_queues_and_the_last_side_wins() {
     let mut t = game();
-    t.resign(player_id(1), false).unwrap();
+    t.resign(player_id(1), Departure::Resigned).unwrap();
     let p = &t.players[1];
     assert_eq!(
         (p.game_status, p.resigned, p.dropped),
@@ -1151,7 +1152,7 @@ fn make_action_the_queue_did_not_pay_for_refunds_its_master_costs() {
     {
         make.paid = false;
     }
-    t.resign(player_id(1), false).unwrap();
+    t.resign(player_id(1), Departure::Resigned).unwrap();
     assert_eq!(t.players[1].attributes[0], Amount::new(92.0));
 }
 
@@ -1159,7 +1160,7 @@ fn make_action_the_queue_did_not_pay_for_refunds_its_master_costs() {
 fn early_in_the_game_resignation_leaves_the_objects_alone() {
     let mut t = game();
     t.world_time = WorldTime::from_millis(60_000);
-    t.resign(player_id(1), true).unwrap();
+    t.resign(player_id(1), Departure::Dropped).unwrap();
     assert_eq!((t.players[1].resigned, t.players[1].dropped), (true, true));
     assert_eq!(t.players[1].attributes[0], Amount::ZERO);
 }

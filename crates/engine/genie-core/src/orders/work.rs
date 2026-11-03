@@ -66,8 +66,9 @@ fn attack_on(top: Option<ActionKind>, a: &Attack, target: Option<ObjectId>) -> b
     top == Some(ATTACK) && a.target.map(AttackTargetId::id) == target
 }
 
-/// Whether the unit's task search ([`World::find_work_task`]) changes its master to the one
-/// whose task it found (1), or only finds the task (0).
+/// Whether a unit changes its master to the one whose task it found (1) or keeps its own (0):
+/// the task search's ([`World::find_work_task`]), and the work command's before it retakes the
+/// task ([`World::retake_task`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum MasterSwap {
     /// The unit takes the master.
@@ -229,8 +230,12 @@ impl World {
             return self.work_move(player, idx, target, point, (notifies, source));
         };
         // a new master's task is another than the one the unit's action holds
-        let same_master = with == self.players.live(player, idx)?.life.master_id;
-        if !same_master {
+        let master = if with == self.players.live(player, idx)?.life.master_id {
+            MasterSwap::Keep
+        } else {
+            MasterSwap::Change
+        };
+        if master == MasterSwap::Change {
             self.change_master(player, idx, with)?;
         }
         if !enabled(&self.players.player(player)?.attributes, task.enablement) {
@@ -241,7 +246,7 @@ impl World {
             .parts
             .actions_of(self.players.live(player, idx)?.id)
             .top_action_kind();
-        let kept = self.retake_task(player, idx, (target, point, notifies), &task, same_master)?;
+        let kept = self.retake_task(player, idx, (target, point, notifies), &task, master)?;
         if carry_test {
             self.carried_resource_test(player, idx, &task)?;
         }
@@ -331,7 +336,7 @@ impl World {
         idx: ListIndex,
         (target, point, notifies): (Option<ObjectId>, Position, Notifies),
         task: &Task,
-        same_master: bool,
+        master: MasterSwap,
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
@@ -345,7 +350,7 @@ impl World {
                 true
             }
             _ if top == Some(task.action_kind) && task.action_kind == ActionKind::BUILD => {
-                if !same_master {
+                if master == MasterSwap::Change {
                     return Err(GenieError::unsupported(
                         "a work command on the Build task of the unit's former master",
                     ));

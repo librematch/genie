@@ -1,10 +1,12 @@
 //! A missile's flight: where it ends, what it hits and where it lands.
 
 use crate::GenieError;
+use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
 use crate::combat::missile::MissileState;
 use crate::combat::missile::ShooterId;
 use crate::combat::missile::StrikeResult;
+use crate::combat::missile::TargetOwner;
 use crate::combat::missile::VanishMode;
 use crate::combat::victims::{readable, victim, victim_of, write_strike_back};
 use crate::combat::volley::Fired;
@@ -177,7 +179,10 @@ impl Unit {
                     "a missile without the map's terrain",
                 ))?
                 .ground(at.ground())?;
-        at = at.with_z(grounded(at.z(), ground, flying, stats.fly_mode));
+        // a missile still flying (`+0x994`) keeps its height
+        if !flying {
+            at = at.with_z(grounded(at.z(), ground, stats.fly_mode));
+        }
         mover.mark_move(at, c.w.world_time);
         mover.new_position(
             &mut self.place,
@@ -434,7 +439,7 @@ impl Unit {
         let hit = Hit {
             at: self.position(),
             from_z: Some(action.origin.position.z()),
-            missile: true,
+            kind: HitKind::Missile,
             chance: master.combat_part().hit_chance,
         };
         let object = streams.get(Stream::Object);
@@ -522,7 +527,7 @@ impl Unit {
         let hit = Hit {
             at: self.position(),
             from_z: None,
-            missile: true,
+            kind: HitKind::Missile,
             chance: master.combat_part().hit_chance,
         };
         let object = c.w.streams.get(Stream::Object);
@@ -625,7 +630,12 @@ impl Unit {
         let v = victim(c, action.target, roles)?.ok_or(GenieError::unsupported(
             "a missile's target the slice does not hold live",
         ))?;
-        if stats.hit_mode.strikes_on_landing(c.player != v.player)
+        let owner = if c.player == v.player {
+            TargetOwner::Own
+        } else {
+            TargetOwner::Other
+        };
+        if stats.hit_mode.strikes_on_landing(owner)
             && on_target(self.position(), stats.radius, v.position, v.radius)
         {
             let result = self.missile_strike(actions, action, fired, c, roles)?;

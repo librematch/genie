@@ -19,6 +19,7 @@ use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
+use crate::movement::move_to::Patience;
 use crate::movement::{Me, footprint_gap};
 use crate::objects::Graphics;
 use crate::objects::ObjectId;
@@ -92,8 +93,13 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         self.timer += c.dt.seconds();
         let gives_up = GiveUp {
-            waits: !r.player_kind.is_computer()
-                && roles.of_class(master_class).contains(ClassRoles::VILLAGER),
+            patience: if !r.player_kind.is_computer()
+                && roles.of_class(master_class).contains(ClassRoles::VILLAGER)
+            {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {

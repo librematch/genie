@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::combat::attack::Fight;
 use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
+use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::update::write_target_back;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, LEAD_REACH, LEAD_WAIT};
@@ -147,11 +148,11 @@ impl HuntAction {
         c: &mut Step<'_>,
         hunter: &mut Unit,
         actions: &mut Action,
-        stops_decay: bool,
+        decay: DecayRule,
         f: &mut Fight,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        if self.stops_decay_of(stops_decay, &mut f.victim, roles) {
+        if self.stops_decay_of(decay, &mut f.victim, roles) {
             write_target_back(c, hunter, actions, f, roles)?;
         }
         Ok(())
@@ -161,14 +162,14 @@ impl HuntAction {
     /// stopped the decay.
     pub(super) fn stops_decay_of(
         &self,
-        stops_decay: bool,
+        decay: DecayRule,
         victim: &mut Victim,
         roles: &Roles,
     ) -> bool {
         let stops = roles
             .of_some_attribute(self.task.kind4)
             .contains(AttributeRoles::DECAY_TASK)
-            && stops_decay
+            && decay == DecayRule::Stops
             && AmountRate::ZERO < victim.decay;
         if stops {
             victim.decay = -victim.decay;

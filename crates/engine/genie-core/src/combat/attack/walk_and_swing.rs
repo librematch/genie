@@ -8,6 +8,7 @@ use crate::combat::attack::{
     AfterHit, Attack, AttackReads, DRAW_SCALE, EPSILON, Fight, HALF, Hit, Readiness, after_hit,
     blast_so_far, reset_sprite, set_attack_timer, set_walker_anim, squared_reach, strike,
 };
+use crate::combat::damage::HitKind;
 use crate::combat::damage::Victim;
 use crate::combat::victims::write_strike_back;
 use crate::combat::volley::Aimed;
@@ -17,6 +18,7 @@ use crate::map::Position;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::movement::move_to::Patience;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::Frame;
 use crate::objects::HitPoints;
@@ -64,8 +66,13 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.player_kind.is_computer()
-                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
+            patience: if !r.player_kind.is_computer()
+                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
+            {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: r.stance,
         };
         match self.update_list(c, unit, me, r, gives_up)?.get() {
@@ -408,7 +415,7 @@ impl Attack {
         let hit = Hit {
             at: f.own.position,
             from_z: Some(f.own.position.z()),
-            missile: false,
+            kind: HitKind::Melee,
             chance,
         };
         let struck = strike(&mut f.own, &mut f.victim, blasted, hit, object_rng, layer)?;
@@ -453,7 +460,7 @@ impl Attack {
                 &f.victim,
                 damage_tuning,
             );
-            if !shield(&mut f.victim, false) {
+            if !shield(&mut f.victim, HitKind::Melee) {
                 let weapons = f.own.weapons.clone();
                 let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
                 take(

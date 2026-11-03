@@ -1,6 +1,7 @@
 //! A command into its packet: genie-rec's layout of the command's kind, filled from the command.
 
 use genie_core::GenieError;
+use genie_core::commands::Departure;
 use genie_core::commands::GatherPointState;
 use genie_core::commands::{
     AttackMoveCommand, BuildCommand, BuildWallCommand, Command, FlareCommand, GameCommand, Order,
@@ -10,6 +11,7 @@ use genie_core::commands::{
 use genie_core::map::Axis;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
+use genie_core::orders::SavedPatrols;
 use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
 
@@ -181,7 +183,7 @@ fn single(command: &Command) -> Result<Packet, GenieError> {
     Ok(match command {
         Command::Resign(c) => Packet::Resign(packets::Resign {
             commp_id: c.player.get(),
-            dropped: u8::from(c.dropped),
+            dropped: u8::from(c.departure == Departure::Dropped),
         }),
         Command::TransformObject(c) => Packet::TransformObject(packets::TransformObject {
             commp_id: c.player.get(),
@@ -357,7 +359,7 @@ fn patrol(c: &PatrolCommand) -> Result<Packet, GenieError> {
         commp_id: c.player.get(),
         num: c.units.count,
         gap_0x06: [0; 2],
-        field_0x08: u8::from(c.reset),
+        field_0x08: u8::from(c.patrols == SavedPatrols::Dropped),
         gap_0x09: [0; 2],
         waypoints_count: c.waypoints.count,
         field_0x0c: x(0),
@@ -398,7 +400,7 @@ fn attack_move(c: &AttackMoveCommand) -> Result<Packet, GenieError> {
         commp_id: c.player.get(),
         num: c.units.count,
         gap_0x06: [0; 2],
-        field_0x08: u8::from(c.reset),
+        field_0x08: u8::from(c.patrols == SavedPatrols::Dropped),
         field_0x09: u8::from(c.queued),
         field_0x0a: u8::from(c.ignore_pending),
         waypoints_count: c.waypoints.count,

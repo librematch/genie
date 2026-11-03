@@ -8,6 +8,7 @@ use crate::construction::build::BuildState;
 use crate::construction::build::{BUILDER_UNMOVING, BuildAction, BuildReads, BuildTask};
 use crate::map::Position;
 use crate::movement::Me;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::{GiveUp, MoveToAction, MoveToReads, WalkTo};
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -381,10 +382,15 @@ impl BuildAction {
     ) -> Result<GiveUp, GenieError> {
         let player_kind = c.w.players.player(c.player)?.kind;
         Ok(GiveUp {
-            waits: roles
+            patience: if roles
                 .of_some_class(reads.class)
                 .contains(ClassRoles::VILLAGER)
-                && !player_kind.is_computer(),
+                && !player_kind.is_computer()
+            {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: c
                 .w
                 .parts

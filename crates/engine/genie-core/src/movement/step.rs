@@ -174,7 +174,7 @@ impl Mover {
         let z = terrain
             .and_then(|t| t.ground(at.ground()).ok())
             .map_or(height, |ground| {
-                missile_grounded(at.z(), ground, false, self.stats.fly_mode)
+                missile_grounded(at.z(), ground, self.stats.fly_mode)
             });
         at.with_z(z)
     }

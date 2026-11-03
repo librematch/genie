@@ -9,6 +9,7 @@ use crate::math::rng::Stream;
 use crate::movement::PathAsk;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveStep;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
@@ -189,7 +190,11 @@ impl Unit {
         self.own_move_gave_up(
             actions,
             c.w.parts.motion.layer_mut(self.id),
-            villager && !c.w.players.player(c.player)?.kind.is_computer(),
+            if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance,
             (
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),

@@ -40,7 +40,7 @@ mod strike_result;
 pub(crate) mod unit;
 
 pub use self::arc_ratio::ArcRatio;
-pub use self::hit_mode::HitMode;
+pub use self::hit_mode::{HitMode, TargetOwner};
 pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::{SmartMode, VanishMode};
 pub use self::missile_state::MissileState;
@@ -489,14 +489,13 @@ pub fn on_target(at: Position, radius: Radii, target: Position, target_radius: F
     dx < target_radius.x() + radius.x() && dy < target_radius.y() + radius.y()
 }
 
-/// The height a missile's place takes on the ground (slot 0x60, `FUN_14113eb60`, with the
-/// ground's height, from the static `new_position)`: a missile still flying (`+0x994`) keeps its
-/// height; else `FUN_141193a10` by its master's fly mode: 0 puts it on the ground, 1 lifts it to
-/// the ground when it is below, others keep it.
+/// The height a place takes on the ground (`FUN_141193a10`, with the ground's height) by its
+/// master's fly mode: 0 puts it on the ground, 1 lifts it to the ground when it is below, others
+/// keep it. A missile still flying (`+0x994`) keeps its height before this (slot 0x60,
+/// `FUN_14113eb60`, from the static `new_position`).
 #[must_use]
-pub fn grounded(z: f32, ground: f32, flying: bool, fly_mode: FlyMode) -> f32 {
+pub fn grounded(z: f32, ground: f32, fly_mode: FlyMode) -> f32 {
     match fly_mode {
-        _ if flying => z,
         FlyMode::GROUND => ground,
         FlyMode::ABOVE if z < ground => ground,
         _ => z,
@@ -687,17 +686,10 @@ mod tests {
     /// −0.3602 and is lifted onto it (the ground hit: its height is the ground's).
     #[test]
     fn spear_past_its_point_takes_the_ground_by_its_fly_mode() {
-        assert_eq!(
-            grounded(0.349_624_8, 0.0, false, FlyMode::ABOVE),
-            0.349_624_8
-        );
-        assert_eq!(grounded(-0.360_166_4, 0.0, false, FlyMode::ABOVE), 0.0);
+        assert_eq!(grounded(0.349_624_8, 0.0, FlyMode::ABOVE), 0.349_624_8);
+        assert_eq!(grounded(-0.360_166_4, 0.0, FlyMode::ABOVE), 0.0);
         // still flying it keeps any height; fly mode 0 always takes the ground
-        assert_eq!(
-            grounded(-0.360_166_4, 0.0, true, FlyMode::ABOVE),
-            -0.360_166_4
-        );
-        assert_eq!(grounded(0.349_624_8, 0.0, false, FlyMode::GROUND), 0.0);
+        assert_eq!(grounded(0.349_624_8, 0.0, FlyMode::GROUND), 0.0);
     }
 
     #[test]

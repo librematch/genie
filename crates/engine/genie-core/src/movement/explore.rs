@@ -16,7 +16,7 @@ use crate::map::{Tile, TileOffset};
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Mover;
-use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads};
+use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, Patience, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
@@ -277,7 +277,11 @@ impl ExploreAction {
         let villager =
             master.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER));
         let gives_up = GiveUp {
-            waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
+            patience: if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: c
                 .w
                 .parts

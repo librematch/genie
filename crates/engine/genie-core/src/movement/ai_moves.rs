@@ -7,6 +7,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::move_to::Patience;
 use crate::objects::ObjectId;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionKind;
@@ -15,6 +16,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
 use crate::players::PlayerId;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::Pace;
 
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntMove;
@@ -136,7 +138,7 @@ impl Unit {
     /// point (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `m.point` stands: the move is done.
     /// Then the head action's slot 0x40 may take the point ([`Unit::head_takes_point`]; the
     /// target it lets go into `releases`). Otherwise a `MoveTo` to the point within `m.range`
-    /// (`FUN_140aa0d30`, the master's walking sprite with `m.walk`, else its running one; the
+    /// (`FUN_140aa0d30`, the master's walking sprite with [`Pace::Walk`], else its running one; the
     /// sprite is not held) is made, the action list is cleared (`FUN_140a98620`,
     /// [`Unit::clear_own_actions`]: the teardowns let their targets go into `releases` and a
     /// counted builder's foundation into `builder_leaves`, by `by`) and the `MoveTo` installed and
@@ -204,7 +206,7 @@ impl Unit {
         }
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
-        let sprite = ai_sprite(master, m.walk)
+        let sprite = ai_sprite(master, m.pace)
             .or_else(|| point_sprite(master, look, Cargo::Empty, roles))
             .and_then(|id| graphics.get(id).copied());
         let move_to = MoveToAction::to_point(m.point, m.range, sprite, motion.mover_mut());
@@ -457,7 +459,7 @@ impl Unit {
         torn_down(c, self, (leaves, releases))?;
         let own = self.master(c.w.master_tables(), c.player)?;
         let range = object_range(range, Some(own), &c.w.model.tuning.order);
-        let sprite = ai_sprite(own, false)
+        let sprite = ai_sprite(own, Pace::Run)
             .or_else(|| object_sprite(own))
             .and_then(|id| c.w.model.graphics.get(id).copied());
         let here = self.position();
@@ -500,7 +502,7 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         motion: MotionMut<'_>,
-        waits: bool,
+        patience: Patience,
         stance: UnitStance,
         (masters, graphics, sprite_rng): (OwnerMasters<'_>, &Graphics, &mut Well512),
         sprite_tuning: SpriteTuning,
@@ -508,7 +510,7 @@ impl Unit {
         let Some(m) = actions.list.move_to_mut() else {
             return Ok(());
         };
-        m.state = m.wait.give_up(waits, stance);
+        m.state = m.wait.give_up(patience, stance);
         if m.state == MoveTo::Failed {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }

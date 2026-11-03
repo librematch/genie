@@ -74,6 +74,7 @@ fn building_relics_scale_its_elevation_factor() {
 
 use super::*;
 use crate::combat::abilities::REMOVAL_REWARD;
+use crate::combat::damage::HitKind;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::combat::damage::blasts::BlastHit;
 use crate::combat::damage::shown_values::HpPart;
@@ -801,13 +802,13 @@ fn shield_spends_charge_per_blocked_hit() {
     let mut sheep = sheep();
     sheep.source.charge_kind = ChargeKind::MELEE_SHIELD;
     sheep.source.charge = Charge::new(1.5);
-    assert!(!shield(&mut sheep, true));
-    assert!(shield(&mut sheep, false));
+    assert!(!shield(&mut sheep, HitKind::Missile));
+    assert!(shield(&mut sheep, HitKind::Melee));
     assert_eq!(sheep.source.charge, Charge::new(0.5));
-    assert!(!shield(&mut sheep, false));
+    assert!(!shield(&mut sheep, HitKind::Melee));
     // COMISS 1.0, charge; JA past: a NaN charge blocks the hit and stays NaN
     sheep.source.charge = Charge::new(f32::NAN);
-    assert!(shield(&mut sheep, false));
+    assert!(shield(&mut sheep, HitKind::Melee));
     assert!(sheep.source.charge.get().is_nan());
 }
 

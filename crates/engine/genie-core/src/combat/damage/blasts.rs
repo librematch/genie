@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::Charge;
+use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::{
     Attacker, Kill, Victim, armor_damage, bonus_damage, charge_hit, elevation_factor,
@@ -288,7 +289,7 @@ pub(super) fn blast_one(
     let Some(d2) = blast_distance2(t, b.center, b.r.get()) else {
         return Ok(());
     };
-    if MasterKind::COMBAT <= t.kind && shield(t, false) {
+    if MasterKind::COMBAT <= t.kind && shield(t, HitKind::Melee) {
         return Ok(());
     }
     let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), hit, damage_tuning);

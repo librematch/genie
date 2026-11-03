@@ -419,6 +419,16 @@ pub struct AiMove {
     pub range: Distance,
     /// The sixth argument: forced, the move replaces even a `MoveTo` to the same point.
     pub force: OrderForce,
-    /// The seventh: the unit walks (its master's walking sprite, `+0x748`), not runs.
-    pub walk: bool,
+    /// The seventh: whether the unit walks or runs.
+    pub pace: Pace,
+}
+
+/// How an [`AiMove`]'s unit goes (its seventh argument): it walks (1, its master's walking
+/// sprite, `+0x748`) or runs (0, its running sprite, `+0x750`, when it has one).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pace {
+    /// It walks.
+    Walk,
+    /// It runs.
+    Run,
 }

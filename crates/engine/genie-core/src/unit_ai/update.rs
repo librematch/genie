@@ -19,6 +19,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTest;
+use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
@@ -596,7 +597,7 @@ impl UnitAi {
                 point: self.target_point,
                 range: at.weapon_range,
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             });
             if let Some(m) = m {
                 side.effect_now(Effect::Move(m), self, ai)?;

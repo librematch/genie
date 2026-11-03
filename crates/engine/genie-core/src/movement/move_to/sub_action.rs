@@ -7,6 +7,7 @@ use crate::map::Position;
 use crate::math::image::garrison::FAR;
 use crate::movement::PathAsk;
 use crate::movement::Speed;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::{
     Follow, MoveTo, MoveToAction, MoveWait, Shown, TargetMoved, Walk, ask_walk, walk_or_give_up,
 };
@@ -33,9 +34,8 @@ pub const NO_TARGET_GAP: f32 = FAR;
 /// What the motion step's giving up reads of the unit ([`MoveWait::give_up`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct GiveUp {
-    /// A human player's villager (`LAB_140aa320c`: `FUN_141659cf0` 0, the master's class 4),
-    /// which waits once before it asks again.
-    pub waits: bool,
+    /// Whether it waits once before it asks again (a human player's villager).
+    pub patience: Patience,
     /// The unit AI's stance (`+0x1a9`), 0 without one: below 2 it waits a second, else two.
     pub stance: UnitStance,
 }
@@ -124,7 +124,7 @@ impl MoveToAction {
             }
             return Ok(code);
         }
-        let GiveUp { waits, stance } = gives_up;
+        let GiveUp { patience, stance } = gives_up;
         Ok(match self.state {
             MoveTo::Start => {
                 self.wait.ask_again();
@@ -134,7 +134,7 @@ impl MoveToAction {
                 if let Some(point) = asked {
                     self.point = point;
                 }
-                self.state = started.unwrap_or_else(|| self.wait.give_up(waits, stance));
+                self.state = started.unwrap_or_else(|| self.wait.give_up(patience, stance));
                 UpdateCode::UnderWay
             }
             MoveTo::Moving => {
@@ -146,7 +146,7 @@ impl MoveToAction {
                 match walk_or_give_up(walk.reborrow())? {
                     Some(MoveTo::Moving) => {}
                     Some(other) => self.state = other,
-                    None => self.state = self.wait.give_up(waits, stance),
+                    None => self.state = self.wait.give_up(patience, stance),
                 }
                 UpdateCode::UnderWay
             }

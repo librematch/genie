@@ -10,6 +10,7 @@ use crate::movement::WaypointIndex;
 use crate::movement::path_points::GoalReach;
 use crate::world::Seconds;
 use crate::world::WorldTime;
+use crate::world::layer::ClassRoles;
 use std::ops::ControlFlow;
 
 use crate::GenieError;
@@ -55,9 +56,9 @@ impl NewPath {
     }
 }
 
-/// The request's way to the walked level's waypoint: the goal and the include list, where the
-/// unit last moved to (`+0x824`), the waypoint and the ground distance between, the unit's
-/// radius, the level's number, range and target, and whether the unit is a trade cart.
+/// The request's way to the walked level's waypoint: the goal and the include list, where the unit
+/// last moved to (`+0x824`), the waypoint and the ground distance between, the unit's radius, the
+/// level's number, range and target, and the roles of the unit's class (a trade cart's).
 pub(super) struct Way<'a> {
     pub(super) goal: Goal<'a>,
     pub(super) include: &'a [ObjectId],
@@ -68,7 +69,7 @@ pub(super) struct Way<'a> {
     pub(super) level: WaypointLevel,
     pub(super) range: Distance,
     pub(super) target_id: Option<ObjectId>,
-    pub(super) trade_cart: bool,
+    pub(super) class_roles: ClassRoles,
 }
 
 impl Mover {
@@ -393,7 +394,10 @@ impl Mover {
     ) -> Result<Option<AfterRequest>, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
-        if !(LONG_PATHER && (w.trade_cart || movement_tuning.short_reach < w.distance.get())) {
+        if !(LONG_PATHER
+            && (w.class_roles.contains(ClassRoles::TRADE_CART)
+                || movement_tuning.short_reach < w.distance.get()))
+        {
             return Ok(None);
         }
         let ground_radius = self.stats.radius.ground();

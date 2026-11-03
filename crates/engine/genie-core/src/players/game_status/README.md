@@ -27,5 +27,5 @@ stand still, buildings stop and give back their queues, and every unit AI drops 
 ## How it connects
 
 <!-- uses -->
-- Uses: [`combat`](../../combat/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`production`](../../production/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`commands`](../../commands/), [`construction`](../../construction/), [`garrison`](../../garrison/), [`gathering`](../../gathering/), [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`production`](../../production/), [`technology`](../../technology/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

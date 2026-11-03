@@ -17,6 +17,7 @@ use crate::unit_ai::AiLayer;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
@@ -444,7 +445,7 @@ impl UnitAi {
                     point: self.target_point,
                     range: self.desired_distance,
                     force: OrderForce::Forced,
-                    walk: false,
+                    pace: Pace::Run,
                 });
                 if let Some(m) = m {
                     side.effect_now(Effect::Move(m), self, ai)?;

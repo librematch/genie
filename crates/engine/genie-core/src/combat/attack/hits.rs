@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
+use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
 use crate::combat::damage::{
@@ -31,13 +32,14 @@ use crate::world::layer::MasterRoles;
 /// melee hit, the missile's for a missile's), the height the elevation factor compares with the
 /// target's (the attacker's slot 0x1f0: a combat object's, `FUN_14120d780`, its origin record's
 /// `+0x8` when the record names an owner that has its master, else its own; None for a missile
-/// whose record names no owner, `FUN_14113e550`: a factor of 1), whether a missile lands it (a
-/// shield of charge type 4 blocks it instead of 5) and the attacker's hit chance (`+0x83e`).
+/// whose record names no owner, `FUN_14113e550`: a factor of 1), what lands it ([`HitKind`]: a
+/// shield of charge type 4 blocks a missile's instead of 5) and the attacker's hit chance
+/// (`+0x83e`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Hit {
     pub at: Position,
     pub from_z: Option<f32>,
-    pub missile: bool,
+    pub kind: HitKind,
     pub chance: HitChance,
 }
 
@@ -122,7 +124,7 @@ pub(crate) fn strike(
         damage_tuning,
         ..
     } = layer;
-    if victim.kind == MasterKind::COMBAT && shield(victim, hit.missile) {
+    if victim.kind == MasterKind::COMBAT && shield(victim, hit.kind) {
         let master_hp = i32::from(own.master_hp.get());
         victim
             .damaged

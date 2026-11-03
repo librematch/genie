@@ -12,6 +12,7 @@ use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::movement::move_to::Patience;
 use crate::objects::layers::Action;
 use crate::objects::layers::MotionMut;
 use crate::objects::masters::MasterTables;
@@ -127,7 +128,7 @@ impl HuntAction {
                 ))
             }
             1 | 2 | 5 => {
-                self.decay_check(c, unit, actions, r.stops_decay, f, roles)?;
+                self.decay_check(c, unit, actions, r.decay, f, roles)?;
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let player = f.own.player;
                 self.set_walk(
@@ -174,8 +175,13 @@ impl HuntAction {
     ) -> Result<HuntNext, GenieError> {
         let roles = &c.w.model.roles.clone();
         let gives_up = GiveUp {
-            waits: !r.attack.player_kind.is_computer()
-                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER),
+            patience: if !r.attack.player_kind.is_computer()
+                && roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
+            {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: r.attack.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {
@@ -227,7 +233,7 @@ impl HuntAction {
             self.begin_face(c, unit, r);
             return Ok(HuntNext::Stay);
         }
-        self.decay_check(c, unit, actions, r.stops_decay, f, roles)?;
+        self.decay_check(c, unit, actions, r.decay, f, roles)?;
         self.set_face(c, unit, actions, f, r, roles)
     }
 

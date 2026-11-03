@@ -61,8 +61,10 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTest;
+use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TakenAs;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::flight::BadPoint;
@@ -761,7 +763,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             point: Position::new(29.5, 89.5, 2.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         }))]
     );
     assert_eq!(
@@ -842,7 +844,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
             point: Position::new(164.5, 51.5, 0.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         }))]
     );
     assert_eq!(
@@ -3151,7 +3153,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
             point: Position::new(20.0, 10.0, 0.0),
             range: Distance::new(2.5),
             force: OrderForce::Forced,
-            walk: false
+            pace: Pace::Run
         })]
     );
     // within reach of its point, nothing
@@ -4351,7 +4353,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
                 point: Position::new(10.0, 10.0, 0.0),
                 range: Distance::new(1.0),
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             })
         ]
     );
@@ -5665,7 +5667,7 @@ fn boar_wanders_up_to_three_tiles_once_in_seven() {
             point,
             range: Distance::new(0.5),
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         }
     );
     // slot 0x130: the move action, no target, the point; the last action is the old one
@@ -5998,12 +6000,12 @@ fn deer_that_sees_an_object_evades_it() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        (moved.point, moved.range, moved.force, moved.walk),
+        (moved.point, moved.range, moved.force, moved.pace),
         (
             Position::new(31.5 - 1.2 * 3.0, 106.5, 0.0),
             Distance::ZERO,
             OrderForce::Forced,
-            false
+            Pace::Run
         )
     );
     assert_eq!(
@@ -6126,7 +6128,7 @@ fn between_turns_an_arrived_move_runs_the_next_queued_order() {
             point: Position::new(89.09375, 60.677_082, 0.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         })]
     );
     assert_eq!(
@@ -6905,7 +6907,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
                 point: Position::new(30.0, 88.0, 0.0),
                 range: Distance::ZERO,
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             })
         ]
     );
@@ -7150,7 +7152,7 @@ fn an_idle_soldier_caps_its_human_order_time_and_searches_for_something_to_attac
                 point: Position::new(25.0, 92.5, 0.0),
                 range: Distance::new(1.0),
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             })
         ]
     );
@@ -7774,7 +7776,7 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
                 point: Position::new(10.0, 11.0, 0.0),
                 range: Distance::new(0.5),
                 force: OrderForce::Forced,
-                walk: true,
+                pace: Pace::Walk,
             })
         ]
     );
@@ -7915,7 +7917,7 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
             point: Position::new(10.0, 10.0, 2.5),
             range: Distance::new(1.0),
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     );
     assert_eq!(
@@ -7986,7 +7988,7 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
                 point: Position::new(25.0, 92.5, 0.0),
                 range: Distance::new(1.0),
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             })
         ]
     );
@@ -8244,7 +8246,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
                 point: Position::new(5.0, 6.0, 0.0),
                 range: Distance::new(0.25),
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             })
         ]
     );
@@ -9041,7 +9043,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
             point: Position::new(ex, ey, 1.5),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     );
     assert_eq!(
@@ -9077,7 +9079,7 @@ fn move_off_footprint_needs_force_or_no_action() {
         point: Position::new(4.0, 5.0, 0.0),
         range: Distance::ZERO,
         force,
-        walk: true,
+        pace: Pace::Walk,
     };
     let mut u = UnitAi {
         current_action: Some(AiAction::Gather),
@@ -9130,7 +9132,7 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         point: Position::new(4.0, 5.0, 0.5),
         range: Distance::new(0.5),
         force,
-        walk: true,
+        pace: Pace::Walk,
     };
     let mut u = UnitAi {
         current_action: Some(AiAction::Attack),
@@ -9432,7 +9434,7 @@ fn human_player_king_runs_from_its_attacker() {
             point: Position::new(18.0, 30.0, 0.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     );
     let mut u = UnitAi {
@@ -9505,7 +9507,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
             point,
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     };
     let runner = |attackers: Vec<i32>| UnitAi {
@@ -10234,7 +10236,7 @@ fn leaving_patrol_order_caps_its_secondary_timer() {
             Some(o.order),
             o.priority,
             Some(class::CLASS_6),
-            false,
+            TakenAs::Order,
             &mut rng(),
             &roles(),
         )
@@ -10544,7 +10546,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
             point: Position::new(18.0, 30.0, 0.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     );
     let (mut u, at) = attacked_transport();
@@ -10907,7 +10909,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
                 point: Position::new(13.0, 30.0, 0.0),
                 range: Distance::ZERO,
                 force: OrderForce::Forced,
-                walk: false,
+                pace: Pace::Run,
             }),
         ]
     );
@@ -12054,7 +12056,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
             point: Position::new(1.0, 2.0, 0.0),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         }),
     ] {
         let mut u = on_target(Some(AiAction::Gather));
@@ -12191,7 +12193,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
             point: Position::new(10.0, 10.0, 0.0),
             range: Distance::new(WALK_BACK),
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })
     );
     assert_eq!(
@@ -13039,7 +13041,7 @@ fn the_run_away_order_runs_from_the_unit_attackers() {
             point: Position::new(5.0, 6.0, 0.25),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })]
     );
     assert_eq!(
@@ -13166,7 +13168,7 @@ fn the_move_orders_move_to_their_point_within_their_range() {
                     point: Position::new(12.7, 30.2, 0.5),
                     range: Distance::new(3.0),
                     force: OrderForce::Forced,
-                    walk: true,
+                    pace: Pace::Walk,
                 })]
             )
         );
@@ -13492,7 +13494,7 @@ fn the_order_on_target_goes_to_the_caller_or_moves_to_gone_one_point() {
                 point: Position::new(12.7, 30.2, 0.5),
                 range: Distance::new(3.0),
                 force: OrderForce::Forced,
-                walk: true,
+                pace: Pace::Walk,
             })]
         );
         assert_eq!((u.current_order, u.order_priority.get()), (Some(order), 40));
@@ -13663,7 +13665,7 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
             Some(OrderKind::Move),
             OrderPriority::of_data(40),
             Some(class::CLASS_6),
-            false,
+            TakenAs::Order,
             &mut r,
             &roles()
         ),
@@ -13685,7 +13687,7 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         Some(OrderKind::AttackMove),
         OrderPriority::of_data(40),
         Some(class::CLASS_6),
-        false,
+        TakenAs::Order,
         &mut r,
         &roles(),
     );
@@ -13699,7 +13701,7 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         Some(OrderKind::Stop),
         OrderPriority::of_data(40),
         Some(class::CLASS_6),
-        false,
+        TakenAs::Order,
         &mut rng(),
         &roles(),
     );
@@ -13713,7 +13715,7 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         Some(OrderKind::AttackMove),
         OrderPriority::of_data(40),
         Some(class::CLASS_51),
-        true,
+        TakenAs::Attack,
         &mut rng(),
         &roles(),
     );
@@ -13727,7 +13729,7 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         Some(OrderKind::Attack),
         OrderPriority::of_data(40),
         Some(class::MONK),
-        false,
+        TakenAs::Order,
         &mut rng(),
         &roles(),
     );

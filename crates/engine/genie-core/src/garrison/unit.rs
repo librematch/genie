@@ -17,6 +17,7 @@ use crate::map::spatial::Placed;
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::move_to::MoveDefaults;
+use crate::movement::move_to::Patience;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
@@ -157,7 +158,11 @@ impl Unit {
         Ok(EnterReads {
             target,
             start,
-            waits: villager && !c.w.players.player(c.player)?.kind.is_computer(),
+            patience: if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: c
                 .w
                 .parts

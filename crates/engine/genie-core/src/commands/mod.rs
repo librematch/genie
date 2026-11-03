@@ -73,7 +73,7 @@ pub use self::packet_values::{QueueId, ResourceWord, SpriteOverride, TradeLots};
 pub use self::patrol::{PatrolCommand, Waypoints};
 pub use self::queue::QueueCommand;
 pub use self::research::ResearchCommand;
-pub use self::resign::ResignCommand;
+pub use self::resign::{Departure, ResignCommand};
 pub use self::seek_shelter::SeekShelterCommand;
 pub use self::set_gather_state::SetGatherStateCommand;
 pub use self::shift::Shift;

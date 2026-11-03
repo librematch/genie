@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::abilities::Look;
+use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::TransportTarget;
@@ -68,7 +69,7 @@ impl TransportAction {
         }
     }
 
-    /// Slot 5 (`FUN_140aa3e10`), the start: `first` (the action list's add passes 1) with a
+    /// Slot 5 (`FUN_140aa3e10`), the start: [`StartCall::Added`] (the action list's add) with a
     /// point not below 0 on either axis (`COMISS`/`JA`, `JBE`: a NaN is not) sails there
     /// (`set_state(11)`); else it idles (`set_state(2)`).
     ///
@@ -77,14 +78,16 @@ impl TransportAction {
     /// A sprite the table lacks.
     pub fn start(
         &mut self,
-        first: bool,
+        call: StartCall,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         let (x, y) = (self.point.x(), self.point.y());
-        let sails = first && at_most_or_unordered(0.0, x) && at_most_or_unordered(0.0, y);
+        let sails = call == StartCall::Added
+            && at_most_or_unordered(0.0, x)
+            && at_most_or_unordered(0.0, y);
         self.set_state(
             if sails {
                 TransportState::Sail { move_to: None }

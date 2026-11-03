@@ -25,6 +25,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite, standing, walking};
 use crate::unit_ai::NotifyKind;
+use crate::unit_ai::Pace;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
 use crate::world::WALKER_UNMOVING;
@@ -148,12 +149,15 @@ pub fn object_sprite(master: &Master) -> Option<SpriteId> {
 }
 
 /// The sprite the unit AI's moves give their `MoveTo` (slot 0x340, `FUN_1410866e0`, with
-/// `walk` its seventh argument; slot 0x348, `FUN_141086440`, never walks): the master's running
+/// `pace` its seventh argument; slot 0x348, `FUN_141086440`, never walks): the master's running
 /// sprite (`+0x750`) unless the move walks, else (or without one) its walking sprite (`+0x748`);
 /// no terrain look. None leaves the constructor's default ([`point_sprite`], [`object_sprite`]).
 #[must_use]
-pub fn ai_sprite(master: &Master, walk: bool) -> Option<SpriteId> {
-    let run = master.moving_part().run_sprite.filter(|_| !walk);
+pub fn ai_sprite(master: &Master, pace: Pace) -> Option<SpriteId> {
+    let run = master
+        .moving_part()
+        .run_sprite
+        .filter(|_| pace == Pace::Run);
     run.or_else(|| master.moving_part().move_sprite)
 }
 
@@ -768,8 +772,8 @@ mod tests {
             Some(SpriteId::named(13153))
         );
         assert_eq!(object_sprite(&master), Some(SpriteId::named(13153)));
-        assert_eq!(ai_sprite(&master, false), Some(SpriteId::named(13154)));
-        assert_eq!(ai_sprite(&master, true), Some(SpriteId::named(13153)));
+        assert_eq!(ai_sprite(&master, Pace::Run), Some(SpriteId::named(13154)));
+        assert_eq!(ai_sprite(&master, Pace::Walk), Some(SpriteId::named(13153)));
         let look = Look {
             standing: Some(SpriteId::named(501)),
             walking: Some(SpriteId::named(500)),
@@ -795,7 +799,7 @@ mod tests {
             Some(SpriteId::named(13151))
         );
         assert_eq!(object_sprite(&still), Some(SpriteId::named(13151)));
-        assert_eq!(ai_sprite(&still, false), None);
+        assert_eq!(ai_sprite(&still, Pace::Run), None);
         let standing_look = Look {
             walking: None,
             ..look

@@ -4,6 +4,7 @@ use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
 use genie_core::commands::Bell;
+use genie_core::commands::Departure;
 use genie_core::commands::GameSub;
 use genie_core::commands::GatherPointState;
 use genie_core::commands::QueueId;
@@ -27,6 +28,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
+use genie_core::orders::SavedPatrols;
 use genie_core::orders::{ControlKey, Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
@@ -272,7 +274,11 @@ fn patrol(c: &packets::Patrol) -> Command {
             count: c.waypoints_count,
             points: from_fn(|i| Point::new(f32::from_bits(xs[i]), ys[i])),
         },
-        reset: c.field_0x08 != 0,
+        patrols: if c.field_0x08 != 0 {
+            SavedPatrols::Dropped
+        } else {
+            SavedPatrols::Kept
+        },
     })
 }
 
@@ -294,7 +300,11 @@ fn attack_move(c: &packets::AttackMove) -> Command {
             count: c.waypoints_count,
             points,
         },
-        reset: c.field_0x08 != 0,
+        patrols: if c.field_0x08 != 0 {
+            SavedPatrols::Dropped
+        } else {
+            SavedPatrols::Kept
+        },
         queued: c.field_0x09 != 0,
         ignore_pending: c.field_0x0a != 0,
     })
@@ -375,7 +385,11 @@ fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
     Ok(Some(match packet {
         Packet::Resign(c) => Command::Resign(ResignCommand {
             player: PlayerId::from(c.commp_id),
-            dropped: c.dropped != 0,
+            departure: if c.dropped != 0 {
+                Departure::Dropped
+            } else {
+                Departure::Resigned
+            },
         }),
         Packet::TransformObject(c) => Command::TransformObject(TransformObjectCommand {
             player: PlayerId::from(c.commp_id),

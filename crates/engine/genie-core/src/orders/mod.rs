@@ -56,6 +56,7 @@ mod gather;
 mod interact;
 mod moves;
 mod patrol;
+pub use self::patrol::SavedPatrols;
 mod points;
 mod split;
 pub mod start_work;
@@ -513,7 +514,7 @@ fn patrol_timeout(i: usize, dt: Millis) -> Millis {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Sweep {
     pub(crate) patrol: bool,
-    pub(crate) reset: bool,
+    pub(crate) patrols: SavedPatrols,
     pub(crate) queued: bool,
     pub(crate) ignore_pending: bool,
 }

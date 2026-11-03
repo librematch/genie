@@ -14,6 +14,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
+use crate::movement::move_to::Patience;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -168,8 +169,9 @@ pub(crate) struct RepairReads {
     /// The repairer's work rate: its `mWorkRatePowerup` (`+0xa30`, slot 0x6e8) plus its
     /// master's `work_rate` (`+0x798`), in that order.
     pub(crate) rate: WorkRate,
-    /// The motion step giving up makes the `MoveTo` wait once (a human player's villager).
-    pub(crate) waits: bool,
+    /// Whether the motion step giving up makes the `MoveTo` wait once (a human player's
+    /// villager).
+    pub(crate) patience: Patience,
     /// The unit AI's stance (`+0x1a9`), which sets the wait
     /// ([`crate::movement::move_to::MoveWait::give_up`]).
     pub(crate) stance: UnitStance,

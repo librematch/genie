@@ -100,7 +100,7 @@ impl World {
             .as_ref()
             .and_then(|t| t.ground(at.ground()).ok())
             .map_or(at, |g| {
-                Position::new(at.x(), at.y(), grounded(at.z(), g, false, fly_mode))
+                Position::new(at.x(), at.y(), grounded(at.z(), g, fly_mode))
             })
     }
 }

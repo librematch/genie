@@ -36,10 +36,10 @@ impl HitMode {
     }
 
     /// Whether a missile that lands on its target strikes it: in mode 0 or 2, or in mode 1 when
-    /// the target is another player's (`foreign`).
+    /// the target is another player's ([`TargetOwner::Other`]).
     #[must_use]
-    pub const fn strikes_on_landing(self, foreign: bool) -> bool {
-        matches!(self.0, 0 | 2) || (self.0 == 1 && foreign)
+    pub const fn strikes_on_landing(self, owner: TargetOwner) -> bool {
+        matches!(self.0, 0 | 2) || (self.0 == 1 && matches!(owner, TargetOwner::Other))
     }
 }
 
@@ -49,9 +49,19 @@ impl genie_diff::Diff for HitMode {
     }
 }
 
+/// Whose a landing missile's target is: the missile's player's, or another player's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TargetOwner {
+    /// The missile's player's.
+    Own,
+    /// Another player's.
+    Other,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::combat::missile::HitMode;
+    use crate::combat::missile::TargetOwner;
 
     /// The modes are the data's bytes.
     #[test]
@@ -59,11 +69,11 @@ mod tests {
         assert_eq!(HitMode::default(), HitMode::TARGET_ALONE);
         assert_eq!(HitMode::of_data(1), HitMode::MISSED);
         assert_eq!(HitMode::of_data(2).get(), 2);
-        assert!(HitMode::TARGET_ALONE.strikes_on_landing(false));
-        assert!(HitMode::of_data(2).strikes_on_landing(false));
-        assert!(!HitMode::MISSED.strikes_on_landing(false));
-        assert!(HitMode::MISSED.strikes_on_landing(true));
-        assert!(!HitMode::of_data(3).strikes_on_landing(true));
+        assert!(HitMode::TARGET_ALONE.strikes_on_landing(TargetOwner::Own));
+        assert!(HitMode::of_data(2).strikes_on_landing(TargetOwner::Own));
+        assert!(!HitMode::MISSED.strikes_on_landing(TargetOwner::Own));
+        assert!(HitMode::MISSED.strikes_on_landing(TargetOwner::Other));
+        assert!(!HitMode::of_data(3).strikes_on_landing(TargetOwner::Other));
         assert_eq!(HitMode::MISSED.plus(255), HitMode::TARGET_ALONE);
     }
 }

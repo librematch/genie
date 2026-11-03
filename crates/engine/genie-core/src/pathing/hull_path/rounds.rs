@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::convex::AtStart;
+use crate::pathing::hull_path::find::Hulls;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
@@ -84,12 +85,12 @@ impl HullPather<'_> {
     pub(super) fn search(
         &mut self,
         q: &HullQuery,
-        keep: bool,
+        hulls: Hulls,
         rounds: &mut Rounds,
         path: &mut Waypoints,
     ) -> Result<Option<ShortFound>, GenieError> {
         while rounds.iterations < ITERATION_CAP && rounds.growths < GROWTHS {
-            if let Some(result) = self.round_start(q, keep, rounds, path)? {
+            if let Some(result) = self.round_start(q, hulls, rounds, path)? {
                 return Ok(Some(result));
             }
             loop {
@@ -110,12 +111,12 @@ impl HullPather<'_> {
     pub(super) fn round_start(
         &mut self,
         q: &HullQuery,
-        keep: bool,
+        hulls: Hulls,
         rounds: &mut Rounds,
         path: &mut Waypoints,
     ) -> Result<Option<ShortFound>, GenieError> {
         self.close_all(NodeList::SEARCH)?;
-        if !keep && rounds.growths == 0 {
+        if hulls == Hulls::New && rounds.growths == 0 {
             self.build_hulls()?;
         }
         let root = self.add_unrefused(UnrefusedNode {

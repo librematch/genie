@@ -15,6 +15,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
@@ -516,7 +517,11 @@ impl HuntAction {
         who: PointWalker,
     ) -> Result<PointWalk, GenieError> {
         let gives_up = GiveUp {
-            waits: !who.player_kind.is_computer() && who.villager,
+            patience: if !who.player_kind.is_computer() && who.villager {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: who.stance,
         };
         let ended = match self.update_list(c, unit, me, gives_up)?.get() {

@@ -72,6 +72,7 @@ use crate::orders::ControlKey;
 use crate::orders::MasterSwap;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
+use crate::orders::SavedPatrols;
 use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
 use crate::ownership::artifact::Artifact;
@@ -4319,7 +4320,7 @@ fn lone_unit_patrols_to_its_waypoint() {
         player_id(1),
         &object_ids([11]),
         &[Point::new(30.0, 20.0)],
-        true,
+        SavedPatrols::Dropped,
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
@@ -4369,7 +4370,7 @@ fn lone_unit_waypoints_but_the_last_become_its_own() {
         Point::new(30.0, 20.0),
         Point::new(30.5, 20.5),
     ];
-    t.patrol(player_id(1), &object_ids([11]), &w, false)
+    t.patrol(player_id(1), &object_ids([11]), &w, SavedPatrols::Kept)
         .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
@@ -4443,7 +4444,7 @@ fn move_runs_the_stop_of_pending_completion_first() {
 fn lone_unit_attack_moves_to_its_waypoint() {
     let sweep = Sweep {
         patrol: false,
-        reset: false,
+        patrols: SavedPatrols::Kept,
         queued: false,
         ignore_pending: true,
     };
@@ -4517,7 +4518,7 @@ fn lone_unit_attack_moves_to_its_waypoint() {
         player_id(1),
         &object_ids([11]),
         &[Point::new(30.0, 20.0)],
-        false,
+        SavedPatrols::Kept,
     )
     .unwrap();
     assert_eq!(
@@ -4539,7 +4540,7 @@ fn lone_unit_attack_moves_to_its_waypoint() {
 fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
     let sweep = |queued, ignore_pending| Sweep {
         patrol: false,
-        reset: true,
+        patrols: SavedPatrols::Dropped,
         queued,
         ignore_pending,
     };
@@ -4621,7 +4622,7 @@ fn loose_patrollers_ignore_each_other_and_one_at_its_waypoint_stays() {
         player_id(1),
         &object_ids([11, 12]),
         &[Point::new(30.0, 20.0)],
-        true,
+        SavedPatrols::Dropped,
     )
     .unwrap();
     let [a, b] = t.players[1].objects.as_slice() else {
@@ -4791,7 +4792,7 @@ fn searchable(mut t: World) -> World {
 fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
     let sweep = Sweep {
         patrol: false,
-        reset: true,
+        patrols: SavedPatrols::Dropped,
         queued: false,
         ignore_pending: true,
     };
@@ -4820,7 +4821,7 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
         player_id(1),
         &object_ids([11, 12]),
         &[Point::new(25.0, 25.0), Point::new(30.0, 20.0)],
-        true,
+        SavedPatrols::Dropped,
     )
     .unwrap();
     let g = &t.groups.groups[0];
@@ -4842,8 +4843,13 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
 fn patrolling_group_walks_loop_through_its_waypoints() {
     let mut t = two_patrollers();
     let w = [Point::new(25.0, 25.0), Point::new(30.0, 20.0)];
-    t.patrol(player_id(1), &object_ids([11, 12]), &w, true)
-        .unwrap();
+    t.patrol(
+        player_id(1),
+        &object_ids([11, 12]),
+        &w,
+        SavedPatrols::Dropped,
+    )
+    .unwrap();
     assert_eq!(t.groups.groups.len(), 1);
     let g = &t.groups.groups[0];
     assert_eq!(
@@ -5594,13 +5600,25 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         Notifies::Cleared,
     );
     assert_eq!(
-        t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &task, true),
+        t.retake_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            at,
+            &task,
+            MasterSwap::Keep
+        ),
         Ok(false)
     );
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
     assert_eq!(
-        t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &task, true),
+        t.retake_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            at,
+            &task,
+            MasterSwap::Keep
+        ),
         Ok(true)
     );
     let other = Task {
@@ -5608,9 +5626,15 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ..task
     };
     assert_eq!(
-        t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &other, true)
-            .err()
-            .map(|e| e.reason()),
+        t.retake_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            at,
+            &other,
+            MasterSwap::Keep
+        )
+        .err()
+        .map(|e| e.reason()),
         Some("a work command on the unit's current task")
     );
     let mut t = forage_world();
@@ -5634,7 +5658,13 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ..task
     };
     assert_eq!(
-        t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &moving, true),
+        t.retake_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            at,
+            &moving,
+            MasterSwap::Keep
+        ),
         Ok(false)
     );
     let mut t = forage_world();
@@ -5662,9 +5692,15 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ..task
     };
     assert_eq!(
-        t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &building, false)
-            .err()
-            .map(|e| e.reason()),
+        t.retake_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            at,
+            &building,
+            MasterSwap::Change
+        )
+        .err()
+        .map(|e| e.reason()),
         Some("a work command on the Build task of the unit's former master")
     );
 }

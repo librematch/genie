@@ -15,6 +15,7 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
@@ -235,7 +236,7 @@ impl UnitAi {
             point: Position::new(x, y, point.z()),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         });
         if let Some(m) = m {
             side.effect_now(Effect::Move(m), self, ai)?;

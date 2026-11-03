@@ -14,6 +14,7 @@ use crate::math::fmath::{cross, minss, normalize};
 use crate::movement::LevelFlags;
 use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::Walk;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::objects::ObjectState;
@@ -49,6 +50,7 @@ use crate::unit_ai::UnitStance;
 use crate::vision::visibility::Visibility;
 use crate::world::Millis;
 use crate::world::index::TestObjects;
+use crate::world::layer::ClassRoles;
 use crate::world::parts::Object;
 use crate::world::{FrameSeed, Player, World};
 use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, SQRT_2};
@@ -1802,27 +1804,27 @@ fn trade_cart_plans_within_its_owners_budget() {
         plans: PlanCount::of_data(6),
     };
     assert!(!may_plan(
-        true,
+        ClassRoles::TRADE_CART,
         Some(spent),
         WaitDelays::of_data(0),
         StepPlans::ZERO
     ));
     // a villager is not held to the budget
     assert!(may_plan(
-        false,
+        ClassRoles::empty(),
         Some(spent),
         WaitDelays::of_data(0),
         StepPlans::ZERO
     ));
     // past the delay cap the budget lets the cart plan again
     assert!(may_plan(
-        true,
+        ClassRoles::TRADE_CART,
         Some(spent),
         WaitDelays::of_data(3),
         StepPlans::ZERO
     ));
     assert!(may_plan(
-        true,
+        ClassRoles::TRADE_CART,
         Some(PlanBudget {
             plans: PlanCount::of_data(5),
             ..spent
@@ -1831,12 +1833,17 @@ fn trade_cart_plans_within_its_owners_budget() {
         StepPlans::ZERO
     ));
     assert!(may_plan(
-        true,
+        ClassRoles::TRADE_CART,
         None,
         WaitDelays::of_data(0),
         StepPlans::ZERO
     ));
-    assert!(!may_plan(false, None, WaitDelays::of_data(0), PLANS));
+    assert!(!may_plan(
+        ClassRoles::empty(),
+        None,
+        WaitDelays::of_data(0),
+        PLANS
+    ));
 }
 
 /// `FUN_140f9eb70`'s list for `FUN_140f60440`: a walker in no group lists itself and its
@@ -3553,7 +3560,7 @@ fn way_9177(goal: Goal<'_>, range: Distance) -> Way<'_> {
         level: WaypointLevel::Walked,
         range,
         target_id: None,
-        trade_cart: false,
+        class_roles: ClassRoles::empty(),
     }
 }
 
@@ -3650,7 +3657,7 @@ fn new_move_to_wait_lasts_second() {
         (MoveWaitState::Never, Seconds::ZERO, Seconds::new(1.0))
     );
     let mut wait = new;
-    let _ = wait.give_up(true, UnitStance::StandGround);
+    let _ = wait.give_up(Patience::WaitsOnce, UnitStance::StandGround);
     assert_eq!(
         (wait.state, wait.delay),
         (MoveWaitState::Waiting, Seconds::new(2.0))

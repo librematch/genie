@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::{UnitList, Waypoints};
+use crate::orders::SavedPatrols;
 use crate::orders::Sweep;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -20,7 +21,7 @@ pub struct AttackMoveCommand {
     /// The waypoints.
     pub waypoints: Waypoints,
     /// `+0x8`.
-    pub reset: bool,
+    pub patrols: SavedPatrols,
     /// `+0x9`.
     pub queued: bool,
     /// `+0xa`.
@@ -41,7 +42,7 @@ impl AttackMoveCommand {
         };
         let sweep = Sweep {
             patrol: false,
-            reset: self.reset,
+            patrols: self.patrols,
             queued: self.queued,
             ignore_pending: self.ignore_pending,
         };

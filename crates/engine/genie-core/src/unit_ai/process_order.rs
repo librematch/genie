@@ -26,6 +26,17 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 
+/// How [`UnitAi::process_order`]'s case took its order: as the order itself, or as an attack
+/// (`bVar2`: the attack move's attack), which the tail ([`UnitAi::order_tail`]) makes the
+/// attack order (700).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TakenAs {
+    /// As the order.
+    Order,
+    /// As an attack.
+    Attack,
+}
+
 impl UnitAi {
     /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `o`: one not ready returns 0xe.
     /// Each case runs its slot, forced (its force argument 1); a slot that does not take the
@@ -104,7 +115,7 @@ impl UnitAi {
             .or(place);
         let class = place.and_then(|(_, class)| class);
         // `bVar2`: the attack move's attack, whose tail makes the order 700
-        let mut attack_move = false;
+        let mut taken_as = TakenAs::Order;
         let taken = match o.order {
             OrderKind::Attack
             | OrderKind::Defend
@@ -112,7 +123,7 @@ impl UnitAi {
             | OrderKind::SeekAndDestroy
             | OrderKind::AttackRoundup
             | OrderKind::AttackMove => {
-                self.combat_order(o, world, ai, side, &mut attack_move, roles)?
+                self.combat_order(o, world, ai, side, &mut taken_as, roles)?
             }
             OrderKind::Build
             | OrderKind::Heal
@@ -179,19 +190,19 @@ impl UnitAi {
         if !taken {
             return Ok(OrderOutcome::NotTaken);
         }
-        Ok(self.order_tail(Some(o.order), o.priority, class, attack_move, ai, roles))
+        Ok(self.order_tail(Some(o.order), o.priority, class, taken_as, ai, roles))
     }
 
     /// [`UnitAi::process_order`]'s combat cases: the attack, the defence (a master that cannot
-    /// defend takes none: the switch's `return 0`, which is the tail's "not taken"), the run
-    /// away, seek and destroy, the attack roundup and the attack move (`attack_move` its attack).
+    /// defend takes none: the switch's `return 0`, which is the tail's "not taken"), the run away,
+    /// seek and destroy, the attack roundup and the attack move (its attack [`TakenAs::Attack`]).
     pub(super) fn combat_order(
         &mut self,
         o: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-        attack_move: &mut bool,
+        taken_as: &mut TakenAs,
         roles: &Roles,
     ) -> Result<bool, GenieError> {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
@@ -221,7 +232,7 @@ impl UnitAi {
                         .of_some_class(at.class)
                         .contains(ClassRoles::ATTACK_MOVE_ATTACKS)
                 {
-                    *attack_move = true;
+                    *taken_as = TakenAs::Attack;
                     self.attack_slot(t, TargetRules::Any, at, side, ai)?
                 } else {
                     let m = self.move_to(order_move(o));
@@ -313,17 +324,17 @@ impl UnitAi {
     /// The order's tail (`LAB_140c5d432`) once its case took order value `order` of priority
     /// `priority`: the stop (`0x2c2`) leaves a patrol order ([`UnitAi::leave_patrol_timers`]) and
     /// ends the order and its priority (−1). The attack roundup (`0x2d9`) and the attack move's
-    /// attack (`attack_move`) leave a patrol order and become the attack order (700); the attack
-    /// order of a unit of class 18 (`class`, its master's) leaves a patrol order, its target goes
-    /// (`+0x48` −1, its class and point kept) and the order is −1. Any other becomes the order,
-    /// leaving a patrol order for another (`LAB_140c5d611`). The priority is the order's but
+    /// attack ([`TakenAs::Attack`]) leave a patrol order and become the attack order (700); the
+    /// attack order of a unit of class 18 (`class`, its master's) leaves a patrol order, its target
+    /// goes (`+0x48` −1, its class and point kept) and the order is −1. Any other becomes the
+    /// order, leaving a patrol order for another (`LAB_140c5d611`). The priority is the order's but
     /// for the stop. Returns 1.
     pub(crate) fn order_tail(
         &mut self,
         order: Option<OrderKind>,
         priority: OrderPriority,
         class: Option<ClassId>,
-        attack_move: bool,
+        taken_as: TakenAs,
         ai: &mut Well512,
         roles: &Roles,
     ) -> OrderOutcome {
@@ -333,7 +344,7 @@ impl UnitAi {
             self.order_priority = OrderPriority::NONE;
             return OrderOutcome::Taken;
         }
-        let new = if order == Some(OrderKind::AttackRoundup) || attack_move {
+        let new = if order == Some(OrderKind::AttackRoundup) || taken_as == TakenAs::Attack {
             self.leave_patrol_timers(ai);
             Some(OrderKind::Attack)
         } else if order == Some(OrderKind::Attack)

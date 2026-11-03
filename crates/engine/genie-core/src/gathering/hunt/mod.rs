@@ -175,6 +175,16 @@ pub struct HuntTask {
     pub kind4: Option<AttributeId>,
 }
 
+/// Whether a hunter's decay task stops its target's decay (`FUN_140ac44b0`, the player's
+/// attribute 292 at 1) or lets it run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DecayRule {
+    /// It stops it.
+    Stops,
+    /// It lets it run.
+    Runs,
+}
+
 /// What the hunt's update reads of its unit, its master, its player and the game besides its
 /// Attack's reads, copied as the update starts ([`crate::objects::unit::Unit::hunt_reads`]).
 #[derive(Clone, Copy, Debug)]
@@ -190,9 +200,9 @@ pub(crate) struct HuntReads {
     pub(crate) capacity: Amount,
     /// The player's attribute the task's `attribute_type2` names, when above 0; else 1.
     pub(crate) productivity: Amount,
-    /// The player's attribute 292 is 1: a task whose `attribute_type4` is 0x124 stops the
-    /// target's decay (`FUN_140ac44b0`).
-    pub(crate) stops_decay: bool,
+    /// Whether a task whose `attribute_type4` is 0x124 stops the target's decay
+    /// (`FUN_140ac44b0`): the player's attribute 292 is 1.
+    pub(crate) decay: DecayRule,
     /// The unit has a unit AI (`FUN_140c4cc50` reads it).
     pub(crate) has_ai: bool,
     /// Its unit AI's target class (`+0x4c`).

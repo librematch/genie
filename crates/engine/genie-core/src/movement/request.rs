@@ -73,14 +73,14 @@ impl Mover {
             return Ok(step);
         }
         let solid = self.stats.radius.sized();
-        let trade_cart = world
+        // The trade cart's class (19), whose path requests the owner's budget limits (`FUN_14165d6f0`).
+        // The classes a long path's stretch may not cross (`0x141150f00` after `FUN_140f9eb70`, raw
+        // `-0xe91`, `-0xe78`, `-0xea9`): walls, towers, and buildings that do not move; gates
+        // ([`GATE`]) too. A villager's (`-0xea8`) path crosses them.
+        let class_roles = world
             .get(me.id)
-            // The trade cart's class (19), whose path requests the owner's budget limits (`FUN_14165d6f0`).
-            // The classes a long path's stretch may not cross (`0x141150f00` after `FUN_140f9eb70`, raw
-            // `-0xe91`, `-0xe78`, `-0xea9`): walls, towers, and buildings that do not move; gates
-            // ([`GATE`]) too. A villager's (`-0xea8`) path crosses them.
-            .is_some_and(|p| roles.of_class(p.class).contains(ClassRoles::TRADE_CART));
-        if solid && !self.plan_allowed(me, world, plan, trade_cart, plans)? {
+            .map_or(ClassRoles::empty(), |p| roles.of_class(p.class));
+        if solid && !self.plan_allowed(me, world, plan, class_roles, plans)? {
             return Ok(AfterRequest::Paused);
         }
         if let Some(step) = self.spend_try()? {
@@ -102,7 +102,7 @@ impl Mover {
                 level: level.level,
                 range: level.range,
                 target_id: level.target,
-                trade_cart,
+                class_roles,
             };
             if let Some(step) = self.plan_solid((at, me), world, plan, &w, &mut np, by_id)? {
                 return Ok(step);
@@ -168,12 +168,12 @@ impl Mover {
         me: &Me,
         world: &Spatial,
         plan: &mut Planning<'_>,
-        trade_cart: bool,
+        class_roles: ClassRoles,
         plans: &mut StepPlans,
     ) -> Result<bool, GenieError> {
         let owner = world.get(me.id).map(|p| p.player);
         let budget = owner.map(|o| plan.pathing.budget(o));
-        if !may_plan(trade_cart, budget, self.wait_delays, *plans) {
+        if !may_plan(class_roles, budget, self.wait_delays, *plans) {
             self.stop()?;
             self.wait_delays = self.wait_delays.plus_one();
             return Ok(false);

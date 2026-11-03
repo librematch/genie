@@ -10,6 +10,7 @@ use crate::combat::victims::{KillLeft, file_kill, victim};
 use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
 use crate::gathering::drop_sites::nearest_drop_site;
+use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
@@ -134,7 +135,11 @@ impl Unit {
                 + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
-            stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),
+            decay: if owner.attributes.get(292) == Some(&Amount::new(1.0)) {
+                DecayRule::Stops
+            } else {
+                DecayRule::Runs
+            },
             has_ai: c.w.parts.unit_ai.contains(self.id),
             ai_class: c
                 .w

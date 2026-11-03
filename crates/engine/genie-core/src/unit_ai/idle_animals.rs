@@ -12,6 +12,7 @@ use crate::objects::WorkerCount;
 use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::Pace;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::{
@@ -68,7 +69,7 @@ impl UnitAi {
             point: home.origin.with_z(z),
             range: AI_MOVE_RANGE,
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         };
         if home.go_home {
             let m = self.move_to(go_home);
@@ -188,7 +189,7 @@ impl UnitAi {
             point: h.origin.with_z(z),
             range: AI_MOVE_RANGE,
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         };
         let leash = h.leash.squared();
         if DistanceSquared::ZERO < leash {

@@ -92,6 +92,18 @@ impl Default for MoveWait {
     }
 }
 
+/// What a `MoveTo` does when the motion step gives up ([`MoveWait::give_up`]): a human player's
+/// villager (`LAB_140aa320c`: `FUN_141659cf0` 0, the master's class 4) waits once before it asks
+/// again, any other fails.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Patience {
+    /// It waits once, then asks again.
+    WaitsOnce,
+    /// It fails at once.
+    #[default]
+    Fails,
+}
+
 impl MoveWait {
     /// A new `MoveTo`'s: never waited, no time waited, [`DEFAULT_WAIT`].
     pub const NEW: Self = Self {
@@ -100,12 +112,13 @@ impl MoveWait {
         delay: DEFAULT_WAIT,
     };
 
-    /// The `MoveTo`'s answer to the motion step giving up (it returns 1, `0x140aa2a70` in state
-    /// 4): a human player's villager (`waits`) whose `MoveTo` has not waited yet (`+0x6c` 0) waits
-    /// (`set_state` 2, `+0x6c` 1) a second with a stance (`+0x1a9`) below 2, else two, then asks
-    /// again; any other `MoveTo` fails (`set_state` 13). Returns the `MoveTo`'s state.
-    pub const fn give_up(&mut self, waits: bool, stance: UnitStance) -> MoveTo {
-        if !matches!(self.state, MoveWaitState::Never) || !waits {
+    /// The `MoveTo`'s answer to the motion step giving up (it returns 1, `0x140aa2a70` in state 4):
+    /// a human player's villager ([`Patience::WaitsOnce`]) whose `MoveTo` has not waited yet
+    /// (`+0x6c` 0) waits (`set_state` 2, `+0x6c` 1) a second with a stance (`+0x1a9`) below 2, else
+    /// two, then asks again; any other `MoveTo` fails (`set_state` 13). Returns the `MoveTo`'s
+    /// state.
+    pub const fn give_up(&mut self, patience: Patience, stance: UnitStance) -> MoveTo {
+        if !matches!(self.state, MoveWaitState::Never) || matches!(patience, Patience::Fails) {
             return MoveTo::Failed;
         }
         self.delay = if stance.below(UnitStance::StandGround) {
@@ -602,7 +615,7 @@ mod tests {
             ..MoveToAction::sub_in(MoveTo::Start)
         };
         let gives_up = GiveUp {
-            waits: true,
+            patience: Patience::WaitsOnce,
             stance: UnitStance::Aggressive,
         };
         let mut ai = None;
@@ -663,19 +676,25 @@ mod tests {
     #[test]
     fn human_villager_moveto_waits_once_before_it_fails() {
         let mut wait = MoveWait::default();
-        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Waiting);
+        assert_eq!(
+            wait.give_up(Patience::WaitsOnce, UnitStance::Aggressive),
+            MoveTo::Waiting
+        );
         assert_eq!(
             (wait.state, wait.delay),
             (MoveWaitState::Waiting, Seconds::new(1.0))
         );
-        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Failed);
         assert_eq!(
-            MoveWait::default().give_up(false, UnitStance::Aggressive),
+            wait.give_up(Patience::WaitsOnce, UnitStance::Aggressive),
+            MoveTo::Failed
+        );
+        assert_eq!(
+            MoveWait::default().give_up(Patience::Fails, UnitStance::Aggressive),
             MoveTo::Failed
         );
         let mut guarded = MoveWait::default();
         assert_eq!(
-            guarded.give_up(true, UnitStance::StandGround),
+            guarded.give_up(Patience::WaitsOnce, UnitStance::StandGround),
             MoveTo::Waiting
         );
         assert_eq!(guarded.delay, Seconds::new(2.0));
@@ -689,12 +708,18 @@ mod tests {
         let mut wait = MoveWait::default();
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::Never);
-        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Waiting);
+        assert_eq!(
+            wait.give_up(Patience::WaitsOnce, UnitStance::Aggressive),
+            MoveTo::Waiting
+        );
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::AskedAgain);
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::AskedAgain);
-        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Failed);
+        assert_eq!(
+            wait.give_up(Patience::WaitsOnce, UnitStance::Aggressive),
+            MoveTo::Failed
+        );
     }
 
     pub(super) fn sheep(x: f32, y: f32) -> Placed {

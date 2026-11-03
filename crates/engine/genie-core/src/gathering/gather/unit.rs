@@ -419,9 +419,9 @@ impl Unit {
                     })?;
                 }
             }
-            Next::Reseed { arrived } => {
+            Next::Reseed { end } => {
                 c.lend_at((&mut *self, &mut *actions), |w, p, i| {
-                    w.reseed_after_walk(p, i, arrived)
+                    w.reseed_after_walk(p, i, end)
                 })?;
             }
             Next::Stay | Next::Done => {}

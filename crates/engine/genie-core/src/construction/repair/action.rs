@@ -393,7 +393,7 @@ impl RepairAction {
     ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
-                waits: reads.waits,
+                patience: reads.patience,
                 stance: reads.stance,
             },
             ..ListUpdate::default()

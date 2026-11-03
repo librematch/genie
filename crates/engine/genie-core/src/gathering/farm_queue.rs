@@ -12,6 +12,7 @@ use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::gathering::QueueCount;
 use crate::gathering::gather::Stand;
+use crate::gathering::gather::WalkEnd;
 use crate::gathering::hunt::stand_sprite;
 use crate::math::image::farm_queue::{
     NO_FARM as FARM_QUEUE_NO_FARM, ONE_FARM as FARM_QUEUE_ONE_FARM,
@@ -432,7 +433,7 @@ impl World {
     }
 
     /// State 0xf2's end (`0x140a8e1d0` case 0xf1, [`crate::gathering::gather::Next::Reseed`]) of player
-    /// `p`'s gatherer at `idx`, its walk `arrived` or failed: the reseed ([`World::reseed`]);
+    /// `p`'s gatherer at `idx`, its walk's `end`: the reseed ([`World::reseed`]);
     /// without one (the interface's event 0x7f, 0x9c for a gatherer not a villager, aside) the
     /// Gather is done or idles ([`crate::gathering::gather::GatherAction::after_reseed`]: standing with
     /// `FUN_140a8b6b0`'s sprite, the targets it lets go released).
@@ -440,7 +441,7 @@ impl World {
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        arrived: bool,
+        end: WalkEnd,
     ) -> Result<(), GenieError> {
         if self.reseed(p, idx)? {
             return Ok(());
@@ -460,7 +461,7 @@ impl World {
             &self.model.graphics,
         );
         let released = gather.after_reseed(
-            arrived,
+            end,
             player_kind,
             self.parts.motion.mover_mut(unit.id),
             Stand {

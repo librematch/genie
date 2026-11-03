@@ -176,7 +176,7 @@ impl Artifact {
 
     /// Slot 0x68 with none: the target goes; the one let go, if any.
     pub fn drop_target(&mut self) -> Option<ObjectId> {
-        self.set_target(None, false).released
+        self.set_target(None).released
     }
 
     /// `FUN_140a98620` on the sub-actions (one at most): a `MoveTo` goes with its goal, whose
@@ -215,15 +215,15 @@ impl Artifact {
     }
 
     /// Slot 0x68, the base's (`FUN_140a7a230`, `+0x60` 0): a target other than `new` goes (let
-    /// go), then `new` comes when it is one in a state below 7 (`alive`, taken); a dead one
-    /// leaves none.
-    fn set_target(&mut self, new: Option<ObjectId>, alive: bool) -> Targets {
+    /// go), then `new` comes (taken); the caller passes none for a dead one (a state of 7 or
+    /// more), which leaves none.
+    fn set_target(&mut self, new: Option<ObjectId>) -> Targets {
         let mut t = Targets::default();
         if self.target == new {
             return t;
         }
         t.released = self.target;
-        match new.filter(|_| alive) {
+        match new {
             Some(new) => {
                 self.target = Some(new);
                 t.taken = Some(new);
@@ -275,8 +275,8 @@ impl Artifact {
             move_to_tuning,
         )?;
         let alive = to.state.is_none_or(|s| s < ObjectState::Removed);
-        let released = self.set_target(None, false).released;
-        let taken = self.set_target(to.id, alive).taken;
+        let released = self.set_target(None).released;
+        let taken = self.set_target(to.id.filter(|_| alive)).taken;
         let gone = self.drop_sub_actions();
         self.goal = Some(to.at);
         self.sub = walk.map(|move_to| ArtifactSub::Walk { move_to });
@@ -325,7 +325,7 @@ impl Artifact {
         if self.sub.is_some() {
             gone = self.drop_sub_actions();
             self.goal = None;
-            released = self.set_target(None, false).released;
+            released = self.set_target(None).released;
         }
         self.state = ArtifactState::Check;
         (gone, released)
@@ -442,7 +442,7 @@ impl Artifact {
     fn end_walk(&mut self) -> (Voice, Option<ObjectId>) {
         let voice = self.take_move_to().map_or(Voice::Loud, |m| m.voice);
         self.goal = None;
-        let released = self.set_target(None, false).released;
+        let released = self.set_target(None).released;
         (voice, released)
     }
 

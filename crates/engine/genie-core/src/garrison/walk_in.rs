@@ -13,6 +13,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::Speed;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::TargetMoved;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, SpriteReads, WalkTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
@@ -121,8 +122,9 @@ pub(crate) struct EnterReads {
     pub(crate) target: Option<EnterTarget>,
     /// What a new `MoveTo` starts by.
     pub(crate) start: WalkStart,
-    /// The `MoveTo`'s give-up waits (a human player's villager), by the unit AI's stance.
-    pub(crate) waits: bool,
+    /// Whether the `MoveTo`'s give-up waits (a human player's villager), by the unit AI's
+    /// stance.
+    pub(crate) patience: Patience,
     /// The unit AI's stance.
     pub(crate) stance: UnitStance,
     /// The sprites its `MoveTo`s' constructors take for none (`FUN_140aa0d30`,
@@ -408,7 +410,7 @@ impl EnterAction {
     ) -> Result<UpdateCode, GenieError> {
         let how = ListUpdate {
             gives_up: GiveUp {
-                waits: reads.waits,
+                patience: reads.patience,
                 stance: reads.stance,
             },
             ..ListUpdate::default()

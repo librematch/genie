@@ -17,6 +17,7 @@ use crate::math::fmath::at_most_or_unordered;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::WalkTo;
 use crate::movement::{Me, Mover};
 use crate::objects::layers::Action;
@@ -119,7 +120,11 @@ impl HuntAction {
             return Ok(Dropped::Again);
         }
         let gives_up = GiveUp {
-            waits: !who.player_kind.is_computer() && who.villager,
+            patience: if !who.player_kind.is_computer() && who.villager {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: who.stance,
         };
         match self.update_list(c, unit, me, gives_up)?.get() {

@@ -34,6 +34,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::Pace;
 use crate::unit_ai::world_view::EnterOrder;
 use crate::unit_ai::{AiMove, Notify, NotifyKind};
 use crate::world::Player;
@@ -561,7 +562,7 @@ impl World {
             point: to,
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         };
         self.move_aside(p, i, walk)
     }

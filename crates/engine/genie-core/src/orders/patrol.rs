@@ -28,10 +28,21 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::Pace;
 use crate::world::Millis;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
+
+/// What PATROL's and `ATTACK_MOVE`'s flag `+0x8` (`FUN_14161b970`'s `param_6`) does to the listed
+/// units' AIs' saved patrols (`zeroPatrolInformation`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SavedPatrols {
+    /// They go (1).
+    Dropped,
+    /// They stay (0).
+    Kept,
+}
 
 impl World {
     /// PATROL (0x15): the command's check (`FUN_140e55590`, [`World::command_check`]: of the
@@ -45,7 +56,7 @@ impl World {
         player: PlayerId,
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
-        reset: bool,
+        patrols: SavedPatrols,
     ) -> Result<(), GenieError> {
         let Some(ids) = self.command_check(player, ids)? else {
             return Ok(());
@@ -55,7 +66,7 @@ impl World {
         } else {
             60
         };
-        self.patrol_order(ids.split_at(ids.len().min(cap)).0, waypoints, reset)
+        self.patrol_order(ids.split_at(ids.len().min(cap)).0, waypoints, patrols)
     }
 
     /// `ATTACK_MOVE` (0x21): the command's check (`FUN_140e54490`, [`World::command_check`], as
@@ -86,29 +97,29 @@ impl World {
         self.sweep_order(ids.split_at(ids.len().min(cap)).0, waypoints, sweep)
     }
 
-    /// `FUN_14161b970` for PATROL (its patrol flag 1, no target, `param_7` 0, `param_8` 1):
-    /// first each listed unit's AI (the gone entries count in the list) takes an idle timer of
-    /// 0 and an adjusted idle timeout and secondary timer of [`patrol_timeout`]; with `reset`
-    /// (`+0x8`) its saved patrol goes (`zeroPatrolInformation`). The splitter (`FUN_140fd9ae0`, no
-    /// Ctrl, [`World::split`]) parts the units. Each of its groups: a new group of the split's
-    /// owner (`FUN_14152efc0`) takes them ([`World::add_to_group`]), its statistics and its
-    /// place ([`World::group_statistics`], [`World::set_initial_position`]), unless they are a
-    /// group the world holds whole, which the splitter keeps ([`World::keep_group`]); one the
-    /// world does not hold takes nothing. Each listed group (60 at most, `DAT_143f152b8`) takes
-    /// the command count as its differentiator, the waypoints its place passes ([`waypoints_from`])
-    /// but the last as its own (`FUN_14100f6b0`, the target forgotten) and a patrol's leg to the
-    /// last ([`World::command_move_to`]: range 0, the target forgotten, direct). Then every
-    /// listed group lists them all (`FUN_1410395a0`) and the command count goes on. Each loose
-    /// unit last.
+    /// `FUN_14161b970` for PATROL (its patrol flag 1, no target, `param_7` 0, `param_8` 1): first
+    /// each listed unit's AI (the gone entries count in the list) takes an idle timer of 0 and an
+    /// adjusted idle timeout and secondary timer of [`patrol_timeout`]; with
+    /// [`SavedPatrols::Dropped`] (`+0x8`) its saved patrol goes (`zeroPatrolInformation`). The
+    /// splitter (`FUN_140fd9ae0`, no Ctrl, [`World::split`]) parts the units. Each of its groups: a
+    /// new group of the split's owner (`FUN_14152efc0`) takes them ([`World::add_to_group`]), its
+    /// statistics and its place ([`World::group_statistics`], [`World::set_initial_position`]),
+    /// unless they are a group the world holds whole, which the splitter keeps
+    /// ([`World::keep_group`]); one the world does not hold takes nothing. Each listed group (60 at
+    /// most, `DAT_143f152b8`) takes the command count as its differentiator, the waypoints its
+    /// place passes ([`waypoints_from`]) but the last as its own (`FUN_14100f6b0`, the target
+    /// forgotten) and a patrol's leg to the last ([`World::command_move_to`]: range 0, the target
+    /// forgotten, direct). Then every listed group lists them all (`FUN_1410395a0`) and the command
+    /// count goes on. Each loose unit last.
     pub(crate) fn patrol_order(
         &mut self,
         ids: &[Option<ObjectId>],
         waypoints: &[Point],
-        reset: bool,
+        patrols: SavedPatrols,
     ) -> Result<(), GenieError> {
         let sweep = Sweep {
             patrol: true,
-            reset,
+            patrols,
             queued: false,
             ignore_pending: true,
         };
@@ -130,8 +141,8 @@ impl World {
     }
 
     /// [`World::sweep_order`]'s timers: each listed unit's AI idles from 0 to its place's patrol
-    /// timeout ([`patrol_timeout`]), its patrol zeroed with `reset`.
-    pub(super) fn start_patrol_timers(&mut self, ids: &[Option<ObjectId>], reset: bool) {
+    /// timeout ([`patrol_timeout`]), its patrol zeroed with [`SavedPatrols::Dropped`].
+    pub(super) fn start_patrol_timers(&mut self, ids: &[Option<ObjectId>], patrols: SavedPatrols) {
         let dt = self.dt;
         for (i, &id) in ids.iter().enumerate() {
             if let Some(ai) = id.and_then(|id| self.parts.unit_ai.get_mut(id)) {
@@ -139,7 +150,7 @@ impl World {
                 let timeout = patrol_timeout(i, dt);
                 ai.adjusted_idle_timeout = timeout;
                 ai.secondary_timer = timeout;
-                if reset {
+                if patrols == SavedPatrols::Dropped {
                     ai.zero_patrol();
                 }
             }
@@ -161,11 +172,13 @@ impl World {
         waypoints: &[Point],
         sweep: Sweep,
     ) -> Result<(), GenieError> {
-        let Sweep { patrol, reset, .. } = sweep;
+        let Sweep {
+            patrol, patrols, ..
+        } = sweep;
         if !patrol {
             self.reset_for_attack_move(ids);
         }
-        self.start_patrol_timers(ids, reset);
+        self.start_patrol_timers(ids, patrols);
         let mut split = self.split(ids, &|_| true, ControlKey::Up)?;
         let mut listed: Vec<GroupId> = Vec::new();
         for units in split.groups.clone() {
@@ -406,7 +419,7 @@ impl World {
                 } else {
                     OrderForce::Unforced
                 },
-                walk: true,
+                pace: Pace::Walk,
             };
             self.move_aside(p, idx, walk)?;
         }

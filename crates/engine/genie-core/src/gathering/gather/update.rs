@@ -13,6 +13,7 @@ use crate::gathering::hunt::walk_sprite;
 use crate::map::Distance;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::WalkTo;
 use crate::movement::move_to::{GiveUp, MoveTo};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
@@ -389,7 +390,11 @@ impl GatherAction {
         // the computer player's test is not held: its villagers would fail at once
         let how = ListUpdate {
             gives_up: GiveUp {
-                waits: roles.of_class(r.class).contains(ClassRoles::VILLAGER),
+                patience: if roles.of_class(r.class).contains(ClassRoles::VILLAGER) {
+                    Patience::WaitsOnce
+                } else {
+                    Patience::Fails
+                },
                 stance: r.stance,
             },
             ..ListUpdate::default()

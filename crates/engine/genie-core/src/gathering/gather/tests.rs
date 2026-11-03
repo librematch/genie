@@ -1,6 +1,7 @@
 use super::*;
 use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
+use crate::gathering::gather::WalkEnd;
 use crate::gathering::hunt::tests::walker;
 use crate::gathering::hunt::{DropOff, resource_kind};
 use crate::map::DistanceSquared;
@@ -1102,7 +1103,9 @@ fn walk_to_point_ends_on_its_target_let_go_as_on_its_arrival() {
     let mut g = at(GatherState::ReseedWalk { move_to: None }, 10028);
     assert_eq!(
         run(&mut g, PlayerKind::Human),
-        Ok(Next::Reseed { arrived: true })
+        Ok(Next::Reseed {
+            end: WalkEnd::Arrived
+        })
     );
     assert_eq!(g.state.move_to().copied(), None);
     // a failed walk: state 15 idles a computer's too
@@ -1288,13 +1291,17 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     let mut g = walking(MoveTo::Arrived);
     assert_eq!(
         farm_update(&mut g, None, 100, PlayerKind::Human),
-        Ok(Next::Reseed { arrived: true })
+        Ok(Next::Reseed {
+            end: WalkEnd::Arrived
+        })
     );
     assert_eq!(g.state.move_to().copied(), None);
     let mut g = walking(MoveTo::Failed);
     assert_eq!(
         farm_update(&mut g, None, 100, PlayerKind::Human),
-        Ok(Next::Reseed { arrived: false })
+        Ok(Next::Reseed {
+            end: WalkEnd::Failed
+        })
     );
     // the farm still standing: the farmer faces it (set_state 6)
     let mut g = walking(MoveTo::Arrived);
@@ -1314,7 +1321,9 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
     };
     assert_eq!(
         farm_update(&mut g, Some(&mut dying), 100, PlayerKind::Human),
-        Ok(Next::Reseed { arrived: true })
+        Ok(Next::Reseed {
+            end: WalkEnd::Arrived
+        })
     );
 }
 
@@ -1322,7 +1331,7 @@ fn at_the_end_of_its_walk_back_farmer_reseeds() {
 /// lets its targets go.
 #[test]
 fn without_reseed_the_farmer_idles_or_computer_is_done() {
-    let after = |arrived: bool, player_kind: PlayerKind| {
+    let after = |end: WalkEnd, player_kind: PlayerKind| {
         let mut g = GatherAction {
             state: GatherState::ReseedWalk {
                 move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
@@ -1335,7 +1344,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         let (mut sprite, mut rng) = (None, Well512::default());
         let released = g
             .after_reseed(
-                arrived,
+                end,
                 player_kind,
                 Some(&mut mover),
                 Stand {
@@ -1349,7 +1358,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         (g.state, released, g.target, g.state.move_to().copied())
     };
     assert_eq!(
-        after(true, PlayerKind::Computer),
+        after(WalkEnd::Arrived, PlayerKind::Computer),
         (
             GatherState::Done,
             [None, None],
@@ -1358,7 +1367,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         )
     );
     assert_eq!(
-        after(true, PlayerKind::Human),
+        after(WalkEnd::Arrived, PlayerKind::Human),
         (
             GatherState::Idle,
             [Some(object_id(5)), Some(object_id(6))],
@@ -1367,7 +1376,7 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
         )
     );
     assert_eq!(
-        after(false, PlayerKind::Computer),
+        after(WalkEnd::Failed, PlayerKind::Computer),
         (
             GatherState::Idle,
             [Some(object_id(5)), Some(object_id(6))],

@@ -344,7 +344,7 @@ impl World {
                 Position::new(
                     position.x(),
                     position.y(),
-                    grounded(position.z(), g, false, made.fly_mode),
+                    grounded(position.z(), g, made.fly_mode),
                 )
             })
         });

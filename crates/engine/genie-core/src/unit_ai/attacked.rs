@@ -19,6 +19,7 @@ use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::TargetRules;
@@ -400,8 +401,11 @@ impl UnitAi {
                     range: Distance::ZERO,
                     force: OrderForce::Forced,
                     // The prey animals' class, whose move off a footprint runs (slot 0x148's seventh argument).
-                    // The villagers' class.
-                    walk: !roles.of_class(off.class).contains(ClassRoles::PREY),
+                    pace: if roles.of_class(off.class).contains(ClassRoles::PREY) {
+                        Pace::Run
+                    } else {
+                        Pace::Walk
+                    },
                 },
                 side,
                 rng,

@@ -18,6 +18,7 @@ use crate::math::fmath::BVector;
 use crate::movement::Me;
 use crate::movement::Mover;
 use crate::movement::Speed;
+use crate::movement::move_to::Patience;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::RoleId;
@@ -36,6 +37,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiMove;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::Pace;
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
@@ -101,8 +103,13 @@ impl Unit {
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
             rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.action_part().work_rate,
-            waits: roles.of_class(own.class).contains(ClassRoles::VILLAGER)
-                && !c.w.players.player(c.player)?.kind.is_computer(),
+            patience: if roles.of_class(own.class).contains(ClassRoles::VILLAGER)
+                && !c.w.players.player(c.player)?.kind.is_computer()
+            {
+                Patience::WaitsOnce
+            } else {
+                Patience::Fails
+            },
             stance: c
                 .w
                 .parts
@@ -186,7 +193,7 @@ impl Unit {
             point: Position::new(w.x(), w.y(), w.height()),
             range: Distance::ZERO,
             force: OrderForce::Forced,
-            walk: false,
+            pace: Pace::Run,
         })
     }
 }

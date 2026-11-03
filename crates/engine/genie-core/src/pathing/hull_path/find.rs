@@ -16,6 +16,26 @@ use crate::pathing::hull_path::{
 };
 use crate::world::slots::CheckedIndex;
 
+/// Whether a search keeps the area and the hulls of the pather's last one (`FindShortPath`'s
+/// argument 11, when the pather has an area) or makes a new area and builds them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Hulls {
+    /// The last search's stay.
+    Kept,
+    /// A new area, its hulls built in the first round.
+    New,
+}
+
+/// Whether a search tries the quick path first (`FindShortPath`'s argument 15 0) or the quick
+/// path alone (1, slot 0x3e0's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum QuickPath {
+    /// The quick path, then the hull search.
+    First,
+    /// The quick path alone.
+    Only,
+}
+
 impl HullPather<'_> {
     /// `MShortPather::FindShortPath` (`FUN_140f85580`) as slot 0x3e8 and `FUN_140f9e540` call it
     /// (the area new, the quick path first): a path from `from` to `to` within `range` of object
@@ -34,7 +54,7 @@ impl HullPather<'_> {
         target_id: Option<ObjectId>,
         range: Distance,
     ) -> Result<(ShortFound, Waypoints), GenieError> {
-        self.find_with(from, to, target_id, range, false, false)
+        self.find_with(from, to, target_id, range, Hulls::New, QuickPath::First)
     }
 
     /// [`HullPather::find`] with `FindShortPath`'s argument 11 set: the area and the hulls of this
@@ -50,7 +70,7 @@ impl HullPather<'_> {
         target_id: Option<ObjectId>,
         range: Distance,
     ) -> Result<(ShortFound, Waypoints), GenieError> {
-        self.find_with(from, to, target_id, range, true, false)
+        self.find_with(from, to, target_id, range, Hulls::Kept, QuickPath::First)
     }
 
     /// [`HullPather::find`] as slot 0x3e0 calls it (its last argument 1): the quick path alone,
@@ -66,24 +86,23 @@ impl HullPather<'_> {
         target_id: Option<ObjectId>,
         range: Distance,
     ) -> Result<(ShortFound, Waypoints), GenieError> {
-        self.find_with(from, to, target_id, range, false, true)
+        self.find_with(from, to, target_id, range, Hulls::New, QuickPath::Only)
     }
 
-    /// `FindShortPath` with its argument 11 (`keep`) and its argument 15 below 2 (`quick_only`
-    /// for 1). Its callers pass 0 (slot 0x3e8, `FUN_140f9e540`) or 1 (slot 0x3e0) there, never 2
-    /// or more, which would skip the quick path. Its arguments 12 to 14 are the pather's player
-    /// and include list; its path is the one returned.
+    /// `FindShortPath` with its argument 11 ([`Hulls`]) and its argument 15 below 2
+    /// ([`QuickPath`]). Its callers pass 0 (slot 0x3e8, `FUN_140f9e540`) or 1 (slot 0x3e0) there,
+    /// never 2 or more, which would skip the quick path. Its arguments 12 to 14 are the pather's
+    /// player and include list; its path is the one returned.
     pub(super) fn find_with(
         &mut self,
         from: Point,
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-        keep: bool,
-        quick_only: bool,
+        hulls: Hulls,
+        quick: QuickPath,
     ) -> Result<(ShortFound, Waypoints), GenieError> {
-        let (result, path, clears) =
-            self.find_unclear(from, to, target_id, range, keep, quick_only)?;
+        let (result, path, clears) = self.find_unclear(from, to, target_id, range, hulls, quick)?;
         if clears {
             self.world.clear_tile_records();
             self.world.set_manager_buffer(None);
@@ -103,11 +122,11 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
         range: Distance,
-        keep: bool,
-        quick_only: bool,
+        hulls: Hulls,
+        quick: QuickPath,
     ) -> Result<(ShortFound, Waypoints, bool), GenieError> {
         let mut path = Waypoints::default();
-        if !keep {
+        if hulls == Hulls::New {
             self.area = NO_AREA;
         }
         if self.off_map(from, to, target_id)? {
@@ -129,10 +148,10 @@ impl HullPather<'_> {
         if self.quick_path(from, self.quick_goal(&q), q.target_id, &mut path)? {
             return Ok((ShortFound::Reached, path, true));
         }
-        if quick_only {
+        if quick == QuickPath::Only {
             return Ok((ShortFound::Blocked, path, false));
         }
-        let keep = self.set_area(from, to, keep);
+        let hulls = self.set_area(from, to, hulls);
         // no target on the goal: the first record with an object that holds the goal is the
         // target, its id still -1 (`FUN_141051900` at 0x140f85fd9)
         if q.target.is_none() {
@@ -147,7 +166,7 @@ impl HullPather<'_> {
         ))?;
         self.empty(NodeList::SEARCH)?;
         let mut rounds = Rounds::new(walk_length(from, to));
-        if let Some(result) = self.search(&q, keep, &mut rounds, &mut path)? {
+        if let Some(result) = self.search(&q, hulls, &mut rounds, &mut path)? {
             return Ok((result, path, true));
         }
         let result = self.path_end(&q, &rounds, &mut path)?;
@@ -259,9 +278,9 @@ impl HullPather<'_> {
     /// The area, unless kept: the walk's tiles and two more each way, on the map (`MINSS`,
     /// `MAXSS` of the start's and the goal's, `CVTTSS2SI`, 0x140f85f61..0x140f85ff5). Whether the
     /// search keeps its hulls: a new area builds them.
-    fn set_area(&mut self, from: Point, to: Point, keep: bool) -> bool {
-        if keep && self.area.x0() != NO_AREA.x0() {
-            return true;
+    fn set_area(&mut self, from: Point, to: Point, hulls: Hulls) -> Hulls {
+        if hulls == Hulls::Kept && self.area.x0() != NO_AREA.x0() {
+            return Hulls::Kept;
         }
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let tile = |v: f32, d: i32| cvttss2si(v).wrapping_add(d);
@@ -275,7 +294,7 @@ impl HullPather<'_> {
             if w <= x1 { w - 1 } else { x1 },
             if h <= y1 { h - 1 } else { y1 },
         );
-        false
+        Hulls::New
     }
 
     /// The search's end: the path to the node found, or to the one nearest the goal; a walk

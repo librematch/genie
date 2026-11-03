@@ -3,6 +3,7 @@
 
 use crate::{decode, encode};
 use genie_core::commands::Bell;
+use genie_core::commands::Departure;
 use genie_core::commands::Shift;
 use genie_core::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
@@ -24,7 +25,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
-use genie_core::orders::{ControlKey, Interact, MoveOrder};
+use genie_core::orders::{ControlKey, Interact, MoveOrder, SavedPatrols};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
@@ -453,12 +454,12 @@ fn patrol_and_attack_move_keep_every_waypoint_slot() {
     .encode()
     .unwrap();
     let Command::Patrol(PatrolCommand {
-        waypoints, reset, ..
+        waypoints, patrols, ..
     }) = round_trip(&patrol)
     else {
         panic!("a patrol")
     };
-    assert!(reset);
+    assert_eq!(patrols, SavedPatrols::Dropped);
     assert_eq!(
         waypoints.used(),
         Some(&[Point::new(1.5, 2.5), Point::new(3.5, 4.5)][..])
@@ -499,7 +500,7 @@ fn patrol_and_attack_move_keep_every_waypoint_slot() {
                     _ => Point::new(0.0, 0.0),
                 }),
             },
-            reset: false,
+            patrols: SavedPatrols::Kept,
             queued: true,
             ignore_pending: true,
         })
@@ -742,7 +743,7 @@ fn the_object_commands_keep_their_fields() {
             .unwrap(),
             Command::Resign(ResignCommand {
                 player: player_id(2),
-                dropped: true,
+                departure: Departure::Dropped,
             }),
         ),
         (

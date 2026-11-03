@@ -3,6 +3,7 @@ use crate::combat::attack::AttackState;
 use crate::combat::attack::BeginLayer;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
+use crate::gathering::hunt::DecayRule;
 use crate::map::Footprint;
 use crate::map::Radii;
 use crate::map::RestrictionId;
@@ -66,7 +67,7 @@ pub(crate) fn hunt_reads() -> HuntReads {
         work_rate: WorkRate::new(1.0),
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
-        stops_decay: false,
+        decay: DecayRule::Runs,
         has_ai: true,
         ai_class: None,
         tree_searched: false,
@@ -213,17 +214,17 @@ fn decay_task_stops_its_target_decay_once() {
         ..Victim::default()
     };
     let mut v = decaying();
-    assert!(!hunt.stops_decay_of(true, &mut v, &roles()));
+    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(0.25));
     hunt.task.kind4 = Some(attribute::DECAY_TASK);
-    assert!(!hunt.stops_decay_of(false, &mut v, &roles()));
+    assert!(!hunt.stops_decay_of(DecayRule::Runs, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(0.25));
-    assert!(hunt.stops_decay_of(true, &mut v, &roles()));
+    assert!(hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(-0.25));
-    assert!(!hunt.stops_decay_of(true, &mut v, &roles()));
+    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
     assert_eq!(v.decay, AmountRate::new(-0.25));
     let mut none = Victim::default();
-    assert!(!hunt.stops_decay_of(true, &mut none, &roles()));
+    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut none, &roles()));
     assert_eq!(none.decay.get().to_bits(), 0);
 }
 
@@ -240,13 +241,13 @@ fn stopped_decay_goes_back_to_the_world_at_once() {
     hunt.task.kind4 = Some(attribute::DECAY_TASK);
     let mut rig = Rig::on_the_path(decaying.clone());
     rig.run(100, |c, u, actions, f, _| {
-        hunt.decay_check(c, u, actions, true, f, &roles())
+        hunt.decay_check(c, u, actions, DecayRule::Stops, f, &roles())
     })
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(-0.25));
     let mut rig = Rig::on_the_path(decaying);
     rig.run(100, |c, u, actions, f, _| {
-        hunt.decay_check(c, u, actions, false, f, &roles())
+        hunt.decay_check(c, u, actions, DecayRule::Runs, f, &roles())
     })
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(0.25));

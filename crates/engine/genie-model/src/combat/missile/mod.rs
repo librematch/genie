@@ -8,7 +8,7 @@ pub mod missile_modes;
 pub mod missile_stats;
 pub mod projectile_kind;
 pub use self::arc_ratio::ArcRatio;
-pub use self::hit_mode::HitMode;
+pub use self::hit_mode::{HitMode, TargetOwner};
 pub use self::miss_spread::MissSpread;
 pub use self::missile_modes::SmartMode;
 pub use self::missile_modes::VanishMode;

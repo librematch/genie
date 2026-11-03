@@ -142,7 +142,7 @@ impl Unit {
                         "a missile without the map's terrain",
                     ))?
                     .ground(position.ground())?;
-            position = position.with_z(grounded(position.z(), ground, false, stats.fly_mode));
+            position = position.with_z(grounded(position.z(), ground, stats.fly_mode));
         }
         mover.mark_move(position, c.w.world_time);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();

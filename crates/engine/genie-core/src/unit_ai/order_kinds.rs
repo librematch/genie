@@ -19,7 +19,9 @@ use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderOutcome;
+use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::TakenAs;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
@@ -428,12 +430,12 @@ impl UnitAi {
             point: o.point,
             range: o.range,
             force: OrderForce::Forced,
-            walk: true,
+            pace: Pace::Walk,
         }) else {
             return Ok(OrderOutcome::NotTaken);
         };
         side.effect_now(Effect::Move(m), self, ai)?;
-        Ok(self.order_tail(Some(o.order), o.priority, class, false, ai, roles))
+        Ok(self.order_tail(Some(o.order), o.priority, class, TakenAs::Order, ai, roles))
     }
 
     /// Slot 0x1b0 by the unit AI's type: the kind of resource of a target class. The civilian's

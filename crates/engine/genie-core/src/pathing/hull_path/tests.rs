@@ -17,6 +17,7 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::convex::AtStart;
+use crate::pathing::hull_path::find::Hulls;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
@@ -3151,7 +3152,10 @@ fn goal_in_the_start_hull_is_walked_to_within_it() {
     };
     let mut rounds = Rounds::new(Distance::ZERO);
     let mut path = Waypoints::default();
-    assert_eq!(p.round_start(&q, true, &mut rounds, &mut path), Ok(None));
+    assert_eq!(
+        p.round_start(&q, Hulls::Kept, &mut rounds, &mut path),
+        Ok(None)
+    );
     assert!(rounds.within);
     assert_eq!(path.points, [Point::new(4.9, 5.5), side]);
 }

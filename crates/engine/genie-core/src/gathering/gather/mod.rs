@@ -271,9 +271,18 @@ pub enum Next {
     /// (`set_state(1)`), a human's idle (`set_state(2)`), and a failed walk idles both
     /// ([`GatherAction::after_reseed`]).
     Reseed {
-        /// The walk arrived (codes 1, 2 and 5), else it failed (code 3).
-        arrived: bool,
+        /// How the walk ended.
+        end: WalkEnd,
     },
+}
+
+/// How State 0xf2's walk ([`Next::Reseed`]) ended: it arrived (codes 1, 2 and 5) or failed (3).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WalkEnd {
+    /// It arrived.
+    Arrived,
+    /// It failed.
+    Failed,
 }
 
 #[cfg(test)]

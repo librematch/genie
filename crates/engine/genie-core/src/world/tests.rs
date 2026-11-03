@@ -13,6 +13,7 @@ use crate::combat::victims::{KillLeft, file_kill, write_back};
 use crate::combat::volley::Aimed;
 use crate::combat::{AttackCount, AttackTargetId, MissileCount};
 use crate::commands::Bell;
+use crate::commands::Departure;
 use crate::commands::GameSub;
 use crate::commands::GatherPointState;
 use crate::commands::ResourceWord;
@@ -50,6 +51,7 @@ use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::WalkEnd;
 use crate::gathering::gather::unit::give_load;
 use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
@@ -91,6 +93,7 @@ use crate::movement::fly::FLY;
 use crate::movement::fly::Fly;
 use crate::movement::fly::FlyState;
 use crate::movement::move_to::MoveWaitState;
+use crate::movement::move_to::Patience;
 use crate::movement::move_to::{MOVE_TO, MoveWait, TargetMoved};
 use crate::movement::move_to::{MoveTo, MoveToAction};
 use crate::movement::{
@@ -172,6 +175,7 @@ use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount}
 use crate::orders::ControlKey;
 use crate::orders::Dispatch;
 use crate::orders::OrderSource;
+use crate::orders::SavedPatrols;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
 use crate::ownership::CaptureKind;
@@ -243,6 +247,7 @@ use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetKind;
+use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
@@ -4419,7 +4424,7 @@ fn the_unit_ai_hunt_build_and_target_orders_apply_after_its_run() {
         point: Position::new(20.0, 20.0, 0.0),
         range: Distance::ZERO,
         force: OrderForce::Unforced,
-        walk: false,
+        pace: Pace::Run,
     };
     assert!(with_effects(&mut t, vec![Effect::Move(walk)]).is_err());
     let mut t = sent_off_world(vec![]);
@@ -8153,7 +8158,7 @@ fn the_ai_move_at_once_matches_the_one_after_the_update() {
         point: Position::new(35.0, 80.0, 0.0),
         range: Distance::ZERO,
         force: OrderForce::Forced,
-        walk: false,
+        pace: Pace::Run,
     };
     later
         .move_aside(PlayerId::new(1), ListIndex::new(0), m)
@@ -11049,7 +11054,7 @@ fn taken_gaia_archer_keeps_copy_of_gaia_master_with_its_new_owner_fog() {
     );
     let mut u = hands_unit(21712, master_id(4));
     let mut unit_ai = hands_ai(21712);
-    let dead = dead_master_of(&u, 0, MasterTables::new(&masters, &own), false);
+    let dead = dead_master_of(&u, 0, MasterTables::new(&masters, &own), None);
     assert_eq!(
         hands(
             (&mut u, Some(&mut unit_ai)),
@@ -11118,7 +11123,7 @@ fn taken_sheep_sees_with_its_new_owner_line_of_sight() {
     let mut u = hands_unit(9520, master_id(705));
     let mut unit_ai = hands_ai(9520);
     assert_eq!(
-        dead_master_of(&u, 1, MasterTables::new(&masters, &own), false),
+        dead_master_of(&u, 1, MasterTables::new(&masters, &own), None),
         None
     );
     assert_eq!(
@@ -11169,7 +11174,7 @@ fn taken_sheep_sees_with_its_new_owner_line_of_sight() {
     let mut a = hands_unit(7, master_id(4));
     let mut other_ai = hands_ai(7);
     assert_eq!(
-        dead_master_of(&a, 1, MasterTables::new(&masters, &own), false),
+        dead_master_of(&a, 1, MasterTables::new(&masters, &own), None),
         None
     );
     assert_eq!(
@@ -11184,7 +11189,12 @@ fn taken_sheep_sees_with_its_new_owner_line_of_sight() {
     );
     // a dead master it holds stays: none is made
     assert_eq!(
-        dead_master_of(&a, 0, MasterTables::new(&masters, &own), true),
+        dead_master_of(
+            &a,
+            0,
+            MasterTables::new(&masters, &own),
+            Some(&Master::default())
+        ),
         None
     );
     assert_eq!(
@@ -14920,12 +14930,12 @@ fn restored_patrol_takes_its_points_and_runs_to_its_waypoint() {
     let run = Unit::restore_patrol(Some(&ai), motion.mover_mut(), &tuning().movement)
         .expect("the saved patrol's move");
     assert_eq!(
-        (run.point, run.range, run.force, run.walk),
+        (run.point, run.range, run.force, run.pace),
         (
             Position::new(30.0, 20.25, 0.5),
             Distance::ZERO,
             OrderForce::Forced,
-            false
+            Pace::Run
         )
     );
     assert_eq!(
@@ -15992,12 +16002,12 @@ fn scout_sprites() -> (Masters, Graphics) {
 
 const AI_POINT: Position = Position::new(14.5, 12.0, 0.0);
 
-fn forced(walk: bool) -> AiMove {
+fn forced(pace: Pace) -> AiMove {
     AiMove {
         point: AI_POINT,
         range: Distance::new(0.5),
         force: OrderForce::Forced,
-        walk,
+        pace,
     }
 }
 
@@ -16015,7 +16025,7 @@ fn an_ai_move_replaces_done_attack_with_move_to_the_point() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::CLASS_47
         ),
         Ok(vec![object_id(9149), object_id(9150)])
@@ -16043,7 +16053,7 @@ fn an_ai_move_replaces_done_attack_with_move_to_the_point() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(true),
+            forced(Pace::Walk),
             class::CLASS_47
         ),
         Ok(vec![])
@@ -16090,7 +16100,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::VILLAGER
         ),
         Ok(vec![object_id(28222)])
@@ -16131,7 +16141,7 @@ fn an_ai_move_hands_the_point_to_hunt_without_work_range() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::VILLAGER
         ),
         Ok(vec![object_id(9149)])
@@ -16160,7 +16170,7 @@ fn an_ai_move_hands_the_point_to_hunt_without_work_range() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::VILLAGER
         ),
         Ok(vec![object_id(9149), object_id(9150)])
@@ -16179,7 +16189,7 @@ fn an_ai_move_hands_the_point_to_hunt_without_work_range() {
 fn an_unforced_ai_move_leaves_move_to_the_same_point() {
     let unforced = AiMove {
         force: OrderForce::Unforced,
-        ..forced(false)
+        ..forced(Pace::Run)
     };
     let old = MoveToAction::to_point(AI_POINT, Distance::ZERO, None, None);
     let (mut u, mut actions, mut motion) = mover_unit(5);
@@ -16211,7 +16221,7 @@ fn an_unforced_ai_move_leaves_move_to_the_same_point() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::CLASS_47
         ),
         Ok(vec![object_id(9149)])
@@ -16251,7 +16261,7 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
     assert!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::CLASS_54
         )
         .is_err()
@@ -16260,7 +16270,7 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::CLASS_51
         ),
         Ok(vec![])
@@ -16325,7 +16335,7 @@ fn an_ai_move_of_unit_without_speed_fails_at_its_start_standing() {
     assert_eq!(
         ai_move_of(
             (&mut u, &mut actions, &mut motion),
-            forced(false),
+            forced(Pace::Run),
             class::CLASS_47
         ),
         Ok(vec![])
@@ -16388,7 +16398,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
     u.own_move_gave_up(
         &mut actions,
         motion.lent(),
-        false,
+        Patience::Fails,
         UnitStance::Aggressive,
         (
             OwnerMasters::new(no_own_masters(), Some(&masters)),
@@ -16412,7 +16422,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
     v.own_move_gave_up(
         &mut deer_actions,
         deer_motion.lent(),
-        true,
+        Patience::WaitsOnce,
         UnitStance::Aggressive,
         (
             OwnerMasters::new(no_own_masters(), Some(&masters)),
@@ -17538,7 +17548,7 @@ fn reseed_world() -> World {
 fn farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
     let mut t = reseed_world();
     t.players[1].auto_farm_queue = true;
-    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
+    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(p.attributes[1], Amount::new(40.0));
@@ -17574,7 +17584,7 @@ fn reseed_takes_queued_farm() {
         t.players[1].auto_farm_queue = auto;
         t.players[1].attributes[1] = Amount::new(wood);
         t.players[1].farm_queue = QueueCount::of_data(2);
-        t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
+        t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
             .unwrap();
         let p = &t.players[1];
         assert_eq!(
@@ -17590,7 +17600,7 @@ fn reseed_takes_queued_farm() {
 #[test]
 fn without_farm_to_make_the_farmer_idles() {
     let mut t = reseed_world();
-    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
+    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
         .unwrap();
     let p = &t.players[1];
     assert_eq!(p.objects.len(), 1);
@@ -17606,7 +17616,7 @@ fn without_farm_to_make_the_farmer_idles() {
     t.players[1].auto_farm_queue = true;
     t.players[1].attributes[1] = Amount::new(59.0);
     t.players[1].kind = PlayerKind::Computer;
-    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), true)
+    t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
         .unwrap();
     let p = &t.players[1];
     assert_eq!((p.objects.len(), p.attributes[1]), (1, Amount::new(59.0)));
@@ -19452,7 +19462,9 @@ fn what_follows_the_gather_update_lets_go_builds_or_reseeds() {
     );
     assert_eq!((seen.0, seen.1), (Ok(()), vec![600]));
     let (_, seen) = follow(
-        Next::Reseed { arrived: true },
+        Next::Reseed {
+            end: WalkEnd::Arrived,
+        },
         (Some(object_id(600)), Some(DropSiteId::new(object_id(700)))),
     );
     assert_eq!(
@@ -22006,7 +22018,12 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         t.players[0].objects[ListIndex::new(0)].workers,
         WorkerCount::of_data(1)
     );
-    let reseeded = followed(&mut t, Next::Reseed { arrived: true });
+    let reseeded = followed(
+        &mut t,
+        Next::Reseed {
+            end: WalkEnd::Arrived,
+        },
+    );
     assert_eq!(
         reseeded,
         Ok((Some(0), Some((None, GatherState::Idle)), None))
@@ -22073,7 +22090,7 @@ fn the_unit_ai_orders_reach_the_unit_and_the_units_they_name() {
         point: Position::new(25.0, 89.5, 0.0),
         range: Distance::ZERO,
         force: OrderForce::Unforced,
-        walk: false,
+        pace: Pace::Run,
     };
     assert_eq!(
         applied(&mut t, vec![Effect::Command(AiCommand::MoveAside(aside))]),
@@ -22475,7 +22492,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
     let way = vec![Point::new(40.5, 89.5)];
     let sweep = Sweep {
         patrol: false,
-        reset: true,
+        patrols: SavedPatrols::Dropped,
         queued: false,
         ignore_pending: false,
     };
@@ -22509,10 +22526,10 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
                 player: player_id(1),
                 units: unit_list(v.clone()),
                 waypoints: Waypoints::of(&way).unwrap(),
-                reset: true,
+                patrols: SavedPatrols::Dropped,
             }),
             PlayerId::new(1),
-            |w| w.patrol(player_id(1), &v, &way, true),
+            |w| w.patrol(player_id(1), &v, &way, SavedPatrols::Dropped),
         ),
         routes(
             &t,
@@ -22520,7 +22537,7 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
                 player: player_id(1),
                 units: unit_list(v.clone()),
                 waypoints: Waypoints::of(&way).unwrap(),
-                reset: true,
+                patrols: SavedPatrols::Dropped,
                 queued: false,
                 ignore_pending: false,
             }),
@@ -22666,10 +22683,10 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
             &t,
             &Command::Resign(ResignCommand {
                 player: player_id(1),
-                dropped: false,
+                departure: Departure::Resigned,
             }),
             PlayerId::new(1),
-            |w| w.resign(player_id(1), false),
+            |w| w.resign(player_id(1), Departure::Resigned),
         ),
         routes(
             &t,

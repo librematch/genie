@@ -10,16 +10,25 @@ use crate::objects::MasterHitPoints;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::MasterKind;
 
+/// What lands a hit: a swing, or a missile (a shield of charge type 5 blocks the first, 4 the
+/// second: [`shield`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HitKind {
+    /// A melee swing.
+    Melee,
+    /// A missile.
+    Missile,
+}
+
 /// `FUN_14108d8a0`: a shield blocks the hit: a target whose master's charge type is 5 against a
 /// melee hit (4 against a missile) spends a charge of 1 when it has one (`COMISS 1.0, charge`,
 /// `JA` past: a NaN charge blocks too). The type-5 shield's local-player statistics
 /// (`FUN_140a497f0`) change no simulation state (FD-037-D20). A target without combat values has
 /// charge type 0.
-pub fn shield(v: &mut Victim, missile: bool) -> bool {
-    let kind = if missile {
-        ChargeKind::MISSILE_SHIELD
-    } else {
-        ChargeKind::MELEE_SHIELD
+pub fn shield(v: &mut Victim, hit: HitKind) -> bool {
+    let kind = match hit {
+        HitKind::Melee => ChargeKind::MELEE_SHIELD,
+        HitKind::Missile => ChargeKind::MISSILE_SHIELD,
     };
     if v.source.charge_kind == kind && at_most_or_unordered(1.0, v.source.charge.get()) {
         v.source.charge -= Charge::new(1.0);

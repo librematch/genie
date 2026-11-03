@@ -219,9 +219,9 @@ impl Unit {
                 .get(new.index())
                 .is_some_and(|m| m.get(self.life.master_id).is_some()));
         }
-        let had = c.w.parts.dead_master.contains(self.id);
+        let held = c.w.parts.dead_master.get(self.id);
         let tables = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
-        let dead = dead_master_of(self, c.player.index(), tables, had);
+        let dead = dead_master_of(self, c.player.index(), tables, held);
         let id = self.id;
         let changed = change_hands(
             (self, actions, c.w.parts.unit_ai.get_mut(id)),

@@ -48,9 +48,9 @@ impl World {
     /// on the Player stream).
     pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> Result<(), GenieError> {
         let mut unit = self.take_out(q, j)?;
-        let had = self.parts.dead_master.contains(unit.id);
+        let held = self.parts.dead_master.get(unit.id);
         let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
-        let dead = dead_master_of(&unit, q.index(), tables, had);
+        let dead = dead_master_of(&unit, q.index(), tables, held);
         let id = unit.id;
         let changed = change_hands(
             (
@@ -351,9 +351,9 @@ impl World {
         id: ObjectId,
     ) -> Result<PlayerId, GenieError> {
         let mut unit = self.take_out(old, idx)?;
-        let had = self.parts.dead_master.contains(unit.id);
+        let held = self.parts.dead_master.get(unit.id);
         let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
-        let dead = dead_master_of(&unit, old.index(), tables, had);
+        let dead = dead_master_of(&unit, old.index(), tables, held);
         let changed = change_hands(
             (
                 &mut unit,
@@ -525,16 +525,16 @@ pub(crate) const DEAD_COPY_KINDS: [MasterKind; 6] = [
 ];
 
 /// The dead master an ownership change of `u` from player `old` makes, unless it holds one
-/// (`had`): its master's death spawn (`+0x5e4`, the master it reads: its own, else its old
+/// (`held`): its master's death spawn (`+0x5e4`, the master it reads: its own, else its old
 /// owner's) in the old owner's table, a copy of type 10 to 40, 70 or 80 (`FUN_14120f800`, before
 /// the copy `FUN_141186d10`); none without a death spawn ([`crate::world::parts::Parts::dead_master`]).
 pub(crate) fn dead_master_of(
     u: &Unit,
     old: usize,
     masters: MasterTables<'_>,
-    had: bool,
+    held: Option<&Master>,
 ) -> Option<Master> {
-    if had {
+    if held.is_some() {
         return None;
     }
     let old_table = masters.players.get(old)?;

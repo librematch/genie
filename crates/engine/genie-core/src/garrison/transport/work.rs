@@ -2,6 +2,7 @@
 //! in the game's data) makes or retakes it.
 
 use crate::GenieError;
+use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{Changed, MapShore, Ship, TRANSPORT, TransportAction};
 use crate::map::Position;
@@ -41,7 +42,13 @@ impl World {
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
         let changed = self.with_shore(p, i, t.task, |ship, shore| {
-            t.start(true, ship, shore, &transport_tuning, &move_to_tuning)
+            t.start(
+                StartCall::Added,
+                ship,
+                shore,
+                &transport_tuning,
+                &move_to_tuning,
+            )
         })?;
         self.parts
             .actions_mut(self.players.live(p, i)?.id)?

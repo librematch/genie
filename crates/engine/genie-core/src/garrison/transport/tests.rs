@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::damage::Victim;
+use crate::garrison::transport::StartCall;
 use crate::garrison::transport::TransportTarget;
 use crate::gathering::hunt::tests::walker;
 use crate::map::GridSize;
@@ -230,7 +231,13 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     // the list's add (first_in_stack with 1): set_state(11), its MoveTo to the shore point
     // on the way, none here, so the place itself
     let changed = t
-        .start(true, &s, &mut c, &tuning().transport, &tuning().move_to)
+        .start(
+            StartCall::Added,
+            &s,
+            &mut c,
+            &tuning().transport,
+            &tuning().move_to,
+        )
         .unwrap();
     assert_eq!(changed, Changed::default());
     assert_eq!(
@@ -241,15 +248,27 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     // a NaN point sails too (COMISS/JA, JBE)
     let mut nan = TransportAction::new(Position::new(f32::NAN, 1.0, 0.0));
     let _ = nan
-        .start(true, &s, &mut c, &tuning().transport, &tuning().move_to)
+        .start(
+            StartCall::Added,
+            &s,
+            &mut c,
+            &tuning().transport,
+            &tuning().move_to,
+        )
         .unwrap();
     assert_eq!(nan.state.bare(), TransportState::Sail { move_to: None });
     // below 0, or not first: idle with the standing sprite
     let mut off = TransportAction::new(Position::new(3.0, -1.0, 0.0));
     assert!(
-        off.start(true, &s, &mut c, &tuning().transport, &tuning().move_to)
-            .unwrap()
-            .stands
+        off.start(
+            StartCall::Added,
+            &s,
+            &mut c,
+            &tuning().transport,
+            &tuning().move_to
+        )
+        .unwrap()
+        .stands
     );
     assert_eq!(
         (off.state.bare(), off.state.move_to().copied()),
@@ -257,7 +276,13 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     );
     let mut later = TransportAction::new(s.position);
     let _ = later
-        .start(false, &s, &mut c, &tuning().transport, &tuning().move_to)
+        .start(
+            StartCall::Other,
+            &s,
+            &mut c,
+            &tuning().transport,
+            &tuning().move_to,
+        )
         .unwrap();
     assert_eq!(later.state.bare(), TransportState::Idle);
 }
@@ -269,7 +294,13 @@ fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
     c.shore = Some(Point::new(19.5, 8.5));
     let mut t = TransportAction::new(s.position);
     let _ = t
-        .start(true, &s, &mut c, &tuning().transport, &tuning().move_to)
+        .start(
+            StartCall::Added,
+            &s,
+            &mut c,
+            &tuning().transport,
+            &tuning().move_to,
+        )
         .unwrap();
     t.point = Position::new(25.0, 8.0, 0.0);
     // set_state(4) again: the old MoveTo's teardown stops the unit, the new one starts

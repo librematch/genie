@@ -109,6 +109,7 @@ pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
 pub use self::order_outcome::OrderOutcome;
 pub use self::order_priority::OrderPriority;
+pub(crate) use self::process_order::TakenAs;
 pub use self::queue_end::QueueEnd;
 pub(crate) use self::side::UNMODELLED_COMMAND;
 pub use self::side::{
@@ -117,8 +118,8 @@ pub use self::side::{
 };
 pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
-    AiMove, Duel, Found, GroupState, Home, OrderForce, Seen, Surroundings, TopTarget, UnitSeen,
-    flood_search, no_search,
+    AiMove, Duel, Found, GroupState, Home, OrderForce, Pace, Seen, Surroundings, TopTarget,
+    UnitSeen, flood_search, no_search,
 };
 use self::surroundings::{LiveTop, group_lets_idle};
 pub use self::target_kind::OrderTargetKind;

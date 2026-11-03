@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::Stand;
+use crate::gathering::gather::WalkEnd;
 use crate::gathering::gather::update::{QUIET_CODE, UNMOVING};
 use crate::gathering::gather::{
     FARM_WAIT_TIME, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT, Walks,
@@ -256,9 +257,13 @@ impl GatherAction {
                 {
                     return self.set_face(c, unit, t, r, roles);
                 }
-                Ok(Next::Reseed { arrived: true })
+                Ok(Next::Reseed {
+                    end: WalkEnd::Arrived,
+                })
             }
-            3 => Ok(Next::Reseed { arrived: false }),
+            3 => Ok(Next::Reseed {
+                end: WalkEnd::Failed,
+            }),
             code => Err(QUIET_CODE.with("code", code)),
         }
     }
@@ -274,7 +279,7 @@ impl GatherAction {
     /// The unit's stop that the motion step does not model.
     pub(crate) fn after_reseed(
         &mut self,
-        arrived: bool,
+        end: WalkEnd,
         player_kind: PlayerKind,
         mover: Option<&mut Mover>,
         stand: Stand<'_>,
@@ -283,7 +288,7 @@ impl GatherAction {
         self.tear_down(mover.as_deref_mut())?;
         self.timer = Seconds::ZERO;
         stand.show(mover.map(|m| &mut m.stats));
-        if arrived && player_kind.is_computer() {
+        if end == WalkEnd::Arrived && player_kind.is_computer() {
             // State 1: done; its update returns 1 and the action list removes it.
             self.state = GatherState::Done;
             return Ok([None; 2]);

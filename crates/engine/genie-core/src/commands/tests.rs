@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::Bell;
+use crate::commands::Departure;
 use crate::commands::GameSub;
 use crate::commands::ResourceWord;
 use crate::commands::Shift;
@@ -20,6 +21,7 @@ use crate::map::Point;
 use crate::map::Tile;
 use crate::objects::Frame;
 use crate::orders::Interact;
+use crate::orders::SavedPatrols;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::TributeFee;
@@ -180,7 +182,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
         }),
         Command::Resign(ResignCommand {
             player: player_id(p),
-            dropped: false,
+            departure: Departure::Resigned,
         }),
         Command::AutoScout(AutoScoutCommand {
             player: player_id(p),
@@ -194,13 +196,13 @@ fn one_of_each(p: u8) -> Vec<Command> {
             player: player_id(p),
             units: unit_list(object_ids(ids.clone())),
             waypoints: Waypoints::of(&[Point::new(1.0, 1.0)]).unwrap(),
-            reset: false,
+            patrols: SavedPatrols::Kept,
         }),
         Command::AttackMove(AttackMoveCommand {
             player: player_id(p),
             units: unit_list(object_ids(ids.clone())),
             waypoints: Waypoints::of(&[Point::new(1.0, 1.0)]).unwrap(),
-            reset: false,
+            patrols: SavedPatrols::Kept,
             queued: false,
             ignore_pending: false,
         }),

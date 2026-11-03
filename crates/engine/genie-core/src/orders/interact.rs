@@ -23,6 +23,7 @@ use crate::orders::{
 use crate::players::PlayerId;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
+use crate::unit_ai::TakenAs;
 use crate::unit_ai::{Issuer, OrderPriority, OrderTargetKind, QueuedOrder};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
@@ -290,7 +291,7 @@ impl World {
             ai.current_order,
             order.priority,
             Some(class),
-            false,
+            TakenAs::Order,
             self.streams.get(Stream::Ai),
             &self.model.roles,
         );

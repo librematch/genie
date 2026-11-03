@@ -8,6 +8,7 @@ use crate::objects::masters::ObstructionKind;
 use crate::pathing::long_path::gate_lets_pass;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::world::layer::ClassRoles;
 
 use crate::map::Footprint;
 use crate::map::Point;
@@ -277,12 +278,13 @@ pub(crate) fn tile_plan_for(
 /// (`FUN_14165d6f0` on its wait delays `+0x7fa`), and no unit makes more than [`PLANS`] plans in
 /// one step (`local_19a8 < 3`). A walker without an owner has no budget to test.
 pub(super) fn may_plan(
-    trade_cart: bool,
+    class_roles: ClassRoles,
     budget: Option<PlanBudget>,
     wait_delays: WaitDelays,
     plans: StepPlans,
 ) -> bool {
-    let allowed = !trade_cart || budget.is_none_or(|b| b.allows(wait_delays.count()));
+    let allowed = !class_roles.contains(ClassRoles::TRADE_CART)
+        || budget.is_none_or(|b| b.allows(wait_delays.count()));
     allowed && plans < PLANS
 }
 
