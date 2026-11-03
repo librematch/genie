@@ -58,6 +58,8 @@ use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::Relation;
+use crate::players::Relations;
+use crate::players::{UnitRelation, UnitRelations};
 use crate::testing::class;
 use crate::unit_ai::UnitAi;
 use crate::vision::TileCount;
@@ -193,6 +195,8 @@ pub struct Scene {
     players: u8,
     /// The relations [`Scene::relation`] set, from each player to another.
     relations: Vec<(PlayerId, PlayerId, Relation)>,
+    /// The players' types [`Scene::kind`] set.
+    kinds: Vec<(PlayerId, PlayerKind)>,
     things: Vec<Thing>,
 }
 
@@ -212,6 +216,7 @@ impl Scene {
             scout: None,
             players: 1,
             relations: Vec::new(),
+            kinds: Vec::new(),
             things: Vec::new(),
         }
     }
@@ -331,6 +336,14 @@ impl Scene {
         self
     }
 
+    /// Player `player`'s type (`player+0x10`) is `kind`; a player's type is
+    /// [`PlayerKind::default`] else.
+    #[must_use]
+    pub fn kind(mut self, player: PlayerId, kind: PlayerKind) -> Self {
+        self.kinds.push((player, kind));
+        self
+    }
+
     /// The object `thing` stands on the map, after the objects placed before it on its tile.
     #[must_use]
     pub fn thing(mut self, thing: Thing) -> Self {
@@ -355,7 +368,7 @@ impl Scene {
             PLAYER,
             vec![Millis::ZERO; players],
             (0..players)
-                .map(|p| player(p, players, &self.relations))
+                .map(|p| player(p, players, &self.relations, &self.kinds))
                 .collect(),
         );
         let wet = |t: &TerrainId| {
@@ -395,6 +408,15 @@ impl Scene {
         w.pathing = Pathing::new(size, self.terrain.clone(), restrictions, 0);
         w.pathing.start_mesh(size.width() as u32);
         w.spatial.sight = Some(sight(size, &self.sight, players));
+        w.spatial.relations =
+            ByPlayer::new(w.players.iter().map(|q| q.relations.clone()).collect());
+        w.spatial.unit_diplomacy = ByPlayer::new(
+            w.players
+                .iter()
+                .enumerate()
+                .map(|(p, q)| unit_diplomacy(p, &q.relations))
+                .collect(),
+        );
         for (i, &t) in self.rocks.iter().enumerate() {
             let id = ObjectId::try_from(FIRST_ROCK + i as i32).expect("a valid id");
             w.spatial.insert(id, rock(t));
@@ -429,8 +451,14 @@ impl Scene {
     }
 }
 
-/// Player `p` of `players`: its own ally and every other's enemy, but for `relations`.
-fn player(p: usize, players: usize, relations: &[(PlayerId, PlayerId, Relation)]) -> Player {
+/// Player `p` of `players`: its own ally and every other's enemy, but for `relations`, of the
+/// type the last of `kinds` for it gives.
+fn player(
+    p: usize,
+    players: usize,
+    relations: &[(PlayerId, PlayerId, Relation)],
+    kinds: &[(PlayerId, PlayerKind)],
+) -> Player {
     let mut row: Vec<Relation> = (0..players)
         .map(|q| {
             if q == p {
@@ -445,21 +473,48 @@ fn player(p: usize, players: usize, relations: &[(PlayerId, PlayerId, Relation)]
             row[to.index()] = relation;
         }
     }
+    let kind = kinds
+        .iter()
+        .rev()
+        .find(|(q, _)| q.index() == p)
+        .map_or_else(PlayerKind::default, |&(_, kind)| kind);
     Player {
+        kind,
         relations: ByPlayer::new(row),
         ..Player::default()
     }
 }
 
-/// The unified map's words for [`PLAYER`]'s `sight` of each tile, in a world of `players`;
-/// the others see nothing.
+/// What player `p`'s queries make of each player's objects (`player+0x278`) as its diplomacy
+/// `relations` writes it: its own, an ally's, a neutral's or an enemy's.
+fn unit_diplomacy(p: usize, relations: &Relations) -> UnitRelations {
+    relations
+        .values()
+        .iter()
+        .enumerate()
+        .map(|(q, &r)| {
+            if q == p {
+                return Some(UnitRelation::Own);
+            }
+            match r {
+                Relation::Ally | Relation::Relation4 => Some(UnitRelation::Ally),
+                Relation::Neutral => Some(UnitRelation::Neutral),
+                Relation::Enemy => Some(UnitRelation::Enemy),
+                Relation::Other(_) => None,
+            }
+        })
+        .collect()
+}
+
+/// The unified map's words for [`PLAYER`]'s `sight` of each tile, in a world of `players`,
+/// with the objects-in-sight registry, empty; the others see nothing.
 fn sight(size: GridSize, sight: &[TileSight], players: usize) -> Visibility {
     let word = |s: &TileSight| match s {
         TileSight::Unknown => VisionBits::empty(),
         TileSight::Explored => VisionBits::explored(PLAYER),
         TileSight::Seen => VisionBits::explored(PLAYER) | VisionBits::visible(PLAYER),
     };
-    Visibility::new(
+    let mut v = Visibility::new(
         size,
         (0..players)
             .map(|_| VisibleMap {
@@ -471,7 +526,9 @@ fn sight(size: GridSize, sight: &[TileSight], players: usize) -> Visibility {
         Vec::new(),
         0,
         vec![PlayerKind::Human; players],
-    )
+    );
+    v.registry = Some(Registry::new(players, CLASSES));
+    v
 }
 
 /// A rock's record on tile `t`.

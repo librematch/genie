@@ -3,9 +3,11 @@ use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
 use crate::construction::FoundationId;
 use crate::construction::MainBuildingId;
+use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::gathering::gather::GATHER;
+use crate::groups::{Member, Motion, UnitGroup};
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -14,6 +16,7 @@ use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
+use crate::math::rng::Stream;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, MoveToAction};
@@ -49,6 +52,7 @@ use crate::players::attribute::AttributeId;
 use crate::test_ids::attack_category;
 use crate::test_ids::class_id;
 use crate::test_ids::class_of;
+use crate::test_ids::group_id;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::order_kind;
@@ -83,6 +87,7 @@ use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
+use crate::world::World;
 
 /// Surroundings with nothing in them but build 158041's roles and slots.
 fn no_surroundings() -> Surroundings {
@@ -914,44 +919,58 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
     );
 }
 
-/// What the unit's slot 0x388 answers ([`UnitSide::wait_solidify`]), and the foundations
-/// asked.
-struct WaitSide(Answer, Vec<ObjectId>);
+/// [`villager_master`] with a Build task on any class, which slot 0x820 finds on a foundation
+/// in the villager's own list.
+fn builder_master() -> Master {
+    Master {
+        action: Some(ActionPart {
+            tasks: vec![build_task()],
+            ..ActionPart::default()
+        }),
+        ..villager_master()
+    }
+}
 
-impl UnitSide for WaitSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
+/// A Build task (`action_kind` [`ActionKind::BUILD`]) on any class.
+fn build_task() -> Task {
+    Task {
+        action_kind: ActionKind::BUILD,
+        ..Task::default()
     }
-    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
-        Ok(true)
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
-        self.1.push(target);
-        Ok(self.0)
-    }
+}
+
+/// Villager 9175 of player 1 (master `villager`, its unit AI `ai`) at (29.5, 89.5) beside
+/// house 10028's foundation at (30, 88) (desolid, no build points), and Gaia's tree 600 at
+/// (33.5, 89.5).
+fn foundation_scene(villager: Master, ai: UnitAi) -> World {
+    let (house, tree) = house_and_tree();
+    Scene::open(GridSize::new(120, 120))
+        .thing(SceneThing {
+            ai: Some(ai),
+            ..SceneThing::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
+        })
+        .thing(SceneThing {
+            desolid: true,
+            state: ObjectState::Foundation,
+            ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 88.0, 0.0))
+        })
+        .thing(SceneThing::new(
+            600,
+            player_id(0),
+            tree,
+            Position::new(33.5, 89.5, 0.0),
+        ))
+        .build()
+}
+
+/// The wait for foundation 10028 that villager 9175 of `w` holds, and whether it is its top
+/// action (type 0x9a).
+fn waits(w: &World) -> (Option<WaitSolidify>, bool) {
+    let actions = w.parts.actions.of(object_id(9175));
+    (
+        actions.list.wait_solidify().copied(),
+        actions.top_action_kind() == Some(WAIT_SOLIDIFY),
+    )
 }
 
 /// The queue a villager sent off a foundation's footprint holds once its move aside ended
@@ -984,66 +1003,58 @@ fn sent_off_queue() -> UnitAi {
 }
 
 /// Case 0x2be, the build (`FUN_140c5c170`): `BuildObject` forced (slot 0xf0, `FUN_140c47d80`)
-/// gives the unit its build command, which the caller runs after the update in the order the
-/// AI gave it ([`AiCommand::BuildObject`]), and at once makes the build the AI's action and the
-/// foundation its target at its place with its class; the tail takes the order and its
-/// priority (428326873's villager 8766 at update 1804, whose hunt after it must come later).
+/// gives the unit its build command at once (a Build on the foundation, the task the
+/// villager's own list holds), and makes the build the AI's action and the foundation its
+/// target at its place with its class; the tail takes the order and its priority (428326873's
+/// villager 8766 at update 1804, whose hunt after it must come later).
 #[test]
 fn the_build_order_builds_and_takes_the_order_at_once() {
-    let mut ai = UnitAi {
-        current_action: None,
-        current_order: None,
-        current_target: Some(object_id(7)),
-        target_class: class_of(10),
-        orders: vec![QueuedOrder {
-            issuer: Some(Issuer::Player(player_id(1))),
-            order: OrderKind::Build,
-            priority: OrderPriority::of_data(-1),
-            target: Some(object_id(10028)),
-            target_owner: owner(1),
-            point: Position::new(30.0, 88.0, 0.0),
-            range: Distance::new(2.0),
-            shown: Point::new(30.0, 88.0),
-            ready: true,
-            target_kind: order_kind(3),
-        }],
-        ..UnitAi::default()
+    let build = QueuedOrder {
+        issuer: Some(Issuer::Player(player_id(1))),
+        order: OrderKind::Build,
+        priority: OrderPriority::of_data(-1),
+        target: Some(object_id(10028)),
+        target_owner: owner(1),
+        point: Position::new(30.0, 88.0, 0.0),
+        range: Distance::new(2.0),
+        shown: Point::new(30.0, 88.0),
+        ready: true,
+        target_kind: order_kind(3),
     };
-    let at = Surroundings {
-        units: vec![UnitSeen {
-            id: object_id(10028),
-            class: class::BUILDING,
-            position: Position::new(30.0, 88.0, 0.0),
-            ..UnitSeen::default()
-        }],
-        ..scout_at(true, false)
-    };
-    let mut side = WaitSide(Answer::NotTaken, Vec::new());
-    let order = ai.orders[0];
-    let mut fx = Vec::new();
-    let r = ai
-        .process_order(
-            &order,
-            Some((&at, PlayerKind::Human)),
-            None,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx),
-            AiLayer {
-                roles: &roles(),
-                slots: slots(),
-                unit_ai_tuning: &tuning().unit_ai,
-            },
-        )
-        .unwrap();
-    assert_eq!(
-        (r, fx),
-        (
-            OrderOutcome::Taken,
-            vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
-                object_id(10028)
-            )))]
-        )
+    let mut w = foundation_scene(
+        builder_master(),
+        UnitAi {
+            current_action: None,
+            current_order: None,
+            current_target: Some(object_id(7)),
+            target_class: class_of(10),
+            orders: vec![build],
+            ..UnitAi::default()
+        },
     );
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(9175)),
+        |ai, at, side, kind, rng| {
+            ai.process_order(
+                &build,
+                Some((at, kind)),
+                None,
+                rng,
+                side,
+                AiLayer {
+                    roles: &roles(),
+                    slots: slots(),
+                    unit_ai_tuning: &tuning().unit_ai,
+                },
+            )
+        },
+    );
+    assert_eq!(r, Ok(OrderOutcome::Taken));
+    let me = object_id(9175);
+    let built = w.parts.actions.of(me).list.build().map(|b| b.target);
+    assert_eq!(built, Some(Some(FoundationId::new(object_id(10028)))));
+    let ai = w.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (
             ai.current_action,
@@ -1069,23 +1080,22 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
 }
 
 /// Case 0x2de (`FUN_140c5c170`): slot 0x108 forced (`FUN_140c68a60`) runs the unit's slot
-/// 0x388 on the foundation; its 1 makes 0x27a the action value with the old one the last,
-/// then the case sets 0x27a again (the last takes it) and the tail takes the order and its
+/// 0x388 on the foundation, whose wait (with the Build task slot 0x820 finds) replaces the
+/// unit's actions at once; its 1 makes 0x27a the action value with the old one the last, then
+/// the case sets 0x27a again (the last takes it) and the tail takes the order and its
 /// priority, which ends the queue's turn: the work waits in the queue.
 #[test]
 fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
-    let mut ai = sent_off_queue();
-    let mut side = WaitSide(Answer::Taken, Vec::new());
-    let fx = ai
-        .off_turn_fx(
-            &scout_at(true, false),
-            &mut side,
-            PlayerKind::Human,
-            &mut rng(),
-        )
-        .unwrap();
-    assert_eq!(fx, vec![]);
-    assert_eq!(side.1, vec![object_id(10028)]);
+    let mut w = foundation_scene(builder_master(), sent_off_queue());
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(9175)),
+        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
+    );
+    assert_eq!(r, Ok(()));
+    let wait = WaitSolidify::new(build_task(), FoundationId::new(object_id(10028)));
+    assert_eq!(waits(&w), (Some(wait), true));
+    let ai = w.parts.unit_ai.get(object_id(9175)).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::WaitSolidify), Some(AiAction::WaitSolidify))
@@ -1098,88 +1108,98 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
     assert_eq!(left, vec![(OrderKind::OnTarget, Some(object_id(600)))]);
 }
 
-/// Slot 0x388's 0 (no foundation, or no task on it): the case still makes 0x27a the action
-/// value, the old one the last, and returns 0; the order goes and the queue runs the next,
-/// the work on its old target (priority 100 passes the action value).
+/// Slot 0x388's 0 (no task on the foundation): the case still makes 0x27a the action value,
+/// the old one the last, and returns 0; the order goes and the queue runs the next, the work
+/// on its old target (priority 100 passes the action value), at once: the villager, without a
+/// task on the tree, is told of a move and walks to it (the work command without a task), and
+/// the tail takes the move's order at the work's priority.
 #[test]
 fn foundation_order_without_wait_goes_and_the_work_runs() {
-    let mut ai = sent_off_queue();
-    let mut side = WaitSide(Answer::NotTaken, Vec::new());
-    // the world holds the work's target
-    let at = Surroundings {
-        units: vec![UnitSeen {
-            id: object_id(600),
-            ..UnitSeen::default()
-        }],
-        ..scout_at(true, false)
-    };
-    let fx = ai
-        .off_turn_fx(&at, &mut side, PlayerKind::Human, &mut rng())
-        .unwrap();
-    assert_eq!(side.1, vec![object_id(10028)]);
+    let mut w = foundation_scene(villager_master(), sent_off_queue());
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(9175)),
+        |ai, at, side, kind, rng| ai.off_turn(at, side, kind, rng),
+    );
+    assert_eq!(r, Ok(()));
+    assert_eq!(waits(&w), (None, false));
+    let me = object_id(9175);
+    let walk = w
+        .parts
+        .actions
+        .of(me)
+        .list
+        .move_to()
+        .map(|m| (m.point, m.target));
+    assert_eq!(
+        walk,
+        Some((Position::new(33.5, 89.5, 0.0), Some(object_id(600))))
+    );
+    let ai = w.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
-        (Some(AiAction::WaitSolidify), None)
+        (Some(AiAction::Move), Some(AiAction::WaitSolidify))
     );
-    assert_eq!((ai.current_order, ai.order_priority.get()), (None, -1));
-    assert_eq!(ai.orders, vec![]);
-    let [Effect::OrderOnTarget(work)] = fx.as_slice() else {
-        panic!("the work on its target: {fx:?}");
-    };
     assert_eq!(
-        (work.order, work.target),
-        (OrderKind::OnTarget, Some(object_id(600)))
+        (ai.current_order, ai.order_priority.get(), ai.current_target),
+        (Some(OrderKind::Move), 100, Some(object_id(600)))
     );
+    assert_eq!(ai.orders, vec![]);
+    assert!(ai.ordered_on_target);
 }
 
 /// Slot 0x108 (`FUN_140c68a60`): unforced, a unit with an action value does not ask its
-/// unit; forced or without one it does, and only its 1 changes the action values.
+/// unit; forced or without one it does, and only its 1 (the wait its slot 0x388 makes, with a
+/// Build task for the foundation) changes the action values.
 #[test]
 fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
-    let mut ai = UnitAi {
+    let busy = UnitAi {
         current_action: Some(AiAction::Gather),
         last_action: Some(AiAction::Heal),
         ..UnitAi::default()
     };
-    let mut side = WaitSide(Answer::Taken, Vec::new());
+    let ask = |villager: Master, ai: UnitAi, force: OrderForce| {
+        let mut w = foundation_scene(villager, ai);
+        let answer = run_ai(
+            &mut w,
+            (player_id(1), object_id(9175)),
+            |ai, _, side, _, _| ai.wait_for_foundation(object_id(10028), force, side),
+        );
+        let ai = w.parts.unit_ai.get(object_id(9175)).unwrap();
+        (answer, (ai.current_action, ai.last_action), waits(&w).1)
+    };
+    let (gather, heal) = (Some(AiAction::Gather), Some(AiAction::Heal));
+    // unforced with an action value: the unit is not asked
     assert_eq!(
-        ai.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
-        Ok(Answer::NotTaken)
+        ask(builder_master(), busy.clone(), OrderForce::Unforced),
+        (Ok(Answer::NotTaken), (gather, heal), false)
     );
-    assert_eq!(side.1, Vec::new());
+    // forced, a unit without a task for the foundation answers 0
     assert_eq!(
-        (ai.current_action, ai.last_action),
-        (Some(AiAction::Gather), Some(AiAction::Heal))
+        ask(villager_master(), busy.clone(), OrderForce::Forced),
+        (Ok(Answer::NotTaken), (gather, heal), false)
     );
-    let mut refused = WaitSide(Answer::NotTaken, Vec::new());
+    // forced, one with a task waits
     assert_eq!(
-        ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut refused),
-        Ok(Answer::NotTaken)
+        ask(builder_master(), busy, OrderForce::Forced),
+        (
+            Ok(Answer::Taken),
+            (Some(AiAction::WaitSolidify), gather),
+            true
+        )
     );
-    assert_eq!(refused.1, vec![object_id(10028)]);
-    assert_eq!(
-        (ai.current_action, ai.last_action),
-        (Some(AiAction::Gather), Some(AiAction::Heal))
-    );
-    assert_eq!(
-        ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut side),
-        Ok(Answer::Taken)
-    );
-    assert_eq!(
-        (ai.current_action, ai.last_action),
-        (Some(AiAction::WaitSolidify), Some(AiAction::Gather))
-    );
-    let mut idle = UnitAi {
+    // unforced without an action value
+    let idle = UnitAi {
         current_action: None,
         ..UnitAi::default()
     };
     assert_eq!(
-        idle.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
-        Ok(Answer::Taken)
-    );
-    assert_eq!(
-        (idle.current_action, idle.last_action),
-        (Some(AiAction::WaitSolidify), None)
+        ask(builder_master(), idle, OrderForce::Unforced),
+        (
+            Ok(Answer::Taken),
+            (Some(AiAction::WaitSolidify), None),
+            true
+        )
     );
 }
 
@@ -4797,145 +4817,139 @@ impl UnitSide for ArtifactSide {
     }
 }
 
-/// A scout's world: the points its two searches find, and whether it made the scout map.
-#[derive(Default)]
-struct ScoutSide {
-    unexplored: Option<Tile>,
-    beyond: Option<Tile>,
-    mapped: bool,
+/// Player 1's scout cavalry 30 (master 448, class 12, line of sight 4) at (20.5, 92.5) on a
+/// map of 120 by 120 tiles of land, its unit AI `ai`, its owner of `kind`; the player has
+/// explored every tile but `unexplored`.
+fn scouting(ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]) -> World {
+    let scout = Master {
+        id: master_id(448),
+        kind: MasterKind::COMBAT,
+        class: class::CLASS_12,
+        radius: Footprint::new(0.2, 0.2),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(45),
+        line_of_sight: Distance::new(4.0),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(1.2))),
+        ..Master::default()
+    };
+    Scene::open(GridSize::new(120, 120))
+        .sight(TileSight::Explored)
+        .sight_on(unexplored.iter().copied(), TileSight::Unknown)
+        .kind(player_id(1), kind)
+        .thing(SceneThing {
+            ai: Some(ai),
+            ..SceneThing::new(30, player_id(1), scout, Position::new(20.5, 92.5, 0.0))
+        })
+        .build()
 }
 
-impl UnitSide for ScoutSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Ok(self.unexplored)
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Ok(self.beyond)
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        self.mapped = true;
-        Ok(())
-    }
+/// The point the Explore of scout 30 of `w` walks to, none without one.
+fn exploring(w: &World) -> Option<Position> {
+    w.parts
+        .actions
+        .of(object_id(30))
+        .list
+        .explore()
+        .map(|e| e.point)
 }
 
 /// The base handler's case 0x202 for the auto scout ([`UnitAi::seek_unexplored`]): a point
-/// its search finds it explores (the explore's action value the last, its own back) and
-/// processing breaks; finding none, on the auto scout order the last search's point is
-/// explored the same way, and with none left the scout map is made; on another order the
-/// target goes and the unit stops. Another explorer's search, a scout order's that finds
-/// none and a computer player's AI told of it are not modelled.
+/// its search finds (the unit AI's own, slot 0x90, without a town centre: an unexplored tile
+/// within its line of sight and 3 more) it explores (the explore's action value the last, its
+/// own back) and processing breaks; finding none, on the auto scout order the last search's
+/// point (the flood through the explored tiles) is explored the same way, and with none left
+/// the scout map is made; on another order the target goes and the unit stops. Another
+/// explorer's search, a scout order's that finds none and a computer player's AI told of it
+/// are not modelled.
 #[test]
 fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
-    let at = Surroundings {
-        id: object_id(20),
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let scout = |order| UnitAi {
+    let scout = |order, action| UnitAi {
         current_order: order,
-        current_action: Some(AiAction::AutoScout),
+        current_action: Some(action),
         current_target: Some(object_id(30)),
         ..idle(UnitAiKind::Hunted)
     };
-    let seek = |u: &mut UnitAi, side: &mut ScoutSide, computer| {
-        let mut fx = Vec::new();
+    let auto = Some(OrderKind::AutoScout);
+    let seek = |ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]| {
+        let mut w = scouting(ai, kind, unexplored);
         let n = Notify::own(object_id(30), NotifyKind::REQUIRES_SEARCH, [605, 0, 0]);
-        let r = u.seek_unexplored(n, &at, computer, &mut rng(), &mut With::new(side, &mut fx));
-        (r, fx)
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(30)),
+            |ai, at, side, kind, rng| ai.seek_unexplored(n, at, kind, rng, side),
+        );
+        (r, w)
     };
-    let mut u = scout(Some(OrderKind::AutoScout));
-    let mut side = ScoutSide {
-        unexplored: Some(Tile::new(5, 6)),
-        ..ScoutSide::default()
+    let actions = |w: &World| {
+        let ai = w.parts.unit_ai.get(object_id(30)).unwrap();
+        (ai.current_action, ai.last_action)
     };
-    let (r, fx) = seek(&mut u, &mut side, PlayerKind::Human);
-    assert_eq!(
-        (r, fx),
-        (Ok(BREAK), vec![Effect::Explore(Point::new(5.0, 6.0))])
+    // the unit AI's search finds (22, 94) within the scout's square
+    let (r, w) = seek(
+        scout(auto, AiAction::AutoScout),
+        PlayerKind::Human,
+        &[Tile::new(22, 94), Tile::new(40, 92)],
     );
+    assert_eq!(r, Ok(BREAK));
+    assert_eq!(exploring(&w), Some(Position::new(22.0, 94.0, 0.0)));
     assert_eq!(
-        (u.current_action, u.last_action),
+        actions(&w),
         (Some(AiAction::AutoScout), Some(AiAction::Explore))
     );
-    let mut u = scout(Some(OrderKind::AutoScout));
-    let mut side = ScoutSide {
-        beyond: Some(Tile::new(7, 8)),
-        ..ScoutSide::default()
-    };
-    let (r, fx) = seek(&mut u, &mut side, PlayerKind::Human);
-    assert_eq!(
-        (r, fx),
-        (Ok(BREAK), vec![Effect::Explore(Point::new(7.0, 8.0))])
+    // none within it: the last search's flood finds (40, 92); the last action the explore set
+    // (the auto scout's) stays
+    let (r, w) = seek(
+        scout(auto, AiAction::AutoScout),
+        PlayerKind::Human,
+        &[Tile::new(40, 92)],
     );
+    assert_eq!(r, Ok(BREAK));
+    assert_eq!(exploring(&w), Some(Position::new(40.0, 92.0, 0.0)));
     assert_eq!(
-        (u.current_action, u.last_action),
+        actions(&w),
         (Some(AiAction::AutoScout), Some(AiAction::AutoScout))
     );
-    let mut u = scout(Some(OrderKind::AutoScout));
-    let mut side = ScoutSide::default();
+    // every tile explored: the scout map from what the player sees
+    let (r, w) = seek(scout(auto, AiAction::AutoScout), PlayerKind::Human, &[]);
+    assert_eq!(r, Ok(BREAK));
+    assert_eq!(exploring(&w), None);
+    assert!(w.spatial.scout_map(player_id(1)).is_some());
     assert_eq!(
-        seek(&mut u, &mut side, PlayerKind::Human),
-        (Ok(BREAK), vec![])
+        seek(scout(auto, AiAction::AutoScout), PlayerKind::Computer, &[]).0,
+        Err(GenieError::unsupported(
+            "a computer player's AI told its scout found nothing (0x202)"
+        ))
     );
-    assert!(side.mapped);
-    let mut u = scout(Some(OrderKind::AutoScout));
-    assert!(
-        seek(&mut u, &mut ScoutSide::default(), PlayerKind::Computer)
-            .0
-            .is_err()
-    );
-    let mut u = scout(None);
+    // on no order the target goes and the unit stops
+    let (r, w) = seek(scout(None, AiAction::AutoScout), PlayerKind::Human, &[]);
+    assert_eq!(r, Ok(GO_ON));
+    let ai = w.parts.unit_ai.get(object_id(30)).unwrap();
+    assert_eq!((ai.current_target, ai.current_action), (None, None));
     assert_eq!(
-        seek(&mut u, &mut ScoutSide::default(), PlayerKind::Human).0,
-        Ok(GO_ON)
+        seek(
+            scout(Some(OrderKind::Scout), AiAction::AutoScout),
+            PlayerKind::Human,
+            &[]
+        )
+        .0,
+        Err(GenieError::unsupported(
+            "a scout that finds no undiscovered tile (the player's slot 0x2e8 with 0x211)"
+        ))
     );
-    assert_eq!((u.current_target, u.current_action), (None, None));
-    let mut u = scout(Some(OrderKind::Scout));
-    assert!(
-        seek(&mut u, &mut ScoutSide::default(), PlayerKind::Human)
-            .0
-            .is_err()
-    );
-    let mut u = UnitAi {
-        current_action: Some(AiAction::Explore),
-        ..scout(None)
-    };
-    assert!(
-        seek(&mut u, &mut ScoutSide::default(), PlayerKind::Human)
-            .0
-            .is_err()
+    assert_eq!(
+        seek(scout(None, AiAction::Explore), PlayerKind::Human, &[]).0,
+        Err(GenieError::unsupported(
+            "an explorer's search for the closest undiscovered tile (slot 0x90)"
+        ))
     );
     // a computer player's explorer finds no tile (slot 0x90 gives none for it): the target goes,
-    // the action stops and its owner hears the notify
-    let mut u = UnitAi {
-        current_action: Some(AiAction::Explore),
-        ..scout(None)
-    };
-    assert_eq!(
-        seek(&mut u, &mut ScoutSide::default(), PlayerKind::Computer).0,
-        Ok(GO_ON)
-    );
-    assert_eq!((u.current_target, u.current_action), (None, None));
+    // the action stops and its owner hears the notify (its AI module, which the world does not
+    // hold here, would)
+    let (r, w) = seek(scout(None, AiAction::Explore), PlayerKind::Computer, &[]);
+    assert_eq!(r, Ok(GO_ON));
+    let ai = w.parts.unit_ai.get(object_id(30)).unwrap();
+    assert_eq!((ai.current_target, ai.current_action), (None, None));
 }
 
 /// A Gaia rock church (MarvinBlue/426048706's 7108: line of sight 5, no speed) and what it
@@ -8983,89 +8997,102 @@ fn deer_evading_an_object_on_its_own_point_steps_off_by_one() {
     assert_eq!(moved.point, Position::new(4.5, 5.5, 0.0));
 }
 
-/// A unit side whose stand test fails a given number of times.
-struct StandSide {
-    refusals: usize,
-    tested: Vec<Point>,
+/// A walker of radius 0.2 and speed 1 on land: master `id` of class `class`.
+fn walker(id: i16, class: ClassId) -> Master {
+    Master {
+        id: master_id(id),
+        kind: MasterKind::COMBAT,
+        class,
+        radius: Footprint::new(0.2, 0.2),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(40),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(1.0))),
+        ..Master::default()
+    }
 }
 
-impl UnitSide for StandSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
+/// Unit 500 of `owner` at `at`, a walker of class `class` (master 4), its unit AI `ai`.
+fn runner_thing(owner: PlayerId, class: ClassId, ai: UnitAi, at: Position) -> SceneThing {
+    SceneThing {
+        ai: Some(ai),
+        ..SceneThing::new(500, owner, walker(4, class), at)
     }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Err(GenieError::unsupported("no search here"))
+}
+
+/// A map of 64 by 64 tiles of land with a rock on each of `rocks`, the `runner` on it and
+/// its owner of type `kind`; player 2's attackers (id, class, x) stand at (x, 30), each a
+/// walker (of the master of its id) whose unit AI targets unit 500. The AI stream is seeded
+/// with 0, as [`rng`] is.
+fn chased(
+    runner: SceneThing,
+    kind: PlayerKind,
+    rocks: &[Tile],
+    attackers: &[(i32, ClassId, f32)],
+) -> World {
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .kind(runner.player, kind)
+        .rocks(rocks.iter().copied())
+        .thing(runner);
+    for &(id, class, x) in attackers {
+        scene = scene.thing(SceneThing {
+            ai: Some(UnitAi {
+                current_target: Some(object_id(500)),
+                ..UnitAi::default()
+            }),
+            ..SceneThing::new(
+                id,
+                player_id(2),
+                walker(i16::try_from(id).expect("a master's id"), class),
+                Position::new(x, 30.0, 0.0),
+            )
+        });
     }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn can_stand(&mut self, point: Point) -> Result<bool, GenieError> {
-        self.tested.push(point);
-        if self.refusals == 0 {
-            return Ok(true);
-        }
-        self.refusals -= 1;
-        Ok(false)
-    }
+    let mut w = scene.build();
+    w.streams.get(Stream::Ai).set_seed(0);
+    w
+}
+
+/// The point the `MoveTo` of unit 500 of `w` walks to, none without one.
+fn walks_to(w: &World) -> Option<Position> {
+    w.parts
+        .actions
+        .of(object_id(500))
+        .list
+        .move_to()
+        .map(|m| m.point)
 }
 
 /// `evasiveMoveTo` (`FUN_140c4d140`): without `uncon` a unit with an action stays; with
-/// `tries` a point the unit cannot stand at moves by four draws (x's sign, its amount, y's
-/// sign, its amount: `rand15 & 1`, `rand15 & 3`), held on the map, up to five times; then the
-/// forced running move within 0, the move action value and the point, the AI commanded.
+/// `tries` a point the unit cannot stand at (a rock on its tile) moves by four draws (x's
+/// sign, its amount, y's sign, its amount: `rand15 & 1`, `rand15 & 3`), held on the map, up to
+/// five times; then the forced running move within 0 (the unit's `MoveTo` at once), the move
+/// action value and the point.
 #[test]
 fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
-    let at = Surroundings {
-        position: Position::new(10.0, 20.0, 1.5),
-        map: GridSize::new(64, 64),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let evade = |ai: UnitAi, point: Position, flags: (OrderForce, BadPoint), rocks: &[Tile]| {
+        let at = Position::new(10.0, 20.0, 0.0);
+        let mut w = chased(
+            runner_thing(player_id(1), class::CLASS_6, ai, at),
+            PlayerKind::Human,
+            rocks,
+            &[],
+        );
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, _, rng| ai.evasive_move(point, flags, at, rng, side),
+        );
+        (r, w)
     };
-    let mut busy = UnitAi {
+    let busy = UnitAi {
         current_action: Some(AiAction::Attack),
         ..idle(UnitAiKind::Hunted)
     };
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
-    };
-    let mut fx = Vec::new();
-    assert_eq!(
-        busy.evasive_move(
-            Position::new(12.0, 22.0, 1.5),
-            (OrderForce::Unforced, BadPoint::Moves),
-            &at,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(Answer::NotTaken)
-    );
-    assert_eq!((fx.len(), side.tested.len()), (0, 0));
-    let mut u = idle(UnitAiKind::Hunted);
-    let mut side = StandSide {
-        refusals: 1,
-        tested: Vec::new(),
-    };
-    let mut r = rng();
+    let unforced = (OrderForce::Unforced, BadPoint::Moves);
+    let (r, w) = evade(busy, Position::new(12.0, 22.0, 0.0), unforced, &[]);
+    assert_eq!((r, walks_to(&w)), (Ok(Answer::NotTaken), None));
     let mut expected = rng();
     let step = |r: &mut Well512, v: f32| {
         let up = r.rand15() & 1 != 0;
@@ -9074,52 +9101,28 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     };
     let ex = step(&mut expected, 12.0);
     let ey = step(&mut expected, 22.0);
-    assert_eq!(
-        u.evasive_move(
-            Position::new(12.0, 22.0, 1.5),
-            (OrderForce::Unforced, BadPoint::Moves),
-            &at,
-            &mut r,
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(Answer::Taken)
+    let (r, mut w) = evade(
+        idle(UnitAiKind::Hunted),
+        Position::new(12.0, 22.0, 0.0),
+        unforced,
+        &[Tile::new(12, 22)],
     );
+    assert_eq!(r, Ok(Answer::Taken));
+    assert_eq!(w.streams.get(Stream::Ai).draws, 4);
+    assert_eq!(walks_to(&w), Some(Position::new(ex, ey, 0.0)));
+    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(
-        side.tested,
-        vec![Point::new(12.0, 22.0), Point::new(ex, ey)]
-    );
-    assert_eq!(r.draws, 4);
-    assert_eq!(
-        fx,
-        vec![Effect::Move(AiMove {
-            point: Position::new(ex, ey, 1.5),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        })]
-    );
-    assert_eq!(
-        (u.current_action, u.target_point),
-        (Some(AiAction::Move), Position::new(ex, ey, 1.5))
+        (ai.current_action, ai.target_point),
+        (Some(AiAction::Move), Position::new(ex, ey, 0.0))
     );
     // a point past the far edge is held a tile in, below 0 at 0
-    let mut u = idle(UnitAiKind::Hunted);
-    let mut fx = Vec::new();
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
-    };
-    let _ = u.evasive_move(
+    let (_, w) = evade(
+        idle(UnitAiKind::Hunted),
         Position::new(70.0, -3.0, 0.0),
         (OrderForce::Forced, BadPoint::Kept),
-        &at,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+        &[],
     );
-    assert_eq!(
-        first_move(&fx).map(|m| m.point),
-        Some(Position::new(63.0, 0.0, 0.0))
-    );
+    assert_eq!(walks_to(&w), Some(Position::new(63.0, 0.0, 0.0)));
 }
 
 /// Slot 0x148 (`FUN_140c4d0d0`): unforced, a unit AI with an action value takes no move off
@@ -9441,70 +9444,33 @@ fn the_building_cares_about_the_soldier_classes_in_its_own_order() {
 /// processing breaks off (3). A computer player's AI would hear the alert (not modelled).
 #[test]
 fn human_player_king_runs_from_its_attacker() {
-    let mut u = UnitAi {
-        hunted: None,
-        ..idle(UnitAiKind::Hunted)
-    };
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 30.0, 0.0),
-        speed: Speed::new(1.0),
-        map: GridSize::new(64, 64),
-        player: PlayerId::new(1),
-        class: Some(class::KING),
-        state: ObjectState::Alive,
-        units: vec![UnitSeen {
-            id: object_id(77),
-            class: class::CLASS_6,
-            owner: PlayerId::new(2),
-            state: ObjectState::Alive,
-            target: Some(object_id(500)),
-            position: Position::new(22.0, 30.0, 0.0),
-            ..UnitSeen::default()
-        }],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
+    let king = |kind| {
+        let mut u = UnitAi {
+            hunted: None,
+            ..idle(UnitAiKind::Hunted)
+        };
+        u.post(n, ObjectState::Alive).unwrap();
+        let at = Position::new(20.0, 30.0, 0.0);
+        let mut w = chased(
+            runner_thing(player_id(1), class::KING, u, at),
+            kind,
+            &[],
+            &[(77, class::CLASS_6, 22.0)],
+        );
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.hunted_damaged(n, Millis::ZERO, at, kind, rng, side),
+        );
+        (r, w)
     };
-    let mut fx = Vec::new();
-    let r = u.hunted_damaged(
-        n,
-        Millis::ZERO,
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
+    let (r, w) = king(PlayerKind::Human);
     assert_eq!(r, Ok(BREAK));
-    assert_eq!(u.attackers, Attackers::of_saved(&[77]));
-    assert_eq!(
-        fx,
-        vec![Effect::Move(AiMove {
-            point: Position::new(18.0, 30.0, 0.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        })]
-    );
-    let mut u = UnitAi {
-        hunted: None,
-        ..idle(UnitAiKind::Hunted)
-    };
-    let r = u.hunted_damaged(
-        n,
-        Millis::ZERO,
-        &at,
-        PlayerKind::Computer,
-        &mut rng(),
-        &mut With::new(&mut side, &mut Vec::new()),
-    );
-    assert!(r.is_err());
+    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
+    assert_eq!(walks_to(&w), Some(Position::new(18.0, 30.0, 0.0)));
+    assert!(king(PlayerKind::Computer).0.is_err());
 }
 
 /// `runAwayFromAttackers` (`FUN_140c5e900`) beyond the king's run: stand ground and no
@@ -9515,94 +9481,51 @@ fn human_player_king_runs_from_its_attacker() {
 /// attacked by class 22 and a computer's transport ship are not modelled.
 #[test]
 fn unit_runs_from_its_attackers_within_its_leash() {
-    let seen = |id, class, x| UnitSeen {
-        id,
-        class,
-        owner: PlayerId::new(2),
-        state: ObjectState::Alive,
-        target: Some(object_id(500)),
-        position: Position::new(x, 30.0, 0.0),
-        ..UnitSeen::default()
-    };
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 30.0, 0.0),
-        speed: Speed::new(1.0),
-        map: GridSize::new(64, 64),
-        player: PlayerId::new(1),
-        class: Some(class::CLASS_6),
-        state: ObjectState::Alive,
-        units: vec![
-            seen(object_id(77), class::CLASS_6, 22.0),
-            seen(object_id(78), class::CLASS_6, 18.0),
-            seen(object_id(79), class::WARSHIP, 22.0),
-        ],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let run = |u: &mut UnitAi, at: &Surroundings, uncon, computer| {
-        let mut side = StandSide {
-            refusals: 0,
-            tested: Vec::new(),
-        };
-        let mut fx = Vec::new();
-        let got = u.run_away(
-            uncon,
-            at,
-            computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx),
+    let attackers = [
+        (77, class::CLASS_6, 22.0),
+        (78, class::CLASS_6, 18.0),
+        (79, class::WARSHIP, 22.0),
+    ];
+    let run = |u: UnitAi, (owner, kind): (PlayerId, PlayerKind), class: ClassId, uncon| {
+        let at = Position::new(20.0, 30.0, 0.0);
+        let mut w = chased(runner_thing(owner, class, u, at), kind, &[], &attackers);
+        let r = run_ai(
+            &mut w,
+            (owner, object_id(500)),
+            |ai, at, side, kind, rng| ai.run_away(uncon, at, kind, rng, side),
         );
-        (got, fx)
+        (r, walks_to(&w))
     };
-    let to = |point| {
-        vec![Effect::Move(AiMove {
-            point,
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        })]
-    };
+    let human = (player_id(1), PlayerKind::Human);
+    let gaia = (PlayerId::GAIA, PlayerKind::Gaia);
     let runner = |attackers: Vec<i32>| UnitAi {
         attackers: Attackers::of_saved(&attackers),
         ..idle(UnitAiKind::Hunted)
     };
+    let forced = OrderForce::Forced;
+    let away = |x| Some(Position::new(x, 30.0, 0.0));
     for stance in [UnitStance::StandGround, UnitStance::NoAttack] {
-        let mut u = UnitAi {
+        let u = UnitAi {
             stance,
             ..runner(vec![77])
         };
         assert_eq!(
-            run(&mut u, &at, OrderForce::Forced, PlayerKind::Human),
-            (Ok(Answer::NotTaken), vec![])
+            run(u.clone(), human, class::CLASS_6, forced),
+            (Ok(Answer::NotTaken), None)
         );
-        let gaia = Surroundings {
-            player: PlayerId::new(0),
-            ..at.clone()
-        };
-        let mut u = UnitAi {
-            stance,
-            ..runner(vec![77])
-        };
-        assert_eq!(
-            run(&mut u, &gaia, OrderForce::Forced, PlayerKind::Human).1,
-            to(Position::new(18.0, 30.0, 0.0))
-        );
+        assert_eq!(run(u, gaia, class::CLASS_6, forced).1, away(18.0));
     }
-    let mut u = UnitAi {
+    let u = UnitAi {
         current_action: Some(AiAction::Attack),
         ..runner(vec![77])
     };
     assert_eq!(
-        run(&mut u, &at, OrderForce::Unforced, PlayerKind::Human),
-        (Ok(Answer::NotTaken), vec![])
+        run(u, human, class::CLASS_6, OrderForce::Unforced),
+        (Ok(Answer::NotTaken), None)
     );
-    let mut u = runner(vec![77, 4242]);
     assert_eq!(
-        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
-        to(Position::new(18.0, 30.0, 0.0))
+        run(runner(vec![77, 4242]), human, class::CLASS_6, forced).1,
+        away(18.0)
     );
     // 77 and 78 on either side: the way two draws give
     let mut e = rng();
@@ -9612,55 +9535,33 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     };
     let (vx, vy) = (part(), part());
     let d = sqrt(vy * vy + vx * vx);
-    let away = Position::new(20.0 - (vx / d) * 2.0, 30.0 - (vy / d) * 2.0, 0.0);
-    let mut u = runner(vec![77, 78]);
+    let way = Position::new(20.0 - (vx / d) * 2.0, 30.0 - (vy / d) * 2.0, 0.0);
     assert_eq!(
-        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
-        to(away)
+        run(runner(vec![77, 78]), human, class::CLASS_6, forced).1,
+        Some(way)
     );
     // a defensive unit with its state position 5 tiles east runs no farther than that
-    let mut u = UnitAi {
+    let u = UnitAi {
         stance: UnitStance::Defensive,
         state_position: Point::new(25.0, 30.0),
         ..runner(vec![77])
     };
-    assert_eq!(
-        run(&mut u, &at, OrderForce::Forced, PlayerKind::Human).1,
-        to(Position::new(20.0, 30.0, 0.0))
+    assert_eq!(run(u, human, class::CLASS_6, forced).1, away(20.0));
+    let computer = (player_id(1), PlayerKind::Computer);
+    assert!(
+        run(runner(vec![79]), computer, class::CLASS_6, forced)
+            .0
+            .is_err()
     );
     assert!(
-        run(
-            &mut runner(vec![79]),
-            &at,
-            OrderForce::Forced,
-            PlayerKind::Computer
-        )
-        .0
-        .is_err()
-    );
-    let ship = Surroundings {
-        class: Some(class::TRANSPORT),
-        ..at.clone()
-    };
-    assert!(
-        run(
-            &mut runner(vec![77]),
-            &ship,
-            OrderForce::Forced,
-            PlayerKind::Computer
-        )
-        .0
-        .is_err()
+        run(runner(vec![77]), computer, class::TRANSPORT, forced)
+            .0
+            .is_err()
     );
     assert!(
-        run(
-            &mut idle(UnitAiKind::Siege),
-            &at,
-            OrderForce::Forced,
-            PlayerKind::Computer
-        )
-        .0
-        .is_err()
+        run(idle(UnitAiKind::Siege), computer, class::CLASS_6, forced)
+            .0
+            .is_err()
     );
 }
 
@@ -10597,114 +10498,103 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
     assert_eq!(u, base);
 }
 
+/// Player 1's transport ship 500 (class 20, unit-AI type 0x13) at (20, 30), its unit AI `ai`
+/// (which names its attacker) and actions `actions`, its owner of type `kind`: player 2's
+/// warship 77 at (22, 30) targets it.
+fn transport_world(ai: UnitAi, actions: Option<Action>, kind: PlayerKind) -> World {
+    let ship = SceneThing {
+        actions,
+        ..runner_thing(
+            player_id(1),
+            class::TRANSPORT,
+            ai,
+            Position::new(20.0, 30.0, 0.0),
+        )
+    };
+    chased(ship, kind, &[], &[(77, class::WARSHIP, 22.0)])
+}
+
+/// The transport ship's unit AI whose attackers hold warship 77.
+fn ship_ai() -> UnitAi {
+    UnitAi {
+        attackers: Attackers::of_saved(&[77]),
+        ..idle(UnitAiKind::Transport)
+    }
+}
+
+/// [`transport_world`]'s ship handles `n` from its unit AI's queue ([`UnitAi::handle`]): its
+/// answer and the world.
+fn ship_hears(
+    n: Notify,
+    mut ai: UnitAi,
+    actions: Option<Action>,
+    kind: PlayerKind,
+) -> (Result<u32, GenieError>, World) {
+    ai.post(n, ObjectState::Alive).unwrap();
+    let mut w = transport_world(ai, actions, kind);
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+    );
+    (r, w)
+}
+
 /// Its damage notify: the attacker it knows joins no one new (no call for help), the unit is
 /// under attack; without an order or an action it runs from its attackers by twice its speed
 /// (slot 0x160 with 1) and breaks off (3). With an order it ignores the damage (2). At no hit
 /// points left it gives up (4). A computer player's AI would hear the alert (not modelled).
 #[test]
 fn transport_ship_runs_from_its_attackers_without_an_order() {
-    let (mut u, at) = attacked_transport();
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
+    let human = PlayerKind::Human;
+    let (r, w) = ship_hears(n, ship_ai(), None, human);
+    assert_eq!(r, Ok(BREAK));
+    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
+    assert_eq!(walks_to(&w), Some(Position::new(18.0, 30.0, 0.0)));
+    let ordered = UnitAi {
+        current_order: Some(OrderKind::Move),
+        ..ship_ai()
     };
-    let mut fx = Vec::new();
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
+        {
+            let (r, w) = ship_hears(n, ordered, None, human);
+            (r, walks_to(&w))
+        },
+        (Ok(GO_ON), None)
     );
-    assert_eq!(u.attackers, Attackers::of_saved(&[77]));
+    // busy with its top action in state 2 it runs too; in another state (its MoveTo's 4) it
+    // stays
+    let moving = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            point: Position::new(25.0, 30.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    };
+    let (r, w) = ship_hears(n, ship_ai(), Some(moving), human);
     assert_eq!(
-        fx,
-        vec![Effect::Move(AiMove {
-            point: Position::new(18.0, 30.0, 0.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        })]
+        (r, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(25.0, 30.0, 0.0)))
     );
-    let (mut u, at) = attacked_transport();
-    u.current_order = Some(OrderKind::Move);
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(GO_ON)
-    );
-    assert_eq!(fx, Vec::<Effect>::new());
-    // busy with its top action in state 2 it runs too; in another state it stays
-    let (mut u, mut at) = attacked_transport();
-    at.flags.set(SurroundingFlags::BUSY, true);
-    at.action_state = Some(ActionState::new(4));
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(fx, Vec::<Effect>::new());
-    let (mut u, at) = attacked_transport();
     let dead = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 0, 0]);
-    assert_eq!(
-        u.handle(
-            dead,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(DEAD)
-    );
-    let (mut u, at) = attacked_transport();
+    assert_eq!(ship_hears(dead, ship_ai(), None, human).0, Ok(DEAD));
     assert!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        )
-        .is_err()
+        ship_hears(n, ship_ai(), None, PlayerKind::Computer)
+            .0
+            .is_err()
     );
-    // a new attacker that is not its target: the call for help (AskForHelp) looks the
-    // attacker up in the world first, which this side does not hold
-    let (mut u, at) = attacked_transport();
-    u.attackers = Attackers::default();
+    // a new attacker that is not its target: the call for help (AskForHelp: the search finds
+    // no helper in the registry, which holds no object), then it joins the set and the ship
+    // runs
+    let (r, w) = ship_hears(n, idle(UnitAiKind::Transport), None, human);
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Err(GenieError::unsupported(
-            "an object's look without the world"
-        ))
+        (r, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
+    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
 }
 
 /// A missile's warning (`0x20f`): one draw, `r * 100 / 0x7fff` below the owner's
@@ -10713,46 +10603,30 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
 fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
     let r = rng().rand15() as i32 * 100 / 0x7fff;
     let warning = Notify::own(object_id(77), NotifyKind::MISSILE_WARNING, [77, 40, 0]);
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
+    let warned = |chance: i32| {
+        let mut w = transport_world(ship_ai(), None, PlayerKind::Human);
+        w.players[1].dodge_chance = Chance::of_data(u8::try_from(chance).unwrap());
+        let answer = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.handle(warning, Millis::ZERO, at, kind, rng, side),
+        );
+        (answer, w)
     };
-    let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = Chance::of_data(u8::try_from(r + 1).unwrap());
-    let mut ai = rng();
-    let mut fx = Vec::new();
+    let (answer, mut w) = warned(r + 1);
+    assert_eq!(answer, Ok(GO_ON));
+    assert_eq!((w.streams.get(Stream::Ai).draws, walks_to(&w)), (1, None));
+    let (answer, w) = warned(r);
     assert_eq!(
-        u.handle(
-            warning,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut ai,
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(GO_ON)
+        (answer, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    assert_eq!((ai.draws, fx.len()), (1, 0));
-    let (mut u, mut at) = attacked_transport();
-    at.dodge_chance = Chance::of_data(u8::try_from(r).unwrap());
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            warning,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(fx.len(), 1);
 }
 
 /// The siege tower (0x12): its idle check (`FUN_140c20690`) only caps the last human order
 /// time; its damage notify (`FUN_140c28400`) is the transport ship's, but a human player's
-/// tower in a group that is not idle ignores the damage (2), and one in an idle group runs.
+/// tower in a group that is not idle (its motion moving) ignores the damage (2), and one in an
+/// idle group runs.
 #[test]
 fn siege_tower_in_busy_group_ignores_its_damage() {
     let mut u = idle(UnitAiKind::SiegeTower);
@@ -10772,51 +10646,52 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
         (vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)], 0)
     );
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
-    let mut side = StandSide {
-        refusals: 0,
-        tested: Vec::new(),
-    };
     let tower = |idle_group: bool| {
-        let (mut u, mut at) = attacked_transport();
-        u.ai_kind = UnitAiKind::SiegeTower;
-        at.group = Some(if idle_group {
-            GroupState::IDLE
-        } else {
-            GroupState::empty()
+        let ai = UnitAi {
+            ai_kind: UnitAiKind::SiegeTower,
+            ..ship_ai()
+        };
+        let mut w = transport_world(ai, None, PlayerKind::Human);
+        let speed = if idle_group { 0.0 } else { 1.0 };
+        w.groups.groups.push(UnitGroup {
+            id: group_id(7),
+            owner: Some(player_id(1)),
+            members: vec![Member {
+                id: object_id(500),
+                ..Member::default()
+            }],
+            motion: Motion {
+                velocity: BVector::new(speed, 0.0, 0.0),
+                ..Motion::default()
+            },
+            ..UnitGroup::default()
         });
-        (u, at)
+        w.players[1]
+            .objects
+            .by_id_mut(object_id(500))
+            .unwrap()
+            .group
+            .id = Some(group_id(7));
+        let answer = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+        );
+        let attackers = w
+            .parts
+            .unit_ai
+            .get(object_id(500))
+            .unwrap()
+            .attackers
+            .clone();
+        (answer, walks_to(&w), attackers)
     };
-    let (mut u, at) = tower(false);
-    let mut fx = Vec::new();
+    assert_eq!(tower(false), (Ok(GO_ON), None, Attackers::of_saved(&[77])));
+    let (answer, walk, _) = tower(true);
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(GO_ON)
+        (answer, walk),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    assert_eq!(
-        (fx.len(), u.attackers.clone()),
-        (0, Attackers::of_saved(&[77]))
-    );
-    let (mut u, at) = tower(true);
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(fx.len(), 1);
 }
 
 /// `AttackObject` (slot 0xb8) of the types whose slot 0xa0 is the base's (`FUN_140c48400`,
