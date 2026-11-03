@@ -17,17 +17,19 @@ use crate::map::spatial::SmoothingWalls;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, length, sub};
 use crate::movement::WaitDelays;
 use crate::movement::{EPSILON, INCLUDED, PLANS, Planning, footprint_gap, footprint_gap_squared};
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::long_path::{LongRequest, LongTarget, path};
+use crate::pathing::short_path::to_path;
 use crate::pathing::short_path::{Call, Entry, Listed};
 use crate::pathing::tile_path::{Found, Path, Request};
 use crate::pathing::{Pathing, PlanBudget, ShortFound};
 use crate::players::PlayerSet;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
-use crate::{GenieError, math::fmath, pathing::short_path};
+use crate::{GenieError, pathing::short_path};
 use std::iter::once;
 
 /// How a step relates to its waypoint (slot 196, `0x14114f400`).
@@ -44,20 +46,16 @@ pub(super) enum Reach {
 /// Compare the distances on the ground: waypoint to position, waypoint to the step's end, and the
 /// step's own length.
 pub(super) fn reach(waypoint: BVector, position: BVector, projected: BVector) -> Reach {
-    let mut now = fmath::sub(waypoint, position);
-    let mut after = fmath::sub(waypoint, projected);
-    let step = fmath::sub(projected, position);
+    let mut now = sub(waypoint, position);
+    let mut after = sub(waypoint, projected);
+    let step = sub(projected, position);
     now = now.with_height(0.0);
     after = after.with_height(0.0);
-    let (now, after, step) = (
-        fmath::length(now),
-        fmath::length(after),
-        fmath::length(step),
-    );
+    let (now, after, step) = (length(now), length(after), length(step));
     // COMISS eps, after; JA: only an ordered 1e-7 above `after` reaches at once
-    if fmath::at_most_or_unordered(EPSILON, after) {
+    if at_most_or_unordered(EPSILON, after) {
         // COMISS step, now; JBE: short also when either is NaN
-        if fmath::at_most_or_unordered(step, now) {
+        if at_most_or_unordered(step, now) {
             return Reach::Short;
         }
         if now < after {
@@ -340,7 +338,7 @@ pub(super) fn include_kept(
 /// switches have no writer (`DAT_1439e60e0` 1 in `.data`, `DAT_143fb54a8` 0 in `.bss`, each read
 /// by it alone).
 pub(super) fn old_pather_for(radius: Distance, movement_tuning: &MovementTuning) -> bool {
-    fmath::below_or_unordered(movement_tuning.new_pather_radius, radius.get())
+    below_or_unordered(movement_tuning.new_pather_radius, radius.get())
 }
 
 /// The short pather (`FUN_140f9e540`) for `walker` from `from` (x, y on the map) to `to` within
@@ -474,7 +472,7 @@ pub(crate) fn short_path_including(
             "a short path without the game's mesh",
         ))?;
     let found = pather.search(mesh, &words, &query, &shapes)?;
-    for p in short_path::to_path(&found.points).points {
+    for p in to_path(&found.points).points {
         let _ = out.push(p);
     }
     Ok(found.result)

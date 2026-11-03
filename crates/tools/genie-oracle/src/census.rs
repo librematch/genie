@@ -5,6 +5,7 @@
 
 use crate::header_runs::{Opened, open};
 use genie_core::objects::ListIndex;
+use genie_rec::de::chapters;
 use genie_rec::de::{self, Op};
 
 use genie_core::world::World;
@@ -110,7 +111,7 @@ pub fn census_run(
     masters: Option<&MasterTable>,
     limit: Option<usize>,
 ) -> Result<CensusRun, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let sections = header.players();
     let (syncs, checkpoints) = recorded_checkpoints(&chapter)?;
@@ -276,7 +277,7 @@ pub fn header_divergences(
     (first, last): (usize, usize),
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
 ) -> Result<Vec<Followed>, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
@@ -303,7 +304,7 @@ pub fn header_divergences(
         let Some(game) = save(update) else {
             continue;
         };
-        let saved = de::chapters(&game)?[0];
+        let saved = chapters(&game)?[0];
         let saved = saved.header()?;
         for (k, &p) in players.iter().enumerate() {
             if done[k] {
@@ -347,7 +348,7 @@ pub fn next_id_divergence(
     (first, last): (usize, usize),
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
 ) -> Result<Option<(usize, i32, i32)>, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
@@ -360,7 +361,7 @@ pub fn next_id_divergence(
         let Some(game) = save(update) else {
             continue;
         };
-        let game = de::chapters(&game)?[0]
+        let game = chapters(&game)?[0]
             .header()?
             .world
             .base_world

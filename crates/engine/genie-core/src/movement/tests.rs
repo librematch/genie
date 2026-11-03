@@ -10,6 +10,7 @@ use crate::map::Tile;
 use crate::map::spatial::RecordId;
 use crate::map::spatial::Tiles;
 use crate::map::spatial::{Gait, Obstruction, Placed};
+use crate::math::fmath::{cross, minss, normalize};
 use crate::movement::LevelFlags;
 use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
@@ -1169,7 +1170,7 @@ fn yaw_turns_forward_and_right_and_takes_the_facet_angle() {
     };
     m.yaw(Angle::new(-FRAC_PI_2), Some(facets)).unwrap();
     assert!(m.forward.x().abs() < 1e-6 && (m.forward.y() - 1.0).abs() < 1e-6);
-    assert_eq!(m.right, fmath::normalize(fmath::cross(UP, m.forward)));
+    assert_eq!(m.right, normalize(cross(UP, m.forward)));
     let facet = facet_of_forward(m.forward, facets);
     assert_eq!(m.angle, angle_of_facet(facet, facets));
     let before = m.angle;
@@ -1428,7 +1429,7 @@ fn loop_reached_waypoint_moves_on_and_its_first_ends_the_step() {
     // no walk ran in the step: the direction it turns toward is zero, at π/2 (426048706's
     // scout 7227 in update 5429 turns by π/2 there)
     let mut expect = m.clone();
-    let flat = fmath::normalize(expect.forward.with_height(0.0));
+    let flat = normalize(expect.forward.with_height(0.0));
     let (turn, _) = expect.turn_toward(
         flat,
         BVector::ZERO,
@@ -1693,7 +1694,7 @@ fn two_boxes_overlap_by_the_lesser_of_their_axes() {
     );
     assert_eq!(
         nan,
-        fmath::minss(
+        minss(
             (22.5f32 + 0.5) - (22.5 - 0.5),
             (91.5f32 + 0.5) - (92.2 - 0.5)
         )

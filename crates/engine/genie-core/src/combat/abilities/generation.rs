@@ -1,7 +1,9 @@
 //! The generation tasks (action type 151): their test, what they make and the player's store.
 
+use crate::GenieError;
 use crate::combat::abilities::{ONE, Own, WORKING, WORKING_ACTIONS};
 use crate::gathering::gather::unit::give_load;
+use crate::math::fmath::below_or_unordered;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -18,7 +20,6 @@ use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
-use crate::{GenieError, math::fmath};
 
 /// What a generation task's test reads of the object's top action (`FUN_140a986f0`): its type
 /// (`+0x8`), its state (`+0x18`) and its target as the world holds it (`FUN_140a78450`), None
@@ -103,7 +104,7 @@ pub fn store(amount: Amount, out: AttributeId, stores: &mut [Amount]) -> Option<
         *s += amount;
         amount = *s;
     }
-    if fmath::below_or_unordered(amount.get(), ONE) {
+    if below_or_unordered(amount.get(), ONE) {
         return None;
     }
     *s = Amount::ZERO;

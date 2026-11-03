@@ -9,7 +9,7 @@
 
 use binrw::io::{Cursor, Read, Seek, SeekFrom};
 use flate2::read::ZlibDecoder;
-use genie_rec::de;
+use genie_rec::de::chapters;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env::var_os;
@@ -254,7 +254,7 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
             continue;
         }
         let data = fs_read(&path).unwrap();
-        let header = de::chapters(&data).unwrap()[0].inflate_header().unwrap();
+        let header = chapters(&data).unwrap()[0].inflate_header().unwrap();
         let trace = read_trace(&trace_path);
         let mut reader = LoggingReader {
             inner: Cursor::new(&header),

@@ -1,6 +1,7 @@
 //! The damage beyond what a blast has done (`FUN_141082e80`) and the blast itself (slot
 //! 0x848).
 
+use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::{
@@ -13,6 +14,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::BlastDefense;
@@ -27,7 +29,6 @@ use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 use std::mem::replace;
 
 /// `FUN_141082e80`: the damage ([`armor_damage`]) beyond what a blast has done: an attacker of
@@ -166,7 +167,7 @@ pub fn blast(
 ) -> Result<bool, GenieError> {
     let a = attacker.source;
     let r = a.area_effect;
-    if !fmath::below_or_unordered(0.0, r.get()) {
+    if !below_or_unordered(0.0, r.get()) {
         return Ok(false);
     }
     let wide = if a.blast_level.contains(BlastLevel::CONE) {
@@ -359,7 +360,7 @@ pub(super) fn ledger_values(
 /// beyond it: `JBE`). The hit's slack (its info's `+0xc`, `+0x10`) is 0 for a melee hit.
 pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f32> {
     let gap = |d: f32, radius: Distance| {
-        if fmath::at_most_or_unordered(d, radius.get()) {
+        if at_most_or_unordered(d, radius.get()) {
             0.0
         } else {
             d - radius.get()
@@ -374,7 +375,7 @@ pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f3
         Distance::new(t.radius.y()),
     );
     let d2 = dy * dy + dx * dx;
-    if fmath::at_most_or_unordered(r * r, d2) {
+    if at_most_or_unordered(r * r, d2) {
         None
     } else {
         Some(d2)
@@ -405,11 +406,11 @@ pub(super) fn blast_falloff(
     }
     if a.missile.is_none() {
         if a.blast_level.contains(BlastLevel::FALLS_OFF) && !is_main {
-            f *= (r - fmath::sqrt(d2)) / r;
+            f *= (r - sqrt(d2)) / r;
         }
     } else {
         let d = if !is_main || t.kind != MasterKind::BUILDING {
-            fmath::sqrt(d2)
+            sqrt(d2)
         } else {
             0.0
         };

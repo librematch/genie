@@ -7,8 +7,8 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Placed;
-use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{add, sqrt, sub};
 use crate::math::rng::Well512;
 use crate::movement::WaypointIndex;
 use crate::movement::{EPSILON, Motion, PathData};
@@ -69,9 +69,9 @@ pub(super) const fn ground_line(at: Position, waypoint: BVector) -> (Point, Poin
 
 /// The length on the ground from `a` to `b`.
 pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = fmath::sub(a, b);
+    let mut d = sub(a, b);
     d = d.with_height(0.0);
-    Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+    Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
 /// The short pather's range for a request (`0x141150f00`): the level's range less 0.1 when its
@@ -119,19 +119,19 @@ pub(super) fn split(path: &mut Path, i: i32) {
     let Some(&[a, b]) = path.points.get(at..at + 2) else {
         return;
     };
-    let d = fmath::sub(b, a);
-    let length = fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+    let d = sub(b, a);
+    let length = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
     if length < EPSILON {
         return;
     }
-    let again = fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+    let again = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
     let half = length * 0.5;
     let step = BVector::new(
         (d.x() / again) * half,
         (d.height() / again) * half,
         (d.y() / again) * half,
     );
-    let _ = path.insert(at + 1, fmath::add(a, step));
+    let _ = path.insert(at + 1, add(a, step));
 }
 
 /// What the motion step knows of where the walked level goes: its target, the gap to it
@@ -227,5 +227,5 @@ pub fn footprint_gap(
 ) -> Distance {
     let x = ((b.x() - a.x()).abs() - (radius_b.x() + radius_a.x())).max(0.0);
     let y = ((b.y() - a.y()).abs() - (radius_b.y() + radius_a.y())).max(0.0);
-    Distance::new(fmath::sqrt(x * x + y * y))
+    Distance::new(sqrt(x * x + y * y))
 }

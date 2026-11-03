@@ -72,6 +72,7 @@ pub(crate) fn closest_resource_of(
     by_id: ObjectsRef<'_>,
     roles: &Roles,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
+    use crate::gathering::gather_search::closest_resource_at;
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
     let gather_search_tuning = &by_id.tuning().gather_search;
 
@@ -175,7 +176,7 @@ pub(crate) fn closest_resource_of(
     let master_id = unit.life.master_id;
     let plan = &mut c.plan;
     let blocked = mask.blocked() | BLOCKED;
-    gather_search::closest_resource_at(
+    closest_resource_at(
         &seeker,
         site.as_ref(),
         kind,

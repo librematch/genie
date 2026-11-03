@@ -3,7 +3,7 @@
 //! ones (save 66.6, build 158041) and skips without it.
 
 use binrw::io::Cursor;
-use genie_rec::de;
+use genie_rec::de::chapters;
 use std::env::var;
 use std::fs::{read, read_dir};
 use std::path::{Path, PathBuf};
@@ -44,7 +44,7 @@ fn tier_1_headers_write_back_their_bytes() {
     let (mut checked, mut differ) = (0, Vec::new());
     for path in &paths {
         let data = read(path).unwrap();
-        let Ok(chapters) = de::chapters(&data) else {
+        let Ok(chapters) = chapters(&data) else {
             continue;
         };
         let Ok(version) = chapters[0].save_version() else {

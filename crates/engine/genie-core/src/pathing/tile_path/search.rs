@@ -3,10 +3,11 @@
 
 use crate::GenieError;
 use crate::map::Distance;
+use crate::math::fmath::sqrt;
+use crate::math::msvc::sort;
 use crate::pathing::tile_path::PlanTile;
 use crate::pathing::tile_path::{CellEdges, CellIndex, CellKind, GridLevel, NO_COST, Planner};
 use crate::world::layer::generated::TilePathTuning;
-use crate::{math::fmath, math::msvc};
 use std::ops::{Index, IndexMut};
 use std::slice::Iter;
 
@@ -152,7 +153,7 @@ impl OpenList {
             let max = self.max.unwrap_or(m);
             if let Some(i) = (m + 1..=max).find(|&i| !self.buckets[i as usize].is_empty()) {
                 self.min = Some(i);
-                msvc::sort(
+                sort(
                     &mut self.buckets[i as usize],
                     &|a: NodeIndex, b: NodeIndex| nodes[a].f > nodes[b].f,
                 )?;
@@ -214,14 +215,14 @@ impl Planner {
     pub(super) fn estimate_from(&self, t: PlanTile) -> Distance {
         let dx = i32::from(self.goal.x()) - i32::from(t.x());
         let dy = i32::from(self.goal.y()) - i32::from(t.y());
-        Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32))
+        Distance::new(sqrt((dy * dy + dx * dx) as f32))
     }
 
     /// The start's estimate (`FUN_140f78850`, `FUN_140f79250`): in f32 differences.
     pub(super) fn start_estimate(&self, t: PlanTile) -> Distance {
         let dx = f32::from(self.goal.x()) - f32::from(t.x());
         let dy = f32::from(self.goal.y()) - f32::from(t.y());
-        Distance::new(fmath::sqrt(dy * dy + dx * dx))
+        Distance::new(sqrt(dy * dy + dx * dx))
     }
 
     /// Where a new node's cost is measured from (`FUN_140f764c0`, `FUN_140f76840`): a turn
@@ -300,7 +301,7 @@ impl Planner {
         };
         let dx = i32::from(entry.x()) - i32::from(centre.x());
         let dy = i32::from(entry.y()) - i32::from(centre.y());
-        let d = Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32));
+        let d = Distance::new(sqrt((dy * dy + dx * dx) as f32));
         let h = self.estimate_from(centre);
         let n = self.alloc(TileNode {
             at,
@@ -340,7 +341,7 @@ impl Planner {
         };
         let dx = i32::from(entry.x()) - i32::from(at.x());
         let dy = i32::from(entry.y()) - i32::from(at.y());
-        let d = Distance::new(fmath::sqrt((dy * dy + dx * dx) as f32));
+        let d = Distance::new(sqrt((dy * dy + dx * dx) as f32));
         let h = self.estimate_from(at);
         let n = self.alloc(TileNode {
             at,

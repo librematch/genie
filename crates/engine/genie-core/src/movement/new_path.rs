@@ -9,6 +9,7 @@ use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si_64;
+use crate::math::fmath::sub;
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::LinkedPathKind;
@@ -38,7 +39,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::TilePathTuning;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath, pathing::short_path};
+use crate::{GenieError, pathing::short_path};
 
 impl Mover {
     /// The new level's path is no path (`0x141150f00` after the plans, fewer than two points or
@@ -141,7 +142,7 @@ impl Mover {
                 *path.points.checked(i as usize)?,
                 *path.points.checked(i as usize - 1)?,
             );
-            let mut d = fmath::sub(a, b);
+            let mut d = sub(a, b);
             d = d.with_height(0.0);
             if movement_tuning.split < d.x() * d.x() + 0.0 + d.y() * d.y() {
                 split(&mut path, i - 1);

@@ -2,7 +2,8 @@
 //! 158041): every command packet decodes into its command's layout and writes back byte for byte.
 //! Skips without the corpus.
 
-use genie_rec::de::{self, Op, command::Command};
+use genie_rec::de::chapters;
+use genie_rec::de::{Op, command::Command};
 use std::collections::BTreeMap;
 use std::env::var;
 use std::fs::{read, read_dir};
@@ -65,7 +66,7 @@ fn every_tier_1_command_decodes_and_writes_back() {
     let (mut packets, mut unknown) = (0usize, BTreeMap::<u8, usize>::new());
     for path in &paths {
         let data = read(path).unwrap();
-        let Ok(chapters) = de::chapters(&data) else {
+        let Ok(chapters) = chapters(&data) else {
             continue;
         };
         let Ok(version) = chapters[0].save_version() else {

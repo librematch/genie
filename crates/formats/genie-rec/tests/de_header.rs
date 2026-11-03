@@ -1,7 +1,7 @@
 //! The DE header reader against `ImHex`'s offsets for aoe2rec's pattern on one recording, and
 //! against every tier-1 recording of the corpus. Needs `GENIE_REC_CORPUS`; skips without it.
 
-use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::generated::world::RgeMasterStaticObject;
 use std::collections::BTreeMap;
 use std::env::var_os;
@@ -56,7 +56,7 @@ fn expected_count(section: &str) -> usize {
 
 fn header_of(path: &Path) -> Vec<u8> {
     let data = read(path).unwrap();
-    de::chapters(&data).unwrap()[0].inflate_header().unwrap()
+    chapters(&data).unwrap()[0].inflate_header().unwrap()
 }
 
 #[test]
@@ -199,7 +199,7 @@ fn every_corpus_header_parses() {
     let mut tier1_failures = Vec::new();
     for path in &paths {
         let data = read(path).unwrap();
-        let chapter = de::chapters(&data).unwrap()[0];
+        let chapter = chapters(&data).unwrap()[0];
         let version = chapter.save_version().unwrap();
         let is_tier1 = (version.hundredths(), version.build) == (6660, 158_041);
         let outcome = match genie_save::parse(&chapter.inflate_header().unwrap()) {

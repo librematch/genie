@@ -1,10 +1,14 @@
 //! A hit: where it comes from ([`Hit`]), what the swing does after it, the strike
 //! (`FUN_141084230`) and the blast so far.
 
+use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
 use crate::combat::damage::HitLayer;
 use crate::combat::damage::Victim;
+use crate::combat::damage::{
+    blast, building_elevation_factor, charge_hit, elevation_factor, shield, take,
+};
 use crate::combat::missile::StrikeResult;
 use crate::construction::build::NOT_HELD;
 use crate::map::Distance;
@@ -20,7 +24,6 @@ use crate::objects::masters::HitChance;
 use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
-use crate::{GenieError, combat::damage};
 
 /// Where a hit comes from: the place it lands (`FUN_141084230`'s x, y, z: the attacker's for a
 /// melee hit, the missile's for a missile's), the height the elevation factor compares with the
@@ -91,15 +94,16 @@ pub(crate) struct Struck {
     pub executed: Option<ObjectId>,
 }
 
-/// `FUN_141084230`: a shield of the target (type 70, [`damage::shield`]) blocks the hit: the
-/// target's unit AI gets notify 500 with the attacker, its hit points and its master's, and
-/// nothing else happens (result 2). A unit of type 60 and up with an area effect blasts about the
-/// hit's place with its target as the blast's main object ([`damage::blast`]) unless its charge
-/// of type 3 is not its hit's, then empties that charge (slot 0x318 with 0). Else the unit tells
-/// its unit AI the action executed (0x200, but for masters 73 and 559), then the 64-bit
-/// Object-stream draw against the hit chance (a missile's master always hits: its missile,
-/// `+0x83c`, is set); a hit is the target's slot 0xe8 ([`damage::take`]) at the elevation factor
-/// (slot 0x1f0, from the origin's height) times the hit's 1. Not held: the last attack time
+/// `FUN_141084230`: a shield of the target (type 70,
+/// [`damage::shield`](crate::combat::damage::shield)) blocks the hit: the target's unit AI gets
+/// notify 500 with the attacker, its hit points and its master's, and nothing else happens (result
+/// 2). A unit of type 60 and up with an area effect blasts about the hit's place with its target as
+/// the blast's main object ([`damage::blast`](crate::combat::damage::blast)) unless its charge of
+/// type 3 is not its hit's, then empties that charge (slot 0x318 with 0). Else the unit tells its
+/// unit AI the action executed (0x200, but for masters 73 and 559), then the 64-bit Object-stream
+/// draw against the hit chance (a missile's master always hits: its missile, `+0x83c`, is set); a
+/// hit is the target's slot 0xe8 ([`damage::take`](crate::combat::damage::take)) at the elevation
+/// factor (slot 0x1f0, from the origin's height) times the hit's 1. Not held: the last attack time
 /// (`+0x648`), the alerts of another owner (slot 0x2e8) and the sounds.
 pub(crate) fn strike(
     own: &mut Victim,
@@ -114,7 +118,7 @@ pub(crate) fn strike(
         damage_tuning,
         ..
     } = layer;
-    if victim.kind == MasterKind::COMBAT && damage::shield(victim, hit.missile) {
+    if victim.kind == MasterKind::COMBAT && shield(victim, hit.missile) {
         let master_hp = i32::from(own.master_hp.get());
         victim
             .damaged
@@ -131,12 +135,12 @@ pub(crate) fn strike(
     };
     if MasterKind::MISSILE <= a.kind
         && Distance::ZERO < a.area_effect
-        && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, victim, roles))
+        && (a.charge_kind != ChargeKind::AREA || charge_hit(&a, victim, roles))
     {
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
-        let _ = damage::blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
+        let _ = blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
         if a.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }
@@ -156,15 +160,15 @@ pub(crate) fn strike(
     // a building's slot 0x1f0 (FUN_1411cc890) scales the factor by its relics and a building
     // target's
     let factor = hit.from_z.map_or(1.0, |z| {
-        let f = damage::elevation_factor(z, own.attack_elevation, victim, damage_tuning);
+        let f = elevation_factor(z, own.attack_elevation, victim, damage_tuning);
         own.building.as_ref().map_or(f, |b| {
             let theirs = victim.building.as_ref().map_or(Relics::NONE, |t| t.relics);
-            damage::building_elevation_factor(f, b.relics, victim.kind, theirs, damage_tuning)
+            building_elevation_factor(f, b.relics, victim.kind, theirs, damage_tuning)
         })
     });
     let weapons = own.weapons.clone();
     let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
-    damage::take(
+    take(
         victim,
         own,
         &mut others,

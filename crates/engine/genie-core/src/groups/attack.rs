@@ -16,7 +16,7 @@ use crate::groups::stats::weapon_range;
 use crate::groups::{GroupTarget, TargetData, UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
-use crate::math::fmath;
+use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, below_or_unordered};
 use crate::movement::{Mover, footprint_gap_squared};
 use crate::objects::ObjectId;
@@ -178,7 +178,7 @@ impl World {
     pub(super) fn target_radius(&self, id: ObjectId) -> Result<Distance, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let r = u.master(self.master_tables(), p)?.radius;
-        Ok(Distance::new(fmath::sqrt(r.x() * r.x() + r.y() * r.y())))
+        Ok(Distance::new(sqrt(r.x() * r.x() + r.y() * r.y())))
     }
 
     /// Whether every member of `g` the world holds that has a top action's target (slot 0x190,

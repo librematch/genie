@@ -6,7 +6,7 @@
 //! search, its node types and its ties: `docs/AoE2DE_s_exe_SHORT_PATHER.md`.
 
 use crate::GenieError;
-use crate::math::fmath;
+use crate::math::fmath::sqrt;
 use crate::pathing::FixedRect;
 use crate::pathing::mesh::{Mesh, ONE};
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
@@ -81,7 +81,7 @@ fn through_float(v: i32) -> FixedDistance {
 fn float_distance(a: FixedPoint, b: FixedPoint) -> FixedDistance {
     let dy = (a.y().wrapping_sub(b.y())) as f32 * TO_FLOAT;
     let dx = (a.x().wrapping_sub(b.x())) as f32 * TO_FLOAT;
-    FixedDistance::new((fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
+    FixedDistance::new((sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
 /// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
@@ -225,7 +225,7 @@ impl Goal {
         if !RECT_HEURISTIC {
             let fy = (self.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
             let fx = (self.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
-            return FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
+            return FixedDistance::new((sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
         }
         let lx =
             i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - i64::from(self.rrx.get());

@@ -15,6 +15,7 @@ use genie_core::world::checkpoint::{ActionTerm, CheckpointObject, TopAction, pla
 use genie_core::world::parts::Parts;
 use genie_core::world::{Player, World};
 use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::{Header, PlayerSection};
 use std::slice::from_ref;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -262,7 +263,7 @@ pub fn blocks_per_tick(
     ticks: usize,
     masters: Option<&MasterTable>,
 ) -> Result<Vec<Vec<[u32; 11]>>, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let sections = header.players();
     if let Some(&id) = ids.iter().find(|&&id| sections.len() <= id as usize) {
@@ -345,7 +346,7 @@ pub(super) fn open<'r>(
     recording: &'r [u8],
     masters: Option<&MasterTable>,
 ) -> Result<Opened<'r>, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     Ok(Opened {
@@ -375,7 +376,7 @@ pub fn header_run(
     ticks: usize,
     masters: Option<&MasterTable>,
 ) -> Result<World, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();

@@ -10,8 +10,8 @@ use genie_core::objects::masters::MasterId;
 use genie_core::objects::unit::Unit;
 use genie_core::players::Amount;
 use genie_core::world::checkpoint::{CheckpointObject, PlayerState, player_block};
-use genie_rec::de;
 use genie_rec::de::Op;
+use genie_rec::de::chapters;
 use genie_save::PlayerSection;
 use genie_save::generated::world::RgeStaticObject;
 
@@ -102,7 +102,7 @@ pub(super) fn player_totals(section: &PlayerSection<'_>, id: u32) -> PlayerState
 /// Compare every player of the first chapter's save with the recording's first checkpoint, in the
 /// order of the checkpoint's lanes. Lanes that are all zero hold no player.
 pub fn compare_first_checkpoint(recording: &[u8]) -> Result<Vec<PlayerComparison>, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let checkpoint = chapter
         .ops()

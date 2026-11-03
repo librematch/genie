@@ -13,7 +13,7 @@ use crate::{Error, live, spatial};
 use genie_core::map::{Restriction, RestrictionId, TerrainId};
 use genie_core::pathing::mesh::{Contact, Mesh};
 use genie_core::pathing::tile_path::Planner;
-use genie_rec::de;
+use genie_rec::de::chapters;
 
 /// The obstruction manager's shape mesh as the tick oracle dumps it (`load_oracle/probes/mesh.py`):
 /// a header line `mesh width W shapes N free F`, a `shape ID X0 Y0 X1 Y1` line per slot with its
@@ -111,7 +111,7 @@ pub fn mesh_owners_from_dump(text: &str) -> Vec<(ObjectId, ShapeId)> {
 /// What the tile pathfinder reads of object `id` in a save: its master's x radius and terrain
 /// restriction (master `+0x5d8`, `+0x606`). None for an object the save does not hold.
 pub fn unit_terrain(save: &[u8], id: i32) -> Result<Option<(f32, RestrictionId)>, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     for section in header.players() {
         for (_, s) in live(&section) {
@@ -142,7 +142,7 @@ pub fn planner_from_save(
     passable: Restriction,
 ) -> Result<Planner, Error> {
     use genie_core::map::spatial::BLOCKED;
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let map = &header.world.base_world.map;
     let terrain_ids: Vec<TerrainId> = map

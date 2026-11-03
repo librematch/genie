@@ -13,7 +13,8 @@ use crate::groups::UnitKind;
 use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
-use crate::math::fmath::{self, BVector};
+use crate::math::fmath::BVector;
+use crate::math::fmath::{add, below_or_unordered, maxss, scale, sqrt, sub};
 use crate::math::image::group::{BOX_HALF as GROUP_BOX_HALF, EPSILON};
 use crate::objects::ObjectId;
 use crate::world::World;
@@ -43,7 +44,7 @@ pub struct MemberPlace {
 
 /// A slot's 3D length as the layouts take it (`x² + y² + z²` in that order).
 fn length(v: BVector) -> f32 {
-    fmath::sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
+    sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
 }
 
 /// The slots of `createHorde` (`FUN_141013eb0`), or of `createUDF` (`FUN_141014f60`) for
@@ -94,7 +95,7 @@ pub(crate) fn slots_by_place(
         };
         let s = formation.slot_mut(i)?;
         s.unit_id = Some(m.id);
-        s.offset = fmath::sub(m.at, position);
+        s.offset = sub(m.at, position);
         s.desired_transform_position = m.at;
         s.transform_position = m.at;
         s.transformed = 1;
@@ -111,7 +112,7 @@ pub(crate) fn slots_by_place(
         let mut ahead = 0.0f32;
         for s in &formation.slots {
             // MAXSS at 0x141015208: a NaN offset keeps the farthest so far
-            ahead = fmath::maxss(s.offset.x(), ahead);
+            ahead = maxss(s.offset.x(), ahead);
         }
         let back = ahead + group_tuning.user_defined_back;
         for s in &mut formation.slots {
@@ -220,7 +221,7 @@ pub(crate) fn phalanx_slots(
     formation.maximum_width = lines;
     formation.maximum_depth = lines;
     formation.number_lines = lines;
-    let single = fmath::scale(group.desired_spacing.get(), BVector::new(0.0, 0.0, -1.0));
+    let single = scale(group.desired_spacing.get(), BVector::new(0.0, 0.0, -1.0));
     let mut slot = 0usize;
     let mut statistic = None;
     let mut placed = 0usize;
@@ -232,7 +233,7 @@ pub(crate) fn phalanx_slots(
         let l = formation.lines.checked_mut(line as usize)?;
         clear_line(l);
         let _ = reset_line(l, width, line);
-        let mut at = fmath::add(fmath::scale((width / 2) as f32, single), BVector::ZERO);
+        let mut at = add(scale((width / 2) as f32, single), BVector::ZERO);
         if width & 1 == 0 {
             let half = [
                 single.x() / group_tuning.spacing_factor,
@@ -265,7 +266,7 @@ pub(crate) fn phalanx_slots(
                 *l.indices.checked_mut(k)? = slot as u32;
             }
             placed += 1;
-            at = fmath::sub(at, single);
+            at = sub(at, single);
             slot += 1;
         }
     }
@@ -365,7 +366,7 @@ pub fn place_box_perimeter(
             0 => {
                 let z = prev.y() + step;
                 // COMISS/JC (0x14102b17e): an unordered place stays on this side
-                if fmath::below_or_unordered(z, max.y()) {
+                if below_or_unordered(z, max.y()) {
                     (max.x(), z)
                 } else {
                     state = 1;
@@ -376,7 +377,7 @@ pub fn place_box_perimeter(
             1 => {
                 let x = prev.x() - step;
                 // COMISS/JC (0x14102b132)
-                if fmath::below_or_unordered(min.x(), x) {
+                if below_or_unordered(min.x(), x) {
                     (x, max.y())
                 } else {
                     state = 2;
@@ -386,7 +387,7 @@ pub fn place_box_perimeter(
             2 => {
                 let z = prev.y() - step;
                 // COMISS/JC (0x14102b0f1)
-                if fmath::below_or_unordered(min.y(), z) {
+                if below_or_unordered(min.y(), z) {
                     (min.x(), z)
                 } else {
                     state = 3;

@@ -20,7 +20,7 @@ use crate::map::TileOffset;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::sqrt;
 use crate::math::image::gather_search::TILE_CENTRE as GATHER_SEARCH_TILE_CENTRE;
-use crate::math::msvc;
+use crate::math::msvc::sort;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
@@ -385,16 +385,16 @@ impl<W> Debug for ResourceWorld<'_, W> {
 /// games the slice runs), −1 for none. A unit below state 2 is not modelled.
 ///
 /// A breadth-first walk over the tiles from the unit's tile, its queue after the tile in hand kept
-/// sorted by the distance of the tiles' centres from the unit ([`msvc::sort`]): a tile the player
-/// has explored (`explored`), within the line of sight plus 5 of the unit (`1.4` per diagonal
-/// step, `+ 0.61`, truncated) and that the unit can stand on (`passable`, `FUN_141185690`) adds
-/// its four neighbours not seen yet that lie on the map. On each such tile the first object in a
-/// pasture or targetable whose master gathers by itself (`enable_auto_gather` 1) as `kind`, with
-/// some amount held, and that is not the unit AI's current target, is tested: with fewer workers
-/// than `max_workers` (−1 for any) a reach makes it the answer; else a reach makes it the
-/// fallback when it is fewer steps away than the last. After 30 tests, or the queue's end, the
-/// fallback is the answer. A tile whose last object fails the first test counts it as found
-/// (the game's loop leaves it in hand).
+/// sorted by the distance of the tiles' centres from the unit
+/// ([`msvc::sort`](crate::math::msvc::sort)): a tile the player has explored (`explored`), within
+/// the line of sight plus 5 of the unit (`1.4` per diagonal step, `+ 0.61`, truncated) and that the
+/// unit can stand on (`passable`, `FUN_141185690`) adds its four neighbours not seen yet that lie
+/// on the map. On each such tile the first object in a pasture or targetable whose master gathers
+/// by itself (`enable_auto_gather` 1) as `kind`, with some amount held, and that is not the unit
+/// AI's current target, is tested: with fewer workers than `max_workers` (−1 for any) a reach makes
+/// it the answer; else a reach makes it the fallback when it is fewer steps away than the last.
+/// After 30 tests, or the queue's end, the fallback is the answer. A tile whose last object fails
+/// the first test counts it as found (the game's loop leaves it in hand).
 ///
 /// # Errors
 ///
@@ -498,7 +498,7 @@ pub fn closest_resource_at<W>(
             }
             if passable(world, tile) {
                 push_neighbours(&mut queue, &mut seen, &at, Cell { tile, steps }, map)?;
-                msvc::sort(queue.tail_mut(i)?, &nearer)?;
+                sort(queue.tail_mut(i)?, &nearer)?;
             }
             let on_tile = objects(world, tile)?;
             let Some(o) = first_resource(&on_tile, kind)? else {

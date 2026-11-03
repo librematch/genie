@@ -18,6 +18,7 @@
 
 use crate::GenieError;
 use crate::construction::build::CART_TASK;
+use crate::gathering::gather_search::closest_resource_at;
 use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
 use crate::map::Distance;
 use crate::map::Rect;
@@ -324,7 +325,7 @@ impl World {
             groups: &self.groups,
         };
         let blocked = mask.blocked() | BLOCKED;
-        gather_search::closest_resource_at(
+        closest_resource_at(
             &seeker,
             None,
             kind,

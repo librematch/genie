@@ -19,7 +19,7 @@ pub use self::graphic::Graphic;
 pub(crate) use self::graphic::top_speed;
 use crate::combat::abilities::Look;
 use crate::math::conversions::cvttss2si;
-use crate::math::fmath;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::image::sprite::EPSILON as SPRITE_EPSILON;
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
@@ -205,7 +205,7 @@ impl ActiveSprite {
         let g = &self.graphic;
         let mut i = g.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
-        if fmath::at_most_or_unordered(EPSILON, g.speed_multiplier.get()) {
+        if at_most_or_unordered(EPSILON, g.speed_multiplier.get()) {
             i *= g.speed_multiplier.get();
         }
         if Speed::ZERO < speed {
@@ -253,7 +253,7 @@ impl ActiveSprite {
             i
         };
         // COMISS/JC at 0x1413b5149: an unordered time or interval returns too
-        if fmath::below_or_unordered(time.get(), interval.get()) {
+        if below_or_unordered(time.get(), interval.get()) {
             return;
         }
         let forward = !g.backwards();
@@ -273,7 +273,7 @@ impl ActiveSprite {
         if self.looped {
             let mut f;
             // COMISS/JBE at 0x1413b521f: an unordered delay loops at once
-            if fmath::at_most_or_unordered(g.replay_delay.get(), 0.0)
+            if at_most_or_unordered(g.replay_delay.get(), 0.0)
                 || self.animate == AnimateState::DELAYED
             {
                 self.animate = AnimateState::PLAYING;

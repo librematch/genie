@@ -23,7 +23,7 @@ use genie_core::unit_ai::task_finder::{
 };
 use genie_model::layer::Roles;
 use genie_model::layer::Slots;
-use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::generated::world::{RgeStaticObject, TribeCombatObject};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -153,7 +153,7 @@ impl FinderWorld {
 ///
 /// [`drop_sites`]: crate::game_tables::drop_sites
 pub fn finder_world(save: &[u8], table: &MasterTable) -> Result<FinderWorld, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let sections = header.players();
     let masters = sections

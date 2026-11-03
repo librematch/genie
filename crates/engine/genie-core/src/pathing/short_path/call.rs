@@ -1,6 +1,7 @@
 //! The short pather's call ([`Call`], [`Query`]) and its state between searches
 //! ([`Pather`]): the terrain's shapes, the start test and the core.
 
+use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -8,6 +9,7 @@ use crate::map::Point;
 use crate::map::TerrainMask;
 use crate::math::conversions::cvttss2si_64;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss, sqrt};
 use crate::objects::ObjectId;
 use crate::pathing::FixedDistance;
 use crate::pathing::FixedRect;
@@ -19,7 +21,6 @@ use crate::pathing::short_path::{
 };
 use crate::pathing::tile_path::Path;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 /// The short pather's arguments (`FUN_140f9d3a0`'s block, which `FUN_140f9e540` and
 /// `FUN_140fa0110` fill): the start and the goal in fixed point (the callers truncate them), the
@@ -155,24 +156,24 @@ impl Call {
     #[must_use]
     pub fn entry(&self) -> Entry {
         if let Some(t) = self.target {
-            let fx = fmath::maxss(
+            let fx = maxss(
                 (self.from.x() - t.position.x()).abs() - t.half_size.x(),
                 0.0,
             );
-            let fy = fmath::maxss(
+            let fy = maxss(
                 (self.from.y() - t.position.y()).abs() - t.half_size.y(),
                 0.0,
             );
-            if fmath::sqrt(fy * fy + fx * fx) - self.radius.get() <= self.range.get() {
+            if sqrt(fy * fy + fx * fx) - self.radius.get() <= self.range.get() {
                 return Entry::InRange;
             }
         }
         let on_map = |p: Point| {
             let (x, y) = (p.x(), p.y());
-            fmath::at_most_or_unordered(0.0, x)
-                && fmath::at_most_or_unordered(0.0, y)
-                && fmath::below_or_unordered(x, self.map.width() as f32)
-                && fmath::below_or_unordered(y, self.map.height() as f32)
+            at_most_or_unordered(0.0, x)
+                && at_most_or_unordered(0.0, y)
+                && below_or_unordered(x, self.map.width() as f32)
+                && below_or_unordered(y, self.map.height() as f32)
         };
         if !on_map(self.from) || !on_map(self.to) {
             return Entry::Invalid;

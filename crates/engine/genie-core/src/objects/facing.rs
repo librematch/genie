@@ -13,7 +13,8 @@ use genie_model::objects::facing::sprite_facets;
 pub use self::sprite_facets::SpriteFacets;
 use crate::map::Point;
 use crate::math::Angle;
-use crate::math::fmath::{self, BVector};
+use crate::math::fmath::BVector;
+use crate::math::fmath::{acos, atan2, below_or_unordered, cross, dot, fmod, sqrt};
 use crate::math::image::facing::{
     EPSILON as FACING_EPSILON, HALF as FACING_HALF, MINUS_HALF as FACING_MINUS_HALF,
     MINUS_ONE as FACING_MINUS_ONE, MINUS_PI as FACING_MINUS_PI,
@@ -60,11 +61,11 @@ fn wrapped(a: f32) -> f32 {
 /// of −x counts back from `m` unless it is 0 (`UCOMISS`: a NaN remainder takes `m −` it).
 #[must_use]
 pub fn modulo(x: f32, m: f32) -> f32 {
-    if fmath::below_or_unordered(x, 0.0) {
-        let r = fmath::fmod(-x, m);
+    if below_or_unordered(x, 0.0) {
+        let r = fmod(-x, m);
         if r == 0.0 { r } else { m - r }
     } else {
-        fmath::fmod(x, m)
+        fmod(x, m)
     }
 }
 
@@ -73,25 +74,21 @@ pub fn modulo(x: f32, m: f32) -> f32 {
 /// when the cross product's height is below 0.
 #[must_use]
 pub fn facet_of_forward(forward: BVector, s: SpriteFacets) -> Facet {
-    let length = fmath::sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
+    let length = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
     let u = BVector::new(
         forward.x() / length,
         forward.height() / length,
         forward.y() / length,
     );
-    let root = fmath::sqrt(TWO);
+    let root = sqrt(TWO);
     let d = BVector::new(ONE / root, 0.0 / root, ONE / root);
-    let dot = fmath::dot(d, u);
+    let dot = dot(d, u);
     let angle = if dot < ONE {
-        if MINUS_ONE < dot {
-            fmath::acos(dot)
-        } else {
-            PI
-        }
+        if MINUS_ONE < dot { acos(dot) } else { PI }
     } else {
         0.0
     };
-    let side = fmath::cross(u, d).height();
+    let side = cross(u, d).height();
     let n = at_least_eight(s);
     let q = angle / (TWO_PI / n as f32);
     let floor = libm::floorf(q);
@@ -154,7 +151,7 @@ pub fn offset_in_facets(dx: f32, dy: f32, angle: Angle, n: i32) -> f32 {
     if dx.abs() <= EPSILON && dy.abs() <= EPSILON {
         return 0.0;
     }
-    let mut a = fmath::atan2(dy, dx);
+    let mut a = atan2(dy, dx);
     if a < 0.0 {
         a += TWO_PI;
     }

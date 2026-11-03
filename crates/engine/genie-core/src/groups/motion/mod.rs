@@ -9,7 +9,10 @@ use crate::groups::MotionFlags;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::Angle;
-use crate::math::fmath::{self, BVector};
+use crate::math::fmath::BVector;
+use crate::math::fmath::{
+    angle_between, at_most_or_unordered, cross, minss, normalize, rotate, rotation, scale, sqrt,
+};
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::Walker;
@@ -121,7 +124,7 @@ impl Motion {
     #[must_use]
     pub fn moving(&self) -> bool {
         let v = self.velocity;
-        0.0 < fmath::sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
+        0.0 < sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
     }
 
     /// `FUN_141046640`: the walked level wants a path; false without one. Its test,
@@ -184,11 +187,11 @@ impl Motion {
         dt: Seconds,
         clamp: bool,
     ) -> Angle {
-        let mut angle = fmath::angle_between(direction, forward);
+        let mut angle = angle_between(direction, forward);
         if clamp {
-            angle = fmath::minss((self.maximum_yaw_per_second_moving * dt).get(), angle);
+            angle = minss((self.maximum_yaw_per_second_moving * dt).get(), angle);
         }
-        Angle::new(if 0.0 < fmath::cross(direction, forward).height() {
+        Angle::new(if 0.0 < cross(direction, forward).height() {
             -angle
         } else {
             angle
@@ -200,12 +203,12 @@ impl Motion {
     /// (`FUN_141027d00`); [`MotionFlags::MOVED`].
     pub fn turn(&mut self, yaw: Angle) {
         // only an ordered 1e-7 below the yaw's size turns: a NaN yaw does not
-        if fmath::at_most_or_unordered(yaw.get().abs(), EPSILON) {
+        if at_most_or_unordered(yaw.get().abs(), EPSILON) {
             return;
         }
-        let r = fmath::rotation(yaw.get(), self.new_position[2]);
-        self.new_position[1] = fmath::normalize(fmath::rotate(&r, self.new_position[1]));
-        self.new_position[3] = fmath::normalize(fmath::rotate(&r, self.new_position[3]));
+        let r = rotation(yaw.get(), self.new_position[2]);
+        self.new_position[1] = normalize(rotate(&r, self.new_position[1]));
+        self.new_position[3] = normalize(rotate(&r, self.new_position[3]));
         self.flags |= MotionFlags::MOVED;
     }
 
@@ -224,7 +227,7 @@ impl Motion {
         ] {
             let d = dt.get() * speed;
             if EPSILON < d.abs() {
-                let v = fmath::scale(d, *self.new_position.checked(along)?);
+                let v = scale(d, *self.new_position.checked(along)?);
                 let p = &mut self.new_position[0];
                 *p = BVector::new(p.x() + v.x(), v.height() + p.height(), v.y() + p.y());
                 self.flags |= MotionFlags::MOVED;

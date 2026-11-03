@@ -7,7 +7,8 @@
 //! `MoveTo` calls the motion step (object slot 193, `0x141150f00`, [`Mover::motion`]), which turns the
 //! unit toward its waypoint and sets the acceleration for the next tick.
 //!
-//! Vectors are the game's `BVector`s ([`fmath::BVector`]: x, height, y).
+//! Vectors are the game's `BVector`s ([`fmath::BVector`](crate::math::fmath::BVector): x, height,
+//! y).
 
 use self::long_walk::{Reach, include_kept, may_plan, owner_number, reach};
 use self::path_points::{
@@ -22,7 +23,8 @@ use crate::map::Position;
 use crate::map::Radii;
 use crate::map::spatial::{Placed, Spatial};
 use crate::math::Angle;
-use crate::math::fmath::{self, BVector};
+use crate::math::fmath::BVector;
+use crate::math::fmath::{maxss, minss};
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Animated;
@@ -303,9 +305,9 @@ fn overlap(a: BVector, radius_a: Footprint, b: BVector, radius_b: Footprint) -> 
     if bx0 >= ax1 || ax0 >= bx1 || by0 >= ay1 || ay0 >= by1 {
         return 0.0;
     }
-    let x = fmath::minss(ax1, bx1) - fmath::maxss(ax0, bx0);
-    let y = fmath::minss(ay1, by1) - fmath::maxss(ay0, by0);
-    fmath::minss(x, y)
+    let x = minss(ax1, bx1) - maxss(ax0, bx0);
+    let y = minss(ay1, by1) - maxss(ay0, by0);
+    minss(x, y)
 }
 
 /// The point `FUN_140f9bcd0` returns outside a path: `DAT_143f0dc88`, in `.bss` (zero at the
@@ -480,7 +482,7 @@ pub(crate) fn gate_gap(
     let mut gap = own;
     for a in by_id.annexes(id).ids().take(2) {
         if let Some(p) = world.get(a) {
-            gap = Distance::new(fmath::minss(
+            gap = Distance::new(minss(
                 annex(footprint_gap(at, radius, p.position, p.radius)).get(),
                 gap.get(),
             ));

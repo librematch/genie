@@ -5,8 +5,8 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
-use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, sqrt, sub};
 use crate::movement::LevelFlags;
 use crate::movement::PathData;
 use crate::movement::WaypointIndex;
@@ -56,9 +56,9 @@ pub(super) fn point(level: &PathData, index: WaypointIndex) -> BVector {
 
 /// The length on the ground from `a` to `b` (`FUN_14087e560`, the height zeroed).
 pub(super) fn ground(a: BVector, b: BVector) -> Distance {
-    let mut d = fmath::sub(a, b);
+    let mut d = sub(a, b);
     d = d.with_height(0.0);
-    Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+    Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
 /// Where a step toward a waypoint ends against it (`FUN_141046130`'s answer).
@@ -79,15 +79,15 @@ pub(in crate::groups) fn passes_waypoint(
     next: BVector,
     group_tuning: &GroupTuning,
 ) -> Passing {
-    let mut a = fmath::sub(waypoint, at);
-    let mut b = fmath::sub(waypoint, next);
-    let c = fmath::sub(next, at);
+    let mut a = sub(waypoint, at);
+    let mut b = sub(waypoint, next);
+    let c = sub(next, at);
     a = a.with_height(0.0);
     b = b.with_height(0.0);
-    let to_waypoint = fmath::sqrt(a.x() * a.x() + 0.0 + a.y() * a.y());
-    let beyond = fmath::sqrt(b.x() * b.x() + b.height() * b.height() + b.y() * b.y());
-    let step = fmath::sqrt(c.x() * c.x() + c.height() * c.height() + c.y() * c.y());
-    if fmath::at_most_or_unordered(step, to_waypoint) {
+    let to_waypoint = sqrt(a.x() * a.x() + 0.0 + a.y() * a.y());
+    let beyond = sqrt(b.x() * b.x() + b.height() * b.height() + b.y() * b.y());
+    let step = sqrt(c.x() * c.x() + c.height() * c.height() + c.y() * c.y());
+    if at_most_or_unordered(step, to_waypoint) {
         Passing::Short
     } else if to_waypoint < beyond || step < group_tuning.near {
         Passing::Passes

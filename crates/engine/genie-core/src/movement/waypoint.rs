@@ -1,5 +1,6 @@
 //! A reached waypoint and what follows it: the next waypoint, a level's end and the moving state.
 
+use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -7,6 +8,7 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
+use crate::math::fmath::{sqrt, sub};
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::LinkedPathKind;
@@ -28,7 +30,6 @@ use crate::vision::SightLayer;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 /// Where and when a unit moved inside the motion step ([`Mover::moved_to`]).
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -205,7 +206,7 @@ impl Mover {
         if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = fmath::sub(at.vector(), *level.points.checked(next.get() as usize)?);
+        let d = sub(at.vector(), *level.points.checked(next.get() as usize)?);
         // a NaN distance is not within
         if d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
             < movement_tuning.target_short_reach
@@ -284,7 +285,7 @@ impl Mover {
         let mut k = from.ahead(5).min(last);
         while from < k {
             let p = *parent.points.checked(k.get() as usize)?;
-            let d = fmath::sub(p, at);
+            let d = sub(p, at);
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= movement_tuning.look_ahead
                 && self.straight(me, p, target, world, by_id)?
             {
@@ -540,7 +541,7 @@ impl Mover {
     pub fn is_moving(&self) -> bool {
         self.velocity.as_ref().is_some_and(|v| {
             let [x, y, z] = v.velocity.get();
-            0.0 < fmath::sqrt(x * x + y * y + z * z)
+            0.0 < sqrt(x * x + y * y + z * z)
         })
     }
 }

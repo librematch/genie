@@ -1,6 +1,7 @@
 //! The members' moves to their slots, a free member's stop, the line test and a member's
 //! steering toward its slot (`FUN_141025fb0`).
 
+use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
@@ -13,6 +14,7 @@ use crate::groups::steer::{EPSILON, KEEPS_MOVING, MOST_FAILURES, MOVE_TO};
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{BVector, below_or_unordered};
+use crate::math::fmath::{sqrt, sub};
 use crate::movement::Mover;
 use crate::objects::ActionState;
 use crate::objects::ObjectId;
@@ -22,7 +24,6 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 impl World {
     /// The members' moves to their slots (`0x14103e8e8`..`0x14103efba`) of group `group`, whose
@@ -294,9 +295,9 @@ impl World {
         let to = s.transform_position;
         let late = s.time < self.world_time;
         let at = u.moved_vector(self.parts.mover_of(u.id));
-        let mut d = fmath::sub(to, at);
+        let mut d = sub(to, at);
         d = d.with_height(0.0);
-        let gap = fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
+        let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
         if !below_or_unordered(EPSILON, gap) && s.state == SlotState::InPlace {
             self.groups
                 .held_mut(group)?

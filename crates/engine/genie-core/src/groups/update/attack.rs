@@ -14,8 +14,8 @@ use crate::groups::{GroupTarget, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
-use crate::math::fmath;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
+use crate::math::fmath::{sqrt, sub};
 use crate::math::image::group::FARTHEST;
 use crate::movement::Mover;
 use crate::objects::ObjectId;
@@ -296,9 +296,9 @@ impl World {
             .ok_or_else(|| member_gone(target))?;
         let at = t.moved_vector();
         let from = g.current_target.original_position;
-        let d = fmath::sub(at, from);
+        let d = sub(at, from);
         if at_most_or_unordered(
-            fmath::sqrt(d.y() * d.y() + d.x() * d.x()),
+            sqrt(d.y() * d.y() + d.x() * d.x()),
             self.model.tuning.group.close,
         ) {
             return Ok(None);
@@ -408,5 +408,5 @@ fn point_gap(at: Point, radius: Footprint, to: Point) -> f32 {
     };
     let gx = gap(to.x() - at.x(), radius.x());
     let gy = gap(to.y() - at.y(), radius.y());
-    fmath::sqrt(gy * gy + gx * gx)
+    sqrt(gy * gy + gx * gx)
 }

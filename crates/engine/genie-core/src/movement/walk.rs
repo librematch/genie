@@ -1,12 +1,16 @@
 //! The walk: its kept hits, the obstruction query's ends, the facets, the steering and the speed
 //! control.
 
+use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::spatial::{RecordId, Spatial};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{
+    angle_between, at_most_or_unordered, cross, length, normalize, rotate, rotation, sqrt, sub,
+};
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathState;
@@ -20,7 +24,6 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
-use crate::{GenieError, math::fmath};
 
 impl Mover {
     /// The walk's kept hits (`0x141150f00` after its first hit loop, which took them into the
@@ -137,7 +140,7 @@ impl Mover {
     ) -> Result<bool, GenieError> {
         let mut flat = self.forward;
         flat = flat.with_height(0.0);
-        let flat = fmath::normalize(flat);
+        let flat = normalize(flat);
         let (turn, clipped) = self.turn_toward(flat, direction, self.turn_dt(dt, movement_tuning));
         if self.paths.walked()?.flags.contains(LevelFlags::REACHED) && turn == Angle::ZERO {
             return Ok(clipped);
@@ -171,16 +174,16 @@ impl Mover {
         direction: BVector,
         dt: Seconds,
     ) -> (Angle, bool) {
-        let angle = fmath::angle_between(direction, forward);
+        let angle = angle_between(direction, forward);
         let most = self.stats.turn_rate * dt;
-        let (mut turn, clipped) = if fmath::at_most_or_unordered(angle, most.get()) {
+        let (mut turn, clipped) = if at_most_or_unordered(angle, most.get()) {
             (Angle::new(angle), false)
         } else if angle < 0.0 {
             (-most, true)
         } else {
             (most, true)
         };
-        if 0.0 < fmath::cross(direction, forward).height() {
+        if 0.0 < cross(direction, forward).height() {
             turn = -turn;
         }
         (turn, clipped)
@@ -200,8 +203,8 @@ impl Mover {
         turn: Angle,
         facets: Option<SpriteFacets>,
     ) -> Result<(), GenieError> {
-        let m = fmath::rotation(turn.get(), UP);
-        let forward = fmath::normalize(fmath::rotate(&m, self.forward));
+        let m = rotation(turn.get(), UP);
+        let forward = normalize(rotate(&m, self.forward));
         self.set_orientation(forward, UP);
         let facets = facets.ok_or(GenieError::unsupported(
             "the yaw of a unit whose sprites differ in their facets",
@@ -217,7 +220,7 @@ impl Mover {
     /// angle (`+0x7e8`), which this slot leaves.
     pub(crate) fn set_orientation(&mut self, forward: BVector, up: BVector) {
         self.forward = forward;
-        self.right = fmath::normalize(fmath::cross(up, forward));
+        self.right = normalize(cross(up, forward));
     }
 
     /// Slot 0x598 (`FUN_14115d050`): the unit's speed along its forward vector (its velocity's
@@ -266,15 +269,15 @@ impl Mover {
             v.velocity = v.velocity.with_y(0.0);
             return;
         }
-        let d = fmath::sub(waypoint, position);
-        let length = fmath::sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
-        let toward = BVector::new(d.x() / length, d.height() / length, d.y() / length);
-        let angle = fmath::angle_between(self.forward, toward);
+        let d = sub(waypoint, position);
+        let distance = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
+        let toward = BVector::new(d.x() / distance, d.height() / distance, d.y() / distance);
+        let angle = angle_between(self.forward, toward);
         let radius =
             ((self.stats.turn_radius * v.velocity.y()) / self.stats.turn_radius_speed.get()).get();
         if 0.0 < v.velocity.y() && EPSILON < angle.abs() {
             let mut side = self.right;
-            if 0.0 < fmath::cross(toward, self.forward).height() {
+            if 0.0 < cross(toward, self.forward).height() {
                 side = -side;
             }
             let centre = BVector::new(
@@ -282,7 +285,7 @@ impl Mover {
                 side.height() * radius + position.height(),
                 side.y() * radius + position.y(),
             );
-            if fmath::length(fmath::sub(waypoint, centre)) < radius {
+            if length(sub(waypoint, centre)) < radius {
                 v.acceleration = v.acceleration.with_y(-f32::MAX);
                 return;
             }

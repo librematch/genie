@@ -8,6 +8,7 @@ use crate::{Error, MasterTable};
 use genie_core::GenieError;
 use genie_core::objects::ObjectId;
 use genie_core::unit_ai::QueuedOrder;
+use genie_rec::de::chapters;
 use genie_rec::de::{self, Op};
 use genie_save::generated::world::RgeActionObject;
 use genie_save::generated::world::{Formation, UnitGroup};
@@ -15,7 +16,7 @@ use genie_save::generated::world::{Path, RgeMovingObject, RgeStaticObject};
 use genie_save::{Header, Object};
 
 fn chapter(data: &[u8]) -> Result<de::Chapter<'_>, Error> {
-    de::chapters(data)?.first().copied().ok_or(Error::NoChapter)
+    chapters(data)?.first().copied().ok_or(Error::NoChapter)
 }
 
 /// Three little-endian f32s of a saved vector (`[u8; 12]`).

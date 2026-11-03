@@ -1,5 +1,6 @@
 //! `BMotion`'s path step (`FUN_14104a270`): its passes and the reached waypoint.
 
+use crate::GenieError;
 use crate::groups::Motion;
 use crate::groups::motion::{
     EPSILON, GroupView, Lead, LeadGroup, PASSES, point, request, reset_level, set_flag, steer,
@@ -8,6 +9,7 @@ use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
+use crate::math::fmath::{length, sub};
 use crate::movement::LevelFlags;
 use crate::movement::LinkedPathKind;
 use crate::movement::PathFlags;
@@ -18,7 +20,6 @@ use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 /// One pass's end (the routine's labels).
 pub(super) enum Pass {
@@ -205,7 +206,7 @@ pub(super) fn reached(
         level.state = PathState::WantsPath;
         return Ok(());
     }
-    let d = fmath::length(fmath::sub(at, point(level, left)));
+    let d = length(sub(at, point(level, left)));
     let mut beyond = match target {
         None => (d - level.range.get()) - group_tuning.near,
         Some(t) => {

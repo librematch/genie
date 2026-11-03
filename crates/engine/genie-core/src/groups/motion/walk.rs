@@ -1,6 +1,7 @@
 //! The walk toward the walked level's waypoint, and `BMotion`'s update with what it reads of
 //! the world.
 
+use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::motion::{
@@ -12,6 +13,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::fmath::BVector;
+use crate::math::fmath::{add, scale, sqrt, sub};
 use crate::math::rng::Stream;
 use crate::movement::LevelFlags;
 use crate::movement::PathFlags;
@@ -26,7 +28,6 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 use std::mem::take;
 
 /// The walk of the walked level (`LAB_14104b6b4`): see [`path_step`]. A group on its waypoint
@@ -53,12 +54,12 @@ pub(super) fn steer(
         return Ok(Pass::Reached);
     }
     // FUN_141046080: the direction on the ground
-    let mut direction = fmath::sub(waypoint, at);
+    let mut direction = sub(waypoint, at);
     direction = direction.with_height(0.0);
-    let l = fmath::sqrt(direction.x() * direction.x() + 0.0 + direction.y() * direction.y());
+    let l = sqrt(direction.x() * direction.x() + 0.0 + direction.y() * direction.y());
     direction = BVector::new(direction.x() / l, direction.height() / l, direction.y() / l);
     let step = (dt.get() * motion.acceleration.y() + motion.velocity.y()) * dt.get();
-    let next = fmath::add(at, fmath::scale(step, direction));
+    let next = add(at, scale(step, direction));
     match passes_waypoint(waypoint, at, next, group_tuning) {
         Passing::Passes => {
             set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
@@ -207,8 +208,8 @@ fn walk_ends(
                 && let Some(top) = top
             {
                 let end = point(top, WaypointIndex::last_of(top.points.len()));
-                let d = fmath::sub(at, end);
-                let gap = fmath::sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
+                let d = sub(at, end);
+                let gap = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
                 if gap - level.range.get() < EPSILON {
                     reset_level(&mut motion.paths)?;
                     motion.stand();
@@ -235,7 +236,7 @@ fn walk_ends(
 /// the yaw the turn rate allows in `dt` ([`Motion::calculate_yaw_angle`], [`Motion::turn`]).
 fn turn_toward(motion: &mut Motion, direction: BVector, dt: Seconds) {
     let forward = motion.position[1].with_height(0.0);
-    let f = fmath::sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
+    let f = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
     let forward = BVector::new(forward.x() / f, forward.height() / f, forward.y() / f);
     let yaw = motion.calculate_yaw_angle(forward, direction, dt, true);
     motion.turn(yaw);
@@ -268,11 +269,11 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupT
     }
     let c = centre.with_height(0.0);
     let here = motion.position[0].with_height(0.0);
-    let d = fmath::sub(here, c);
+    let d = sub(here, c);
     if group_tuning.pull_distance <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
-        motion.new_position[0] = fmath::add(
-            fmath::scale(group_tuning.pull_share, c),
-            fmath::scale(group_tuning.pull_keep, motion.new_position[0]),
+        motion.new_position[0] = add(
+            scale(group_tuning.pull_share, c),
+            scale(group_tuning.pull_keep, motion.new_position[0]),
         );
     }
 }

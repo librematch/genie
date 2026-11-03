@@ -3,7 +3,7 @@
 
 use crate::combat::Charge;
 use crate::combat::damage::{Armored, Victim};
-use crate::math::fmath;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::HitPoints;
 use crate::objects::HpPowerup;
 use crate::objects::MasterHitPoints;
@@ -21,7 +21,7 @@ pub fn shield(v: &mut Victim, missile: bool) -> bool {
     } else {
         ChargeKind::MELEE_SHIELD
     };
-    if v.source.charge_kind == kind && fmath::at_most_or_unordered(1.0, v.source.charge.get()) {
+    if v.source.charge_kind == kind && at_most_or_unordered(1.0, v.source.charge.get()) {
         v.source.charge -= Charge::new(1.0);
         return true;
     }
@@ -111,7 +111,7 @@ pub fn heal_hp(
         *hp = HitPoints::new(1.0);
     }
     let most = HitPoints::of_master(master_hp) + powerup.max;
-    if fmath::below_or_unordered((powerup.room() + *hp).get(), most.get()) {
+    if below_or_unordered((powerup.room() + *hp).get(), most.get()) {
         return false;
     }
     *hp = HitPoints::of_master(master_hp);

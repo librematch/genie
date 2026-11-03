@@ -1,12 +1,12 @@
 //! The forced replay (FD-008): its steps, its continuous run, the old pather's answers and the
 //! game's state in a save.
 
+use crate::groups::{globals_from_dump, group_differences, unit_groups};
 use crate::masters::MasterTable;
 use crate::{
-    Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump,
-    groups, layer, loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run,
-    run_from_save, save_header, tech_state, tile_lists_from_dump, tile_order_differences,
-    turns_from_save,
+    Dumps, Error, SavedStep, command_phase_from_save, compare_players, ghost_pool_from_dump, layer,
+    loaded_slice, object, played_frames, primed, recycle_pools_from_dump, run, run_from_save,
+    save_header, tech_state, tile_lists_from_dump, tile_order_differences, turns_from_save,
 };
 use genie_core::GenieError;
 use genie_core::groups::GroupId;
@@ -444,12 +444,12 @@ pub(super) fn owned_group_differences(
     globals: Option<&str>,
 ) -> Vec<(u32, String)> {
     if let (Some(text), Some(g)) = (globals, game.groups.as_mut()) {
-        groups::globals_from_dump(text, g);
+        globals_from_dump(text, g);
     }
     let Some(g) = game.groups.as_ref() else {
         return Vec::new();
     };
-    groups::group_differences(&turns.groups, g, globals.is_some())
+    group_differences(&turns.groups, g, globals.is_some())
         .into_iter()
         .map(|d| (group_owner(turns, game, &d), d))
         .collect()
@@ -543,7 +543,7 @@ pub(super) fn game_state(
         frame_seed: FrameSeed::of_data(world.current_frame_random_seed),
         next_reusable_id: ObjectId::try_from(world.next_reusable_object_id)?,
         game_state: PlayState::of_data(u32::from(world.temp_game_state)),
-        groups: groups::unit_groups(world).ok(),
+        groups: unit_groups(world).ok(),
         ..Default::default()
     };
     for p in header.players() {

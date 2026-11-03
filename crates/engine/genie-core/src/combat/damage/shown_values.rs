@@ -1,10 +1,12 @@
 //! The bonus damage tasks (`FUN_14107ce60`) and the attack, armor and range a combat object
 //! shows.
 
+use crate::GenieError;
 use crate::combat::damage::{
     EPSILON, ONE, Victim, charge_hit, charged, master_melee_armor, melee_armor, range_charge_hit,
 };
 use crate::map::Distance;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss, minss};
 use crate::objects::HitPoints;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ChargeEvent;
@@ -15,7 +17,6 @@ use crate::objects::masters::{ClassAmount, DamageClass};
 use crate::players::attribute::AttributeId;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::{GenieError, math::fmath};
 
 /// The action type of a bonus damage task (`FUN_14107ce60`).
 pub const BONUS_DAMAGE: ActionKind = ActionKind::named(0xa0);
@@ -59,8 +60,8 @@ impl Victim {
     #[must_use]
     pub fn hp_share(&self, lacking: bool) -> f32 {
         let most = self.most_hp();
-        let least = fmath::minss(most.get(), self.shown_hp().get());
-        if !fmath::below_or_unordered(0.0, most.get()) {
+        let least = minss(most.get(), self.shown_hp().get());
+        if !below_or_unordered(0.0, most.get()) {
             return 0.0;
         }
         let share = least / most.get();
@@ -93,21 +94,21 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
         if !(any || t.object_id == Some(target.master_id) || t.for_class(target.class)) {
             continue;
         }
-        let whose = if fmath::at_most_or_unordered(t.work_range.get(), 0.0) {
+        let whose = if at_most_or_unordered(t.work_range.get(), 0.0) {
             attacker
         } else {
             target
         };
         // the task's `+0x26` read as a flag: other than 0 (none, −1, is other too)
         let share = whose.hp_share(AttributeId::field(t.attribute_kind4) != 0);
-        if fmath::at_most_or_unordered(t.work_val2.get(), 0.0)
-            || fmath::at_most_or_unordered(target.shown_hp().get(), 0.0)
+        if at_most_or_unordered(t.work_val2.get(), 0.0)
+            || at_most_or_unordered(target.shown_hp().get(), 0.0)
         {
             continue;
         }
         sum += libm::floorf(share / t.work_val2.get() + EPSILON) * t.work_val1.get();
     }
-    fmath::maxss(sum, 0.0)
+    maxss(sum, 0.0)
 }
 
 /// What the attack and the range a combat object shows (slots 0x878 and 0x880) read besides the

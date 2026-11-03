@@ -8,7 +8,7 @@
 //! - `unit-ais SAVE PLAYER ID…`: orders, actions, targets and timers
 //! - `tiles SAVE X0 X1 Y0 Y1`: tile heights in a window, in both axis orders
 
-use genie_oracle::views;
+use genie_oracle::views::{movement, objects, tiles, unit_ais};
 use std::env::args;
 use std::error::Error;
 use std::fs::read;
@@ -25,11 +25,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         rest[from..].iter().map(|a| a.parse()).collect()
     };
     let text = match (view.as_str(), rest) {
-        ("objects", [player]) => views::objects(&data, player.parse()?, None)?,
-        ("objects", [player, id]) => views::objects(&data, player.parse()?, Some(id.parse()?))?,
-        ("movement", [player, _, ..]) => views::movement(&data, player.parse()?, &numbers(1)?)?,
-        ("unit-ais", [player, _, ..]) => views::unit_ais(&data, player.parse()?, &numbers(1)?)?,
-        ("tiles", [x0, x1, y0, y1]) => views::tiles(
+        ("objects", [player]) => objects(&data, player.parse()?, None)?,
+        ("objects", [player, id]) => objects(&data, player.parse()?, Some(id.parse()?))?,
+        ("movement", [player, _, ..]) => movement(&data, player.parse()?, &numbers(1)?)?,
+        ("unit-ais", [player, _, ..]) => unit_ais(&data, player.parse()?, &numbers(1)?)?,
+        ("tiles", [x0, x1, y0, y1]) => tiles(
             &data,
             (x0.parse()?, x1.parse()?),
             (y0.parse()?, y1.parse()?),

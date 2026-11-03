@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 
 use genie_diff::Scope;
-use genie_rec::de;
+use genie_rec::de::chapters;
 
 use crate::census::{CensusStop, stop_of};
 use crate::{
@@ -60,7 +60,7 @@ pub fn header_survey(
     scope: Scope,
     save: &mut dyn FnMut(usize) -> Option<Vec<u8>>,
 ) -> Result<Survey, Error> {
-    let chapter = de::chapters(recording)?[0];
+    let chapter = chapters(recording)?[0];
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters).map_err(Error::Unmodelled)?;
     let mut decoder = Decoder::default();
@@ -88,7 +88,7 @@ pub fn header_survey(
         let Some(game) = save(update) else {
             continue;
         };
-        let saved = de::chapters(&game)?[0];
+        let saved = chapters(&game)?[0];
         let saved = saved.header()?;
         survey.saves += 1;
         for (k, &p) in players.iter().enumerate() {

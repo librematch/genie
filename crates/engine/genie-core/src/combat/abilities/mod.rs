@@ -35,7 +35,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
-use crate::math::fmath;
+use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -156,7 +156,7 @@ pub struct Reward {
 /// NaN) takes the living path, else the dead one.
 #[must_use]
 pub fn alive(hp: HitPoints) -> bool {
-    fmath::at_most_or_unordered(ONE, hp.get())
+    at_most_or_unordered(ONE, hp.get())
 }
 
 /// The action types the routine acts on.

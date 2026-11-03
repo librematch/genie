@@ -2,10 +2,11 @@
 //! sight and technologies, the unit groups, the hunted animals' origins.
 
 use crate::command_args::Frame;
+use crate::groups::{globals_from_dump, unit_groups};
 use crate::masters::{MasterTable, TerrainTable};
 use crate::setup::layer;
 use crate::{
-    Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump, groups,
+    Decoder, Dumps, Error, SavedStep, TickReport, frames, ghost_pool_from_dump,
     inside_lists_from_dump, mesh_from_dump, mesh_owners_from_dump, object_differences,
     recycle_pools_from_dump, registry_from_dump, run, slice, spatial, tile_differences,
     tile_lists_from_dump, visibility_differences, watch_at_load,
@@ -24,7 +25,7 @@ use genie_core::unit_ai::{Hunted, UnitAiKind};
 use genie_core::world::GameState;
 use genie_core::world::Tick;
 use genie_core::world::{Player, World};
-use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::Header;
 use std::collections::BTreeMap;
 
@@ -221,11 +222,11 @@ pub fn run_from_save(
 ///
 /// When the save does not parse or its groups do not import.
 pub fn saved_groups(save: &[u8], globals: Option<&str>) -> Result<UnitGroups, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
-    let mut g = groups::unit_groups(&header.world.base_world).map_err(Error::Unmodelled)?;
+    let mut g = unit_groups(&header.world.base_world).map_err(Error::Unmodelled)?;
     if let Some(text) = globals {
-        groups::globals_from_dump(text, &mut g);
+        globals_from_dump(text, &mut g);
     }
     Ok(g)
 }
@@ -273,7 +274,7 @@ pub(super) fn from_save(
 
 /// A save's world: its first chapter's header.
 pub(super) fn save_header(save: &[u8]) -> Result<Header, Error> {
-    Ok(de::chapters(save)?[0].header()?)
+    Ok(chapters(save)?[0].header()?)
 }
 
 /// The slice from a save as the game's load leaves it: the tick oracle's dumps beside the save
@@ -311,7 +312,7 @@ pub(super) fn load_dumps(turns: &mut World, dumps: Dumps<'_>) -> Result<(), Erro
         let _ = turns.force_garrisons(&inside_lists_from_dump(text)?);
     }
     if let Some(text) = dumps.globals {
-        groups::globals_from_dump(text, &mut turns.groups);
+        globals_from_dump(text, &mut turns.groups);
     }
     Ok(())
 }
@@ -323,7 +324,7 @@ pub(super) fn played_frames<'a>(
     recording: &'a [u8],
     limit: usize,
 ) -> Result<Vec<Frame<'a>>, Error> {
-    let played = de::chapters(recording)?[0];
+    let played = chapters(recording)?[0];
     hunted_origins(turns, &played.header()?);
     frames(&played, limit)
 }
@@ -410,7 +411,7 @@ pub fn spatial_from_save(save: &[u8]) -> Result<Spatial, Error> {
 
 /// The world's objects as movement sees them, from a save, with each tile's terrain class.
 pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> Result<Spatial, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     let layer = layer().map_err(Error::Unmodelled)?;
     spatial(&header, terrain, layer).map_err(Error::Unmodelled)

@@ -1,6 +1,7 @@
 use crate::layer::BuildLayer;
 use crate::layer::Roles;
 use crate::layer::by_id;
+use crate::layer::by_id::table;
 use crate::layer::generated::AttributeRoles;
 use crate::layer::generated::ClassRoles;
 use crate::layer::generated::MasterRoles;
@@ -37,7 +38,7 @@ struct Table {
 /// names the ids with roles only.
 #[test]
 fn role_tables_hold_each_ids_roles_and_name_only_ids_with_roles() {
-    let sets = by_id::table(&[(3, Sample::FIRST), (1, Sample::SECOND), (3, Sample::SECOND)]);
+    let sets = table(&[(3, Sample::FIRST), (1, Sample::SECOND), (3, Sample::SECOND)]);
     assert_eq!(
         sets,
         [

@@ -43,6 +43,7 @@ impl Unit {
         roles: &Roles,
     ) -> Result<Option<Work>, GenieError> {
         use crate::gathering::gather_search::{self, Candidate};
+        use crate::gathering::gather_search::{gather_group, more_work as gather_search_more_work};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
         const REACH_LOW: f32 = 4.0;
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
@@ -138,7 +139,7 @@ impl Unit {
                 let cell = (width * i64::from(t.y()) + i64::from(t.x())) as usize;
                 Ok(cells.checked(cell)?.edges.is_empty())
             };
-            gather_search::more_work(
+            gather_search_more_work(
                 entry,
                 &builder,
                 spatial.map,
@@ -155,7 +156,7 @@ impl Unit {
                 "a builder's search for more work finding a farm",
             ));
         }
-        let (kind, cap) = gather_search::gather_group(found.attribute, roles);
+        let (kind, cap) = gather_group(found.attribute, roles);
         let target = self.resource_search(actions, c, kind, cap)?;
         let spatial: &Spatial = &c.w.spatial;
         let target = target

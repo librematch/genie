@@ -16,7 +16,8 @@ use crate::map::TerrainMask;
 use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point};
 use crate::math::fmath::BVector;
-use crate::math::fmath::{self, cross, normalize};
+use crate::math::fmath::{add, line_distance, scale, sqrt, sub};
+use crate::math::fmath::{cross, normalize};
 use crate::math::image::group::{FARTHEST as GROUP_FARTHEST, SPIRAL_FIRST, SPIRAL_LAST};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
@@ -230,7 +231,7 @@ impl World {
                 .copied()
                 .unwrap_or_else(|| BVector::new(self.model.tuning.group.default_forward, 0.0, 0.0))
         } else {
-            let l = fmath::sqrt(squared);
+            let l = sqrt(squared);
             BVector::new(sum[0] / l, sum[1] / l, sum[2] / l)
         };
         let g = self.groups.held_mut(group)?;
@@ -246,18 +247,19 @@ impl World {
 
 impl World {
     /// `movePositionToFront` (`FUN_141025a20`) of group `group`, `ahead` (`param_2`, 100 in the
-    /// update) the distance of the point ahead along the group's forward. The group's place is
-    /// its own, or with [`MotionFlags::NEW`] the members' centre (slot 0x520, summed over the
-    /// members the world holds, over the members' count). A flanked group (locked type 8) whose
-    /// lead's object ([`World::lead_object`]) moves and could stand there among the members (slot
-    /// 0x270, [`crate::map::spatial::Spatial::point_clear_among`], with `GroupTuning::front_share` of its radius;
-    /// an object that does not move cannot) stands there. Else the members within the spacing (`GroupTuning::front_share` of it but for a
-    /// staggered lock, type 7) of the line along the forward through that place (on the
-    /// ground, [`fmath::line_distance`]) are in front: of them the one nearest the point ahead
-    /// on the ground (the only one, however far), else the member nearest that point. The
-    /// group's stored positions lose their points ([`crate::groups::PointLine::clear_points`]) and it
-    /// stands on the chosen member's place (slot 0x520, height included). Nothing changes when
-    /// the world holds no member.
+    /// update) the distance of the point ahead along the group's forward. The group's place is its
+    /// own, or with [`MotionFlags::NEW`] the members' centre (slot 0x520, summed over the members
+    /// the world holds, over the members' count). A flanked group (locked type 8) whose lead's
+    /// object ([`World::lead_object`]) moves and could stand there among the members (slot 0x270,
+    /// [`crate::map::spatial::Spatial::point_clear_among`], with `GroupTuning::front_share` of its
+    /// radius; an object that does not move cannot) stands there. Else the members within the
+    /// spacing (`GroupTuning::front_share` of it but for a staggered lock, type 7) of the line
+    /// along the forward through that place (on the ground,
+    /// [`fmath::line_distance`](crate::math::fmath::line_distance)) are in front: of them the one
+    /// nearest the point ahead on the ground (the only one, however far), else the member nearest
+    /// that point. The group's stored positions lose their points
+    /// ([`crate::groups::PointLine::clear_points`]) and it stands on the chosen member's place
+    /// (slot 0x520, height included). Nothing changes when the world holds no member.
     ///
     /// # Errors
     ///
@@ -284,7 +286,7 @@ impl World {
         };
         let m = &g.motion;
         let forward = m.position[1];
-        let front = fmath::add(fmath::scale(ahead.get(), forward), m.position[0]);
+        let front = add(scale(ahead.get(), forward), m.position[0]);
         let held: Vec<(ObjectId, BVector)> = g
             .members
             .iter()
@@ -336,7 +338,7 @@ impl World {
         let mut nearest_d = DistanceSquared::new(FARTHEST);
         for &(id, p) in &held {
             let q = p.with_height(0.0);
-            if fmath::line_distance(q, through, forward) < limit.get() {
+            if line_distance(q, through, forward) < limit.get() {
                 in_front.push((id, p));
             }
             let d = ground_squared(q, front);
@@ -422,7 +424,7 @@ const FARTHEST: f32 = GROUP_FARTHEST;
 /// `p − q` squared on the ground, the height difference zeroed (`FUN_14087e560`, then
 /// `x² + 0 + y²`).
 fn ground_squared(p: BVector, q: BVector) -> DistanceSquared {
-    let d = fmath::sub(p, q);
+    let d = sub(p, q);
     DistanceSquared::new(d.x() * d.x() + 0.0 + d.y() * d.y())
 }
 

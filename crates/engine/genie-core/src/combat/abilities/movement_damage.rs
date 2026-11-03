@@ -1,6 +1,7 @@
 //! The movement damage tasks (action type 152): their timer and reach, the bystanders they
 //! strike and the hit.
 
+use crate::GenieError;
 use crate::combat::abilities::{ALWAYS_REACHED, ONE, Own};
 use crate::combat::damage::Victim;
 use crate::combat::damage::lose;
@@ -12,6 +13,7 @@ use crate::map::GridSize;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
+use crate::math::fmath::{at_most_or_unordered, below_or_unordered, length};
 use crate::movement::footprint_gap_squared;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -30,7 +32,6 @@ use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
-use crate::{GenieError, math::fmath};
 
 /// A movement damage task's timer (`+0x9a4`, `0x141207758`): above 0 (not a NaN) it runs down by
 /// the world's dt, never below 0. The task hits once it is at most 0 (`COMISS 0, t` / `JC`: a
@@ -45,7 +46,7 @@ pub fn movement_damage_due(timer: &mut Seconds, dt: Seconds) -> bool {
             t = Seconds::ZERO;
         }
     }
-    !fmath::below_or_unordered(0.0, t.get())
+    !below_or_unordered(0.0, t.get())
 }
 
 /// The tiles a movement damage task reaches about the object at `position` (`0x1412077e1`): the
@@ -133,7 +134,7 @@ pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander, roles: &Roles) ->
         return false;
     }
     let d2 = footprint_gap_squared(hitter.position, hitter.radius, b.position, b.radius);
-    fmath::at_most_or_unordered(d2.get(), range.squared().get())
+    at_most_or_unordered(d2.get(), range.squared().get())
 }
 
 /// The hit's end on an object left below 1 hit point (`COMISS 1.0, hp` / `JBE`: a NaN is not):
@@ -194,7 +195,7 @@ impl World {
             .parts
             .mover_of(unit.id)
             .and_then(|m| m.velocity.as_ref())
-            .is_some_and(|v| 0.0 < fmath::length(v.velocity));
+            .is_some_and(|v| 0.0 < length(v.velocity));
         if master.kind != MasterKind::COMBAT || !moving {
             return Ok(());
         }

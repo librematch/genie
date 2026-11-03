@@ -1,5 +1,6 @@
 //! The velocity step, a new object's setup, the position setter and the motion step's loop.
 
+use crate::GenieError;
 use crate::combat::missile::grounded as missile_grounded;
 use crate::groups::UnitGroups;
 use crate::map::Distance;
@@ -11,6 +12,7 @@ use crate::map::spatial::{Placed, RecordId, Spatial, WalkQuery};
 use crate::map::terrain::Terrain;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{add, at_most_or_unordered, scale};
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathState;
@@ -35,7 +37,6 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
 use crate::world::layer::generated::SpawnTuning;
 use crate::world::layer::generated::VisibilityTuning;
-use crate::{GenieError, math::fmath};
 
 mod ends;
 
@@ -108,8 +109,7 @@ impl Mover {
                 // the walked level walks (state 3) and its pause is not above 0 (`COMISS`
                 // then `JA`: a NaN pause walks)
                 let walks = self.paths.first().is_some_and(|l| {
-                    l.state == PathState::Walking
-                        && fmath::at_most_or_unordered(l.pause_time.get(), 0.0)
+                    l.state == PathState::Walking && at_most_or_unordered(l.pause_time.get(), 0.0)
                 });
                 return if walks { speed } else { Speed::ZERO };
             }
@@ -242,7 +242,7 @@ impl Mover {
         if d.get().abs() < EPSILON {
             return None;
         }
-        let to = fmath::add(self.moved_at.vector(), fmath::scale(d.get(), self.forward));
+        let to = add(self.moved_at.vector(), scale(d.get(), self.forward));
         Some(self.set_position(to.position(), map, movement_tuning))
     }
 

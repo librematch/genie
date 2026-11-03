@@ -15,7 +15,7 @@ use crate::map::Point;
 use crate::map::Radii;
 use crate::map::{GroundOffset, Offset, Position};
 use crate::math::Angle;
-use crate::math::fmath;
+use crate::math::fmath::{atan2, cos, sin, sqrt};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
@@ -172,7 +172,7 @@ pub struct Missile {
 /// cos·ox + sin·oy, the height by oz.
 #[must_use]
 pub fn spawn_point(at: Position, angle: Angle, offset: Offset) -> Position {
-    let (c, s) = (fmath::cos(angle.get()), fmath::sin(angle.get()));
+    let (c, s) = (cos(angle.get()), sin(angle.get()));
     let (ox, oy) = (offset.x(), offset.y());
     let y = c * ox + s * oy + at.y();
     let x = (c * oy - s * ox) + at.x();
@@ -183,7 +183,7 @@ pub fn spawn_point(at: Position, angle: Angle, offset: Offset) -> Position {
 #[must_use]
 pub fn reach(radius: Footprint, range: Distance, missile_tuning: &MissileTuning) -> Distance {
     Distance::new(
-        fmath::sqrt(radius.x() * radius.x() + radius.y() * radius.y())
+        sqrt(radius.x() * radius.x() + radius.y() * radius.y())
             + range.get()
             + missile_tuning.reach_margin,
     )
@@ -250,7 +250,7 @@ pub fn volley_reach(
     missile_tuning: &MissileTuning,
 ) -> Distance {
     Distance::new(
-        fmath::sqrt(radius.x() * radius.x() + radius.y() * radius.y())
+        sqrt(radius.x() * radius.x() + radius.y() * radius.y())
             + range.get()
             + missile_tuning.volley_reach_margin,
     )
@@ -316,7 +316,7 @@ pub fn aim(
         z += radius.z() / missile_tuning.height_share;
     }
     let dx = x - from.x();
-    let mut gap = fmath::sqrt((y - from.y()) * (y - from.y()) + dx * dx);
+    let mut gap = sqrt((y - from.y()) * (y - from.y()) + dx * dx);
     let mut chance = aimer.hit_chance;
     if let Some((radius, class)) = target
         && roles
@@ -373,7 +373,7 @@ impl MissileAction {
         let dy = aimed.y() - from.y();
         let dz = aimed.z() - from.z();
         let dz2 = dz * dz;
-        let way = fmath::sqrt(dy * dy + dx * dx + dz2);
+        let way = sqrt(dy * dy + dx * dx + dz2);
         self.distance = Distance::new(way);
         if stats.smart_mode.contains(SmartMode::LEADS_TARGET) && self.target.is_some() {
             return Err(GenieError::unsupported(
@@ -388,14 +388,11 @@ impl MissileAction {
                     Offset::new(dx / way, dy / way, dz / way)
                 };
                 self.timer = Distance::ZERO;
-                Some(Angle::new(fmath::atan2(
-                    self.direction.y(),
-                    self.direction.x(),
-                )))
+                Some(Angle::new(atan2(self.direction.y(), self.direction.x())))
             }
             ProjectileKind::WHOLE_WAY => {
                 self.direction = Offset::new(dx, dy, dz);
-                Some(Angle::new(fmath::atan2(dy, dx)))
+                Some(Angle::new(atan2(dy, dx)))
             }
             _ => {
                 return Err(GenieError::unsupported(

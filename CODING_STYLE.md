@@ -118,6 +118,11 @@ data-oriented architect makes it.
   name and its own: `use std::fmt::Error as FmtError;`. std's `fmt::Result` and
   `io::Result<T>` are the prelude's `Result` with the error imported: `Result<(), Error>`,
   `use std::fmt::Error;`. Doc links name the item by its path from the crate root.
+- A function of genie's is imported by its own name too, never called through its module:
+  `use crate::math::fmath::sqrt;`, then `sqrt(x)`, not `use crate::math::fmath;`, then
+  `fmath::sqrt(x)`. A type or a constant may keep its module (`layers::Action`), and std's and
+  other crates' modules keep Rust's idiom (`mem::take`). `scripts/module_paths.py` (pre-commit
+  and CI) fails on a function through an imported module (FD-043-D37).
 - Give each engine system a folder with a `README.md`. Write its prose by hand.
   `scripts/readmes.py SRC` fills the generated tables. If you add a file or a folder, run it.
   If you change the first sentence of a `//!` doc, run it too.
@@ -558,6 +563,8 @@ cannot fail CI's checks. `.github/workflows/ci.yml` runs the same checks and mor
 | Clippy | `cargo clippy --locked --workspace --all-targets -- -D warnings` | hook, CI |
 | File length | `scripts/file_size.py` | hook, CI |
 | Allowances | `scripts/lint_allows.py` | hook, CI |
+| Casing | `scripts/c_case.py` | hook, CI |
+| Module paths | `scripts/module_paths.py` | hook, CI |
 | Folder READMEs | `scripts/readmes.py crates/engine/genie-core/src --check` | hook, CI |
 | Effects inventory | `scripts/effects.py crates/engine/genie-core/src --check` | hook, CI |
 | Schedule | `scripts/schedule.py crates/engine/genie-core/src --check` | hook, CI |

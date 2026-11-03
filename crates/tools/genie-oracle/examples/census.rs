@@ -13,7 +13,7 @@
 mod support;
 
 use genie_oracle::census::census_run;
-use genie_oracle::install;
+use genie_oracle::install::read as install_read;
 use std::env::{args, var};
 use std::error::Error;
 use std::fs::read;
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("usage: census REC DAT [UPDATES]".into()),
     };
     let recording = read(rec)?;
-    let masters = install::read(dat.as_ref())?;
+    let masters = install_read(dat.as_ref())?;
     let run = census_run(&recording, Some(&masters), limit)?;
     println!(
         "{} updates ({:?}), {} checkpoints",

@@ -16,7 +16,8 @@
 //! passability and the obstruction manager's blocked tiles, as the game does at load.
 
 use crate::map::Distance;
-use crate::math::fmath::{self, BVector};
+use crate::math::fmath::BVector;
+use crate::math::fmath::{at_most_or_unordered, sqrt, sub};
 use genie_diff::Diff;
 
 mod cell;
@@ -124,8 +125,8 @@ impl Path {
             let [a, b] = w else {
                 continue;
             };
-            let d = fmath::sub(*b, *a);
-            total += fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
+            let d = sub(*b, *a);
+            total += sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
         }
         self.length = Distance::new(total);
     }
@@ -136,7 +137,7 @@ impl Path {
         for &p in &other.points {
             let _ = self.push(p);
         }
-        if fmath::at_most_or_unordered(other.length.get(), 1e-7) {
+        if at_most_or_unordered(other.length.get(), 1e-7) {
             self.measure();
         } else {
             self.length = other.length;

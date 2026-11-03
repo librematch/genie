@@ -15,6 +15,7 @@ use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 
+use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::groups::UnitGroups;
 use crate::map::DistanceSquared;
@@ -23,6 +24,7 @@ use crate::map::Position;
 use crate::map::spatial::{Placed, RecordId, Spatial};
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::BVector;
+use crate::math::fmath::{add, at_most_or_unordered, below_or_unordered, scale, sqrt, sub};
 use crate::movement::WaypointIndex;
 use crate::movement::{
     Avoided, EPSILON, LongWalker, Me, Mover, PathAsk, PathData, Planning, ShortAsk, footprint_gap,
@@ -37,7 +39,6 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::generated::MovementTuning;
-use crate::{GenieError, math::fmath};
 
 /// What a reach test asks of the unit ([`Mover::reach_test`]'s arguments after the world).
 #[derive(Clone, Copy, Debug)]
@@ -91,10 +92,10 @@ impl Mover {
         let (w, h) = (world.map.width(), world.map.height());
         // COMISS 0, v; JA and COMISS v, size; JNC (0x140fa03f1..0x140fa0459): a NaN passes
         let on_map = |px: f32, py: f32| {
-            fmath::at_most_or_unordered(0.0, px)
-                && fmath::at_most_or_unordered(0.0, py)
-                && fmath::below_or_unordered(px, w as f32)
-                && fmath::below_or_unordered(py, h as f32)
+            at_most_or_unordered(0.0, px)
+                && at_most_or_unordered(0.0, py)
+                && below_or_unordered(px, w as f32)
+                && below_or_unordered(py, h as f32)
         };
         if !on_map(x, y) || !on_map(to.x(), to.y()) {
             return Ok(false);
@@ -131,7 +132,7 @@ impl Mover {
         }
         let solid = 0.0 < radius.z() && 0.0 < radius.x() && 0.0 < radius.y();
         let (dx, dy) = (to.x() - x, to.y() - y);
-        if solid && fmath::sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
+        if solid && sqrt(dx * dx + 0.0 + dy * dy) <= movement_tuning.reach_short {
             let goal = BVector::new(to.x(), 0.0, to.y());
             // FUN_140fa0370 hands the start test both vectors' first two floats: x and the
             // height, the unit's (`+0x824`) and the target's (slot 0x520), not x and y
@@ -353,9 +354,9 @@ impl Mover {
         if ask.resume == WaypointIndex::NONE {
             let end = goal.vector();
             let last = point_or_zero(&path, WaypointIndex::last_of(path.points.len()));
-            let mut d = fmath::sub(end, last);
+            let mut d = sub(end, last);
             d = d.with_height(0.0);
-            if EPSILON < fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
+            if EPSILON < sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()) {
                 let _ = path.push(end);
             }
         }
@@ -430,9 +431,9 @@ impl Mover {
         if from.x() != to.x() || from.y() != to.y() {
             let x = to.x() - from.x();
             let z = to.y() - from.y();
-            let length = fmath::sqrt(x * x + 0.0 + z * z);
+            let length = sqrt(x * x + 0.0 + z * z);
             // COMISS eps, length; JBE at 0x14114f2aa: a NaN length divides too
-            if fmath::at_most_or_unordered(EPSILON, length) {
+            if at_most_or_unordered(EPSILON, length) {
                 return BVector::new(x / length, 0.0, z / length);
             }
         }
@@ -447,11 +448,11 @@ impl Mover {
         let Some(v) = &self.velocity else {
             return position;
         };
-        let mut next = fmath::add(v.velocity, fmath::scale(dt.get(), v.acceleration));
+        let mut next = add(v.velocity, scale(dt.get(), v.acceleration));
         if self.stats.speed < Speed::new(next.y()) || next.y() <= 0.0 {
             next = next.with_y(self.stats.speed.get());
         }
-        fmath::add(position, fmath::scale(dt.get() * next.y(), direction))
+        add(position, scale(dt.get() * next.y(), direction))
     }
 
     /// [`Mover::avoid`]'s first loop's test of the hit `id` (`other` its record): kept unless

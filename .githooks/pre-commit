@@ -1,6 +1,6 @@
 #!/bin/sh
-# The commit gate: CI's rustfmt, clippy, file-length, allowance, casing, README, contracts and
-# docs jobs (.github/workflows/ci.yml), run before each commit so a commit cannot fail them, then
+# The commit gate: CI's rustfmt, clippy, file-length, allowance, casing, module-path, README,
+# contracts and docs jobs (.github/workflows/ci.yml), run before each commit so a commit cannot fail them, then
 # the CRAP gate (scripts/crap.sh: the tests under coverage, no function newly above the
 # threshold). Enable it once per clone (worktrees share the setting):
 #
@@ -15,6 +15,7 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 scripts/file_size.py
 scripts/lint_allows.py
 scripts/c_case.py
+scripts/module_paths.py
 scripts/readmes.py crates/engine/genie-core/src --check
 scripts/effects.py crates/engine/genie-core/src --check
 scripts/schedule.py crates/engine/genie-core/src --check

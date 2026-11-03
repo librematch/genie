@@ -1,5 +1,7 @@
 //! The search's run: its main loop and a popped node's expansion by its type.
 
+use crate::GenieError;
+use crate::math::fmath::sqrt;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::outline::Outline;
 use crate::pathing::short_path::{
@@ -10,7 +12,6 @@ use crate::pathing::short_path::{
 };
 use crate::pathing::{FixedDistance, ShapeId, ShapeSide, ShortFound};
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 /// What a polygon's re-walk keeps fixed: the node it comes from, the polygon and its vertex count.
 struct Rewalk {
@@ -475,7 +476,7 @@ impl Search<'_> {
                 let dy = ((i64::from(t.y().wrapping_sub(p.y())) * f) >> 22) as i32;
                 let fy = dy as f32 * TO_FLOAT;
                 let fx = dx as f32 * TO_FLOAT;
-                let g = FixedDistance::new((fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
+                let g = FixedDistance::new((sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
                 base = self.add(n.g.wrapping_add(g), n.idx, qp, Kind::Waypoint);
                 break;
             }

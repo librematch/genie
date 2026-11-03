@@ -4,8 +4,8 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
-use crate::math::fmath;
 use crate::math::fmath::BVector;
+use crate::math::fmath::sqrt;
 use crate::pathing::tile_path::{
     CellKind, Found, GridLevel, Path, PlanTile, Planner, Request, SegmentTest, smooth,
 };
@@ -63,8 +63,7 @@ impl Planner {
                     let dy = f32::from(goal.y()) - f32::from(c.y());
                     let dx = f32::from(goal.x()) - f32::from(c.x());
                     if result != Found::Goal
-                        || req.radii.get() + tile_path_tuning.goal_gap
-                            < fmath::sqrt(dy * dy + dx * dx)
+                        || req.radii.get() + tile_path_tuning.goal_gap < sqrt(dy * dy + dx * dx)
                     {
                         end = Self::centre(c);
                     }

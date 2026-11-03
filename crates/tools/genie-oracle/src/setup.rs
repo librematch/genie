@@ -35,8 +35,9 @@ use self::player_parts::ai_settings;
 pub(super) use self::player_parts::tech_state;
 pub use self::player_parts::{ai_module, history};
 
+use crate::groups::unit_groups;
 use crate::masters::{MasterTable, TerrainTable};
-use crate::{groups, market, object, spatial, work_masters};
+use crate::{market, object, spatial, work_masters};
 use genie_core::combat::Firepower;
 use genie_core::garrison::{attack_rate, share as garrison_share};
 use genie_core::map::Position;
@@ -377,7 +378,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
     turns.start_work_due = turns.settings.empire_wars() && turns.world_time == WorldTime::ZERO;
     turns.game_state = PlayState::of_data(u32::from(world.temp_game_state));
     turns.victory_conquest = world.tribe_scenario.base_scenario.victory_conquest != 0;
-    match groups::unit_groups(world) {
+    match unit_groups(world) {
         Ok(g) => turns.groups = g,
         Err(e) => stop_all(&mut turns, &e),
     }

@@ -6,7 +6,7 @@
 use genie_core::players::CivId;
 use genie_core::world::World;
 use genie_core::world::parts::{Object, ObjectView};
-use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::Header;
 
 use crate::masters::MasterTable;
@@ -33,7 +33,7 @@ pub fn saved_objects(
     id: u32,
     masters: Option<&MasterTable>,
 ) -> Result<Vec<Object>, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     header_objects(&header, id, masters)
 }

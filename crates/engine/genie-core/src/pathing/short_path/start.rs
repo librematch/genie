@@ -1,6 +1,8 @@
 //! The start's node, the hits' points and the two legs of an L.
 
+use crate::GenieError;
 use crate::math::conversions::cvttss2si_64;
+use crate::math::fmath::sqrt;
 use crate::pathing::mesh::ONE;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
@@ -10,7 +12,6 @@ use crate::pathing::short_path::{
 use crate::pathing::{FixedDistance, FixedDistanceSquared};
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 /// The corners of a side of a shape as the start's scan walks it ([`shrunk_corner`]'s
 /// numbers): side 0 from corner 0 to 1, side 1 from 1 to 2, side 2 from 3 to 2, side 3 from 0
@@ -39,7 +40,7 @@ fn float_distance(p: FixedPoint, a: FixedPoint) -> FixedDistance {
     let [px, py] = p.get();
     let dy = (py.wrapping_sub(a.y())) as f32 * TO_FLOAT;
     let dx = (px.wrapping_sub(a.x())) as f32 * TO_FLOAT;
-    FixedDistance::new((fmath::sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
+    FixedDistance::new((sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
 /// What the search's start found (`FUN_140fa4410`'s result).
@@ -68,7 +69,7 @@ impl Search<'_> {
         let fx = (g.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
         let fy = (g.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
         // CVTTSS2SI RAX at 0x140fa4558, EAX stored: a start 512 tiles or more away wraps
-        let f = cvttss2si_64(fmath::sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
+        let f = cvttss2si_64(sqrt(fx * fx + fy * fy) * TO_FIXED) as i32;
         let start = Node {
             g: FixedDistance::ZERO,
             f: FixedDistance::new(f),
@@ -175,7 +176,7 @@ impl Search<'_> {
             return Ok(());
         }
         let b = self.bounds;
-        let h = (fmath::sqrt((rr2.get() - dist2.get()) as f32 * TO_FLOAT) * TO_FIXED) as i32;
+        let h = (sqrt((rr2.get() - dist2.get()) as f32 * TO_FLOAT) * TO_FIXED) as i32;
         for c in [t - h, h + t] {
             if 0 < c && c < span {
                 let q = FixedPoint::new(
@@ -194,8 +195,7 @@ impl Search<'_> {
             let dy = i64::from(py - a.y());
             let d2 = FixedDistanceSquared::new(((dx * dx) >> 22) + ((dy * dy) >> 22));
             if d2 < rr2 {
-                let g =
-                    FixedDistance::new((fmath::sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32);
+                let g = FixedDistance::new((sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32);
                 self.side_node(g, root, id, side, a);
             }
         }
@@ -284,7 +284,7 @@ impl Search<'_> {
             let dy = i64::from(py - q.y());
             let d2 = FixedDistanceSquared::new(((dy * dy) >> 22) + ((dx * dx) >> 22));
             if d2 < rr2 {
-                let g0 = (fmath::sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32;
+                let g0 = (sqrt(d2.get() as f32 * TO_FLOAT) * TO_FIXED) as i32;
                 let g = FixedDistance::new(if c.side == side { g0 + 0x32 } else { g0 });
                 self.side_node(g, root, id, side, q);
             }

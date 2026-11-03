@@ -7,7 +7,7 @@
 //! The ignored sweeps run every f32 through a port and through the `libm` crate, which ports the
 //! same msun sources the game links (`cargo test --release -- --ignored`).
 
-use genie_core::math::fmath;
+use genie_core::math::fmath::{acos, atan, atan2, cos, fmod, log, sin, sqrt};
 use std::num::NonZero;
 use std::thread::{available_parallelism, scope};
 
@@ -55,40 +55,28 @@ fn mismatches(name: &str, ours: impl Fn(&[f32]) -> f32) -> Vec<String> {
 
 #[test]
 fn sqrt_is_the_games_sqrtf() {
-    assert_eq!(
-        mismatches("sqrtf", |a| fmath::sqrt(a[0])),
-        Vec::<String>::new()
-    );
+    assert_eq!(mismatches("sqrtf", |a| sqrt(a[0])), Vec::<String>::new());
 }
 
 #[test]
 fn acos_is_the_games_acosf() {
-    assert_eq!(
-        mismatches("acosf", |a| fmath::acos(a[0])),
-        Vec::<String>::new()
-    );
+    assert_eq!(mismatches("acosf", |a| acos(a[0])), Vec::<String>::new());
 }
 
 #[test]
 fn cos_is_the_games_cosf() {
-    assert_eq!(
-        mismatches("cosf", |a| fmath::cos(a[0])),
-        Vec::<String>::new()
-    );
+    assert_eq!(mismatches("cosf", |a| cos(a[0])), Vec::<String>::new());
 }
 
 #[test]
 fn sin_is_the_games_sinf() {
-    assert_eq!(
-        mismatches("sinf", |a| fmath::sin(a[0])),
-        Vec::<String>::new()
-    );
+    assert_eq!(mismatches("sinf", |a| sin(a[0])), Vec::<String>::new());
 }
 
 #[test]
 fn atan2_is_the_games_atan2f() {
     assert_eq!(
-        mismatches("atan2f", |a| fmath::atan2(a[0], a[1])),
+        mismatches("atan2f", |a| atan2(a[0], a[1])),
         Vec::<String>::new()
     );
 }
@@ -124,13 +112,13 @@ fn sweep(ours: fn(f32) -> f32, oracle: fn(f32) -> f32) -> Vec<u32> {
 #[test]
 #[ignore = "expensive: all 2^32 inputs, in release; just test-expensive"]
 fn acos_agrees_with_libm_on_every_f32() {
-    assert_eq!(sweep(fmath::acos, libm::acosf), Vec::<u32>::new());
+    assert_eq!(sweep(acos, libm::acosf), Vec::<u32>::new());
 }
 
 #[test]
 #[ignore = "expensive: all 2^32 inputs, in release; just test-expensive"]
 fn atan_agrees_with_libm_on_every_f32() {
-    assert_eq!(sweep(fmath::atan, libm::atanf), Vec::<u32>::new());
+    assert_eq!(sweep(atan, libm::atanf), Vec::<u32>::new());
 }
 
 #[test]
@@ -138,7 +126,7 @@ fn atan_agrees_with_libm_on_every_f32() {
 fn atan2_agrees_with_libm_on_random_pairs() {
     // libm returns `x + y` for a NaN, the game `y + x`: two NaNs may differ in payload only
     let differ = |y: f32, x: f32| {
-        let (ours, theirs) = (fmath::atan2(y, x), libm::atan2f(y, x));
+        let (ours, theirs) = (atan2(y, x), libm::atan2f(y, x));
         ours.to_bits() != theirs.to_bits() && !(ours.is_nan() && theirs.is_nan())
     };
     let threads = 16u64;
@@ -175,13 +163,13 @@ fn atan2_agrees_with_libm_on_random_pairs() {
 #[test]
 #[ignore = "expensive: all 2^32 inputs, in release; just test-expensive"]
 fn cos_agrees_with_libm_on_every_f32() {
-    assert_eq!(sweep(fmath::cos, libm::cosf), Vec::<u32>::new());
+    assert_eq!(sweep(cos, libm::cosf), Vec::<u32>::new());
 }
 
 #[test]
 #[ignore = "expensive: all 2^32 inputs, in release; just test-expensive"]
 fn sin_agrees_with_libm_on_every_f32() {
-    assert_eq!(sweep(fmath::sin, libm::sinf), Vec::<u32>::new());
+    assert_eq!(sweep(sin, libm::sinf), Vec::<u32>::new());
 }
 
 #[test]
@@ -190,7 +178,7 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
     // the exact remainder of two floats is a float: the double's `%` (fmod) gives it; libm's
     // fmodf is a second opinion; NaNs match any NaN
     let differ = |x: f32, y: f32| {
-        let ours = fmath::fmod(x, y);
+        let ours = fmod(x, y);
         // the remainder is a float already: the cast does not round
         #[allow(clippy::cast_possible_truncation)]
         let exact = (f64::from(x) % f64::from(y)) as f32;
@@ -255,7 +243,7 @@ fn log_is_the_games_logf() {
                 u32::from_str_radix(game, 16).expect("a hex f32"),
             );
             calls += 1;
-            let got = fmath::log(f32::from_bits(x)).to_bits();
+            let got = log(f32::from_bits(x)).to_bits();
             let both_nan = f32::from_bits(got).is_nan() && f32::from_bits(game).is_nan();
             (got != game && !both_nan).then(|| format!("{x:08x} -> {got:08x}, game {game:08x}"))
         })

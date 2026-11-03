@@ -29,14 +29,15 @@ use crate::objects::unit::Unit;
 use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 
+use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::damage::HitLayer;
+use crate::combat::damage::{blast, charge_hit, elevation_factor, shield, take};
 use crate::objects::layers::Action;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::step::Step;
-use crate::{GenieError, combat::damage};
 
 impl Attack {
     /// States 4, 5 and 11 (cases 3, 4, 10): the sub-action list's update (`FUN_140a992b0`,
@@ -387,7 +388,7 @@ impl Attack {
         let a = f.own.source;
         if Distance::ZERO < a.area_effect
             && a.weapon_range < Distance::new(damage_tuning.blast_range)
-            && (a.charge_kind != ChargeKind::AREA || damage::charge_hit(&a, &f.victim, roles))
+            && (a.charge_kind != ChargeKind::AREA || charge_hit(&a, &f.victim, roles))
         {
             return Self::trample(f, blasted, chance, object_rng, layer);
         }
@@ -412,14 +413,14 @@ impl Attack {
         Ok(struck.executed)
     }
 
-    /// `FUN_1412115e0`'s trample: the blast about the unit, past its target ([`damage::blast`];
-    /// the target stays among the objects on its tiles, the main building its annexes' hits
-    /// go to); a building target's blast so far (`+0xb90`, its main building's for an annex,
-    /// `0x141211933`) is what its hit leaves out; the unit tells its unit AI the action executed
-    /// (0x200, whatever its master); the 64-bit Object-stream draw against the hit chance; a hit
-    /// the target's shield does not block (`FUN_14108d8a0`, on a target of any type) is its slot
-    /// 0xe8 at the elevation factor times the hit's 1. A charge of type 1 or 3 the blast or the
-    /// hit was for (`+0x8a8`) is emptied.
+    /// `FUN_1412115e0`'s trample: the blast about the unit, past its target
+    /// ([`damage::blast`](crate::combat::damage::blast); the target stays among the objects on its
+    /// tiles, the main building its annexes' hits go to); a building target's blast so far
+    /// (`+0xb90`, its main building's for an annex, `0x141211933`) is what its hit leaves out; the
+    /// unit tells its unit AI the action executed (0x200, whatever its master); the 64-bit
+    /// Object-stream draw against the hit chance; a hit the target's shield does not block
+    /// (`FUN_14108d8a0`, on a target of any type) is its slot 0xe8 at the elevation factor times
+    /// the hit's 1. A charge of type 1 or 3 the blast or the hit was for (`+0x8a8`) is emptied.
     pub(super) fn trample(
         f: &mut Fight,
         blasted: &mut [Victim],
@@ -431,7 +432,7 @@ impl Attack {
         let (center, target) = (f.own.position, f.victim.id);
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(&mut f.victim);
-        let _ = damage::blast(
+        let _ = blast(
             &mut f.own,
             center,
             Some(target),
@@ -444,16 +445,16 @@ impl Attack {
         let draw = object_rng.raw64();
         let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
         if r <= i64::from(chance.get()) {
-            let factor = damage::elevation_factor(
+            let factor = elevation_factor(
                 f.own.position.z(),
                 f.own.attack_elevation,
                 &f.victim,
                 damage_tuning,
             );
-            if !damage::shield(&mut f.victim, false) {
+            if !shield(&mut f.victim, false) {
                 let weapons = f.own.weapons.clone();
                 let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
-                damage::take(
+                take(
                     &mut f.victim,
                     &mut f.own,
                     &mut others,

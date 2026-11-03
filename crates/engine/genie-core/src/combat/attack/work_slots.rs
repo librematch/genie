@@ -1,11 +1,13 @@
 //! The swing's state (7), slot 9 (`RGE_Action_Attack::work`) and slot 0x68
 //! (`set_target_obj`).
 
+use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{
     Attack, AttackReads, Fight, Ground, NO_OBJECT_STREAM, reset_sprite, set_walker_anim,
 };
+use crate::combat::damage::charge_hit;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -21,7 +23,6 @@ use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
-use crate::{GenieError, combat::damage};
 
 /// An object as the Attack's slot 9 ([`Attack::work`]) and slot 0x68 ([`Attack::set_target`])
 /// read it.
@@ -98,7 +99,7 @@ impl Attack {
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
         });
         let special = r.swing_sprites.special.filter(|_| {
-            MasterKind::COMBAT <= f.own.kind && damage::charge_hit(&f.own.source, &f.victim, roles)
+            MasterKind::COMBAT <= f.own.kind && charge_hit(&f.own.source, &f.victim, roles)
         });
         let chosen = if let Some(look) = r.swing_sprites.look {
             Some(look)

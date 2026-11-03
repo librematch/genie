@@ -1,6 +1,7 @@
 //! The way round a record on the line to the slot: the short pather, the long pather and the
 //! tile planner.
 
+use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
@@ -17,6 +18,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::{RestrictionId, TerrainMask};
 use crate::math::fmath::{BVector, at_most_or_unordered};
+use crate::math::fmath::{add, scale, sqrt, sub};
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::{LongWalker, OUTSIDE_PATH, Planning, Walker, long_path_for, short_path_for};
@@ -29,7 +31,6 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
-use crate::{GenieError, math::fmath};
 
 impl World {
     /// The way round a record on the line to the slot (`0x141026867`..`0x1410277e5`), for member
@@ -544,16 +545,16 @@ pub(super) fn one_step_toward(
     forward: BVector,
     map: GridSize,
 ) -> BVector {
-    let d = fmath::sub(to, r.at);
+    let d = sub(to, r.at);
     let mut dir = if d.x().abs() <= ROUND_STILL && d.y().abs() <= ROUND_STILL {
         forward
     } else {
         d
     };
     dir = dir.with_height(0.0);
-    let len = fmath::sqrt(dir.x() * dir.x() + 0.0 + dir.y() * dir.y());
+    let len = sqrt(dir.x() * dir.x() + 0.0 + dir.y() * dir.y());
     let dir = BVector::new(dir.x() / len, dir.height() / len, dir.y() / len);
-    let mut step = fmath::add(r.at, fmath::scale(1.0, dir));
+    let mut step = add(r.at, scale(1.0, dir));
     let (w, h) = (map.width(), map.height());
     let (top_x, top_y) = (w as f32 - r.radius.x(), h as f32 - r.height.get());
     if r.radius.x() > step.x() {
@@ -573,7 +574,7 @@ pub(super) fn one_step_toward(
 /// from the slot `to` on the ground.
 pub(super) fn ends_farther(record: &Path, to: BVector, gap: Distance) -> bool {
     let end = record.points.last().copied().unwrap_or(OUTSIDE_PATH);
-    let mut d = fmath::sub(to, end);
+    let mut d = sub(to, end);
     d = d.with_height(0.0);
-    gap < Distance::new(fmath::sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
+    gap < Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }

@@ -5,7 +5,8 @@
 //! 2026-10-15); aoe2rec rejects a recording that ends right after a sync, and aoc-mgz cannot parse
 //! the headers of three others.
 
-use genie_rec::de::{self, Op};
+use genie_rec::de::Op;
+use genie_rec::de::chapters;
 use std::env::var;
 use std::fs::{read, read_dir};
 use std::path::{Path, PathBuf};
@@ -45,7 +46,7 @@ fn tier_1_recordings_read_and_round_trip() {
     let (mut tier1, mut problems) = (0, Vec::new());
     for path in &paths {
         let data = read(path).unwrap();
-        let Ok(chapters) = de::chapters(&data) else {
+        let Ok(chapters) = chapters(&data) else {
             continue;
         };
         let Ok(version) = chapters[0].save_version() else {

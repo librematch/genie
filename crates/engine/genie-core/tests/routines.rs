@@ -3,7 +3,8 @@
 //! its arguments' edge cases and seeded draws in the tick oracle's emulator), a header line
 //! (`fuzz ADDR SIG`) and per call the arguments' and the result's bits in hex.
 
-use genie_core::{math::fmath, objects::facing};
+use genie_core::math::fmath::atan;
+use genie_core::objects::facing::modulo;
 
 /// A call: the arguments' bits and the result's (None where the call faulted in the emulator).
 type Call = (Vec<u32>, Option<u32>);
@@ -48,7 +49,7 @@ fn modulo_matches_the_game_bit_for_bit() {
     let m = mismatches(
         include_str!("fixtures/fuzz_modulo_158041.txt"),
         "fuzz 0x141158f20 f32,f32->f32",
-        |a| facing::modulo(a[0], a[1]),
+        |a| modulo(a[0], a[1]),
     );
     assert_eq!(m, Vec::<String>::new());
 }
@@ -59,7 +60,7 @@ fn atan_matches_the_game_bit_for_bit() {
     let m = mismatches(
         include_str!("fixtures/fuzz_atanf_158041.txt"),
         "fuzz 0x14099e2f0 f32->f32",
-        |a| fmath::atan(a[0]),
+        |a| atan(a[0]),
     );
     assert_eq!(m, Vec::<String>::new());
 }

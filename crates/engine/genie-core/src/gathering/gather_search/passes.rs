@@ -9,7 +9,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::math::image::gather_search::ROUNDING as GATHER_SEARCH_ROUNDING;
-use crate::math::msvc;
+use crate::math::msvc::sort;
 use crate::objects::masters::GatherGroup;
 use crate::players::Amount;
 use crate::vision::SightTiles;
@@ -42,7 +42,7 @@ pub(super) fn search_passes(
     match site {
         Some(s) if s.footprint => {
             let mut seeds = footprint_seeds(s, map, passable);
-            msvc::sort(&mut seeds, nearer)?;
+            sort(&mut seeds, nearer)?;
             passes.push(Pass {
                 origin: Tile::new(s.position.x() as i32, s.position.y() as i32),
                 max_steps: SightTiles::of(s.line_of_sight).get().wrapping_add(10),

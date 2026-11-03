@@ -28,7 +28,7 @@ use genie_core::vision::visibility::{
 use genie_core::world::GameState;
 use genie_core::world::parts::Object;
 use genie_model::layer::BuildLayer;
-use genie_rec::de;
+use genie_rec::de::chapters;
 use genie_save::Header;
 use genie_save::generated::world::VisibleResourceManager;
 
@@ -66,7 +66,7 @@ pub(super) fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
 
 /// The differences between the slice's map terrain and a save's, tile by tile.
 pub fn terrain_differences(slice: &Terrain, save: &[u8]) -> Result<Vec<String>, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     Ok(header_terrain_differences(slice, &chapter.header()?))
 }
 
@@ -133,7 +133,7 @@ pub(super) struct SavedStep {
 
 impl SavedStep {
     pub(super) fn of(save: &[u8], masters: Option<&MasterTable>) -> Result<Self, Error> {
-        let chapter = de::chapters(save)?[0];
+        let chapter = chapters(save)?[0];
         let header = chapter.header()?;
         let objects = (0..header.players().len() as u32)
             .map(|id| header_objects(&header, id, masters))
@@ -387,7 +387,7 @@ pub(super) fn saved_resources(
 
 /// The players' visible maps and the unified map of a save, as [`Visibility`] holds them.
 pub fn saved_visibility(save: &[u8]) -> Result<Visibility, Error> {
-    let chapter = de::chapters(save)?[0];
+    let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     saved_sight(&header).map_err(Error::Unmodelled)
 }
