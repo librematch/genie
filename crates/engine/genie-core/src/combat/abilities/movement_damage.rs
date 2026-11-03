@@ -140,8 +140,8 @@ pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander, roles: &Roles) ->
 
 /// The hit's end on an object left below 1 hit point (`COMISS 1.0, hp` / `JBE`: a NaN is not):
 /// it has 0, and holds 0 (`FUN_14119d320` with 0, 0 and 1: at most its master's capacity, a
-/// capacity below 0 taken as it is). Returns whether it was.
-pub fn finish(v: &mut Victim) -> bool {
+/// capacity below 0 taken as it is): [`HitEnd::Killed`], else [`HitEnd::Survived`].
+pub fn finish(v: &mut Victim) -> HitEnd {
     if v.hp < HitPoints::new(ONE) {
         v.hp = HitPoints::ZERO;
         v.amount = Amount::ZERO;
@@ -149,9 +149,19 @@ pub fn finish(v: &mut Victim) -> bool {
         if capacity < v.amount {
             v.amount = capacity;
         }
-        return true;
+        return HitEnd::Killed;
     }
-    false
+    HitEnd::Survived
+}
+
+/// Whether a hit left its object below 1 hit point ([`finish`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum HitEnd {
+    /// It was: it has 0 hit points and holds 0.
+    Killed,
+    /// It has 1 or more.
+    Survived,
 }
 
 impl World {
@@ -311,7 +321,7 @@ impl World {
             &self.model.roles,
         );
         lose(&mut v, damage);
-        let killed = finish(&mut v);
+        let killed = finish(&mut v) == HitEnd::Killed;
         let (_, u) = self.object_mut(b.id).ok_or(NOT_HELD)?;
         u.life.hp = v.hp;
         u.life.amount = v.amount;

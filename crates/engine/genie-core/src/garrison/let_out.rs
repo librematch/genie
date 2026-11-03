@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::Firepower;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
+use crate::garrison::LetOut;
 use crate::garrison::RaiderCountdown;
 use crate::garrison::{INSIDE_SIGHT, NO_POINT, SIEGE_UNLOAD, attack_rate, share};
 use crate::map::Point;
@@ -46,27 +47,26 @@ impl World {
     }
 
     /// `FUN_1411e7220`: the unit `id` (any player's, with its own player's masters and orders)
-    /// leaves the building at `building` of player `player` toward `point`, when a spot beside
-    /// it is free ([`World::spot_beside`], toward the point, or the building's gather point when
-    /// not on itself): it takes the spot at the building's
-    /// height (`FUN_14119d610`), leaves the building (slot 0x1a8, `FUN_141213120`: the
-    /// building's slot 0x1c8, `FUN_1411d6ad0` -> `FUN_141217910`, takes its share off the
-    /// volleys, back to its master's volley fire when none is left inside or it fell below it,
-    /// and lets it out of its list, `FUN_141197e10`; the building's sight lets the circle of 5
-    /// go, slot 0x1d8 with 5) and goes on the map there (slot 0x58: its tile's list, its
-    /// obstruction record, the mesh, its sight). With a gather point (`+0xc30` 1) not on the
-    /// building and no point, it then goes to work on the gather point's target when the world
-    /// holds it (its unit AI forgets its target, `FUN_140c5e1e0`; [`World::gather`]); else, or
-    /// with a point, it moves there ([`World::gather_move`] after the same forgetting). False
-    /// when no spot is free. With neither a point nor a gather point its unit AI stops, forgets
-    /// its target and takes its stance again (slots 0xb0 and 0x1c0). With an object to work on
-    /// (`work_on`, `GO_BACK_TO_WORK`'s) its work command (slot 0x128) goes to it at the point first.
-    /// Not modelled: class 42's and livestock's counts in a building of a player with `+0x88`, a siege
-    /// building's (class 13) slot 0x1b0; not held: the building's villager count (`+0xba8`) and
-    /// raider count (`+0xc2c`, which the building's slot 0x1c8 `FUN_1411d6ad0` lowers for a unit
-    /// of type 70 whose `+0x9a0` runs: such a unit inside is refused, [`World::garrisoned`]), its
-    /// sound (slot 0x4c0), its garrison sprite. Its work command (slot 0x128) has `+0xa14` 0: the
-    /// unit AI keeps its notifies and its queued orders.
+    /// leaves the building at `building` of player `player` toward `point`, when a spot beside it
+    /// is free ([`World::spot_beside`], toward the point, or the building's gather point when not
+    /// on itself): it takes the spot at the building's height (`FUN_14119d610`), leaves the
+    /// building (slot 0x1a8, `FUN_141213120`: the building's slot 0x1c8, `FUN_1411d6ad0` ->
+    /// `FUN_141217910`, takes its share off the volleys, back to its master's volley fire when none
+    /// is left inside or it fell below it, and lets it out of its list, `FUN_141197e10`; the
+    /// building's sight lets the circle of 5 go, slot 0x1d8 with 5) and goes on the map there (slot
+    /// 0x58: its tile's list, its obstruction record, the mesh, its sight). With a gather point
+    /// (`+0xc30` 1) not on the building and no point, it then goes to work on the gather point's
+    /// target when the world holds it (its unit AI forgets its target, `FUN_140c5e1e0`;
+    /// [`World::gather`]); else, or with a point, it moves there ([`World::gather_move`] after the
+    /// same forgetting). [`LetOut::Stayed`] when no spot is free. With neither a point nor a gather
+    /// point its unit AI stops, forgets its target and takes its stance again (slots 0xb0 and
+    /// 0x1c0). With an object to work on (`work_on`, `GO_BACK_TO_WORK`'s) its work command (slot
+    /// 0x128) goes to it at the point first. Not modelled: class 42's and livestock's counts in a
+    /// building of a player with `+0x88`, a siege building's (class 13) slot 0x1b0; not held: the
+    /// building's villager count (`+0xba8`) and raider count (`+0xc2c`, which the building's slot
+    /// 0x1c8 `FUN_1411d6ad0` lowers for a unit of type 70 whose `+0x9a0` runs: such a unit inside
+    /// is refused, [`World::garrisoned`]), its sound (slot 0x4c0), its garrison sprite. Its work
+    /// command (slot 0x128) has `+0xa14` 0: the unit AI keeps its notifies and its queued orders.
     pub(crate) fn let_out(
         &mut self,
         player: PlayerId,
@@ -74,7 +74,7 @@ impl World {
         id: ObjectId,
         point: Point,
         (work_on, _sound): (Option<ObjectId>, bool),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<LetOut, GenieError> {
         let b = self.players.live(player, building)?;
         let bid = b.id;
         let bm = b.master(self.master_tables(), player)?.clone();
@@ -300,7 +300,7 @@ impl World {
         ui: ListIndex,
         class: ClassId,
         (point, gather, bid, work_on): (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<LetOut, GenieError> {
         // an object to work on (GO_BACK_TO_WORK's): slot 0x128 on it at the point, the unit's
         // `+0xa14` 0 (its unit AI keeps its notifies)
         if let Some(target) = work_on {
@@ -312,7 +312,7 @@ impl World {
                 source: OrderSource::Queued,
             };
             self.order_work(up, ui, &work)?;
-            return Ok(true);
+            return Ok(LetOut::Out);
         }
         // the gather point (`+0xc30` 1, not on the building) gives a unit without a point its
         // target, when the world holds it, else its point
@@ -324,7 +324,7 @@ impl World {
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
                     self.gather(up, ui, g, bid, OrderSource::Queued, FinderUse::Skips)?;
-                    return Ok(true);
+                    return Ok(LetOut::Out);
                 }
                 g.point.ground()
             }
@@ -346,7 +346,7 @@ impl World {
                     set_stance(ai, stance, place, side, rng, &roles)
                 })?;
             }
-            return Ok(true);
+            return Ok(LetOut::Out);
         }
         // a move to the point: the unit AI forgets its target (`FUN_140c5e1e0`), then slot 0x2a0
         // and slot 0x128 with no target, `+0xa14` 0
@@ -354,7 +354,7 @@ impl World {
             ai.remove_target();
         }
         self.gather_move(up, ui, to.with_height(0.0), OrderSource::Queued)?;
-        Ok(true)
+        Ok(LetOut::Out)
     }
 
     /// [`World::let_out`] for a unit that is not inside an object (a new unit an effect could not
@@ -371,7 +371,7 @@ impl World {
         ui: ListIndex,
         (made, at): (&Master, Position),
         rest: (Point, Option<GatherPoint>, ObjectId, Option<ObjectId>),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<LetOut, GenieError> {
         let id = self.players.live(up, ui)?.id;
         let mut placed = *self
             .spatial

@@ -545,15 +545,15 @@ fn sprite_resets_only_for_its_own_graphic() {
         ..ActiveSprite::start(swing, &mut Well512::default(), tuning().sprite)
     });
     let before = sprite;
-    assert!(!reset_sprite(&mut sprite, other));
+    assert_eq!(reset_sprite(&mut sprite, other), SpriteReset::NoInstance);
     assert_eq!(sprite, before);
-    assert!(reset_sprite(&mut sprite, swing));
+    assert_eq!(reset_sprite(&mut sprite, swing), SpriteReset::Reset);
     let s = sprite.unwrap();
     assert_eq!(
         (s.frame, s.last_frame, s.looped),
         (Frame::of_data(0), Frame::of_data(0), false)
     );
-    assert!(!reset_sprite(&mut None, swing));
+    assert_eq!(reset_sprite(&mut None, swing), SpriteReset::NoInstance);
 }
 
 /// A soldier (class 6, type 70, speed 0.8, radius 0.2) as a mover.

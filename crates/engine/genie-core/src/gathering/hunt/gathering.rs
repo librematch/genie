@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::combat::attack::Fight;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::Walks;
+use crate::gathering::hunt::HuntGather;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HERD_FAR, HuntAction, HuntNext, HuntReads, LAST_BIT, REMAINDER};
 use crate::gathering::{HuntTargetId, both_food};
@@ -238,12 +239,12 @@ impl HuntAction {
     }
 
     /// State 7 (case 6): the work, `(work rate) × work_val1 × dt`, at most what the target holds,
-    /// times the productivity, while the load stays within the capacity: the target loses the
-    /// work, its last bit below 0.1 going with a thousandth of its master's first storage amount;
-    /// the unit gains, a remainder below 0.1 of the capacity rounding the load up. A full load or
-    /// an empty target ends the gathering: true asks the caller for `set_state(8)` (its drop site
-    /// search, [`HuntAction::set_drop`]). The game's `+0xc14`
-    /// (`FUN_140c884c0`), 0 as the tick oracle holds it, would take the whole target at once.
+    /// times the productivity, while the load stays within the capacity: the target loses the work,
+    /// its last bit below 0.1 going with a thousandth of its master's first storage amount; the
+    /// unit gains, a remainder below 0.1 of the capacity rounding the load up. A full load or an
+    /// empty target ends the gathering: [`HuntGather::DropOff`] asks the caller for `set_state(8)`
+    /// (its drop site search, [`HuntAction::set_drop`]). The game's `+0xc14` (`FUN_140c884c0`), 0
+    /// as the tick oracle holds it, would take the whole target at once.
     pub(super) fn gather(
         &self,
         dt: Seconds,
@@ -251,7 +252,7 @@ impl HuntAction {
         victim: &mut Victim,
         r: &HuntReads,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<HuntGather, GenieError> {
         let held = &mut unit.life.amount;
         let work = Amount::new((r.work_rate * self.task.work_value) * dt);
         let take = if work <= victim.amount {
@@ -267,7 +268,7 @@ impl HuntAction {
             gain.partial_cmp(&room),
             Some(Ordering::Less | Ordering::Equal)
         ) {
-            return Ok(true);
+            return Ok(HuntGather::DropOff);
         }
         victim.amount -= take;
         // the last bit and the storage's share summed first (`0x140ac8e04`)
@@ -295,6 +296,10 @@ impl HuntAction {
                 "a gold load of class 9 or 10 (its player's attribute 3)",
             ));
         }
-        Ok(!(REMAINDER <= over && Amount::ZERO < victim.amount))
+        Ok(if REMAINDER <= over && Amount::ZERO < victim.amount {
+            HuntGather::GoesOn
+        } else {
+            HuntGather::DropOff
+        })
     }
 }

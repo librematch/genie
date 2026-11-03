@@ -56,6 +56,7 @@ use crate::gathering::gather::WalkEnd;
 use crate::gathering::gather::unit::give_load;
 use crate::gathering::gather::{GATHER, GatherAction, Resource, StopRate};
 use crate::gathering::hunt::HuntState;
+use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::tests::{hunting, walker};
 use crate::gathering::hunt::{HUNT, HuntAction, HuntTask};
 use crate::gathering::make::MAKE;
@@ -6707,7 +6708,10 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
         )
     };
     let mut t = lumber_world(31.5);
-    assert_eq!(search(&mut t, Some(Distance::new(8.0)), None), Ok(true));
+    assert_eq!(
+        search(&mut t, Some(Distance::new(8.0)), None),
+        Ok(TreeSearch::Found)
+    );
     let h = t
         .parts
         .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -6735,13 +6739,19 @@ fn hunt_that_lost_its_tree_takes_the_next_one() {
         .hunt_mut()
         .unwrap()
         .point = Position::new(40.0, 89.5, 0.0);
-    assert_eq!(search(&mut t, Some(Distance::new(8.0)), None), Ok(false));
-    assert_eq!(search(&mut t, None, Some(Distance::new(1.5))), Ok(false));
+    assert_eq!(
+        search(&mut t, Some(Distance::new(8.0)), None),
+        Ok(TreeSearch::NoneFound)
+    );
+    assert_eq!(
+        search(&mut t, None, Some(Distance::new(1.5))),
+        Ok(TreeSearch::NoneFound)
+    );
     let mut t = lumber_world(31.5);
     for i in [2, 3] {
         t.players[0].objects[ListIndex::new(i)].life.amount = Amount::ZERO;
     }
-    assert_eq!(search(&mut t, None, None), Ok(false));
+    assert_eq!(search(&mut t, None, None), Ok(TreeSearch::NoneFound));
 }
 
 /// A hunt's end of an Attack that failed (`FUN_140ac4670` with -1 and 5,

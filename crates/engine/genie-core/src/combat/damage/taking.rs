@@ -167,8 +167,8 @@ pub(super) enum HitRoute {
 /// values (172, 153). Then `damaged_lately_timer` (`+0x30d`) is 60 and its annexes take its hit
 /// points (the write-back gives them to those `others` does not hold, [`Building::struck`]); a
 /// dealt hit's attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS hp, 1`
-/// / `JC` past) to its effects ([`attack_effects`]). Answers whether the hit got past the hit point
-/// test.
+/// / `JC` past) to its effects ([`attack_effects`]). [`BuildingHit::Past`] when the hit got past
+/// the hit point test.
 pub(super) fn take_building(
     t: &mut Victim,
     src: &mut Victim,
@@ -176,7 +176,7 @@ pub(super) fn take_building(
     strike: Strike<'_>,
     route: HitRoute,
     layer: HitLayer<'_>,
-) -> Result<bool, GenieError> {
+) -> Result<BuildingHit, GenieError> {
     let HitLayer {
         roles,
         slots,
@@ -192,10 +192,11 @@ pub(super) fn take_building(
     if route == HitRoute::Dealt
         && let Some(main) = main
     {
-        return forward_to_main(t, src, others, strike, main, layer);
+        forward_to_main(t, src, others, strike, main, layer)?;
+        return Ok(BuildingHit::Stopped);
     }
     if HitPoints::ZERO >= t.hp {
-        return Ok(false);
+        return Ok(BuildingHit::Stopped);
     }
     damage(t, src, weapons, factor, blast_taken, roles)?;
     // the kill of its damage ran slot 0x8b0, which counts it (+0x954)
@@ -258,13 +259,23 @@ pub(super) fn take_building(
     {
         attack_effects(&src.source, t)?;
     }
-    Ok(true)
+    Ok(BuildingHit::Past)
+}
+
+/// Whether a building's hit got past its hit point test ([`take_building`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum BuildingHit {
+    /// It did: the building took it.
+    Past,
+    /// The building had no hit points, or the hit went to its main building.
+    Stopped,
 }
 
 /// [`take_building`]'s forward of an annex `t`'s hit to its main building `main` among
 /// `others` (out of the slice while it takes the hit, not forwarded again): the annex takes the
 /// main building's hit points when the hit got past its test and the main building lists it.
-/// Answers false.
+/// Its caller answers [`BuildingHit::Stopped`].
 fn forward_to_main(
     t: &mut Victim,
     src: &mut Victim,
@@ -272,7 +283,7 @@ fn forward_to_main(
     strike: Strike<'_>,
     main: MainBuildingId,
     layer: HitLayer<'_>,
-) -> Result<bool, GenieError> {
+) -> Result<(), GenieError> {
     let k = others
         .iter()
         .position(|v| v.id == main.id())
@@ -283,11 +294,11 @@ fn forward_to_main(
         .building
         .as_ref()
         .is_some_and(|b| b.annexes.contains(&t.id));
-    if matches!(struck, Ok(true)) && annexed {
+    if matches!(struck, Ok(BuildingHit::Past)) && annexed {
         t.hp = m.hp;
     }
     **others.checked_mut(k)? = m;
-    struck.map(|_| false)
+    struck.map(|_| ())
 }
 
 /// `FUN_1415c6510`, the kill bonus of the attacker `src` (type 40 and up) for an object it

@@ -1987,44 +1987,59 @@ fn gain_fills_hit_points_and_its_overflow_takes_off_the_powerup() {
 fn heal_to_full_holds_the_master_hit_points() {
     let mut hp = HitPoints::new(30.0);
     let mut ups = HpPowerup::default();
-    assert!(!heal_hp(
-        &mut hp,
-        &mut ups,
-        MasterHitPoints::of_data(60),
-        HitPoints::new(10.0)
-    ));
+    assert_eq!(
+        heal_hp(
+            &mut hp,
+            &mut ups,
+            MasterHitPoints::of_data(60),
+            HitPoints::new(10.0)
+        ),
+        Heal::Partial
+    );
     assert_eq!(hp, HitPoints::new(40.0));
-    assert!(heal_hp(
-        &mut hp,
-        &mut ups,
-        MasterHitPoints::of_data(60),
-        HitPoints::new(25.0)
-    ));
+    assert_eq!(
+        heal_hp(
+            &mut hp,
+            &mut ups,
+            MasterHitPoints::of_data(60),
+            HitPoints::new(25.0)
+        ),
+        Heal::Full
+    );
     assert_eq!(hp, HitPoints::new(60.0));
     let mut hp = HitPoints::new(0.5);
-    assert!(!heal_hp(
-        &mut hp,
-        &mut ups,
-        MasterHitPoints::of_data(60),
-        HitPoints::new(-3.0)
-    ));
+    assert_eq!(
+        heal_hp(
+            &mut hp,
+            &mut ups,
+            MasterHitPoints::of_data(60),
+            HitPoints::new(-3.0)
+        ),
+        Heal::Partial
+    );
     assert_eq!(hp, HitPoints::new(1.0));
     let mut hp = HitPoints::new(55.0);
     let mut ups = pu(5.0, 5.0);
-    assert!(!heal_hp(
-        &mut hp,
-        &mut ups,
-        MasterHitPoints::of_data(60),
-        HitPoints::new(4.0)
-    ));
+    assert_eq!(
+        heal_hp(
+            &mut hp,
+            &mut ups,
+            MasterHitPoints::of_data(60),
+            HitPoints::new(4.0)
+        ),
+        Heal::Partial
+    );
     assert_eq!(hp, HitPoints::new(59.0));
     let mut hp = HitPoints::new(f32::NAN);
-    assert!(!heal_hp(
-        &mut hp,
-        &mut HpPowerup::default(),
-        MasterHitPoints::of_data(60),
-        HitPoints::new(1.0)
-    ));
+    assert_eq!(
+        heal_hp(
+            &mut hp,
+            &mut HpPowerup::default(),
+            MasterHitPoints::of_data(60),
+            HitPoints::new(1.0)
+        ),
+        Heal::Partial
+    );
 }
 
 /// The blast's ledger (`+0xbb8`): an annex keeps its damage on its main building among the

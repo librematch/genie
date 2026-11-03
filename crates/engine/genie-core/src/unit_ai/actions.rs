@@ -23,6 +23,7 @@ use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitStance;
+use crate::unit_ai::WalkBack;
 use crate::unit_ai::{
     AiMove, ENDED_ACTIONS, Effect, GO_ON, Notify, PRODUCED, QueuedOrder, Surroundings, UnitAi,
     UnitSide, WALK_BACK, point_gap_squared,
@@ -330,16 +331,16 @@ impl UnitAi {
     /// for classes 51 and 54, whose slot `FUN_141216c50` the caller does not model). On the
     /// move the action value becomes the move's (`0x262`, the old one the last); the target
     /// stays. The move gives the unit its `MoveTo` at once: the update's later checks see it
-    /// busy. True when it walks.
+    /// busy ([`WalkBack::Walks`]).
     pub(super) fn walk_back(
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<WalkBack, GenieError> {
         let gap = point_gap_squared(self.state_position, at.position, at.size);
         if !below_or_unordered(WALK_BACK, gap.get()) {
-            return Ok(false);
+            return Ok(WalkBack::Stays);
         }
         let (x, y) = (self.state_position.x(), self.state_position.y());
         side.effect_now(
@@ -353,7 +354,7 @@ impl UnitAi {
             rng,
         )?;
         self.set_action(Some(AiAction::Move));
-        Ok(true)
+        Ok(WalkBack::Walks)
     }
 
     /// The reset at the full update once the unit's actions ended (the unit's slot 0x430 false):

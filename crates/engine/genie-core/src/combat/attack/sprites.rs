@@ -91,36 +91,56 @@ pub(crate) fn show_arrived(
     Ok(())
 }
 
+/// Whether a sprite instance went back to its first frame ([`reset_sprite`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum SpriteReset {
+    /// It did.
+    Reset,
+    /// The list holds none of the graphic.
+    NoInstance,
+}
+
+/// Whether a unit faces its target after its turn ([`face_target`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum Aim {
+    /// It faces the target.
+    Faces,
+    /// It is still turning.
+    Turning,
+}
+
 /// `FUN_1413b9f00` on the object's sprite list (`+0x148`, genie's: the unit's one sprite): the
 /// first instance of graphic `g` (a node's `+0x8`) goes back to its first frame (its slot 9 with
-/// `0x7fff`, [`ActiveSprite::reset_frame`]); false when the list holds none.
-pub(crate) fn reset_sprite(sprite: &mut Option<ActiveSprite>, g: Graphic) -> bool {
+/// `0x7fff`, [`ActiveSprite::reset_frame`]); [`SpriteReset::NoInstance`] when the list holds none.
+pub(crate) fn reset_sprite(sprite: &mut Option<ActiveSprite>, g: Graphic) -> SpriteReset {
     match sprite.as_mut() {
         Some(sp) if sp.graphic.id == g.id => {
             sp.reset_frame();
-            true
+            SpriteReset::Reset
         }
-        _ => false,
+        _ => SpriteReset::NoInstance,
     }
 }
 
 /// `FUN_141162db0`: the unit at `at` turns to face `to` with its sprites' facets, at once for a
 /// unit without a turn time ([`crate::objects::facing::face`]), else a facet a turn time
-/// ([`crate::objects::facing::turn_toward`] by the world time); returns whether it faces. The facets are
-/// its current sprite's ([`Mover::facets`]).
+/// ([`crate::objects::facing::turn_toward`] by the world time); [`Aim::Faces`] when it faces, else
+/// [`Aim::Turning`]. The facets are its current sprite's ([`Mover::facets`]).
 pub(crate) fn face_target(
     mover: &mut Mover,
     at: Position,
     to: Position,
     world_time: WorldTime,
-) -> Result<bool, GenieError> {
+) -> Result<Aim, GenieError> {
     let facets = mover.facets().ok_or(GenieError::unsupported(
         "a unit facing a target whose sprites differ in their facets",
     ))?;
     let (at, to) = (at.ground(), to.ground());
     if mover.stats.turn_time == Seconds::ZERO {
         mover.angle = face(at, mover.angle, to, Some(facets));
-        return Ok(true);
+        return Ok(Aim::Faces);
     }
     let (angle, last, faces) = turn_toward(
         at,
@@ -132,5 +152,5 @@ pub(crate) fn face_target(
         world_time,
     );
     (mover.angle, mover.last_turn) = (angle, last);
-    Ok(faces)
+    Ok(if faces { Aim::Faces } else { Aim::Turning })
 }

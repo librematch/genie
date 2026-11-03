@@ -6,6 +6,7 @@ use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, Fight, set_walker_anim};
 use crate::combat::victims::{file_kill, write_back};
+use crate::gathering::hunt::HuntGather;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
@@ -75,9 +76,12 @@ impl HuntAction {
                 })
             }
             HuntState::Gather => {
-                let full = self.gather(c.dt.seconds(), unit, &mut f.victim, r, roles)?;
+                let gathered = self.gather(c.dt.seconds(), unit, &mut f.victim, r, roles)?;
                 write_target_back(c, unit, actions, f, roles)?;
-                Ok(if full { HuntNext::Drop } else { HuntNext::Stay })
+                Ok(match gathered {
+                    HuntGather::DropOff => HuntNext::Drop,
+                    HuntGather::GoesOn => HuntNext::Stay,
+                })
             }
             _ => Err(GenieError::unsupported(
                 "a Hunt action in a state the slice does not model",

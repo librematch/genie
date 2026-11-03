@@ -8,6 +8,7 @@ use crate::construction::MainBuildingId;
 use crate::garrison::EnterKind;
 use crate::garrison::GarrisonScope;
 use crate::garrison::GarrisonSwitch;
+use crate::garrison::LetOut;
 use crate::garrison::ShelterReach;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
@@ -2347,9 +2348,10 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
         .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .firepower = Firepower::new(f32::NAN);
-    assert!(
+    assert_eq!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(2000))
-            .unwrap()
+            .unwrap(),
+        WorkReturn::Went
     );
     assert!(
         t.parts
@@ -2369,9 +2371,10 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut bell = t.parts.town_bell_of(object_id(1000));
     bell.work.point = Point::new(4.5, 15.5);
     t.parts.set_town_bell(object_id(1000), bell);
-    assert!(
+    assert_eq!(
         t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
-            .unwrap()
+            .unwrap(),
+        WorkReturn::Went
     );
     assert_eq!(
         t.parts
@@ -2416,9 +2419,10 @@ fn back_to_work_without_its_object_asks_the_unit_ai_to_search() {
             ..t.parts.town_bell_of(object_id(1000))
         };
         t.parts.set_town_bell(object_id(1000), bell);
-        assert!(
+        assert_eq!(
             t.back_to_work(Some((PlayerId::new(1), ListIndex::new(0))), object_id(1000))
-                .unwrap()
+                .unwrap(),
+            WorkReturn::Went
         );
         let ai = t.parts.unit_ai.get(object_id(1000)).unwrap();
         let heard: Vec<_> = ai.notifies.iter().map(|n| (n.kind, n.p)).collect();
@@ -3978,7 +3982,7 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
             Point::new(NO_POINT, NO_POINT),
             (None, false)
         ),
-        Ok(true)
+        Ok(LetOut::Out)
     );
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
@@ -4015,7 +4019,7 @@ fn unit_on_the_map_let_out_moves_beside_the_building() {
             Point::new(NO_POINT, NO_POINT),
             (None, false)
         ),
-        Ok(true)
+        Ok(LetOut::Out)
     );
     let v = t.object(object_id(1000)).unwrap().1;
     assert_ne!(v.position().ground(), tc_at.ground());
@@ -4269,7 +4273,7 @@ fn let_out_beside_second_centre(
     setup: impl FnOnce(&mut World),
     point: Point,
     work_on: Option<ObjectId>,
-) -> (Result<bool, GenieError>, World) {
+) -> (Result<LetOut, GenieError>, World) {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     t.parts.set_unit_ai(
@@ -4311,7 +4315,7 @@ fn let_out_beside_second_centre(
 #[test]
 fn unit_let_out_works_its_record_or_the_gather_point_target() {
     let (r, t) = let_out_beside_second_centre(|_| (), Point::new(4.5, 4.5), Some(object_id(101)));
-    assert_eq!(r, Ok(true));
+    assert_eq!(r, Ok(LetOut::Out));
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
     assert_eq!(
@@ -4333,7 +4337,7 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
         .unwrap();
     };
     let (r, t) = let_out_beside_second_centre(gather, Point::new(NO_POINT, NO_POINT), None);
-    assert_eq!(r, Ok(true));
+    assert_eq!(r, Ok(LetOut::Out));
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
     assert_eq!(

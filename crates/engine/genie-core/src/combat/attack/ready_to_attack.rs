@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::MissileCount;
+use crate::combat::attack::Aim;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::walks::MoveStart;
@@ -273,7 +274,7 @@ impl Attack {
         if !roles
             .of_master(f.own.master_id)
             .contains(MasterRoles::UNTURNED_ATTACKER)
-            && !face_target(mover, at, to, r.world_time)?
+            && face_target(mover, at, to, r.world_time)? == Aim::Turning
         {
             return Ok(Readiness::Waiting);
         }

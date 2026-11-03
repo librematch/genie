@@ -2,6 +2,7 @@
 //! action's state; the AI's build orders whose foundation is gone.
 
 use crate::GenieError;
+use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
@@ -420,7 +421,7 @@ impl BuildAction {
                 .position;
         let now = c.w.world_time;
         let mover = c.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
-        if !face_target(mover, at, to, now)? {
+        if face_target(mover, at, to, now)? == Aim::Turning {
             return Err(GenieError::unsupported(
                 "a builder that turns over time to face its foundation",
             ));

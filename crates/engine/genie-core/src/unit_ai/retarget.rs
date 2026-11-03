@@ -16,10 +16,12 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::AttackChecks;
 use crate::unit_ai::GroupState;
+use crate::unit_ai::MiscEnd;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::Pace;
+use crate::unit_ai::RetargetCheck;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
@@ -56,7 +58,7 @@ impl UnitAi {
     /// retarget.") or without a target (or one gone), and one with a player's target off the attack
     /// order but for a building or wall target (classes 3, 27, 39, 49, 52) or a trebuchet's (51,
     /// 54), whose search for a better target (slot 0x538 with 9, then slot 0x520) is not modelled;
-    /// nor is the attack order's search. True when the timer ran out.
+    /// nor is the attack order's search. [`RetargetCheck::Due`] when the timer ran out.
     pub(super) fn retarget_check(
         &mut self,
         world_time: WorldTime,
@@ -64,27 +66,29 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<RetargetCheck, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // without an order, the order whose own action the current one is (`action + 100`)
         let order = self
             .current_order
             .or_else(|| self.current_action.and_then(AiAction::order));
-        if order == Some(OrderKind::Defend) && self.defend_misc(at, player_kind, ai, side)? {
-            return Ok(false);
+        if order == Some(OrderKind::Defend)
+            && self.defend_misc(at, player_kind, ai, side)? == MiscEnd::Ends
+        {
+            return Ok(RetargetCheck::NotDue);
         }
-        if order == Some(OrderKind::Follow) && self.follow(at, side, ai)? {
-            return Ok(false);
+        if order == Some(OrderKind::Follow) && self.follow(at, side, ai)? == MiscEnd::Ends {
+            return Ok(RetargetCheck::NotDue);
         }
-        if self.leash_ends(at, ai, side)? {
-            return Ok(false);
+        if self.leash_ends(at, ai, side)? == MiscEnd::Ends {
+            return Ok(RetargetCheck::NotDue);
         }
         if self.retarget_disabled != 0 {
-            return Ok(false);
+            return Ok(RetargetCheck::NotDue);
         }
         if world_time.since(self.last_retarget_time) < self.retarget_timer {
-            return Ok(false);
+            return Ok(RetargetCheck::NotDue);
         }
         self.last_retarget_time = world_time;
         self.retarget_timer = Millis::new(750 + ai.rand15() % 500);
@@ -106,13 +110,13 @@ impl UnitAi {
         )? {
             let _ = self.retarget_search(search, player_kind, at, side, ai)?;
         }
-        Ok(true)
+        Ok(RetargetCheck::Due)
     }
 
     /// [`UnitAi::retarget_check`]'s leashes (not on the orders 0x2c7, 0x2dd and 0x323, nor in a
     /// group that patrols), measured from the unit's footprint (`FUN_140a847c0`): with patrol
-    /// information, the patrol leashes; else the defend stance's and stand ground's. True when
-    /// slot 73 ends there (its 9 and 10).
+    /// information, the patrol leashes; else the defend stance's and stand ground's.
+    /// [`MiscEnd::Ends`] when slot 73 ends there (its 9 and 10).
     ///
     /// # Errors
     ///
@@ -122,7 +126,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         // the leashes (unless on orders 0x2c7, 0x2dd and 0x323, which no order holds, or in a
         // group that patrols: FUN_141017c30, FUN_141017c40), measured from the unit's footprint
@@ -148,10 +152,10 @@ impl UnitAi {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.restore_patrol(at, ai, side)?;
-                return Ok(true);
+                return Ok(MiscEnd::Ends);
             }
             if self.stance == UnitStance::Defensive {
-                return Ok(true);
+                return Ok(MiscEnd::Ends);
             }
         }
         if leashed && self.stance == UnitStance::Defensive && self.patrol_path.is_none() {
@@ -183,10 +187,10 @@ impl UnitAi {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.walk_back(at, side, ai)?;
-                return Ok(true);
+                return Ok(MiscEnd::Ends);
             }
         }
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     }
 
     /// The retarget's search for a better target (`0x140c567c0` past its checks):
@@ -372,30 +376,29 @@ impl UnitAi {
     /// processMisc's defend order (`0x140c567c0`, "I have a defend order for Unit #%d"). A defend
     /// target (`+0x60`) the world does not hold, or not the owner's own or an ally's
     /// (`FUN_141663d90` with the ally flag), ends it ("Unit #%d is invalid, stopping."); one held,
-    /// it first gives a target point at (−1, x) its place (`UCOMISS`: not a NaN) and ends the
-    /// order once dead (above state 2) but for Gaia's ("Unit #%d is dead, stopping."). The end:
-    /// the defend target and the target go (`FUN_140c5e1e0`), the current action stops (slot 0xb0
-    /// with 1), a patrol order leaves its timers ([`UnitAi::leave_patrol_timers`]) and the order
-    /// is −1. Else, but on the attack action (600), the evacuation (`0x2bf`) or a move toward the
-    /// defend target (`0x262` with the unit's top action's target, slot 0x280, the defend
-    /// target): with a defend target the target point takes its place (x, y, z) and the distance
-    /// is the footprints' squared gap (`FUN_14118f8c0`), without one the squared gap from the
-    /// unit's footprint to the point (`FUN_140a847c0`); beyond the desired distance plus 1,
-    /// squared (`ADDSS`, `MULSS`, `COMISS` with `JBE`: a NaN stays), the unit moves to the
-    /// target (slot 0x138, [`UnitAi::move_to_object`], within the desired distance) or to the
-    /// point (slot 0x130 forced, running, within the desired distance). Within it, a defend
-    /// target with a unit AI names the attacker of its nearest to it (its AI's slot 0x78,
-    /// [`UnitSide::defended_attacker`]), which the unit attacks (slot 0xb8 forced, not any:
-    /// [`UnitAi::attack_slot`]); with none, its processIdle (slot 0x240 with 0,
-    /// [`UnitAi::process_idle`]) and an action it produced end slot 73. True when slot 73 ends
-    /// here (10, or 9 after the order ended).
+    /// it first gives a target point at (−1, x) its place (`UCOMISS`: not a NaN) and ends the order
+    /// once dead (above state 2) but for Gaia's ("Unit #%d is dead, stopping."). The end: the
+    /// defend target and the target go (`FUN_140c5e1e0`), the current action stops (slot 0xb0 with
+    /// 1), a patrol order leaves its timers ([`UnitAi::leave_patrol_timers`]) and the order is −1.
+    /// Else, but on the attack action (600), the evacuation (`0x2bf`) or a move toward the defend
+    /// target (`0x262` with the unit's top action's target, slot 0x280, the defend target): with a
+    /// defend target the target point takes its place (x, y, z) and the distance is the footprints'
+    /// squared gap (`FUN_14118f8c0`), without one the squared gap from the unit's footprint to the
+    /// point (`FUN_140a847c0`); beyond the desired distance plus 1, squared (`ADDSS`, `MULSS`,
+    /// `COMISS` with `JBE`: a NaN stays), the unit moves to the target (slot 0x138,
+    /// [`UnitAi::move_to_object`], within the desired distance) or to the point (slot 0x130 forced,
+    /// running, within the desired distance). Within it, a defend target with a unit AI names the
+    /// attacker of its nearest to it (its AI's slot 0x78, [`UnitSide::defended_attacker`]), which
+    /// the unit attacks (slot 0xb8 forced, not any: [`UnitAi::attack_slot`]); with none, its
+    /// processIdle (slot 0x240 with 0, [`UnitAi::process_idle`]) and an action it produced end slot
+    /// 73. [`MiscEnd::Ends`] when slot 73 ends here (10, or 9 after the order ended).
     pub(super) fn defend_misc(
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let mut defended = None;
         if let Some(target) = self.defend_target {
@@ -418,7 +421,7 @@ impl UnitAi {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.leave_patrol_timers(ai);
                 self.current_order = None;
-                return Ok(true);
+                return Ok(MiscEnd::Ends);
             }
             defended = held.map(|t| (target, t));
         }
@@ -429,7 +432,7 @@ impl UnitAi {
             Some(AiAction::Attack | AiAction::MoveAside)
         ) || toward_it
         {
-            return Ok(false);
+            return Ok(MiscEnd::GoesOn);
         }
         let gap = if let Some((_, t)) = defended {
             self.target_point = t.position;
@@ -453,38 +456,42 @@ impl UnitAi {
                     side.effect_now(Effect::Move(m), self, ai)?;
                 }
             }
-            return Ok(true);
+            return Ok(MiscEnd::Ends);
         }
         if let Some((target, _)) = defended {
             match side.defended_attacker(target)? {
                 NearestAttacker::Attacker(attacker) => {
                     let _ = self.attack_slot(attacker, TargetRules::Any, at, side, ai)?;
-                    return Ok(true);
+                    return Ok(MiscEnd::Ends);
                 }
                 NearestAttacker::NoAttacker => {
-                    return self.process_idle(at, player_kind, ai, side);
+                    return Ok(if self.process_idle(at, player_kind, ai, side)? {
+                        MiscEnd::Ends
+                    } else {
+                        MiscEnd::GoesOn
+                    });
                 }
                 NearestAttacker::NoUnitAi => {}
             }
         }
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     }
 
-    /// processMisc's follow order (`0x140c567c0`, "I have a follow order for Unit #%d"): a
-    /// target gone or dying (above state 2) or on a tile the unit's player does not see now ends
-    /// it ("Target is gone or dying, stopping.", "He's NOT on a visible tile, stopping."): the
-    /// defend target `+0x60` and the target go (`FUN_140c5e1e0`), the current action
-    /// stops (slot 0xb0 with 1) and the order is −1. On action `0x2bf` or `0x2c0` the target
-    /// point becomes (−1, −1). Otherwise a target more than a tile off the AI's target point on
-    /// either axis gives the point its place (x, y, z); when the footprints' squared gap
-    /// (`FUN_14118f8c0`) then exceeds the desired distance squared, the AI moves to it
-    /// ([`UnitAi::move_to_object`] within the desired distance). True when the check ends there.
+    /// processMisc's follow order (`0x140c567c0`, "I have a follow order for Unit #%d"): a target
+    /// gone or dying (above state 2) or on a tile the unit's player does not see now ends it
+    /// ("Target is gone or dying, stopping.", "He's NOT on a visible tile, stopping."): the defend
+    /// target `+0x60` and the target go (`FUN_140c5e1e0`), the current action stops (slot 0xb0
+    /// with 1) and the order is −1. On action `0x2bf` or `0x2c0` the target point becomes (−1, −1).
+    /// Otherwise a target more than a tile off the AI's target point on either axis gives the point
+    /// its place (x, y, z); when the footprints' squared gap (`FUN_14118f8c0`) then exceeds the
+    /// desired distance squared, the AI moves to it ([`UnitAi::move_to_object`] within the desired
+    /// distance). [`MiscEnd::Ends`] when the check ends there.
     pub(super) fn follow(
         &mut self,
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MiscEnd, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         // the world holds the current target (`at.target`) only when the AI has one
         let (Some(id), Some(target)) = (
@@ -496,14 +503,14 @@ impl UnitAi {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, rng)?;
             self.current_order = None;
-            return Ok(true);
+            return Ok(MiscEnd::Ends);
         };
         if matches!(
             self.current_action,
             Some(AiAction::MoveAside | AiAction::GroupAside)
         ) {
             self.target_point = self.target_point.with_x(-1.0).with_y(-1.0);
-            return Ok(false);
+            return Ok(MiscEnd::GoesOn);
         }
         let dx = target.position.x() - self.target_point.x();
         let dy = target.position.y() - self.target_point.y();
@@ -512,7 +519,7 @@ impl UnitAi {
             || dy < unit_ai_tuning.follow_slack_low
             || unit_ai_tuning.follow_slack_high < dy;
         if !moved {
-            return Ok(false);
+            return Ok(MiscEnd::GoesOn);
         }
         self.target_point = target.position;
         let gap = footprint_gap_squared(at.position, at.size, target.position, target.radius);
@@ -520,9 +527,9 @@ impl UnitAi {
         if range.squared() < gap {
             let held = (target.state, target.class, target.position);
             self.move_to_object(id, held, range, side, rng)?;
-            return Ok(true);
+            return Ok(MiscEnd::Ends);
         }
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     }
 
     /// The AI's move to an object (slot 0x138, `FUN_140c55490`, its fourth argument 1 as its only

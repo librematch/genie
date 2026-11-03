@@ -2,6 +2,7 @@
 //! in the way and the teardown.
 
 use crate::GenieError;
+use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
@@ -266,7 +267,7 @@ impl GatherAction {
         }
         let at = unit.place.position();
         let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-        if !face_target(mover, at, target.position, c.w.world_time)? {
+        if face_target(mover, at, target.position, c.w.world_time)? == Aim::Turning {
             return Ok(Next::Stay);
         }
         if Amount::ZERO < target.amount

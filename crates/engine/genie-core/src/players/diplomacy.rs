@@ -12,6 +12,7 @@
 
 use crate::GenieError;
 use crate::garrison::ContainerId;
+use crate::garrison::LetOut;
 use crate::garrison::SIEGE_UNLOAD;
 use crate::map::Point;
 use crate::map::Position;
@@ -224,7 +225,8 @@ impl World {
         let holder_master = h.master(self.master_tables(), hp)?;
         if holder_master.kind == MasterKind::BUILDING {
             let hi = self.housed_index(hp, holder.id())?;
-            if !self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? {
+            if self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? == LetOut::Stayed
+            {
                 self.destroy(p, id)?;
             }
         } else if self
@@ -279,7 +281,8 @@ impl World {
         let bi = self.housed_index(p, id)?;
         for &g in garrison.iter().rev() {
             if self.object(g).is_some_and(|(gp, _)| gp == q)
-                && !self.let_out(p, bi, g, Point::from([NO_POINT; 2]), (None, true))?
+                && self.let_out(p, bi, g, Point::from([NO_POINT; 2]), (None, true))?
+                    == LetOut::Stayed
             {
                 self.destroy(q, g)?;
             }

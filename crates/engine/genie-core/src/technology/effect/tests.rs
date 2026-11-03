@@ -66,6 +66,7 @@ use crate::technology::Effects;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::TechMode;
+use crate::technology::effect::object_slots::ObjectChange;
 use crate::technology::{ResearchCap, TechKind};
 use crate::test_ids::costs;
 use crate::test_ids::group_id;
@@ -559,20 +560,22 @@ fn total_missiles_change_sets_adds_or_scales_the_volleys() {
         (Change::Add, 3.0, 5.0),
         (Change::Multiply, 0.5, 2.5),
     ] {
-        assert!(
+        assert_eq!(
             t.change_object(object_id(1), change, v, MasterAttribute::TOTAL_MISSILES)
-                .unwrap()
+                .unwrap(),
+            ObjectChange::Ran
         );
         assert_eq!(fire(&t).to_bits(), f32::to_bits(after), "{change:?}");
     }
-    assert!(
-        !t.change_object(
+    assert_eq!(
+        t.change_object(
             object_id(9),
             Change::Set,
             1.0,
             MasterAttribute::TOTAL_MISSILES
         )
-        .unwrap()
+        .unwrap(),
+        ObjectChange::NotHeld
     );
 }
 

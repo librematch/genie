@@ -60,7 +60,9 @@ mod movement_damage;
 
 pub use self::generation::{TopWork, WorkTarget, generated, generates, store};
 pub use self::looks_and_rewards::{look, reward, terrain_mask};
-pub use self::movement_damage::{Bystander, Hitter, finish, movement_damage_due, reach, struck};
+pub use self::movement_damage::{
+    Bystander, HitEnd, Hitter, finish, movement_damage_due, reach, struck,
+};
 use crate::combat::attack::ATTACK;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;

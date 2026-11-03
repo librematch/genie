@@ -109,6 +109,16 @@ impl World {
     }
 }
 
+/// Whether a technology's change of an object ran ([`World::change_object`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum ObjectChange {
+    /// Its type's slot ran.
+    Ran,
+    /// The world lacks the object.
+    NotHeld,
+}
+
 /// The objects of a tracker's list, its queued units' places (−1) left out.
 fn tracked_ids(list: &[Option<ObjectId>]) -> Vec<ObjectId> {
     list.iter().copied().flatten().collect()
@@ -118,16 +128,16 @@ impl World {
     /// `FUN_14165bae0` and the objects' slots 0x78, 0x80, 0x88 (by `change`) on object `id` of
     /// player `p`: nothing for an object the world lacks (or one with a master of its own,
     /// `FUN_141188bc0`, which the slice does not hold: none taken to have one); else its type's
-    /// slot, which reads its master's values before the master changes. Returns whether it ran.
+    /// slot, which reads its master's values before the master changes ([`ObjectChange::Ran`]).
     pub(crate) fn change_object(
         &mut self,
         id: ObjectId,
         change: Change,
         v: f32,
         attribute: MasterAttribute,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<ObjectChange, GenieError> {
         let Some((owner, u)) = self.object(id) else {
-            return Ok(false);
+            return Ok(ObjectChange::NotHeld);
         };
         let master = u.master(self.master_tables(), owner)?.clone();
         match master.kind {
@@ -137,7 +147,7 @@ impl World {
             MasterKind::COMBAT => self.change_combat(owner, id, &master, change, v, attribute)?,
             _ => self.change_static(owner, id, &master, change, v, attribute)?,
         }
-        Ok(true)
+        Ok(ObjectChange::Ran)
     }
 
     /// `FUN_141195a50`, `FUN_141196060`, `FUN_1411962e0`: the static object's slots. The hit

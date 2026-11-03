@@ -66,9 +66,11 @@ pub(crate) use self::hits::{Hit, strike};
 pub use self::ready_to_attack::AtOnce;
 #[cfg(test)]
 use self::ready_to_attack::in_range;
+#[cfg(test)]
+use self::sprites::SpriteReset;
+pub(crate) use self::sprites::{Aim, face_target, reset_sprite, show_arrived, volleys};
 use self::sprites::{NO_OBJECT_STREAM, set_attack_timer};
 pub use self::sprites::{SwingSprites, swing_sprites};
-pub(crate) use self::sprites::{face_target, reset_sprite, show_arrived, volleys};
 pub(crate) use self::unit::run_down_attack_timers;
 use self::update::squared_reach;
 use self::walks::move_reads;

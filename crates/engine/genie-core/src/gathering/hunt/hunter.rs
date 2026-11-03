@@ -8,6 +8,7 @@ use crate::combat::victims::readable;
 use crate::gathering::DropSiteId;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
+use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{DropOff, Dropped, PointWalk, PointWalker};
 use crate::map::Distance;
 use crate::movement::move_to::MoveTo;
@@ -168,7 +169,7 @@ impl Unit {
                     Some(Distance::new(c.w.model.tuning.turn.tree_search_within)),
                     None,
                     roles,
-                )? => {}
+                )? == TreeSearch::Found => {}
             Some(_) => self.hunt_strike(actions, c, me, own, tree_lost, roles)?,
             None => {}
         }

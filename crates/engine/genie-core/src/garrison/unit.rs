@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::combat::Firepower;
 use crate::garrison::ContainerId;
+use crate::garrison::EnterOutcome;
 use crate::garrison::EnterSlot;
 use crate::garrison::EnterState;
 use crate::garrison::{
@@ -194,7 +195,7 @@ impl Unit {
             OthersRef::of(&c.w.players, &c.w.index, c.player)?,
             target.id(),
         );
-        if !self.enter_building(actions, c, target, inside, roles)? {
+        if self.enter_building(actions, c, target, inside, roles)? == EnterOutcome::NoRoom {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
             ));
@@ -263,24 +264,23 @@ impl Unit {
         )
     }
 
-    /// The enter (`FUN_140a867b0`) into `target`, one of the unit's player's buildings: a
-    /// building that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load
-    /// first (the resource for kinds 15 to 17 is food, 0 to 3 and 56 their own, others none:
-    /// [`give_load`]; the unit carries nothing after, `FUN_14119d310` with −1). A building at no
-    /// more than a fifth of its master's hit points (in floats) and a master with a transform
-    /// task (0x88) on the building's are not modelled. Then slot 0x1a0 (`FUN_141212e10` ->
-    /// `FUN_141084b30` -> `FUN_1411921d0`): with room in the building, the unit's sight goes from
-    /// its tile (slot 0x1d8), it leaves its tile's list (`FUN_140f5f560`), the obstruction
-    /// manager (`FUN_141055b40`) and the mesh (`+0x660`, `FUN_141053840`), a member of a unit
-    /// group leaves it (`FUN_14102c160`, the caller's) and stands
-    /// (slot 0x560), and it joins the
-    /// building's (slot 0x1c0, `FUN_1411cb850` -> `FUN_14118c890`: `+0x2f0`, at the building's
-    /// x and y); its records leave the registry's lists (`FUN_14128a1d0` from its mask to 0);
-    /// the building's sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell
-    /// flag follows the garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter
-    /// action value and `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`)
-    /// and villager count (`+0xba8`) follow from the units inside; the sound, the tracker and
-    /// a Gaia building's capture (slot 0x70) are not held.
+    /// The enter (`FUN_140a867b0`) into `target`, one of the unit's player's buildings: a building
+    /// that takes what the unit carries (`FUN_140fdd190`, as a drop site) takes its load first (the
+    /// resource for kinds 15 to 17 is food, 0 to 3 and 56 their own, others none: [`give_load`];
+    /// the unit carries nothing after, `FUN_14119d310` with −1). A building at no more than a fifth
+    /// of its master's hit points (in floats) and a master with a transform task (0x88) on the
+    /// building's are not modelled. Then slot 0x1a0 (`FUN_141212e10` -> `FUN_141084b30` ->
+    /// `FUN_1411921d0`): with room in the building, the unit's sight goes from its tile (slot
+    /// 0x1d8), it leaves its tile's list (`FUN_140f5f560`), the obstruction manager
+    /// (`FUN_141055b40`) and the mesh (`+0x660`, `FUN_141053840`), a member of a unit group leaves
+    /// it (`FUN_14102c160`, the caller's) and stands (slot 0x560), and it joins the building's
+    /// (slot 0x1c0, `FUN_1411cb850` -> `FUN_14118c890`: `+0x2f0`, at the building's x and y); its
+    /// records leave the registry's lists (`FUN_14128a1d0` from its mask to 0); the building's
+    /// sight takes a circle of 5 (slot 0x1d0 with 5) and the villager's town-bell flag follows the
+    /// garrison (`FUN_1412067f0` with 3). Then notify 0x1fa with the enter action value and
+    /// `set_state(1)` ([`Unit::entered`]). The building's firepower (`+0xa00`) and villager count
+    /// (`+0xba8`) follow from the units inside; the sound, the tracker and a Gaia building's
+    /// capture (slot 0x70) are not held. [`EnterOutcome::NoRoom`] without room in the building.
     pub(crate) fn enter_building(
         &mut self,
         actions: &mut Action,
@@ -288,7 +288,7 @@ impl Unit {
         target: ContainerId,
         inside: usize,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<EnterOutcome, GenieError> {
         let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
@@ -378,7 +378,7 @@ impl Unit {
             ));
         }
         if bm.garrison.units() <= inside {
-            return Ok(false);
+            return Ok(EnterOutcome::NoRoom);
         }
         self.go_inside(actions, c, target, &me, &bm, roles)?;
         self.post_own(
@@ -387,7 +387,7 @@ impl Unit {
             [AiAction::Enter.value(), 0, 0],
         )?;
         self.entered(actions, c)?;
-        Ok(true)
+        Ok(EnterOutcome::Inside)
     }
 
     /// The unit's slot 0x1a0 into building `target` (`FUN_141212e10`; the room test, slot 0x198,

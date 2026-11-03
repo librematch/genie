@@ -17,6 +17,7 @@
 use crate::GenieError;
 use crate::map::Position;
 use crate::map::Tile;
+use crate::objects::ListFate;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -56,6 +57,16 @@ pub struct Watched {
     pub cell: Cell,
     /// The bits last seen (`+0x10`).
     pub bits: VisionBits,
+}
+
+/// Whether a player's watched list took an object ([`World::watch`], `FUN_141090430`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum GhostWatch {
+    /// The list holds it now.
+    Watched,
+    /// An object of another owner, or one the list holds already.
+    Refused,
 }
 
 /// What a ghost's link (`FUN_14108f9b0`) reads of its original.
@@ -161,17 +172,17 @@ impl World {
     }
 
     /// `FUN_141090430`: player `owner`'s watched list takes object `id` at tile (`x`, `y`) (an
-    /// object of another owner, or one it holds already, is refused). The entry keeps the tile's
-    /// bits; it follows the tile, or for an object of type 50 and up with its footprint's UMV
-    /// entry (`+0x904`) its own visibility mask (`+0x8f8`).
+    /// object of another owner, or one it holds already, is refused: [`GhostWatch::Refused`]). The
+    /// entry keeps the tile's bits; it follows the tile, or for an object of type 50 and up with
+    /// its footprint's UMV entry (`+0x904`) its own visibility mask (`+0x8f8`).
     pub(crate) fn watch(
         &mut self,
         owner: PlayerId,
         id: ObjectId,
         at: Tile,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GhostWatch, GenieError> {
         let Some((p, u)) = self.object(id) else {
-            return Ok(false);
+            return Ok(GhostWatch::Refused);
         };
         if p != owner
             || self
@@ -181,12 +192,12 @@ impl World {
                 .iter()
                 .any(|w| w.id == id)
         {
-            return Ok(false);
+            return Ok(GhostWatch::Refused);
         }
         // the game takes the tile's word without a bounds test: every caller passes the
         // object's own tile, which is on the map
         let Some(tile) = self.tile_index(at) else {
-            return Ok(false);
+            return Ok(GhostWatch::Refused);
         };
         let bits = self.tile_bits(at)?;
         let kind = u.master(self.master_tables(), p)?.kind;
@@ -205,7 +216,7 @@ impl World {
             .player_mut(owner)?
             .watched
             .push(Watched { id, cell, bits });
-        Ok(true)
+        Ok(GhostWatch::Watched)
     }
 
     /// The tile (`(int)x`, `(int)y`) of a place, as the game's callers truncate it.
@@ -494,8 +505,7 @@ impl World {
     pub(crate) fn update_ghosts(&mut self, p: PlayerId) -> Result<(), GenieError> {
         let mut k = 0;
         while k < self.players.player(p)?.ghosts.len() {
-            let leaves = self.update_ghost(p, k)?;
-            if leaves {
+            if self.update_ghost(p, k)? == ListFate::Leaves {
                 let g = self.players.player_mut(p)?.ghosts.swap_remove(k);
                 if g.original_master.is_some_and(|m| {
                     self.model
@@ -609,15 +619,15 @@ impl World {
         Ok((seen, destroy))
     }
 
-    fn update_ghost(&mut self, p: PlayerId, k: usize) -> Result<bool, GenieError> {
+    fn update_ghost(&mut self, p: PlayerId, k: usize) -> Result<ListFate, GenieError> {
         let g = *self.players.player(p)?.ghosts.checked(k)?;
         let leaves = match g.state {
             ObjectState::Removed => {
                 self.players.player_mut(p)?.ghosts.checked_mut(k)?.state = ObjectState::Gone;
-                false
+                ListFate::Stays
             }
-            ObjectState::Gone => true,
-            _ => false,
+            ObjectState::Gone => ListFate::Leaves,
+            _ => ListFate::Stays,
         };
         if g.seen && g.state < ObjectState::Dying {
             self.destroy_ghost(p, k)?;
@@ -847,7 +857,7 @@ mod tests {
         set_tile(&mut t, 2, 1, 0x0000_0002_0000_0002 | (1 << 30));
         assert_eq!(
             t.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
-            Ok(true)
+            Ok(GhostWatch::Watched)
         );
         assert_eq!(
             t.players[1].watched,
@@ -860,17 +870,17 @@ mod tests {
         // a second watch and another owner's object are refused
         assert_eq!(
             t.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
-            Ok(false)
+            Ok(GhostWatch::Refused)
         );
         assert_eq!(
             t.watch(PlayerId::new(1), object_id(5), Tile::new(1, 2)),
-            Ok(false)
+            Ok(GhostWatch::Refused)
         );
         // the mine (type 30) follows its tile
         set_tile(&mut t, 1, 2, 0x0000_0001_0000_0000);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
-            Ok(true)
+            Ok(GhostWatch::Watched)
         );
         assert_eq!(
             t.players[0].watched,
@@ -1268,7 +1278,7 @@ mod tests {
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0007);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
-            Ok(true)
+            Ok(GhostWatch::Watched)
         );
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
         t.watch_pass(PlayerId::new(0)).unwrap();
@@ -1284,7 +1294,7 @@ mod tests {
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0005);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
-            Ok(true)
+            Ok(GhostWatch::Watched)
         );
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0001);
         assert!(t.watch_pass(PlayerId::new(0)).is_err());
@@ -1294,7 +1304,7 @@ mod tests {
         set_tile(&mut t, 1, 2, 0x0000_0007_0000_0007);
         assert_eq!(
             t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
-            Ok(true)
+            Ok(GhostWatch::Watched)
         );
         t.players[0].objects.clear();
         t.reindex();

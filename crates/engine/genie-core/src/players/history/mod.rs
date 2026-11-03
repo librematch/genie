@@ -67,6 +67,16 @@ pub enum EventKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Unnamed(u8);
 
+/// Whether the new battle stayed in the history ([`History::mark_new_battle`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum BattleMark {
+    /// It stayed (an older battle went, or there were at most three).
+    Kept,
+    /// It went: no older battle lay below it.
+    NewDropped,
+}
+
 impl EventKind {
     /// The value of raw `value`: its variant, else `Other`.
     const fn of_raw(value: u8) -> Self {
@@ -261,20 +271,20 @@ impl History {
     /// becomes 1. With more than three battles, the one among the three newest (the new one
     /// first) whose `data2` lies furthest below the new one's goes (`COMISS` with `JBE`: a NaN
     /// never qualifies, the first of equal gaps wins); with none below it the new battle goes
-    /// instead. True unless the new battle went.
-    pub fn mark_new_battle(&mut self) -> bool {
+    /// instead ([`BattleMark::NewDropped`]; else [`BattleMark::Kept`]).
+    pub fn mark_new_battle(&mut self) -> BattleMark {
         let battles = self
             .events
             .iter()
             .filter(|e| e.kind == EventKind::Battle)
             .count();
         let Some(new) = self.events.first_mut() else {
-            return true;
+            return BattleMark::Kept;
         };
         new.data3 = 1.0;
         let new = new.data2;
         if battles <= BATTLES_KEPT {
-            return true;
+            return BattleMark::Kept;
         }
         let mut seen = 0;
         let mut widest = 0.0f32;
@@ -297,10 +307,10 @@ impl History {
         }
         if let Some(i) = furthest {
             let _ = self.events.remove(i);
-            true
+            BattleMark::Kept
         } else {
             let _ = self.events.remove(0);
-            false
+            BattleMark::NewDropped
         }
     }
 
@@ -688,7 +698,7 @@ mod tests {
         assert_eq!(h.events[0].kind, EventKind::FeudalAge);
         // a NaN gap never qualifies
         h.events.insert(0, battle(f32::NAN));
-        assert!(!h.mark_new_battle());
+        assert_eq!(h.mark_new_battle(), BattleMark::NewDropped);
         assert_eq!(h.events.len(), 4);
     }
 

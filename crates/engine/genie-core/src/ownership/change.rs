@@ -2,6 +2,7 @@
 //! foundation, annexes and garrison, and the attributes and storage it moves.
 
 use crate::GenieError;
+use crate::garrison::LetOut;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
@@ -450,13 +451,14 @@ impl World {
             let Some(Place::Live(_, bi)) = self.place(id) else {
                 break;
             };
-            if !self.let_out(
+            if self.let_out(
                 owner,
                 bi,
                 g,
                 Point::from([HANDOVER_NO_POINT; 2]),
                 (None, true),
-            )? {
+            )? == LetOut::Stayed
+            {
                 stayed.push(g);
             }
         }

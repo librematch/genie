@@ -1,6 +1,7 @@
 //! Leading own livestock to its drop site (state 10), facing an animal and the decay check.
 
 use crate::GenieError;
+use crate::combat::attack::Aim;
 use crate::combat::attack::Fight;
 use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
@@ -68,7 +69,7 @@ impl HuntAction {
         now: WorldTime,
     ) -> Result<(), GenieError> {
         let mover = mover.ok_or(HUNTER_UNMOVING)?;
-        if !face_target(mover, at, to, now)? {
+        if face_target(mover, at, to, now)? == Aim::Turning {
             return Err(GenieError::unsupported(
                 "a hunter that turns over time to face its target",
             ));

@@ -13,6 +13,7 @@ use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::DecayRule;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
+use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -183,7 +184,7 @@ impl Unit {
                 None,
                 Some(Distance::new(c.w.model.tuning.hunt.tree_near)),
                 roles,
-            )?
+            )? == TreeSearch::Found
         {
             return Ok(());
         }

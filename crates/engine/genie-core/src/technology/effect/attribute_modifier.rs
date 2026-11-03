@@ -26,6 +26,7 @@ use crate::objects::masters::follow_moving;
 use crate::objects::masters::player_master;
 use crate::objects::sprite::{ActiveSprite, Graphic, new_sprite};
 use crate::players::PlayerId;
+use crate::technology::effect::object_slots::ObjectChange;
 use crate::technology::effect::{CAPPED, Change, OBJECT_GONE, has_actions, within_table};
 use crate::world::World;
 use crate::world::index::Place;
@@ -279,7 +280,7 @@ impl World {
         };
         let (done, pending) = self.tracked_class(p, class)?;
         for id in done {
-            if !self.change_object(id, change, v, attribute)? {
+            if self.change_object(id, change, v, attribute)? == ObjectChange::NotHeld {
                 continue;
             }
             let annexes = match self.object(id) {

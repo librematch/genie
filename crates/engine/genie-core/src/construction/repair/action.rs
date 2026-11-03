@@ -2,6 +2,7 @@
 //! wait, the work, a new target, a move and the halt.
 
 use crate::GenieError;
+use crate::combat::attack::Aim;
 use crate::combat::attack::face_target;
 use crate::combat::damage::ArmorPair;
 use crate::construction::repair::RepairOutcome;
@@ -260,7 +261,7 @@ impl RepairAction {
                 .ok_or(GenieError::unreachable(
                     "a repairer without movement state (an action object always has one)",
                 ))?;
-        if face_target(mover, at, t.position, c.w.world_time)? {
+        if face_target(mover, at, t.position, c.w.world_time)? == Aim::Faces {
             self.set_state(c, repairer, RepairState::Work, reads, roles)?;
         }
         Ok(())

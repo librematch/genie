@@ -2,6 +2,7 @@
 //! repairer's player.
 
 use crate::GenieError;
+use crate::combat::damage::Heal;
 use crate::combat::damage::heal_hp;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::ONE;
@@ -221,12 +222,12 @@ pub fn repair_unit(
             return Ok(RepairOutcome::Unpaid);
         }
     }
-    let full = heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount);
-    Ok(if full {
-        RepairOutcome::Full
-    } else {
-        RepairOutcome::Healed
-    })
+    Ok(
+        match heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount) {
+            Heal::Full => RepairOutcome::Full,
+            Heal::Partial => RepairOutcome::Healed,
+        },
+    )
 }
 
 /// A repairer's player's attributes as its repair pays from them

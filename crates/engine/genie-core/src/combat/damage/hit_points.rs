@@ -106,23 +106,33 @@ pub fn gain_hp(
     powerup.taken = up;
 }
 
+/// Whether a heal left its object at its full hit points ([`heal_hp`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum Heal {
+    /// It holds exactly its master's hit points.
+    Full,
+    /// It holds fewer.
+    Partial,
+}
+
 /// `FUN_141193b30`: slot 0xb8 adds `amount` ([`gain_hp`]); a loss (`amount` below 0) leaves at
 /// least 1 hit point; healed to its full hit points (slot 0xc0 at least slot 200, `COMISS` with
-/// `JC`: a NaN is not), it holds exactly its master's. True then.
+/// `JC`: a NaN is not), it holds exactly its master's ([`Heal::Full`], else [`Heal::Partial`]).
 pub fn heal_hp(
     hp: &mut HitPoints,
     powerup: &mut HpPowerup,
     master_hp: MasterHitPoints,
     amount: HitPoints,
-) -> bool {
+) -> Heal {
     gain_hp(hp, powerup, master_hp, amount);
     if amount < HitPoints::ZERO && *hp < HitPoints::new(1.0) {
         *hp = HitPoints::new(1.0);
     }
     let most = HitPoints::of_master(master_hp) + powerup.max;
     if below_or_unordered((powerup.room() + *hp).get(), most.get()) {
-        return false;
+        return Heal::Partial;
     }
     *hp = HitPoints::of_master(master_hp);
-    true
+    Heal::Full
 }

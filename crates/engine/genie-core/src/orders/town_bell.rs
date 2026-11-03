@@ -8,6 +8,7 @@ use crate::commands::Bell;
 use crate::garrison::ContainerId;
 use crate::garrison::ShelterReach;
 use crate::garrison::Shelters;
+use crate::garrison::WorkReturn;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
@@ -131,7 +132,7 @@ impl TownBell {
     /// `FUN_141206a20`: with the flag clear, the unit's present work replaces the first record
     /// when any of its fields differs. The first record moves to the second when the new work is
     /// building (`0x25a`) and the old was not; any other new work clears the second (its ids −1,
-    /// its point (−1, −1)). The new record ([`BackToWork`]) is the caller's: its target, target
+    /// its point (−1, −1)). The new record ([`WorkReturn`]) is the caller's: its target, target
     /// class, the unit AI's action, the second target and the point.
     pub fn record(&mut self, now: BackToWork) {
         if self.flag.is_sheltered() || now == self.work {
@@ -517,22 +518,22 @@ impl World {
     /// no object to work on, slot 0x340 (`FUN_141216c50`, [`crate::world::World::move_aside`]) to
     /// the point on the ground, range 0, forced, not walking; else slot 0x7e8 on the object at
     /// the point with the carried-resource test, any task, `+0xa14` 0. Then it is no longer under
-    /// the town bell (`+0xa14` takes 1, not held). True when it went.
+    /// the town bell (`+0xa14` takes 1, not held). [`WorkReturn::Went`] when it went.
     pub(crate) fn back_outside(
         &mut self,
         id: ObjectId,
         work_on: Option<ObjectId>,
         point: Point,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<WorkReturn, GenieError> {
         let Some(Place::Live(up, ui)) = self.place(id) else {
-            return Ok(false);
+            return Ok(WorkReturn::Stayed);
         };
         if !self.parts.town_bell_of(id).flag.is_sheltered() {
-            return Ok(false);
+            return Ok(WorkReturn::Stayed);
         }
         let (x, y) = (point.x(), point.y());
         if x == NO_POINT || y == NO_POINT {
-            return Ok(false);
+            return Ok(WorkReturn::Stayed);
         }
         match work_on {
             None => self.move_aside(
@@ -560,7 +561,7 @@ impl World {
         if self.object(id).is_some() {
             self.parts.set_town_bell_flag(id, BellShelter::Free);
         }
-        Ok(true)
+        Ok(WorkReturn::Went)
     }
 
     /// `FUN_1412067f0` before slot 0x7e8's work command, for a villager or master 1808 and a

@@ -3036,7 +3036,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
                 &mut rng(),
                 &mut With::new(&mut side, &mut fx)
             ),
-            Ok(true)
+            Ok(MiscEnd::Ends)
         );
         assert_eq!(
             (u.defend_target, u.current_target, u.current_order),
@@ -3060,7 +3060,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     );
     assert_eq!(u.defend_target, Some(object_id(20)));
     // on the attack action only the unset point takes the ward's place
@@ -3081,7 +3081,7 @@ fn defend_order_ends_with_its_ward_gone_foreign_or_dead() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     );
     assert_eq!(
         (u.target_point, fx),
@@ -3108,7 +3108,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(MiscEnd::Ends)
     );
     assert_eq!(
         fx,
@@ -3137,7 +3137,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(MiscEnd::Ends)
     );
     assert_eq!(side.attacks, vec![object_id(40)]);
     // a point to defend, beyond reach: the forced run to it
@@ -3153,7 +3153,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
             &mut rng(),
             &mut With::new(&mut DamageSide::default(), &mut fx)
         ),
-        Ok(true)
+        Ok(MiscEnd::Ends)
     );
     assert_eq!(
         fx,
@@ -3176,7 +3176,7 @@ fn defend_order_follows_its_ward_and_attacks_its_attackers() {
             &mut rng(),
             &mut With::new(&mut DamageSide::default(), &mut Vec::new())
         ),
-        Ok(false)
+        Ok(MiscEnd::GoesOn)
     );
 }
 
@@ -4351,7 +4351,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
             &mut r,
             &mut With::new(&mut finds_nothing(), &mut fx)
         ),
-        Ok(false)
+        Ok(RetargetCheck::NotDue)
     );
     assert_eq!(
         fx,
@@ -6988,7 +6988,7 @@ fn the_follow_order_moves_to_target_that_left_its_point() {
     let deer = Position::new(114.75516, 40.34795, 0.0);
     let (mut u, at) = follower(deer, true);
     let mut fx = Vec::new();
-    assert!(u.follow(&at, &mut fx, &mut rng()).unwrap());
+    assert_eq!(u.follow(&at, &mut fx, &mut rng()).unwrap(), MiscEnd::Ends);
     assert_eq!(
         fx,
         vec![Effect::MoveToObject {
@@ -7009,7 +7009,7 @@ fn the_follow_order_moves_to_target_that_left_its_point() {
     // less than a tile off on both axes it stays
     let (mut u, at) = follower(Position::new(115.0, 40.2, 0.0), true);
     let mut fx = Vec::new();
-    assert!(!u.follow(&at, &mut fx, &mut rng()).unwrap());
+    assert_eq!(u.follow(&at, &mut fx, &mut rng()).unwrap(), MiscEnd::GoesOn);
     assert_eq!(fx, Vec::<Effect>::new());
     assert_eq!(u.target_point, Position::new(115.6998, 39.299_213, 0.0));
 }
@@ -7018,7 +7018,7 @@ fn the_follow_order_moves_to_target_that_left_its_point() {
 fn the_follow_order_ends_on_target_out_of_sight() {
     let (mut u, at) = follower(Position::new(114.75516, 40.34795, 0.0), false);
     let mut fx = Vec::new();
-    assert!(u.follow(&at, &mut fx, &mut rng()).unwrap());
+    assert_eq!(u.follow(&at, &mut fx, &mut rng()).unwrap(), MiscEnd::Ends);
     assert_eq!(fx, vec![Effect::Stop]);
     assert_eq!(
         (u.current_order, u.current_action, u.current_target),
@@ -7923,9 +7923,15 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
     };
     let mut fx = Vec::new();
     // 1.4 off, 0.9 off its footprint: within a tile
-    assert!(!u.walk_back(&at(11.4), &mut fx, &mut rng()).unwrap());
+    assert_eq!(
+        u.walk_back(&at(11.4), &mut fx, &mut rng()).unwrap(),
+        WalkBack::Stays
+    );
     assert_eq!((fx.len(), u.current_action), (0, Some(AiAction::Attack)));
-    assert!(u.walk_back(&at(11.6), &mut fx, &mut rng()).unwrap());
+    assert_eq!(
+        u.walk_back(&at(11.6), &mut fx, &mut rng()).unwrap(),
+        WalkBack::Walks
+    );
     assert_eq!(
         fx,
         vec![Effect::Move(AiMove {
@@ -7944,9 +7950,10 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
         state_position: Point::new(f32::NAN, 10.0),
         ..idle(UnitAiKind::SOLDIER)
     };
-    assert!(
+    assert_eq!(
         lost.walk_back(&at(10.0), &mut Vec::new(), &mut rng())
-            .unwrap()
+            .unwrap(),
+        WalkBack::Walks
     );
 }
 
@@ -12203,7 +12210,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
             &mut rng(),
             &mut With::new(&mut finds_nothing(), &mut fx)
         ),
-        Ok(false)
+        Ok(RetargetCheck::NotDue)
     );
     assert_eq!(fx[0], Effect::Stop);
     assert_eq!(
@@ -12372,14 +12379,17 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
     // stand ground within 0.5: no leash, on to the retarget check (the timer runs out)
     let mut u = unit(UnitStance::StandGround);
     let (r, fx) = run(&mut u, &at(10.0));
-    assert_eq!((r, fx), (Ok(true), vec![]));
+    assert_eq!((r, fx), (Ok(RetargetCheck::Due), vec![]));
     assert_eq!(u.last_retarget_time, WorldTime::from_millis(1000));
     // beyond it: stop, the target forgotten, the patrol walked on (10)
     let mut u = unit(UnitStance::StandGround);
     let (r, fx) = run(&mut u, &at(11.0));
     assert_eq!(
         (r, fx),
-        (Ok(false), vec![Effect::Stop, Effect::RestorePatrol])
+        (
+            Ok(RetargetCheck::NotDue),
+            vec![Effect::Stop, Effect::RestorePatrol]
+        )
     );
     assert_eq!(
         (u.current_target, u.current_order, u.secondary_timer),
@@ -12388,14 +12398,17 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
     // the defend stance within 5 ends slot 73 before the retarget check (9)
     let mut u = unit(UnitStance::Defensive);
     let (r, fx) = run(&mut u, &at(11.0));
-    assert_eq!((r, fx), (Ok(false), vec![]));
+    assert_eq!((r, fx), (Ok(RetargetCheck::NotDue), vec![]));
     assert_eq!(u.last_retarget_time, WorldTime::ZERO);
     // beyond 5 it walks the patrol on
     let mut u = unit(UnitStance::Defensive);
     let (r, fx) = run(&mut u, &at(16.0));
     assert_eq!(
         (r, fx),
-        (Ok(false), vec![Effect::Stop, Effect::RestorePatrol])
+        (
+            Ok(RetargetCheck::NotDue),
+            vec![Effect::Stop, Effect::RestorePatrol]
+        )
     );
 }
 

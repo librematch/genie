@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
+use crate::gathering::hunt::TreeSearch;
 use crate::gathering::hunt::{NO_HUNT, Quarry};
 use crate::map::Distance;
 use crate::map::Position;
@@ -29,15 +30,15 @@ use std::cmp::Ordering;
 
 impl Unit {
     /// The hunt's search for another target (`FUN_140ac4670`) when the class its unit AI targets
-    /// (else the hunt's) is one the AI's slot 0x1b0 gives 0 (the civilian's `FUN_140c1c4f0`:
-    /// trees, 15): with `within` (its first argument above 0; 8 when the target went on the walk
-    /// to it) only a hunt within it of its point searches (the 3D distance, its components summed
-    /// x, height, y); the unit AI's `ClosestResourceObject` with gather group 0, the hunt's second
+    /// (else the hunt's) is one the AI's slot 0x1b0 gives 0 (the civilian's `FUN_140c1c4f0`: trees,
+    /// 15): with `within` (its first argument above 0; 8 when the target went on the walk to it)
+    /// only a hunt within it of its point searches (the 3D distance, its components summed x,
+    /// height, y); the unit AI's `ClosestResourceObject` with gather group 0, the hunt's second
     /// target as the drop site, at most 2 workers ([`Unit::resource_search_from`]) names the next
     /// tree; with `near` (its second argument above 0; 5 when the Attack's `MoveTo` failed) a tree
-    /// farther than it from the unit (the same 3D distance) does not count. The hunt takes it
-    /// (slot 0x48: [`crate::gathering::hunt::HuntAction::retarget`], the new target taken). True when it
-    /// found one.
+    /// farther than it from the unit (the same 3D distance) does not count. The hunt takes it (slot
+    /// 0x48: [`crate::gathering::hunt::HuntAction::retarget`], the new target taken).
+    /// [`TreeSearch::Found`] when it found one.
     pub(crate) fn hunt_tree_search(
         &mut self,
         actions: &mut Action,
@@ -45,7 +46,7 @@ impl Unit {
         within: Option<Distance>,
         near: Option<Distance>,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<TreeSearch, GenieError> {
         // NaN compares false as the game's `comiss` does
         let beyond = |a: Position, b: Position, limit: Distance| {
             let (dx, dz, dy) = (a.x() - b.x(), a.z() - b.z(), a.y() - b.y());
@@ -56,7 +57,7 @@ impl Unit {
         if let Some(within) = within
             && beyond(hunt.point, self.position(), within)
         {
-            return Ok(false);
+            return Ok(TreeSearch::NoneFound);
         }
         let site = hunt.carry_to;
         let Some(found) = self.resource_search_from(
@@ -67,7 +68,7 @@ impl Unit {
             site,
         )?
         else {
-            return Ok(false);
+            return Ok(TreeSearch::NoneFound);
         };
         let (tp, t) = OthersRef::of(&c.w.players, &c.w.index, c.player)?
             .find(found)
@@ -81,7 +82,7 @@ impl Unit {
                 self.position().y() - t.position().y(),
             );
             if near.get() < sqrt(dx * dx + dz * dz + dy * dy) {
-                return Ok(false);
+                return Ok(TreeSearch::NoneFound);
             }
         }
         let target_master = t.master(c.w.master_tables(), tp)?;
@@ -180,6 +181,6 @@ impl Unit {
             let by = self.releaser(c)?;
             take(c, self, found, by, roles)?;
         }
-        Ok(true)
+        Ok(TreeSearch::Found)
     }
 }

@@ -6,6 +6,7 @@ use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
 use crate::gathering::closest_resource::herded;
 use crate::gathering::hunt::HuntChase;
+use crate::gathering::hunt::HuntEnd;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HuntTask, NO_HUNT, Quarry, stand_sprite};
 use crate::map::Distance;
@@ -236,7 +237,7 @@ impl Unit {
                 .hunt_back_to_target(actions, c, roles)
                 .map(|()| HeadCode::Keeps);
         }
-        if self.hunt_drop_orders(c)? {
+        if self.hunt_drop_orders(c)? == HuntEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
         let (found, kind) = self.hunt_next_search(actions, c, roles)?;
@@ -359,8 +360,8 @@ impl Unit {
     /// target is gone (the world does not hold it, or its sight sees it past state 5) leave
     /// (`FUN_140c5de60`); with orders left the AI's order and action clear (`FUN_140c64b60`,
     /// `FUN_140c64b50`) and the hunt ends (`set_state(1)`; its update returns 1, whose deletion
-    /// lets the drop site go): its unit AI runs the queued order. True when it ends.
-    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<bool, GenieError> {
+    /// lets the drop site go): its unit AI runs the queued order ([`HuntEnd::Ends`]).
+    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<HuntEnd, GenieError> {
         let ai =
             c.w.parts
                 .unit_ai
@@ -386,10 +387,10 @@ impl Unit {
             ) && gone(o.target))
         });
         if ai.orders.is_empty() {
-            return Ok(false);
+            return Ok(HuntEnd::GoesOn);
         }
         ai.end_order_and_action()?;
-        Ok(true)
+        Ok(HuntEnd::Ends)
     }
 
     /// The search after the drop by the target class (the AI's target's, else the hunt's

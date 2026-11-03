@@ -471,7 +471,7 @@ fn hit_below_1_hit_point_leaves_0_and_holds_nothing() {
         capacity: CarryCapacity::of_data(100),
         ..Victim::default()
     };
-    assert!(finish(&mut v));
+    assert_eq!(finish(&mut v), HitEnd::Killed);
     assert_eq!((v.hp, v.amount), (HitPoints::ZERO, Amount::ZERO));
     // a capacity below 0 is taken as it is
     let mut v = Victim {
@@ -480,20 +480,20 @@ fn hit_below_1_hit_point_leaves_0_and_holds_nothing() {
         capacity: CarryCapacity::of_data(-1),
         ..Victim::default()
     };
-    assert!(finish(&mut v));
+    assert_eq!(finish(&mut v), HitEnd::Killed);
     assert_eq!((v.hp, v.amount), (HitPoints::ZERO, Amount::new(-1.0)));
     let mut v = Victim {
         hp: HitPoints::new(1.0),
         amount: Amount::new(30.0),
         ..Victim::default()
     };
-    assert!(!finish(&mut v));
+    assert_eq!(finish(&mut v), HitEnd::Survived);
     assert_eq!(v.amount, Amount::new(30.0));
     let mut v = Victim {
         hp: HitPoints::new(f32::NAN),
         ..Victim::default()
     };
-    assert!(!finish(&mut v));
+    assert_eq!(finish(&mut v), HitEnd::Survived);
 }
 
 #[test]

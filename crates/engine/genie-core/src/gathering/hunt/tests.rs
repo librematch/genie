@@ -655,7 +655,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     let mut tree = victim(100.0);
     assert_eq!(
         hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
-        Ok(false)
+        Ok(HuntGather::GoesOn)
     );
     let w = (1.0f32 * 0.39) * 0.02;
     assert_eq!(
@@ -667,7 +667,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     let mut tree = victim(50.0);
     assert_eq!(
         hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
-        Ok(true)
+        Ok(HuntGather::DropOff)
     );
     assert_eq!(unit.life.amount, Amount::new(10.0));
     // a tree's last bit goes with a thousandth of its master's storage, the empty target
@@ -676,7 +676,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     let mut tree = victim(0.05);
     assert_eq!(
         hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
-        Ok(true)
+        Ok(HuntGather::DropOff)
     );
     assert_eq!(
         (unit.life.amount, tree.amount),

@@ -31,6 +31,16 @@ use crate::world::others::OthersRef;
 use crate::world::parts::Part;
 use crate::world::step::Step;
 
+/// Whether a unit changed hands ([`Unit::change_owner`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum OwnerChange {
+    /// The new owner has its master: the unit is theirs.
+    Changed,
+    /// The new owner lacks its master: the unit stays its owner's.
+    Kept,
+}
+
 impl Unit {
     /// `FUN_140aab570`: player `new` takes the animal over. Its stop (slot 0x148,
     /// `FUN_14108c050` -> `FUN_14106fa60`): its Artifact action's slot 0x38 (the unit AI of a
@@ -51,7 +61,7 @@ impl Unit {
     ) -> Result<(bool, Vec<ObjectId>), GenieError> {
         let class = self.placed_class(c)?;
         self.capture_stop(actions, c, class, roles)?;
-        let changed = self.change_owner(actions, c, new, roles)?;
+        let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
         // the scan reads the owner after the change: the old one when `new` lacks the master
         let mut taken = Vec::new();
         // The livestock class (`-0xe72` raw).
@@ -167,7 +177,7 @@ impl Unit {
         c: &mut Step<'_>,
         roles: &Roles,
     ) -> Result<(), GenieError> {
-        let changed = self.change_owner(actions, c, new, roles)?;
+        let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
         if changed || c.building_handover {
             c.taken_over = Some((new, changed));
         }
@@ -199,25 +209,29 @@ impl Unit {
     }
 
     /// The ownership change (slot 0x70, [`change_hands`]) of the unit, from its owner to `new`:
-    /// false when `new` has not its master. A building's (`FUN_1411cd860`) is the caller's after
-    /// the update, whole ([`Captured::building`], [`crate::world::World::building_changes_hands`]),
-    /// whether or not `new` has its master.
+    /// [`OwnerChange::Kept`] when `new` has not its master. A building's (`FUN_1411cd860`) is the
+    /// caller's after the update, whole ([`Captured::building`],
+    /// [`crate::world::World::building_changes_hands`]), whether or not `new` has its master.
     pub(crate) fn change_owner(
         &mut self,
         actions: &mut Action,
         c: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<OwnerChange, GenieError> {
         let master = self.master(c.w.master_tables(), c.player);
         if master.is_ok_and(|m| m.kind == MasterKind::BUILDING) {
             c.building_handover = true;
-            return Ok(c
-                .w
-                .model
-                .masters
-                .get(new.index())
-                .is_some_and(|m| m.get(self.life.master_id).is_some()));
+            let has =
+                c.w.model
+                    .masters
+                    .get(new.index())
+                    .is_some_and(|m| m.get(self.life.master_id).is_some());
+            return Ok(if has {
+                OwnerChange::Changed
+            } else {
+                OwnerChange::Kept
+            });
         }
         let held = c.w.parts.dead_master.get(self.id);
         let tables = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
@@ -233,13 +247,13 @@ impl Unit {
             c.w.model.tuning.visibility,
         )?;
         let Some(own) = changed else {
-            return Ok(false);
+            return Ok(OwnerChange::Kept);
         };
         c.w.set_part(self.id, Part::OwnMaster(own))?;
         if let Some(d) = dead {
             c.w.set_part(self.id, Part::DeadMaster(Box::new(d)))?;
         }
-        Ok(true)
+        Ok(OwnerChange::Changed)
     }
 }
 
@@ -342,7 +356,7 @@ fn take_livestock(
     let position = unit.position();
     c.w.parts.put_actions(id, actions);
     let _ = c.w.put_back_own(c.player, unit)?;
-    Ok(done?.then_some(position))
+    Ok((done? == OwnerChange::Changed).then_some(position))
 }
 
 /// What a takeover in an object's update did ([`Outcome::Captured`]): player `new` took the object

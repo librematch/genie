@@ -34,6 +34,7 @@ Units go into buildings and transports, and come out again. This folder holds bo
 | [`let_out.rs`](let_out.rs) | A unit's leave of the building or the transport it is inside (`FUN_1411e7220`), or its place on the map. |
 | [`meeting.rs`](meeting.rs) | Where an Enter meets its target (`FUN_140a85f30`): the landing tile, the walled-off test, the meeting point and the reach. |
 | [`mod.rs`](mod.rs) | Units inside other objects: the garrison order, the Enter action, the unloads and the Transport action. |
+| [`outcomes.rs`](outcomes.rs) | What a unit's way out of a building (`LetOut`), its way in (`EnterOutcome`) and its way back to work after the town bell (`WorkReturn`) answer. |
 | [`raider_countdown.rs`](raider_countdown.rs) | A combat object's raider countdown. |
 | [`scope.rs`](scope.rs) | Which shelters a garrison takes (`GarrisonScope`) and how far a unit goes to one (`ShelterReach`). |
 | [`shelter.rs`](shelter.rs) | The garrison order and `SEEK_SHELTER`: each unit to a building that takes it in, nearest first (`Shelters`). |

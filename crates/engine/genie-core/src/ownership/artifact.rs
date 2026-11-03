@@ -26,6 +26,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
+use crate::ownership::capture::OwnerChange;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::world::Millis;
@@ -635,7 +636,8 @@ impl Unit {
             Some(Handover::ToGaia) => {
                 let class = self.placed_class(c)?;
                 self.capture_stop(actions, c, class, roles)?;
-                let main = self.change_owner(actions, c, PlayerId::GAIA, roles)?;
+                let main =
+                    self.change_owner(actions, c, PlayerId::GAIA, roles)? == OwnerChange::Changed;
                 let building = take(&mut c.building_handover);
                 Ok((main || building).then(|| Captured {
                     new: PlayerId::new(0),

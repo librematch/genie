@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::construction::MainBuildingId;
 use crate::garrison::ContainerId;
+use crate::garrison::EnterOutcome;
 use crate::garrison::EnterState;
 use crate::garrison::meeting::Meeting;
 use crate::garrison::{
@@ -588,7 +589,7 @@ impl World {
         };
         let roles = self.model.roles.clone();
         self.run_on_step(player, idx, |unit, actions, c| {
-            if !unit.enter_building(actions, c, target, inside, &roles)? {
+            if unit.enter_building(actions, c, target, inside, &roles)? == EnterOutcome::NoRoom {
                 return Err(GenieError::unsupported(
                     "an Enter in reach that did not get in",
                 ));

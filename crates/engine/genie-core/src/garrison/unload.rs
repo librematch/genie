@@ -3,7 +3,9 @@
 use crate::GenieError;
 use crate::commands::unload::{UnloadCommand, UnloadPick};
 use crate::garrison::ContainerId;
+use crate::garrison::LetOut;
 use crate::garrison::SIEGE_UNLOAD;
+use crate::garrison::WorkReturn;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
@@ -409,14 +411,14 @@ impl World {
     /// unit then leaves it toward the record's point with the object to work on
     /// ([`World::let_out`], `FUN_1411e7220` with its sound); outside it goes back
     /// ([`World::back_outside`]). Once out or back it is no longer under the town bell
-    /// (`+0x9dc`; `+0xa14` takes 1, not held). True when it went.
+    /// (`+0x9dc`; `+0xa14` takes 1, not held). [`WorkReturn::Went`] when it went.
     ///
     /// [`TownBell::back_to_work`]: crate::orders::town_bell::TownBell::back_to_work
     pub(crate) fn back_to_work(
         &mut self,
         from: Option<(PlayerId, ListIndex)>,
         id: ObjectId,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<WorkReturn, GenieError> {
         use crate::orders::town_bell::RecordTarget;
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
@@ -424,7 +426,7 @@ impl World {
                 Some(Place::Live(p, i)) => (p, i),
                 // the callers pass an object of type 70 or more the world holds, which never
                 // sleeps
-                _ => return Ok(false),
+                _ => return Ok(WorkReturn::Stayed),
             },
         };
         let mut bell = self.parts.town_bell_of(id);
@@ -462,11 +464,16 @@ impl World {
         let Some((p, building)) = from else {
             return self.back_outside(id, found.map(|f| f.id), record.point);
         };
-        let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?;
+        let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?
+            == LetOut::Out;
         if out && self.object(id).is_some() {
             self.parts.set_town_bell_flag(id, BellShelter::Free);
         }
-        Ok(out)
+        Ok(if out {
+            WorkReturn::Went
+        } else {
+            WorkReturn::Stayed
+        })
     }
 
     /// `FUN_14118a610`: whether UNLOAD's `pick` takes `unit` of player `player`, by its
