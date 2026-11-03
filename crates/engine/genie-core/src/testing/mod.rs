@@ -2,6 +2,7 @@
 //! fixture states it (FD-046-D08), so a test needs no Nickel, and the classes, masters and
 //! player attributes the tests name.
 
+pub mod ai;
 pub mod attribute;
 pub mod build_158041;
 pub mod class;

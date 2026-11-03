@@ -39,6 +39,7 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Animated, Static};
 use crate::objects::lifecycle::Lifecycle;
@@ -142,12 +143,15 @@ pub struct Thing {
     pub flags: UnitFlags,
     /// The object it is inside.
     pub inside: Option<ContainerId>,
+    /// Its action layer, none for an empty one.
+    pub actions: Option<Action>,
 }
 
 impl Thing {
     /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points,
-    /// outside the sight registry, not a foundation, without a unit AI or flags, on the map.
-    /// A moving master's object stands with its movement state ([`Mover`]) at its place.
+    /// outside the sight registry, not a foundation, without a unit AI, flags or actions, on
+    /// the map. A moving master's object stands with its movement state ([`Mover`]) at its
+    /// place.
     ///
     /// # Panics
     ///
@@ -166,6 +170,7 @@ impl Thing {
             ai: None,
             flags: UnitFlags::empty(),
             inside: None,
+            actions: None,
         }
     }
 }
@@ -595,6 +600,7 @@ fn place_thing(w: &mut World, thing: Thing) {
         ref ai,
         flags,
         inside,
+        ref actions,
     } = thing;
     let unit = Unit {
         id,
@@ -619,6 +625,9 @@ fn place_thing(w: &mut World, thing: Thing) {
     }
     if let Some(ai) = ai {
         object = Object::with_ai(object, ai.clone());
+    }
+    if let Some(layer) = actions {
+        object = Object::with_actions(object, layer.clone());
     }
     let _ = w
         .push_live(player, object)

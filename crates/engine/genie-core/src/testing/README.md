@@ -11,6 +11,7 @@ the two equal. The module exists in test builds only.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`ai.rs`](ai.rs) | A scene's unit AI run on its unit (FD-043-D47): the unit's update holds it, and its AI is lent out with the real side (`crate::unit_ai::world_view::UnitView`) as the game's update lends them (`Unit::run_ai`). |
 | [`attribute.rs`](attribute.rs) | The player attributes genie-core's tests name: build 158041's numbers, as the tests' players hold them, by the names the engine's constants had (FD-046-D48: the engine reads them from the build layer's slots and roles). |
 | [`build_158041.rs`](build_158041.rs) | Build 158041's layer as genie's tests build it (FD-046-D08): the values of `builds/158041.ncl`, each float by its bits, without Nickel. |
 | [`class.rs`](class.rs) | The classes genie-core's tests name: build 158041's `.dat` values, as the tests' masters carry them. |

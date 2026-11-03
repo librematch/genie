@@ -9,16 +9,21 @@ use crate::gathering::gather::GATHER;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::RestrictionId;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
+use crate::movement::move_to::{MoveTo, MoveToAction};
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
+use crate::objects::MasterHitPoints;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
+use crate::objects::actions::ActionList;
+use crate::objects::layers::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::AttackPriority;
@@ -49,10 +54,13 @@ use crate::test_ids::object_id;
 use crate::test_ids::order_kind;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
+use crate::testing::ai::run_ai;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::WONDER;
 use crate::testing::roles;
+use crate::testing::scene::Thing as SceneThing;
+use crate::testing::scene::{Scene, walking};
 use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
@@ -677,104 +685,109 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
     assert_eq!(side.searches, [(FISHING_CARED.to_vec(), 14.0)]);
 }
 
-/// A unit sent off a footprint: what [`UnitSide::off_footprint`] answers.
-struct OffSide(OffFootprint, Vec<(ObjectId, Footprint)>);
-
-impl UnitSide for OffSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn off_footprint(
-        &mut self,
-        site: FoundationId,
-        radius: Footprint,
-    ) -> Result<OffFootprint, GenieError> {
-        self.1.push((site.id(), radius));
-        Ok(self.0)
+/// A villager of player 1: a walking civilian of radius 0.2 on land.
+fn villager_master() -> Master {
+    Master {
+        id: ids::VILLAGER_MALE,
+        kind: MasterKind::COMBAT,
+        class: class::VILLAGER,
+        radius: Footprint::new(0.2, 0.2),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(25),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(0.8))),
+        ..Master::default()
     }
 }
 
-/// Notify 0x216 (`FUN_14123bb20`'s, the base handler's case): the radii come back from the
-/// hundredths, the unit walks to the spot (action 0x2bf, the old one the last); a human
-/// villager whose action has a target queues the foundation's order in front and that work
-/// behind, the points the vectors' x and height.
+/// A house (master 70) of radius 1 and a tree (master 349, Gaia's).
+fn house_and_tree() -> (Master, Master) {
+    let house = Master {
+        id: ids::HOUSE,
+        kind: MasterKind::BUILDING,
+        class: class::BUILDING,
+        radius: Footprint::new(1.0, 1.0),
+        height: Distance::new(2.0),
+        hit_points: MasterHitPoints::of_data(550),
+        ..Master::default()
+    };
+    let tree = Master {
+        id: master_id(349),
+        kind: MasterKind::TREE,
+        class: class::TREE,
+        radius: Footprint::new(0.5, 0.5),
+        height: Distance::new(2.0),
+        ..Master::default()
+    };
+    (house, tree)
+}
+
+/// Notify 0x216 (`FUN_14123bb20`'s, the base handler's case) on a villager standing on house
+/// 10028's foundation (at (30, 90); the notify's radii, from the hundredths, 1 and 1.5) on its
+/// way to tree 600: its spot is the nearest empty tile off the footprint, (28.5, 89.5), and it
+/// walks there (action 0x2bf, the old one the last); a human villager whose action has a
+/// target queues the foundation's order in front and that work behind, the points the
+/// vectors' x and height.
 #[test]
 fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
-    let site = Named {
-        id: object_id(10028),
-        master: master_id(70),
-        owner: player_id(1),
-        vector: Point::new(30.0, 2.0),
+    let (house, tree) = house_and_tree();
+    let to_tree = MoveToAction {
+        target: Some(object_id(600)),
+        point: Position::new(33.5, 95.5, 0.0),
+        ..MoveToAction::sub_in(MoveTo::Moving)
     };
-    let tree = Named {
-        id: object_id(600),
-        master: master_id(349),
-        owner: player_id(0),
-        vector: Point::new(33.5, 2.0),
+    let villager = SceneThing {
+        ai: Some(UnitAi {
+            ai_kind: UnitAiKind::Civilian,
+            current_action: Some(AiAction::Gather),
+            orders: vec![QueuedOrder {
+                order: OrderKind::Move,
+                ..QueuedOrder::default()
+            }],
+            ..UnitAi::default()
+        }),
+        actions: Some(Action {
+            list: ActionList::default().with_move_to(Some(to_tree)),
+            ..Action::default()
+        }),
+        ..SceneThing::new(
+            9175,
+            player_id(1),
+            villager_master(),
+            Position::new(29.6, 89.6, 0.0),
+        )
     };
-    let off = OffFootprint {
-        spot: Some(Point::new(29.5, 89.5)),
-        z: 2.0,
-        class: class::VILLAGER,
-        player_kind: PlayerKind::Human,
-        player: player_id(1),
-        site: Some(site),
-        action_target: Some(tree),
-    };
-    let mut ai = UnitAi {
-        current_action: Some(AiAction::Gather),
-        orders: vec![QueuedOrder {
-            order: OrderKind::Move,
-            ..QueuedOrder::default()
-        }],
-        ..UnitAi::default()
-    };
-    let mut side = OffSide(off, Vec::new());
-    let mut fx = Vec::new();
+    let mut w = Scene::open(GridSize::new(120, 120))
+        .thing(villager)
+        .thing(SceneThing {
+            desolid: true,
+            state: ObjectState::Foundation,
+            ..SceneThing::new(10028, player_id(1), house, Position::new(30.0, 90.0, 0.0))
+        })
+        .thing(SceneThing::new(
+            600,
+            player_id(0),
+            tree,
+            Position::new(33.5, 95.5, 0.0),
+        ))
+        .build();
     let n = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
-    assert_eq!(
-        ai.sent_off(
-            n,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng(),
-            &roles(),
-            &tuning().unit_ai
-        ),
-        Ok(GO_ON)
+    let answer = run_ai(
+        &mut w,
+        (player_id(1), object_id(9175)),
+        |ai, _, side, _, rng| ai.sent_off(n, side, rng, &roles(), &tuning().unit_ai),
     );
-    assert_eq!(side.1, vec![(object_id(10028), Footprint::new(1.0, 1.5))]);
-    assert_eq!(
-        fx,
-        vec![Effect::Command(AiCommand::MoveAside(AiMove {
-            point: Position::new(29.5, 89.5, 2.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Walk,
-        }))]
-    );
+    assert_eq!(answer, Ok(GO_ON));
+    let me = object_id(9175);
+    let walk = w
+        .parts
+        .actions
+        .of(me)
+        .list
+        .move_to()
+        .map(|m| (m.point, m.target));
+    assert_eq!(walk, Some((Position::new(28.5, 89.5, 0.0), None)));
+    let ai = w.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::MoveAside), Some(AiAction::Gather))
@@ -790,7 +803,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             (
                 OrderKind::Foundation,
                 Some(object_id(10028)),
-                Position::new(30.0, 2.0, 0.0),
+                Position::new(30.0, 0.0, 0.0),
                 100,
                 true
             ),
@@ -798,7 +811,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             (
                 OrderKind::OnTarget,
                 Some(object_id(600)),
-                Position::new(33.5, 2.0, 0.0),
+                Position::new(33.5, 0.0, 0.0),
                 100,
                 true
             ),
@@ -807,9 +820,10 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
 }
 
 /// 426049848's deer 14054 (Gaia's, unit-AI type 2, no actions) in update 685: a town centre's
-/// foundation sent it off its footprint (0x216). Its move off (slot 0x148 forced: the unit's
-/// slot 0x340) gives it its `MoveTo` at once, so the full update's later check (slot 0x430)
-/// sees it busy and the action value 0x2bf stays.
+/// foundation (here at (164.5, 49), the notify's radii 2) sent it off its footprint (0x216).
+/// Its move off (slot 0x148 forced: the unit's slot 0x340) to the nearest tile off the
+/// footprint gives it its `MoveTo` at once, so the full update's later check (slot 0x430) sees
+/// it busy and the action value 0x2bf stays.
 #[test]
 fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
     let mut u = idle(UnitAiKind::Hunted);
@@ -818,46 +832,59 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         ObjectState::Alive,
     )
     .unwrap();
-    let off = OffFootprint {
-        spot: Some(Point::new(164.5, 51.5)),
-        z: 0.0,
+    let deer = Master {
+        id: master_id(65),
+        kind: MasterKind::COMBAT,
         class: class::PREY,
-        player_kind: PlayerKind::Human,
-        player: player_id(0),
-        site: None,
-        action_target: None,
+        radius: Footprint::new(0.2, 0.2),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(5),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(1.0))),
+        ..Master::default()
     };
-    let mut side = OffSide(off, Vec::new());
-    let at = Surroundings {
-        position: Position::new(164.5, 50.5, 0.0),
-        state: ObjectState::Alive,
-        class: Some(class::PREY),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let town_centre = Master {
+        id: ids::TOWN_CENTRE,
+        radius: Footprint::new(2.0, 2.0),
+        ..house_and_tree().0
     };
-    let fx = u
-        .update_fx(
-            Millis::new(50),
-            WorldTime::from_millis(22643),
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(
-        fx,
-        vec![Effect::Command(AiCommand::MoveAside(AiMove {
-            point: Position::new(164.5, 51.5, 0.0),
-            range: Distance::ZERO,
-            force: OrderForce::Forced,
-            pace: Pace::Run,
-        }))]
+    let mut w = Scene::open(GridSize::new(200, 100))
+        .thing(SceneThing {
+            ai: Some(u),
+            ..SceneThing::new(14054, player_id(0), deer, Position::new(164.5, 50.5, 0.0))
+        })
+        .thing(SceneThing {
+            desolid: true,
+            state: ObjectState::Foundation,
+            ..SceneThing::new(
+                14100,
+                player_id(1),
+                town_centre,
+                Position::new(164.5, 49.0, 0.0),
+            )
+        })
+        .build();
+    let after = run_ai(
+        &mut w,
+        (player_id(0), object_id(14054)),
+        |ai, at, side, kind, rng| {
+            ai.update(
+                Millis::new(50),
+                WorldTime::from_millis(22643),
+                kind,
+                at,
+                rng,
+                side,
+            )
+        },
     );
+    assert_eq!(after, Ok(None));
+    let me = object_id(14054);
+    let walk = w.parts.actions.of(me).list.move_to().map(|m| m.point);
+    assert_eq!(walk, Some(Position::new(164.5, 51.5, 0.0)));
+    let ai = w.parts.unit_ai.get(me).unwrap();
     assert_eq!(
-        (u.current_action, u.last_action),
+        (ai.current_action, ai.last_action),
         (Some(AiAction::MoveAside), None)
     );
 }
