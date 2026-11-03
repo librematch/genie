@@ -94,7 +94,6 @@ impl UnitView<'_, '_> {
         let (class_id, sight, flags) = (own.class, own.line_of_sight, own.object_flags);
         let id = self.unit.id;
         let unit = SearchUnit {
-            id,
             position: self.unit.position().ground(),
             civilian: roles.of_class(class_id).contains(ClassRoles::VILLAGER),
         };

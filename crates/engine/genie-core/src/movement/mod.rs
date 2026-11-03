@@ -60,6 +60,7 @@ pub use self::path_state::PathState;
 pub use self::waypoint_index::WaypointIndex;
 mod request;
 mod request_plans;
+pub(crate) mod scout_area;
 pub use self::acceleration::Acceleration;
 pub use self::speed::Speed;
 pub use genie_model::movement::TurnRate;

@@ -21,8 +21,7 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{cos, sin};
 use crate::math::image::facing::QUARTER_PI;
 use crate::math::rng::Well512;
-use crate::movement::explore::Area;
-use crate::objects::ObjectId;
+use crate::movement::scout_area::ScoutArea;
 use crate::players::ai_module::InfoModule;
 
 /// A path map's byte of a tile no search has touched (-1).
@@ -37,17 +36,9 @@ pub const DEAD_END: u8 = 2;
 /// A tile in the map that the path map does not hold (the game reads what follows it).
 const OFF_THE_GRID: GenieError = GenieError::unreachable("a tile the AI's path map does not hold");
 
-/// What the search asks of the world beyond [`Area`].
-pub trait SearchArea: Area {
-    /// The player sees the tile now (`FUN_141285350` gives 0xf).
-    fn visible_now(&self, tile: Tile) -> bool;
-}
-
 /// What the search reads of the explorer.
 #[derive(Clone, Copy, Debug)]
 pub struct SearchUnit {
-    /// Its id.
-    pub id: ObjectId,
     /// Its place on the ground.
     pub position: Point,
     /// Its master's class is the civilian's (4).
@@ -138,17 +129,17 @@ impl InfoModule {
     }
 
     /// `FUN_140b71990` for `unit`, starting at `start`: the tile its pick goes to, None when the
-    /// flood reaches no tile that counts ([`SearchArea`]: `map` is the map's size, `rng` the
+    /// flood reaches no tile that counts ([`ScoutArea`]: `map` is the map's size, `rng` the
     /// unsynced stream).
     ///
     /// # Errors
     ///
     /// A tile of the map that the path map does not hold, or what the area's reads do not model.
-    pub fn closest_unexplored_tile(
+    pub(crate) fn closest_unexplored_tile(
         &mut self,
         unit: &SearchUnit,
         start: Point,
-        area: &mut dyn SearchArea,
+        area: &mut ScoutArea<'_>,
         (map, rng): (GridSize, &mut Well512),
     ) -> Result<Option<Tile>, GenieError> {
         let own = area.own_zone().byte();
@@ -172,7 +163,7 @@ impl InfoModule {
         unit: &SearchUnit,
         start: Point,
         own: u8,
-        area: &mut dyn SearchArea,
+        area: &mut ScoutArea<'_>,
         (map, rng): (GridSize, &mut Well512),
     ) -> Result<Flood, GenieError> {
         let (first, _) = self.clamp(start.tile());
@@ -240,7 +231,7 @@ impl InfoModule {
     fn mark_dead_ends(
         &mut self,
         own: u8,
-        area: &mut dyn SearchArea,
+        area: &ScoutArea<'_>,
         map: GridSize,
     ) -> Result<(), GenieError> {
         for y in 0..map.height() {

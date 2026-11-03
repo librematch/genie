@@ -18,6 +18,7 @@ use crate::movement::Me;
 use crate::movement::Mover;
 use crate::movement::move_to::{GiveUp, MoveDefaults, MoveToReads, Patience, SpriteReads};
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
+use crate::movement::scout_area::ScoutArea;
 use crate::objects::SpriteId;
 use crate::objects::UpdateCode;
 use crate::objects::masters::ActionKind;
@@ -49,7 +50,6 @@ use crate::objects::Graphics;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
 use crate::objects::sprite::new_sprite;
-use crate::pathing::zones::ZoneId;
 use crate::unit_ai::NotifyKind;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -374,24 +374,6 @@ const AROUND: [TileOffset; 8] = TileOffset::table([
     [-1, 0],
 ]);
 
-/// What the search asks of a tile of the map's grid.
-pub trait Area {
-    /// The player saw the tile or sees it (`FUN_141285350` not 0).
-    fn explored(&self, tile: Tile) -> Result<bool, GenieError>;
-    /// The tile's zone for the unit's restriction (`FUN_1411958c0`), and the unit's own
-    /// (`FUN_14118eea0`).
-    fn zone(&mut self, tile: Tile) -> ZoneId;
-    /// The unit's own zone (`FUN_14118eea0`).
-    fn own_zone(&mut self) -> ZoneId;
-    /// The unit could stand at the point (slot 0x278, [`crate::map::spatial::Spatial::point_clear`]).
-    fn clear(&mut self, tile: Tile) -> Result<bool, GenieError>;
-    /// The unit reaches the point within its line of sight less a tile (slot 0x3d8,
-    /// [`crate::movement::Mover::reaches`]).
-    fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError>;
-    /// The gap from the unit's footprint to the point (`FUN_14118faf0`).
-    fn distance(&self, tile: Tile) -> f32;
-}
-
 /// `FUN_140c65490`: the closest point the unit may explore around its player's first town centre
 /// (`FUN_1416597e0`, its tile `tc`), None without a town centre or a point. The points lie 10,
 /// 15 and 20 tiles from the centre's tile in eight directions each; a point counts when it is on
@@ -400,10 +382,10 @@ pub trait Area {
 /// strictly closer one, wins. The player's explored-points grid (`player+0x1370`, which the
 /// search would read instead of the explored tiles and mark the point found in) is never made
 /// in the slice: the base notify makes it only when no point is found, which it does not model.
-pub fn unexplored_area(
+pub(crate) fn unexplored_area(
     tc: Option<Tile>,
     map: GridSize,
-    area: &mut dyn Area,
+    area: &mut ScoutArea<'_>,
 ) -> Result<Option<Tile>, GenieError> {
     let Some(tc) = tc else {
         return Ok(None);
@@ -459,8 +441,8 @@ pub struct Seeker {
 /// (`d < best + draw % 3`). The best then counts only when the unit reaches it (slot 0x3d8 within
 /// its line of sight less a tile). The waypoint queue the search passes by (`+0xd8`, count
 /// `+0x158`, not saved) is empty in the slice.
-pub fn closest_undiscovered(
-    area: &mut dyn Area,
+pub(crate) fn closest_undiscovered(
+    area: &mut ScoutArea<'_>,
     seeker: Seeker,
     map: GridSize,
     ai: &mut Well512,
@@ -513,21 +495,21 @@ pub fn closest_undiscovered(
 /// How far past its line of sight the auto scout's last search draws its square, in tiles.
 const SQUARE_PAST_SIGHT: i32 = 2;
 
-/// `FUN_140c4b130`, the auto scout's last search when neither the search around the town centre
-/// nor the closest undiscovered tile found a point (the base handler's case 0x202 on the auto
-/// scout order): the edge of a square about the unit's tile (`at`), its line of sight and 2 more
-/// tiles out, side by side (top from its left corner, right, bottom and left from the next
-/// corner on, the tiles off the map left out; `map`), in an order `std::shuffle` draws from the AI
-/// stream (`ai`): the first tile the player never saw, in the unit's zone, where it could stand
-/// (slot 0x278) and that it reaches (slot 0x3d8 within its line of sight less a tile) wins.
-/// Else a flood from the unit's tile through the tiles the player saw (left, right, up and down,
-/// on the map, each once; the start tile is not marked and comes again) stops at the first
-/// unseen tile it meets that counts as above; unseen tiles that do not count end their branch.
-/// None when the flood runs out. With the player's scout map (`player+0x1370`) both read it
-/// instead of the seen tiles (a tile scouted is 1; [`Area::explored`] answers by it) and the point
-/// found is marked in it (the caller's).
-pub fn beyond_sight(
-    area: &mut dyn Area,
+/// `FUN_140c4b130`, the auto scout's last search when neither the search around the town centre nor
+/// the closest undiscovered tile found a point (the base handler's case 0x202 on the auto scout
+/// order): the edge of a square about the unit's tile (`at`), its line of sight and 2 more tiles
+/// out, side by side (top from its left corner, right, bottom and left from the next corner on, the
+/// tiles off the map left out; `map`), in an order `std::shuffle` draws from the AI stream (`ai`):
+/// the first tile the player never saw, in the unit's zone, where it could stand (slot 0x278) and
+/// that it reaches (slot 0x3d8 within its line of sight less a tile) wins. Else a flood from the
+/// unit's tile through the tiles the player saw (left, right, up and down, on the map, each once;
+/// the start tile is not marked and comes again) stops at the first unseen tile it meets that
+/// counts as above; unseen tiles that do not count end their branch. None when the flood runs out.
+/// With the player's scout map (`player+0x1370`) both read it instead of the seen tiles (a tile
+/// scouted is 1; [`ScoutArea::explored`] answers by it) and the point found is marked in it (the
+/// caller's).
+pub(crate) fn beyond_sight(
+    area: &mut ScoutArea<'_>,
     at: Position,
     line_of_sight: Distance,
     map: GridSize,
@@ -554,7 +536,7 @@ pub fn beyond_sight(
         edge.extend((y0 + 1..=y1).filter(|&y| on_y(y)).map(|y| Tile::new(x0, y)));
     }
     ai.shuffle(&mut edge);
-    let counts = |area: &mut dyn Area, tile: Tile| -> Result<bool, GenieError> {
+    let counts = |area: &mut ScoutArea<'_>, tile: Tile| -> Result<bool, GenieError> {
         Ok(area.zone(tile) == own && area.clear(tile)? && area.reaches(tile)?)
     };
     for &t in &edge {
@@ -729,8 +711,7 @@ pub(crate) fn bare_walk() -> ExploreMove<'static> {
 mod tests {
     use super::*;
     use crate::map::Footprint;
-    #[cfg(test)]
-    use crate::math::fmath::sqrt;
+    use crate::map::spatial::TileSight;
     use crate::movement::Speed;
     #[cfg(test)]
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait, TargetMoved};
@@ -742,8 +723,11 @@ mod tests {
     use crate::objects::sprite::Graphic;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
+    use crate::pathing::zones::ZoneId;
+    use crate::testing::scene::{Scene, scout_area};
     use crate::testing::tuning;
     use crate::world::Seconds;
+    use crate::world::World;
 
     const WALKING: Graphic = Graphic {
         id: SpriteId::named(7),
@@ -884,224 +868,211 @@ mod tests {
         assert_eq!(b.state, ExploreState::Walk { move_to: None });
     }
 
-    /// An area where every point but the unexplored ones counts, at its distance from (20, 92).
-    struct Open {
-        explored: Vec<[i32; 2]>,
-        unreachable: Vec<[i32; 2]>,
-    }
-
-    impl Area for Open {
-        fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
-            Ok(self.explored.contains(&tile.get()))
-        }
-        fn zone(&mut self, _: Tile) -> ZoneId {
-            ZoneId::new(1)
-        }
-        fn own_zone(&mut self) -> ZoneId {
-            ZoneId::new(1)
-        }
-        fn clear(&mut self, _: Tile) -> Result<bool, GenieError> {
-            Ok(true)
-        }
-        fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
-            Ok(!self.unreachable.contains(&tile.get()))
-        }
-        fn distance(&self, tile: Tile) -> f32 {
-            let (dx, dy) = ((tile.x() - 20) as f32, (tile.y() - 92) as f32);
-            sqrt(dx * dx + dy * dy)
-        }
-    }
-
     fn rng() -> Well512 {
         let mut r = Well512::default();
         r.set_seed(7);
         r
     }
 
+    /// MarvinBlue/426048731's scout near its town centre: at (20.5, 92.5) on a map of 120 by
+    /// 120 tiles of land, line of sight `sight`, on `scene`'s tiles (the scene's size is
+    /// replaced).
+    fn scouting(scene: Scene, sight: f32) -> World {
+        scene
+            .scout(Position::new(20.5, 92.5, 0.0), Distance::new(sight))
+            .build()
+    }
+
+    /// 120 by 120 tiles of land, [`PLAYER`] seeing `sight` of each.
+    fn map(sight: TileSight) -> Scene {
+        Scene::open(GridSize::new(120, 120)).sight(sight)
+    }
+
+    /// A closed ring of rocks about the tiles from `low` to `high` (each corner inside), which no
+    /// path crosses.
+    fn walled(scene: Scene, low: Tile, high: Tile) -> Scene {
+        let (x0, y0, x1, y1) = (low.x() - 1, low.y() - 1, high.x() + 1, high.y() + 1);
+        let ring = (x0..=x1)
+            .flat_map(|x| [Tile::new(x, y0), Tile::new(x, y1)])
+            .chain((y0 + 1..y1).flat_map(|y| [Tile::new(x0, y), Tile::new(x1, y)]));
+        scene.rocks(ring)
+    }
+
+    fn tiles(list: &[[i32; 2]]) -> Vec<Tile> {
+        list.iter().map(|&[x, y]| Tile::new(x, y)).collect()
+    }
+
     /// The last search's square: line of sight 2 makes it 4 tiles out. With every edge tile but
-    /// one seen, that one wins whatever the shuffle; with the edge all seen, the flood walks the
-    /// seen tiles to the first unseen one it meets.
+    /// one explored, that one wins whatever the shuffle; with the square all explored, the flood
+    /// walks the explored tiles to the first unexplored one it meets.
     #[test]
     fn the_last_search_takes_the_square_then_floods_the_seen_tiles() {
-        let square: Vec<[i32; 2]> = (16..=24)
-            .flat_map(|x| (88..=96).map(move |y| [x, y]))
+        let square: Vec<Tile> = (16..=24)
+            .flat_map(|x| (88..=96).map(move |y| Tile::new(x, y)))
             .collect();
-        let mut area = Open {
-            explored: square.iter().copied().filter(|&p| p != [24, 90]).collect(),
-            unreachable: vec![],
-        };
+        let edge_but_one = square.iter().copied().filter(|&t| t != Tile::new(24, 90));
+        let mut w = scouting(
+            map(TileSight::Unknown).sight_on(edge_but_one, TileSight::Explored),
+            2.0,
+        );
+        let (mut area, map_size, _) = scout_area(&mut w);
         let found = beyond_sight(
             &mut area,
             Position::new(20.5, 92.5, 0.0),
             Distance::new(2.0),
-            GridSize::new(120, 120),
+            map_size,
             &mut rng(),
         );
         assert_eq!(found, Ok(Some(Tile::new(24, 90))));
-        // all of the square seen: the flood leaves it left first, at (15, 92)
-        let mut area = Open {
-            explored: square,
-            unreachable: vec![],
-        };
+        // all of the square explored: the flood leaves it left first, at (15, 92)
+        let mut w = scouting(
+            map(TileSight::Unknown).sight_on(square, TileSight::Explored),
+            2.0,
+        );
+        let (mut area, map_size, _) = scout_area(&mut w);
         let found = beyond_sight(
             &mut area,
             Position::new(20.5, 92.5, 0.0),
             Distance::new(2.0),
-            GridSize::new(120, 120),
+            map_size,
             &mut rng(),
         );
         assert_eq!(found, Ok(Some(Tile::new(15, 92))));
     }
 
+    /// MarvinBlue/426048731's first pick: the town centre at (29, 94), the scout at (20.5,
+    /// 92.5); the nearest ring point by the gap from the scout's footprint wins, an explored one
+    /// does not count, nor one walled in by rocks beyond the scout's reach (its line of sight 4
+    /// less a tile).
     #[test]
     fn the_closest_open_point_of_the_rings_wins() {
-        // MarvinBlue/426048731's first pick: the town centre at (29, 94), the scout near (21, 92)
-        let mut area = Open {
-            explored: vec![],
-            unreachable: vec![],
-        };
+        let tc = Some(Tile::new(29, 94));
+        let size = GridSize::new(120, 120);
+        let mut w = scouting(map(TileSight::Unknown), 4.0);
+        let (mut area, _, _) = scout_area(&mut w);
         assert_eq!(
-            unexplored_area(Some(Tile::new(29, 94)), GridSize::new(120, 120), &mut area),
+            unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(19, 94)))
         );
-        area.explored = vec![[19, 94], [19, 104]];
+        let explored = tiles(&[[19, 94], [19, 104]]);
+        let mut w = scouting(
+            map(TileSight::Unknown).sight_on(explored.clone(), TileSight::Explored),
+            4.0,
+        );
+        let (mut area, _, _) = scout_area(&mut w);
         assert_eq!(
-            unexplored_area(Some(Tile::new(29, 94)), GridSize::new(120, 120), &mut area),
+            unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(14, 94)))
         );
-        area.explored.push([14, 94]);
-        area.unreachable = vec![[19, 84]];
+        // (19, 84) walled in 4 tiles out: the reach of 3 cannot get to it
+        let scene = map(TileSight::Unknown)
+            .sight_on(explored, TileSight::Explored)
+            .sight_on([Tile::new(14, 94)], TileSight::Explored);
+        let mut w = scouting(walled(scene, Tile::new(15, 80), Tile::new(23, 88)), 4.0);
+        let (mut area, _, _) = scout_area(&mut w);
         assert_eq!(
-            unexplored_area(Some(Tile::new(29, 94)), GridSize::new(120, 120), &mut area),
+            unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(9, 94)))
         );
-        assert_eq!(
-            unexplored_area(None, GridSize::new(120, 120), &mut area),
-            Ok(None)
-        );
+        assert_eq!(unexplored_area(None, size, &mut area), Ok(None));
     }
 
-    /// [`Open`] with every tile in zone `zone`, the unit's own 1.
-    struct Zoned {
-        open: Open,
-        zone: u16,
+    /// A map 40 wide and 60 high: the labelling starts patches only in its 40 by 40 square, and
+    /// its fill (`FUN_141413190`, each row's `height` tiles from `row * width`) reaches the land
+    /// below the water row 39 up to (19, 40): that land keeps the unreached zone 512 there. A
+    /// pond's islet inside is numbered. The scout stands at (15.5, 35.5), line of sight 8, the
+    /// town centre at (15, 30); every tile is explored but `open`.
+    fn below_the_water(open: Tile) -> World {
+        let size = GridSize::new(40, 60);
+        let row = (0..40).map(|x| Tile::new(x, 39));
+        let pond = (22..=28)
+            .flat_map(|x| (27..=33).map(move |y| Tile::new(x, y)))
+            .filter(|t| t.x() == 22 || t.x() == 28 || t.y() == 27 || t.y() == 33);
+        Scene::open(size)
+            .water(row.chain(pond))
+            .sight(TileSight::Explored)
+            .sight_on([open], TileSight::Unknown)
+            .scout(Position::new(15.5, 35.5, 0.0), Distance::new(8.0))
+            .build()
     }
 
-    impl Area for Zoned {
-        fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
-            self.open.explored(tile)
-        }
-        fn zone(&mut self, _: Tile) -> ZoneId {
-            ZoneId::new(self.zone)
-        }
-        fn own_zone(&mut self) -> ZoneId {
-            ZoneId::new(1)
-        }
-        fn clear(&mut self, tile: Tile) -> Result<bool, GenieError> {
-            self.open.clear(tile)
-        }
-        fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
-            self.open.reaches(tile)
-        }
-        fn distance(&self, tile: Tile) -> f32 {
-            self.open.distance(tile)
-        }
-    }
-
+    /// The rings compare the zones' low bytes (`CMP byte ptr [RSP+0x48],AL` at 0x140c65812):
+    /// the point (15, 40) below the water, zone 512, counts as the scout's zone 0; the islet's
+    /// (25, 30) does not. The unit AI's search compares whole zones: (15, 40) does not count
+    /// there.
     #[test]
     fn the_rings_compare_the_zones_low_bytes() {
-        // CMP byte ptr [RSP+0x48],AL at 0x140c65812: zone 0x101 is the unit's zone 1
-        let open = || Open {
-            explored: vec![],
-            unreachable: vec![],
-        };
-        let mut area = Zoned {
-            open: open(),
-            zone: 0x101,
-        };
+        let tc = Some(Tile::new(15, 30));
+        let mut w = below_the_water(Tile::new(15, 40));
+        let (mut area, map_size, _) = scout_area(&mut w);
+        assert_eq!(area.own_zone(), ZoneId::new(0));
+        assert_eq!(area.zone(Tile::new(15, 40)), ZoneId::new(0x200));
+        assert_ne!(area.zone(Tile::new(25, 30)).byte(), 0);
         assert_eq!(
-            unexplored_area(Some(Tile::new(29, 94)), GridSize::new(120, 120), &mut area),
-            Ok(Some(Tile::new(19, 94)))
+            unexplored_area(tc, map_size, &mut area),
+            Ok(Some(Tile::new(15, 40)))
         );
-        let mut area = Zoned {
-            open: open(),
-            zone: 0x102,
-        };
-        assert_eq!(
-            unexplored_area(Some(Tile::new(29, 94)), GridSize::new(120, 120), &mut area),
-            Ok(None)
-        );
-    }
-
-    /// An area where only the listed tiles are unexplored.
-    struct Patch {
-        unexplored: Vec<[i32; 2]>,
-        unreachable: Vec<[i32; 2]>,
-    }
-
-    impl Area for Patch {
-        fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
-            Ok(!self.unexplored.contains(&tile.get()))
-        }
-        fn zone(&mut self, _: Tile) -> ZoneId {
-            ZoneId::new(1)
-        }
-        fn own_zone(&mut self) -> ZoneId {
-            ZoneId::new(1)
-        }
-        fn clear(&mut self, _: Tile) -> Result<bool, GenieError> {
-            Ok(true)
-        }
-        fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
-            Ok(!self.unreachable.contains(&tile.get()))
-        }
-        fn distance(&self, _: Tile) -> f32 {
-            0.0
-        }
-    }
-
-    #[test]
-    fn the_unit_ai_search_takes_the_nearest_unexplored_tile_it_reaches() {
         let seeker = Seeker {
-            at: Position::new(20.5, 92.5, 0.0),
-            line_of_sight: Distance::new(4.0),
+            at: Position::new(15.5, 35.5, 0.0),
+            line_of_sight: Distance::new(8.0),
             order: None,
             target_point: Point::new(NO_POINT, NO_POINT),
             player_kind: PlayerKind::Human,
         };
-        let seeded = || {
-            let mut r = Well512::default();
-            r.set_seed(7);
-            r
-        };
-        let mut area = Patch {
-            // within the line of sight and 3: 16 and 25 tiles squared away, and one beyond
-            unexplored: vec![[16, 92], [25, 92], [20, 97], [40, 92]],
-            unreachable: vec![],
-        };
-        let mut ai = seeded();
-        let found = closest_undiscovered(&mut area, seeker, GridSize::new(120, 120), &mut ai);
-        assert_eq!(found, Ok(Some(Tile::new(16, 92))));
-        // one draw of the AI stream
-        let mut once = seeded();
-        let _ = once.rand15();
-        assert_eq!(ai.rand15(), once.rand15());
-        // the best is the only one tested for reach
-        area.unreachable.push([16, 92]);
         assert_eq!(
-            closest_undiscovered(&mut area, seeker, GridSize::new(120, 120), &mut seeded()),
+            closest_undiscovered(&mut area, seeker, map_size, &mut rng()),
             Ok(None)
         );
-        // a computer player's unit searches nothing
+        let mut w = below_the_water(Tile::new(25, 30));
+        let (mut area, map_size, _) = scout_area(&mut w);
+        assert_eq!(unexplored_area(tc, map_size, &mut area), Ok(None));
+    }
+
+    /// The unit AI's search (`FUN_140c4bd40`) on MarvinBlue/426048731's scout (line of sight 2,
+    /// its square 5 tiles out): of the unexplored tiles in the square the nearest wins after
+    /// one draw of the AI stream; walled in, it is the only one tested for reach, and none wins;
+    /// a computer player's unit searches nothing and draws nothing.
+    #[test]
+    fn the_unit_ai_search_takes_the_nearest_unexplored_tile_it_reaches() {
+        let seeker = Seeker {
+            at: Position::new(20.5, 92.5, 0.0),
+            line_of_sight: Distance::new(2.0),
+            order: None,
+            target_point: Point::new(NO_POINT, NO_POINT),
+            player_kind: PlayerKind::Human,
+        };
+        // within the square: 16 and 25 tiles squared away, and one beyond
+        let unexplored = tiles(&[[16, 92], [25, 92], [20, 97], [40, 92]]);
+        let scene = map(TileSight::Explored).sight_on(unexplored, TileSight::Unknown);
+        let mut w = scouting(scene.clone(), 2.0);
+        let (mut area, size, _) = scout_area(&mut w);
+        let mut ai = rng();
+        let found = closest_undiscovered(&mut area, seeker, size, &mut ai);
+        assert_eq!(found, Ok(Some(Tile::new(16, 92))));
+        let mut once = rng();
+        let _ = once.rand15();
+        assert_eq!(ai.rand15(), once.rand15());
+        // (16, 92) walled in beyond the reach of 1
+        let mut w = scouting(
+            walled(scene.clone(), Tile::new(15, 91), Tile::new(16, 92)),
+            2.0,
+        );
+        let (mut area, size, _) = scout_area(&mut w);
+        assert_eq!(
+            closest_undiscovered(&mut area, seeker, size, &mut rng()),
+            Ok(None)
+        );
         let computer = Seeker {
             player_kind: PlayerKind::Computer,
             ..seeker
         };
-        let mut untouched = seeded();
+        let mut w = scouting(scene, 2.0);
+        let (mut area, size, _) = scout_area(&mut w);
+        let mut untouched = rng();
         assert_eq!(
-            closest_undiscovered(&mut area, computer, GridSize::new(120, 120), &mut untouched),
+            closest_undiscovered(&mut area, computer, size, &mut untouched),
             Ok(None)
         );
-        assert_eq!(untouched.rand15(), seeded().rand15());
+        assert_eq!(untouched.rand15(), rng().rand15());
     }
 }

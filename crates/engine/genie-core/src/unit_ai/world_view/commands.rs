@@ -4,25 +4,14 @@ use crate::GenieError;
 use crate::construction::repair::{REPAIR, repairers};
 use crate::garrison::EnterSlot;
 use crate::map::Distance;
-use crate::map::Footprint;
 use crate::map::GridSize;
-use crate::map::Position;
 use crate::map::Tile;
-use crate::map::spatial::Spatial;
-use crate::map::spatial::TileSight;
-use crate::math::fmath::sqrt;
-use crate::math::rng::Stream;
-use crate::movement::explore::Area;
-use crate::movement::{Me, Mover, Planning};
+use crate::movement::scout_area::ScoutArea;
 use crate::objects::ObjectId;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
-use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::Amount;
-use crate::players::PlayerId;
-use crate::players::ai_module::SearchArea;
 use crate::players::world_player::town_centres;
 use crate::unit_ai::Answer;
 use crate::unit_ai::task_finder::Actor;
@@ -31,7 +20,6 @@ use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, 
 use crate::unit_ai::world_view::owner_view;
 use crate::unit_ai::world_view::{EnterOrder, RepairOrder, UnitView};
 use crate::world::UNIT_AI_MASTER;
-use crate::world::index::ObjectsRef;
 use crate::world::layer::MasterSlots;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
@@ -305,64 +293,11 @@ impl UnitView<'_, '_> {
         Ok(Answer::Taken)
     }
 
-    /// What an explorer's searches ask of the world, the map's size and the unit's line of sight.
+    /// What an explorer's searches ask of the world ([`ScoutArea::of`] for the unit), the map's
+    /// size and the unit's line of sight.
     pub(crate) fn scout_area(&mut self) -> Result<(ScoutArea<'_>, GridSize, Distance), GenieError> {
-        let unit = &*self.unit;
-        let master = unit.master(
-            MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
-            self.player,
-        )?;
-        let mover = self
-            .c
-            .w
-            .parts
-            .mover_of(unit.id)
-            .ok_or(GenieError::unsupported(
-                "an auto scout without movement state",
-            ))?;
-        let map = self.c.w.spatial.map;
-        let terrain = self
-            .c
-            .w
-            .spatial
-            .terrain
-            .as_ref()
-            .ok_or(GenieError::unsupported(
-                "the map's zones without its terrain",
-            ))?;
-        let values = terrain
-            .restriction(mover.stats.restriction)
-            .ok_or(UNKNOWN_RESTRICTION)?;
-        let zones = self.c.w.zones.of(map, &terrain.kinds, values)?;
-        let me = unit.me(self.actions);
-        let area = ScoutArea {
-            spatial: &mut self.c.w.spatial,
-            by_id: ObjectsRef::new(
-                &self.c.w.players,
-                &self.c.w.index,
-                &self.c.w.model.masters,
-                &self.c.w.parts,
-                &self.c.w.model.roles,
-                &self.c.w.model.tuning,
-            ),
-            zones,
-            plan: Planning {
-                pathing: &mut self.c.w.pathing,
-                now: self.c.w.world_time,
-                player_kind: self.player_kind,
-                object: self.c.w.streams.get(Stream::Object),
-                groups: &self.c.w.groups,
-            },
-            mover,
-            at: unit.position(),
-            me,
-            player: self.player,
-            master: master.id,
-            radius: master.radius,
-            reach: master.line_of_sight - Distance::new(self.c.w.model.tuning.explore.los_margin),
-            scouted: false,
-        };
-        Ok((area, map, master.line_of_sight))
+        let me = self.unit.me(self.actions);
+        ScoutArea::of(self.c.w, self.unit, me, self.player, self.player_kind)
     }
 }
 
@@ -394,90 +329,4 @@ pub(crate) fn town_centre_unit(
         return Ok(Some(first));
     }
     Ok(None)
-}
-
-impl SearchArea for ScoutArea<'_> {
-    fn visible_now(&self, tile: Tile) -> bool {
-        self.spatial
-            .scout_sight(self.player, tile)
-            .is_some_and(TileSight::seen)
-    }
-}
-
-/// What the auto scout's search asks of the world for one unit ([`crate::movement::explore::Area`]).
-pub(crate) struct ScoutArea<'a> {
-    pub(crate) spatial: &'a mut Spatial,
-    /// The world's objects, whose gaits the stand and reach tests read.
-    pub(crate) by_id: ObjectsRef<'a>,
-    pub(crate) zones: &'a ZoneMap,
-    pub(crate) plan: Planning<'a>,
-    pub(crate) mover: &'a Mover,
-    /// The scout's place (its row's static layer), which the search does not move.
-    pub(crate) at: Position,
-    pub(crate) me: Me,
-    pub(crate) player: PlayerId,
-    pub(crate) master: MasterId,
-    pub(crate) radius: Footprint,
-    /// The reach of slot 0x3d8: the line of sight less a tile.
-    pub(crate) reach: Distance,
-    /// The search reads the player's scout map for the tiles seen (`FUN_140c4b130` with one).
-    pub(crate) scouted: bool,
-}
-
-impl Area for ScoutArea<'_> {
-    fn explored(&self, tile: Tile) -> Result<bool, GenieError> {
-        if self.scouted {
-            return self
-                .spatial
-                .scout_map(self.player)
-                .and_then(|m| m.get(tile))
-                .map(|v| v == 1)
-                .ok_or(GenieError::unsupported("a tile off the player's scout map"));
-        }
-        self.spatial.explored(self.player, tile)
-    }
-
-    fn zone(&mut self, tile: Tile) -> ZoneId {
-        self.zones.zone(tile)
-    }
-
-    fn own_zone(&mut self) -> ZoneId {
-        let (x, y) = (self.at.x(), self.at.y());
-        self.zones.zone(Tile::new(x as i32, y as i32))
-    }
-
-    fn clear(&mut self, tile: Tile) -> Result<bool, GenieError> {
-        let mask = self.mover.stats.restriction_mask;
-        self.spatial.point_clear(
-            self.me.id,
-            tile.corner(),
-            Distance::new(self.radius.x()),
-            mask,
-            self.by_id,
-        )
-    }
-
-    fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
-        let to = tile.corner();
-        let _tuning = self.by_id.tuning();
-        self.mover.reaches(
-            (self.at, &self.me),
-            (self.spatial, self.by_id),
-            &mut self.plan,
-            to,
-            self.reach,
-            self.master,
-        )
-    }
-
-    /// `FUN_14118faf0`: the gap from the footprint on each axis (at least 0), then its length.
-    fn distance(&self, tile: Tile) -> f32 {
-        let gap = |d: f32, r: f32| {
-            let g = d.abs() - r;
-            if g <= 0.0 { 0.0 } else { g }
-        };
-        let gx = gap(tile.x() as f32 - self.at.x(), self.radius.x());
-        let gy = gap(tile.y() as f32 - self.at.y(), self.radius.y());
-        sqrt(gy * gy + gx * gx)
-    }
 }

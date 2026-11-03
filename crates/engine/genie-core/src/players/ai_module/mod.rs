@@ -14,7 +14,7 @@ mod explored;
 mod search;
 mod unit_ai_side;
 
-pub(crate) use self::search::{SearchArea, SearchUnit};
+pub(crate) use self::search::SearchUnit;
 
 use crate::map::GridSize;
 use crate::map::Tile;
