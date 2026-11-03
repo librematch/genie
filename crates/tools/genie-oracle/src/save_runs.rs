@@ -391,7 +391,8 @@ pub(super) fn hunted_origins(turns: &mut World, start: &Header) {
             let leash = masters
                 .and_then(|m| m.get(unit.life.master_id))
                 .and_then(|m| {
-                    m.tasks
+                    m.action_part()
+                        .tasks
                         .iter()
                         .rev()
                         .find(|t| t.action_kind == ActionKind::HUNT_RANGE)

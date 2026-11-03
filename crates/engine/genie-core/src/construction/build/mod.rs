@@ -276,7 +276,12 @@ impl Completion<'_> {
                 .of_master(master.id)
                 .intersects(MasterRoles::PASTURE_MANGROVE | MasterRoles::PASTURE);
         }
-        part.cart = self.ai && master.tasks.iter().any(|t| t.action_kind == CART_TASK);
+        part.cart = self.ai
+            && master
+                .action_part()
+                .tasks
+                .iter()
+                .any(|t| t.action_kind == CART_TASK);
         Ok(part)
     }
 }

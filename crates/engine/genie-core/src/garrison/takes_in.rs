@@ -212,7 +212,7 @@ impl World {
             && (unit.kind == MasterKind::COMBAT
                 || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
         {
-            if !has_garrison_task(&unit.tasks, GARRISON, own.class) {
+            if !has_garrison_task(&unit.action_part().tasks, GARRISON, own.class) {
                 return Ok(false);
             }
             return Ok(unchecked || self.has_room(bp, b, None)?);
@@ -234,7 +234,11 @@ impl World {
         if !above || !bm.garrison.holds() {
             return Ok(false);
         }
-        if !has_garrison_task(&unit.tasks, GARRISON, self.model.slots.class.building) {
+        if !has_garrison_task(
+            &unit.action_part().tasks,
+            GARRISON,
+            self.model.slots.class.building,
+        ) {
             return Ok(false);
         }
         let garrison_type = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_type);

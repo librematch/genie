@@ -168,7 +168,7 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
             carry.id().get()
-        } else if master.drop_sites.is_empty() {
+        } else if master.action_part().drop_sites.is_empty() {
             -1
         } else {
             let mut w = DropWorld {
@@ -459,7 +459,8 @@ impl Unit {
         }
         let master = self.master(c.w.master_tables(), c.player)?;
         let mover = c.w.parts.mover_of(self.id).ok_or(HUNTER_UNMOVING)?;
-        let radius = civilian_search_radius(master.line_of_sight, master.search_radius);
+        let radius =
+            civilian_search_radius(master.line_of_sight, master.action_part().search_radius);
         let search = Search {
             at: self.position().ground(),
             radius,

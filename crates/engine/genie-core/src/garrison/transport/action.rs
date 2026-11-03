@@ -459,10 +459,15 @@ impl TransportAction {
     ) -> Result<Option<SpriteId>, GenieError> {
         Ok(match task {
             Some(id) => {
-                let task = master.tasks.iter().find(|t| t.id == id).ok_or_else(|| {
-                    GenieError::missing_data("a Transport's task its master lacks")
-                        .with("task", id.get())
-                })?;
+                let task = master
+                    .action_part()
+                    .tasks
+                    .iter()
+                    .find(|t| t.id == id)
+                    .ok_or_else(|| {
+                        GenieError::missing_data("a Transport's task its master lacks")
+                            .with("task", id.get())
+                    })?;
                 task.sprites.moving
             }
             None => master.move_sprite,

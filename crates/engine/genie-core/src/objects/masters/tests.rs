@@ -82,21 +82,24 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         id,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        task_by_group: TaskGroup::of_data(task_by_group),
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
-        tasks,
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
-        work_rate: WorkRate::new(1.0),
         hit_points: MasterHitPoints::of_data(25),
         creatable: Some(CreatablePart {
             cost: costs(&[]),
             build_time: WholeSeconds::ZERO,
             ..CreatablePart::default()
+        }),
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::of_data(task_by_group),
+            tasks,
+            work_rate: WorkRate::new(1.0),
+            ..ActionPart::default()
         }),
         ..Master::default()
     }
@@ -107,21 +110,24 @@ fn house() -> Master {
         id: ids::HOUSE,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        task_by_group: TaskGroup::NONE,
         radius: Footprint::new(1.0, 1.0),
         tall: true,
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
-        tasks: vec![],
         obstruction_class: ObstructionClass::UNIT,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
-        work_rate: WorkRate::ZERO,
         hit_points: MasterHitPoints::of_data(550),
         creatable: Some(CreatablePart {
             cost: costs(&[(player_attribute::WOOD, 25, true)]),
             build_time: WholeSeconds::of_data(25),
             ..CreatablePart::default()
+        }),
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::NONE,
+            tasks: vec![],
+            work_rate: WorkRate::ZERO,
+            ..ActionPart::default()
         }),
         ..Master::default()
     }
@@ -1429,7 +1435,11 @@ fn the_action_and_moving_setters_change_their_values() {
     m.add_attribute(MasterAttribute::COMMAND_SOUND, 9.0, &world(false));
     assert_eq!(m, before);
     assert_eq!(
-        (m.work_rate, m.search_radius, m.run_pattern),
+        (
+            m.action_part().work_rate,
+            m.action_part().search_radius,
+            m.action_part().run_pattern
+        ),
         (
             WorkRate::new(1.5),
             Distance::new(6.0),
@@ -1630,10 +1640,13 @@ fn master_copy_keeps_its_id_class_and_flags() {
     );
     assert!(militia.available && !militia.disabled);
     assert_eq!(
-        (militia.hit_points, militia.tasks.len()),
+        (militia.hit_points, militia.action_part().tasks.len()),
         (MasterHitPoints::of_data(45), 2)
     );
-    assert_eq!(militia.task_by_group, TaskGroup::FEMALE_VILLAGERS);
+    assert_eq!(
+        militia.action_part().task_by_group,
+        TaskGroup::FEMALE_VILLAGERS
+    );
 }
 
 /// The work command's choice for a gather (0x6a) on a farm (master 50, one of the objects

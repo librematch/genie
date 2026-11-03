@@ -321,7 +321,7 @@ impl World {
             ai_type,
             Some(master.class),
             master.line_of_sight,
-            master.search_radius,
+            master.action_part().search_radius,
             player_type,
             &self.model.roles,
         )?;

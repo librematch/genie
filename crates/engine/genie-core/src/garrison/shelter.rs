@@ -339,7 +339,7 @@ impl World {
                 // (its slot unchecked: one the player lacks would crash the game)
                 let (_, _, transport_class) = *capacities.checked(first_transport + k)?;
                 let list = self.master(player, master)?;
-                if has_garrison_task(&list.tasks, GARRISON, transport_class) {
+                if has_garrison_task(&list.action_part().tasks, GARRISON, transport_class) {
                     let gap = gap_to(transport.id())?;
                     if gap < reach {
                         pairs.push((i, first_transport + k, gap));

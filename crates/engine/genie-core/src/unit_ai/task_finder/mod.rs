@@ -204,7 +204,7 @@ pub fn enabled(attributes: &[Amount], resource: Option<AttributeId>) -> bool {
 
 /// One search over the list: the first task the predicate takes, in list order.
 fn first(list: &Master, pred: impl Fn(&Task) -> bool) -> Option<&Task> {
-    list.tasks.iter().find(|t| pred(t))
+    list.action_part().tasks.iter().find(|t| pred(t))
 }
 
 /// The filter: any task (â1), or one of this type.
@@ -273,7 +273,7 @@ fn general<'m>(
     filter: Option<ActionKind>,
     dip: &impl Diplomacy,
 ) -> Option<&'m Task> {
-    if list.tasks.is_empty() {
+    if list.action_part().tasks.is_empty() {
         return None;
     }
     if let Some(t) = target {
@@ -482,6 +482,7 @@ fn finder_tail<'m>(
     // the tail: conversions, task 0x84, healing, task 0x88, the siege and class-53 tasks
     let monk = roles.of_class(own.class).contains(ClassRoles::MONK);
     let converts = list
+        .action_part()
         .tasks
         .iter()
         .any(|t| t.action_kind == ActionKind::CONVERT);
@@ -491,6 +492,7 @@ fn finder_tail<'m>(
         ));
     }
     if list
+        .action_part()
         .tasks
         .iter()
         .any(|t| t.action_kind == ActionKind::PICK_UP)
@@ -498,7 +500,13 @@ fn finder_tail<'m>(
     {
         return Err(GenieError::unsupported("the task finder's task 0x84"));
     }
-    if list.tasks.iter().any(|t| t.action_kind == ActionKind::HEAL) && target.is_some() {
+    if list
+        .action_part()
+        .tasks
+        .iter()
+        .any(|t| t.action_kind == ActionKind::HEAL)
+        && target.is_some()
+    {
         return Err(GenieError::unsupported("the task finder's healing (0x69)"));
     }
     if roles
@@ -564,6 +572,7 @@ mod tests {
     #[cfg(test)]
     use crate::gathering::gather::GATHER;
     use crate::objects::WorkerCount;
+    use crate::objects::masters::ActionPart;
     use crate::objects::masters::CombatLevel;
     use crate::objects::masters::GarrisonCapacity;
     use crate::objects::masters::MasterKind;
@@ -616,7 +625,10 @@ mod tests {
             id,
             kind,
             class,
-            tasks,
+            action: Some(ActionPart {
+                tasks,
+                ..ActionPart::default()
+            }),
             ..Master::default()
         }
     }
@@ -1289,7 +1301,7 @@ mod tests {
                 &Alone,
                 &roles()
             ),
-            Ok(Finding::Answer(Some(&villager.tasks[0])))
+            Ok(Finding::Answer(Some(&villager.action_part().tasks[0])))
         );
         let monk = master(ids::ID_448, MasterKind::COMBAT, class::MONK, vec![]);
         let converting = Actor {
@@ -1372,7 +1384,7 @@ mod tests {
                 &Alone,
                 &roles()
             ),
-            Ok(Finding::Answer(Some(&builder.tasks[0])))
+            Ok(Finding::Answer(Some(&builder.action_part().tasks[0])))
         );
         assert_eq!(
             on_target(
@@ -1428,7 +1440,7 @@ mod tests {
         let dock = building(&m45, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
             on_target(&trader, &cart, &dock, None, &Alone, &roles()),
-            Ok(Finding::Answer(Some(&trader.tasks[2])))
+            Ok(Finding::Answer(Some(&trader.action_part().tasks[2])))
         );
         assert_eq!(
             on_target(
@@ -1439,7 +1451,7 @@ mod tests {
                 &Alone,
                 &roles()
             ),
-            Ok(Finding::Answer(Some(&trader.tasks[2])))
+            Ok(Finding::Answer(Some(&trader.action_part().tasks[2])))
         );
         assert_eq!(
             on_target(&trader, &cart, &dock, Some(GATHER), &Alone, &roles()),
@@ -1455,7 +1467,7 @@ mod tests {
                 &Alone,
                 &roles()
             ),
-            Ok(Finding::Answer(Some(&trader.tasks[0])))
+            Ok(Finding::Answer(Some(&trader.action_part().tasks[0])))
         );
         // state 3 and up: no trade
         assert_eq!(
@@ -1515,7 +1527,7 @@ mod tests {
         let site = building(&camp, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
             drop(&lumberjack, carrying(Some(attribute::FOOD), 10.0), &site),
-            Finding::Answer(Some(&lumberjack.tasks[0]))
+            Finding::Answer(Some(&lumberjack.action_part().tasks[0]))
         );
         assert_eq!(drop(&lumberjack, carrying(None, 0.0), &site), Finding::Next);
         let idle = master(master_id(123), MasterKind::COMBAT, class::VILLAGER, vec![]);
@@ -1567,7 +1579,10 @@ mod tests {
         let t = transport(&ship, PlayerId::new(2));
         assert_eq!(
             into(&soldier, &t, None),
-            (Finding::Answer(Some(&soldier.tasks[0])), false)
+            (
+                Finding::Answer(Some(&soldier.action_part().tasks[0])),
+                false
+            )
         );
         assert_eq!(into(&bare, &t, Some(ENTER)), (Finding::Answer(None), false));
         assert_eq!(into(&bare, &t, None), (Finding::Next, true));
@@ -1618,7 +1633,7 @@ mod tests {
         );
         assert_eq!(
             repair(&any, &damaged, None),
-            Finding::Answer(Some(&any.tasks[0]))
+            Finding::Answer(Some(&any.action_part().tasks[0]))
         );
         assert_eq!(
             repair(
@@ -1673,7 +1688,7 @@ mod tests {
         );
         assert_eq!(
             tail(&thirteen, &own, Some(ActionKind::GUARD)),
-            Ok(Some(&thirteen.tasks[0]))
+            Ok(Some(&thirteen.action_part().tasks[0]))
         );
         assert_eq!(tail(&thirteen, &own, None), Ok(None));
         let sheep = master(master_id(594), MasterKind::COMBAT, class::LIVESTOCK, vec![]);
@@ -1689,7 +1704,7 @@ mod tests {
                 &building(&sheep, PlayerId::new(0), ObjectState::Alive),
                 None
             ),
-            Ok(Some(&shepherd.tasks[0]))
+            Ok(Some(&shepherd.action_part().tasks[0]))
         );
         for list in [
             master(master_id(125), MasterKind::COMBAT, class::MONK, vec![]),

@@ -116,6 +116,7 @@ use crate::objects::lifecycle::death_parts::{count_class, storage_leaves};
 use crate::objects::lifecycle::{Class, Held, Lifecycle, MasterData};
 use crate::objects::lines::UnitLines;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
@@ -633,16 +634,13 @@ pub(crate) fn builder_masters() -> Masters {
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        task_by_group: group,
         radius: Footprint::new(0.2, 0.2),
         tall: true,
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
-        tasks,
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
-        work_rate: WorkRate::new(1.0),
         hit_points: MasterHitPoints::of_data(25),
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
         moving: Some(MoveStats {
@@ -671,6 +669,12 @@ pub(crate) fn builder_masters() -> Masters {
             build_time: WholeSeconds::ZERO,
             ..CreatablePart::default()
         }),
+        action: Some(ActionPart {
+            task_by_group: group,
+            tasks,
+            work_rate: WorkRate::new(1.0),
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     let base = || {
@@ -695,16 +699,13 @@ pub(crate) fn builder_masters() -> Masters {
             terrain_restriction: Some(RestrictionId::named(0)),
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
-            task_by_group: TaskGroup::NONE,
             radius: Footprint::new(1.0, 1.0),
             tall: true,
             obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
-            tasks: vec![],
             obstruction_class: ObstructionClass::UNIT,
             object_flags: ObjectFlags::NONE,
             combat_level: CombatLevel::NONE,
-            work_rate: WorkRate::ZERO,
             hit_points: MasterHitPoints::of_data(550),
             // a house's clearance, which BUILD's placement test reads
             clearance: Footprint::new(1.0, 1.0),
@@ -722,12 +723,18 @@ pub(crate) fn builder_masters() -> Masters {
             }),
             // its dying sprite (2196), which it dies on built
             death_sprite: Some(SpriteId::named(2196)),
+            // built by the villagers (the builders' test, FUN_141262270)
             creatable: Some(CreatablePart {
                 cost: costs(&[(attribute::WOOD, 25, true)]),
                 build_time: WholeSeconds::of_data(25),
-                // built by the villagers (the builders' test, FUN_141262270)
                 trained_at: vec![ids::BUILDER],
                 ..CreatablePart::default()
+            }),
+            action: Some(ActionPart {
+                task_by_group: TaskGroup::NONE,
+                tasks: vec![],
+                work_rate: WorkRate::ZERO,
+                ..ActionPart::default()
             }),
             ..Master::default()
         },
@@ -1825,7 +1832,10 @@ fn combat_object_counts_in_its_player_class_attributes() {
         let m = Master {
             id,
             class,
-            task_by_group,
+            action: Some(ActionPart {
+                task_by_group,
+                ..ActionPart::default()
+            }),
             ..Master::default()
         };
         count_class(&mut a, &m, 1.0, &roles());
@@ -2439,7 +2449,15 @@ fn slot_0x820_search_takes_the_own_task_else_the_first_master_of_the_swap_group(
     );
     // without a swap group there is no other list to try
     let alone = Master {
-        task_by_group: TaskGroup::NONE,
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::NONE,
+            ..masters
+                .get(VILLAGER_MALE)
+                .unwrap()
+                .action
+                .clone()
+                .unwrap_or_default()
+        }),
         ..masters.get(VILLAGER_MALE).unwrap().clone()
     };
     assert_eq!(search(&alone), None);
@@ -2690,11 +2708,15 @@ fn repair_world() -> World {
             .combat
             .get_or_insert_with(Default::default)
             .weapon_range = Distance::new(0.5);
-        builder.tasks.push(Task {
-            id: task_id(4),
-            work_val1: WorkValue::new(0.5),
-            ..task(REPAIR)
-        });
+        builder
+            .action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .push(Task {
+                id: task_id(4),
+                work_val1: WorkValue::new(0.5),
+                ..task(REPAIR)
+            });
     }
     t
 }
@@ -3332,16 +3354,25 @@ pub(crate) fn forage_world() -> World {
         let forager = Master {
             id: master_id(120),
             capacity: CarryCapacity::of_data(10),
-            drop_sites: vec![ids::TOWN_CENTRE],
-            tasks: vec![Task {
-                id: task_id(2),
-                action_kind: GATHER,
-                object_group: Some(class_id(7)),
-                attribute_type: Some(AttributeId::named(17)),
-                work_range: Distance::new(0.25),
-                work_val1: WorkValue::new(0.31),
-                ..Task::default()
-            }],
+            action: Some(ActionPart {
+                drop_sites: vec![ids::TOWN_CENTRE],
+                tasks: vec![Task {
+                    id: task_id(2),
+                    action_kind: GATHER,
+                    object_group: Some(class_id(7)),
+                    attribute_type: Some(AttributeId::named(17)),
+                    work_range: Distance::new(0.25),
+                    work_val1: WorkValue::new(0.31),
+                    ..Task::default()
+                }],
+                ..masters
+                    .get(VILLAGER_MALE)
+                    .unwrap()
+                    .clone()
+                    .action
+                    .clone()
+                    .unwrap_or_default()
+            }),
             ..masters.get(VILLAGER_MALE).unwrap().clone()
         };
         let bush = Master {
@@ -3956,6 +3987,8 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
         Arc::make_mut(masters)
             .get_mut(master_id(120))
             .unwrap()
+            .action
+            .get_or_insert_with(Default::default)
             .drop_sites = vec![ids::ID_45, ids::TOWN_CENTRE];
     }
     t.unit_order(
@@ -4009,6 +4042,8 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
         Arc::make_mut(masters)
             .get_mut(master_id(120))
             .unwrap()
+            .action
+            .get_or_insert_with(Default::default)
             .tasks
             .push(Task {
                 id: task_id(3),
@@ -4618,11 +4653,14 @@ fn cart_world() -> World {
             radius: Footprint::new(0.5, 0.5),
             line_of_sight: Distance::new(4.0),
             moving: Some(walker().stats),
-            tasks: vec![Task {
-                action_kind: CART_TASK,
-                object_group: Some(class_id(7)),
-                ..Task::default()
-            }],
+            action: Some(ActionPart {
+                tasks: vec![Task {
+                    action_kind: CART_TASK,
+                    object_group: Some(class_id(7)),
+                    ..Task::default()
+                }],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         };
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([cart])));
@@ -4688,6 +4726,8 @@ fn mule_cart_finds_the_nearest_resource_of_its_task_class() {
     Arc::make_mut(&mut t.model.masters[1])
         .get_mut(ids::MASTER_1808)
         .unwrap()
+        .action
+        .get_or_insert_with(Default::default)
         .tasks[0]
         .object_group = Some(class_id(99));
     assert_eq!(
@@ -5025,13 +5065,22 @@ pub(crate) fn hunt_world() -> World {
     for masters in &mut t.model.masters {
         let hunter = Master {
             id: master_id(122),
-            drop_sites: vec![ids::TOWN_CENTRE],
-            tasks: vec![Task {
-                action_kind: HUNT,
-                object_group: Some(class_id(9)),
-                work_range: Distance::new(0.5),
-                ..Task::default()
-            }],
+            action: Some(ActionPart {
+                drop_sites: vec![ids::TOWN_CENTRE],
+                tasks: vec![Task {
+                    action_kind: HUNT,
+                    object_group: Some(class_id(9)),
+                    work_range: Distance::new(0.5),
+                    ..Task::default()
+                }],
+                ..masters
+                    .get(VILLAGER_MALE)
+                    .unwrap()
+                    .clone()
+                    .action
+                    .clone()
+                    .unwrap_or_default()
+            }),
             ..masters.get(VILLAGER_MALE).unwrap().clone()
         };
         let deer = Master {
@@ -5702,7 +5751,10 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         });
         for masters in &mut t.model.masters {
             let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
-            (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
+            (
+                hunter.capacity,
+                hunter.action.get_or_insert_with(Default::default).work_rate,
+            ) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
         }
         let deer = &mut t.players[0].objects[ListIndex::new(0)];
         (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -5774,7 +5826,10 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
     });
     for masters in &mut t.model.masters {
         let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
-        (hunter.capacity, hunter.work_rate) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
+        (
+            hunter.capacity,
+            hunter.action.get_or_insert_with(Default::default).work_rate,
+        ) = (CarryCapacity::of_data(10), WorkRate::new(1.0));
     }
     let deer = &mut t.players[0].objects[ListIndex::new(0)];
     (deer.life.state, deer.life.hp) = (ObjectState::Dying, HitPoints::ZERO);
@@ -5878,6 +5933,8 @@ fn shepherd_world(x: f32) -> World {
         Arc::make_mut(masters)
             .get_mut(master_id(122))
             .unwrap()
+            .action
+            .get_or_insert_with(Default::default)
             .tasks
             .push(Task {
                 action_kind: HUNT,
@@ -6062,12 +6119,16 @@ fn lumber_world(near: f32) -> World {
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([tree])));
         let hunter = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
         hunter.line_of_sight = Distance::new(4.0);
-        hunter.tasks.push(Task {
-            action_kind: HUNT,
-            object_group: Some(class_id(15)),
-            work_range: Distance::new(0.5),
-            ..Task::default()
-        });
+        hunter
+            .action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .push(Task {
+                action_kind: HUNT,
+                object_group: Some(class_id(15)),
+                work_range: Distance::new(0.5),
+                ..Task::default()
+            });
     }
     let tree = |id, x: f32| Unit {
         id,
@@ -6696,11 +6757,14 @@ fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
             let mut m = masters.get(VILLAGER_MALE).unwrap().clone();
             m.id = master_id(156);
             m.combat.get_or_insert_with(Default::default).weapon_range = Distance::new(0.5);
-            m.tasks.push(Task {
-                id: task_id(4),
-                work_val1: WorkValue::new(0.5),
-                ..task(REPAIR)
-            });
+            m.action
+                .get_or_insert_with(Default::default)
+                .tasks
+                .push(Task {
+                    id: task_id(4),
+                    work_val1: WorkValue::new(0.5),
+                    ..task(REPAIR)
+                });
             *masters = Arc::new(Masters::new(masters.iter().cloned().chain([m])));
         }
     }
@@ -7080,17 +7144,20 @@ fn livestock_enter_world() -> World {
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         radius: Footprint::new(0.2, 0.2),
-        tasks: vec![Task {
-            id: task_id(1),
-            action_kind: ENTER,
-            object_group: Some(class_id(3)),
-            ..Task::default()
-        }],
         moving: Some(walker().stats),
         // no walking or standing sprite: its Enter's MoveTo takes none (the world's sprites'
         // table holds none)
         move_sprite: None,
         standing_sprite: None,
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                id: task_id(1),
+                action_kind: ENTER,
+                object_group: Some(class_id(3)),
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     for masters in &mut t.model.masters {
@@ -7681,7 +7748,10 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
             let m = Arc::make_mut(&mut t.model.masters[1])
                 .get_mut(master_id(id))
                 .unwrap();
-            m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
+            m.action
+                .get_or_insert_with(Default::default)
+                .tasks
+                .retain(|k| k.action_kind != ActionKind::BUILD);
         }
     };
     let mut t = sent_off_world(vec![]);
@@ -7825,7 +7895,10 @@ fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
         let m = Arc::make_mut(&mut t.model.masters[1])
             .get_mut(master_id(id))
             .unwrap();
-        m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
+        m.action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .retain(|k| k.action_kind != ActionKind::BUILD);
     }
     assert!(answers(&mut t, FoundationId::new(object_id(10028))));
     let mut t = sent_off_world(vec![]);
@@ -7833,7 +7906,10 @@ fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
         let m = Arc::make_mut(&mut t.model.masters[1])
             .get_mut(master_id(id))
             .unwrap();
-        m.tasks.retain(|k| k.action_kind != ActionKind::BUILD);
+        m.action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .retain(|k| k.action_kind != ActionKind::BUILD);
     }
     assert!(!answers(&mut t, FoundationId::new(object_id(10028))));
 }
@@ -8051,12 +8127,21 @@ fn the_hunt_command_at_once_matches_the_one_after_the_update() {
     for masters in &mut later.model.masters {
         let hunter = Master {
             id: master_id(122),
-            tasks: vec![Task {
-                action_kind: HUNT,
-                object_group: Some(class_id(9)),
-                work_range: Distance::new(0.5),
-                ..Task::default()
-            }],
+            action: Some(ActionPart {
+                tasks: vec![Task {
+                    action_kind: HUNT,
+                    object_group: Some(class_id(9)),
+                    work_range: Distance::new(0.5),
+                    ..Task::default()
+                }],
+                ..masters
+                    .get(VILLAGER_MALE)
+                    .unwrap()
+                    .clone()
+                    .action
+                    .clone()
+                    .unwrap_or_default()
+            }),
             ..masters.get(VILLAGER_MALE).unwrap().clone()
         };
         let deer = Master {
@@ -8361,16 +8446,19 @@ fn farm_master() -> Master {
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: MasterKind::BUILDING,
         class: class::FARM,
-        work_rate: WorkRate::new(0.4),
         capacity: CarryCapacity::of_data(15),
-        default_task: TaskIndex::of_data(0),
-        tasks: vec![Task {
-            action_kind: MAKE,
-            attribute_type: Some(attribute::FARM_FOOD),
-            attribute_type2: Some(attribute::FOOD),
-            work_val1: WorkValue::new(1.0),
-            ..Task::default()
-        }],
+        action: Some(ActionPart {
+            work_rate: WorkRate::new(0.4),
+            default_task: TaskIndex::of_data(0),
+            tasks: vec![Task {
+                action_kind: MAKE,
+                attribute_type: Some(attribute::FARM_FOOD),
+                attribute_type2: Some(attribute::FOOD),
+                work_val1: WorkValue::new(1.0),
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
         ..Master::default()
     }
 }
@@ -8735,15 +8823,18 @@ fn built_farm_master_starts_make_and_another_default_task_is_reported() {
     use crate::objects::layers::default_start;
     assert_eq!(default_start(&farm_master()), DefaultTask::Make);
     let mut other = farm_master();
-    other.tasks[0].action_kind = FLY;
+    other.action.get_or_insert_with(Default::default).tasks[0].action_kind = FLY;
     assert_eq!(
         default_start(&other),
         DefaultTask::Fails(Unstartable::Unported(FLY))
     );
     // a type the factories make nothing of starts nothing (a wild animal's Explore, 6)
-    other.tasks[0].action_kind = ActionKind::named(6);
+    other.action.get_or_insert_with(Default::default).tasks[0].action_kind = ActionKind::named(6);
     assert_eq!(default_start(&other), DefaultTask::Nothing);
-    other.default_task = None;
+    other
+        .action
+        .get_or_insert_with(Default::default)
+        .default_task = None;
     assert_eq!(default_start(&other), DefaultTask::Nothing);
 }
 
@@ -9814,7 +9905,10 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
     let centre = Master {
         id: ids::TOWN_CENTRE,
         kind: MasterKind::BUILDING,
-        work_rate: WorkRate::new(1.0),
+        action: Some(ActionPart {
+            work_rate: WorkRate::new(1.0),
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     let quick = Master {
@@ -12507,10 +12601,13 @@ fn hunter_drop_off_takes_the_drop_site_it_found() {
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             radius: Footprint::new(0.2, 0.2),
-            drop_sites: vec![ids::TOWN_CENTRE],
             // no sprites: the sprites' table holds none
             move_sprite: None,
             standing_sprite: None,
+            action: Some(ActionPart {
+                drop_sites: vec![ids::TOWN_CENTRE],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         },
         Master {
@@ -16612,7 +16709,6 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
         id,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
         standing_sprite: Some(SpriteId::named(300)),
         storage,
@@ -16622,6 +16718,10 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
             weapon_range: Distance::new(0.5),
             reload: Seconds::new(2.0),
             ..CombatPart::default()
+        }),
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::MALE_VILLAGERS,
+            ..ActionPart::default()
         }),
         ..Master::default()
     };
@@ -17493,10 +17593,11 @@ fn fishing_ship_reseeds_fish_trap() {
         };
         let ms = &mut t.model.masters[1];
         // a ship builds as itself: its own Build task, no group
-        let tasks = ms.get(ids::BUILDER).unwrap().tasks.clone();
+        let tasks = ms.get(ids::BUILDER).unwrap().action_part().tasks.clone();
         let ship = Arc::make_mut(ms).get_mut(master_id(259)).unwrap();
-        (ship.class, ship.task_by_group, ship.tasks) =
-            (class::FISHING_SHIP, TaskGroup::NONE, tasks);
+        ship.class = class::FISHING_SHIP;
+        let action = ship.action.get_or_insert_with(Default::default);
+        (action.task_by_group, action.tasks) = (TaskGroup::NONE, tasks);
         *ms = Arc::new(Masters::new(ms.iter().cloned().chain([trap])));
         t.players[1].farm_queue = QueueCount::of_data(0);
     };
@@ -19532,6 +19633,8 @@ fn drop_site_search_from_unit_takes_the_nearest_it_reaches() {
             Arc::make_mut(masters)
                 .get_mut(master_id(120))
                 .unwrap()
+                .action
+                .get_or_insert_with(Default::default)
                 .drop_sites = vec![ids::TOWN_CENTRE, master_id(999)];
         }
         t.players[1].objects[ListIndex::new(2)].life.master_id = master_id(999);
@@ -19925,7 +20028,10 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
     t.spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([4, 1])]);
     for masters in &mut t.model.masters {
         let m = Arc::make_mut(masters).get_mut(master_id(122)).unwrap();
-        (m.line_of_sight, m.search_radius) = (Distance::new(4.0), Distance::new(4.0));
+        (
+            m.line_of_sight,
+            m.action.get_or_insert_with(Default::default).search_radius,
+        ) = (Distance::new(4.0), Distance::new(4.0));
     }
     t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();

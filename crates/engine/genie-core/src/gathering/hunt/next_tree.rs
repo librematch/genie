@@ -108,7 +108,7 @@ impl Unit {
             (self.id, self.life.master_id),
             c.w.model.masters.of(c.player),
         )?;
-        let drops_here = master.drop_sites.contains(&t.life.master_id);
+        let drops_here = master.action_part().drop_sites.contains(&t.life.master_id);
         let at = |id: ObjectId| {
             c.w.spatial
                 .get_known(id)?

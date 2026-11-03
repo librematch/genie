@@ -47,6 +47,7 @@ use genie_model::objects::masters::HitChance;
 use genie_model::objects::masters::InvulnerabilityLevel;
 use genie_model::objects::masters::MasterField;
 use genie_model::objects::masters::ObjectFlags;
+use genie_model::objects::masters::RunPattern;
 use genie_model::objects::masters::SoundEvents;
 use genie_model::objects::masters::SpecialAttack;
 use genie_model::objects::masters::TargetOwner;
@@ -110,8 +111,8 @@ pub fn master_facets(
     seen.all(|f| f == first).then_some(first)
 }
 
-/// A master's action part, whatever class it is: what holds its work rate, search radius and
-/// task list.
+/// A master's action part, whatever class it is (a missile's under its RGE combat part too):
+/// what holds its work rate, search radius, task list and run pattern.
 #[must_use]
 pub fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
     None.or_else(|| {
@@ -128,11 +129,18 @@ pub fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
     })
     .or_else(|| {
         m.rge_master.as_deref().and_then(|r| {
-            r.rge_master_action_object.as_deref().or_else(|| {
-                r.rge_master_combat_object
-                    .as_deref()
-                    .map(|c| &c.rge_master_action_object)
-            })
+            r.rge_master_action_object
+                .as_deref()
+                .or_else(|| {
+                    r.rge_master_combat_object
+                        .as_deref()
+                        .map(|c| &c.rge_master_action_object)
+                })
+                .or_else(|| {
+                    r.rge_master_missile_object
+                        .as_deref()
+                        .map(|mm| &mm.rge_master_combat_object.rge_master_action_object)
+                })
         })
     })
 }
@@ -161,7 +169,7 @@ pub fn task_at(
     }
     masters
         .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.tasks.get(i))
+        .and_then(|w| w.action_part().tasks.get(i))
         .copied()
         .ok_or(GenieError::unsupported(
             "a saved action's task the data file does not have",
@@ -244,15 +252,21 @@ pub fn work_masters(
         work.line_of_sight = Distance::new(s.los);
         work.capacity = CarryCapacity::of_data(s.attribute_max_amount);
         work.blast_defense = BlastDefense::new(s.area_effect_object_level);
+        // the action layer is the save's RGE action part (its tasks where it saved them, else
+        // the copy's): a master without one has no tasks, whatever its copy's are
         if let Some(a) = action_part(m) {
-            work.work_rate = WorkRate::new(a.work_rate);
-            work.search_radius = Distance::new(a.search_radius);
+            let p = work.action.get_or_insert_with(Default::default);
+            p.work_rate = WorkRate::new(a.work_rate);
+            p.search_radius = Distance::new(a.search_radius);
+            p.run_pattern = RunPattern::of_data(a.run_pattern);
             if let Some(tasks) = a.tasks.as_deref() {
-                work.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
+                p.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
                     Ok(tasks) => tasks,
                     Err(e) => return Some(Err(e)),
                 };
             }
+        } else {
+            work.action = None;
         }
         let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
             m.tribe_master_building_object

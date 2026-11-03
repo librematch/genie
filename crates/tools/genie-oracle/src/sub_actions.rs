@@ -217,7 +217,7 @@ pub(super) fn fly_task(
     }
     masters
         .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.tasks.iter().find(|t| t.action_kind == fly))
+        .and_then(|w| w.action_part().tasks.iter().find(|t| t.action_kind == fly))
         .copied()
         .ok_or(GenieError::unsupported(
             "a bird whose Fly task is not in the data file",
@@ -251,7 +251,12 @@ pub(super) fn master_build_task(
     }
     masters
         .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.tasks.iter().find(|t| t.action_kind == build))
+        .and_then(|w| {
+            w.action_part()
+                .tasks
+                .iter()
+                .find(|t| t.action_kind == build)
+        })
         .copied()
         .ok_or(GenieError::unsupported(
             "a builder whose Build task is not in the data file",

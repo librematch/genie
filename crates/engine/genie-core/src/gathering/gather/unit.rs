@@ -166,7 +166,8 @@ impl Unit {
         let task = gather.task;
         let attributes = &c.w.players.player(c.player)?.attributes;
         Ok(GatherReads {
-            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup
+                + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: (task.productivity)
                 .and_then(|i| attributes.get(i.index()))
@@ -449,7 +450,7 @@ impl Unit {
         let master = self.master(c.w.master_tables(), c.player)?;
         let site = if let Some(carry) = carry_to {
             carry.id().get()
-        } else if !master.drop_sites.is_empty() {
+        } else if !master.action_part().drop_sites.is_empty() {
             let mut w = DropWorld {
                 masters: OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 spatial: &mut c.w.spatial,

@@ -410,10 +410,13 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
     );
     // a cart (a task of action type 0x99) with a unit AI searches
     let cart = Master {
-        tasks: vec![Task {
-            action_kind: CART_TASK,
-            ..Task::default()
-        }],
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: CART_TASK,
+                ..Task::default()
+            }],
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     let searches = |ai: bool| {
@@ -1288,6 +1291,7 @@ use crate::map::spatial::Spatial;
 use crate::map::spatial::{BLOCKED, Placed};
 use crate::objects::FacetCount;
 use crate::objects::layers::{Building, Static};
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::sprite::Graphic;
 use crate::players::history::{EntryKind, Population};

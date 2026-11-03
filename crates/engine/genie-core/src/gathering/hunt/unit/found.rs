@@ -89,7 +89,7 @@ impl Unit {
             (h.task.sprites, moving)
         });
         let arms = arms(master, &c.w.model.graphics, sprites, moving, roles);
-        let drops_here = master.drop_sites.contains(&t.life.master_id);
+        let drops_here = master.action_part().drop_sites.contains(&t.life.master_id);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),

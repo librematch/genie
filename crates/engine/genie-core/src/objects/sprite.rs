@@ -320,6 +320,7 @@ impl ActiveSprite {
 #[must_use]
 pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
     master
+        .action_part()
         .tasks
         .iter()
         // A trade cart's class (`FUN_14106a940`, decoded 0x13).
@@ -429,6 +430,7 @@ mod tests {
     use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
     use crate::objects::FacetCount;
+    use crate::objects::masters::ActionPart;
     use crate::objects::masters::CombatPart;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterKind;
@@ -810,7 +812,10 @@ mod tests {
             class: class::TRADE_CART,
             standing_sprite: Some(SpriteId::named(20)),
             move_sprite: Some(SpriteId::named(21)),
-            tasks: vec![other, trade],
+            action: Some(ActionPart {
+                tasks: vec![other, trade],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         };
         assert_eq!(
@@ -831,7 +836,10 @@ mod tests {
         );
         // without a trade task, none
         let bare = Master {
-            tasks: Vec::new(),
+            action: Some(ActionPart {
+                tasks: Vec::new(),
+                ..cart.action.clone().unwrap_or_default()
+            }),
             ..cart
         };
         assert_eq!(standing(&bare, None, true, &roles()), None);

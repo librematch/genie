@@ -210,6 +210,7 @@ impl World {
             return Ok(Vec::new());
         }
         let tasks: Vec<Task> = master
+            .action_part()
             .tasks
             .iter()
             .filter(|t| ACTIONS.contains(&t.action_kind))

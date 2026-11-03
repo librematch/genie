@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Static;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
@@ -420,9 +421,12 @@ fn task_master(id: MasterId, tasks: Vec<Task>) -> Master {
         id,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
-        tasks,
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::MALE_VILLAGERS,
+            tasks,
+            ..ActionPart::default()
+        }),
         ..Master::default()
     }
 }
@@ -554,7 +558,9 @@ fn member_without_task_takes_the_swap_group_first_with_one() {
 #[test]
 fn master_without_swap_group_has_no_other_to_try() {
     let mut own = task_master(ids::VILLAGER_MALE, vec![]);
-    own.task_by_group = TaskGroup::NONE;
+    own.action
+        .get_or_insert_with(Default::default)
+        .task_by_group = TaskGroup::NONE;
     let t = tasked_world(
         vec![
             own,
@@ -577,9 +583,11 @@ fn master_with_board_task_and_no_task_found_is_not_modelled() {
         ids::VILLAGER_MALE,
         vec![plain_task(ActionKind::PICK_UP, Distance::new(1.0))],
     );
-    own.task_by_group = TaskGroup::NONE;
+    own.action
+        .get_or_insert_with(Default::default)
+        .task_by_group = TaskGroup::NONE;
     // its own list finds the board task for any target, so give it one for another object
-    own.tasks[0].object_id = Some(master_id(999));
+    own.action.get_or_insert_with(Default::default).tasks[0].object_id = Some(master_id(999));
     let t = tasked_world(vec![own.clone(), building_master()], 9.0);
     assert!(t.member_task(member_11(), &query_on(60)).is_err());
     own.kind = MasterKind::of_data(0x27);
@@ -871,7 +879,7 @@ fn filter_takes_the_range_of_the_members_task_of_that_type() {
         .iter_mut()
         .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
     {
-        master.tasks = vec![
+        master.action.get_or_insert_with(Default::default).tasks = vec![
             plain_task(GATHER, Distance::new(6.0)),
             plain_task(ActionKind::CONVERT, Distance::new(1.5)),
         ];
@@ -1128,7 +1136,7 @@ fn attack_world_with_task(members: &[(i32, i16, f32, f32)]) -> World {
         .iter_mut()
         .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
     {
-        master.tasks = vec![attack_task()];
+        master.action.get_or_insert_with(Default::default).tasks = vec![attack_task()];
     }
     t
 }
@@ -1175,7 +1183,7 @@ fn group_ordered_with_general_task_runs_the_general_command() {
         .iter_mut()
         .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
     {
-        master.tasks = vec![Task {
+        master.action.get_or_insert_with(Default::default).tasks = vec![Task {
             action_kind: GATHER,
             work_range: Distance::new(6.0),
             ..attack_task()

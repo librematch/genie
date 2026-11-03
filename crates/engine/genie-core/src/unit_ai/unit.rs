@@ -152,10 +152,15 @@ impl Unit {
             }),
             size: master.map_or(Footprint::ZERO, |m| m.radius),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
-            search_radius: master.map_or(Distance::ZERO, |m| m.search_radius),
+            search_radius: master.map_or(Distance::ZERO, |m| m.action_part().search_radius),
             weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
             interruptible,
-            task_0x99: master.is_some_and(|m| m.tasks.iter().any(|t| t.action_kind == CART_TASK)),
+            task_0x99: master.is_some_and(|m| {
+                m.action_part()
+                    .tasks
+                    .iter()
+                    .any(|t| t.action_kind == CART_TASK)
+            }),
             garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
@@ -164,8 +169,12 @@ impl Unit {
             capture: self.capture_kind(c),
             master: self.life.master_id,
             scenario: c.w.settings.game_mode.scenario(),
-            task_0x69: master
-                .is_some_and(|m| m.tasks.iter().any(|t| t.action_kind == ActionKind::HEAL)),
+            task_0x69: master.is_some_and(|m| {
+                m.action_part()
+                    .tasks
+                    .iter()
+                    .any(|t| t.action_kind == ActionKind::HEAL)
+            }),
             // a new owner sees the target with its own map
             target: self.ai_target(c, view.player)?,
             under_attack: self.under_attack,

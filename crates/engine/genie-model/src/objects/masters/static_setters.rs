@@ -6,7 +6,6 @@ use crate::map::RestrictionId;
 use crate::math::fmath::at_most_or_unordered;
 use crate::movement::Speed;
 use crate::objects::MasterHitPoints;
-use crate::objects::WorkRate;
 use crate::objects::masters::AttributeWorld;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::CarryCapacity;
@@ -27,7 +26,6 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
 use crate::objects::masters::ROUND;
-use crate::objects::masters::RunPattern;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::add_short;
 use crate::objects::masters::add_sprite;
@@ -534,9 +532,13 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            MasterAttribute::WORK_RATE => self.work_rate = WorkRate::new(v),
-            MasterAttribute::SEARCH_RADIUS => self.search_radius = Distance::new(v),
-            MasterAttribute::RUN_PATTERN => self.run_pattern = RunPattern::of_data(low8(v)),
+            MasterAttribute::WORK_RATE
+            | MasterAttribute::SEARCH_RADIUS
+            | MasterAttribute::RUN_PATTERN => {
+                if let Some(p) = self.action.as_mut() {
+                    p.set_value(attribute, v);
+                }
+            }
             // the command and move sounds (132 to 135) are the interface's
             MasterAttribute::COMMAND_SOUND
             | MasterAttribute::COMMAND_SOUND_EVENT
@@ -554,9 +556,13 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            MasterAttribute::WORK_RATE => self.work_rate += WorkRate::new(v),
-            MasterAttribute::SEARCH_RADIUS => self.search_radius += Distance::new(v),
-            MasterAttribute::RUN_PATTERN => self.run_pattern = self.run_pattern.plus(low8(v)),
+            MasterAttribute::WORK_RATE
+            | MasterAttribute::SEARCH_RADIUS
+            | MasterAttribute::RUN_PATTERN => {
+                if let Some(p) = self.action.as_mut() {
+                    p.add_value(attribute, v);
+                }
+            }
             // the command and move sounds (through slot 0x18) are the interface's
             MasterAttribute::COMMAND_SOUND | MasterAttribute::MOVE_SOUND => {}
             _ => self.add_moving(attribute, v, world),
@@ -571,8 +577,11 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match attribute {
-            MasterAttribute::WORK_RATE => self.work_rate *= v,
-            MasterAttribute::SEARCH_RADIUS => self.search_radius *= v,
+            MasterAttribute::WORK_RATE | MasterAttribute::SEARCH_RADIUS => {
+                if let Some(p) = self.action.as_mut() {
+                    p.multiply_value(attribute, v);
+                }
+            }
             _ => self.multiply_moving(attribute, v, world),
         }
     }

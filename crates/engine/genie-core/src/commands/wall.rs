@@ -414,6 +414,7 @@ impl World {
             .contains(ClassRoles::WALL_BUILDER)
         {
             return Ok(m
+                .action_part()
                 .tasks
                 .iter()
                 // The builder the train locations name for every villager (`FUN_141262270`: `0x76`).

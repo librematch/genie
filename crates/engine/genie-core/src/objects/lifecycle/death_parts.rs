@@ -343,7 +343,7 @@ pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32, r
     }
     if roles.of_class(master.class).contains(ClassRoles::VILLAGER)
         && matches!(
-            master.task_by_group,
+            master.action_part().task_by_group,
             TaskGroup::MALE_VILLAGERS | TaskGroup::FEMALE_VILLAGERS
         )
     {

@@ -108,7 +108,13 @@ pub(crate) fn victim_of(
                 )
             })
         };
-    let tasks = |kind: ActionKind| master.tasks.iter().any(|t| t.action_kind == kind);
+    let tasks = |kind: ActionKind| {
+        master
+            .action_part()
+            .tasks
+            .iter()
+            .any(|t| t.action_kind == kind)
+    };
     Victim {
         id: u.id,
         // the caller's, which holds the tile lists
@@ -165,6 +171,7 @@ pub(crate) fn victim_of(
         weapons: master.combat_part().weapons.clone(),
         master_hp: master.hit_points,
         bonus_tasks: master
+            .action_part()
             .tasks
             .iter()
             .filter(|t| t.action_kind == BONUS_DAMAGE)
@@ -187,6 +194,7 @@ pub(crate) fn victim_of(
             armor_removed: combat.armor_removed,
             hp_powerup: combat.hp_powerup,
             kill_tasks: master
+                .action_part()
                 .tasks
                 .iter()
                 .any(|t| t.action_kind == REMOVAL_REWARD && 1e-7 < t.work_val1.get()),

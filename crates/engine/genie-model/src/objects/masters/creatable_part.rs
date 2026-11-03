@@ -5,6 +5,7 @@ use crate::combat::ChargeRate;
 use crate::combat::{Firepower, MissileCount};
 use crate::objects::Regeneration;
 use crate::objects::SpriteId;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::ChargeEvent;
@@ -108,13 +109,14 @@ pub struct CreatablePart {
 static ABSENT: LazyLock<CreatablePart> = LazyLock::new(CreatablePart::default);
 
 impl Master {
-    /// A master of type `kind` with the defaults of the layers its type holds (the combat layer
-    /// for [`MasterKind::has_combat_layer`], the creatable one for
-    /// [`MasterKind::has_creatable_layer`]).
+    /// A master of type `kind` with the defaults of the layers its type holds (the action layer
+    /// for [`MasterKind::has_action_layer`], the combat one for [`MasterKind::has_combat_layer`],
+    /// the creatable one for [`MasterKind::has_creatable_layer`]).
     #[must_use]
     pub fn of_kind(kind: MasterKind) -> Self {
         Self {
             kind,
+            action: kind.has_action_layer().then(ActionPart::default),
             combat: kind.has_combat_layer().then(CombatPart::default),
             creatable: kind.has_creatable_layer().then(CreatablePart::default),
             ..Self::default()

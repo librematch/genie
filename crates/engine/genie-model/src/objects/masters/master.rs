@@ -13,9 +13,9 @@ use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
 use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
-use crate::objects::WorkRate;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::lifecycle::MasterData;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::AdjacentMode;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BuildableOn;
@@ -44,11 +44,8 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
-use crate::objects::masters::RunPattern;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::Task;
-use crate::objects::masters::TaskGroup;
-use crate::objects::masters::TaskIndex;
 use crate::objects::masters::Trail;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -63,7 +60,8 @@ impl Master {
     /// `+0x788`), if it has one.
     #[must_use]
     pub fn default_task(&self) -> Option<&Task> {
-        self.tasks.get(self.default_task?.index())
+        let action = self.action_part();
+        action.tasks.get(action.default_task?.index())
     }
 
     /// Whether its objects move: a moving master (types 30 and up) whose speed (`+0x740`, the
@@ -86,7 +84,7 @@ impl Master {
         if MasterKind::RGE_COMBAT <= self.kind {
             sprites.push(self.combat_part().attack_sprite);
         }
-        for t in &self.tasks {
+        for t in &self.action_part().tasks {
             sprites.extend(t.sprites.ids());
         }
         let mut seen = sprites
@@ -162,8 +160,9 @@ pub struct Master {
     pub base_id: Option<MasterId>,
     /// `+0x410`.
     pub class: ClassId,
-    /// `+0x7b8`, the `.dat`'s `TaskSwapGroup` (the save does not carry it); 0 for none.
-    pub task_by_group: TaskGroup,
+    /// The action layer (types 40 and up but 90, `+0x790`..`+0x7b9`): tasks, default task, work
+    /// rate, search radius, drop sites; None for other masters.
+    pub action: Option<ActionPart>,
     /// `radius_x`, `radius_y` (`+0x5d8`, `+0x5dc`).
     pub radius: Footprint,
     /// `radius_z` (`+0x5e0`) is above 0: its objects count as tall on their tiles.
@@ -186,23 +185,13 @@ pub struct Master {
     pub object_flags: ObjectFlags,
     /// The `.dat`'s `combat_level` (`+0x62c`).
     pub combat_level: CombatLevel,
-    /// Its task list.
-    pub tasks: Vec<Task>,
-    /// `+0x790`, `default_task`: the id of the task its object's empty action list starts in
-    /// state 2 (`RGE_Action_Object::update`, slot 0x7f0); None for the game's −1.
-    pub default_task: Option<TaskIndex>,
-    /// The creatable layer (types 70 and 80, `+0x880`..`+0x94f`): costs, train locations, volleys, charge; None for other masters.
+    /// The creatable layer (types 70 and 80, `+0x880`..`+0x94f`): costs, train locations, volleys,
+    /// charge; None for other masters.
     pub creatable: Option<CreatablePart>,
-    /// `work_rate` (`+0x798`): what a builder of this master adds to the work per second.
-    pub work_rate: WorkRate,
-    /// `search_radius` (`+0x794`, the object's slot 0x2c8).
-    pub search_radius: Distance,
-    /// The `.dat`'s `drop_sites` (`+0x7a0`..`+0x7a8`, `FUN_14109d4f0`): the buildings a unit of
-    /// this master takes its load to.
-    pub drop_sites: Vec<MasterId>,
     /// The hit points (`+0x530`).
     pub hit_points: MasterHitPoints,
-    /// The combat layer (types 50 and up but 90, `+0x7f8`..`+0x87f`): attack, armor, blast; None for other masters.
+    /// The combat layer (types 50 and up but 90, `+0x7f8`..`+0x87f`): attack, armor, blast; None
+    /// for other masters.
     pub combat: Option<CombatPart>,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
     pub capacity: CarryCapacity,
@@ -306,8 +295,6 @@ pub struct Master {
     pub damage_graphic_entry: DamageGraphicEntry,
     /// A moving master's trail (`+0x75e`..`+0x764`).
     pub trail: Trail,
-    /// `+0x7b9`, `run_pattern`.
-    pub run_pattern: RunPattern,
 }
 
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's

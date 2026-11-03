@@ -429,7 +429,8 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
         turns.spatial.reach = Distance::new(
             all()
                 .flat_map(|m| {
-                    m.tasks
+                    m.action_part()
+                        .tasks
                         .iter()
                         .map(|t| t.work_range)
                         .chain([m.combat_part().weapon_range])

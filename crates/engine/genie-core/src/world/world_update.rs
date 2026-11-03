@@ -84,7 +84,12 @@ impl World {
             .iter()
             .map(|m| {
                 m.iter()
-                    .filter(|m| m.tasks.iter().any(|t| t.action_kind == CART_TASK))
+                    .filter(|m| {
+                        m.action_part()
+                            .tasks
+                            .iter()
+                            .any(|t| t.action_kind == CART_TASK)
+                    })
                     .map(|m| m.id)
                     .collect()
             })

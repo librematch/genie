@@ -163,12 +163,12 @@ impl World {
             .map(Option::<&Task>::copied)
         };
         let mut found = find(own)?;
-        if found.is_none() && own.task_by_group != TaskGroup::NONE {
+        if found.is_none() && own.action_part().task_by_group != TaskGroup::NONE {
             let masters = self.model.masters.of(player);
             for candidate in masters.into_iter().flat_map(Masters::iter) {
                 if candidate.class != own.class
                     || candidate.kind != own.kind
-                    || candidate.task_by_group != own.task_by_group
+                    || candidate.action_part().task_by_group != own.action_part().task_by_group
                 {
                     continue;
                 }
@@ -221,6 +221,7 @@ impl World {
 fn holds_board_task(master: &Master) -> bool {
     FIRST_ACTING_KIND <= master.kind
         && master
+            .action_part()
             .tasks
             .iter()
             .any(|t| matches!(t.action_kind, BOARD_TASK | UNBOARD_TASK))

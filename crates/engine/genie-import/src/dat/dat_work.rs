@@ -1,7 +1,7 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_dat::de::{Creatable, Sound, Task, Type50, Unit};
+use genie_dat::de::{Bird, Creatable, Sound, Task, Type50, Unit};
 use genie_model::GenieError;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
@@ -31,6 +31,7 @@ use genie_model::objects::masters::ObstructionClass;
 use genie_model::objects::masters::ObstructionKind;
 use genie_model::objects::masters::PlacementTerrains;
 use genie_model::objects::masters::RestrictionField;
+use genie_model::objects::masters::RunPattern;
 use genie_model::objects::masters::SoundEvents;
 use genie_model::objects::masters::TargetOwner;
 use genie_model::objects::masters::TaskFlags;
@@ -154,7 +155,6 @@ pub(super) fn dat_work(
         base_id: MasterId::of_data(base_id(unit.base_id)),
         class: ClassId::of_master(unit.class),
         terrain_restriction: RestrictionId::of_field(unit.terrain_restriction)?,
-        task_by_group: TaskGroup::of_data(unit.bird.as_ref().map_or(0, |b| b.task_swap_group)),
         radius: Radii::from(unit.collision_size).ground(),
         tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
@@ -163,21 +163,6 @@ pub(super) fn dat_work(
         obstruction_class: ObstructionClass::from(unit.obstruction_class),
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::of_data(unit.combat_level),
-        tasks: dat_tasks(unit, sounds)?,
-        default_task: unit
-            .bird
-            .as_ref()
-            .and_then(|b| TaskIndex::of_data(b.default_task_id)),
-        work_rate: unit
-            .bird
-            .as_ref()
-            .map_or(WorkRate::ZERO, |b| WorkRate::new(b.work_rate)),
-        drop_sites: unit.bird.as_ref().map_or_else(Vec::new, |b| {
-            b.drop_sites
-                .iter()
-                .filter_map(|&d| MasterId::of_data(d))
-                .collect()
-        }),
         hit_points: MasterHitPoints::of_data(unit.hit_points),
         capacity: CarryCapacity::of_data(unit.resource_capacity),
         clearance: Footprint::from(unit.clearance_size),
@@ -221,6 +206,11 @@ pub(super) fn dat_work(
         death_spawns: [unit.dead_unit_id, unit.blood_unit_id].map(MasterId::of_data),
         creatable: unit.creatable.as_ref().map(dat_creatable).transpose()?,
         combat: unit.type50.as_ref().map(dat_combat),
+        action: unit
+            .bird
+            .as_ref()
+            .map(|b| dat_action(b, sounds))
+            .transpose()?,
         ..work::Master::default()
     })
 }
@@ -294,16 +284,31 @@ fn dat_creatable(c: &Creatable) -> Result<work::CreatablePart, GenieError> {
     })
 }
 
-/// The tasks of a `.dat` unit's action part ([`dat_task`]), none without one.
+/// The action layer of a `.dat` unit's type-40 section ([`work::ActionPart`], genieutils'
+/// `Bird`): its tasks ([`dat_task`], with the world's sound table), default task, task swap
+/// group, work rate, search radius, drop sites and run pattern.
 ///
 /// # Errors
 ///
 /// A task that holds no type or attribute.
-fn dat_tasks(unit: &Unit, sounds: &[Sound]) -> Result<Vec<work::Task>, GenieError> {
-    unit.bird.as_ref().map_or_else(
-        || Ok(Vec::new()),
-        |b| b.tasks.iter().map(|t| dat_task(t, sounds)).collect(),
-    )
+fn dat_action(b: &Bird, sounds: &[Sound]) -> Result<work::ActionPart, GenieError> {
+    Ok(work::ActionPart {
+        task_by_group: TaskGroup::of_data(b.task_swap_group),
+        tasks: b
+            .tasks
+            .iter()
+            .map(|t| dat_task(t, sounds))
+            .collect::<Result<_, _>>()?,
+        default_task: TaskIndex::of_data(b.default_task_id),
+        work_rate: WorkRate::new(b.work_rate),
+        search_radius: Distance::new(b.search_radius),
+        drop_sites: b
+            .drop_sites
+            .iter()
+            .filter_map(|&d| MasterId::of_data(d))
+            .collect(),
+        run_pattern: RunPattern::of_data(b.run_pattern),
+    })
 }
 
 /// A `.dat` creatable section's cost slots (`resource_costs`) in their places.
@@ -337,4 +342,49 @@ pub fn attributes<const N: usize>(
         *slot = AttributeId::of_field(value)?;
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::dat::dat_work::dat_action;
+    use genie_dat::de::Bird;
+    use genie_model::map::Distance;
+    use genie_model::objects::WorkRate;
+    use genie_model::objects::masters::{MasterId, RunPattern, TaskGroup, TaskIndex};
+
+    /// A type-40 section with two drop sites, the second none (−1), and no tasks.
+    fn bird() -> Bird {
+        Bird {
+            default_task_id: 1,
+            search_radius: 4.5,
+            work_rate: 0.75,
+            drop_site_count: Some(2),
+            drop_sites: vec![109, -1],
+            task_swap_group: 1,
+            attack_sound: -1,
+            move_sound: -1,
+            wwise_attack_sound_id: 0,
+            wwise_move_sound_id: 0,
+            run_pattern: 3,
+            task_count: Some(0),
+            tasks: Vec::new(),
+        }
+    }
+
+    /// The action layer holds the type-40 section's values: the search radius and the run
+    /// pattern as well, which the save holds too; a drop site of −1 is none.
+    #[test]
+    fn the_action_layer_holds_the_type_40_sections_values() {
+        let part = dat_action(&bird(), &[]).unwrap();
+        assert_eq!(part.default_task, TaskIndex::of_data(1));
+        assert_eq!(part.task_by_group, TaskGroup::of_data(1));
+        assert_eq!(part.work_rate, WorkRate::new(0.75));
+        assert_eq!(part.search_radius, Distance::new(4.5));
+        assert_eq!(
+            part.drop_sites,
+            MasterId::of_data(109).into_iter().collect::<Vec<_>>()
+        );
+        assert_eq!(part.run_pattern, RunPattern::of_data(3));
+        assert_eq!(part.tasks, Vec::new());
+    }
 }

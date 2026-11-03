@@ -95,7 +95,7 @@ impl World {
                 let search = if master.kind < MasterKind::ACTION {
                     master.line_of_sight
                 } else {
-                    master.search_radius
+                    master.action_part().search_radius
                 };
                 let reach = maxss(search.get(), master.line_of_sight.get());
                 let reach = reach * reach;
@@ -390,7 +390,11 @@ impl World {
             return self.master(player, master).map(|_| false);
         };
         Ok(masters.get(master).is_some_and(|m| {
-            MasterKind::ACTION <= m.kind && m.tasks.iter().any(|t| t.action_kind == action)
+            MasterKind::ACTION <= m.kind
+                && m.action_part()
+                    .tasks
+                    .iter()
+                    .any(|t| t.action_kind == action)
         }))
     }
 

@@ -824,8 +824,9 @@ mod tests {
             let master = Arc::make_mut(&mut t.model.masters[0])
                 .get_mut(master_id(96))
                 .unwrap();
-            master.tasks = vec![task];
-            master.default_task = default;
+            let action = master.action.get_or_insert_with(Default::default);
+            action.tasks = vec![task];
+            action.default_task = default;
             let r = in_update(
                 &mut t,
                 (PlayerId::new(0), ListIndex::new(0)),

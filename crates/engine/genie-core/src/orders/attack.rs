@@ -317,6 +317,7 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?
+            .action_part()
             .drop_sites
             .iter()
             .any(|&d| Some(d) == target_master);

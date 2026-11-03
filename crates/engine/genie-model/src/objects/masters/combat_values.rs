@@ -233,6 +233,7 @@ impl CombatPart {
             MasterAttribute::BONUS_DAMAGE_RESISTANCE => {
                 self.resistance *= v;
             }
+            // integer products (`IMUL`) of the truncated amount
             MasterAttribute::FRAME_DELAY => {
                 self.fire_frame = self.fire_frame.times(low16(v));
             }

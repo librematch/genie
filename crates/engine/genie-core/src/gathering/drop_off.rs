@@ -246,7 +246,8 @@ impl Unit {
             roles,
         )?;
         let rate = StopRate {
-            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup
+                + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: productivity_of(
                 actions.list.gather().and_then(|g| g.task.productivity),
@@ -327,7 +328,7 @@ impl Unit {
                 master: target_master.id,
                 player: owner,
                 workers: t.workers,
-                drop_site: master.drop_sites.contains(&t.life.master_id),
+                drop_site: master.action_part().drop_sites.contains(&t.life.master_id),
                 gap: footprint_gap(
                     self.position(),
                     master.radius,
@@ -496,11 +497,11 @@ impl Unit {
         let master = self.master_in(c.masters)?;
         let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut site = carry_to;
-        if site.is_none() && !master.drop_sites.is_empty() {
+        if site.is_none() && !master.action_part().drop_sites.is_empty() {
             let masters = c.masters.table.ok_or(GenieError::unsupported(
                 "a drop-off of a player without masters",
             ))?;
-            let sites = &master.drop_sites;
+            let sites = &master.action_part().drop_sites;
             site =
                 match self.drop_site_from((actions, Some(mover)), c, others, state, true, by_id)? {
                     Some(s) => Some(s),
@@ -602,7 +603,7 @@ impl Unit {
         drop_site_search(
             others.own_iter(),
             OwnerMasters::new(c.masters.own, Some(masters)),
-            &master.drop_sites,
+            &master.action_part().drop_sites,
             self.position(),
             Some(seeker),
             (outside, at_work),

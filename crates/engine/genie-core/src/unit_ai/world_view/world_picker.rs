@@ -162,7 +162,7 @@ impl WorldPicker<'_> {
             master: p.life.master_id,
             faith: p.life.amount,
             attributes,
-            tasks: &pm.tasks,
+            tasks: &pm.action_part().tasks,
         };
         let target = self.held(whom)?.map(|(q, t, _, tm)| Convertee {
             owner: q,

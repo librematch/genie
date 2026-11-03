@@ -51,6 +51,7 @@ use crate::objects::Voice;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::layers::Animated;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
@@ -165,18 +166,24 @@ fn garrison_masters() -> Masters {
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             copy_id: Some(VILLAGER),
-            tasks: vec![task(GARRISON, 3), task(GARRISON, 20)],
             // no walking or standing sprite: a MoveTo the villager makes takes none (the
             // world's sprites' table holds none)
             move_sprite: None,
             standing_sprite: None,
+            action: Some(ActionPart {
+                tasks: vec![task(GARRISON, 3), task(GARRISON, 20)],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         },
         Master {
             id: ARCHER,
             kind: MasterKind::COMBAT,
             class: class::CLASS_0,
-            tasks: vec![task(ActionKind::COMBAT, 3)],
+            action: Some(ActionPart {
+                tasks: vec![task(ActionKind::COMBAT, 3)],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         },
         Master {
@@ -1785,7 +1792,10 @@ fn transport_takes_combat_unit_with_task_on_its_class_and_room() {
         id: master_id(1500),
         kind: MasterKind::MISSILE,
         class: class::SIEGE,
-        tasks: vec![task(GARRISON, 20)],
+        action: Some(ActionPart {
+            tasks: vec![task(GARRISON, 20)],
+            ..ActionPart::default()
+        }),
         ..Master::default()
     }]));
     t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
@@ -2218,10 +2228,13 @@ fn an_enter_gives_its_load_to_drop_site_and_needs_room() {
     let transforms: fn(&mut World) = |t| {
         for m in &mut t.model.masters {
             let v = Arc::make_mut(m).get_mut(VILLAGER).unwrap();
-            v.tasks.push(Task {
-                object_id: Some(TC),
-                ..task(ActionKind::DEPOSIT, -1)
-            });
+            v.action
+                .get_or_insert_with(Default::default)
+                .tasks
+                .push(Task {
+                    object_id: Some(TC),
+                    ..task(ActionKind::DEPOSIT, -1)
+                });
         }
     };
     assert_eq!(
@@ -2790,7 +2803,7 @@ fn shore_world(at: Point, ship: Point) -> World {
     let mut t = sized_world(40, 40);
     for m in &mut t.model.masters {
         if let Some(v) = Arc::make_mut(m).get_mut(VILLAGER) {
-            v.tasks = vec![
+            v.action.get_or_insert_with(Default::default).tasks = vec![
                 task(GARRISON, 3),
                 Task {
                     work_range: Distance::new(1.0),
@@ -3251,14 +3264,17 @@ fn transport_task_world() -> (World, ListIndex) {
         all.push(market);
         *m = Arc::new(Masters::new(all));
         if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
-            s.tasks.push(Task {
-                id: task_id(7),
-                action_kind: transport::TRANSPORT,
-                object_group: None,
-                object_id: None,
-                terrain: TaskTerrain::of_data(0),
-                ..Task::default()
-            });
+            s.action
+                .get_or_insert_with(Default::default)
+                .tasks
+                .push(Task {
+                    id: task_id(7),
+                    action_kind: transport::TRANSPORT,
+                    object_group: None,
+                    object_id: None,
+                    terrain: TaskTerrain::of_data(0),
+                    ..Task::default()
+                });
         }
     }
     building_at(&mut t, 4000, ids::MARKET, Point::new(18.5, 12.5), None);

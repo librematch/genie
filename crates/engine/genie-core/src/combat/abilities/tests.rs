@@ -659,6 +659,7 @@ use crate::map::terrain::{Terrain, TerrainKind};
 use crate::movement::Velocity;
 use crate::movement::move_to::{MOVE_TO, TargetMoved};
 use crate::objects::layers::Static;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::WorkValue;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
@@ -709,9 +710,12 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
         id,
         kind,
         class,
-        tasks,
         radius: Footprint::new(0.5, 0.5),
         hit_points: MasterHitPoints::of_data(100),
+        action: Some(ActionPart {
+            tasks,
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     for ms in &mut t.model.masters {

@@ -194,7 +194,7 @@ impl World {
                 .parts
                 .actions_of(self.object_at(place)?.id)
                 .top_action_kind()
-            && !new.tasks.iter().any(|t| t.action_kind == top)
+            && !new.action_part().tasks.iter().any(|t| t.action_kind == top)
             && let Place::Live(q, i) = place
         {
             self.object_stop(q, i)?;
@@ -474,7 +474,8 @@ impl World {
         new: &Master,
     ) -> Result<(), GenieError> {
         let find = |task: &Task| {
-            new.tasks
+            new.action_part()
+                .tasks
                 .iter()
                 .rev()
                 .find(|t| {
@@ -484,7 +485,7 @@ impl World {
                 })
                 .copied()
         };
-        let old_task = |id: TaskId| old.tasks.iter().find(|t| t.id == id).copied();
+        let old_task = |id: TaskId| old.action_part().tasks.iter().find(|t| t.id == id).copied();
         let graphics = &self.model.graphics;
         let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
         let sprites = MasterSprites {
@@ -606,6 +607,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::lifecycle::Lifecycle;
     use crate::objects::masters::ActionKind;
+    use crate::objects::masters::ActionPart;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeKind;
     use crate::objects::masters::CreatablePart;
@@ -1105,30 +1107,36 @@ mod tests {
         t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
             .unwrap();
         let mut old = t.model.masters[1].get(master_id(120)).unwrap().clone();
-        old.tasks.push(task(
-            task_id(3),
-            ActionKind::BUILD,
-            Some(class_id(3)),
-            Distance::new(0.25),
-        ));
+        old.action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .push(task(
+                task_id(3),
+                ActionKind::BUILD,
+                Some(class_id(3)),
+                Distance::new(0.25),
+            ));
         let make = task(task_id(4), MAKE, None, Distance::ZERO);
         let waiting = task(task_id(9), WAIT_SOLIDIFY, Some(class_id(3)), Distance::ZERO);
         let new = Master {
             id: master_id(121),
-            tasks: vec![
-                task(task_id(5), GATHER, Some(class_id(7)), Distance::new(0.5)),
-                task(task_id(6), GATHER, Some(class_id(7)), Distance::new(0.75)),
-                Task {
-                    sprites: TaskSprites::of_data([12, -1, -1, -1]),
-                    ..task(
-                        task_id(7),
-                        ActionKind::BUILD,
-                        Some(class_id(3)),
-                        Distance::new(1.5),
-                    )
-                },
-                task(task_id(8), MAKE, None, Distance::new(2.0)),
-            ],
+            action: Some(ActionPart {
+                tasks: vec![
+                    task(task_id(5), GATHER, Some(class_id(7)), Distance::new(0.5)),
+                    task(task_id(6), GATHER, Some(class_id(7)), Distance::new(0.75)),
+                    Task {
+                        sprites: TaskSprites::of_data([12, -1, -1, -1]),
+                        ..task(
+                            task_id(7),
+                            ActionKind::BUILD,
+                            Some(class_id(3)),
+                            Distance::new(1.5),
+                        )
+                    },
+                    task(task_id(8), MAKE, None, Distance::new(2.0)),
+                ],
+                ..old.action.clone().unwrap_or_default()
+            }),
             ..old.clone()
         };
         let u = &mut t.players[1].objects[ListIndex::new(0)];
@@ -1183,7 +1191,7 @@ mod tests {
                 .copied()
                 .unwrap()
                 .task,
-            HuntTask::of(&new.tasks[1])
+            HuntTask::of(&new.action_part().tasks[1])
         );
         assert_eq!(
             t.parts.actions_of(u.id).list.build().copied().unwrap().task,
@@ -1198,7 +1206,7 @@ mod tests {
         );
         assert_eq!(
             t.parts.actions_of(u.id).list.make().copied().unwrap().task,
-            new.tasks[3]
+            new.action_part().tasks[3]
         );
         assert_eq!(
             t.parts
@@ -1220,7 +1228,10 @@ mod tests {
             .unwrap()
             .task;
         let mut bare = old.clone();
-        bare.tasks.clear();
+        bare.action
+            .get_or_insert_with(Default::default)
+            .tasks
+            .clear();
         t.actions_take_master(
             Place::Live(PlayerId::new(1), ListIndex::new(0)),
             &bare,
@@ -1436,7 +1447,10 @@ mod tests {
         let old = t.model.masters[1].get(master_id(120)).unwrap().clone();
         let bare = Master {
             id: master_id(121),
-            tasks: Vec::new(),
+            action: Some(ActionPart {
+                tasks: Vec::new(),
+                ..old.action.clone().unwrap_or_default()
+            }),
             ..old.clone()
         };
         let place = Place::Live(PlayerId::new(1), ListIndex::new(0));

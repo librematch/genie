@@ -55,6 +55,7 @@ use genie_model::objects::masters::charge_kind;
 use genie_model::objects::masters::charge_target;
 use genie_model::objects::masters::class_id;
 mod class_mask;
+use genie_model::objects::masters::action_part;
 use genie_model::objects::masters::combat_ability;
 use genie_model::objects::masters::combat_part;
 use genie_model::objects::masters::creatable_part;
@@ -98,6 +99,7 @@ use genie_model::objects::masters::volley_spread;
 use genie_model::objects::masters::work_value;
 
 pub use self::action_kind::ActionKind;
+pub use self::action_part::ActionPart;
 pub use self::adjacent_mode::AdjacentMode;
 pub use self::attack_priority::AttackPriority;
 pub use self::attribute::MasterAttribute;

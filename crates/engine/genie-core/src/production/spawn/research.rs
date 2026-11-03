@@ -102,8 +102,8 @@ impl World {
         }
         let (t, def) = self.research_tech(p, r.tech)?;
         let master = building.life.master_id;
-        let rate =
-            self.parts.combat_of(building.id).work_rate_powerup + self.master(p, master)?.work_rate;
+        let rate = self.parts.combat_of(building.id).work_rate_powerup
+            + self.master(p, master)?.action_part().work_rate;
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, false);
         let shared = def.kind == TechKind::SHARED;

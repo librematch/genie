@@ -16,6 +16,7 @@ use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::UpdateCode;
 use crate::objects::layers::{Motion, MotionMut, Static};
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
@@ -795,17 +796,20 @@ fn transport_move_to_shows_its_task_or_its_master_sprite() {
     use crate::objects::masters::{Master, Task};
     let master = Master {
         move_sprite: Some(SpriteId::named(7)),
-        tasks: vec![
-            Task {
-                id: task_id(4),
-                sprites: TaskSprites::of_data([3, -1, -1, -1]),
-                ..Task::default()
-            },
-            Task {
-                id: task_id(5),
-                ..Task::default()
-            },
-        ],
+        action: Some(ActionPart {
+            tasks: vec![
+                Task {
+                    id: task_id(4),
+                    sprites: TaskSprites::of_data([3, -1, -1, -1]),
+                    ..Task::default()
+                },
+                Task {
+                    id: task_id(5),
+                    ..Task::default()
+                },
+            ],
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     let on = |task, master: &Master| TransportAction::given_sprite(task, master);

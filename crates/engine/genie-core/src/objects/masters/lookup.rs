@@ -113,13 +113,13 @@ pub fn work_master<'m>(
     ))?;
     let own_task = find_task(own_list, actor, on, filter, dip, slots, roles)?;
     if own_task.is_none_or(|t| t.action_kind == ActionKind::COMBAT)
-        && own.task_by_group != TaskGroup::NONE
+        && own.action_part().task_by_group != TaskGroup::NONE
     {
         let (mut by_class, mut generic) = (None, None);
         for candidate in masters.iter() {
             if candidate.class != own.class
                 || candidate.kind != own.kind
-                || candidate.task_by_group != own.task_by_group
+                || candidate.action_part().task_by_group != own.action_part().task_by_group
             {
                 continue;
             }

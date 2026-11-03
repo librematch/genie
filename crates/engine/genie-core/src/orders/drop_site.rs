@@ -59,7 +59,7 @@ impl World {
         let (kind, class, at) = (master.kind, master.class, unit.position().ground());
         let held = unit.life.attribute_type;
         let mut site = None;
-        if !master.drop_sites.is_empty() {
+        if !master.action_part().drop_sites.is_empty() {
             site = self.ordered_drop_site(p, idx)?;
         }
         if site.is_none() {
@@ -116,7 +116,7 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
         let seeks = master.kind < MasterKind::COMBAT
-            || (!master.drop_sites.iter().any(|&d| {
+            || (!master.action_part().drop_sites.iter().any(|&d| {
                 self.model.roles.of_master(d).contains(MasterRoles::DOCK)
                     || self.model.roles.of_master(d).contains(MasterRoles::PORT)
             }) && !self
@@ -131,7 +131,7 @@ impl World {
             return drop_site_search(
                 &self.players.player(p)?.objects,
                 OwnerMasters::new(&self.parts.own_master, Some(masters)),
-                &master.drop_sites,
+                &master.action_part().drop_sites,
                 unit.position(),
                 None,
                 (false, None),

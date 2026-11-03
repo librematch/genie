@@ -113,7 +113,11 @@ pub fn object_range(
         return range;
     }
     let cart = master.is_some_and(|m| {
-        m.kind == MasterKind::BUILDING && m.tasks.iter().any(|t| t.action_kind == CART_TASK)
+        m.kind == MasterKind::BUILDING
+            && m.action_part()
+                .tasks
+                .iter()
+                .any(|t| t.action_kind == CART_TASK)
     });
     if cart {
         Distance::new(order_tuning.cart_move_range)
@@ -540,6 +544,7 @@ mod tests {
     use crate::movement::move_to::tests::sheep;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    use crate::objects::masters::ActionPart;
     #[cfg(test)]
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
@@ -839,12 +844,18 @@ mod tests {
         };
         let cart = Master {
             kind: MasterKind::BUILDING,
-            tasks: vec![Task::default(), cart_task],
+            action: Some(ActionPart {
+                tasks: vec![Task::default(), cart_task],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         };
         let building = Master {
             kind: MasterKind::BUILDING,
-            tasks: vec![Task::default()],
+            action: Some(ActionPart {
+                tasks: vec![Task::default()],
+                ..ActionPart::default()
+            }),
             ..Master::default()
         };
         let unit = Master {

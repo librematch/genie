@@ -63,6 +63,14 @@ impl MasterKind {
         Self(value)
     }
 
+    /// Whether a master of this type holds the action layer (`RGE_Master_Action_Object`'s
+    /// values, `+0x790`..`+0x7b9`): the `.dat` reads the type-40 section (genieutils' `Bird`)
+    /// for the types 40 and up but 90; the save holds the RGE action part for 40 and up.
+    #[must_use]
+    pub const fn has_action_layer(self) -> bool {
+        Self::ACTION.0 <= self.0 && self.0 != 90
+    }
+
     /// Whether a master of this type holds the combat layer (`RGE_Master_Combat_Object`'s
     /// values, `+0x7f8`..`+0x87f`): the `.dat` reads the type-50 section for the types 50 and up
     /// but 90; the save holds the RGE combat part for 50, the missiles (60), 70 and 80.

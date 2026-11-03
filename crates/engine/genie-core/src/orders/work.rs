@@ -638,7 +638,7 @@ impl World {
         if let Some(task) = find(own, filter)? {
             return Ok(Some(task));
         }
-        if own.task_by_group == TaskGroup::NONE {
+        if own.action_part().task_by_group == TaskGroup::NONE {
             return Ok(None);
         }
         let mut found = None;
@@ -646,7 +646,7 @@ impl World {
         for candidate in self.model.masters.checked(player.index())?.iter() {
             if candidate.class != own.class
                 || candidate.kind != own.kind
-                || candidate.task_by_group != own.task_by_group
+                || candidate.action_part().task_by_group != own.action_part().task_by_group
             {
                 continue;
             }

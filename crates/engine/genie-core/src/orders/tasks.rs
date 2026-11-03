@@ -150,7 +150,7 @@ impl World {
         };
         let build_task = BuildTask::of(
             task,
-            builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
+            builder.action_part().work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
         );
         // the sprites its MoveTo's constructor takes for none (FUN_140aa0df0)
         let move_reads = MoveToReads::of(

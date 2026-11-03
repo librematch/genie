@@ -48,6 +48,7 @@ use crate::objects::layers::{Action, Motion, MotionMut, Static};
 use crate::objects::lifecycle::Held;
 use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
@@ -3455,9 +3456,12 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         id,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
-        tasks,
+        action: Some(ActionPart {
+            task_by_group: TaskGroup::MALE_VILLAGERS,
+            tasks,
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     t.model.masters[1] = Arc::new(Masters::new([
@@ -5545,6 +5549,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
     let task = *t.model.masters[1]
         .get(master_id(120))
         .unwrap()
+        .action_part()
         .tasks
         .first()
         .unwrap();
@@ -5634,6 +5639,7 @@ fn work_command_factory_starts_the_task_action() {
     let task = *t.model.masters[1]
         .get(master_id(120))
         .unwrap()
+        .action_part()
         .tasks
         .first()
         .unwrap();
@@ -5711,12 +5717,20 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         ..Master::default()
     };
     let soldier = Master {
-        tasks: vec![Task {
-            action_kind: ActionKind::COMBAT,
-            owner_type: TargetOwner::ENEMY,
-            object_group: Some(class::BUILDING),
-            ..Task::default()
-        }],
+        action: Some(ActionPart {
+            tasks: vec![Task {
+                action_kind: ActionKind::COMBAT,
+                owner_type: TargetOwner::ENEMY,
+                object_group: Some(class::BUILDING),
+                ..Task::default()
+            }],
+            ..t.model.masters[1]
+                .get(master_id(4))
+                .unwrap()
+                .action
+                .clone()
+                .unwrap_or_default()
+        }),
         ..t.model.masters[1].get(master_id(4)).unwrap().clone()
     };
     t.model.masters[1] = Arc::new(Masters::new([soldier, building.clone()]));

@@ -130,7 +130,8 @@ impl Unit {
                 roles,
                 &c.w.model.tuning.turn,
             ),
-            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
+            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup
+                + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity,
             stops_decay: owner.attributes.get(292) == Some(&Amount::new(1.0)),

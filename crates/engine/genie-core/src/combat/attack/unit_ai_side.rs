@@ -414,7 +414,7 @@ impl UnitView<'_, '_> {
         if !roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
             return None;
         }
-        let swap = if master.task_by_group == TaskGroup::MALE_VILLAGERS {
+        let swap = if master.action_part().task_by_group == TaskGroup::MALE_VILLAGERS {
             // The villagers a villager's attack command switches to by its task swap group (its player's
             // master table's entries at `+0x298` and `+0x928`).
             self.c.w.model.slots.master.villager_male

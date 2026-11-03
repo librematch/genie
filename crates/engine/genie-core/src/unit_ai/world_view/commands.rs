@@ -99,7 +99,7 @@ impl UnitView<'_, '_> {
         let own = unit.master(self.c.w.master_tables(), self.player)?;
         let switch = repairers(self.c.w.model.slots.master)
             .iter()
-            .find(|&&(group, _)| group == own.task_by_group)
+            .find(|&&(group, _)| group == own.action_part().task_by_group)
             .and_then(|&(_, id)| masters.get(id));
         let (Some(t), Some(general)) = (
             task_target_with(

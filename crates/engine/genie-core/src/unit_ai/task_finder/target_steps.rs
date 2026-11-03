@@ -217,7 +217,7 @@ pub(super) fn repair_finding<'m>(
         // needs a work value above 0, the any one only without a class's
         let mut any = None;
         let mut by_class = None;
-        for task in &list.tasks {
+        for task in &list.action_part().tasks {
             if task.action_kind != REPAIR || !wanted(filter, task) {
                 continue;
             }
@@ -254,6 +254,7 @@ fn build_task<'m>(
 ) -> Option<&'m Task> {
     let (mut by_class, mut generic) = (None, None);
     for task in list
+        .action_part()
         .tasks
         .iter()
         .filter(|t| t.action_kind == ActionKind::BUILD && wanted(filter, t))

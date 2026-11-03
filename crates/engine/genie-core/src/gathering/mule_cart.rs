@@ -119,7 +119,7 @@ impl World {
         let master = self.players.live(p, idx)?.master(self.master_tables(), p)?;
         let mut kinds = Vec::new();
         let mut cart_class = None;
-        for t in &master.tasks {
+        for t in &master.action_part().tasks {
             if t.action_kind == CART_TASK {
                 cart_class = t.object_group;
             }

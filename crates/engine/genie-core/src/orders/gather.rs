@@ -103,7 +103,7 @@ impl World {
             .gather()
             .and_then(|g| g.task.productivity);
         let rate = StopRate {
-            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
+            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.action_part().work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: productivity_of(
                 productivity,
@@ -264,6 +264,7 @@ impl World {
         let unit = &self.players.live(player, idx)?;
         Ok(unit
             .master(self.master_tables(), player)?
+            .action_part()
             .drop_sites
             .contains(&main_master))
     }
@@ -408,7 +409,7 @@ impl World {
         // the constructor's time per stop: the gatherer's work rate (its master's plus its
         // powerup, slot 0x6e8), capacity and productivity attribute (none: 1.0)
         let rate = StopRate {
-            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
+            work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.action_part().work_rate,
             capacity: Amount::of_master(me.capacity),
             productivity: productivity_of(
                 task.productivity,

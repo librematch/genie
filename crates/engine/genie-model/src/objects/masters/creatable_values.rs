@@ -163,6 +163,7 @@ impl CreatablePart {
                     self.train_location_entry = TrainLocationEntry::of_selected(n);
                 }
             }
+            // the game's: the selected entry plus the amount, not the count
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
                 let count = f32::from(self.train_location_entry.get()) + v;
                 resize_train_locations(

@@ -20,6 +20,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
@@ -5494,15 +5495,18 @@ fn new_object_takes_its_hunt_range_from_its_master_last_task_of_type_6() {
         copy_id: Some(master_id(1240)),
         class: class::PREY,
         object_flags: ObjectFlags::SCOUT | ObjectFlags::GATHERED_BUILDING,
-        tasks: vec![
-            task(ActionKind::named(6), Distance::new(2.0)),
-            task(ActionKind::COMBAT, Distance::new(9.0)),
-            task(ActionKind::named(6), Distance::new(3.5)),
-            task(GATHER, Distance::new(1.0)),
-        ],
         creatable: Some(CreatablePart {
             hero_flag: HeroFlags::REGENERATES,
             ..CreatablePart::default()
+        }),
+        action: Some(ActionPart {
+            tasks: vec![
+                task(ActionKind::named(6), Distance::new(2.0)),
+                task(ActionKind::COMBAT, Distance::new(9.0)),
+                task(ActionKind::named(6), Distance::new(3.5)),
+                task(GATHER, Distance::new(1.0)),
+            ],
+            ..ActionPart::default()
         }),
         ..Master::default()
     };

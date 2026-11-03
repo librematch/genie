@@ -349,6 +349,7 @@ impl Unit {
             ));
         }
         if me
+            .action_part()
             .tasks
             .iter()
             .find(|t| t.action_kind == ActionKind::DEPOSIT)

@@ -141,7 +141,8 @@ impl MakeAction {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).
             MakeState::Done => return Ok(HeadCode::Deletes),
             MakeState::Making if Amount::ZERO < self.remaining || self.total <= Amount::ZERO => {
-                let rate = (master.work_rate + c.w.parts.combat_of(farm.id).work_rate_powerup)
+                let rate = (master.action_part().work_rate
+                    + c.w.parts.combat_of(farm.id).work_rate_powerup)
                     * self.task.work_val1.get()
                     * c.dt.seconds();
                 let before = farm.life.amount;
@@ -200,6 +201,7 @@ mod tests {
     use crate::objects::ListIndex;
     use crate::objects::ObjectState;
     use crate::objects::WorkRate;
+    use crate::objects::masters::ActionPart;
     use crate::objects::masters::CarryCapacity;
     use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
@@ -241,8 +243,11 @@ mod tests {
             id,
             kind: MasterKind::BUILDING,
             class: class::FARM,
-            work_rate: WorkRate::new(0.4),
             capacity: CarryCapacity::of_data(15),
+            action: Some(ActionPart {
+                work_rate: WorkRate::new(0.4),
+                ..ActionPart::default()
+            }),
             ..Master::default()
         }
     }

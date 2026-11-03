@@ -124,6 +124,7 @@ impl Master {
                     }
                 }
             }
+            // the ability's button, tooltips and hotkey action are the interface's
             MasterAttribute::ABILITY_BUTTON_ICON_ID
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID
@@ -302,6 +303,7 @@ impl Master {
                     t.time = t.time.plus(low16(v));
                 }
             }
+            // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             MasterAttribute::ATTACK_GRAPHIC_2 => {
                 if let Some(p) = self.combat.as_mut() {
                     add_sprite(&mut p.attack_sprite2, v, world);

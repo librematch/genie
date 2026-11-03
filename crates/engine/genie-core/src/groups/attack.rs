@@ -282,7 +282,7 @@ impl World {
         let Some(master) = self.model.masters.of(player).and_then(|m| m.get(master)) else {
             return Ok(0.0);
         };
-        for task in &master.tasks {
+        for task in &master.action_part().tasks {
             if filter == CONVERSION_TASK && task.action_kind == CONVERSION_TASK {
                 let bonus = self
                     .players

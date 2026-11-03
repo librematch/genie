@@ -96,7 +96,7 @@ impl Unit {
             counted_in,
             radius: own.radius,
             scenario: c.w.settings.game_mode.scenario(),
-            rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.work_rate,
+            rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.action_part().work_rate,
             waits: roles.of_class(own.class).contains(ClassRoles::VILLAGER)
                 && !c.w.players.player(c.player)?.kind.is_computer(),
             stance: c

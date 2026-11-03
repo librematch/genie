@@ -338,6 +338,7 @@ impl NewObject {
             hero_flag: made.creatable_part().hero_flag,
             // FUN_141206d50: each task of action type 6 in turn sets `+0xb74`
             hunt_range: made
+                .action_part()
                 .tasks
                 .iter()
                 .rev()

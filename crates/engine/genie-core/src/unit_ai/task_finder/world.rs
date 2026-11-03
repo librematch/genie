@@ -173,13 +173,13 @@ pub(crate) fn task_search<'m>(
     if let Some(task) = find(own, filter)? {
         return Ok(Some((task, None)));
     }
-    if own.task_by_group == TaskGroup::NONE {
+    if own.action_part().task_by_group == TaskGroup::NONE {
         return Ok(None);
     }
     for candidate in masters.iter() {
         if candidate.class != own.class
             || candidate.kind != own.kind
-            || candidate.task_by_group != own.task_by_group
+            || candidate.action_part().task_by_group != own.action_part().task_by_group
         {
             continue;
         }

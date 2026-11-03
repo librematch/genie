@@ -48,6 +48,7 @@ use crate::objects::SpriteId;
 use crate::objects::Voice;
 use crate::objects::layers::Static;
 use crate::objects::masters::ActionKind;
+use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
@@ -153,12 +154,15 @@ fn world() -> World {
         class: class::CLASS_6,
         hit_points: MasterHitPoints::of_data(60),
         line_of_sight: Distance::new(4.0),
-        search_radius: Distance::new(3.0),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: None,
         creatable: Some(CreatablePart {
             formation_category: FormationClass::of_data(1),
             ..CreatablePart::default()
+        }),
+        action: Some(ActionPart {
+            search_radius: Distance::new(3.0),
+            ..ActionPart::default()
         }),
         ..Master::default()
     };
@@ -399,7 +403,10 @@ fn relic_carriers_keep_their_command_pending() {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         class: class::MONK,
-        tasks,
+        action: Some(ActionPart {
+            tasks,
+            ..ActionPart::default()
+        }),
         ..Master::default()
     };
     let set_masters = |t: &mut World, tasks: Vec<Task>| {

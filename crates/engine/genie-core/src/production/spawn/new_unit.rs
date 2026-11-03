@@ -144,6 +144,7 @@ impl World {
         let now = self.players.live(p, new)?.life.master_id;
         if self
             .master(p, now)?
+            .action_part()
             .tasks
             .iter()
             .any(|t| t.action_kind == ActionKind::ACTION_156)
