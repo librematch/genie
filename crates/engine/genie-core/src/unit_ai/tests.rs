@@ -57,6 +57,7 @@ use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerKind;
 use crate::players::Posture;
+use crate::players::UnitRelation;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::attack_category;
 use crate::test_ids::class_id;
@@ -78,7 +79,6 @@ use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AlertMode;
-use crate::unit_ai::AttackChecks;
 use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::GroupState;
 use crate::unit_ai::Notifies;
@@ -13840,240 +13840,191 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
     );
 }
 
-/// A soldier's world for its retarget search: what `bestUnitToAttack` finds, the attack
-/// commands it gave, and each search's place, reference distance, `any_class` and work state.
-struct RetargetSide {
-    found: i32,
-    attacks: Vec<(ObjectId, OrderForce)>,
-    searched: Vec<(Point, f32, bool, bool)>,
-}
-
-impl RetargetSide {
-    const fn finding(found: i32) -> Self {
-        Self {
-            found,
-            attacks: Vec::new(),
-            searched: Vec::new(),
-        }
-    }
-}
-
-impl UnitSide for RetargetSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
-        if let Pick::Attack { ask, .. } = &search.pick {
-            self.searched.push((
-                search.at,
-                ask.distance.get(),
-                ask.checks.contains(AttackChecks::ANY_CLASS),
-                ask.checks.contains(AttackChecks::WORK_STATE),
-            ));
-        }
-        Ok(Found {
-            id: ObjectId::of_field(self.found),
-            enemies: self.found != -1,
-            position: Some(Position::new(10.0, 11.0, 0.0)),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    }
-    fn attack(
-        &mut self,
-        target: ObjectId,
-        force: OrderForce,
-        _: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
-        self.attacks.push((target, force));
-        Ok(Attacked {
-            attacks: true,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Ok(Some((class::LIVESTOCK, Position::new(10.0, 11.0, 0.0))))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-}
-
-/// A soldier at (10, 10) on the attack order against `target` (−1 for none), among the
-/// world's objects: an enemy's sheep 25954 at (12, 10), its archer 30 (class 0), its house 40
-/// (class 3, type 80) and the house's annex 41 (main 40), and its trebuchet 42 (class 54, type
-/// 80) and farm 43 (class 49, type 80).
-fn retargeting(target: i32) -> (UnitAi, Surroundings) {
+/// The retarget tests' soldier ([`soldier_master`] of line of sight 6) on the attack order
+/// against `target` (−1 for none).
+fn retargeter(target: i32) -> (Master, UnitAi) {
+    let soldier = Master {
+        line_of_sight: Distance::new(6.0),
+        ..soldier_master()
+    };
     let u = UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(AiAction::Attack),
         current_target: ObjectId::of_field(target),
         ..idle(UnitAiKind::Soldier)
     };
-    let seen = |id, class: ClassId, kind: MasterKind, main| UnitSeen {
-        id,
+    (soldier, u)
+}
+
+/// Player 2's object `id` of master `master` at (x, y), its unit AI of `kind`.
+fn enemy_thing(id: i32, master: Master, (x, y): (f32, f32), kind: UnitAiKind) -> SceneThing {
+    SceneThing {
+        ai: Some(idle(kind)),
+        ..SceneThing::new(id, player_id(2), master, Position::new(x, y, 0.0))
+    }
+}
+
+/// A building master `id` of class `class`: radius 1, a moving object of speed 0.
+fn building_master(id: i16, class: ClassId) -> Master {
+    Master {
+        id: master_id(id),
+        kind: MasterKind::BUILDING,
         class,
-        owner: PlayerId::new(2),
-        state: ObjectState::Alive,
-        kind,
-        main,
-        position: Position::new(12.0, 10.0, 0.0),
-        ..UnitSeen::default()
-    };
-    let at = Surroundings {
-        id: object_id(500),
-        class: Some(class::CLASS_6),
-        player: PlayerId::new(1),
-        position: Position::new(10.0, 10.0, 0.0),
-        los: Distance::new(6.0),
-        units: vec![
-            seen(object_id(25954), class::LIVESTOCK, MasterKind::COMBAT, None),
-            seen(object_id(30), class::CLASS_0, MasterKind::COMBAT, None),
-            seen(object_id(40), class::BUILDING, MasterKind::BUILDING, None),
-            seen(
-                object_id(41),
-                class::BUILDING,
-                MasterKind::BUILDING,
-                Some(MainBuildingId::new(object_id(40))),
-            ),
-            seen(object_id(42), class::CLASS_54, MasterKind::BUILDING, None),
-            seen(object_id(43), class::FARM, MasterKind::BUILDING, None),
-        ],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    (u, at)
+        radius: Footprint::new(1.0, 1.0),
+        height: Distance::new(2.0),
+        hit_points: MasterHitPoints::of_data(550),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::ZERO)),
+        ..Master::default()
+    }
+}
+
+/// The retarget's search ([`UnitAi::retarget_search`]) of unit 500 of `w`: its answer, its
+/// Attack's target, and the objects the search's enemies list held.
+fn retargets(
+    w: &mut World,
+    search: RetargetSearch,
+) -> (Result<u32, GenieError>, Option<ObjectId>, Vec<ObjectId>) {
+    let r = run_ai(
+        w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.retarget_search(search, kind, at, side, rng),
+    );
+    let seen = w
+        .spatial
+        .searched()
+        .map(|l| l[UnitRelation::Enemy].iter().map(|r| r.id).collect())
+        .unwrap_or_default();
+    (r, attacks_500(w), seen)
 }
 
 /// The retarget's search for a better target ([`UnitAi::retarget_search`]): from the current
-/// target's place within `UnitAiTuning::retarget_reach`, any class only for a building target and in the
-/// attack work state the checks read. On the attack order a find of another attack category
-/// than the live current target's ends it (9), as does any find without a building target.
-/// Without a target the search starts from the unit, without a reference distance, any class.
+/// target's place (a sheep far from the soldier: the archer beside it is in the search's
+/// lists, one beside the soldier is not); on the attack order a find of another attack
+/// category than the live current target's ends it (9), as does any find without a building
+/// target (another archer beside the current one). Without a target the search starts from
+/// the unit. None attacks.
 #[test]
 fn retarget_search_ends_on_another_category_or_without_building_target() {
-    let (mut u, at) = retargeting(25954);
-    let mut side = RetargetSide::finding(30);
     let plain = RetargetSearch {
         building: false,
         work_state: true,
     };
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.retarget_search(
-            plain,
-            PlayerKind::Human,
-            &at,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(9)
+    let sheep = SceneThing {
+        capture: CaptureKind::Livestock,
+        ..enemy_thing(
+            25954,
+            walker(594, class::LIVESTOCK),
+            (30.0, 20.0),
+            UnitAiKind::Livestock,
+        )
+    };
+    let archer = |id: i32, at| enemy_thing(id, walker(7, class::CLASS_0), at, UnitAiKind::Ranged);
+    let mut w = soldier_world(
+        retargeter(25954),
+        None,
+        &[sheep.clone(), archer(30, (31.0, 20.0))],
     );
-    assert_eq!(
-        side.searched,
-        [(
-            Point::new(12.0, 10.0),
-            tuning().unit_ai.retarget_reach,
-            false,
-            true
-        )]
-    );
-    assert_eq!((side.attacks.len(), fx.len()), (0, 0));
+    assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![object_id(30)]));
+    assert_eq!(ai_500(&w).alert_mode, AlertMode::Alert);
+    let mut w = soldier_world(retargeter(25954), None, &[sheep, archer(30, (21.0, 20.0))]);
+    assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![]));
     // the same category: no building target, so nothing more either
-    let mut side = RetargetSide::finding(25954);
-    assert_eq!(
-        u.retarget_search(
-            plain,
-            PlayerKind::Human,
-            &at,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(9)
+    let mut w = soldier_world(
+        retargeter(30),
+        None,
+        &[archer(30, (30.0, 20.0)), archer(31, (31.0, 20.0))],
     );
-    let (mut none, at) = retargeting(-1);
-    let mut side = RetargetSide::finding(-1);
-    assert_eq!(
-        none.retarget_search(
-            plain,
-            PlayerKind::Human,
-            &at,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(9)
-    );
-    assert_eq!(side.searched, [(Point::new(10.0, 10.0), 0.0, true, false)]);
+    let (r, attacked, _) = retargets(&mut w, plain);
+    assert_eq!((r, attacked), (Ok(9), None));
+    // without a target: from the unit
+    let mut w = soldier_world(retargeter(-1), None, &[archer(30, (22.0, 20.0))]);
+    assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![object_id(30)]));
+    let mut w = soldier_world(retargeter(-1), None, &[archer(30, (40.0, 20.0))]);
+    assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![]));
 }
 
-/// With a building target the search goes on: a found building keeps the current target (10),
-/// but a trebuchet's classes, or a find for a farm target that is no farm; a found annex names
-/// its main building; a found object other than the current target is attacked (slot 0xb8,
-/// not any; 10), the current target itself is not (9). A computer player's unit in stance 0
-/// keeps its building target past the category test.
+/// With a building target the search goes on (off the attack order): a found building keeps
+/// the current target (10), but a trebuchet's classes, or a find for a farm target that is no
+/// farm; a found annex names its main building (house 40 out of the search's reach); a found
+/// object other than the current target is attacked (slot 0xb8, not any; 10), the current
+/// target itself is not (9). A current target gone, the search starts from the unit. A
+/// computer player's search (on the attack order, the unit in stance 0) is not modelled.
 #[test]
 fn retarget_search_with_building_target_attacks_what_it_finds() {
     let building = RetargetSearch {
         building: true,
         work_state: false,
     };
-    let attacked = |target, found, computer| {
-        let (mut u, at) = retargeting(target);
-        u.current_order = None;
-        let mut side = RetargetSide::finding(found);
-        let r = u.retarget_search(
-            building,
-            computer,
-            &at,
-            &mut With::new(&mut side, &mut Vec::new()),
-            &mut rng(),
-        );
-        (r, side.attacks)
+    let archer = || {
+        enemy_thing(
+            30,
+            walker(7, class::CLASS_0),
+            (22.0, 21.0),
+            UnitAiKind::Ranged,
+        )
     };
-    assert_eq!(
-        attacked(40, 30, PlayerKind::Human),
-        (Ok(10), vec![(object_id(30), OrderForce::Forced)])
+    let house = |at| {
+        enemy_thing(
+            40,
+            building_master(70, class::BUILDING),
+            at,
+            UnitAiKind::Building,
+        )
+    };
+    let annex = |at| SceneThing {
+        annex_of: Some(MainBuildingId::new(object_id(40))),
+        ..enemy_thing(
+            41,
+            building_master(71, class::BUILDING),
+            at,
+            UnitAiKind::Building,
+        )
+    };
+    let trebuchet = enemy_thing(
+        42,
+        building_master(42, class::CLASS_54),
+        (23.0, 23.0),
+        UnitAiKind::Siege,
     );
-    assert_eq!(attacked(40, 40, PlayerKind::Human), (Ok(10), vec![]));
-    assert_eq!(attacked(30, 41, PlayerKind::Human), (Ok(10), vec![]));
+    let farm = enemy_thing(
+        43,
+        building_master(50, class::FARM),
+        (23.0, 20.0),
+        UnitAiKind::Building,
+    );
+    let attacked = |target: i32, others: &[SceneThing]| {
+        let (soldier, mut u) = retargeter(target);
+        u.current_order = None;
+        let mut w = soldier_world((soldier, u), None, others);
+        let (r, attacked, _) = retargets(&mut w, building);
+        (r, attacked)
+    };
+    let near = (23.0, 20.0);
+    let far = (40.0, 20.0);
     assert_eq!(
-        attacked(43, 41, PlayerKind::Human),
-        (Ok(10), vec![(object_id(40), OrderForce::Forced)])
+        attacked(40, &[house(near), archer()]),
+        (Ok(10), Some(object_id(30)))
+    );
+    assert_eq!(attacked(40, &[house(near)]), (Ok(10), None));
+    assert_eq!(attacked(30, &[house(far), annex(near)]), (Ok(10), None));
+    assert_eq!(
+        attacked(43, &[farm.clone(), house(far), annex((25.0, 20.0))]),
+        (Ok(10), Some(object_id(40)))
     );
     assert_eq!(
-        attacked(40, 42, PlayerKind::Human),
-        (Ok(10), vec![(object_id(42), OrderForce::Forced)])
+        attacked(40, &[house(near), trebuchet]),
+        (Ok(10), Some(object_id(42)))
     );
-    assert_eq!(attacked(43, 43, PlayerKind::Human), (Ok(10), vec![]));
-    assert_eq!(attacked(30, 30, PlayerKind::Human), (Ok(9), vec![]));
-    // on the attack order a computer's unit in stance 0 keeps its building target past the
-    // category test: the archer is attacked
-    let (mut u, at) = retargeting(40);
-    let mut side = RetargetSide::finding(30);
-    let r = u.retarget_search(
-        building,
-        PlayerKind::Computer,
-        &at,
-        &mut With::new(&mut side, &mut Vec::new()),
-        &mut rng(),
-    );
+    assert_eq!(attacked(43, &[farm]), (Ok(10), None));
+    assert_eq!(attacked(30, &[archer()]), (Ok(9), None));
+    // a computer player's search
+    let mut w = soldier_world(retargeter(40), None, &[house(near), archer()]);
+    w.players[1].kind = PlayerKind::Computer;
     assert_eq!(
-        (r, side.attacks),
-        (Ok(10), vec![(object_id(30), OrderForce::Forced)])
+        retargets(&mut w, building).0,
+        Err(GenieError::unsupported(
+            "a computer player's bestUnitToAttack"
+        ))
     );
 }

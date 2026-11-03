@@ -7,6 +7,7 @@
 //! a new one. Tests build their world here instead of standing in for its reads.
 
 use crate::construction::BuilderCount;
+use crate::construction::MainBuildingId;
 use crate::construction::build::Construction;
 use crate::garrison::ContainerId;
 use crate::gathering::PastureId;
@@ -159,13 +160,16 @@ pub struct Thing {
     /// Its sprite, started on the scene's graphic of that id ([`Scene::graphic`]); none for
     /// an object without one.
     pub sprite: Option<SpriteId>,
+    /// The main building it is an annex of (`+0xbb8`), none for an object that is none's; the
+    /// scene links it into the main building's annexes (`+0xbc0`), as a save holds both.
+    pub annex_of: Option<MainBuildingId>,
 }
 
 impl Thing {
     /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points, outside
     /// the sight registry, not a foundation, attackable (the flag a spawn gives a new object),
-    /// without a unit AI, other flags, actions, capture flag or pasture, on the map. A moving
-    /// master's object stands with its movement state ([`Mover`]) at its place.
+    /// without a unit AI, other flags, actions, capture flag, pasture or main building, on the
+    /// map. A moving master's object stands with its movement state ([`Mover`]) at its place.
     ///
     /// # Panics
     ///
@@ -188,6 +192,7 @@ impl Thing {
             capture: CaptureKind::None,
             pasture: None,
             sprite: None,
+            annex_of: None,
         }
     }
 }
@@ -457,9 +462,15 @@ impl Scene {
         if let Some(scout) = self.scout {
             place_scout(&mut w, scout);
         }
+        let annexes: Vec<(ObjectId, MainBuildingId)> = self
+            .things
+            .iter()
+            .filter_map(|t| Some((t.id, t.annex_of?)))
+            .collect();
         for thing in self.things {
             place_thing(&mut w, thing);
         }
+        link_annexes(&mut w, &annexes);
         w.reindex();
         w
     }
@@ -690,6 +701,7 @@ fn place_thing(w: &mut World, thing: Thing) {
         capture,
         pasture,
         sprite,
+        annex_of: _,
     } = thing;
     let sprite = sprite.map(|id| {
         let graphic = *w.model.graphics.get(id).expect("the scene's graphic");
@@ -756,6 +768,24 @@ fn place_thing(w: &mut World, thing: Thing) {
     w.pathing.tiles_changed(w.spatial.take_changes());
     if let Some(mask) = seen_by {
         register(w, &thing, mask);
+    }
+}
+
+/// Each annex `(id, main)` names its main building, which holds it in its next free slot, in
+/// the scene's order.
+fn link_annexes(w: &mut World, annexes: &[(ObjectId, MainBuildingId)]) {
+    for (n, &(id, main)) in annexes.iter().enumerate() {
+        w.parts
+            .building_mut(id)
+            .expect("an annex's building layer")
+            .annex_of = Some(main);
+        let slot = annexes[..n].iter().filter(|&&(_, m)| m == main).count();
+        w.parts
+            .building_mut(main.id())
+            .expect("a main building's layer")
+            .annexes
+            .link(slot, id)
+            .expect("a main building's free annex slot");
     }
 }
 
