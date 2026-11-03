@@ -288,18 +288,17 @@ impl Unit {
             engagement,
             arms,
             idle,
-            special_graphic: if master.kind == MasterKind::COMBAT && master.special_graphic {
-                Some(
-                    master
-                        .special_sprite
-                        .and_then(|s| c.w.model.graphics.get(s))
+            special_graphic: match master.creatable_part().special_sprite {
+                Some(s) if master.kind == MasterKind::COMBAT => Some(
+                    c.w.model
+                        .graphics
+                        .get(s)
                         .copied()
                         .ok_or(GenieError::unsupported(
                             "a special graphic the data file does not have",
                         ))?,
-                )
-            } else {
-                None
+                ),
+                _ => None,
             },
         }))
     }

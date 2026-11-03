@@ -471,6 +471,7 @@ mod stack_tests {
     use crate::objects::layers::{Building, Static};
     use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::objects::masters::BuildableOn;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FlyMode;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
@@ -518,8 +519,6 @@ mod stack_tests {
             tall: 0.0 < z,
             obstruction_kind: kind,
             obstruction_class: ObstructionClass::UNIT,
-            build_time: WholeSeconds::of_data(bt),
-            trained_at: vec![master_id(9999)],
             hit_points: MasterHitPoints::of_data(hp),
             building: Some(BuildingMaster {
                 stack_unit: None,
@@ -530,6 +529,11 @@ mod stack_tests {
                 head_unit: opt_master(head),
                 transform_unit: None,
                 ..BuildingMaster::default()
+            }),
+            creatable: Some(CreatablePart {
+                build_time: WholeSeconds::of_data(bt),
+                trained_at: vec![master_id(9999)],
+                ..CreatablePart::default()
             }),
             ..Master::default()
         }
@@ -569,7 +573,9 @@ mod stack_tests {
             (Some(AttributeId::named(506)), Amount::new(1.0), 16),
             (None, Amount::ZERO, 0),
         ];
-        tc.volley_missile = Some(master_id(54));
+        if let Some(p) = tc.creatable.as_mut() {
+            p.volley_missile = Some(master_id(54));
+        }
         let mut empty = building(
             890,
             (0.0, 4.0, ObstructionKind::CIRCLE),
@@ -848,7 +854,9 @@ mod stack_tests {
             let mut t = world();
             for ms in &mut t.model.masters {
                 let m = Arc::make_mut(ms).get_mut(ids::TOWN_CENTRE).unwrap();
-                m.build_time = WholeSeconds::ZERO;
+                if let Some(p) = m.creatable.as_mut() {
+                    p.build_time = WholeSeconds::ZERO;
+                }
                 m.obstruction_kind = ObstructionKind::CIRCLE;
                 m.obstruction_class = ObstructionClass::UNIT;
                 m.height = Distance::new(height);
@@ -880,7 +888,9 @@ mod stack_tests {
                     let m = Arc::make_mut(ms).get_mut(master_id(id)).unwrap();
                     m.class = class::GATE;
                     m.storage.clear();
-                    m.volley_missile = None;
+                    if let Some(p) = m.creatable.as_mut() {
+                        p.volley_missile = None;
+                    }
                     // every building holds its movement state
                     m.moving = Some(MoveStats {
                         fly_mode: FlyMode::GROUND,

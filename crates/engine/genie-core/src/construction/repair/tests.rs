@@ -17,6 +17,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::SpeedMultiplier;
 use crate::objects::SpriteFlags;
 use crate::objects::Voice;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::{ActiveSprite, Graphic};
@@ -176,7 +177,10 @@ fn masters() -> Masters {
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             hit_points: MasterHitPoints::of_data(550),
-            cost: costs(&[(attribute::WOOD, 25, true)]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::WOOD, 25, true)]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         },
         Master {
@@ -185,7 +189,10 @@ fn masters() -> Masters {
             kind: MasterKind::COMBAT,
             class: class::SIEGE,
             hit_points: MasterHitPoints::of_data(175),
-            cost: costs(&[(attribute::WOOD, 160, true), (attribute::GOLD, 75, true)]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::WOOD, 160, true), (attribute::GOLD, 75, true)]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         },
     ])

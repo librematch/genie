@@ -7,6 +7,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{BuildingMaster, Master, Masters};
@@ -348,7 +349,12 @@ fn player_without_an_object_that_keeps_it_loses() {
             ..master(master_id(900), MasterKind::COMBAT, class::CLASS_11)
         },
         Master {
-            trained_at: vec![ids::TOWN_CENTRE],
+            creatable: Some(CreatablePart {
+                trained_at: vec![ids::TOWN_CENTRE],
+                ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
         },
     ]);
@@ -557,25 +563,50 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     };
     let masters = Masters::new([
         Master {
-            trained_at: vec![ids::TOWN_CENTRE],
+            creatable: Some(CreatablePart {
+                trained_at: vec![ids::TOWN_CENTRE],
+                ..master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
-            trained_at: vec![ids::TOWN_CENTRE],
             available: false,
+            creatable: Some(CreatablePart {
+                trained_at: vec![ids::TOWN_CENTRE],
+                ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
-            trained_at: vec![ids::TOWN_CENTRE],
             disabled: true,
+            creatable: Some(CreatablePart {
+                trained_at: vec![ids::TOWN_CENTRE],
+                ..master(master_id(85), MasterKind::COMBAT, class::VILLAGER)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(master_id(85), MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
-            trained_at: vec![ids::TOWN_CENTRE],
+            creatable: Some(CreatablePart {
+                trained_at: vec![ids::TOWN_CENTRE],
+                ..master(master_id(86), MasterKind::MISSILE, class::VILLAGER)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(master_id(86), MasterKind::MISSILE, class::VILLAGER)
         },
         Master {
-            trained_at: vec![master_id(12)],
+            creatable: Some(CreatablePart {
+                trained_at: vec![master_id(12)],
+                ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
         },
         master(ids::TOWN_CENTRE, MasterKind::BUILDING, class::BUILDING),
@@ -690,13 +721,23 @@ fn the_upgradable_count_follows_the_tech_tree() {
     let mut t = world();
     let masters = Masters::new([
         Master {
-            trained_at: vec![master_id(12)],
             available: false,
+            creatable: Some(CreatablePart {
+                trained_at: vec![master_id(12)],
+                ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
         },
         Master {
-            trained_at: vec![master_id(12)],
             available: false,
+            creatable: Some(CreatablePart {
+                trained_at: vec![master_id(12)],
+                ..master(master_id(75), MasterKind::COMBAT, class::CLASS_6)
+                    .creatable
+                    .unwrap_or_default()
+            }),
             ..master(master_id(75), MasterKind::COMBAT, class::CLASS_6)
         },
         master(master_id(12), MasterKind::BUILDING, class::BUILDING),

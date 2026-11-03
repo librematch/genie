@@ -270,7 +270,7 @@ impl World {
                 id,
                 group: u.group.id,
                 kind: master.kind,
-                grouped: master.formation_category.grouped(),
+                grouped: master.creatable_part().formation_category.grouped(),
                 turns: master.object_flags.contains(ObjectFlags::SHIP),
                 speed: self
                     .parts

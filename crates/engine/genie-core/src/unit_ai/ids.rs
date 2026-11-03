@@ -184,7 +184,7 @@ pub fn unit_ai_type(master: &Master, id: MasterId, roles: &Roles) -> Option<Unit
     factory_type(
         master.class,
         id,
-        master.volley_missile,
+        master.creatable_part().volley_missile,
         master.combat_level,
         roles,
     )
@@ -335,7 +335,7 @@ impl NewObject {
             copy_id: made.copy_id,
             class: made.class,
             object_flags: made.object_flags,
-            hero_flag: made.hero_flag,
+            hero_flag: made.creatable_part().hero_flag,
             // FUN_141206d50: each task of action type 6 in turn sets `+0xb74`
             hunt_range: made
                 .tasks

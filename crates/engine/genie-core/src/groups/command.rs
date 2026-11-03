@@ -137,7 +137,9 @@ impl World {
         for m in &g.members {
             if let Some((p, u)) = self.object(m.id) {
                 let master = u.master(self.master_tables(), p)?;
-                if MasterKind::COMBAT <= master.kind && master.formation_category.grouped() {
+                if MasterKind::COMBAT <= master.kind
+                    && master.creatable_part().formation_category.grouped()
+                {
                     return Ok(false);
                 }
             }
@@ -669,6 +671,7 @@ mod tests {
     use crate::groups::MotionFlags;
     use crate::groups::{GroupCommand, Member, UnitGroups};
     use crate::objects::ListIndex;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FormationClass;
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
@@ -710,7 +713,10 @@ mod tests {
         let master = Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
-            formation_category: FormationClass::of_data(1),
+            creatable: Some(CreatablePart {
+                formation_category: FormationClass::of_data(1),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         t.model.masters = vec![Masters::new([master]); 2]

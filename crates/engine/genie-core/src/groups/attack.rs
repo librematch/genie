@@ -440,13 +440,13 @@ impl World {
         master: &Master,
         target: &WorldObject<'_>,
     ) -> Result<bool, GenieError> {
-        if !master.charge_kind.ranged() {
+        if !master.creatable_part().charge_kind.ranged() {
             return Ok(false);
         }
         let tm = self.master(target.player(), target.master_id(self.model.slots))?;
         let works = charge_works(
-            master.charge_target,
-            master.charge_kind,
+            master.creatable_part().charge_target,
+            master.creatable_part().charge_kind,
             tm.class,
             tm.kind,
             &self.model.roles,

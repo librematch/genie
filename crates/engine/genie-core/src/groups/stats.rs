@@ -316,7 +316,7 @@ impl World {
             ));
         }
         let master = u.master(self.master_tables(), p)?;
-        let attack_priority = master.attack_priority;
+        let attack_priority = master.creatable_part().attack_priority;
         let (classes, radius) = search_area(
             ai_type,
             Some(master.class),
@@ -423,7 +423,7 @@ impl World {
         };
         // slot 0x300 of a charge type other than 1 and 3: at least 1 (`COMISS`, a NaN is not)
         Ok(if self.charge_hits(u, master, &t)? {
-            range + master.charge_event.range()
+            range + master.creatable_part().charge_event.range()
         } else {
             range
         })
@@ -606,6 +606,7 @@ mod tests {
     use crate::objects::masters::ChargeKind;
     use crate::objects::masters::ChargeTarget;
     use crate::objects::masters::ClassId;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FormationClass;
     use crate::objects::masters::MasterId;
     use crate::objects::masters::{Master, Masters};
@@ -659,7 +660,8 @@ mod tests {
             let m = Arc::make_mut(&mut t.model.masters[1])
                 .get_mut(master_id(4))
                 .unwrap();
-            (m.charge_kind, m.charge_target, m.charge_event) = (
+            let c = m.creatable.get_or_insert_with(Default::default);
+            (c.charge_kind, c.charge_target, c.charge_event) = (
                 ChargeKind::of_data(charge_type),
                 ChargeTarget::of_data(charge_target),
                 ChargeEvent::of_data(2),
@@ -742,10 +744,13 @@ mod tests {
             id,
             kind: MasterKind::COMBAT,
             class,
-            formation_category: FormationClass::of_data(1),
             line_of_sight: Distance::new(4.0),
             weapon_range: Distance::new(1.0),
             radius: Footprint::new(0.2, 0.2),
+            creatable: Some(CreatablePart {
+                formation_category: FormationClass::of_data(1),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         t.model.masters = vec![
@@ -962,7 +967,9 @@ mod tests {
             for masters in &mut t.model.masters {
                 *masters = Arc::new(Masters::new(masters.iter().cloned().map(|mut m| {
                     m.height = Distance::new(1.0);
-                    m.spacing_modifier = SpacingModifier::new(spacing);
+                    if let Some(p) = m.creatable.as_mut() {
+                        p.spacing_modifier = SpacingModifier::new(spacing);
+                    }
                     m
                 })));
             }

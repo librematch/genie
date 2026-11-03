@@ -125,6 +125,7 @@ use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
 use crate::objects::masters::CostAmount;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -637,13 +638,11 @@ pub(crate) fn builder_masters() -> Masters {
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tasks,
-        cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
         hit_points: MasterHitPoints::of_data(25),
-        build_time: WholeSeconds::ZERO,
         // a villager moves (its master's slot 0xe8), which BUILD's last loop asks
         moving: Some(MoveStats {
             fly_mode: FlyMode::GROUND,
@@ -666,6 +665,11 @@ pub(crate) fn builder_masters() -> Masters {
         standing_sprite: None,
         move_sprite: None,
         run_sprite: None,
+        creatable: Some(CreatablePart {
+            cost: costs(&[]),
+            build_time: WholeSeconds::ZERO,
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let base = || {
@@ -696,17 +700,13 @@ pub(crate) fn builder_masters() -> Masters {
             obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tasks: vec![],
-            cost: costs(&[(attribute::WOOD, 25, true)]),
             obstruction_class: ObstructionClass::UNIT,
             object_flags: ObjectFlags::NONE,
             combat_level: CombatLevel::NONE,
             work_rate: WorkRate::ZERO,
             hit_points: MasterHitPoints::of_data(550),
-            build_time: WholeSeconds::of_data(25),
             // a house's clearance, which BUILD's placement test reads
             clearance: Footprint::new(1.0, 1.0),
-            // built by the villagers (the builders' test, FUN_141262270)
-            trained_at: vec![ids::BUILDER],
             // a house's building part: no annexes, no stack unit, not an annex; its destruction
             // sprite (392 in build 158041's .dat), which it dies on unbuilt
             building: Some(BuildingMaster {
@@ -721,6 +721,13 @@ pub(crate) fn builder_masters() -> Masters {
             }),
             // its dying sprite (2196), which it dies on built
             death_sprite: Some(SpriteId::named(2196)),
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::WOOD, 25, true)]),
+                build_time: WholeSeconds::of_data(25),
+                // built by the villagers (the builders' test, FUN_141262270)
+                trained_at: vec![ids::BUILDER],
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         },
     ])
@@ -4388,11 +4395,10 @@ fn an_order_on_target_and_the_rest_after_it_run_inside_the_one_update() {
         for masters in &mut t.model.masters {
             for id in [83, 118, 120] {
                 if let Some(m) = Arc::make_mut(masters).get_mut(master_id(id)) {
-                    (m.kind, m.hit_points, m.regeneration) = (
-                        MasterKind::COMBAT,
-                        MasterHitPoints::of_data(25),
-                        Regeneration::new(20.0),
-                    );
+                    (m.kind, m.hit_points) = (MasterKind::COMBAT, MasterHitPoints::of_data(25));
+                    m.creatable
+                        .get_or_insert_with(Default::default)
+                        .regeneration = Regeneration::new(20.0);
                 }
             }
         }
@@ -4794,6 +4800,8 @@ fn formation_units_on_new_foundation_move_off_together() {
         Arc::make_mut(masters)
             .get_mut(master_id(120))
             .unwrap()
+            .creatable
+            .get_or_insert_with(Default::default)
             .formation_category = FormationClass::of_data(1);
     }
     t.evacuate(FoundationId::new(object_id(10028)), &[object_id(9175)])
@@ -9773,22 +9781,30 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
         id,
         kind: MasterKind::COMBAT,
         available: true,
-        trained_at: vec![ids::TOWN_CENTRE],
-        train_locations: vec![TrainLocation {
-            location: Some(ids::TOWN_CENTRE),
-            time,
-            button: LocationButton::of_data(1),
-            hotkey: HotkeyId::of_data(0),
-        }],
+        creatable: Some(CreatablePart {
+            trained_at: vec![ids::TOWN_CENTRE],
+            train_locations: vec![TrainLocation {
+                location: Some(ids::TOWN_CENTRE),
+                time,
+                button: LocationButton::of_data(1),
+                hotkey: HotkeyId::of_data(0),
+            }],
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let villager = |id| Master {
         class: class::VILLAGER,
-        cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
             (Some(attribute::POPULATION), Amount::new(1.0), 2),
         ],
+        creatable: Some(CreatablePart {
+            cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
+            ..trained(id, WholeSeconds::of_data(25))
+                .creatable
+                .unwrap_or_default()
+        }),
         ..trained(id, WholeSeconds::of_data(25))
     };
     let centre = Master {
@@ -13057,7 +13073,6 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
     };
     let workshop = Master {
         kind: MasterKind::BUILDING,
-        build_time: WholeSeconds::of_data(10),
         storage: vec![
             (Some(attribute::HEADROOM), Amount::new(5.0), 4),
             (None, Amount::ZERO, 0),
@@ -13072,6 +13087,12 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
             head_unit: None,
             transform_unit: None,
             ..BuildingMaster::default()
+        }),
+        creatable: Some(CreatablePart {
+            build_time: WholeSeconds::of_data(10),
+            ..master(master_id(1378), class::ARTIFACT, Distance::new(4.0))
+                .creatable
+                .unwrap_or_default()
         }),
         ..master(master_id(1378), class::ARTIFACT, Distance::new(4.0))
     };
@@ -14068,8 +14089,11 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
         id: ids::CASTLE,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        cost: costs(&[(attribute::STONE, 650, true), (attribute::FOOD, 10, false)]),
         weapons: vec![ClassAmount::new(3, 11)],
+        creatable: Some(CreatablePart {
+            cost: costs(&[(attribute::STONE, 650, true), (attribute::FOOD, 10, false)]),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let annex = Master {
@@ -14285,11 +14309,14 @@ fn trebuchet_is_master_of_class_51_or_54_with_weapon() {
         &roles()
     ));
     let paid = Master {
-        cost: costs(&[
-            (attribute::WOOD, 200, true),
-            (attribute::GOLD, 200, true),
-            (attribute::STONE, 7, false),
-        ]),
+        creatable: Some(CreatablePart {
+            cost: costs(&[
+                (attribute::WOOD, 200, true),
+                (attribute::GOLD, 200, true),
+                (attribute::STONE, 7, false),
+            ]),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     assert_eq!(paid_cost(&paid), Amount::new(400.0));
@@ -14510,7 +14537,10 @@ fn set_gather_point_takes_building_that_trains_without_garrisoning() {
             id: master_id(74),
             kind: MasterKind::COMBAT,
             available: true,
-            trained_at: vec![master_id(12)],
+            creatable: Some(CreatablePart {
+                trained_at: vec![master_id(12)],
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         },
     ]))];
@@ -15069,7 +15099,6 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
         kind: MasterKind::BUILDING,
         class: class::GATE,
         hit_points: MasterHitPoints::of_data(10),
-        build_time: WholeSeconds::of_data(70),
         standing_sprite: Some(SpriteId::named(1751)),
         death_sprite,
         building: Some(BuildingMaster {
@@ -15081,6 +15110,10 @@ fn annexes_before_their_dying_foundation_die_in_the_next_update() {
             destruction_sprite,
             construction_sprite: None,
             ..BuildingMaster::default()
+        }),
+        creatable: Some(CreatablePart {
+            build_time: WholeSeconds::of_data(70),
+            ..CreatablePart::default()
         }),
         ..Master::default()
     };
@@ -15259,7 +15292,10 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
         id: master_id(692),
         kind: MasterKind::COMBAT,
         hit_points: MasterHitPoints::of_data(54),
-        regeneration: Regeneration::new(20.0),
+        creatable: Some(CreatablePart {
+            regeneration: Regeneration::new(20.0),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let unit = |hp| {
@@ -15316,7 +15352,10 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         id: master_id(692),
         kind: MasterKind::COMBAT,
         hit_points: MasterHitPoints::of_data(54),
-        regeneration: Regeneration::new(20.0),
+        creatable: Some(CreatablePart {
+            regeneration: Regeneration::new(20.0),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let unit = |hp| Unit {
@@ -15363,7 +15402,10 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     );
     // a hero's 30 and the powerups: stinger + (powerup + (30 + master))
     let hero = Master {
-        hero_flag: HeroFlags::FULL_HERO,
+        creatable: Some(CreatablePart {
+            hero_flag: HeroFlags::FULL_HERO,
+            ..berserk.clone().creatable.unwrap_or_default()
+        }),
         ..berserk.clone()
     };
     let powered_combat = Combat {
@@ -15376,7 +15418,10 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         Regeneration::new(60.0)
     );
     let not_hero = Master {
-        hero_flag: HeroFlags::REGENERATES | HeroFlags::INVERTED,
+        creatable: Some(CreatablePart {
+            hero_flag: HeroFlags::REGENERATES | HeroFlags::INVERTED,
+            ..berserk.clone().creatable.unwrap_or_default()
+        }),
         ..berserk.clone()
     };
     assert_eq!(
@@ -15386,8 +15431,11 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     // a gate of Aftermath's: -1000 a minute takes 1 hit point per 0.06 s, at most what it has
     let gate = Master {
         hit_points: MasterHitPoints::of_data(1650),
-        regeneration: Regeneration::new(-1000.0),
         kind: MasterKind::BUILDING,
+        creatable: Some(CreatablePart {
+            regeneration: Regeneration::new(-1000.0),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let mut g = unit(HitPoints::new(1650.0));
@@ -15524,12 +15572,15 @@ fn building_short_of_its_build_time_dies(state: ObjectState) {
         class: class::BUILDING,
         standing_sprite: Some(SpriteId::named(207)),
         death_sprite: Some(SpriteId::named(2573)),
-        build_time: WholeSeconds::of_data(50),
         hit_points: MasterHitPoints::of_data(1200),
         building: Some(BuildingMaster {
             destruction_sprite: Some(SpriteId::named(389)),
             construction_sprite: None,
             ..BuildingMaster::default()
+        }),
+        creatable: Some(CreatablePart {
+            build_time: WholeSeconds::of_data(50),
+            ..CreatablePart::default()
         }),
         ..Master::default()
     };
@@ -17157,9 +17208,17 @@ fn farm_masters() -> Masters {
         radius: Footprint::new(1.5, 1.5),
         clearance: Footprint::new(1.5, 1.5),
         tall: false,
-        cost: costs(&[(attribute::WOOD, 60, true)]),
         hit_points: MasterHitPoints::of_data(480),
-        build_time: WholeSeconds::of_data(15),
+        creatable: Some(CreatablePart {
+            cost: costs(&[(attribute::WOOD, 60, true)]),
+            build_time: WholeSeconds::of_data(15),
+            ..builders
+                .get(ids::HOUSE)
+                .unwrap()
+                .clone()
+                .creatable
+                .unwrap_or_default()
+        }),
         ..builders.get(ids::HOUSE).unwrap().clone()
     };
     Masters::new(builders.iter().cloned().chain([farmer, farm]))
@@ -17991,13 +18050,16 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         weapon_range: Distance::new(4.0),
         reload: Seconds::new(2.0),
         hit_chance: HitChance::of_data(hit_chance),
-        max_volley: MissileCount::of_data(max_volley),
-        volley_spread: VolleySpread {
-            x: Distance::new(spread),
-            y: Distance::new(spread),
-            start: Distance::ZERO,
-        },
         moving: Some(walker().stats),
+        creatable: Some(CreatablePart {
+            max_volley: MissileCount::of_data(max_volley),
+            volley_spread: VolleySpread {
+                x: Distance::new(spread),
+                y: Distance::new(spread),
+                start: Distance::ZERO,
+            },
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let arrow = Master {
@@ -18425,6 +18487,8 @@ fn volley_own_missiles_hit_without_the_shooter() {
         Arc::make_mut(m)
             .get_mut(master_id(4))
             .unwrap()
+            .creatable
+            .get_or_insert_with(Default::default)
             .volley_missile = Some(master_id(364));
         all.retain(|x| x.id != master_id(4));
         all.push(m.get(master_id(4)).unwrap().clone());
@@ -18507,8 +18571,12 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         (
             |t| {
                 for m in &mut t.model.masters {
-                    Arc::make_mut(m).get_mut(master_id(4)).unwrap().charge_kind =
-                        ChargeKind::of_data(6);
+                    Arc::make_mut(m)
+                        .get_mut(master_id(4))
+                        .unwrap()
+                        .creatable
+                        .get_or_insert_with(Default::default)
+                        .charge_kind = ChargeKind::of_data(6);
                 }
             },
             "a charged hit",
@@ -20936,7 +21004,10 @@ fn repair_pays_ends_at_full_hit_points_and_reaches_an_ally_house() {
         let castle = Master {
             id: ids::CASTLE,
             hit_points: MasterHitPoints::of_data(4800),
-            cost: costs(&[(attribute::STONE, 650, true)]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::STONE, 650, true)]),
+                ..house.creatable.clone().unwrap_or_default()
+            }),
             ..house
         };
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([castle])));
@@ -21899,7 +21970,16 @@ fn built_building_death_reaches_its_owner_within_its_update() {
             let mut castle = Master {
                 id: ids::CASTLE,
                 death_sprite: None,
-                cost: costs(&[(attribute::STONE, 650, true)]),
+                creatable: Some(CreatablePart {
+                    cost: costs(&[(attribute::STONE, 650, true)]),
+                    ..masters
+                        .get(ids::HOUSE)
+                        .unwrap()
+                        .clone()
+                        .creatable
+                        .clone()
+                        .unwrap_or_default()
+                }),
                 ..masters.get(ids::HOUSE).unwrap().clone()
             };
             let b = castle.building.as_mut().unwrap();

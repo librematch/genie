@@ -253,7 +253,7 @@ impl Unit {
             },
         )?;
         if started {
-            c.w.parts.combat_mut(self.id)?.firepower = master.volley_fire;
+            c.w.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
             let (p, id) = (c.player, self.id);
             c.lend((&mut *self, &mut *actions), |w| w.watch_started(p, id))?;
         }

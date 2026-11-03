@@ -30,10 +30,7 @@ pub fn swing_sprites(look: Option<&Look>, master: &Master, graphics: &Graphics) 
     let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
     SwingSprites {
         look: g(look.and_then(|l| l.attacking)),
-        special: master
-            .special_graphic
-            .then(|| g(master.special_sprite))
-            .flatten(),
+        special: g(master.creatable_part().special_sprite),
     }
 }
 
@@ -72,7 +69,7 @@ pub(super) fn set_attack_timer(
 /// has (`masters`), so its hits go through its volley even without a missile.
 pub(crate) fn volleys(master: &Master, masters: &Masters) -> bool {
     let has = |id: Option<MasterId>| id.and_then(|id| masters.get(id)).is_some();
-    has(master.volley_missile) || has(master.charge_projectile)
+    has(master.creatable_part().volley_missile) || has(master.creatable_part().charge_projectile)
 }
 
 /// Slot 0x68 (`FUN_141217000`): the unit's sprite becomes `g` unless it is already; a new sprite

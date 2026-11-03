@@ -415,7 +415,7 @@ pub fn building_death(
     build_points: Seconds,
 ) -> Option<SpriteId> {
     let points = cvttss2si(build_points.get()).to_le_bytes();
-    if i16::from_le_bytes([points[0], points[1]]) < master.build_time.get() {
+    if i16::from_le_bytes([points[0], points[1]]) < master.creatable_part().build_time.get() {
         let destruction = master.building.as_ref().and_then(|b| b.destruction_sprite);
         return destruction.or(master.death_sprite);
     }
@@ -429,6 +429,7 @@ mod tests {
     use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
     use crate::objects::FacetCount;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::TaskSprites;
     #[cfg(test)]
@@ -733,11 +734,14 @@ mod tests {
             move_sprite: Some(SpriteId::named(10)),
             run_sprite: Some(SpriteId::named(11)),
             attack_sprite: Some(SpriteId::named(12)),
-            build_time: WholeSeconds::of_data(50),
             building: Some(BuildingMaster {
                 destruction_sprite: Some(SpriteId::named(389)),
                 construction_sprite: None,
                 ..BuildingMaster::default()
+            }),
+            creatable: Some(CreatablePart {
+                build_time: WholeSeconds::of_data(50),
+                ..CreatablePart::default()
             }),
             ..Master::default()
         }

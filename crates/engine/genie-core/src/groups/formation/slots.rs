@@ -56,10 +56,12 @@ impl World {
             return Ok(FormationCategory::ANY);
         };
         let master = self.master(object.player(), object.master_id(self.model.slots))?;
-        Ok(
-            sub_formation(master.kind, master.hero_flag, master.formation_category)
-                .unwrap_or(FormationCategory::ANY),
+        Ok(sub_formation(
+            master.kind,
+            master.creatable_part().hero_flag,
+            master.creatable_part().formation_category,
         )
+        .unwrap_or(FormationCategory::ANY))
     }
 
     /// `ClosestUnit` (`FUN_14100e370`) of group `g` to `point`: of the members the world holds

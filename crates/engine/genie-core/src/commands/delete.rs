@@ -239,7 +239,7 @@ impl World {
             "a removed building the slice does not hold",
         ))?;
         let master = unit.master(self.master_tables(), owner)?;
-        let cost = master.cost;
+        let cost = master.creatable_part().cost;
         let (state, hp) = (unit.life.state, unit.life.hp);
         let site = self.parts.building_of(unit.id).construction;
         let desolid = site.is_some_and(|c| c.desolid);
@@ -614,6 +614,7 @@ mod tests {
     use crate::objects::MasterHitPoints;
     #[cfg(test)]
     use crate::objects::layers::Building;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::ObstructionClass;
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{Master, Masters};
@@ -717,7 +718,10 @@ mod tests {
                 id: ids::HOUSE,
                 class: class::BUILDING,
                 kind: MasterKind::BUILDING,
-                cost: costs(&[(attribute::WOOD, 25, true), (attribute::HEADROOM, 1, false)]),
+                creatable: Some(CreatablePart {
+                    cost: costs(&[(attribute::WOOD, 25, true), (attribute::HEADROOM, 1, false)]),
+                    ..CreatablePart::default()
+                }),
                 ..Master::default()
             },
             Master {
@@ -840,6 +844,7 @@ mod clearing_tests {
     use crate::objects::masters::BuildableOn;
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::ObstructionClass;
@@ -1179,11 +1184,14 @@ mod clearing_tests {
     fn death_refunds_its_paid_cost_by_its_type() {
         let unit = Master {
             kind: MasterKind::COMBAT,
-            cost: costs(&[
-                (attribute::FOOD, 50, true),
-                (attribute::GOLD, 20, true),
-                (attribute::WOOD, 5, false),
-            ]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[
+                    (attribute::FOOD, 50, true),
+                    (attribute::GOLD, 20, true),
+                    (attribute::WOOD, 5, false),
+                ]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         assert_eq!(

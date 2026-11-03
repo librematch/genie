@@ -88,13 +88,16 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tasks,
-        cost: costs(&[]),
         obstruction_class: ObstructionClass::NONE,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::new(1.0),
         hit_points: MasterHitPoints::of_data(25),
-        build_time: WholeSeconds::ZERO,
+        creatable: Some(CreatablePart {
+            cost: costs(&[]),
+            build_time: WholeSeconds::ZERO,
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }
 }
@@ -110,13 +113,16 @@ fn house() -> Master {
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         tasks: vec![],
-        cost: costs(&[(player_attribute::WOOD, 25, true)]),
         obstruction_class: ObstructionClass::UNIT,
         object_flags: ObjectFlags::NONE,
         combat_level: CombatLevel::NONE,
         work_rate: WorkRate::ZERO,
         hit_points: MasterHitPoints::of_data(550),
-        build_time: WholeSeconds::of_data(25),
+        creatable: Some(CreatablePart {
+            cost: costs(&[(player_attribute::WOOD, 25, true)]),
+            build_time: WholeSeconds::of_data(25),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }
 }
@@ -191,10 +197,7 @@ fn world(capped: bool) -> AttributeWorld<'static> {
 }
 
 fn of_type(kind: MasterKind) -> Master {
-    Master {
-        kind,
-        ..Master::default()
-    }
+    Master::of_kind(kind)
 }
 
 /// A field of a master, read as an `f32`.
@@ -211,11 +214,14 @@ fn stocked(kind: MasterKind) -> Master {
             (Some(player_attribute::WOOD), Amount::new(1.0), 1),
             (Some(player_attribute::STONE), Amount::new(1.0), 1),
         ],
-        cost: costs(&[(player_attribute::FOOD, 1, true)]),
         damage_graphics: vec![DamageGraphic::default(); 2],
         damage_graphic_entry: DamageGraphicEntry::of_data(1),
-        train_locations: vec![TrainLocation::default(); 2],
-        train_location_entry: TrainLocationEntry::of_data(1),
+        creatable: Some(CreatablePart {
+            cost: costs(&[(player_attribute::FOOD, 1, true)]),
+            train_locations: vec![TrainLocation::default(); 2],
+            train_location_entry: TrainLocationEntry::of_data(1),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }
 }
@@ -609,138 +615,142 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
     let rows: &[(MasterAttribute, Read, [f32; 3])] = &[
         (
             MasterAttribute::HERO_STATUS,
-            |m| f32::from(m.hero_flag.bits()),
+            |m| f32::from(m.creatable_part().hero_flag.bits()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::TRAIN_LOCATION,
-            |m| f32::from(MasterId::field(m.train_locations[1].location)),
+            |m| {
+                f32::from(MasterId::field(
+                    m.creatable_part().train_locations[1].location,
+                ))
+            },
             [3.0; 3],
         ),
         (
             MasterAttribute::TRAIN_BUTTON,
-            |m| f32::from(m.train_locations[1].button.get()),
+            |m| f32::from(m.creatable_part().train_locations[1].button.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::SHOWN_PIERCE_ARMOR,
-            |m| m.shown.pierce_armor.as_f32(),
+            |m| m.creatable_part().pierce_armor_shown.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::HOTKEY_ID,
-            |m| m.train_locations[1].hotkey.get() as f32,
+            |m| m.creatable_part().train_locations[1].hotkey.get() as f32,
             [3.0; 3],
         ),
         (
             MasterAttribute::MAXIMUM_CHARGE,
-            |m| m.max_charge.get(),
+            |m| m.creatable_part().max_charge.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::RECHARGE_RATE,
-            |m| m.recharge_rate.get(),
+            |m| m.creatable_part().recharge_rate.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::CHARGE_EVENT,
-            |m| f32::from(m.charge_event.get()),
+            |m| f32::from(m.creatable_part().charge_event.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::CHARGE_TYPE,
-            |m| f32::from(m.charge_kind.get()),
+            |m| f32::from(m.creatable_part().charge_kind.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::SECONDARY_PROJECTILE_UNIT,
-            |m| f32::from(MasterId::field(m.volley_missile)),
+            |m| f32::from(MasterId::field(m.creatable_part().volley_missile)),
             [3.0; 3],
         ),
         (
             MasterAttribute::SPECIAL_GRAPHIC,
-            |m| sprite_value(m.special_sprite),
+            |m| sprite_value(m.creatable_part().special_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::SPECIAL_ABILITY,
-            |m| f32::from(m.special_attack.get()),
+            |m| f32::from(m.creatable_part().special_attack.get()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::IDLE_ATTACK_GRAPHIC,
-            |m| sprite_value(m.idle_attack_sprite),
+            |m| sprite_value(m.creatable_part().idle_attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::HERO_GLOW_GRAPHIC,
-            |m| sprite_value(m.hero_glow_sprite),
+            |m| sprite_value(m.creatable_part().hero_glow_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::GARRISON_GRAPHIC,
-            |m| sprite_value(m.garrison_sprite),
+            |m| sprite_value(m.creatable_part().garrison_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::FOOD_COSTS,
-            |m| m.cost[0].amount.as_f32(),
+            |m| m.creatable_part().cost[0].amount.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TRAIN_TIME,
-            |m| f32::from(m.train_locations[1].time.get()),
+            |m| f32::from(m.creatable_part().train_locations[1].time.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TOTAL_MISSILES,
-            |m| m.volley_fire.get(),
+            |m| m.creatable_part().volley_fire.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MAXIMUM_TOTAL_MISSILES,
-            |m| f32::from(m.max_volley.get()),
+            |m| f32::from(m.creatable_part().max_volley.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::REGENERATION_RATE,
-            |m| m.regeneration.get(),
+            |m| m.creatable_part().regeneration.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MIN_CONVERSION_TIME_MODIFIER,
-            |m| m.conversion.min_time,
+            |m| m.creatable_part().conversion.min_time,
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::CONVERSION_CHANCE_MODIFIER,
-            |m| m.conversion.chance,
+            |m| m.creatable_part().conversion.chance,
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FORMATION_CATEGORY,
-            |m| f32::from(m.formation_category.get()),
+            |m| f32::from(m.creatable_part().formation_category.get()),
             [3.0; 3],
         ),
         // 10 hit points times the amount, set then added
         (
             MasterAttribute::REGENERATION_HP_PERCENT,
-            |m| m.regeneration.get(),
+            |m| m.creatable_part().regeneration.get(),
             [30.0, 50.0, 50.0],
         ),
         (
             MasterAttribute::CHARGE_PROJECTILE_UNIT,
-            |m| f32::from(MasterId::field(m.charge_projectile)),
+            |m| f32::from(MasterId::field(m.creatable_part().charge_projectile)),
             [3.0; 3],
         ),
         (
             MasterAttribute::ATTACK_PRIORITY,
-            |m| f32::from(m.attack_priority.get()),
+            |m| f32::from(m.creatable_part().attack_priority.get()),
             [3.0; 3],
         ),
         (
             MasterAttribute::INVULNERABILITY_LEVEL,
-            |m| m.invulnerability.get(),
+            |m| m.creatable_part().invulnerability.get(),
             [3.0, 5.0, 10.0],
         ),
         (
@@ -750,23 +760,26 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::SPAWNING_AREA_WIDTH,
-            |m| m.volley_spread.x.get(),
+            |m| m.creatable_part().volley_spread.x.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SPAWNING_AREA_RANDOMNESS,
-            |m| m.volley_spread.start.get(),
+            |m| m.creatable_part().volley_spread.start.get(),
             [3.0, 5.0, 10.0],
         ),
         // the selected entry plus ten times the count, as the damage sprites'
         (
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
-            |m| f32::from(m.train_location_entry.get()) + 10.0 * m.train_locations.len() as f32,
+            |m| {
+                f32::from(m.creatable_part().train_location_entry.get())
+                    + 10.0 * m.creatable_part().train_locations.len() as f32
+            },
             [21.0, 21.0, 32.0],
         ),
         (
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
-            |m| m.train_locations.len() as f32,
+            |m| m.creatable_part().train_locations.len() as f32,
             [3.0, 3.0, 6.0],
         ),
     ];
@@ -988,7 +1001,7 @@ fn missile_smart_mode_multiply_sets_it() {
 #[test]
 fn the_cost_attributes_change_their_resource_entries() {
     let mut m = of_type(MasterKind::BUILDING);
-    m.cost = costs(&[
+    m.creatable.get_or_insert_with(Default::default).cost = costs(&[
         (player_attribute::WOOD, 25, true),
         (player_attribute::HEADROOM, 1, false),
     ]);
@@ -999,7 +1012,7 @@ fn the_cost_attributes_change_their_resource_entries() {
     ];
     m.add_attribute(MasterAttribute::WOOD_COSTS, -5.0, &world(false));
     assert_eq!(
-        m.cost,
+        m.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 20, true),
             (player_attribute::HEADROOM, 1, false)
@@ -1008,7 +1021,7 @@ fn the_cost_attributes_change_their_resource_entries() {
     m.multiply_attribute(MasterAttribute::RESOURCE_COSTS, 0.85, &world(false));
     // 20 × 0.85 + 0.5 = 17.5
     assert_eq!(
-        m.cost,
+        m.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 17, true),
             (player_attribute::HEADROOM, 1, false)
@@ -1016,12 +1029,12 @@ fn the_cost_attributes_change_their_resource_entries() {
     );
     m.set_attribute(MasterAttribute::GOLD_COSTS, 50.0, &world(false));
     assert_eq!(
-        m.cost[0].entry(),
+        m.creatable_part().cost[0].entry(),
         Some((player_attribute::WOOD, CostAmount::of_data(17), true))
     );
     m.set_attribute(MasterAttribute::POPULATION, 2.0, &world(false));
     assert_eq!(
-        m.cost,
+        m.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 17, true),
             (player_attribute::HEADROOM, -2, false)
@@ -1048,40 +1061,60 @@ fn the_train_location_attributes_change_the_selected_entry() {
         hotkey: HotkeyId::of_data(16_000),
     };
     let mut m = of_type(MasterKind::COMBAT);
-    m.train_locations = vec![
+    m.creatable
+        .get_or_insert_with(Default::default)
+        .train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.train_location_entry = TrainLocationEntry::of_data(1);
+    m.creatable
+        .get_or_insert_with(Default::default)
+        .train_location_entry = TrainLocationEntry::of_data(1);
     m.multiply_attribute(MasterAttribute::TRAIN_TIME, 0.9, &world(false));
     // 30 × 0.9 + 0.5 = 27.5
-    assert_eq!(m.train_locations[1].time, WholeSeconds::of_data(27));
+    assert_eq!(
+        m.creatable_part().train_locations[1].time,
+        WholeSeconds::of_data(27)
+    );
     m.set_attribute(
         MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
         9.0,
         &world(false),
     );
-    assert_eq!(m.train_location_entry, TrainLocationEntry::of_data(1));
+    assert_eq!(
+        m.creatable_part().train_location_entry,
+        TrainLocationEntry::of_data(1)
+    );
     // the add's count is the selected entry plus the amount: 1 + 2
     m.add_attribute(
         MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
         2.0,
         &world(false),
     );
-    assert_eq!(m.train_locations.len(), 3);
-    assert_eq!(m.train_locations[2], m.train_locations[1]);
+    assert_eq!(m.creatable_part().train_locations.len(), 3);
+    assert_eq!(
+        m.creatable_part().train_locations[2],
+        m.creatable_part().train_locations[1]
+    );
     m.set_attribute(
         MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
         -4.0,
         &world(false),
     );
-    assert_eq!(m.train_locations, []);
-    assert_eq!(m.train_location_entry, TrainLocationEntry::of_data(-1));
-    m.train_locations = vec![
+    assert_eq!(m.creatable_part().train_locations, []);
+    assert_eq!(
+        m.creatable_part().train_location_entry,
+        TrainLocationEntry::of_data(-1)
+    );
+    m.creatable
+        .get_or_insert_with(Default::default)
+        .train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.train_location_entry = TrainLocationEntry::of_data(0);
+    m.creatable
+        .get_or_insert_with(Default::default)
+        .train_location_entry = TrainLocationEntry::of_data(0);
     // ~(−1) = 0: the first goes, the entry stays at 0
     m.multiply_attribute(
         MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
@@ -1089,7 +1122,10 @@ fn the_train_location_attributes_change_the_selected_entry() {
         &world(false),
     );
     assert_eq!(
-        (m.train_locations.len(), m.train_locations[0].time),
+        (
+            m.creatable_part().train_locations.len(),
+            m.creatable_part().train_locations[0].time
+        ),
         (1, WholeSeconds::of_data(30))
     );
     m.multiply_attribute(
@@ -1098,12 +1134,18 @@ fn the_train_location_attributes_change_the_selected_entry() {
         &world(false),
     );
     assert_eq!(
-        (m.train_locations.len(), m.train_location_entry.get()),
+        (
+            m.creatable_part().train_locations.len(),
+            m.creatable_part().train_location_entry.get()
+        ),
         (2, 1)
     );
     follow(&mut m, MasterAttribute::TRAIN_TIME, &Graphics::new(), None);
     assert_eq!(
-        (m.trained_at.clone(), m.build_time),
+        (
+            m.creatable_part().trained_at.clone(),
+            m.creatable_part().build_time
+        ),
         (
             vec![master_id(12), master_id(12)],
             WholeSeconds::of_data(30)
@@ -1179,14 +1221,37 @@ fn building_master_setters_fall_back_on_the_combat_master_s() {
         (b.garrison_heal_rate, b.foundation_terrain),
         (HitPoints::new(3.0), Some(TerrainId::named(2)))
     );
-    assert_eq!(m.regeneration, Regeneration::new(300.0));
+    assert_eq!(m.creatable_part().regeneration, Regeneration::new(300.0));
     assert_eq!(m, {
         let mut same = of_type(MasterKind::BUILDING);
         same.building = Some(b);
         same.hit_points = MasterHitPoints::of_data(600);
-        same.regeneration = Regeneration::new(300.0);
+        same.creatable
+            .get_or_insert_with(Default::default)
+            .regeneration = Regeneration::new(300.0);
         same
     });
+}
+
+/// The creatable layer's setters are the TRIBE combat master's (slots 0x18, 0x20 and 0x28 of
+/// its class): a master of a type without the layer (30, a moving one) has no such values, so
+/// an effect on them leaves it as it was.
+#[test]
+fn an_effect_on_the_creatable_layer_leaves_masters_without_it_unchanged() {
+    let moving = of_type(MasterKind::MOVING);
+    for attribute in [
+        MasterAttribute::MAXIMUM_CHARGE,
+        MasterAttribute::RECHARGE_RATE,
+        MasterAttribute::SHOWN_PIERCE_ARMOR,
+        MasterAttribute::TRAIN_TIME,
+        MasterAttribute::HERO_STATUS,
+    ] {
+        let mut m = moving.clone();
+        m.set_attribute(attribute, 5.0, &world(false));
+        m.add_attribute(attribute, 5.0, &world(false));
+        m.multiply_attribute(attribute, 2.0, &world(false));
+        assert_eq!(m, moving, "{attribute:?}");
+    }
 }
 
 /// The foundation terrain's add works on the game's short: none is −1, so an add of 2 lays
@@ -1425,25 +1490,39 @@ fn the_combat_master_own_values_change() {
     m.set_attribute(MasterAttribute::ABILITY_BUTTON_ICON_ID, 9.0, &world(false));
     assert_eq!(m, before);
     assert_eq!(
-        (m.hero_flag, m.max_charge, m.recharge_rate),
+        (
+            m.creatable_part().hero_flag,
+            m.creatable_part().max_charge,
+            m.creatable_part().recharge_rate
+        ),
         (
             HeroFlags::FULL_HERO | HeroFlags::REGENERATES,
             Charge::new(15.0),
             ChargeRate::new(0.5)
         )
     );
-    assert_eq!((m.charge_event.get(), m.charge_kind.get()), (2, 6));
     assert_eq!(
-        m.conversion,
+        (
+            m.creatable_part().charge_event.get(),
+            m.creatable_part().charge_kind.get()
+        ),
+        (2, 6)
+    );
+    assert_eq!(
+        m.creatable_part().conversion,
         ConversionAdjust {
             min_time: 0.0,
             max_time: 4.0,
             chance: 0.0
         }
     );
-    assert_eq!(m.regeneration, Regeneration::new(30.0));
+    assert_eq!(m.creatable_part().regeneration, Regeneration::new(30.0));
     assert_eq!(
-        (m.volley_fire, m.max_volley, m.attack_sprite2),
+        (
+            m.creatable_part().volley_fire,
+            m.creatable_part().max_volley,
+            m.attack_sprite2
+        ),
         (
             Firepower::new(2.0),
             MissileCount::of_data(0),
@@ -1451,7 +1530,7 @@ fn the_combat_master_own_values_change() {
         )
     );
     assert_eq!(
-        m.volley_spread,
+        m.creatable_part().volley_spread,
         VolleySpread {
             x: Distance::new(0.0),
             y: Distance::new(0.0),
@@ -1459,7 +1538,10 @@ fn the_combat_master_own_values_change() {
         }
     );
     assert_eq!(
-        (m.volley_missile, m.charge_projectile),
+        (
+            m.creatable_part().volley_missile,
+            m.creatable_part().charge_projectile
+        ),
         (None, Some(master_id(1500)))
     );
 }
@@ -1499,7 +1581,7 @@ fn the_missile_building_and_animated_setters() {
     b.add_attribute(MasterAttribute::BUILDING_ICON_OVERRIDE, 3.0, &world(false));
     b.add_attribute(MasterAttribute::GARRISON_TYPE, 2.0, &world(false));
     assert_eq!(
-        (b.building_facet, b.building.unwrap().garrison_type),
+        (b.building.unwrap().facet, b.building.unwrap().garrison_type),
         (3, GarrisonKinds::INFANTRY)
     );
     let mut a = of_type(MasterKind::DOPPELGANGER);
@@ -1670,7 +1752,10 @@ fn master_unit_ai_type_reads_its_class_volley_missile_and_combat_level() {
     let master = |class, volley_missile, combat_level| Master {
         class,
         combat_level,
-        volley_missile,
+        creatable: Some(CreatablePart {
+            volley_missile,
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     // a building without a volley missile, with one (the tower's), and a boar's combat level

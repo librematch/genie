@@ -82,13 +82,16 @@ pub(crate) fn regeneration_rate(
     combat: &Combat,
     turn_tuning: &TurnTuning,
 ) -> Regeneration {
-    let hero = master.hero_flag.grants(HeroFlags::REGENERATES);
+    let hero = master
+        .creatable_part()
+        .hero_flag
+        .grants(HeroFlags::REGENERATES);
     let bonus = if hero {
         Regeneration::new(turn_tuning.hero_regeneration)
     } else {
         Regeneration::ZERO
     };
-    combat.regen_stinger + (combat.regen_powerup + (bonus + master.regeneration))
+    combat.regen_stinger + (combat.regen_powerup + (bonus + master.creatable_part().regeneration))
 }
 
 impl Unit {
@@ -145,7 +148,10 @@ impl Unit {
         let Some(d) = combat.hp_powerup.absorb(d) else {
             return;
         };
-        let floor = master.invulnerability.floor(master.hit_points);
+        let floor = master
+            .creatable_part()
+            .invulnerability
+            .floor(master.hit_points);
         let left = self.life.hp - d;
         self.life.hp = if floor == HitPoints::ZERO || floor <= left {
             left

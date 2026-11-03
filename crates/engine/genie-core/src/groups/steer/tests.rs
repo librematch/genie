@@ -27,6 +27,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
@@ -145,7 +146,10 @@ fn world() -> World {
         standing_sprite: Some(SpriteId::named(6)),
         move_sprite: Some(SpriteId::named(7)),
         run_sprite: Some(SpriteId::named(8)),
-        formation_category: FormationClass::of_data(1),
+        creatable: Some(CreatablePart {
+            formation_category: FormationClass::of_data(1),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     t.model.masters = vec![Masters::new([master]); 2]

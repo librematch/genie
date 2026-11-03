@@ -3,36 +3,27 @@
 
 use crate::combat::Charge;
 use crate::combat::ChargeRate;
-use crate::combat::{Firepower, MissileCount};
 use crate::layer::AttributeRoles;
-use crate::map::Distance;
 use crate::map::TerrainId;
 use crate::objects::HitPoints;
-use crate::objects::Regeneration;
-use crate::objects::masters::AttackPriority;
 use crate::objects::masters::AttributeWorld;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::CostAmount;
-use crate::objects::masters::DamageAmount;
-use crate::objects::masters::FormationClass;
-use crate::objects::masters::InvulnerabilityLevel;
+use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ROUND;
-use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::TrainLocationEntry;
 use crate::objects::masters::add_sprite;
 use crate::objects::masters::cost_resource;
 use crate::objects::masters::id_of;
-use crate::objects::masters::insert_train_location;
 use crate::objects::masters::low8;
 use crate::objects::masters::low16;
 use crate::objects::masters::resize_train_locations;
 use crate::objects::masters::select_entry;
 use crate::objects::masters::set_sprite;
-use crate::objects::masters::{GarrisonKinds, HeroFlags};
 use crate::players::Amount;
 use crate::production::HotkeyId;
 use crate::production::LocationButton;
@@ -47,8 +38,9 @@ impl Master {
         attribute: MasterAttribute,
     ) -> impl Iterator<Item = &mut CostAmount> {
         let resource = cost_resource(attribute);
-        self.cost
+        self.creatable
             .iter_mut()
+            .flat_map(|p| p.cost.iter_mut())
             .filter(move |c| {
                 c.attribute.is_some() && ((c.paid && resource.is_none()) || c.attribute == resource)
             })
@@ -62,33 +54,46 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::HERO_STATUS => self.hero_flag = HeroFlags::from_bits_retain(low8(v)),
+            MasterAttribute::HERO_STATUS
+            | MasterAttribute::SHOWN_PIERCE_ARMOR
+            | MasterAttribute::SECONDARY_PROJECTILE_UNIT
+            | MasterAttribute::SPECIAL_ABILITY
+            | MasterAttribute::TOTAL_MISSILES
+            | MasterAttribute::MAXIMUM_TOTAL_MISSILES
+            | MasterAttribute::REGENERATION_RATE
+            | MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::CONVERSION_CHANCE_MODIFIER
+            | MasterAttribute::FORMATION_CATEGORY
+            | MasterAttribute::REGENERATION_HP_PERCENT
+            | MasterAttribute::ATTACK_PRIORITY
+            | MasterAttribute::INVULNERABILITY_LEVEL
+            | MasterAttribute::SPAWNING_AREA_WIDTH
+            | MasterAttribute::SPAWNING_AREA_LENGTH
+            | MasterAttribute::SPAWNING_AREA_RANDOMNESS => {
+                let hit_points = self.hit_points;
+                if let Some(p) = self.creatable.as_mut() {
+                    p.set_value(attribute, v, hit_points);
+                }
+            }
             MasterAttribute::TRAIN_LOCATION
             | MasterAttribute::TRAIN_BUTTON
             | MasterAttribute::HOTKEY_ID
             | MasterAttribute::TRAIN_TIME
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => self.set_train_attribute(attribute, v),
-            MasterAttribute::SHOWN_PIERCE_ARMOR => {
-                self.shown.pierce_armor = DamageAmount::of_effect(v);
-            }
             MasterAttribute::MAXIMUM_CHARGE
             | MasterAttribute::RECHARGE_RATE
             | MasterAttribute::CHARGE_EVENT
             | MasterAttribute::CHARGE_TYPE
             | MasterAttribute::CHARGE_PROJECTILE_UNIT => self.set_charge(attribute, v),
-            MasterAttribute::SECONDARY_PROJECTILE_UNIT => self.volley_missile = id_of(cvttss2si(v)),
             MasterAttribute::SPECIAL_GRAPHIC
             | MasterAttribute::IDLE_ATTACK_GRAPHIC
             | MasterAttribute::HERO_GLOW_GRAPHIC
             | MasterAttribute::GARRISON_GRAPHIC
             | MasterAttribute::ATTACK_GRAPHIC_2 => self.set_tribe_sprite(attribute, v, world),
-            MasterAttribute::SPECIAL_ABILITY => {
-                self.special_attack = SpecialAttack::of_data(low8(v));
-            }
             MasterAttribute::RESOURCE_COSTS
             | MasterAttribute::FOOD_COSTS
             | MasterAttribute::WOOD_COSTS
@@ -98,18 +103,14 @@ impl Master {
                     *c = CostAmount::of_data(low16(v));
                 }
             }
-            MasterAttribute::TOTAL_MISSILES => self.volley_fire = Firepower::new(v),
-            MasterAttribute::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley = MissileCount::of_data(low8(v));
-            }
-            MasterAttribute::REGENERATION_RATE => self.regeneration = Regeneration::new(v),
             MasterAttribute::POPULATION => {
                 // the unpaid entries take the negated amount; the storage of population (4) the
                 // amount, of resources 11 and 19 its negation
                 let negated = -v;
                 for c in self
-                    .cost
+                    .creatable
                     .iter_mut()
+                    .flat_map(|p| p.cost.iter_mut())
                     .filter(|c| c.attribute.is_some() && !c.paid)
                 {
                     c.amount = CostAmount::of_data(low16(negated));
@@ -123,30 +124,6 @@ impl Master {
                     }
                 }
             }
-            MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::CONVERSION_CHANCE_MODIFIER => {
-                *self.conversion.lane_mut(attribute) = v;
-            }
-            MasterAttribute::FORMATION_CATEGORY => {
-                self.formation_category = FormationClass::of_data(low8(v));
-            }
-            MasterAttribute::REGENERATION_HP_PERCENT => {
-                self.regeneration =
-                    Regeneration::new(HitPoints::of_master(self.hit_points).get() * v);
-            }
-            MasterAttribute::ATTACK_PRIORITY => {
-                self.attack_priority = AttackPriority::of_byte(low8(v));
-            }
-            MasterAttribute::INVULNERABILITY_LEVEL => {
-                self.invulnerability = InvulnerabilityLevel::new(v);
-            }
-            MasterAttribute::SPAWNING_AREA_WIDTH
-            | MasterAttribute::SPAWNING_AREA_LENGTH
-            | MasterAttribute::SPAWNING_AREA_RANDOMNESS => {
-                *self.volley_spread.lane_mut(attribute) = Distance::new(v);
-            }
-            // the ability's button, tooltips and hotkey action are the interface's
             MasterAttribute::ABILITY_BUTTON_ICON_ID
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID
@@ -161,11 +138,31 @@ impl Master {
         use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::MAXIMUM_CHARGE => self.max_charge = Charge::new(v),
-            MasterAttribute::RECHARGE_RATE => self.recharge_rate = ChargeRate::new(v),
-            MasterAttribute::CHARGE_EVENT => self.charge_event = ChargeEvent::of_data(low16(v)),
-            MasterAttribute::CHARGE_TYPE => self.charge_kind = ChargeKind::of_data(low16(v)),
-            MasterAttribute::CHARGE_PROJECTILE_UNIT => self.charge_projectile = id_of(cvttss2si(v)),
+            MasterAttribute::MAXIMUM_CHARGE => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.max_charge = Charge::new(v);
+                }
+            }
+            MasterAttribute::RECHARGE_RATE => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.recharge_rate = ChargeRate::new(v);
+                }
+            }
+            MasterAttribute::CHARGE_EVENT => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.charge_event = ChargeEvent::of_data(low16(v));
+                }
+            }
+            MasterAttribute::CHARGE_TYPE => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.charge_kind = ChargeKind::of_data(low16(v));
+                }
+            }
+            MasterAttribute::CHARGE_PROJECTILE_UNIT => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.charge_projectile = id_of(cvttss2si(v));
+                }
+            }
             _ => {}
         }
     }
@@ -182,16 +179,24 @@ impl Master {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::SPECIAL_GRAPHIC => {
-                set_sprite(&mut self.special_sprite, cvttss2si(v), world);
+                if let Some(p) = self.creatable.as_mut() {
+                    set_sprite(&mut p.special_sprite, cvttss2si(v), world);
+                }
             }
             MasterAttribute::IDLE_ATTACK_GRAPHIC => {
-                set_sprite(&mut self.idle_attack_sprite, cvttss2si(v), world);
+                if let Some(p) = self.creatable.as_mut() {
+                    set_sprite(&mut p.idle_attack_sprite, cvttss2si(v), world);
+                }
             }
             MasterAttribute::HERO_GLOW_GRAPHIC => {
-                set_sprite(&mut self.hero_glow_sprite, cvttss2si(v), world);
+                if let Some(p) = self.creatable.as_mut() {
+                    set_sprite(&mut p.hero_glow_sprite, cvttss2si(v), world);
+                }
             }
             MasterAttribute::GARRISON_GRAPHIC => {
-                set_sprite(&mut self.garrison_sprite, cvttss2si(v), world);
+                if let Some(p) = self.creatable.as_mut() {
+                    set_sprite(&mut p.garrison_sprite, cvttss2si(v), world);
+                }
             }
             MasterAttribute::ATTACK_GRAPHIC_2 => {
                 set_sprite(&mut self.attack_sprite2, cvttss2si(v), world);
@@ -227,16 +232,16 @@ impl Master {
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
-                if let Some(n) = select_entry(self.train_locations.len(), cvttss2si(v)) {
-                    self.train_location_entry = TrainLocationEntry::of_selected(n);
+                if let Some(p) = self.creatable.as_mut()
+                    && let Some(n) = select_entry(p.train_locations.len(), cvttss2si(v))
+                {
+                    p.train_location_entry = TrainLocationEntry::of_selected(n);
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                resize_train_locations(
-                    &mut self.train_locations,
-                    &mut self.train_location_entry,
-                    v,
-                );
+                if let Some(p) = self.creatable.as_mut() {
+                    resize_train_locations(&mut p.train_locations, &mut p.train_location_entry, v);
+                }
             }
             _ => {}
         }
@@ -251,29 +256,36 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        use crate::math::conversions::cvttss2si;
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::HERO_STATUS => {
-                self.hero_flag =
-                    HeroFlags::from_bits_retain(self.hero_flag.bits().wrapping_add(low8(v)));
+            MasterAttribute::HERO_STATUS
+            | MasterAttribute::SHOWN_PIERCE_ARMOR
+            | MasterAttribute::MAXIMUM_CHARGE
+            | MasterAttribute::RECHARGE_RATE
+            | MasterAttribute::CHARGE_EVENT
+            | MasterAttribute::SPECIAL_GRAPHIC
+            | MasterAttribute::SPECIAL_ABILITY
+            | MasterAttribute::IDLE_ATTACK_GRAPHIC
+            | MasterAttribute::HERO_GLOW_GRAPHIC
+            | MasterAttribute::GARRISON_GRAPHIC
+            | MasterAttribute::TOTAL_MISSILES
+            | MasterAttribute::MAXIMUM_TOTAL_MISSILES
+            | MasterAttribute::REGENERATION_RATE
+            | MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::CONVERSION_CHANCE_MODIFIER
+            | MasterAttribute::REGENERATION_HP_PERCENT
+            | MasterAttribute::INVULNERABILITY_LEVEL
+            | MasterAttribute::SPAWNING_AREA_WIDTH
+            | MasterAttribute::SPAWNING_AREA_LENGTH
+            | MasterAttribute::SPAWNING_AREA_RANDOMNESS
+            | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
+            | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
+                let hit_points = self.hit_points;
+                if let Some(p) = self.creatable.as_mut() {
+                    p.add_value(attribute, v, hit_points, world);
+                }
             }
-            MasterAttribute::SHOWN_PIERCE_ARMOR => {
-                self.shown.pierce_armor = self.shown.pierce_armor.plus(DamageAmount::of_effect(v));
-            }
-            MasterAttribute::MAXIMUM_CHARGE => self.max_charge += Charge::new(v),
-            MasterAttribute::RECHARGE_RATE => self.recharge_rate += ChargeRate::new(v),
-            MasterAttribute::CHARGE_EVENT => self.charge_event = self.charge_event.plus(low16(v)),
-            MasterAttribute::SPECIAL_GRAPHIC => add_sprite(&mut self.special_sprite, v, world),
-            MasterAttribute::SPECIAL_ABILITY => {
-                self.special_attack =
-                    SpecialAttack::of_data(self.special_attack.get().wrapping_add(low8(v)));
-            }
-            MasterAttribute::IDLE_ATTACK_GRAPHIC => {
-                add_sprite(&mut self.idle_attack_sprite, v, world);
-            }
-            MasterAttribute::HERO_GLOW_GRAPHIC => add_sprite(&mut self.hero_glow_sprite, v, world),
-            MasterAttribute::GARRISON_GRAPHIC => add_sprite(&mut self.garrison_sprite, v, world),
             MasterAttribute::RESOURCE_COSTS
             | MasterAttribute::FOOD_COSTS
             | MasterAttribute::WOOD_COSTS
@@ -288,45 +300,7 @@ impl Master {
                     t.time = t.time.plus(low16(v));
                 }
             }
-            MasterAttribute::TOTAL_MISSILES => self.volley_fire += Firepower::new(v),
-            MasterAttribute::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley = self.max_volley.plus(low8(v));
-            }
-            MasterAttribute::REGENERATION_RATE => self.regeneration += Regeneration::new(v),
-            MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::CONVERSION_CHANCE_MODIFIER => {
-                *self.conversion.lane_mut(attribute) += v;
-            }
-            MasterAttribute::REGENERATION_HP_PERCENT => {
-                self.regeneration +=
-                    Regeneration::new(HitPoints::of_master(self.hit_points).get() * v);
-            }
-            MasterAttribute::INVULNERABILITY_LEVEL => {
-                self.invulnerability += InvulnerabilityLevel::new(v);
-            }
-            // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             MasterAttribute::ATTACK_GRAPHIC_2 => add_sprite(&mut self.attack_sprite2, v, world),
-            MasterAttribute::SPAWNING_AREA_WIDTH
-            | MasterAttribute::SPAWNING_AREA_LENGTH
-            | MasterAttribute::SPAWNING_AREA_RANDOMNESS => {
-                *self.volley_spread.lane_mut(attribute) += Distance::new(v);
-            }
-            MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
-                let n = cvttss2si(f32::from(self.train_location_entry.get()) + v);
-                if let Some(n) = select_entry(self.train_locations.len(), n) {
-                    self.train_location_entry = TrainLocationEntry::of_selected(n);
-                }
-            }
-            // the game's: the selected entry plus the amount, not the count
-            MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                let count = f32::from(self.train_location_entry.get()) + v;
-                resize_train_locations(
-                    &mut self.train_locations,
-                    &mut self.train_location_entry,
-                    count,
-                );
-            }
             MasterAttribute::ABILITY_BUTTON_ICON_ID
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID
@@ -344,11 +318,25 @@ impl Master {
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::SHOWN_PIERCE_ARMOR => {
-                self.shown.pierce_armor = self.shown.pierce_armor.times(low16(v));
+            MasterAttribute::SHOWN_PIERCE_ARMOR
+            | MasterAttribute::MAXIMUM_CHARGE
+            | MasterAttribute::RECHARGE_RATE
+            | MasterAttribute::TOTAL_MISSILES
+            | MasterAttribute::MAXIMUM_TOTAL_MISSILES
+            | MasterAttribute::REGENERATION_RATE
+            | MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
+            | MasterAttribute::CONVERSION_CHANCE_MODIFIER
+            | MasterAttribute::INVULNERABILITY_LEVEL
+            | MasterAttribute::SPAWNING_AREA_WIDTH
+            | MasterAttribute::SPAWNING_AREA_LENGTH
+            | MasterAttribute::SPAWNING_AREA_RANDOMNESS
+            | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
+            | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
+                if let Some(p) = self.creatable.as_mut() {
+                    p.multiply_value(attribute, v);
+                }
             }
-            MasterAttribute::MAXIMUM_CHARGE => self.max_charge *= v,
-            MasterAttribute::RECHARGE_RATE => self.recharge_rate *= v,
             MasterAttribute::RESOURCE_COSTS
             | MasterAttribute::FOOD_COSTS
             | MasterAttribute::WOOD_COSTS
@@ -364,34 +352,6 @@ impl Master {
                     t.time = WholeSeconds::of_data(low16(f32::from(t.time.get()) * v + ROUND));
                 }
             }
-            MasterAttribute::TOTAL_MISSILES => self.volley_fire *= v,
-            MasterAttribute::MAXIMUM_TOTAL_MISSILES => {
-                self.max_volley =
-                    MissileCount::of_data(low8(f32::from(self.max_volley.get()) * v + ROUND));
-            }
-            MasterAttribute::REGENERATION_RATE => self.regeneration *= v,
-            MasterAttribute::MIN_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::MAX_CONVERSION_TIME_MODIFIER
-            | MasterAttribute::CONVERSION_CHANCE_MODIFIER => {
-                *self.conversion.lane_mut(attribute) *= v;
-            }
-            MasterAttribute::INVULNERABILITY_LEVEL => self.invulnerability *= v,
-            MasterAttribute::SPAWNING_AREA_WIDTH
-            | MasterAttribute::SPAWNING_AREA_LENGTH
-            | MasterAttribute::SPAWNING_AREA_RANDOMNESS => {
-                *self.volley_spread.lane_mut(attribute) *= v;
-            }
-            MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
-                insert_train_location(&mut self.train_locations, &mut self.train_location_entry, v);
-            }
-            MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                let count = self.train_locations.len() as f32 * v;
-                resize_train_locations(
-                    &mut self.train_locations,
-                    &mut self.train_location_entry,
-                    count,
-                );
-            }
             _ => self.multiply_combat(attribute, v, world),
         }
     }
@@ -406,7 +366,11 @@ impl Master {
     ) {
         use crate::objects::masters::MasterAttribute;
         match attribute {
-            MasterAttribute::BUILDING_ICON_OVERRIDE => self.building_facet = low16(v),
+            MasterAttribute::BUILDING_ICON_OVERRIDE => {
+                if let Some(b) = self.building.as_mut() {
+                    b.facet = low16(v);
+                }
+            }
             MasterAttribute::GARRISON_TYPE => {
                 if let Some(b) = self.building.as_mut() {
                     b.garrison_type = GarrisonKinds::from_bits_retain(low8(v));
@@ -446,7 +410,9 @@ impl Master {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::BUILDING_ICON_OVERRIDE => {
-                self.building_facet = self.building_facet.wrapping_add(low16(v));
+                if let Some(b) = self.building.as_mut() {
+                    b.facet = b.facet.wrapping_add(low16(v));
+                }
             }
             MasterAttribute::GARRISON_TYPE => {
                 if let Some(b) = self.building.as_mut() {

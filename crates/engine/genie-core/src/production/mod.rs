@@ -373,7 +373,7 @@ impl MakeObj {
         if m.object_flags.contains(ObjectFlags::OWN_TRAIN_TIME) {
             return self.train_time;
         }
-        train_time(&m.train_locations, building, self.button)
+        train_time(&m.creatable_part().train_locations, building, self.button)
     }
 }
 
@@ -490,6 +490,7 @@ mod tests {
     use crate::gathering::QueueCount;
     use crate::objects::masters::CostAmount;
     use crate::objects::masters::CostSlot;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
     use crate::players::attribute::AttributeId;
@@ -750,7 +751,10 @@ mod tests {
         );
         let mut m = Master {
             kind: MasterKind::COMBAT,
-            train_locations: locations.to_vec(),
+            creatable: Some(CreatablePart {
+                train_locations: locations.to_vec(),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let mut make = MakeObj::for_entry(&Entry {
@@ -907,11 +911,14 @@ mod tests {
     fn refund_gives_back_what_the_entry_paid() {
         let m = Master {
             kind: MasterKind::COMBAT,
-            cost: costs(&[
-                (attribute::FOOD, 60, true),
-                (attribute::GOLD, 20, true),
-                (attribute::HEADROOM, 1, false),
-            ]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[
+                    (attribute::FOOD, 60, true),
+                    (attribute::GOLD, 20, true),
+                    (attribute::HEADROOM, 1, false),
+                ]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let mut held = Held(vec![Amount::new(1.0); 5]);
@@ -966,7 +973,10 @@ mod tests {
         Master {
             id: ids::VILLAGER_MALE,
             kind: MasterKind::COMBAT,
-            cost: costs(cost),
+            creatable: Some(CreatablePart {
+                cost: costs(cost),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         }
     }
@@ -989,11 +999,13 @@ mod tests {
     #[test]
     fn queue_entry_keeps_the_empty_cost_slot_in_its_place() {
         let mut m = villager(&[]);
-        m.cost = [
-            CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
-            CostSlot::default(),
-            CostSlot::new(attribute::HEADROOM, CostAmount::of_data(1), false),
-        ];
+        if let Some(p) = m.creatable.as_mut() {
+            p.cost = [
+                CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
+                CostSlot::default(),
+                CostSlot::new(attribute::HEADROOM, CostAmount::of_data(1), false),
+            ];
+        }
         let ms = Masters::new([m]);
         assert_eq!(
             master_costs(&ms, ids::VILLAGER_MALE, &held(), &roles(), slots())
@@ -1187,11 +1199,14 @@ mod tests {
         let building = |id: i16, head: i16, stack: i16, cost: &[(AttributeId, i16, bool)]| Master {
             id: master_id(id),
             kind: MasterKind::BUILDING,
-            cost: costs(cost),
             building: Some(BuildingMaster {
                 head_unit: opt_master(head),
                 stack_unit: opt_master(stack),
                 ..BuildingMaster::default()
+            }),
+            creatable: Some(CreatablePart {
+                cost: costs(cost),
+                ..CreatablePart::default()
             }),
             ..Master::default()
         };

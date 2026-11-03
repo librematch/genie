@@ -59,15 +59,15 @@ impl FormationUnit {
         let full =
             Distance::ZERO < master.height && 0.0 < master.radius.x() && 0.0 < master.radius.y();
         let radius = if MasterKind::COMBAT <= master.kind && full {
-            master.spacing_modifier.get() * master.radius.x()
+            master.creatable_part().spacing_modifier.get() * master.radius.x()
         } else {
             group_tuning.default_radius
         };
         Self {
             master: master.id,
             kind: master.kind,
-            hero_flag: master.hero_flag,
-            formation_category: master.formation_category,
+            hero_flag: master.creatable_part().hero_flag,
+            formation_category: master.creatable_part().formation_category,
             radius: Distance::new(radius),
         }
     }
@@ -446,6 +446,7 @@ mod tests {
     use crate::movement::PathState;
     use crate::objects::ListIndex;
     use crate::objects::ObjectId;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FormationClass;
     use crate::objects::masters::MasterId;
     use crate::objects::masters::MasterKind;
@@ -527,7 +528,10 @@ mod tests {
         let master = |id: MasterId, category: u8| Master {
             id,
             kind: MasterKind::COMBAT,
-            formation_category: FormationClass::of_data(category),
+            creatable: Some(CreatablePart {
+                formation_category: FormationClass::of_data(category),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let masters = Masters::new([master(master_id(4), 1), master(ids::ID_6, 3)]);
@@ -639,13 +643,19 @@ mod tests {
                 Master {
                     id: ids::ID_7,
                     kind: MasterKind::MISSILE,
-                    formation_category: FormationClass::of_data(1),
+                    creatable: Some(CreatablePart {
+                        formation_category: FormationClass::of_data(1),
+                        ..CreatablePart::default()
+                    }),
                     ..Master::default()
                 },
                 Master {
                     id: master_id(8),
                     kind: MasterKind::COMBAT,
-                    formation_category: FormationClass::of_data(2),
+                    creatable: Some(CreatablePart {
+                        formation_category: FormationClass::of_data(2),
+                        ..CreatablePart::default()
+                    }),
                     ..Master::default()
                 },
             ];
@@ -830,7 +840,9 @@ mod tests {
                 let m = Arc::make_mut(masters).get_mut(master_id(id)).unwrap();
                 m.radius = Footprint::new(r, r);
                 m.height = Distance::new(1.0);
-                m.spacing_modifier = SpacingModifier::new(1.0);
+                if let Some(p) = m.creatable.as_mut() {
+                    p.spacing_modifier = SpacingModifier::new(1.0);
+                }
             }
         }
         t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;

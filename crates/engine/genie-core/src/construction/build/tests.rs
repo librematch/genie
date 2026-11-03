@@ -21,6 +21,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::AdjacentMode;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
@@ -757,7 +758,6 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
         id,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        cost: costs(cost),
         building: Some(BuildingMaster {
             adjacent_mode: AdjacentMode::NONE,
             disappears_when_built: false,
@@ -773,6 +773,11 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
             transform_unit: None,
             destruction_sprite: None,
             construction_sprite: None,
+            facet: 0,
+        }),
+        creatable: Some(CreatablePart {
+            cost: costs(cost),
+            ..CreatablePart::default()
         }),
         ..Master::default()
     }
@@ -1107,7 +1112,9 @@ fn the_work_starts_the_desolid_annexes_first() {
         u
     };
     let mut post = built_master(master_id(1192), &Vec::new());
-    post.volley_fire = Firepower::new(2.0);
+    post.creatable
+        .get_or_insert_with(Default::default)
+        .volley_fire = Firepower::new(2.0);
     let mut t = site_world(
         world,
         vec![built_master(master_id(665), &Vec::new()), post],

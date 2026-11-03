@@ -56,7 +56,7 @@ impl World {
             GenieError::unsupported("BUILD of a master the player does not have"),
         )?;
         let mut listed = [0i16; 4];
-        for (resource, amount, _) in cost_entries(&site.cost) {
+        for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {
             if let Some(r) = resource.is_resource().then(|| resource.index()) {
                 let entry = listed.checked_mut(r)?;
                 *entry = entry.wrapping_add(amount.get());
@@ -86,7 +86,11 @@ impl World {
         if self.players.player(player)?.kind.is_computer() {
             return Ok(true);
         }
-        let trained_at = self.master(player, master)?.trained_at.clone();
+        let trained_at = self
+            .master(player, master)?
+            .creatable_part()
+            .trained_at
+            .clone();
         for &id in builders.iter().flatten() {
             if self.builds((master, &trained_at), id)? {
                 return Ok(true);
@@ -226,7 +230,7 @@ impl World {
     pub(crate) fn affords(&self, player: PlayerId, master: MasterId) -> Result<bool, GenieError> {
         let site = self.master(player, master)?;
         let owner = self.players.player(player)?;
-        for (resource, amount, _) in cost_entries(&site.cost) {
+        for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {
             let r = resource.index();
             if r == 4 {
                 return Err(GenieError::unsupported(

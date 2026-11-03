@@ -121,6 +121,7 @@ impl World {
                 MasterTables::new(&self.model.masters, &self.parts.own_master),
                 p,
             )?
+            .creatable_part()
             .volley_fire;
         let now = self.world_time;
         let u = held(&mut self.players, place)?;

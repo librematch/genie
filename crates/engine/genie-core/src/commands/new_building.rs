@@ -72,7 +72,7 @@ impl World {
     ) -> Result<(FoundationId, Position), GenieError> {
         let unit_ai = unit_ai_type(self.master(player, master)?, master, &self.model.roles);
         let made = self.make_building(player, master, Ok(unit_ai), position)?;
-        let cost = self.master(player, master)?.cost;
+        let cost = self.master(player, master)?.creatable_part().cost;
         let owner = self.players.player_mut(player)?;
         for (resource, amount, paid) in cost_entries(&cost) {
             let slot = owner
@@ -105,9 +105,9 @@ impl World {
         }
         let _ = self.streams.get(Stream::Object).rand15();
         if let Some(m) = player_master(&self.model.masters, player, master)
-            .filter(|m| m.kind == MasterKind::BUILDING && !m.trained_at.is_empty())
+            .filter(|m| m.kind == MasterKind::BUILDING && !m.creatable_part().trained_at.is_empty())
         {
-            let paid: i32 = cost_entries(&m.cost)
+            let paid: i32 = cost_entries(&m.creatable_part().cost)
                 .filter(|&(_, _, paid)| paid)
                 .map(|(_, amount, _)| i32::from(amount.get()))
                 .sum();
@@ -249,14 +249,14 @@ impl World {
                 .of_master(master)
                 .intersects(MasterRoles::DEAD_FARM | MasterRoles::DEAD_RICE_FARM)
             && building.head_unit.is_none();
-        let hp = if foundation && WholeSeconds::ZERO < made.build_time {
+        let hp = if foundation && WholeSeconds::ZERO < made.creatable_part().build_time {
             1.0
         } else {
             HitPoints::of_master(made.hit_points).get()
         };
         // a foundation shows its master's construction sprite (+0x950; its standing one for
         // none, FUN_141158620) through slot 0x68 (FUN_141217000)
-        if foundation && WholeSeconds::ZERO < made.build_time {
+        if foundation && WholeSeconds::ZERO < made.creatable_part().build_time {
             let shown = building
                 .construction_sprite
                 .and_then(|s| self.model.graphics.get(s).copied())
@@ -274,10 +274,10 @@ impl World {
         let progress = if foundation {
             Seconds::ZERO
         } else {
-            Seconds::of_master(made.build_time)
+            Seconds::of_master(made.creatable_part().build_time)
         };
         // FUN_1411cf770 with no master copy of its own and no annex link yet
-        let desolid = WholeSeconds::ZERO < made.build_time
+        let desolid = WholeSeconds::ZERO < made.creatable_part().build_time
             && !self
                 .model
                 .roles
@@ -295,7 +295,7 @@ impl World {
             attack_count: AttackCount::ZERO,
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
             firepower: player_master(&self.model.masters, player, master)
-                .map_or(Firepower::ZERO, |m| m.volley_fire),
+                .map_or(Firepower::ZERO, |m| m.creatable_part().volley_fire),
             next_volley: MissileCount::ZERO,
             reload_worldtime: WorldTime::ZERO,
             raider_countdown: RaiderCountdown::NONE,
@@ -349,7 +349,7 @@ impl World {
                 desolid,
                 builders: BuilderCount::of_data(0),
                 hit_points: made.hit_points,
-                build_time: made.build_time,
+                build_time: made.creatable_part().build_time,
                 record: Obstruction {
                     kind: made.obstruction_kind,
                     class: made.obstruction_class,
@@ -426,7 +426,7 @@ impl World {
         let master = made.id;
         self.track_add(player, id, master)?;
         self.building_place(player, id, made, position, desolid)?;
-        if foundation && WholeSeconds::ZERO < made.build_time {
+        if foundation && WholeSeconds::ZERO < made.creatable_part().build_time {
             self.construction_terrain(player, master, position)?;
         }
         self.clear_footprint(player, master, position.ground(), false)

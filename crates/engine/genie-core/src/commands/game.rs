@@ -297,6 +297,7 @@ impl World {
 mod tests {
     use super::*;
     use crate::gathering::QueueCount;
+    use crate::objects::masters::CreatablePart;
     use crate::players::Amount;
     use crate::players::Posture;
     #[cfg(test)]
@@ -407,7 +408,10 @@ mod tests {
         let costing = |id, wood| Master {
             id,
             kind: MasterKind::COMBAT,
-            cost: costs(&[(attribute::WOOD, wood, true)]),
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::WOOD, wood, true)]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let mut t = world();

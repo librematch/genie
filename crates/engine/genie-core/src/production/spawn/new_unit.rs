@@ -426,6 +426,7 @@ impl World {
             }
         }
         let cost: i32 = made
+            .creatable_part()
             .cost
             .iter()
             .filter_map(|slot| slot.entry())
@@ -456,7 +457,7 @@ impl World {
         count_class(&mut owner.attributes, made, 1.0, &self.model.roles);
         let combat = Combat {
             // the TRIBE combat setup (FUN_14121df60): the master's volley fire
-            firepower: made.volley_fire,
+            firepower: made.creatable_part().volley_fire,
             ..Default::default()
         };
         let unit = Unit {

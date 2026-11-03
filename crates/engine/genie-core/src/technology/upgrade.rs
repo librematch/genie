@@ -140,7 +140,8 @@ impl World {
             );
         if MasterKind::COMBAT <= kind {
             let id = self.object_at_mut(place)?.id;
-            self.parts.combat_mut(id)?.firepower += new.volley_fire - old.volley_fire;
+            self.parts.combat_mut(id)?.firepower +=
+                new.creatable_part().volley_fire - old.creatable_part().volley_fire;
         }
         if MasterKind::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
             self.show_if(place, old.attack_sprite, new.attack_sprite)?;
@@ -357,10 +358,10 @@ impl World {
             .map(|&(_, to)| to);
         if MasterKind::COMBAT <= kind
             && MasterKind::COMBAT <= new.kind
-            && old.charge_kind.charges()
-            && new.charge_kind.charges()
+            && old.creatable_part().charge_kind.charges()
+            && new.creatable_part().charge_kind.charges()
         {
-            let more = (new.max_charge - old.max_charge).abs();
+            let more = (new.creatable_part().max_charge - old.creatable_part().max_charge).abs();
             if Charge::ZERO < more {
                 let id = self.object_at_mut(place)?.id;
                 self.parts.combat_mut(id)?.charge += more;
@@ -486,7 +487,7 @@ impl World {
             moving: g(new.move_sprite),
             attack: g(new.attack_sprite),
             standing: g(new.standing_sprite),
-            idle_attack: g(new.idle_attack_sprite),
+            idle_attack: g(new.creatable_part().idle_attack_sprite),
             second: g(new.attack_sprite2),
             combat: MasterKind::COMBAT <= new.kind,
         };
@@ -603,6 +604,7 @@ mod tests {
     use crate::objects::masters::ActionKind;
     use crate::objects::masters::BuildableOn;
     use crate::objects::masters::ChargeKind;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::DamageSpriteMode;
     use crate::objects::masters::MasterId;
     use crate::objects::masters::ObstructionKind;
@@ -1005,7 +1007,10 @@ mod tests {
             kind: MasterKind::COMBAT,
             class: class::VILLAGER,
             hit_points: MasterHitPoints::of_data(25),
-            volley_fire: Firepower::new(1.0),
+            creatable: Some(CreatablePart {
+                volley_fire: Firepower::new(1.0),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let new = Master {
@@ -1013,7 +1018,10 @@ mod tests {
             kind: MasterKind::COMBAT,
             class: class::CLASS_6,
             hit_points: MasterHitPoints::of_data(50),
-            volley_fire: Firepower::new(3.0),
+            creatable: Some(CreatablePart {
+                volley_fire: Firepower::new(3.0),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let mut v = object(
@@ -1674,8 +1682,11 @@ mod tests {
             standing_sprite_2: Some(SpriteId::named(301)),
             death_sprite: Some(SpriteId::named(302)),
             undead_sprite: Some(SpriteId::named(303)),
-            charge_kind: ChargeKind::ATTACK,
-            max_charge: Charge::new(2.0),
+            creatable: Some(CreatablePart {
+                charge_kind: ChargeKind::ATTACK,
+                max_charge: Charge::new(2.0),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         let new = Master {
@@ -1685,7 +1696,10 @@ mod tests {
             standing_sprite_2: None,
             death_sprite: Some(SpriteId::named(402)),
             undead_sprite: Some(SpriteId::named(403)),
-            max_charge: Charge::new(5.0),
+            creatable: Some(CreatablePart {
+                max_charge: Charge::new(5.0),
+                ..old.clone().creatable.unwrap_or_default()
+            }),
             ..old.clone()
         };
         let upgraded = |old: &Master, new: &Master, at: i16| {
@@ -1730,7 +1744,10 @@ mod tests {
         };
         assert_eq!(upgraded(&none, &new, 304).0, HitPoints::ZERO);
         let uncharged = Master {
-            charge_kind: ChargeKind::NONE,
+            creatable: Some(CreatablePart {
+                charge_kind: ChargeKind::NONE,
+                ..new.creatable.clone().unwrap_or_default()
+            }),
             ..new
         };
         assert_eq!(upgraded(&old, &uncharged, 304).2, Charge::ZERO);

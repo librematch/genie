@@ -30,6 +30,7 @@ use crate::objects::actions::ActionList;
 use crate::objects::layers::{Action, Motion};
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::CostAmount;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskId;
@@ -168,11 +169,14 @@ fn game() -> World {
             id: ids::VILLAGER_MALE,
             class: class::VILLAGER,
             kind: MasterKind::COMBAT,
-            cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
             storage: vec![
                 (Some(attribute::HEADROOM), Amount::new(-1.0), 2),
                 (Some(attribute::POPULATION), Amount::new(1.0), 2),
             ],
+            creatable: Some(CreatablePart {
+                cost: costs(&[(attribute::FOOD, 46, true), (attribute::HEADROOM, 1, false)]),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         },
     ]);
@@ -788,12 +792,15 @@ fn cancel_of_all_goes_on_into_villagers_and_stops_at_research() {
     *ms = Arc::new(Masters::new(ms.iter().cloned().chain([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
-        cost: costs(&[
-            (attribute::WOOD, 25, true),
-            (attribute::GOLD, 45, true),
-            (attribute::HEADROOM, 1, false),
-        ]),
         storage: vec![(Some(attribute::HEADROOM), Amount::new(-1.0), 2)],
+        creatable: Some(CreatablePart {
+            cost: costs(&[
+                (attribute::WOOD, 25, true),
+                (attribute::GOLD, 45, true),
+                (attribute::HEADROOM, 1, false),
+            ]),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }])));
     t.players[1].attributes[80] = Amount::new(4.0);

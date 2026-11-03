@@ -135,7 +135,8 @@ impl Master {
             | MasterAttribute::TRAIN_TIME
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM
-                if self.train_locations.is_empty() && !self.trained_at.is_empty() =>
+                if self.creatable_part().train_locations.is_empty()
+                    && !self.creatable_part().trained_at.is_empty() =>
             {
                 Some("a master's train locations (+0x898) the loader did not fill")
             }
@@ -171,7 +172,7 @@ impl Master {
     /// The selected train location (`FUN_1412669d0`: `+0x940` sign-extended, below the count as
     /// an unsigned value, so a negative entry selects none).
     pub(super) fn train_location_mut(&mut self) -> Option<&mut TrainLocation> {
-        self.train_locations
-            .get_mut(self.train_location_entry.index()?)
+        let p = self.creatable.as_mut()?;
+        p.train_locations.get_mut(p.train_location_entry.index()?)
     }
 }

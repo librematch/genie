@@ -1,7 +1,7 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_dat::de::{Sound, Task, Unit};
+use genie_dat::de::{Creatable, Sound, Task, Unit};
 use genie_model::GenieError;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
@@ -168,7 +168,6 @@ pub(super) fn dat_work(
             .bird
             .as_ref()
             .and_then(|b| TaskIndex::of_data(b.default_task_id)),
-        cost: dat_cost(unit)?,
         work_rate: unit
             .bird
             .as_ref()
@@ -181,39 +180,10 @@ pub(super) fn dat_work(
         }),
         hit_points: MasterHitPoints::of_data(unit.hit_points),
         capacity: CarryCapacity::of_data(unit.resource_capacity),
-        build_time: unit
-            .creatable
-            .as_ref()
-            .and_then(|c| c.train_locations.first())
-            .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.queue_time)),
-        trained_at: unit.creatable.as_ref().map_or_else(Vec::new, |c| {
-            c.train_locations
-                .iter()
-                .filter_map(|t| MasterId::of_data(t.location_id))
-                .collect()
-        }),
-        // the whole entries, which the attribute setters change (a .dat before VER 8.7 holds no
-        // hotkey: 0)
-        train_locations: unit.creatable.as_ref().map_or_else(Vec::new, |c| {
-            c.train_locations
-                .iter()
-                .map(|t| work::TrainLocation {
-                    location: MasterId::of_data(t.location_id),
-                    time: WholeSeconds::of_data(t.queue_time),
-                    button: LocationButton::of_data(t.button_id),
-                    hotkey: HotkeyId::of_data(t.hot_key_id.unwrap_or_default()),
-                })
-                .collect()
-        }),
         attack_sprite2: unit
             .type50
             .as_ref()
             .and_then(|t| t.attack_graphic2)
-            .and_then(SpriteId::of_data),
-        idle_attack_sprite: unit
-            .creatable
-            .as_ref()
-            .and_then(|c| c.idle_attack_graphic)
             .and_then(SpriteId::of_data),
         clearance: Footprint::from(unit.clearance_size),
         outline: Radii::from(unit.outline_size).ground(),
@@ -221,6 +191,8 @@ pub(super) fn dat_work(
         terrain_bonus: RestrictionField::of_data(
             unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
         ),
+        // the save's facet counts; which `.dat` field the loader reads into `+0x982` is not
+        // known (MISSING.md)
         building: unit.building.as_ref().map(|b| work::BuildingMaster {
             adjacent_mode: AdjacentMode::of_data(b.adjacent_mode),
             disappears_when_built: b.disappears_when_built != 0,
@@ -236,6 +208,7 @@ pub(super) fn dat_work(
             transform_unit: MasterId::of_data(b.transform_unit),
             destruction_sprite: SpriteId::of_data(b.destruction_graphic_id),
             construction_sprite: SpriteId::of_data(b.construction_graphic_id),
+            ..work::BuildingMaster::default()
         }),
         garrison: GarrisonCapacity::of_data(unit.garrison_capacity),
         recyclable: unit.recyclable != 0,
@@ -252,15 +225,6 @@ pub(super) fn dat_work(
             unit.placement_terrain[0],
             unit.placement_terrain[1],
         ]),
-        special_graphic: unit
-            .creatable
-            .as_ref()
-            .is_some_and(|c| 0 <= c.special_graphic),
-        special_sprite: unit
-            .creatable
-            .as_ref()
-            .and_then(|c| i16::try_from(c.special_graphic).ok())
-            .and_then(SpriteId::of_data),
         death_sprite: SpriteId::of_data(unit.dying_graphic),
         death_spawns: [unit.dead_unit_id, unit.blood_unit_id].map(MasterId::of_data),
         garrison_firepower: unit
@@ -268,41 +232,65 @@ pub(super) fn dat_work(
             .as_ref()
             .and_then(|t| t.garrison_firepower)
             .map_or(Firepower::ZERO, Firepower::new),
-        volley_fire: Firepower::new(unit.creatable.as_ref().map_or(0.0, |c| c.total_projectiles)),
+        creatable: unit.creatable.as_ref().map(dat_creatable).transpose()?,
+        ..work::Master::default()
+    })
+}
+
+/// The creatable layer of a `.dat` unit's creatable section ([`work::CreatablePart`]): its
+/// costs, train locations, special graphic and volley values.
+///
+/// # Errors
+///
+/// A cost slot that holds no attribute ([`dat_cost`]).
+fn dat_creatable(c: &Creatable) -> Result<work::CreatablePart, GenieError> {
+    Ok(work::CreatablePart {
+        cost: dat_cost(c)?,
+        build_time: c
+            .train_locations
+            .first()
+            .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.queue_time)),
+        trained_at: c
+            .train_locations
+            .iter()
+            .filter_map(|t| MasterId::of_data(t.location_id))
+            .collect(),
+        // the whole entries, which the attribute setters change (a .dat before VER 8.7 holds no
+        // hotkey: 0)
+        train_locations: c
+            .train_locations
+            .iter()
+            .map(|t| work::TrainLocation {
+                location: MasterId::of_data(t.location_id),
+                time: WholeSeconds::of_data(t.queue_time),
+                button: LocationButton::of_data(t.button_id),
+                hotkey: HotkeyId::of_data(t.hot_key_id.unwrap_or_default()),
+            })
+            .collect(),
+        idle_attack_sprite: c.idle_attack_graphic.and_then(SpriteId::of_data),
+        special_sprite: i16::try_from(c.special_graphic)
+            .ok()
+            .and_then(SpriteId::of_data),
+        volley_fire: Firepower::new(c.total_projectiles),
         // the DE master's mSpacingModifier (+0x8b8), the data file's "flank attack modifier"
-        spacing_modifier: work::SpacingModifier::new(
-            unit.creatable
-                .as_ref()
-                .map_or(0.0, |c| c.flank_attack_modifier),
-        ),
-        max_volley: MissileCount::of_data(
-            unit.creatable
-                .as_ref()
-                .map_or(0, |c| c.max_total_projectiles),
-        ),
-        volley_spread: unit
-            .creatable
-            .as_ref()
-            .map_or_else(VolleySpread::default, |c| {
-                let [x, y, start] = c.projectile_spawning_area;
-                VolleySpread {
-                    x: Distance::new(x),
-                    y: Distance::new(y),
-                    start: Distance::new(start),
-                }
-            }),
-        volley_missile: unit
-            .creatable
-            .as_ref()
-            .and_then(|c| i16::try_from(c.secondary_projectile_unit).ok())
+        spacing_modifier: work::SpacingModifier::new(c.flank_attack_modifier),
+        max_volley: MissileCount::of_data(c.max_total_projectiles),
+        volley_spread: {
+            let [x, y, start] = c.projectile_spawning_area;
+            VolleySpread {
+                x: Distance::new(x),
+                y: Distance::new(y),
+                start: Distance::new(start),
+            }
+        },
+        volley_missile: i16::try_from(c.secondary_projectile_unit)
+            .ok()
             .and_then(MasterId::of_data),
-        charge_projectile: unit
-            .creatable
-            .as_ref()
-            .and_then(|c| c.charge_projectile_unit)
+        charge_projectile: c
+            .charge_projectile_unit
             .and_then(|id| i16::try_from(id).ok())
             .and_then(MasterId::of_data),
-        ..work::Master::default()
+        ..work::CreatablePart::default()
     })
 }
 
@@ -318,22 +306,19 @@ fn dat_tasks(unit: &Unit, sounds: &[Sound]) -> Result<Vec<work::Task>, GenieErro
     )
 }
 
-/// A `.dat` unit's cost slots (`resource_costs`) in their places, empty without a creatable
-/// part.
+/// A `.dat` creatable section's cost slots (`resource_costs`) in their places.
 ///
 /// # Errors
 ///
 /// A slot whose attribute is below −1.
-fn dat_cost(unit: &Unit) -> Result<[CostSlot; COST_SLOTS], GenieError> {
+fn dat_cost(c: &Creatable) -> Result<[CostSlot; COST_SLOTS], GenieError> {
     let mut cost = [CostSlot::default(); COST_SLOTS];
-    if let Some(c) = unit.creatable.as_ref() {
-        for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {
-            *slot = CostSlot {
-                attribute: AttributeId::of_field(r.kind)?,
-                amount: CostAmount::of_data(r.amount),
-                paid: r.flag != 0,
-            };
-        }
+    for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {
+        *slot = CostSlot {
+            attribute: AttributeId::of_field(r.kind)?,
+            amount: CostAmount::of_data(r.amount),
+            paid: r.flag != 0,
+        };
     }
     Ok(cost)
 }

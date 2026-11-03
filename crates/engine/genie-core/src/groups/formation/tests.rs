@@ -25,6 +25,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::layers::Static;
 use crate::objects::masters::BuildableOn;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
@@ -100,9 +101,12 @@ pub(crate) fn slot_world(units: &[(i32, i16, f32, f32)], blocked: &[(usize, usiz
     let master = |id: MasterId, category: u8| Master {
         id,
         kind: MasterKind::COMBAT,
-        formation_category: FormationClass::of_data(category),
         terrain_restriction: Some(RestrictionId::named(0)),
         radius: Footprint::new(0.2, 0.2),
+        creatable: Some(CreatablePart {
+            formation_category: FormationClass::of_data(category),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([
@@ -248,21 +252,30 @@ fn unit_category_is_its_masters_and_none_for_null_object_or_ghost() {
             Master {
                 id: master_id(4),
                 kind: MasterKind::COMBAT,
-                formation_category: FormationClass::of_data(1),
-                hero_flag: HeroFlags::PROTECTED_FORMATION,
+                creatable: Some(CreatablePart {
+                    formation_category: FormationClass::of_data(1),
+                    hero_flag: HeroFlags::PROTECTED_FORMATION,
+                    ..CreatablePart::default()
+                }),
                 ..Master::default()
             },
             Master {
                 id: ids::ID_35,
                 kind: MasterKind::COMBAT,
                 class: class::SIEGE,
-                formation_category: FormationClass::of_data(2),
+                creatable: Some(CreatablePart {
+                    formation_category: FormationClass::of_data(2),
+                    ..CreatablePart::default()
+                }),
                 ..Master::default()
             },
             Master {
                 id: ids::DOPPELGANGER,
                 kind: MasterKind::DOPPELGANGER,
-                formation_category: FormationClass::of_data(1),
+                creatable: Some(CreatablePart {
+                    formation_category: FormationClass::of_data(1),
+                    ..CreatablePart::default()
+                }),
                 ..Master::default()
             },
         ]));
@@ -979,7 +992,10 @@ fn type_world(paths: Vec<PathData>) -> World {
     let masters = Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
-        formation_category: FormationClass::of_data(1),
+        creatable: Some(CreatablePart {
+            formation_category: FormationClass::of_data(1),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }]);
     t.model.masters = vec![Arc::new(masters.clone()), Arc::new(masters)];

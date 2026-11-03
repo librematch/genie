@@ -491,6 +491,7 @@ mod tests {
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::ClassId;
+    use crate::objects::masters::CreatablePart;
     use crate::objects::masters::Master;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::Masters;
@@ -519,7 +520,10 @@ mod tests {
         Master {
             id,
             kind: MasterKind::COMBAT,
-            cost: costs(cost),
+            creatable: Some(CreatablePart {
+                cost: costs(cost),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         }
     }

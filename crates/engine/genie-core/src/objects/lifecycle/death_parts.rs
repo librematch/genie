@@ -147,7 +147,7 @@ pub(crate) fn refund_of(
     slots: Slots,
 ) -> Vec<(AttributeId, Amount)> {
     let mut cost = 0.0f32;
-    for (_, amount, paid) in cost_entries(&master.cost) {
+    for (_, amount, paid) in cost_entries(&master.creatable_part().cost) {
         if paid {
             cost += amount.as_f32();
         }

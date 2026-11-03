@@ -53,6 +53,7 @@ pub fn attack_rate(
     // the game reads the slot of an id below the player's master count without testing it: a
     // null slot there would crash it, so a master the player has is the only case it runs
     let volley = master
+        .creatable_part()
         .volley_missile
         .and_then(|id| masters.get(id))
         .filter(|_| {
@@ -103,16 +104,17 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
     }
     let mut sum = 0.0f32;
     // COMISS volley, 1.0; JBE: an unordered volley fire adds no missiles
-    if ONE_MISSILE < master.volley_fire.get() {
+    if ONE_MISSILE < master.creatable_part().volley_fire.get() {
         // the volley missile's slot when the table has one, else the missile's (an id out of
         // the table gives none); a null slot or one without weapons adds nothing
         let missile = master
+            .creatable_part()
             .volley_missile
             .filter(|&id| in_table(masters, id))
             .or_else(|| master.missile.master())
             .and_then(|id| masters.get(id));
         if let Some(m) = missile {
-            let extra = cvttss2si(master.volley_fire.get() - ONE_MISSILE);
+            let extra = cvttss2si(master.creatable_part().volley_fire.get() - ONE_MISSILE);
             for &ClassAmount { class, amount } in &m.weapons {
                 if matches!(class, DamageClass::PIERCE | DamageClass::CLASS_38) {
                     // IMUL EAX, R8D then CVTDQ2PS

@@ -167,7 +167,7 @@ impl WorldPicker<'_> {
             owner: q,
             class: tm.class,
             master: t.life.master_id,
-            hero: tm.hero_flag,
+            hero: tm.creatable_part().hero_flag,
         });
         Ok(can_convert(
             &converter,
@@ -327,10 +327,11 @@ impl WorldPicker<'_> {
         let shown = Shown {
             target: target.as_ref(),
             projectile: om
+                .creatable_part()
                 .charge_projectile
                 .and_then(|id| player_master(self.every.players, q, id))
                 .map(|m| &m.weapons[..]),
-            charge_event: om.charge_event,
+            charge_event: om.creatable_part().charge_event,
             range_powerup: self.parts.combat_of(o.id).range_powerup,
         };
         let attack = shown_attack(&v, &shown, roles);

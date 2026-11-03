@@ -270,7 +270,7 @@ impl World {
             };
             let master = u.master(self.master_tables(), p)?;
             if master.kind < MasterKind::COMBAT
-                || !master.formation_category.grouped()
+                || !master.creatable_part().formation_category.grouped()
                 || split.far.contains(&id)
             {
                 i += 1;

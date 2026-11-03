@@ -1,9 +1,7 @@
 //! A master and the players' tables of them: the `.dat`'s unit records as the engine reads them (FD-046).
 
-use crate::combat::Charge;
-use crate::combat::ChargeRate;
+use crate::combat::Firepower;
 use crate::combat::missile::{MissSpread, MissileStats};
-use crate::combat::{Firepower, MissileCount};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
@@ -12,6 +10,7 @@ use crate::map::RestrictionId;
 use crate::map::TerrainId;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
+use crate::objects::Frame;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
@@ -21,38 +20,29 @@ use crate::objects::WorkRate;
 use crate::objects::facing::SpriteFacets;
 use crate::objects::lifecycle::MasterData;
 use crate::objects::masters::AdjacentMode;
-use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
-use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::CarryCapacity;
-use crate::objects::masters::ChargeEvent;
-use crate::objects::masters::ChargeKind;
-use crate::objects::masters::ChargeTarget;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatAbility;
 use crate::objects::masters::CombatLevel;
-use crate::objects::masters::ConversionAdjust;
-use crate::objects::masters::CostSlot;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::DamageGraphic;
 use crate::objects::masters::DamageGraphicEntry;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
-use crate::objects::masters::FormationClass;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::GhostMode;
-use crate::objects::masters::HeroFlags;
 use crate::objects::masters::HillMode;
 use crate::objects::masters::HitChance;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
-use crate::objects::masters::InvulnerabilityLevel;
 use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -65,15 +55,10 @@ use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::RunPattern;
 use crate::objects::masters::SelectionEffect;
-use crate::objects::masters::SpacingModifier;
-use crate::objects::masters::SpecialAttack;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskIndex;
 use crate::objects::masters::Trail;
-use crate::objects::masters::TrainLocationEntry;
-use crate::objects::masters::VolleySpread;
-use crate::objects::{Frame, Regeneration};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::{HotkeyId, LocationButton};
@@ -158,6 +143,8 @@ pub struct BuildingMaster {
     /// `+0x9ba`, `transform_unit`: the master it transforms into (−1 for none); a gate with one
     /// is in its player's gate list (`+0x1360`, `FUN_141616200`).
     pub transform_unit: Option<MasterId>,
+    /// `+0x982`, `building_facet` (the attribute list's "Building Icon Override").
+    pub facet: i16,
     /// `+0x960`, the `.dat`'s `destruction_graphic_id` (the save's third building sprite): the
     /// sprite a building that dies before it is built shows (`RGE_Static_Object::update`), −1
     /// for none.
@@ -213,8 +200,8 @@ pub struct Master {
     /// `+0x790`, `default_task`: the id of the task its object's empty action list starts in
     /// state 2 (`RGE_Action_Object::update`, slot 0x7f0); None for the game's −1.
     pub default_task: Option<TaskIndex>,
-    /// `+0x880`, the cost slots in their places (an empty one among them).
-    pub cost: [CostSlot; COST_SLOTS],
+    /// The creatable layer (types 70 and 80, `+0x880`..`+0x94f`): costs, train locations, volleys, charge; None for other masters.
+    pub creatable: Option<CreatablePart>,
     /// `work_rate` (`+0x798`): what a builder of this master adds to the work per second.
     pub work_rate: WorkRate,
     /// `search_radius` (`+0x794`, the object's slot 0x2c8).
@@ -225,30 +212,13 @@ pub struct Master {
     /// The hit points (`+0x530`) and the build time: the first train location's train time
     /// (`+0x898`'s first entry), 0 without one.
     pub hit_points: MasterHitPoints,
-    /// The build time: the first train location's train time, 0 without one.
-    pub build_time: WholeSeconds,
-    /// The train locations' ids (`+0x898`, each entry's first short): the units that build a
-    /// building, the buildings that train a unit (`FUN_141263610`).
-    pub trained_at: Vec<MasterId>,
     /// The combat master's `weapon_range` (`+0x828`, object slot 0x230) and
     /// `minimum_weapon_range` (`+0x850`, slot 0x240).
     pub weapon_range: Distance,
     /// `minimum_weapon_range` (`+0x850`, slot 0x240).
     pub min_range: Distance,
-    /// `charge_type` (`+0x922`): 6 and 7 add `charge_event` (`+0x920`) to the range against some
-    /// targets (slot 0x2f8).
-    pub charge_kind: ChargeKind,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
     pub capacity: CarryCapacity,
-    /// `+0x8bc`, `mFormationCategory`: 0 (villagers) keeps a unit out of the groups an order's
-    /// splitter forms (`FUN_140fd76d0`).
-    pub formation_category: FormationClass,
-    /// `+0x8d9`, `hero_flag`: a combat master it grants
-    /// [`HeroFlags::PROTECTED_FORMATION`] joins a group's fifth sub-formation (`FUN_141011300`).
-    pub hero_flag: HeroFlags,
-    /// `+0x8b8`, `mSpacingModifier`: with the radius on x the unit's radius in a group's
-    /// formation (`FUN_141025920`). The player's masters copy it from the data file's.
-    pub spacing_modifier: SpacingModifier,
     /// `+0x688`, `+0x68c`: the `.dat`'s `outline_size` (x, y), an obstruction-type-11 object's
     /// shape radii (`FUN_141054fe0`).
     pub outline: Footprint,
@@ -290,20 +260,8 @@ pub struct Master {
     pub combat_ability: CombatAbility,
     /// `damage_reflection` (`+0x864`).
     pub reflection: DamageShare,
-    /// `invulnerability_level` (`+0x930`): a hit point floor.
-    pub invulnerability: InvulnerabilityLevel,
-    /// `attack_priority` (`+0x92c`, `FUN_141202220`): 3 attacks only the classes of
-    /// `FUN_140fddf10`.
-    pub attack_priority: AttackPriority,
-    /// `special_attack_flag` (`+0x8d8`).
-    pub special_attack: SpecialAttack,
     /// `friendly_fire_damage` (`+0x868`).
     pub friendly_fire: DamageShare,
-    /// It has a special graphic (`+0x8e8`).
-    pub special_graphic: bool,
-    /// The special graphic's sprite (the `.dat`'s `special_graphic`), −1 for none: a herder
-    /// leading livestock shows it.
-    pub special_sprite: Option<SpriteId>,
     /// `area_effect_object_level` (`+0x62b`): the blasts that reach it.
     pub blast_defense: BlastDefense,
     /// `area_effect_range` (`+0x82c`): its blast's radius.
@@ -312,10 +270,6 @@ pub struct Master {
     pub blast_level: BlastLevel,
     /// `area_damage` (`+0x834`).
     pub area_damage: DamageShare,
-    /// `max_charge` (`+0x918`).
-    pub max_charge: Charge,
-    /// `charge_target` (`+0x924`).
-    pub charge_target: ChargeTarget,
     /// `+0x5d4`, `obj_max` (the `.dat`'s `garrison_capacity`): a building that garrisons takes a
     /// gather point (`FUN_140e7e9a0`).
     pub garrison: GarrisonCapacity,
@@ -362,8 +316,6 @@ pub struct Master {
     /// Its second standing sprite (`+0x478`, the `.dat`'s `standing_graphic[1]`), whose idle
     /// animation the object swaps in (`0x141071880`); None for none.
     pub standing_sprite_2: Option<SpriteId>,
-    /// The sprite it waits with between swings (`+0x910`, −1 for none).
-    pub idle_attack_sprite: Option<SpriteId>,
     /// Its walking sprite (`+0x748`, `move_sprite_id`; the unit's slot 0x7c8) and its running
     /// one (`+0x750`, `run_sprite_id`; slot 0x7d0), −1 for none.
     pub move_sprite: Option<SpriteId>,
@@ -394,18 +346,6 @@ pub struct Master {
     /// `garrison_firepower` (`+0x870`): what a unit adds to the volleys of a building it is
     /// inside; one at most 0 adds its magnitude.
     pub garrison_firepower: Firepower,
-    /// `volley_fire_amount` (`+0x8c0`, the `.dat`'s total projectiles): a new object's missiles
-    /// per volley (`+0xa00`).
-    pub volley_fire: Firepower,
-    /// `max_attacks_in_volley` (`+0x8c4`, the `.dat`'s max total projectiles).
-    pub max_volley: MissileCount,
-    /// `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment` (`+0x8c8`..
-    /// `+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles scatter.
-    pub volley_spread: VolleySpread,
-    /// `volley_missile_id` (`+0x8d4`, the `.dat`'s secondary projectile), None for −1.
-    pub volley_missile: Option<MasterId>,
-    /// `mChargeProjectileUnit` (`+0x928`), None for −1.
-    pub charge_projectile: Option<MasterId>,
     /// A missile master's flight (type 60, [`crate::combat::missile::MissileStats`]).
     pub missile_stats: Option<MissileStats>,
     /// What a unit of this master moves with, its speed with the master's walking sprite (the
@@ -439,32 +379,9 @@ pub struct Master {
     pub trail: Trail,
     /// `+0x7b9`, `run_pattern`.
     pub run_pattern: RunPattern,
-    /// `+0x856`, `+0x858`, `+0x854` and `+0x8b0`: the attack, range, melee and pierce armor a
-    /// combat master shows (`orig_weapon`, `orig_weapon_range`, `orig_armor`,
-    /// `orig_pierce_armor`).
+    /// `+0x856`, `+0x858` and `+0x854`: the attack, range and melee armor a combat master shows
+    /// (`orig_weapon`, `orig_weapon_range`, `orig_armor`).
     pub shown: Shown,
-    /// The train locations (`+0x898`, 12 bytes each; the save's `train_location`), which
-    /// [`Master::trained_at`] and [`Master::build_time`] follow.
-    pub train_locations: Vec<TrainLocation>,
-    /// `+0x940`, `mTrainLocationEntryMod`: the train location the attributes 42, 43, 58 and 101
-    /// change.
-    pub train_location_entry: TrainLocationEntry,
-    /// `+0x8b4`, `regeneration_rate`.
-    pub regeneration: Regeneration,
-    /// `+0x91c`, `mRechargeRate`.
-    pub recharge_rate: ChargeRate,
-    /// `+0x920`, `mChargeEvent`.
-    pub charge_event: ChargeEvent,
-    /// `+0x934`, `+0x938`, `+0x93c`: `mMinConversionTimeAdj`, `mMaxConversionTimeAdj`,
-    /// `mConversionChanceAdj`.
-    pub conversion: ConversionAdjust,
-    /// `+0x908`, the hero glow sprite (−1 for none).
-    pub hero_glow_sprite: Option<SpriteId>,
-    /// `+0x8f0`, the garrison sprite (−1 for none).
-    pub garrison_sprite: Option<SpriteId>,
-    /// A building master's `+0x982`, `building_facet` (the attribute list's "Building Icon
-    /// Override").
-    pub building_facet: i16,
 }
 
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's
@@ -482,7 +399,8 @@ pub struct TrainLocation {
     pub hotkey: HotkeyId,
 }
 
-/// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`, `+0x8b0`).
+/// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`; the pierce armor it
+/// shows is the creatable layer's, [`CreatablePart::pierce_armor_shown`]).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
 pub struct Shown {
@@ -492,8 +410,6 @@ pub struct Shown {
     pub range: Distance,
     /// `+0x854`, `orig_armor`.
     pub melee_armor: DamageAmount,
-    /// `+0x8b0`, `orig_pierce_armor`.
-    pub pierce_armor: DamageAmount,
 }
 
 /// A player's masters by id.

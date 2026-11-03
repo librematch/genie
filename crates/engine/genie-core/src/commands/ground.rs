@@ -103,7 +103,7 @@ impl World {
             }
             if owner == site_owner
                 && MasterKind::COMBAT <= master.kind
-                && master.formation_category.grouped()
+                && master.creatable_part().formation_category.grouped()
             {
                 together.push(id);
                 continue;
@@ -225,7 +225,7 @@ impl World {
             return Ok(());
         };
         let m = self.master(player, master)?;
-        if m.build_time <= WholeSeconds::ZERO {
+        if m.creatable_part().build_time <= WholeSeconds::ZERO {
             return Ok(());
         }
         let f = Foundation {

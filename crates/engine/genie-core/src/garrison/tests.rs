@@ -55,6 +55,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::GarrisonKinds;
@@ -1231,9 +1232,12 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         reload: Seconds::new(2.0),
         weapon_range: Distance::new(6.0),
         weapons: vec![ClassAmount::new(3, 5)],
-        volley_missile: Some(master_id(54)),
-        volley_fire: Firepower::new(1.0),
-        max_volley: MissileCount::of_data(11),
+        creatable: Some(CreatablePart {
+            volley_missile: Some(master_id(54)),
+            volley_fire: Firepower::new(1.0),
+            max_volley: MissileCount::of_data(11),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let villager = Master {
@@ -1294,8 +1298,11 @@ fn town_center() -> Master {
         reload: Seconds::new(2.0),
         weapon_range: Distance::new(6.0),
         weapons: vec![ClassAmount::new(3, 5)],
-        volley_missile: Some(master_id(54)),
-        volley_fire: Firepower::new(1.0),
+        creatable: Some(CreatablePart {
+            volley_missile: Some(master_id(54)),
+            volley_fire: Firepower::new(1.0),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     }
 }
@@ -1394,8 +1401,11 @@ fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
         weapons: vec![ClassAmount::new(3, 4)],
         missile: MasterField::of(Some(ids::FARM)),
         garrison_firepower: Firepower::new(1.0),
-        volley_fire: Firepower::new(3.0),
-        volley_missile,
+        creatable: Some(CreatablePart {
+            volley_fire: Firepower::new(3.0),
+            volley_missile,
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([missile, volley, unarmed]);
@@ -1441,8 +1451,11 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
         kind: MasterKind::COMBAT,
         reload: Seconds::new(1.0),
         garrison_firepower: Firepower::new(1.0),
-        volley_fire: Firepower::new(1e10),
-        volley_missile: Some(master_id(54)),
+        creatable: Some(CreatablePart {
+            volley_fire: Firepower::new(1e10),
+            volley_missile: Some(master_id(54)),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([volley(1)]);
@@ -1458,7 +1471,10 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
     // the f32 truncation toward zero: 3.9 - 1 gives 2 extra missiles
     let masters = Masters::new([volley(3)]);
     let three = Master {
-        volley_fire: Firepower::new(3.9),
+        creatable: Some(CreatablePart {
+            volley_fire: Firepower::new(3.9),
+            ..tower.creatable.clone().unwrap_or_default()
+        }),
         ..tower
     };
     assert_eq!(
@@ -1871,7 +1887,9 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     if let Some(tc) = masters.get_mut(TC) {
         tc.radius = Footprint::new(2.0, 2.0);
         tc.tall = true;
-        tc.volley_fire = Firepower::new(1.0);
+        tc.creatable
+            .get_or_insert_with(Default::default)
+            .volley_fire = Firepower::new(1.0);
         // no stack unit, head or annexes: the tracker files it under its own id
         if let Some(b) = tc.building.as_mut() {
             b.stack_unit = None;

@@ -50,6 +50,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterKind;
@@ -1132,9 +1133,12 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         id,
         terrain_restriction: Some(RestrictionId::named(0)),
         kind: MasterKind::COMBAT,
-        formation_category,
         move_sprite: None,
         standing_sprite: None,
+        creatable: Some(CreatablePart {
+            formation_category,
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     t.model.masters = vec![
@@ -1705,8 +1709,11 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         id,
         kind: MasterKind::BUILDING,
         hit_points: MasterHitPoints::of_data(100),
-        build_time,
-        volley_fire: Firepower::new(f32::from(build_time.get() / 15)),
+        creatable: Some(CreatablePart {
+            build_time,
+            volley_fire: Firepower::new(f32::from(build_time.get() / 15)),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     t.model.masters[1] = Arc::new(Masters::new([
@@ -2510,9 +2517,12 @@ fn switch_masters() -> (Master, Master) {
             (Some(attribute::HEADROOM), Amount::new(1.0), 2),
             (Some(AttributeId::named(14)), Amount::new(1.0), 16),
         ],
-        volley_fire: Firepower::new(3.0),
         obstruction_kind: ObstructionKind::TYPE_3,
         obstruction_class: ObstructionClass::RESOURCE,
+        creatable: Some(CreatablePart {
+            volley_fire: Firepower::new(3.0),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     (old, next)

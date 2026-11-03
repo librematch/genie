@@ -211,7 +211,7 @@ impl World {
         new: MasterId,
     ) -> Result<(), GenieError> {
         self.change_master(player, idx, new)?;
-        let build_time = self.master(player, new)?.build_time;
+        let build_time = self.master(player, new)?.creatable_part().build_time;
         let unit = self.players.live_mut(player, idx)?;
         if unit.life.state == ObjectState::Alive
             && let Some(c) = self.parts.building_mut(unit.id)?.construction.as_mut()
@@ -536,7 +536,7 @@ pub(crate) fn switch_master(
     // in state 2 the volleys (`+0xa00`) are the new master's volley fire, the shares of the
     // units inside dropped
     if unit.life.state == ObjectState::Alive {
-        combat.firepower = next.volley_fire;
+        combat.firepower = next.creatable_part().volley_fire;
     }
     Ok(switched)
 }

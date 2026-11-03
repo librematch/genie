@@ -63,6 +63,14 @@ impl MasterKind {
         Self(value)
     }
 
+    /// Whether a master of this type holds the creatable layer (`TRIBE_Master_Combat_Object`'s
+    /// values, `+0x880`..`+0x94f`): the `.dat` reads the creatable section for the types 70 and
+    /// up but 90, one of the data's own types; the save holds the TRIBE combat part for 70 and 80.
+    #[must_use]
+    pub const fn has_creatable_layer(self) -> bool {
+        Self::COMBAT.0 <= self.0 && self.0 != 90
+    }
+
     /// A type the code names, in one of the constants above: only they make them.
     const fn named(value: u8) -> Self {
         Self(value)

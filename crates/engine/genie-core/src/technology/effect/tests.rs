@@ -1086,11 +1086,8 @@ fn an_object_copies_of_its_master_follow_its_change() {
         Some(SpriteId::named(7)),
         [Some(master_id(0)), Some(master_id(9))],
     );
-    (m.build_time, m.obstruction_kind, m.obstruction_class) = (
-        WholeSeconds::of_data(33),
-        ObstructionKind::CIRCLE,
-        ObstructionClass::UNIT,
-    );
+    m.creatable.get_or_insert_with(Default::default).build_time = WholeSeconds::of_data(33);
+    (m.obstruction_kind, m.obstruction_class) = (ObstructionKind::CIRCLE, ObstructionClass::UNIT);
     (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
     t.model.masters = vec![Arc::new(Masters::new([
         m,
@@ -1652,7 +1649,8 @@ fn spawns_and_cost_entries() {
     let mut tc = combat(ids::TOWN_CENTRE, ClassId::of_master(80), 2400);
     tc.kind = MasterKind::BUILDING;
     let mut serjeant = combat(master_id(1658), class::CLASS_6, 60);
-    serjeant.cost = costs(&[(attribute::FOOD, 60, true), (attribute::STONE, 35, true)]);
+    serjeant.creatable.get_or_insert_with(Default::default).cost =
+        costs(&[(attribute::FOOD, 60, true), (attribute::STONE, 35, true)]);
     t.model.masters = vec![Arc::new(Masters::new([tc, serjeant]))];
     t.do_effect(PlayerId::new(0), &[attribute(7, 1658, 109, 5, 0.0)], None)
         .unwrap();
@@ -1665,7 +1663,11 @@ fn spawns_and_cost_entries() {
     t.do_effect(PlayerId::new(0), &[attribute(5, 1658, -1, 103, -2.0)], None)
         .unwrap();
     assert_eq!(
-        t.model.masters[0].get(master_id(1658)).unwrap().cost,
+        t.model.masters[0]
+            .get(master_id(1658))
+            .unwrap()
+            .creatable_part()
+            .cost,
         [
             CostSlot::default(),
             CostSlot::new(attribute::STONE, CostAmount::of_data(35), true),
@@ -1676,7 +1678,11 @@ fn spawns_and_cost_entries() {
     t.do_effect(PlayerId::new(0), &[attribute(5, 1658, -1, 105, -1.0)], None)
         .unwrap();
     assert_eq!(
-        t.model.masters[0].get(master_id(1658)).unwrap().cost,
+        t.model.masters[0]
+            .get(master_id(1658))
+            .unwrap()
+            .creatable_part()
+            .cost,
         costs(&[(attribute::GOLD, -1, true), (attribute::STONE, 35, true)])
     );
 }

@@ -220,7 +220,7 @@ impl World {
             moving: g(master.move_sprite),
             attack: g(master.attack_sprite),
             standing: g(master.standing_sprite),
-            idle_attack: g(master.idle_attack_sprite),
+            idle_attack: g(master.creatable_part().idle_attack_sprite),
             second: g(master.attack_sprite2),
             combat: MasterKind::COMBAT <= master.kind,
         };
@@ -528,7 +528,7 @@ impl World {
                     | MasterAttribute::TRAIN_LOCATION
                     | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
                     | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                        c.build_time = master.build_time;
+                        c.build_time = master.creatable_part().build_time;
                     }
                     MasterAttribute::OBSTRUCTION_TYPE | MasterAttribute::BLOCKAGE_CLASS => {
                         c.record = Obstruction {

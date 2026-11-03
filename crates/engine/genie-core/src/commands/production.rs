@@ -179,7 +179,7 @@ impl World {
             *rooms.checked_mut(k)? -= 1;
             *counts.checked_mut(k)? += 1;
             let at = self.at(*found.checked(k)?)?.1.life.master_id;
-            let time = train_time(&unit.train_locations, at, button);
+            let time = train_time(&unit.creatable_part().train_locations, at, button);
             *loads.checked_mut(k)? += Seconds::of_master(time);
             pick = Some(k);
         }
@@ -296,7 +296,7 @@ impl World {
         for e in queue.slots.head(entries)? {
             if let Some(master) = e.master {
                 let time = player_master(&self.model.masters, p, master)
-                    .and_then(|m| m.train_locations.first())
+                    .and_then(|m| m.creatable_part().train_locations.first())
                     .map_or(WholeSeconds::ZERO, |l| l.time);
                 queued += Seconds::new((i32::from(e.count.get()) * i32::from(time.get())) as f32);
             } else if let Some(tech) = e.tech {
@@ -455,7 +455,7 @@ impl World {
         };
         let time = made
             .filter(|m| MasterKind::COMBAT <= m.kind)
-            .map(|m| train_time(&m.train_locations, building, button));
+            .map(|m| train_time(&m.creatable_part().train_locations, building, button));
         let production = self.production_or_new(id)?;
         if let Some(last) = production.queue.last()
             && last.master == Some(master)
@@ -600,7 +600,7 @@ fn affordable(
 ) -> Result<Option<i32>, GenieError> {
     let (costed, annex) = costed(masters, unit);
     let short = |count: i32| -> Result<bool, GenieError> {
-        for (attribute, each, paid) in cost_entries(&costed.cost) {
+        for (attribute, each, paid) in cost_entries(&costed.creatable_part().cost) {
             if (annex && !paid)
                 || roles
                     .of_attribute(attribute)

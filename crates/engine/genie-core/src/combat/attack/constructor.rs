@@ -468,7 +468,7 @@ pub fn arms_looking(
         sprite: g(sprites.proceeding).or_else(|| g(master.attack_sprite)),
         second_sprite: g(master.attack_sprite2),
         idle_sprite: g(master.standing_sprite),
-        idle_attack_sprite: g(master.idle_attack_sprite),
+        idle_attack_sprite: g(master.creatable_part().idle_attack_sprite),
         missile: master.missile.master(),
         fire_frame: master.fire_frame,
         interrupt_frame: master.interrupt_frame,
@@ -485,7 +485,7 @@ pub fn engagement(
     them: &Placed,
     world_time: WorldTime,
 ) -> Result<Engagement, GenieError> {
-    if master.charge_kind.ranged() {
+    if master.creatable_part().charge_kind.ranged() {
         return Err(GenieError::unsupported(
             "an attacker whose charge adds to its range (slot 0x2f8)",
         ));

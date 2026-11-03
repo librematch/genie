@@ -240,8 +240,8 @@ impl World {
         }
         let master = unit.master(self.master_tables(), player)?;
         if master.kind != CHARGER
-            || master.max_charge <= Charge::ZERO
-            || master.special_attack != SpecialAttack::CHARGE
+            || master.creatable_part().max_charge <= Charge::ZERO
+            || master.creatable_part().special_attack != SpecialAttack::CHARGE
         {
             return Ok(speed.get());
         }

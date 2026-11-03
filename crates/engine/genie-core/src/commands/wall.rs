@@ -241,7 +241,7 @@ impl World {
         if site.kind != MasterKind::BUILDING {
             return Ok(());
         }
-        let (radius, trained_at) = (site.radius, site.trained_at.clone());
+        let (radius, trained_at) = (site.radius, site.creatable_part().trained_at.clone());
         let player_type = self.players.player(player)?.kind;
         let builders: &[Option<ObjectId>] =
             if player_type.is_computer() && builders.first() == Some(&None) {

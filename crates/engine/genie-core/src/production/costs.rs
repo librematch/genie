@@ -33,7 +33,7 @@ pub fn refund(
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
-    for (attribute, _, paid) in cost_entries(&master.cost) {
+    for (attribute, _, paid) in cost_entries(&master.creatable_part().cost) {
         if !paid {
             continue;
         }
@@ -80,7 +80,7 @@ pub fn refund_master(
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
-    for (attribute, amount, paid) in cost_entries(&master.cost) {
+    for (attribute, amount, paid) in cost_entries(&master.creatable_part().cost) {
         if !paid {
             continue;
         }
@@ -142,7 +142,11 @@ const ONE: CostCount = CostCount::ONE;
 
 /// A master's cost entry `j` `(attribute, amount, paid)`, none for an entry it lacks.
 fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, bool)> {
-    master.cost.get(j).and_then(|slot| slot.entry())
+    master
+        .creatable_part()
+        .cost
+        .get(j)
+        .and_then(|slot| slot.entry())
 }
 
 /// The master whose costs the cost tests read for player's master `m` (`FUN_141618db0`,

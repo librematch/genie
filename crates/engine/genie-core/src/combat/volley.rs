@@ -117,7 +117,7 @@ impl Unit {
                 "a self-destructing attacker's hit (its object 112 and its death)",
             ));
         }
-        if master.charge_kind.ranged() {
+        if master.creatable_part().charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "a charged hit (slot 0x2f8 with charge types 6 and 7)",
             ));
@@ -138,13 +138,21 @@ impl Unit {
             roles
                 .of_class(master.class)
                 .contains(ClassRoles::UNPACKED_TREBUCHET),
-            master.volley_spread,
+            master.creatable_part().volley_spread,
         );
-        let (first, extra) = if master.max_volley == MissileCount::ZERO {
+        let (first, extra) = if master.creatable_part().max_volley == MissileCount::ZERO {
             (true, 0)
         } else {
             let full = master.combat_ability.contains(CombatAbility::FULL_VOLLEY);
-            self.volley_shots(c, (master.max_volley, master.volley_spread, full), notifies)?
+            self.volley_shots(
+                c,
+                (
+                    master.creatable_part().max_volley,
+                    master.creatable_part().volley_spread,
+                    full,
+                ),
+                notifies,
+            )?
         };
         if missile || 0 < extra {
             // a target of a player but Gaia: its player makes a flare (master 112, slot 0x1c0)
@@ -247,7 +255,7 @@ impl Unit {
         let combat = c.w.parts.combat_mut(self.id)?;
         combat.attack_count = combat.attack_count.next();
         let master = self.master(c.w.master_tables(), c.player)?;
-        if master.charge_kind.ranged() {
+        if master.creatable_part().charge_kind.ranged() {
             return Err(GenieError::unsupported(
                 "a charge projectile (charge types 6 and 7, slot 0x2f8)",
             ));
@@ -334,11 +342,14 @@ impl Unit {
             self.position(),
             facing,
             master.weapon_offset,
-            master.volley_spread.start,
+            master.creatable_part().volley_spread.start,
             scatter,
             building.then_some(aimed.position.ground()),
         );
-        let volley = master.volley_missile.and_then(|id| masters.get(id));
+        let volley = master
+            .creatable_part()
+            .volley_missile
+            .and_then(|id| masters.get(id));
         let made = match volley {
             Some(v) => v,
             None if master.missile.master().is_some() => {

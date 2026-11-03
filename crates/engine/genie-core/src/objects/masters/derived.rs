@@ -73,8 +73,8 @@ pub fn follow_moving(
 }
 
 /// The values the slice derives from master `master`'s after attribute `attribute` changed: its
-/// height test, its missile's flight, whether it has damage sprites and a special graphic,
-/// its train locations' ids and first time, and what a unit moving with it reads
+/// height test, its missile's flight, whether it has damage sprites, its train locations' ids
+/// and first time, and what a unit moving with it reads
 /// ([`follow_moving`]).
 pub fn follow(
     master: &mut Master,
@@ -98,22 +98,21 @@ pub fn follow(
         MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
             master.damage_sprites = !master.damage_graphics.is_empty();
         }
-        MasterAttribute::SPECIAL_GRAPHIC => {
-            master.special_graphic = master.special_sprite.is_some();
-        }
         MasterAttribute::TRAIN_LOCATION
         | MasterAttribute::TRAIN_TIME
         | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
         | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-            master.trained_at = master
-                .train_locations
-                .iter()
-                .filter_map(|t| t.location)
-                .collect();
-            master.build_time = master
-                .train_locations
-                .first()
-                .map_or(WholeSeconds::ZERO, |t| t.time);
+            if let Some(p) = master.creatable.as_mut() {
+                p.trained_at = p
+                    .train_locations
+                    .iter()
+                    .filter_map(|t| t.location)
+                    .collect();
+                p.build_time = p
+                    .train_locations
+                    .first()
+                    .map_or(WholeSeconds::ZERO, |t| t.time);
+            }
         }
         _ => {}
     }

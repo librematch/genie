@@ -258,30 +258,50 @@ pub fn work_masters(
                 .as_deref()
                 .map(|b| &b.tribe_master_combat_object)
         });
+        // the creatable layer is the save's TRIBE combat part: a master without one has no
+        // costs or train locations, whatever its copy's are
         if let Some(c) = combat {
-            work.cost = build_cost(&c.build_inventory);
-            work.build_time = c
+            let p = work.creatable.get_or_insert_with(Default::default);
+            p.cost = build_cost(&c.build_inventory);
+            p.build_time = c
                 .train_location
                 .first()
                 .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-            work.charge_kind = ChargeKind::of_data(c.charge_type);
-            work.formation_category = FormationClass::of_data(c.temp_formation_category);
-            work.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
-            work.volley_fire = Firepower::new(c.volley_fire_amount);
-            work.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
-            work.volley_spread = VolleySpread {
+            p.charge_kind = ChargeKind::of_data(c.charge_type);
+            p.formation_category = FormationClass::of_data(c.temp_formation_category);
+            p.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
+            p.volley_fire = Firepower::new(c.volley_fire_amount);
+            p.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
+            p.volley_spread = VolleySpread {
                 x: Distance::new(c.volley_xspread),
                 y: Distance::new(c.volley_yspread),
                 start: Distance::new(c.volley_start_spread_adjustment),
             };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
-            work.volley_missile = id(c.volley_missile_id);
-            work.charge_projectile = id(c.charge_projectile_unit);
-            work.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
-            work.attack_priority = AttackPriority::of_byte(c.attack_priority);
-            work.special_attack = SpecialAttack::of_data(c.special_attack_flag);
-            work.max_charge = Charge::new(c.max_charge);
-            work.charge_target = ChargeTarget::of_data(c.charge_target);
+            p.volley_missile = id(c.volley_missile_id);
+            p.charge_projectile = id(c.charge_projectile_unit);
+            p.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
+            p.attack_priority = AttackPriority::of_byte(c.attack_priority);
+            p.special_attack = SpecialAttack::of_data(c.special_attack_flag);
+            p.max_charge = Charge::new(c.max_charge);
+            p.charge_target = ChargeTarget::of_data(c.charge_target);
+            p.train_locations = c
+                .train_location
+                .iter()
+                .map(|t| TrainLocation {
+                    location: MasterId::of_data(t.train_location_id),
+                    time: WholeSeconds::of_data(t.train_time),
+                    button: LocationButton::of_data(t.button_location_id),
+                    hotkey: HotkeyId::of_data(t.hotkey_id),
+                })
+                .collect();
+            p.trained_at = p
+                .train_locations
+                .iter()
+                .filter_map(|t| t.location)
+                .collect();
+        } else {
+            work.creatable = None;
         }
         // the combat part a missile master has too (`RGE_Master_Missile_Object`'s base)
         let rge_combat = combat.map(|c| &c.rge_master_combat_object).or_else(|| {
@@ -336,13 +356,11 @@ pub fn work_masters(
         // the save holds the foundation terrain of its own building masters, its garrison's
         // kinds (`garrison_units`, read into `+0x9bc`: a civilisation's bonus, as the Gurjaras'
         // herdables in mills, changes them at the start) and rates, and its facet
-        if let Some(saved) = m.tribe_master_building_object.as_deref() {
-            work.building_facet = saved.building_facet.cast_signed();
-        }
         if let (Some(b), Some(saved)) = (
             work.building.as_mut(),
             m.tribe_master_building_object.as_deref(),
         ) {
+            b.facet = saved.building_facet.cast_signed();
             b.garrison_type = GarrisonKinds::from_bits_retain(saved.garrison_units);
             b.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
             b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
@@ -387,23 +405,6 @@ pub fn work_masters(
                 percent: HpPercent::of_data(d.sprite_info_damage_percent),
                 apply_mode: DamageSpriteMode::of_data(d.sprite_info_flag),
             })
-            .collect();
-        // a master without a combat part has no train locations, whatever its copy's are
-        work.train_locations = combat.map_or_else(Vec::new, |c| {
-            c.train_location
-                .iter()
-                .map(|t| TrainLocation {
-                    location: MasterId::of_data(t.train_location_id),
-                    time: WholeSeconds::of_data(t.train_time),
-                    button: LocationButton::of_data(t.button_location_id),
-                    hotkey: HotkeyId::of_data(t.hotkey_id),
-                })
-                .collect()
-        });
-        work.trained_at = work
-            .train_locations
-            .iter()
-            .filter_map(|t| t.location)
             .collect();
         work.fly_mode = MasterId::of_data(s.copy_id())
             .and_then(|m| table.fly_mode(civ, m))

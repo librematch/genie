@@ -435,11 +435,9 @@ impl World {
                 id: t,
                 building: m.kind == MasterKind::BUILDING,
                 class: m.class,
-                built: self
-                    .parts
-                    .building_of(o.id)
-                    .construction
-                    .is_some_and(|c| Seconds::of_master(m.build_time) <= c.progress),
+                built: self.parts.building_of(o.id).construction.is_some_and(|c| {
+                    Seconds::of_master(m.creatable_part().build_time) <= c.progress
+                }),
             }))
         };
         let (found, record) = bell.back_to_work(&lookup, &self.model.roles)?;

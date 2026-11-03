@@ -597,7 +597,7 @@ pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
 /// floats in its order, as the kill counts read it (`FUN_1412005b0`, `FUN_1411cea90`).
 pub(crate) fn paid_cost(master: &Master) -> Amount {
     let mut cost = Amount::ZERO;
-    for (_, amount, paid) in cost_entries(&master.cost) {
+    for (_, amount, paid) in cost_entries(&master.creatable_part().cost) {
         if paid {
             cost += Amount::new(amount.as_f32());
         }

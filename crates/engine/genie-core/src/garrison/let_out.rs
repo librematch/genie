@@ -182,8 +182,10 @@ impl World {
             let _ = b.garrison.swap_remove(k);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
-        if b.garrison.is_empty() || self.parts.combat_of(b.id).firepower < bm.volley_fire {
-            self.parts.combat_mut(b.id)?.firepower = bm.volley_fire;
+        if b.garrison.is_empty()
+            || self.parts.combat_of(b.id).firepower < bm.creatable_part().volley_fire
+        {
+            self.parts.combat_mut(b.id)?.firepower = bm.creatable_part().volley_fire;
         }
         // a building's sight lets the circle of 5 go (slot 0x1d8 with 5)
         let (building_at, building_radius) = (b.position(), bm.radius);

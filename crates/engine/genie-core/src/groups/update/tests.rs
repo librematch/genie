@@ -50,6 +50,7 @@ use crate::objects::layers::Static;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterId;
@@ -154,7 +155,10 @@ fn world() -> World {
         search_radius: Distance::new(3.0),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: None,
-        formation_category: FormationClass::of_data(1),
+        creatable: Some(CreatablePart {
+            formation_category: FormationClass::of_data(1),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     t.model.masters = vec![Masters::new([master]); 4]
@@ -663,7 +667,10 @@ fn unit_shows_its_standing_walking_or_running_sprite() {
             standing_sprite: SpriteId::of_data(sprites[0]),
             move_sprite: SpriteId::of_data(sprites[1]),
             run_sprite: SpriteId::of_data(sprites[2]),
-            formation_category: FormationClass::of_data(1),
+            creatable: Some(CreatablePart {
+                formation_category: FormationClass::of_data(1),
+                ..CreatablePart::default()
+            }),
             ..Master::default()
         };
         t.model.masters = vec![Masters::new([m]); 4]
@@ -2209,13 +2216,15 @@ fn unit_speed_is_its_movers_unless_charge_runs() {
     assert_eq!(speed(&t, 11).unwrap(), 0.0);
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
     let mut m4 = t.model.masters[1].get(master_id(4)).unwrap().clone();
-    m4.max_charge = Charge::new(1.0);
+    m4.creatable.get_or_insert_with(Default::default).max_charge = Charge::new(1.0);
     t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
-    m4.special_attack = SpecialAttack::CHARGE;
+    m4.creatable
+        .get_or_insert_with(Default::default)
+        .special_attack = SpecialAttack::CHARGE;
     t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert!(speed(&t, 10).is_err());
-    m4.max_charge = Charge::ZERO;
+    m4.creatable.get_or_insert_with(Default::default).max_charge = Charge::ZERO;
     t.model.masters[1] = Arc::new(Masters::new([m4]));
     assert_eq!(speed(&t, 10).unwrap(), 0.8);
 }

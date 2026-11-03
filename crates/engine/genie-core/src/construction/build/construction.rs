@@ -172,6 +172,7 @@ pub(super) fn completion_counts(
     }
     // its paid cost: the cost entries of a resource flagged paid (`+0x880`), summed as shorts
     let paid: i32 = master
+        .creatable_part()
         .cost
         .iter()
         .filter_map(|slot| slot.entry())

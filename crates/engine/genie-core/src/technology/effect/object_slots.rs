@@ -261,7 +261,8 @@ impl World {
             (MasterAttribute::MAXIMUM_CHARGE, _) => {
                 let _ = self.object(id).ok_or(OBJECT_GONE)?;
                 let combat = self.parts.combat_mut(id)?;
-                combat.charge = charge_after(combat.charge, master.max_charge, change, v);
+                combat.charge =
+                    charge_after(combat.charge, master.creatable_part().max_charge, change, v);
                 Ok(())
             }
             (MasterAttribute::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
@@ -332,7 +333,12 @@ impl World {
             (MasterAttribute::TRAIN_TIME, _) => {
                 let (_, layer) = self.object_and_layer_mut(id)?.ok_or(OBJECT_GONE)?;
                 if let Some(c) = layer.construction.as_mut() {
-                    c.progress = build_points_after(c.progress, master.build_time, change, v);
+                    c.progress = build_points_after(
+                        c.progress,
+                        master.creatable_part().build_time,
+                        change,
+                        v,
+                    );
                 }
                 Ok(())
             }

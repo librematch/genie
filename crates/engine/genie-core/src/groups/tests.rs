@@ -16,6 +16,7 @@ use crate::objects::layers::Static;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::HeroFlags;
 use crate::objects::masters::MasterId;
@@ -643,9 +644,12 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         id,
         kind: MasterKind::COMBAT,
         class,
-        formation_category: FormationClass::of_data(1),
         weapon_range: Distance::new(4.0),
         radius: Footprint::new(0.3, 0.3),
+        creatable: Some(CreatablePart {
+            formation_category: FormationClass::of_data(1),
+            ..CreatablePart::default()
+        }),
         ..Master::default()
     };
     let building = Master {

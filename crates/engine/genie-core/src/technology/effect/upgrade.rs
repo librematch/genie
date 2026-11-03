@@ -391,11 +391,15 @@ impl World {
             if !named || m.kind < MasterKind::COMBAT {
                 continue;
             }
+            // a tree (type 90) has no creatable layer, so no costs to edit
+            let Some(part) = m.creatable.as_mut() else {
+                continue;
+            };
             let wanted = match edit {
                 CostEdit::Remove => Some(resource),
                 CostEdit::Add => None,
             };
-            if let Some(slot) = m.cost.iter_mut().find(|c| c.attribute == wanted) {
+            if let Some(slot) = part.cost.iter_mut().find(|c| c.attribute == wanted) {
                 *slot = match edit {
                     CostEdit::Remove => CostSlot::default(),
                     CostEdit::Add => CostSlot::new(resource, CostAmount::of_data(-1), true),

@@ -221,7 +221,7 @@ impl World {
     /// (`+0x984`) and has one (0 or more). A master without train locations trains nowhere.
     #[must_use]
     pub fn trains_at(&self, m: &Master, building: MasterId) -> bool {
-        if m.trained_at.is_empty() {
+        if m.creatable_part().trained_at.is_empty() {
             return false;
         }
         let mut at = building;
@@ -237,6 +237,6 @@ impl World {
         {
             at = stack;
         }
-        m.trained_at.contains(&at)
+        m.creatable_part().trained_at.contains(&at)
     }
 }
