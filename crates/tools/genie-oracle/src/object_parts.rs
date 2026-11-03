@@ -24,6 +24,7 @@ use genie_core::players::Amount;
 use genie_core::players::AmountRate;
 use genie_core::players::CivId;
 use genie_core::players::attribute::AttributeId;
+use genie_core::unit_ai::AlertMode;
 use genie_core::unit_ai::OrderPriority;
 use genie_core::unit_ai::best_target::AttackCategory;
 use genie_core::unit_ai::{AiAction, OrderKind};
@@ -158,7 +159,7 @@ pub(super) fn unit_ai(
         formation_kind: FormationKind::of_byte(ai.formation_kind),
         state_position: Point::new(ai.state_position_xvalue, ai.state_position_yvalue),
         retarget_disabled: ai.disable_retargeting,
-        alert_mode: ai.alert_mode_value != 0,
+        alert_mode: AlertMode::of_data(ai.alert_mode_value),
         time_since_enemy: Seconds::new(ai.time_since_enemy_sighting),
         patrol_path: patrol_path(ai),
         patrol_waypoint: WaypointIndex::of_data(ai.patrol_current_waypoint),

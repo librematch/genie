@@ -70,6 +70,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::ControlKey;
 use crate::orders::MasterSwap;
+use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::SavedPatrols;
@@ -1521,9 +1522,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     let order = MoveOrder {
         target: None,
         point: Point::new(30.0, 30.0),
-        queued: true,
-        direct: false,
-        human: false,
+        flags: OrderFlags::QUEUED,
         control: ControlKey::Up,
     };
     t.move_order(PlayerId::new(2), &object_ids([11]), &order)
@@ -1532,9 +1531,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
         target: None,
         point: Point::new(25.0, 30.0),
         carry_test: false,
-        queued: true,
-        direct: false,
-        human: false,
+        flags: OrderFlags::QUEUED,
         filter: None,
     };
     t.interact(PlayerId::new(2), &object_ids([11]), &interact)
@@ -1565,9 +1562,7 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
     let order = MoveOrder {
         target: None,
         point: Point::new(30.0, 30.0),
-        queued: false,
-        direct: false,
-        human: false,
+        flags: OrderFlags::empty(),
         control: ControlKey::Up,
     };
     let mut t = soldiers(&units, &[11]);
@@ -1609,9 +1604,7 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
         target: None,
         point: Point::new(30.0, 30.0),
         carry_test: false,
-        queued: false,
-        direct: false,
-        human: false,
+        flags: OrderFlags::empty(),
         filter: None,
     };
     let mut t = two();
@@ -1835,9 +1828,11 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
         target: None,
         point: Point::new(25.0, 30.0),
         carry_test: false,
-        queued,
-        direct: false,
-        human: false,
+        flags: if queued {
+            OrderFlags::QUEUED
+        } else {
+            OrderFlags::empty()
+        },
         filter: None,
     };
     let run = |queued| {
@@ -1894,9 +1889,7 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
         target: None,
         point: Point::new(25.0, 30.0),
         carry_test: false,
-        queued: false,
-        direct: false,
-        human: false,
+        flags: OrderFlags::empty(),
         filter: None,
     };
     t.interact(PlayerId::new(1), &object_ids([11]), &interact)
@@ -1926,9 +1919,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         target: None,
         point: Point::new(25.0, 30.0),
         carry_test: false,
-        queued: true,
-        direct: false,
-        human: false,
+        flags: OrderFlags::QUEUED,
         filter: None,
     };
     let mover = || {
@@ -1986,8 +1977,7 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     ai.orders.push(QueuedOrder::default());
     let itself = Interact {
         target: Some(object_id(11)),
-        queued: false,
-        direct: true,
+        flags: OrderFlags::DIRECT,
         ..interact
     };
     t.interact_unit(PlayerId::new(1), object_id(11), &[], None, &itself)
@@ -4905,9 +4895,7 @@ fn move_of_soldiers_in_no_group_forms_new_groups() {
     let order = MoveOrder {
         target: None,
         point: Point::new(40.0, 40.0),
-        queued: false,
-        direct: false,
-        human: false,
+        flags: OrderFlags::empty(),
         control: ControlKey::Up,
     };
     let world = || searchable(patrollers(&units, &[]));
@@ -4950,9 +4938,7 @@ fn move_of_whole_group_keeps_it() {
     let order = MoveOrder {
         target: None,
         point: Point::new(40.0, 40.0),
-        queued: false,
-        direct: false,
-        human: false,
+        flags: OrderFlags::empty(),
         control: ControlKey::Up,
     };
     let kept = || {
@@ -5825,9 +5811,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         target: Some(object_id(60)),
         point: Point::new(40.0, 40.0),
         carry_test: false,
-        queued: false,
-        direct: true,
-        human: true,
+        flags: OrderFlags::DIRECT | OrderFlags::HUMAN,
         filter: None,
     };
     t.interact(PlayerId::new(1), &object_ids([11, 12, 13]), &order)

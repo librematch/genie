@@ -64,22 +64,31 @@ pub struct Search<'a> {
     pub memory: Memory<'a>,
 }
 
+bitflags::bitflags! {
+    /// `bestUnitToAttack`'s flag arguments.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AttackChecks: u8 {
+        /// An idle check.
+        const IDLE = 1;
+        /// The path checks.
+        const PATHS = 1 << 1;
+        /// Any class.
+        const ANY_CLASS = 1 << 2;
+        /// The unit is in an attack work state.
+        const WORK_STATE = 1 << 3;
+    }
+}
+
 /// `bestUnitToAttack`'s arguments past its point ([`crate::unit_ai::best_target::Ask`] without its
 /// list: at most one extra object).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AttackAsk {
     /// The reference distance (0: none).
     pub distance: Distance,
-    /// An idle check.
-    pub idle: bool,
-    /// The path checks.
-    pub paths: bool,
+    /// Its flag arguments.
+    pub checks: AttackChecks,
     /// An extra object for the statistics.
     pub extra: Option<ObjectId>,
-    /// Any class.
-    pub any_class: bool,
-    /// The unit is in an attack work state.
-    pub work_state: bool,
 }
 
 impl AttackAsk {
@@ -87,11 +96,10 @@ impl AttackAsk {
     /// object, any class, not in an attack work state.
     pub const IDLE: Self = Self {
         distance: Distance::ZERO,
-        idle: true,
-        paths: true,
+        checks: AttackChecks::IDLE
+            .union(AttackChecks::PATHS)
+            .union(AttackChecks::ANY_CLASS),
         extra: None,
-        any_class: true,
-        work_state: false,
     };
 
     /// The full arguments ([`crate::unit_ai::best_target::Ask`]).
@@ -99,11 +107,11 @@ impl AttackAsk {
     pub fn ask(&self) -> Ask {
         Ask {
             distance: self.distance,
-            idle: self.idle,
-            paths: u8::from(self.paths),
+            idle: self.checks.contains(AttackChecks::IDLE),
+            paths: u8::from(self.checks.contains(AttackChecks::PATHS)),
             extra: self.extra.into_iter().collect(),
-            any_class: self.any_class,
-            work_state: self.work_state,
+            any_class: self.checks.contains(AttackChecks::ANY_CLASS),
+            work_state: self.checks.contains(AttackChecks::WORK_STATE),
         }
     }
 }

@@ -17,6 +17,7 @@ use crate::movement::StepPlans;
 use crate::movement::WaitDelays;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
+use crate::movement::request_plans::PlanFlags;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::movement::{
     AfterRequest, EPSILON, Goal, LongWalker, Me, Mover, Planning, cut_path, footprint_gap, ground,
@@ -112,7 +113,7 @@ impl Mover {
         }
         if np.path.points.len() < 2 || np.path.length.get() < EPSILON {
             return self.no_path(
-                np.found,
+                np.flags,
                 goal.target.map(|(_, t)| t),
                 goal.to_end,
                 movement_tuning,
@@ -237,7 +238,7 @@ impl Mover {
         };
         let _ = np.path.push(to);
         np.path.measure();
-        np.found = true;
+        np.flags |= PlanFlags::FOUND;
         Ok(())
     }
 

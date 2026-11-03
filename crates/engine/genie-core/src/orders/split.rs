@@ -10,6 +10,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::orders::ControlKey;
+use crate::orders::OrderFlags;
 use crate::orders::SplitPath;
 use crate::orders::{Interact, Split, Splittable, centroid};
 use crate::pathing::tile_path::Found;
@@ -54,7 +55,7 @@ impl World {
             ));
         }
         let centroid = if 1 < loose.len() {
-            self.order_spread(&loose, order.queued)?
+            self.order_spread(&loose, order.flags.contains(OrderFlags::QUEUED))?
         } else {
             None
         };

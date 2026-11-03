@@ -401,7 +401,7 @@ pub(super) fn take_unit(
         let off = facing_to(&a, t.position, src)?;
         if damage_tuning.minus_facing < off && off < damage_tuning.facing {
             factor *= damage_tuning.special;
-            if a.special_graphic {
+            if a.special_sprite.is_some() {
                 return Err(GenieError::unsupported(
                     "a special attack's sprite (master +0x8e8)",
                 ));

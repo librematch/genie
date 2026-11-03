@@ -66,6 +66,7 @@ mod create;
 pub use self::create::LeavingWalk;
 
 use crate::math::fmath::{sqrt, sub};
+pub use command::MoveFlags;
 pub use command::MoveTo as CommandMoveTo;
 /// What `commandMoveTo` is told besides the target and the point ([`crate::world::World::command_move_to`]).
 pub use order::CommandArgs;

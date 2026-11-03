@@ -19,6 +19,7 @@ use crate::movement::PlanTries;
 use crate::movement::WaypointIndex;
 use crate::movement::WaypointLevel;
 use crate::movement::request_plans::NewPath;
+use crate::movement::request_plans::PlanFlags;
 use crate::movement::{
     AfterRequest, LONG_PATHER, Me, Mover, PathData, Planning, ReachAsk, SHORT_PATHER, ShortAsk,
     TileAsk, Walker, footprint_gap_squared, owner_number, short_path_including, split,
@@ -50,7 +51,7 @@ impl Mover {
     /// that stop the unit otherwise are not modelled.
     pub(super) fn no_path(
         &mut self,
-        found: bool,
+        flags: PlanFlags,
         target: Option<&Placed>,
         to_end: Distance,
         movement_tuning: &MovementTuning,
@@ -64,7 +65,7 @@ impl Mover {
             }
         }
         let level = self.paths.walked_mut()?;
-        if !found || level.range < to_end {
+        if !flags.contains(PlanFlags::FOUND) || level.range < to_end {
             if level.waypoint.at_or_past_last(level.points.len()) {
                 if level.continue_counter.left() {
                     // the unit pauses itself (slot 0x5f0, the walked level's `+0x34`) and stops
@@ -109,11 +110,12 @@ impl Mover {
         let NewPath {
             mut new,
             mut path,
-            found,
-            partial,
-            planned,
+            flags,
             ..
         } = np;
+        let found = flags.contains(PlanFlags::FOUND);
+        let partial = flags.contains(PlanFlags::PARTIAL);
+        let planned = flags.contains(PlanFlags::PLANNED);
         let level = self.paths.walked_mut()?;
         level.state = PathState::Idle;
         level.continue_counter = PlanTries::FULL;

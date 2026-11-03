@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MoveFlags;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
@@ -141,9 +142,7 @@ impl World {
             to,
             MoveTo {
                 range,
-                forget_target: true,
-                direct: true,
-                ..MoveTo::default()
+                flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
             },
         )?;
         *relayout = true;
@@ -310,9 +309,7 @@ impl World {
                 from.ground(),
                 MoveTo {
                     range: Distance::ZERO,
-                    forget_target: true,
-                    direct: true,
-                    ..MoveTo::default()
+                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
                 },
             )?;
             return Ok(Some(false));
@@ -338,8 +335,7 @@ impl World {
             at.ground(),
             MoveTo {
                 range,
-                direct: true,
-                ..MoveTo::default()
+                flags: MoveFlags::DIRECT,
             },
         )?;
         let g = self.groups.held_mut(group)?;

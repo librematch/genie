@@ -12,6 +12,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AlertMode;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -204,7 +205,7 @@ impl UnitAi {
             // the object's place
             state_position: position.ground(),
             retarget_disabled: 0,
-            alert_mode: false,
+            alert_mode: AlertMode::Calm,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
             patrol_waypoint: WaypointIndex::FIRST,

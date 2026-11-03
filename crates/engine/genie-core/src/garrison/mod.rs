@@ -46,7 +46,7 @@ pub use self::takes_in::{GarrisonSwitch, class_has_flags, garrison_kind_takes, i
 use self::unload::NO_POINT;
 #[cfg(test)]
 use self::unload::unload_group_takes;
-pub use self::walk_in::{ENTER, EnterAction, EnterTarget, WalkStart, Walking};
+pub use self::walk_in::{ENTER, EnterAction, EnterKind, EnterTarget, WalkStart, Walking};
 pub(crate) use self::walk_in::{EnterReads, NO_SPEED, SIEGE_UNLOAD};
 use crate::math::image::garrison::{CLASS_FLAGS as GARRISON_CLASS_FLAGS, FAR as GARRISON_FAR};
 #[cfg(test)]

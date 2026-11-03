@@ -11,6 +11,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
@@ -533,7 +534,7 @@ impl UnitAi {
             ));
         }
         if found.fresh {
-            self.alert_mode = false;
+            self.alert_mode = AlertMode::Calm;
         }
         if !matches!(
             self.current_order,
@@ -644,7 +645,7 @@ impl UnitAi {
         if !found.fresh {
             return Ok(());
         }
-        self.alert_mode = found.enemies;
+        self.alert_mode = AlertMode::of_search(found.enemies);
         if found.enemies {
             if Seconds::new(unit_ai_tuning.enemy_sighting_gap) < self.time_since_enemy
                 && player_kind.is_computer()

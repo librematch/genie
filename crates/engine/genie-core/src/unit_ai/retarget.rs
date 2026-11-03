@@ -14,6 +14,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::AttackChecks;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -207,14 +208,12 @@ impl UnitAi {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let current = Self::world_object(self.current_target, at, side)?;
-        let (from, distance, any_class, work_state) =
-            current.map_or((at.position, 0.0, true, false), |t| {
-                (
-                    t.position,
-                    unit_ai_tuning.retarget_reach,
-                    search.building,
-                    search.work_state,
-                )
+        let (from, distance, checks) =
+            current.map_or((at.position, 0.0, AttackChecks::ANY_CLASS), |t| {
+                let mut checks = AttackChecks::empty();
+                checks.set(AttackChecks::ANY_CLASS, search.building);
+                checks.set(AttackChecks::WORK_STATE, search.work_state);
+                (t.position, unit_ai_tuning.retarget_reach, checks)
             });
         let (classes, radius) = self.search_area(at, player_kind)?;
         let found = side.closest(&Search {
@@ -231,11 +230,8 @@ impl UnitAi {
                 seeker: self.seeker(at),
                 ask: AttackAsk {
                     distance: Distance::new(distance),
-                    idle: true,
-                    paths: true,
+                    checks: checks | AttackChecks::IDLE | AttackChecks::PATHS,
                     extra: None,
-                    any_class,
-                    work_state,
                 },
             },
             memory: self.memory(),

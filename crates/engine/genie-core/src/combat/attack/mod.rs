@@ -218,15 +218,36 @@ pub(crate) struct ReadyReads {
 /// readyToAttack's answer to the start ([`Attack::begin`]), which the start's end follows
 /// ([`Attack::command`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Begun {
-    /// Its last `MoveTo` started arrived.
-    arrived: bool,
-    /// The start ends in `set_state(6)`.
-    ready: bool,
-    /// The start ends in `set_state(13)`.
-    failed: bool,
+enum Begun {
+    /// The unit can move: its `MoveTo` started.
+    Moves {
+        /// Its last `MoveTo` started arrived.
+        arrived: bool,
+        /// readyToAttack's `set_state(13)` came before the start's `set_state(4)`.
+        failed_first: bool,
+    },
+    /// The unit cannot move, and the start ends in `set_state(6)`.
+    Ready,
+    /// The unit cannot move, and the start ends in `set_state(13)`.
+    Failed,
+}
+
+impl Begun {
+    /// The unit's last `MoveTo` started arrived.
+    const fn arrived(self) -> bool {
+        matches!(self, Self::Moves { arrived: true, .. })
+    }
+
     /// readyToAttack's `set_state(13)` came before the start's `set_state(4)`.
-    failed_first: bool,
+    const fn failed_first(self) -> bool {
+        matches!(
+            self,
+            Self::Moves {
+                failed_first: true,
+                ..
+            }
+        )
+    }
 }
 
 /// What the Attack reads of its unit and its target when it starts.

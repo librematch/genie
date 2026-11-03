@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::groups::FarMembers;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MoveFlags;
 use crate::groups::{CommandMoveTo, common_group};
 use crate::map::Distance;
 use crate::map::Point;
@@ -218,16 +219,18 @@ impl World {
                 continue;
             };
             for w in before {
-                g.add_waypoint(*w, true);
+                g.add_waypoint(*w, MoveFlags::FORGET_TARGET);
             }
             let leg = CommandMoveTo {
                 range: Distance::ZERO,
-                leg: patrol,
-                forget_target: true,
-                hold: !patrol,
-                queued: false,
-                direct: true,
-                keep_flag: false,
+                // a patrol's leg, else a hold
+                flags: MoveFlags::FORGET_TARGET
+                    | MoveFlags::DIRECT
+                    | if patrol {
+                        MoveFlags::LEG
+                    } else {
+                        MoveFlags::HOLD
+                    },
             };
             let _ = self.command_move_to(id, None, last, leg)?;
         }

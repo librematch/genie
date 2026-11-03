@@ -55,6 +55,8 @@ mod form;
 mod gather;
 mod interact;
 mod moves;
+mod order_flags;
+pub use self::order_flags::OrderFlags;
 mod patrol;
 pub use self::patrol::SavedPatrols;
 mod points;
@@ -102,12 +104,8 @@ pub struct Interact {
     pub point: Point,
     /// `+0x12`: the work command's carried-resource test.
     pub carry_test: bool,
-    /// `+0x13`: the order is queued.
-    pub queued: bool,
-    /// `+0x14`: a unit with a unit AI takes the order at once.
-    pub direct: bool,
-    /// `+0x15`: each unit's last human order time is set (`FUN_140e5e780`).
-    pub human: bool,
+    /// `+0x13` to `+0x15`.
+    pub flags: OrderFlags,
     /// `+0x16`: the work command's task filter, -1 for any.
     pub filter: Option<ActionKind>,
 }
@@ -119,13 +117,8 @@ pub struct MoveOrder {
     pub target: Option<ObjectId>,
     /// `x`, `y` (`+0x8`, `+0xc`).
     pub point: Point,
-    /// `+0x13`: queued; `+0x14`: a unit with a unit AI takes it at once; `+0x15`: the last human
-    /// order time is set.
-    pub queued: bool,
-    /// `+0x14`: a unit with a unit AI takes it at once.
-    pub direct: bool,
-    /// `+0x15`: the last human order time is set.
-    pub human: bool,
+    /// `+0x13` to `+0x15`.
+    pub flags: OrderFlags,
     /// `+0x12` (`cade_api`'s `controlHeld`): held, the splitter makes each unit it may group a
     /// group of its own ([`World::split`]).
     pub control: ControlKey,

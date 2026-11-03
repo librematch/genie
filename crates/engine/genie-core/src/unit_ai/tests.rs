@@ -56,6 +56,8 @@ use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::AlertMode;
+use crate::unit_ai::AttackChecks;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
@@ -626,7 +628,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         .unwrap();
     assert_eq!(side.searches, [(BUILDING_CARED.to_vec(), 7.0)]);
     assert_eq!(side.walks, [object_id(7955)]);
-    assert!(gate.alert_mode);
+    assert_eq!(gate.alert_mode, AlertMode::Alert);
     let mut villager = idle(CIVILIAN);
     let mut side = HelpSide {
         holds: true,
@@ -1936,17 +1938,20 @@ fn fresh_search_enemies_set_the_alert_mode() {
         ..idle(CIVILIAN)
     };
     u.alert(found(true, true), Seconds::new(0.05));
-    assert_eq!((u.alert_mode, u.time_since_enemy), (true, Seconds::ZERO));
+    assert_eq!(
+        (u.alert_mode, u.time_since_enemy),
+        (AlertMode::Alert, Seconds::ZERO)
+    );
     u.time_since_enemy = Seconds::new(3.0);
     u.alert(found(false, false), Seconds::new(0.05));
     assert_eq!(
         (u.alert_mode, u.time_since_enemy),
-        (true, Seconds::new(3.0))
+        (AlertMode::Alert, Seconds::new(3.0))
     );
     u.alert(found(true, false), Seconds::new(0.05));
     assert_eq!(
         (u.alert_mode, u.time_since_enemy),
-        (false, Seconds::new(3.0))
+        (AlertMode::Calm, Seconds::new(3.0))
     );
 }
 
@@ -4611,7 +4616,7 @@ fn new_building_unit_ai_draws_its_three_timers() {
             formation_kind: FormationKind::Horde,
             state_position: Point::new(30.0, 88.0),
             retarget_disabled: 0,
-            alert_mode: false,
+            alert_mode: AlertMode::Calm,
             time_since_enemy: Seconds::ZERO,
             patrol_path: None,
             patrol_waypoint: WaypointIndex::of_data(0),
@@ -6012,7 +6017,10 @@ fn deer_that_sees_an_object_evades_it() {
         (u.current_action, u.target_point),
         (Some(AiAction::Move), moved.point)
     );
-    assert_eq!((u.alert_mode, u.time_since_enemy), (true, Seconds::ZERO));
+    assert_eq!(
+        (u.alert_mode, u.time_since_enemy),
+        (AlertMode::Alert, Seconds::ZERO)
+    );
 }
 
 #[test]
@@ -8352,7 +8360,7 @@ fn no_attack_tower_only_searches() {
         .unwrap();
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
     assert_eq!(searched, vec![(9.0, TOWER_CARED.len(), Pick::Look)]);
-    assert!(u.alert_mode);
+    assert_eq!(u.alert_mode, AlertMode::Alert);
 }
 
 /// The tower's processIdle in the idle part (`FUN_140c564c0` with 1): what
@@ -14094,8 +14102,12 @@ impl UnitSide for RetargetSide {
     }
     fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
         if let Pick::Attack { ask, .. } = &search.pick {
-            self.searched
-                .push((search.at, ask.distance.get(), ask.any_class, ask.work_state));
+            self.searched.push((
+                search.at,
+                ask.distance.get(),
+                ask.checks.contains(AttackChecks::ANY_CLASS),
+                ask.checks.contains(AttackChecks::WORK_STATE),
+            ));
         }
         self.soldier.closest(search)
     }

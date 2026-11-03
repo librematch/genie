@@ -2064,11 +2064,8 @@ fn standing_arms() -> Arms {
 #[derive(Debug)]
 struct Started {
     attack: Attack,
-    arrived: bool,
+    begun: Begun,
     posted: Vec<(NotifyKind, [i32; 3])>,
-    ready: bool,
-    failed: bool,
-    failed_first: bool,
 }
 
 fn own_start(
@@ -2109,11 +2106,8 @@ fn own_start_among(
     let (attack, begun, posted) = Attack::own_start(&cmd, (world, by_id), mover, &reads)?;
     Ok(Started {
         attack,
-        arrived: begun.arrived,
+        begun,
         posted,
-        ready: begun.ready,
-        failed: begun.failed,
-        failed_first: begun.failed_first,
     })
 }
 
@@ -2142,10 +2136,7 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
         engaged(Distance::new(f32::NAN), 1.2, false, UnitStance::StandGround),
     ] {
         let c = start(e);
-        assert_eq!(
-            (c.ready, c.failed, c.failed_first, c.arrived, c.posted),
-            (true, false, false, false, vec![])
-        );
+        assert_eq!((c.begun, c.posted), (Begun::Ready, vec![]));
         assert_eq!(
             c.attack.point.get().map(f32::to_bits),
             e.target_position.get().map(f32::to_bits)
@@ -2159,8 +2150,8 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
         UnitStance::StandGround,
     ));
     assert_eq!(
-        (away.ready, away.failed, away.posted),
-        (false, true, vec![(NotifyKind::OUT_OF_REACH, [0; 3])])
+        (away.begun, away.posted),
+        (Begun::Failed, vec![(NotifyKind::OUT_OF_REACH, [0; 3])])
     );
     assert_eq!(away.attack.point, Position::new(NONE, NONE, NONE));
     let close = start(Engagement {
@@ -2168,8 +2159,8 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
         ..engaged(Distance::new(0.5), 1.2, false, UnitStance::StandGround)
     });
     assert_eq!(
-        (close.ready, close.failed, close.posted),
-        (false, true, vec![(NotifyKind::TOO_CLOSE, [-1; 3])])
+        (close.begun, close.posted),
+        (Begun::Failed, vec![(NotifyKind::TOO_CLOSE, [-1; 3])])
     );
 }
 
@@ -2195,15 +2186,18 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
         )
         .unwrap();
         assert_eq!(
-            (c.attack.state.bare(), c.ready, c.failed),
-            (AttackState::Move { move_to: None }, false, false)
+            (
+                c.attack.state.bare(),
+                matches!(c.begun, Begun::Moves { .. })
+            ),
+            (AttackState::Move { move_to: None }, true)
         );
         assert_eq!(
             c.attack.state.move_to().copied().map(|m| m.state),
             Some(MoveTo::Start)
         );
         (
-            c.failed_first,
+            c.begun.failed_first(),
             c.posted,
             mover.animated.speed == Speed::new(0.0),
         )
@@ -2273,7 +2267,7 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
         &mut mover,
     )
     .unwrap();
-    assert_eq!((c.failed, c.ready, c.posted), (true, false, vec![]));
+    assert_eq!((c.begun, c.posted), (Begun::Failed, vec![]));
 }
 
 /// readyToAttack's ready end turns the unit to its target (`FUN_141162db0`) but for masters
@@ -2345,7 +2339,7 @@ fn gate_reach_is_to_its_nearest_part() {
     )
     .unwrap();
     // the part 8 is 0.5 off (its footprint 0.1); the part 10, the third, is not read
-    assert_eq!((c.ready, c.failed, c.posted), (true, false, vec![]));
+    assert_eq!((c.begun, c.posted), (Begun::Ready, vec![]));
     // without its parts the gate is out of reach
     let bare = world_with(7, PlayerId::new(0), class::GATE, gate_at);
     let mut mover = soldier_mover(0.0);
@@ -2358,7 +2352,7 @@ fn gate_reach_is_to_its_nearest_part() {
         &mut mover,
     )
     .unwrap();
-    assert_eq!((c.ready, c.failed), (false, true));
+    assert_eq!(c.begun, Begun::Failed);
     // an update's readyToAttack the same way
     let victim = Victim {
         id: object_id(7),

@@ -11,6 +11,7 @@ use genie_core::commands::{
 use genie_core::map::Axis;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
+use genie_core::orders::OrderFlags;
 use genie_core::orders::SavedPatrols;
 use genie_core::technology::TechId;
 use genie_rec::de::command::{self as packets, Command as Packet};
@@ -229,9 +230,9 @@ macro_rules! interact_packet {
             y: $o.point.y(),
             num: $units.count,
             field_0x12: u8::from($o.carry_test),
-            field_0x13: u8::from($o.queued),
-            field_0x14: u8::from($o.direct),
-            field_0x15: u8::from($o.human),
+            field_0x13: $o.flags.byte(OrderFlags::QUEUED),
+            field_0x14: $o.flags.byte(OrderFlags::DIRECT),
+            field_0x15: $o.flags.byte(OrderFlags::HUMAN),
             field_0x16: ActionKind::field($o.filter).cast_unsigned(),
             ids: ids(&$units.ids, packets::$kind::FIXED)?,
         })
@@ -252,9 +253,9 @@ fn order(c: &OrderCommand) -> Result<Packet, GenieError> {
             y: o.point.y(),
             num: units.count,
             field_0x12: o.control.byte(),
-            field_0x13: u8::from(o.queued),
-            field_0x14: u8::from(o.direct),
-            field_0x15: u8::from(o.human),
+            field_0x13: o.flags.byte(OrderFlags::QUEUED),
+            field_0x14: o.flags.byte(OrderFlags::DIRECT),
+            field_0x15: o.flags.byte(OrderFlags::HUMAN),
             gap_0x16: [0; 2],
             ids: ids(&units.ids, packets::Move::FIXED)?,
         }),

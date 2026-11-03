@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::commands::UnitList;
 use crate::objects::ObjectId;
+use crate::orders::OrderFlags;
 use crate::orders::{Interact, MoveOrder};
 use crate::players::PlayerId;
 use crate::world::World;
@@ -68,8 +69,8 @@ impl OrderCommand {
             return Ok(());
         }
         let human = match order {
-            Order::Interact(o) => o.human,
-            Order::Move(o) => o.human,
+            Order::Interact(o) => o.flags.contains(OrderFlags::HUMAN),
+            Order::Move(o) => o.flags.contains(OrderFlags::HUMAN),
             Order::Follow(_) | Order::Guard(_) => Self::any_human_unit(w, &units)?,
             Order::Work(_) | Order::Retreat(_) => false,
         };

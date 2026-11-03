@@ -89,6 +89,15 @@ pub struct EnterAction {
     pub moving: Option<SpriteId>,
 }
 
+/// What an Enter goes into: a building (type 80) or a transport.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EnterKind {
+    /// A building.
+    Building,
+    /// A transport.
+    Transport,
+}
+
 /// What an Enter's update reads of its target.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EnterTarget {
@@ -102,8 +111,8 @@ pub struct EnterTarget {
     pub position: Position,
     /// The unit is in reach of it ([`EnterAction::in_reach`]).
     pub in_reach: bool,
-    /// It is a building (type 80); else a transport.
-    pub building: bool,
+    /// A building or a transport.
+    pub kind: EnterKind,
 }
 
 /// What a new `MoveTo` of an Enter starts by (`0x140aa2100` with 1,
@@ -195,7 +204,7 @@ impl EnterAction {
         if t.in_reach {
             return Ok(Walking::Enter);
         }
-        let code = if t.building {
+        let code = if t.kind == EnterKind::Building {
             0
         } else {
             let (meet_at, code) = meeting.point(by_id)?;
@@ -210,23 +219,24 @@ impl EnterAction {
             gap: start.gap,
             state: Some(t.state),
         };
-        let move_to = if t.building || self.point.x() < 0.0 || self.point.y() < 0.0 {
-            reads.to_object(
-                to,
-                self.walk_range(t.building),
-                self.moving,
-                TargetMoved::Ignores,
-                move_to_tuning,
-            )?
-        } else {
-            reads.to_point_of(
-                to,
-                (self.point, self.walk_range(false).get()),
-                self.moving,
-                TargetMoved::Ignores,
-                move_to_tuning,
-            )?
-        };
+        let move_to =
+            if t.kind == EnterKind::Building || self.point.x() < 0.0 || self.point.y() < 0.0 {
+                reads.to_object(
+                    to,
+                    self.walk_range(t.kind),
+                    self.moving,
+                    TargetMoved::Ignores,
+                    move_to_tuning,
+                )?
+            } else {
+                reads.to_point_of(
+                    to,
+                    (self.point, self.walk_range(EnterKind::Transport).get()),
+                    self.moving,
+                    TargetMoved::Ignores,
+                    move_to_tuning,
+                )?
+            };
         self.state = EnterState::Walk { move_to };
         Ok(Walking::Walk((code == 1).then_some(Position::new(
             self.point.x(),
@@ -257,8 +267,11 @@ impl EnterAction {
     }
 
     /// The range its `MoveTo` stops within: the task's for a building, 0 for a transport.
-    pub(super) const fn walk_range(&self, building: bool) -> Distance {
-        if building { self.range } else { Distance::ZERO }
+    pub(super) const fn walk_range(&self, kind: EnterKind) -> Distance {
+        match kind {
+            EnterKind::Building => self.range,
+            EnterKind::Transport => Distance::ZERO,
+        }
     }
 
     /// `set_state(2)` (`FUN_140a87320` case 2): the wait of [`WAIT_SECONDS`], and the unit shows

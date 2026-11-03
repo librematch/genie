@@ -189,7 +189,7 @@ pub(crate) fn victim_of(
             invulnerability: master.creatable_part().invulnerability,
             special_attack: master.creatable_part().special_attack,
             friendly_fire: master.combat_part().friendly_fire,
-            special_graphic: master.creatable_part().special_sprite.is_some(),
+            special_sprite: master.creatable_part().special_sprite,
             terrain: defense,
             armor_powerups: combat.armor_powerups,
             armor_removed: combat.armor_removed,

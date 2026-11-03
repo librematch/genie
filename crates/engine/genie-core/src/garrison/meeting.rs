@@ -2,6 +2,7 @@
 //! the meeting point and the reach.
 
 use crate::GenieError;
+use crate::garrison::EnterKind;
 use crate::garrison::transport::TRANSPORT;
 use crate::garrison::{EnterAction, EnterTarget, NO_SPEED, WalkStart};
 use crate::map::Distance;
@@ -455,10 +456,18 @@ pub(crate) fn enter_view(
     range: Distance,
     by_id: ObjectsRef<'_>,
 ) -> Result<(EnterTarget, WalkStart), GenieError> {
-    let building = tm.kind == MasterKind::BUILDING;
+    let kind = if tm.kind == MasterKind::BUILDING {
+        EnterKind::Building
+    } else {
+        EnterKind::Transport
+    };
     let stats = mover.map(|m| m.stats).ok_or(NO_SPEED)?;
     let moved_at = mover.map_or_else(|| unit.position(), |m| m.moved_at);
-    let target_mover = if building { None } else { target_mover };
+    let target_mover = if kind == EnterKind::Building {
+        None
+    } else {
+        target_mover
+    };
     let in_reach = enter_reach(
         spatial,
         masters,
@@ -482,7 +491,7 @@ pub(crate) fn enter_view(
             room,
             position: t.position(),
             in_reach,
-            building,
+            kind,
         },
         WalkStart { gap },
     ))

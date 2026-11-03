@@ -61,6 +61,7 @@ use crate::objects::MasterHitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::Relics;
+use crate::objects::SpriteId;
 use crate::objects::masters::BlastDefense;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::CarryCapacity;
@@ -293,8 +294,8 @@ pub struct Armored {
     pub special_attack: SpecialAttack,
     /// Its master's `friendly_fire_damage`.
     pub friendly_fire: DamageShare,
-    /// Its master has a special graphic (`+0x8e8`), which its special attack shows.
-    pub special_graphic: bool,
+    /// Its master's special graphic (`+0x8e8`), which its special attack shows; None for none.
+    pub special_sprite: Option<SpriteId>,
     /// Its terrain defense: `defense_terrain_bonus`'s restriction's value for its tile's terrain
     /// (the terrain to restore, else the terrain; 0 counts as 1), 1 off the map; None when the
     /// slice lacks the map or the restriction.

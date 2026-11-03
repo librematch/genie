@@ -134,22 +134,22 @@ impl Attack {
             reads,
             layer,
         )?;
-        if begun.ready {
+        if begun == Begun::Ready {
             return Err(GenieError::unsupported(
                 "an attack that starts in reach and cannot move (set_state 6)",
             ));
         }
-        if begun.failed {
+        if begun == Begun::Failed {
             return Err(GenieError::unsupported(
                 "an attack whose unit cannot move to its target",
             ));
         }
-        if begun.failed_first {
+        if begun.failed_first() {
             return Err(GenieError::unsupported(
                 "a hunt's Attack readyToAttack failed before its start's state 4 (+0x7b8 at 1)",
             ));
         }
-        Ok((a, begun.arrived))
+        Ok((a, begun.arrived()))
     }
 
     /// A unit's own Attack (the attack command, `FUN_141081a80`): the constructor
@@ -237,10 +237,10 @@ impl Attack {
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
             Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
-        if begun.failed_first {
+        if begun.failed_first() {
             c.w.parts.set_anim_speed(unit.id, Speed::new(1.0));
         }
-        if begun.failed {
+        if begun == Begun::Failed {
             attack.fail_at_start(
                 &mut unit.sprite,
                 c.w.parts.motion_mut(unit.id),
@@ -248,7 +248,7 @@ impl Attack {
                 c.w.model.tuning.sprite,
             )?;
         }
-        if begun.ready {
+        if begun == Begun::Ready {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
@@ -266,7 +266,7 @@ impl Attack {
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }
-        if begun.arrived {
+        if begun.arrived() {
             unit.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(unit.id),
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
@@ -283,8 +283,8 @@ impl Attack {
     /// then a unit with a top speed (slot 0x208, `UCOMISS`: a NaN one has some) whose unit AI may
     /// move to attack (slot 0x1d0) turns to state 4 (`set_state(4)`: a `MoveTo` to the target, the
     /// old one's teardown stopping the unit); any other goes ready (`set_state(6)`,
-    /// [`Begun::ready`]) when readyToAttack reached its ready end (its second argument 1), else
-    /// fails (`set_state(13)`, [`Begun::failed`]).
+    /// [`Begun::Ready`]) when readyToAttack reached its ready end (its second argument 1), else
+    /// fails (`set_state(13)`, [`Begun::Failed`]).
     ///
     /// readyToAttack at the start: a target of a player (`target_owner` above 0) out of the
     /// player's sight (`visible` false: its slot 0x1e0 neither 0xf nor 0x80 with its master's fog
@@ -362,18 +362,15 @@ impl Attack {
         }
         if movable {
             let arrived = self.set_move(e, mover, reads, move_to_tuning)?;
-            return Ok(Begun {
+            return Ok(Begun::Moves {
                 arrived,
-                ready: false,
-                failed: false,
                 failed_first,
             });
         }
-        Ok(Begun {
-            arrived: false,
-            ready: ready_end,
-            failed: !ready_end,
-            failed_first: false,
+        Ok(if ready_end {
+            Begun::Ready
+        } else {
+            Begun::Failed
         })
     }
 

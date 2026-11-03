@@ -38,6 +38,7 @@ The files hold the orders by kind:
 | [`interact.rs`](interact.rs) | An interact order's unit, an order on a target, MOVE and its groups. |
 | [`mod.rs`](mod.rs) | The orders a command gives its units: INTERACT and its splitter into loose units and groups, the moves, patrols and follows, the work, gather, hunt and build orders, the drop-offs, the town bell and the Empire Wars start. |
 | [`moves.rs`](moves.rs) | A unit's move, to a point or aside, a work order, its reach and a point's move order. |
+| [`order_flags.rs`](order_flags.rs) | The orders' flag bytes `+0x13` to `+0x15` (`OrderFlags`), which INTERACT and MOVE share. |
 | [`patrol.rs`](patrol.rs) | PATROL, the attack move and their sweep, and the group the splitter keeps. |
 | [`points.rs`](points.rs) | Where the units of an order go: their centroid, offsets, spreads and grid points. |
 | [`split.rs`](split.rs) | INTERACT and the order splitter: which units move loose and which form groups. |

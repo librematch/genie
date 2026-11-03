@@ -19,6 +19,7 @@ mod actions;
 mod ai_action;
 mod ai_kind;
 pub mod ai_kinds;
+mod alert_mode;
 mod attack_orders;
 mod attack_pick;
 mod attack_picker;
@@ -59,11 +60,12 @@ pub(crate) mod world_view;
 pub use self::actions::OrderTest;
 pub use self::ai_action::AiAction;
 pub use self::ai_kind::UnitAiKind;
+pub use self::alert_mode::AlertMode;
 use self::attack_pick::point_gap_squared;
 pub(crate) use self::attack_pick::spares_friends;
 pub use self::attack_pick::{
-    AttackAsk, Attacker, Memory, Pick, Search, Seeker, Target, can_attack, soldier_can_attack,
-    tower_can_attack,
+    AttackAsk, AttackChecks, Attacker, Memory, Pick, Search, Seeker, Target, can_attack,
+    soldier_can_attack, tower_can_attack,
 };
 pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
@@ -473,8 +475,8 @@ pub struct UnitAi {
     pub state_position: Point,
     /// `+0x1d6`: non-zero skips the retarget check.
     pub retarget_disabled: u8,
-    /// `+0x1b8`, `alertModeValue`: the last search found enemies.
-    pub alert_mode: bool,
+    /// `+0x1b8`, `alertModeValue`.
+    pub alert_mode: AlertMode,
     /// `+0x1b4`, `time_since_enemy_sighting`: seconds since a search last found enemies; each full
     /// update adds the world's dt.
     pub time_since_enemy: Seconds,

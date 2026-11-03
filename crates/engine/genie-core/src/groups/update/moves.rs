@@ -7,6 +7,7 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
+use crate::groups::MoveFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
@@ -84,12 +85,7 @@ impl World {
                                 at.ground(),
                                 MoveTo {
                                     range,
-                                    leg: false,
-                                    forget_target: false,
-                                    hold: false,
-                                    queued: false,
-                                    direct: true,
-                                    keep_flag: false,
+                                    flags: MoveFlags::DIRECT,
                                 },
                             )?;
                         }

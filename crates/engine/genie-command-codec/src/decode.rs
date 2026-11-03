@@ -28,6 +28,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
+use genie_core::orders::OrderFlags;
 use genie_core::orders::SavedPatrols;
 use genie_core::orders::{ControlKey, Interact, MoveOrder};
 use genie_core::players::Amount;
@@ -123,9 +124,7 @@ macro_rules! interact {
             target: ObjectId::of_field($c.tid),
             point: Point::new($c.x, $c.y),
             carry_test: $c.field_0x12 != 0,
-            queued: $c.field_0x13 != 0,
-            direct: $c.field_0x14 != 0,
-            human: $c.field_0x15 == 1,
+            flags: OrderFlags::of_bytes($c.field_0x13, $c.field_0x14, $c.field_0x15),
             filter: ActionKind::of_data($c.field_0x16.cast_signed()),
         }
     };
@@ -150,9 +149,7 @@ fn orders(packet: &Packet) -> Result<Option<Command>, GenieError> {
             let order = MoveOrder {
                 target: ObjectId::of_field(c.tid),
                 point: Point::new(c.x, c.y),
-                queued: c.field_0x13 != 0,
-                direct: c.field_0x14 != 0,
-                human: c.field_0x15 == 1,
+                flags: OrderFlags::of_bytes(c.field_0x13, c.field_0x14, c.field_0x15),
                 control: ControlKey::of_byte(c.field_0x12),
             };
             (c.commp_id, listed(c.num, &c.ids), Order::Move(order))

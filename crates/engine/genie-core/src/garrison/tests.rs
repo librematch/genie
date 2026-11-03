@@ -5,6 +5,7 @@ use crate::commands::GatherPointState;
 use crate::commands::UnloadPick;
 use crate::commands::{GatherPoint, UnloadCommand};
 use crate::construction::MainBuildingId;
+use crate::garrison::EnterKind;
 use crate::garrison::GarrisonScope;
 use crate::garrison::GarrisonSwitch;
 use crate::garrison::ShelterReach;
@@ -328,7 +329,7 @@ fn an_enter_walks_to_its_building_unless_it_is_in_reach() {
         room: true,
         position: Position::new(104.0, 47.0, 0.0),
         in_reach: false,
-        building: true,
+        kind: EnterKind::Building,
     };
     let start = |gap| WalkStart { gap };
     let mut far = EnterAction::new(
@@ -475,7 +476,7 @@ fn an_enter_of_unit_without_speed_starts_failed_beyond_arrived() {
         room: true,
         position: Position::new(104.0, 47.0, 0.0),
         in_reach: false,
-        building: true,
+        kind: EnterKind::Building,
     };
     let mut e = EnterAction::new(
         ContainerId::new(object_id(100)),
@@ -514,7 +515,7 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
         room: true,
         position: Position::new(5.5, 30.5, 0.25),
         in_reach: false,
-        building: false,
+        kind: EnterKind::Transport,
     };
     let start = WalkStart {
         gap: Distance::new(6.0),
@@ -532,8 +533,8 @@ fn transport_enter_walks_to_it_and_sends_it_where_they_meet() {
         (enter.point, enter.state.move_to().copied().map(|m| m.state)),
         (Position::new(5.5, 17.5, 0.0), Some(MoveTo::Start))
     );
-    assert_eq!(enter.walk_range(false), Distance::ZERO);
-    assert_eq!(enter.walk_range(true), Distance::new(1.0));
+    assert_eq!(enter.walk_range(EnterKind::Transport), Distance::ZERO);
+    assert_eq!(enter.walk_range(EnterKind::Building), Distance::new(1.0));
     t.parts
         .actions
         .of_mut(object_id(200))
@@ -849,7 +850,7 @@ fn moved_ship(y: f32) -> EnterTarget {
         room: true,
         position: Position::new(82.5, y, 0.0),
         in_reach: false,
-        building: false,
+        kind: EnterKind::Transport,
     }
 }
 

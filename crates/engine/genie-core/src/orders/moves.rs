@@ -20,6 +20,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
+use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::town_bell::BellShelter;
@@ -89,7 +90,7 @@ impl World {
             .master(self.master_tables(), player)?;
         let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
         if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
-            if order.queued {
+            if order.flags.contains(OrderFlags::QUEUED) {
                 return Err(GenieError::unsupported(
                     "a queued move of an object that does not move",
                 ));
@@ -112,12 +113,10 @@ impl World {
         for &other in others {
             ignore_unit(&mut mover.ignore_units, other);
         }
-        let takes_it = !order.queued
-            && self
-                .parts
-                .unit_ai
-                .get(unit.id)
-                .is_none_or(|ai| order.direct || !ai.has_unready_order());
+        let takes_it = !order.flags.contains(OrderFlags::QUEUED)
+            && self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
+                order.flags.contains(OrderFlags::DIRECT) || !ai.has_unready_order()
+            });
         if !takes_it {
             let state = unit.life.state;
             let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
@@ -135,11 +134,13 @@ impl World {
                 point: point2.with_height(0.0),
                 range: Distance::ZERO,
                 shown: order.point,
-                ready: order.direct,
+                ready: order.flags.contains(OrderFlags::DIRECT),
                 target_kind,
             };
             let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
-            if !order.queued && !order.direct {
+            if !order.flags.contains(OrderFlags::QUEUED)
+                && !order.flags.contains(OrderFlags::DIRECT)
+            {
                 readiness(&mut ai.orders, ReadyOrders::Drop);
                 // the pass's tail: the unit's stop (its slot 0x148)
                 self.object_stop(player, idx)?;

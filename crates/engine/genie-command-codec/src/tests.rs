@@ -25,7 +25,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
-use genie_core::orders::{ControlKey, Interact, MoveOrder, SavedPatrols};
+use genie_core::orders::{ControlKey, Interact, MoveOrder, OrderFlags, SavedPatrols};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
@@ -114,9 +114,7 @@ fn an_interact_keeps_its_order_and_units() {
         target: Some(object_id(500)),
         point: Point::new(1.0, 2.0),
         carry_test: true,
-        queued: false,
-        direct: true,
-        human: true,
+        flags: OrderFlags::DIRECT | OrderFlags::HUMAN,
         filter: Some(ENTER),
     };
     assert_eq!(
@@ -155,7 +153,7 @@ fn an_interact_keeps_its_order_and_units() {
     .unwrap();
     let worked = Interact {
         target: Some(object_id(600)),
-        queued: true,
+        flags: OrderFlags::QUEUED,
         ..Interact::default()
     };
     assert_eq!(
@@ -222,9 +220,7 @@ fn move_follow_and_guard_keep_their_orders() {
             order: Order::Move(MoveOrder {
                 target: None,
                 point: Point::new(5.0, 6.0),
-                queued: true,
-                direct: false,
-                human: true,
+                flags: OrderFlags::QUEUED | OrderFlags::HUMAN,
                 control: ControlKey::Up,
             }),
         })

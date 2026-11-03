@@ -53,25 +53,33 @@ const TARGET_COMMANDS: [GroupCommandKind; 11] =
 pub(super) const ATTACK_COMMANDS: [GroupCommandKind; 4] =
     GroupCommandKind::table([7, 9, 0x68, 0x7d]);
 
-/// What `commandMoveTo` is told besides the target and the point: the range (`param_5`), and its
-/// flags `param_6` (a patrol's leg), `param_7` (the group's target goes), `param_8`, `param_9`
-/// (queued), `param_10` (at once, though orders are queued) and `param_11`.
+bitflags::bitflags! {
+    /// `commandMoveTo`'s flags `param_6` to `param_11`.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct MoveFlags: u8 {
+        /// `param_6`: a patrol's leg, whose path loops.
+        const LEG = 1;
+        /// `param_7`: the group forgets its target (`mCurrentTarget`).
+        const FORGET_TARGET = 1 << 1;
+        /// `param_8`.
+        const HOLD = 1 << 2;
+        /// `param_9`: the move goes into the order queue.
+        const QUEUED = 1 << 3;
+        /// `param_10`: the move runs though orders are queued.
+        const DIRECT = 1 << 4;
+        /// `param_11`.
+        const KEEP_FLAG = 1 << 5;
+    }
+}
+
+/// What `commandMoveTo` is told besides the target and the point: the range (`param_5`) and its
+/// flags.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MoveTo {
     /// `param_5`: the path level's range.
     pub range: Distance,
-    /// `param_6`: a patrol's leg, whose path loops.
-    pub leg: bool,
-    /// `param_7`: the group forgets its target (`mCurrentTarget`).
-    pub forget_target: bool,
-    /// `param_8`.
-    pub hold: bool,
-    /// `param_9`: the move goes into the order queue.
-    pub queued: bool,
-    /// `param_10`: the move runs though orders are queued.
-    pub direct: bool,
-    /// `param_11`.
-    pub keep_flag: bool,
+    /// `param_6` to `param_11`.
+    pub flags: MoveFlags,
 }
 
 impl UnitGroup {
@@ -90,14 +98,14 @@ impl UnitGroup {
         }
     }
 
-    /// `FUN_14100f6b0`: [`GroupFlags::MEMBERS_SENT`] clears; with `forget_target` the target goes
+    /// `FUN_14100f6b0`: [`GroupFlags::MEMBERS_SENT`] clears; with [`MoveFlags::FORGET_TARGET`] the target goes
     /// (-1, type -1, its place, range and radius 0, its retargeting byte 0); the rams are not
     /// re-added (`FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes); every member's
     /// seconds since attacking are `f32::MAX`; the waypoints (`+0x398`, count `+0x3a0`) take (`at`'s
     /// x, the desired height, its y). The array's growth (5, then twice) fails only without memory.
-    pub fn add_waypoint(&mut self, at: Point, forget_target: bool) {
+    pub fn add_waypoint(&mut self, at: Point, how: MoveFlags) {
         self.flags &= !GroupFlags::MEMBERS_SENT;
-        if forget_target {
+        if how.contains(MoveFlags::FORGET_TARGET) {
             let t = &mut self.current_target;
             t.target = GroupTarget::None;
             t.original_position = BVector::ZERO;
@@ -171,26 +179,29 @@ impl World {
         &mut self,
         group: GroupId,
         point: Point,
-        how: &MoveTo,
+        how: MoveTo,
     ) -> Result<Option<bool>, GenieError> {
         let g = self.groups.held_mut(group)?;
         let at = BVector::new(point.x(), 0.0, point.y());
-        if how.queued {
+        if how.flags.contains(MoveFlags::QUEUED) {
             g.queue_command(GroupCommand {
                 command: MOVE_COMMAND,
                 target_id: None,
                 range: how.range,
                 point: at,
-                approved: u8::from(how.direct),
+                approved: u8::from(how.flags.contains(MoveFlags::DIRECT)),
                 disable_retargeting: 0,
                 approved_2: 0xffff,
             });
-            if g.current_command == GroupCommandKind::NONE && how.direct && g.hibernating != 1 {
+            if g.current_command == GroupCommandKind::NONE
+                && how.flags.contains(MoveFlags::DIRECT)
+                && g.hibernating != 1
+            {
                 g.hibernating = 1;
             }
             return Ok(Some(false));
         }
-        if !how.direct && !g.command_queue.is_empty() {
+        if !how.flags.contains(MoveFlags::DIRECT) && !g.command_queue.is_empty() {
             g.queue_command(GroupCommand {
                 command: MOVE_COMMAND,
                 target_id: None,
@@ -211,27 +222,27 @@ impl World {
     /// bits 5 and 12 clear; a changed target resets the attack plan's entries (`FUN_140fd76a0`
     /// on `+0x3b0`, `mCurrentAttackPlan`, which no save holds, every load empties and only a
     /// group's attack fills, which the slice does not run: empty here). A queued move goes into
-    /// the command queue ([`UnitGroup::queue_command`], approved with `direct`) and, for a group
-    /// without a command, `direct` makes it hibernate (`+0x13c` 1); false. A move behind queued
-    /// commands without `direct` joins them unapproved, the approved ones go
+    /// the command queue ([`UnitGroup::queue_command`], approved with [`MoveFlags::DIRECT`]) and, for a group
+    /// without a command, [`MoveFlags::DIRECT`] makes it hibernate (`+0x13c` 1); false. A move behind queued
+    /// commands without [`MoveFlags::DIRECT`] joins them unapproved, the approved ones go
     /// ([`UnitGroup::approve_queued`]) and the queue runs ([`World::check_queued_orders`]); true.
     /// Else a group whose last command was not queued empties its command queue
-    /// ([`UnitGroup::clear_command_queue`]); `forget_target` clears its target (`mCurrentTarget`:
+    /// ([`UnitGroup::clear_command_queue`]); [`MoveFlags::FORGET_TARGET`] clears its target (`mCurrentTarget`:
     /// -1 and type -1, its place, range, radius and retargeting byte 0); its rams are not
     /// re-added (`readdRams`, `FUN_14102b730`, gated by `DAT_143f01837`, which nothing writes).
     /// Each member's seconds since attacking are `f32::MAX`. A horde moves as one
     /// (`commandHorde`, not modelled). A changed target, or a patrol's path (the top path's
     /// [`PathFlags::LOOPS`], [`crate::groups::formation::top_path`], or [`GroupFlags::PATROL`])
-    /// when neither `leg` nor `hold`, sets [`GroupFlags::RELAYOUT_AT_TURN`] and
+    /// when neither [`MoveFlags::LEG`] nor [`MoveFlags::HOLD`], sets [`GroupFlags::RELAYOUT_AT_TURN`] and
     /// [`GroupFlags::PLACE_AGAIN`]. Below [`EPSILON`] of top speed nothing moves (false). The
     /// path (a new one, flags [`PathFlags::NEW`], made now) runs from the group's place through
     /// its waypoints (which it empties) to the point at the group's desired height, without
-    /// [`PathFlags::LOOPS`] and with [`PathFlags::BACK_AND_FORTH`]; a patrol's leg (`leg`) loops
+    /// [`PathFlags::LOOPS`] and with [`PathFlags::BACK_AND_FORTH`]; a patrol's leg ([`MoveFlags::LEG`]) loops
     /// instead and goes back and forth when the point is at least `GroupTuning::patrol_leg_reach` from the
     /// group on the ground (`COMISS`/`JBE` at 0x141010de3: a NaN distance too).
-    /// [`GroupFlags::PATROL`] ends set only with `hold`, which also clears the path's
-    /// [`PathFlags::LOOPS`] (`keep_flag`'s [`GroupFlags::PATROL`] is cleared again after it, and a
-    /// leg leaves it to `hold` alone). Measured, under two points
+    /// [`GroupFlags::PATROL`] ends set only with [`MoveFlags::HOLD`], which also clears the path's
+    /// [`PathFlags::LOOPS`] ([`MoveFlags::KEEP_FLAG`]'s [`GroupFlags::PATROL`] is cleared again after it, and a
+    /// leg leaves it to [`MoveFlags::HOLD`] alone). Measured, under two points
     /// or at most [`EPSILON`] of length (`COMISS`/`JC` at 0x141010e2a: a NaN length keeps it) it
     /// is none. The group's path data resets ([`PathData`]'s `FUN_140f98e80`) and takes it
     /// (`FUN_140f9b800`: range, target, waypoint 1, state 2) as waypoint level 2 (that level even
@@ -261,14 +272,14 @@ impl World {
         g.flags &= !(GroupFlags::MEMBERS_SENT | GroupFlags::FOLLOWED);
         // the game compares the two integers: a target of none changes a group with one
         let changed = target != g.current_target.target.key();
-        if let Some(done) = self.queue_move(group, point, &how)? {
+        if let Some(done) = self.queue_move(group, point, how)? {
             return Ok(done);
         }
         let g = self.groups.held_mut(group)?;
         if g.replaces_queue != 0 {
             g.clear_command_queue();
         }
-        if how.forget_target {
+        if how.flags.contains(MoveFlags::FORGET_TARGET) {
             let t = &mut g.current_target;
             t.target = GroupTarget::None;
             t.original_position = BVector::ZERO;
@@ -284,7 +295,7 @@ impl World {
                 "a horde's move (commandHorde, FUN_141010180)",
             ));
         }
-        let Some((patrol, length)) = self.set_move_level(group, point, &how, (target, changed))?
+        let Some((patrol, length)) = self.set_move_level(group, point, how, (target, changed))?
         else {
             return Ok(false);
         };
@@ -338,7 +349,7 @@ impl World {
         &mut self,
         group: GroupId,
         point: Point,
-        how: &MoveTo,
+        how: MoveTo,
         (target, changed): (Option<ObjectId>, bool),
     ) -> Result<Option<(bool, Option<Distance>)>, GenieError> {
         let world_time = self.world_time;
@@ -347,7 +358,9 @@ impl World {
         let patrol = top_path(&g.motion.paths)
             .is_some_and(|l| l.path_flags.contains(PathFlags::LOOPS))
             || g.flags.contains(GroupFlags::PATROL);
-        if (!how.hold && !how.leg && patrol) || changed {
+        if (!how.flags.contains(MoveFlags::HOLD) && !how.flags.contains(MoveFlags::LEG) && patrol)
+            || changed
+        {
             g.flags |= GroupFlags::RELAYOUT_AT_TURN | GroupFlags::PLACE_AGAIN;
         }
         // the top speed below the tolerance (`COMISS`/`JA` at 0x141010cc3)
@@ -362,11 +375,15 @@ impl World {
         g.waypoints.clear();
         let at = BVector::new(point.x(), g.desired_height, point.y());
         let _ = path.push(at);
-        let mut path_flags =
-            move_path_flags(g.motion.position[0], at, how.leg, &self.model.tuning.group);
-        // `keep_flag` sets PATROL (0x141010dc1) off a leg, which the hold's test then decides
+        let mut path_flags = move_path_flags(
+            g.motion.position[0],
+            at,
+            how.flags.contains(MoveFlags::LEG),
+            &self.model.tuning.group,
+        );
+        // `MoveFlags::KEEP_FLAG` sets PATROL (0x141010dc1) off a leg, which the hold's test then decides
         // again
-        if how.hold {
+        if how.flags.contains(MoveFlags::HOLD) {
             path_flags &= !PathFlags::LOOPS;
             g.flags |= GroupFlags::PATROL;
         } else {
@@ -405,7 +422,7 @@ impl World {
     /// 0x7d: the attack, `FUN_14100f7f0`) ends the run; any other is dropped. The run also ends
     /// when the next command differs from its first (the queue's end counts as -1). Then, when
     /// an approved command ran and none ended the run, the group moves to the last command of the
-    /// run ([`World::command_move_to`] with its range, the target forgotten, `direct`); the
+    /// run ([`World::command_move_to`] with its range, the target forgotten, [`MoveFlags::DIRECT`]); the
     /// hibernating group wakes as above.
     ///
     /// # Errors
@@ -478,9 +495,7 @@ impl World {
                 last.point.ground(),
                 MoveTo {
                     range: last.range,
-                    forget_target: true,
-                    direct: true,
-                    ..MoveTo::default()
+                    flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
                 },
             )?;
         }
@@ -534,7 +549,7 @@ impl World {
             {
                 self.groups
                     .held_mut(group)?
-                    .add_waypoint(node.point.position().ground(), false);
+                    .add_waypoint(node.point.position().ground(), MoveFlags::empty());
                 Ok(false)
             }
             _ => Ok(false),
@@ -761,15 +776,13 @@ mod tests {
     }
 
     /// `FUN_141010a80` with `param_9`: the move joins the command queue (`queueOrder`, approved
-    /// with `direct`) and nothing moves; a group without a command hibernates for a direct one.
+    /// with [`MoveFlags::DIRECT`]) and nothing moves; a group without a command hibernates for a direct one.
     #[test]
     fn queued_move_joins_the_command_queue() {
         let mut t = moving_world();
         let how = MoveTo {
             range: Distance::new(0.5),
-            queued: true,
-            direct: true,
-            ..MoveTo::default()
+            flags: MoveFlags::QUEUED | MoveFlags::DIRECT,
         };
         assert!(
             !t.command_move_to(group_id(1), None, Point::new(3.0, 4.0), how)
@@ -855,7 +868,7 @@ mod tests {
         assert_eq!((g.hibernating, g.flags.contains(marked)), (0, true));
     }
 
-    /// A move without `direct` behind queued commands joins them unapproved; the approved ones
+    /// A move without [`MoveFlags::DIRECT`] behind queued commands joins them unapproved; the approved ones
     /// go and the queue runs: the group moves to the new point.
     #[test]
     fn move_behind_queued_commands_runs_the_queue() {
@@ -886,7 +899,7 @@ mod tests {
     fn held_move_keeps_flags_bit_11_and_patrol_is_the_top_path_s() {
         let mut t = moving_world();
         let hold = MoveTo {
-            hold: true,
+            flags: MoveFlags::HOLD,
             ..MoveTo::default()
         };
         assert!(
@@ -946,9 +959,7 @@ mod tests {
     #[test]
     fn patrol_leg_loops_and_turns_back_from_five_tiles() {
         let leg = MoveTo {
-            leg: true,
-            forget_target: true,
-            direct: true,
+            flags: MoveFlags::LEG | MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
             ..MoveTo::default()
         };
         for (point, flags) in [

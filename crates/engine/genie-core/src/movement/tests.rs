@@ -17,6 +17,7 @@ use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Patience;
 use crate::movement::move_to::Walk;
+use crate::movement::request_plans::PlanFlags;
 use crate::movement::request_plans::{NewPath, Way};
 use crate::objects::ObjectState;
 use crate::objects::SpeedMultiplier;
@@ -2193,7 +2194,12 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     let mut m = builder_9177();
     m.paths[0].flags = LevelFlags::MET_TARGET;
     assert!(matches!(
-        m.no_path(false, Some(&target), Distance::new(0.5), &tuning().movement),
+        m.no_path(
+            PlanFlags::empty(),
+            Some(&target),
+            Distance::new(0.5),
+            &tuning().movement
+        ),
         Ok(AfterRequest::Paused)
     ));
     assert_eq!(
@@ -2208,7 +2214,12 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
         let mut m = builder_9177();
         m.paths[0].continue_counter = PlanTries::of_data(0);
         edit(&mut m);
-        let r = m.no_path(false, None, Distance::new(0.5), &tuning().movement);
+        let r = m.no_path(
+            PlanFlags::empty(),
+            None,
+            Distance::new(0.5),
+            &tuning().movement,
+        );
         (r, m)
     };
     let (r, m) = out(&|m| m.paths[1].waypoint = WaypointIndex::of_data(0));
@@ -2227,12 +2238,22 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
     let mut m = builder_9177();
     assert!(
-        m.no_path(true, None, Distance::new(0.05), &tuning().movement)
-            .is_err()
+        m.no_path(
+            PlanFlags::FOUND,
+            None,
+            Distance::new(0.05),
+            &tuning().movement
+        )
+        .is_err()
     );
     m.paths[0].path_flags |= PathFlags::LOOPS;
     assert!(matches!(
-        m.no_path(true, None, Distance::new(0.05), &tuning().movement),
+        m.no_path(
+            PlanFlags::FOUND,
+            None,
+            Distance::new(0.05),
+            &tuning().movement
+        ),
         Ok(AfterRequest::Again)
     ));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
@@ -3636,7 +3657,7 @@ fn unit_without_footprint_takes_the_straight_way() {
     let mut np = NewPath::new(WorldTime::ZERO);
     m.straight_way(start, &mut np).unwrap();
     assert_eq!(np.path.points, [start, BVector::new(30.0, 0.0, 88.0)]);
-    assert!(np.found);
+    assert!(np.flags.contains(PlanFlags::FOUND));
     let mut m = builder_9177();
     m.paths[0].waypoint = WaypointIndex::of_data(2);
     let mut np = NewPath::new(WorldTime::ZERO);

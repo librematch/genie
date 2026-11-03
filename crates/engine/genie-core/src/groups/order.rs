@@ -6,6 +6,7 @@ use crate::groups::GroupCommand;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MoveFlags;
 use crate::groups::StopScope;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::{ATTACK_COMMANDS, MOVE_COMMAND, MoveTo};
@@ -81,14 +82,15 @@ impl World {
         let command = task.map(|t| GroupCommandKind::of_action(t.command));
         let mut moved = false;
         if command.is_none_or(|c| c == MOVE_COMMAND) {
+            let mut flags = MoveFlags::FORGET_TARGET;
+            flags.set(MoveFlags::QUEUED, order.queued);
+            flags.set(MoveFlags::DIRECT, order.direct);
             moved = self.command_move_to(
                 group,
                 target,
                 point,
                 MoveTo {
-                    forget_target: true,
-                    queued: order.queued,
-                    direct: order.direct,
+                    flags,
                     ..MoveTo::default()
                 },
             )?;
@@ -176,9 +178,7 @@ impl World {
             point,
             MoveTo {
                 range,
-                forget_target: true,
-                direct: true,
-                ..MoveTo::default()
+                flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
             },
         )?;
         if !moved {

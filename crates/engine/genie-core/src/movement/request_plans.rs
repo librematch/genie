@@ -28,16 +28,26 @@ use crate::pathing::tile_path::{Found, Path};
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
 
-/// The new level and its path, and what the request's planners found: a path (`local_19d0`),
-/// one partway (`bVar35`), one the tile pathfinder planned (`bVar6`), a failed short path
-/// (`bVar4`), and how far from the waypoint the short path ends (`fVar41`).
+bitflags::bitflags! {
+    /// What the request's planners found.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub(super) struct PlanFlags: u8 {
+        /// `local_19d0`: a path.
+        const FOUND = 1;
+        /// `bVar35`: one partway.
+        const PARTIAL = 1 << 1;
+        /// `bVar6`: one the tile pathfinder planned.
+        const PLANNED = 1 << 2;
+        /// `bVar4`: a failed short path.
+        const SHORT_FAILED = 1 << 3;
+    }
+}
+
+/// The new level and its path, what the request's planners found ([`PlanFlags`]), and how far from the waypoint the short path ends (`fVar41`).
 pub(super) struct NewPath {
     pub(super) new: PathData,
     pub(super) path: Path,
-    pub(super) found: bool,
-    pub(super) partial: bool,
-    pub(super) planned: bool,
-    failed: bool,
+    pub(super) flags: PlanFlags,
     end_gap: Distance,
 }
 
@@ -47,10 +57,7 @@ impl NewPath {
         Self {
             new: PathData::new(now),
             path: Path::default(),
-            found: false,
-            partial: false,
-            planned: false,
-            failed: false,
+            flags: PlanFlags::empty(),
             end_gap: Distance::new(FAR),
         }
     }
@@ -105,7 +112,7 @@ impl Mover {
         if tail && let Some(step) = self.long_tail((at, me), world, plan, w, np, by_id)? {
             return Ok(Some(step));
         }
-        if (!np.found || too_short(&np.path, movement_tuning))
+        if (!np.flags.contains(PlanFlags::FOUND) || too_short(&np.path, movement_tuning))
             && w.level == WaypointLevel::Top
             && TILE_PATHER
         {
@@ -137,8 +144,8 @@ impl Mover {
         } else {
             let _ = np.path.insert(0, w.position);
             let _ = np.path.push(w.waypoint);
-            np.planned = true;
-            np.found = true;
+            np.flags |= PlanFlags::PLANNED;
+            np.flags |= PlanFlags::FOUND;
         }
         np.path.measure();
         np.new.created = plan.now;
@@ -171,11 +178,11 @@ impl Mover {
         };
         let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
-            np.failed = true;
+            np.flags |= PlanFlags::SHORT_FAILED;
             np.path.points.clear();
             return Ok(false);
         }
-        np.found = true;
+        np.flags |= PlanFlags::FOUND;
         Ok(true)
     }
 
@@ -220,13 +227,13 @@ impl Mover {
         {
             return Ok(());
         }
-        np.planned = true;
+        np.flags |= PlanFlags::PLANNED;
         let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
         let farther = w.distance < ground(w.waypoint, last);
         if farther {
             np.path.points.clear();
         }
-        np.found = !farther;
+        np.flags.set(PlanFlags::FOUND, !farther);
         if !target_moves && !farther && level.level == WaypointLevel::Top && r == Found::Nearest {
             level.flags |= LevelFlags::NEAREST;
         }
@@ -283,17 +290,17 @@ impl Mover {
         } else {
             GoalReach::Far
         };
-        if np.found && 3 <= np.path.points.len() {
+        if np.flags.contains(PlanFlags::FOUND) && 3 <= np.path.points.len() {
             return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
         if SHORT_PATHER
-            && !np.failed
+            && !np.flags.contains(PlanFlags::SHORT_FAILED)
             && (w.distance <= Distance::new(movement_tuning.short_reach) || near == GoalReach::Near)
             && let Some(step) = self.short_try(me, (world, by_id), plan, w, near, np)?
         {
             return Ok(ControlFlow::Break(step));
         }
-        if np.found {
+        if np.flags.contains(PlanFlags::FOUND) {
             return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
         if (w.distance < Distance::new(movement_tuning.close)
@@ -305,7 +312,7 @@ impl Mover {
             let _ = np.path.push(w.waypoint);
             np.path.measure();
             np.new.created = plan.now;
-            np.found = true;
+            np.flags |= PlanFlags::FOUND;
             return Ok(ControlFlow::Continue(false));
         }
         Ok(ControlFlow::Continue(true))
@@ -324,7 +331,7 @@ impl Mover {
         np: &mut NewPath,
     ) -> Result<Option<AfterRequest>, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
-        np.planned = false;
+        np.flags &= !PlanFlags::PLANNED;
         np.path.points.clear();
         let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         let length = np.path.length.get();
@@ -342,8 +349,8 @@ impl Mover {
                 .waypoint_in_range(w, plan.now, movement_tuning)
                 .map(Some);
         }
-        np.found = true;
-        np.partial = r == ShortFound::Partial;
+        np.flags |= PlanFlags::FOUND;
+        np.flags.set(PlanFlags::PARTIAL, r == ShortFound::Partial);
         let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
         np.end_gap = ground(w.waypoint, last);
         Ok(None)
@@ -413,7 +420,7 @@ impl Mover {
         if !far {
             return Ok(None);
         }
-        np.planned = false;
+        np.flags &= !PlanFlags::PLANNED;
         let target = w.goal.target;
         let ask = LongAsk {
             waypoint: w.waypoint,
@@ -427,7 +434,7 @@ impl Mover {
             return Ok(Some(AfterRequest::Paused));
         };
         np.new.created = plan.now;
-        np.found = reached;
+        np.flags.set(PlanFlags::FOUND, reached);
         if let Some(end) = farther {
             np.end_gap = end;
         }
@@ -471,13 +478,13 @@ impl Mover {
                 for &p in &other.points {
                     let _ = np.path.push(p);
                 }
-                np.planned = true;
-                np.found = true;
+                np.flags |= PlanFlags::PLANNED;
+                np.flags |= PlanFlags::FOUND;
                 np.path.measure();
                 np.new.created = plan.now;
                 if np.path.length < LONG {
                     np.path.points.clear();
-                    np.found = false;
+                    np.flags &= !PlanFlags::FOUND;
                 }
             }
         } else {

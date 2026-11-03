@@ -84,19 +84,29 @@ pub fn holds_object(livestock: bool, master: MasterId, state: ObjectState, roles
         && state < ObjectState::Removed
 }
 
+/// How one update of a [`MoveToAction`] ended.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum StepEnd {
+    /// It goes on.
+    #[default]
+    Going,
+    /// It is done (its update in state 1 returns 1): the action list removes it.
+    Done,
+    /// It had failed (state 13): its update returns 3 after the notify 0x1f9 (an own `MoveTo` is
+    /// never quiet); the action list removes it.
+    Failed,
+}
+
 /// What one update of a [`MoveToAction`] did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MoveStep {
-    /// It is done (its update in state 1 returns 1): the action list removes it.
-    pub done: bool,
+    /// How it ended.
+    pub end: StepEnd,
     /// Its target left its point: it told the unit (notify 0x1fc) and turned to state 3.
     pub target_moved: bool,
     /// The motion step could not go on (its result 1): the caller sets state 13, or for a
     /// human's villager the wait of state 2 (`LAB_140aa320c`).
     pub gave_up: bool,
-    /// It had failed (state 13): its update returns 3 after the notify 0x1f9 (an own `MoveTo` is
-    /// never quiet); the action list removes it.
-    pub failed: bool,
 }
 
 /// The range a `MoveTo` to an object (`FUN_140aa0df0`) takes for `range`: one made with none
@@ -398,7 +408,7 @@ impl MoveToAction {
             MoveTo::Start => {
                 self.update_start(&mut walk, ask, &mut step, &mut shows)?;
             }
-            MoveTo::Arrived => step.done = true,
+            MoveTo::Arrived => step.end = StepEnd::Done,
             // case 2: the timer runs by dt; at its end the MoveTo asks again (set_state 3)
             MoveTo::Waiting => {
                 self.wait.timer += walk.dt;
@@ -408,7 +418,7 @@ impl MoveToAction {
                 }
             }
             // 0x140aa2a70's state 13: the notify (the caller's), then code 3
-            MoveTo::Failed => step.failed = true,
+            MoveTo::Failed => step.end = StepEnd::Failed,
         }
         Ok(step)
     }
@@ -668,11 +678,11 @@ mod tests {
             (step, m.state)
         };
         let done = MoveStep {
-            done: true,
+            end: StepEnd::Done,
             ..MoveStep::default()
         };
         let failed = MoveStep {
-            failed: true,
+            end: StepEnd::Failed,
             ..MoveStep::default()
         };
         assert_eq!(ended(MoveTo::Arrived), (done, MoveTo::Arrived));

@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
+use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::{
@@ -101,7 +102,7 @@ impl World {
             // an object that does not move takes slot 0x128 at once with 1 (no carried-resource
             // test, any task) at the order's point, z 0; a queued order then goes on as a mover's
             self.order_at_once(player, idx, order.target, order.point)?;
-            if !order.queued {
+            if !order.flags.contains(OrderFlags::QUEUED) {
                 return Ok(());
             }
         }
@@ -139,11 +140,10 @@ impl World {
                 )
             },
         );
-        let takes_it = self
-            .parts
-            .unit_ai
-            .get(unit.id)
-            .is_none_or(|ai| !order.queued && (order.direct || !ai.has_unready_order()));
+        let takes_it = self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
+            !order.flags.contains(OrderFlags::QUEUED)
+                && (order.flags.contains(OrderFlags::DIRECT) || !ai.has_unready_order())
+        });
         if takes_it {
             // slot 0x128 with 1 (FUN_141211b80): `+0xa14` is 1 and a unit AI's order queue
             // empties (FUN_140c5e010); FUN_14106c590 passes the order on unless the target is the
@@ -176,7 +176,7 @@ impl World {
             point: point.with_height(0.0),
             range: Distance::ZERO,
             shown: order.point,
-            ready: order.direct,
+            ready: order.flags.contains(OrderFlags::DIRECT),
             target_kind,
         };
         let state = unit.life.state;
@@ -186,7 +186,7 @@ impl World {
             .get_mut(unit.id)
             .ok_or(GenieError::unreachable("unreachable: no unit AI"))?;
         let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
-        if !order.queued && !order.direct {
+        if !order.flags.contains(OrderFlags::QUEUED) && !order.flags.contains(OrderFlags::DIRECT) {
             readiness(&mut ai.orders, ReadyOrders::Drop);
             // the pass's tail: the unit's stop (its slot 0x148)
             self.object_stop(player, idx)?;
@@ -343,7 +343,10 @@ impl World {
                 "a move of several units of a computer player (FUN_140d61870)",
             ));
         }
-        let narrow = 1 < loose.len() && self.order_spread(&loose, order.queued)?.is_some();
+        let narrow = 1 < loose.len()
+            && self
+                .order_spread(&loose, order.flags.contains(OrderFlags::QUEUED))?
+                .is_some();
         let map = self.spatial.map;
         for (i, &id) in loose.iter().enumerate() {
             let others: Vec<ObjectId> = loose
@@ -370,8 +373,8 @@ impl World {
             target: order.target,
             point: order.point,
             args: CommandArgs {
-                queued: order.queued,
-                direct: order.direct,
+                queued: order.flags.contains(OrderFlags::QUEUED),
+                direct: order.flags.contains(OrderFlags::DIRECT),
                 disable_retargeting: order.control.is_held(),
                 filter: None,
             },
@@ -396,8 +399,8 @@ impl World {
             target: order.target,
             point: order.point,
             args: CommandArgs {
-                queued: order.queued,
-                direct: order.direct,
+                queued: order.flags.contains(OrderFlags::QUEUED),
+                direct: order.flags.contains(OrderFlags::DIRECT),
                 disable_retargeting: order.carry_test,
                 filter: order.filter,
             },

@@ -11,6 +11,7 @@ use crate::objects::ObjectState;
 use crate::objects::WorkerCount;
 use crate::players::PlayerKind;
 use crate::players::QueryRelation;
+use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
 use crate::unit_ai::TargetRules;
@@ -121,7 +122,7 @@ impl UnitAi {
         if !found.fresh {
             return;
         }
-        self.alert_mode = found.enemies;
+        self.alert_mode = AlertMode::of_search(found.enemies);
         if found.enemies {
             self.time_since_enemy = Seconds::ZERO;
         }

@@ -174,6 +174,7 @@ use crate::objects::unit::{Unit, loses_actions};
 use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount};
 use crate::orders::ControlKey;
 use crate::orders::Dispatch;
+use crate::orders::OrderFlags;
 use crate::orders::OrderSource;
 use crate::orders::SavedPatrols;
 use crate::orders::town_bell::BackToWork;
@@ -22787,9 +22788,7 @@ fn the_command_phase_runs_an_order_after_its_check() {
     let walk = MoveOrder {
         target: None,
         point: Point::new(40.5, 89.5),
-        queued: false,
-        direct: false,
-        human: true,
+        flags: OrderFlags::HUMAN,
         control: ControlKey::Up,
     };
     let order = |units: Vec<Option<ObjectId>>, order| {
@@ -22846,9 +22845,7 @@ fn an_order_of_the_last_commanded_units_reads_what_the_last_run_order_left() {
     let walk = MoveOrder {
         target: None,
         point: Point::new(40.5, 89.5),
-        queued: false,
-        direct: false,
-        human: true,
+        flags: OrderFlags::HUMAN,
         control: ControlKey::Up,
     };
     let order = |units| {

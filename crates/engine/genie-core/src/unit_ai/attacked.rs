@@ -15,6 +15,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::AttackChecks;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -197,11 +198,8 @@ impl UnitAi {
                 seeker: self.seeker(at),
                 ask: AttackAsk {
                     distance: Distance::ZERO,
-                    idle: false,
-                    paths: false,
+                    checks: AttackChecks::ANY_CLASS,
                     extra: Some(attacker_id),
-                    any_class: true,
-                    work_state: false,
                 },
             },
             memory: self.memory(),

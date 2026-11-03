@@ -26,6 +26,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::UnitRelation;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AlertMode;
 use crate::unit_ai::{Memory, Pick, Search, kind_attacks_neutral, search_area};
 use crate::world::Seconds;
 use crate::world::Unread;
@@ -356,7 +357,7 @@ impl World {
         if fresh {
             let enemies = !lists[UnitRelation::Enemy].is_empty();
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-                ai.alert_mode = enemies;
+                ai.alert_mode = AlertMode::of_search(enemies);
                 if enemies {
                     ai.time_since_enemy = Seconds::ZERO;
                 }
@@ -859,7 +860,10 @@ mod tests {
             .unit_ai
             .get(t.players[1].objects[ListIndex::new(0)].id)
             .unwrap();
-        assert_eq!((ai.alert_mode, ai.time_since_enemy), (true, Seconds::ZERO));
+        assert_eq!(
+            (ai.alert_mode, ai.time_since_enemy),
+            (AlertMode::Alert, Seconds::ZERO)
+        );
         t.member_objects(object_id(10), &mut objects).unwrap();
         assert_eq!(objects, [object_id(20), object_id(30)]);
         let mut full: Vec<ObjectId> = object_id_list(1000..1069);
@@ -916,11 +920,14 @@ mod tests {
                     .alert_mode,
             )
         };
-        assert_eq!(found(UnitAiKind::TRANSPORT), (vec![], false));
-        assert_eq!(found(CIVILIAN), (vec![object_id(20), object_id(22)], true));
+        assert_eq!(found(UnitAiKind::TRANSPORT), (vec![], AlertMode::Calm));
+        assert_eq!(
+            found(CIVILIAN),
+            (vec![object_id(20), object_id(22)], AlertMode::Alert)
+        );
         assert_eq!(
             found(SOLDIER_AI),
-            (vec![object_id(20), object_id(30)], true)
+            (vec![object_id(20), object_id(30)], AlertMode::Alert)
         );
     }
 

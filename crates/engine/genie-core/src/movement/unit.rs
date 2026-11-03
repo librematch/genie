@@ -10,6 +10,7 @@ use crate::movement::PathAsk;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveStep;
 use crate::movement::move_to::Patience;
+use crate::movement::move_to::StepEnd;
 use crate::movement::move_to::{MoveTo, Shows};
 use crate::movement::{GroupSpeed, Me};
 use crate::objects::SpriteId;
@@ -164,9 +165,9 @@ impl Unit {
         if step.target_moved {
             self.post_own(&mut c.w.parts.unit_ai, NotifyKind::TARGET_MOVED, [0, 0, 0])?;
         }
-        let ended = step.done || step.failed;
+        let ended = step.end != StepEnd::Going;
         if ended {
-            self.own_move_end(c, step.failed)?;
+            self.own_move_end(c, step.end)?;
         }
         Ok(HeadCode::ended(ended))
     }
@@ -286,8 +287,8 @@ impl Unit {
     /// The own `MoveTo`'s end, done or `failed`: its update in state 1 posts its completion
     /// (0x1fa with the move action value; an own `MoveTo` is never quiet), in state 13 its
     /// failure (0x1f9) and returns 3.
-    fn own_move_end(&self, c: &mut Step<'_>, failed: bool) -> Result<(), GenieError> {
-        let notify = if failed {
+    fn own_move_end(&self, c: &mut Step<'_>, end: StepEnd) -> Result<(), GenieError> {
+        let notify = if end == StepEnd::Failed {
             NotifyKind::ACTION_FAILED
         } else {
             NotifyKind::ACTION_COMPLETED

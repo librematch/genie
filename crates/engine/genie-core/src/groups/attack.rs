@@ -10,6 +10,7 @@ use crate::groups::FormationCategory;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MoveFlags;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
 use crate::groups::stats::weapon_range;
@@ -139,9 +140,7 @@ impl World {
             at.ground(),
             MoveTo {
                 range: Distance::new(range),
-                keep_flag: true,
-                direct: true,
-                ..MoveTo::default()
+                flags: MoveFlags::KEEP_FLAG | MoveFlags::DIRECT,
             },
         )?;
         let g = self.groups.held_mut(group)?;
