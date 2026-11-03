@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::TransformKind;
+use crate::groups::formation::SlotFill;
 use crate::groups::formation::SlotOrder;
 use crate::groups::formation::{RIGHT_ANGLE, find_point_from_front, transform_slot};
 use crate::groups::motion::YawLimit;
@@ -52,8 +53,8 @@ impl World {
     /// [`RIGHT_ANGLE`] with fewer than two sub-formations takes the units anew: every slot of the
     /// array loses its unit and its filled mark and the slots take their units (from the previous
     /// column, [`World::from_previous_column`], in that order, else the closest,
-    /// [`World::populate_slots`]). Then the slots' passability ([`World::passable_slots`]). Returns
-    /// whether the slots took their units anew (`*param_3`).
+    /// [`World::populate_slots`]). Then the slots' passability ([`World::passable_slots`]).
+    /// [`SlotFill::Anew`] when the slots took their units anew (`*param_3`).
     ///
     /// # Errors
     ///
@@ -63,9 +64,9 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
         order: SlotOrder,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<SlotFill, GenieError> {
         if formation.slots.is_empty() {
-            return Ok(false);
+            return Ok(SlotFill::Kept);
         }
         let g = self.groups.held(group)?;
         let world = (self.world_time, self.spatial.map);
@@ -123,7 +124,7 @@ impl World {
                     let indices = line.indices.clone();
                     let width = indices.len() as i32;
                     for k in indices {
-                        let _ = transform_slot(
+                        transform_slot(
                             formation,
                             &rotation,
                             point,
@@ -131,7 +132,7 @@ impl World {
                             TransformKind::ByLines,
                             world,
                             &self.model.tuning.group,
-                        );
+                        )?;
                     }
                     if width < 0x100 {
                         formation.number_transformed_slots += width;
@@ -146,7 +147,7 @@ impl World {
                 };
                 let mut i = 0;
                 loop {
-                    let _ = transform_slot(
+                    transform_slot(
                         formation,
                         &rotation,
                         point,
@@ -154,7 +155,7 @@ impl World {
                         kind,
                         world,
                         &self.model.tuning.group,
-                    );
+                    )?;
                     i += 1;
                     formation.number_transformed_slots += 1;
                     if capacity <= formation.number_transformed_slots {
@@ -175,7 +176,7 @@ impl World {
             took = true;
         }
         self.passable_slots(formation, group)?;
-        Ok(took)
+        Ok(if took { SlotFill::Anew } else { SlotFill::Kept })
     }
 
     /// The unreachable slots' places: each one's unit searches the grid for the cell it can

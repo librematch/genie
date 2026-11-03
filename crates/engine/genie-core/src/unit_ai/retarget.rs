@@ -16,6 +16,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::AttackChecks;
 use crate::unit_ai::GroupState;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::MiscEnd;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderForce;
@@ -465,11 +466,13 @@ impl UnitAi {
                     return Ok(MiscEnd::Ends);
                 }
                 NearestAttacker::NoAttacker => {
-                    return Ok(if self.process_idle(at, player_kind, ai, side)? {
-                        MiscEnd::Ends
-                    } else {
-                        MiscEnd::GoesOn
-                    });
+                    return Ok(
+                        if self.process_idle(at, player_kind, ai, side)? == IdleOutcome::Acted {
+                            MiscEnd::Ends
+                        } else {
+                            MiscEnd::GoesOn
+                        },
+                    );
                 }
                 NearestAttacker::NoUnitAi => {}
             }

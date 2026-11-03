@@ -12,6 +12,7 @@ use crate::gathering::hunt::walks::QUIET_CODE;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads};
 use crate::math::rng::Stream;
 use crate::movement::Me;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::Patience;
@@ -336,7 +337,7 @@ impl HuntAction {
         let target = self.target.ok_or(GenieError::unreachable(
             "a hunt's Attack on its livestock without a target",
         ))?;
-        let (a, arrived) = Attack::start(
+        let (a, move_start) = Attack::start(
             target.id(),
             &herd.engagement,
             herd.arms,
@@ -348,7 +349,7 @@ impl HuntAction {
                 move_to_tuning: &c.w.model.tuning.move_to,
             },
         )?;
-        if arrived {
+        if move_start == MoveStart::Arrived {
             a.arrived_sprite(
                 unit,
                 c.w.parts.motion_mut(unit.id),

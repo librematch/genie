@@ -106,7 +106,7 @@ impl Planner {
         };
         for x in (0..w0 >> 3).rev() {
             for y in (0..h0 >> 3).rev() {
-                let _ = planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
+                planner.init_cell(GridLevel::TOP, PlanTile::new(x, y));
             }
         }
         planner.update(PlanRect::new(0, 0, w, h), map);
@@ -152,9 +152,9 @@ impl Planner {
         self.cells[self.index(level, at)]
     }
 
-    /// `FUN_140f7da90`: clear a cell and mark its children that lie off the map; true when all of
-    /// it does.
-    pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) -> bool {
+    /// `FUN_140f7da90`: clear a cell and mark its children that lie off the map (its kind holds
+    /// [`CellKind::OFF_MAP`] when all of it does).
+    pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) {
         let i = self.index(level, at);
         self.cells[i] = Cell::EMPTY;
         if level == GridLevel::TILES {
@@ -163,12 +163,16 @@ impl Planner {
             }
         } else {
             for (bit, child) in at.children().into_iter().enumerate() {
-                if self.init_cell(level.down(), child) {
+                self.init_cell(level.down(), child);
+                if self
+                    .cell(level.down(), child)
+                    .kind
+                    .contains(CellKind::OFF_MAP)
+                {
                     self.cells[i].kind = self.cells[i].kind.plus(CellKind::child_off_map(bit));
                 }
             }
         }
-        self.cells[i].kind.contains(CellKind::OFF_MAP)
     }
 
     /// `FUN_140f799b0` (through the passability lambda, `0x140f7b110`): 1 when the tile is

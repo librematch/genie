@@ -75,6 +75,7 @@ fn building_relics_scale_its_elevation_factor() {
 use super::*;
 use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::HitKind;
+use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
 use crate::combat::damage::blasts::BlastHit;
 use crate::combat::damage::shown_values::HpPart;
@@ -802,13 +803,13 @@ fn shield_spends_charge_per_blocked_hit() {
     let mut sheep = sheep();
     sheep.source.charge_kind = ChargeKind::MELEE_SHIELD;
     sheep.source.charge = Charge::new(1.5);
-    assert!(!shield(&mut sheep, HitKind::Missile));
-    assert!(shield(&mut sheep, HitKind::Melee));
+    assert_eq!(shield(&mut sheep, HitKind::Missile), ShieldBlock::Passes);
+    assert_eq!(shield(&mut sheep, HitKind::Melee), ShieldBlock::Blocked);
     assert_eq!(sheep.source.charge, Charge::new(0.5));
-    assert!(!shield(&mut sheep, HitKind::Melee));
+    assert_eq!(shield(&mut sheep, HitKind::Melee), ShieldBlock::Passes);
     // COMISS 1.0, charge; JA past: a NaN charge blocks the hit and stays NaN
     sheep.source.charge = Charge::new(f32::NAN);
-    assert!(shield(&mut sheep, HitKind::Melee));
+    assert_eq!(shield(&mut sheep, HitKind::Melee), ShieldBlock::Blocked);
     assert!(sheep.source.charge.get().is_nan());
 }
 
@@ -1055,7 +1056,7 @@ fn blast_nan_paths_are_the_game_s() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     let f = (1.0 - fmath::sqrt(0.5 * 0.5)) / 1.0 * 0.5;
     assert_eq!(t.hp, HitPoints::new(14.0 - 10.0 * f));
@@ -1091,7 +1092,7 @@ fn blast_nan_paths_are_the_game_s() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(t.hp, HitPoints::new(9.0));
     // a NaN area damage share leaves the factor at 1
@@ -1112,7 +1113,7 @@ fn blast_nan_paths_are_the_game_s() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(t.hp, HitPoints::new(4.0));
     // no radius, no blast; a NaN radius blasts
@@ -1131,7 +1132,7 @@ fn blast_nan_paths_are_the_game_s() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(false)
+        Ok(())
     );
     elephant.source.area_effect = Distance::new(f32::NAN);
     assert_eq!(
@@ -1148,7 +1149,7 @@ fn blast_nan_paths_are_the_game_s() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     // CVTTSS2SI gives 0x80000000 past the i32 range: 0 in the low short
     assert_eq!(
@@ -1201,7 +1202,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(
         (target.hp, near.hp, far.hp, friend.hp),
@@ -1230,7 +1231,7 @@ fn blast_reaches_the_objects_about_its_attacker() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     let dx = (10.8f32 - 10.5f32).abs();
     let f = (1.0 - fmath::sqrt(0.0 * 0.0 + dx * dx)) / 1.0 * 0.5;
@@ -1860,7 +1861,7 @@ fn blast_takes_main_building_less_what_its_annexes_took() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(all.map(|t| t.id), [object_id(21), object_id(20)]);
     assert_eq!(
@@ -1917,7 +1918,7 @@ fn blast_walks_tile_objects_in_its_list_order() {
                 damage_tuning: &tuning().damage,
             },
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(
         all.map(|t| t.id),

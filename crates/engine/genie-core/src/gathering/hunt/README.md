@@ -39,7 +39,7 @@ hunts its own livestock can lead the animal toward the drop site first (state 10
 | [`hunter_strike.rs`](hunter_strike.rs) | The hunt's strike as the hunter's update runs it: the hunter as a gatherer and an attacker, the herd it leads, the hunt's update and what follows. |
 | [`mod.rs`](mod.rs) | The Hunt action (`TRIBE_Action_Hunt`, type 110, vtable `0x142ed70f8`): a villager sent to a tree (or an animal) with a gather task attacks it first (state 12, an `Attack` sub-action); once it is dead the villager walks to it (state 4, a `MoveTo` sub-action), faces it (6) and gathers (7), then carries the load to a drop site (8). |
 | [`next_tree.rs`](next_tree.rs) | The hunt's search for another target when its class is one the unit AI does not attack (trees): the closest tree from the hunt's drop site, which the hunt then takes. |
-| [`outcomes.rs`](outcomes.rs) | What the Hunt's steps answer: whether its tree search found a tree (`TreeSearch`), whether its gathering asks for the drop-off (`HuntGather`) and whether the drop-off's queued orders end it (`HuntEnd`). |
+| [`outcomes.rs`](outcomes.rs) | What the Hunt's steps answer: whether its tree search found a tree (`TreeSearch`) and whether its gathering asks for the drop-off (`HuntGather`). |
 | [`sprites.rs`](sprites.rs) | The hunt's sprites: standing, walking and the task's; an asked drop-off and the kind of what a unit carries. |
 | [`start.rs`](start.rs) | The Hunt's start, its chase and retarget, a move's target and the walk to a point (states 11 and 15). |
 | [`tests.rs`](tests.rs) | Tests. |

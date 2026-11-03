@@ -11,6 +11,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::WorkerCount;
@@ -150,7 +151,7 @@ impl Unit {
             roles,
         );
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        if let Some(arrived) = hunt.retarget(
+        if let Some(move_start) = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
                 player: c.player,
@@ -167,7 +168,7 @@ impl Unit {
             },
             &c.w.model.tuning.hunt,
         )? {
-            if arrived {
+            if move_start == MoveStart::Arrived {
                 show_arrived(
                     &arms,
                     &mut self.sprite,

@@ -31,6 +31,7 @@ part of the update, which binds the action to the world.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`action_end.rs`](action_end.rs) | Whether a gathering action ends at its drop-off for the unit AI's queued orders. |
 | [`closest_resource.rs`](closest_resource.rs) | `ClosestResourceObject` (`FUN_140c49760`): where it searches from and what it finds; a herded sheep. |
 | [`drop_off.rs`](drop_off.rs) | A gatherer's walk after a drop and the drop sites it walks to. |
 | [`drop_site_id.rs`](drop_site_id.rs) | A drop site's id as its own type: the object a worker carries its load to. |

@@ -18,6 +18,7 @@ use crate::map::Position;
 use crate::map::spatial::{Placed, Spatial};
 use crate::math::fmath::{at_most_or_unordered, sqrt};
 use crate::math::rng::{Stream, Well512};
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::gate_gap;
 use crate::movement::move_to::{MoveToReads, TargetMoved};
@@ -95,8 +96,8 @@ impl Attack {
     /// is the object itself (the area-effect and gate cases are not reached by a villager) and in
     /// sight (a hunt's targets are, and none is a gate, whose parts' gaps the hunt's callers do
     /// not hand on). The unit's `+0x900` (attack count) is cleared and its sprites
-    /// set; the slice holds neither. True with it: the last `MoveTo` started arrived, and the
-    /// caller shows its idle sprite ([`Attack::arrived_sprite`]).
+    /// set; the slice holds neither. [`MoveStart::Arrived`] with it: the last `MoveTo` started
+    /// arrived, and the caller shows its idle sprite ([`Attack::arrived_sprite`]).
     ///
     /// # Errors
     ///
@@ -110,7 +111,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         layer: BeginLayer<'_>,
-    ) -> Result<(Self, bool), GenieError> {
+    ) -> Result<(Self, MoveStart), GenieError> {
         let roles = layer.roles;
         let mut a = Self {
             voice: Voice::Quiet,
@@ -149,7 +150,7 @@ impl Attack {
                 "a hunt's Attack readyToAttack failed before its start's state 4 (+0x7b8 at 1)",
             ));
         }
-        Ok((a, begun.arrived()))
+        Ok((a, begun.start()))
     }
 
     /// A unit's own Attack (the attack command, `FUN_141081a80`): the constructor
@@ -266,7 +267,7 @@ impl Attack {
             };
             attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
         }
-        if begun.arrived() {
+        if begun.start() == MoveStart::Arrived {
             unit.shows_standing_sprite(
                 c.w.parts.motion.layer_mut(unit.id),
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),

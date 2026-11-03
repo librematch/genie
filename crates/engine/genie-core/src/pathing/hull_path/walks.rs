@@ -46,6 +46,28 @@ enum WalkEnd {
     Target,
 }
 
+/// Whether a node's rays left the hull's boxes ([`HullPather::cast_rays`],
+/// [`HullPather::cast_into`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum Rays {
+    /// A ray left the boxes.
+    LeftBoxes,
+    /// Every ray stayed on the boxes.
+    InBoxes,
+}
+
+/// Whether a walk's first steps or a box's side points made a node ([`HullPather::first_steps`],
+/// [`HullPather::side_points`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum Steps {
+    /// One or more were made.
+    Made,
+    /// None was.
+    NoneMade,
+}
+
 impl HullPather<'_> {
     /// The gap between `p` and the target's box grown by the radius; each axis held at 0 or
     /// more by `MAXSS` (0x140f86bcf, 0x140f85a18): an unordered one is 0.
@@ -146,7 +168,7 @@ impl HullPather<'_> {
     /// The points about box `b` a walk within a hull starts from: from the sides facing the region
     /// of `p` about the box (inside it, its nearest side and those within the radius), a point every
     /// `step` of the side's length, [`NUDGE`] off the box; with `reach`, only those within it of
-    /// `p`; none inside a box of the hull. Returns whether one was made.
+    /// `p`; none inside a box of the hull. [`Steps::Made`] when one was.
     pub(super) fn side_points(
         &mut self,
         hull: HullIndex,
@@ -155,7 +177,7 @@ impl HullPather<'_> {
         p: Point,
         step: f32,
         reach: Option<(Point, f32)>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Steps, GenieError> {
         let (x0, y0, x1, y1) = (b.x0(), b.y0(), b.x1(), b.y1());
         // `COMISS`/`JA`, then `SETBE`; `JBE`, then `CMOVA` (0x140f8d1fc..0x140f8d235,
         // 0x140f893a4..0x140f893d0): an unordered coordinate counts past the box's far side
@@ -216,7 +238,7 @@ impl HullPather<'_> {
                 )
             })
         };
-        let mut made = false;
+        let mut made = Steps::NoneMade;
         let mut add = |me: &mut Self, q: Point| -> Result<(), GenieError> {
             if near(q) && me.hulls.checked(hull.index())?.box_holding(q).is_none() {
                 let _ = me.add_node(NewNode {
@@ -230,7 +252,7 @@ impl HullPather<'_> {
                     direction: -1,
                     by_place: false,
                 })?;
-                made = true;
+                made = Steps::Made;
             }
             Ok(())
         };
@@ -278,10 +300,10 @@ impl HullPather<'_> {
         root: NodeIndex,
         p: Point,
         goal: Option<Point>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Steps, GenieError> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let d = self.radius + self.radius;
-        let mut made = false;
+        let mut made = Steps::NoneMade;
         for dir in DIRECTIONS {
             let mut q = Point::new(d.get() * dir.x() + p.x(), d.get() * dir.y() + p.y());
             if let Some((at, _)) = self.hulls.checked(hull.index())?.intersection(
@@ -304,7 +326,7 @@ impl HullPather<'_> {
                     direction: -1,
                     by_place: false,
                 })?;
-                made = true;
+                made = Steps::Made;
             }
         }
         Ok(made)
@@ -451,7 +473,8 @@ impl HullPather<'_> {
                     break 'search;
                 }
             }
-            left_boxes |= self.cast_rays(hull, node, goal, nudge, paths, (count, most))?;
+            left_boxes |=
+                self.cast_rays(hull, node, goal, nudge, paths, (count, most))? == Rays::LeftBoxes;
         }
         // the search's end
         // without a goal the walk's ways out are its answer, even past a target within range
@@ -519,7 +542,7 @@ impl HullPather<'_> {
             return Ok((inside, false));
         };
         self.close(NodeList::WALKS, root)?;
-        let mut made = self.first_steps(hull, root, from, goal)?;
+        let mut made = self.first_steps(hull, root, from, goal)? == Steps::Made;
         let bounds = self.hulls.checked(hull.index())?.objects.checked(b)?.bounds;
         let d = self.radius + self.radius;
         made |= self.side_points(
@@ -529,7 +552,7 @@ impl HullPather<'_> {
             from,
             hull_path_tuning.exit_step,
             Some((from, d.get())),
-        )?;
+        )? == Steps::Made;
         Ok((inside, !made))
     }
 
@@ -563,7 +586,7 @@ impl HullPather<'_> {
     /// ([`HullPather::may_cast`]): a ray onto a box of hull `hull` goes on from the box's side; one
     /// that leaves the boxes ends on the hull's edge, where toward a `goal` the walk goes on, and
     /// without one it is a way out (nudged past the edge with `nudge`), kept in `paths` while
-    /// `count` is below `most`. True when a ray left the boxes.
+    /// `count` is below `most`. [`Rays::LeftBoxes`] when a ray left the boxes.
     pub(super) fn cast_rays(
         &mut self,
         hull: HullIndex,
@@ -572,7 +595,7 @@ impl HullPather<'_> {
         nudge: bool,
         paths: &mut [Waypoints],
         (count, most): (&mut usize, usize),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Rays, GenieError> {
         let at = self.nodes.checked(node)?.at;
         let mut left_boxes = false;
         for side in 0..4 {
@@ -637,6 +660,10 @@ impl HullPather<'_> {
                 }
             }
         }
-        Ok(left_boxes)
+        Ok(if left_boxes {
+            Rays::LeftBoxes
+        } else {
+            Rays::InBoxes
+        })
     }
 }

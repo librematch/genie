@@ -10,6 +10,7 @@ use crate::combat::attack::{
     blast_so_far, reset_sprite, set_attack_timer, set_walker_anim, squared_reach, strike,
 };
 use crate::combat::damage::HitKind;
+use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::Victim;
 use crate::combat::victims::write_strike_back;
 use crate::combat::volley::Aimed;
@@ -442,7 +443,7 @@ impl Attack {
         let (center, target) = (f.own.position, f.victim.id);
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(&mut f.victim);
-        let _ = blast(
+        blast(
             &mut f.own,
             center,
             Some(target),
@@ -461,7 +462,7 @@ impl Attack {
                 &f.victim,
                 damage_tuning,
             );
-            if !shield(&mut f.victim, HitKind::Melee) {
+            if shield(&mut f.victim, HitKind::Melee) == ShieldBlock::Passes {
                 let weapons = f.own.weapons.clone();
                 let mut others: Vec<&mut Victim> = blasted.iter_mut().collect();
                 take(

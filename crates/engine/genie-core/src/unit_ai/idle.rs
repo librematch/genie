@@ -13,6 +13,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::Answer;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
@@ -35,20 +36,21 @@ use crate::world::layer::generated::UnitAiTuning;
 impl UnitAi {
     /// processIdle, slot 72 (`+0x240`) of each factory type's vtable: the hunted animal's
     /// ([`UnitAi::hunted_idle`]), the boar's ([`UnitAi::boar_idle`]), the lion's
-    /// ([`UnitAi::lion_idle`]), the soldier's ([`UnitAi::soldier_idle`]) and the tower's, the
-    /// base `FUN_140c564c0` ([`UnitAi::tower_idle`]); the villager's (`FUN_140c1e610`) and the
-    /// transport ship's (`0x140c21d20`) only lower the unit's last human order time
+    /// ([`UnitAi::lion_idle`]), the soldier's ([`UnitAi::soldier_idle`]) and the tower's, the base
+    /// `FUN_140c564c0` ([`UnitAi::tower_idle`]); the villager's (`FUN_140c1e610`) and the transport
+    /// ship's (`0x140c21d20`) only lower the unit's last human order time
     /// ([`UnitAi::cap_human_order`]); the building's (`FUN_140c1e600`) and the livestock's
-    /// (`FUN_140c1fea0`) do nothing. True when it produced an action (6), false for 5. Its
-    /// second argument (1 from the idle part, else 0) lets an order the soldier's and the base's
-    /// slot 0x250 retry give 6, which no modelled type's slot 0x60 allows.
+    /// (`FUN_140c1fea0`) do nothing. [`IdleOutcome::Acted`] when it produced an action (6),
+    /// [`IdleOutcome::Idle`] for 5. Its second argument (1 from the idle part, else 0) lets an
+    /// order the soldier's and the base's slot 0x250 retry give 6, which no modelled type's slot
+    /// 0x60 allows.
     pub(super) fn process_idle(
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         match self.ai_kind {
             UnitAiKind::HUNTED => self.hunted_idle(at, player_kind, ai, side),
             BOAR_AI => Ok(self.boar_idle(at, ai, side)?),
@@ -57,14 +59,14 @@ impl UnitAi {
             // tower's (FUN_140c20690): the cap, then 5
             CIVILIAN | UnitAiKind::TRANSPORT | SIEGE_TOWER_AI => {
                 self.cap_human_order(side, ai)?;
-                Ok(false)
+                Ok(IdleOutcome::Idle)
             }
             SOLDIER_AI => self.soldier_idle(at, player_kind, ai, side),
             TRADE_AI | FISHING_AI => self.ship_idle(at, player_kind, ai, side),
             SIEGE_AI => self.siege_idle(at, player_kind, ai, side),
             TOWER_AI => self.tower_idle(at, player_kind, side, ai),
             ARTIFACT_AI => self.artifact_idle(at, side, ai),
-            UnitAiKind::BUILDING | UnitAiKind::LIVESTOCK => Ok(false),
+            UnitAiKind::BUILDING | UnitAiKind::LIVESTOCK => Ok(IdleOutcome::Idle),
             _ => Err(GenieError::unsupported(
                 "processIdle (slot 0x240) of a unit-AI type not modelled",
             )),
@@ -77,20 +79,20 @@ impl UnitAi {
     /// (`ClosestObject` with every relation, state and master, reachable: [`Pick::Closest`]; the
     /// search adds the fishing ship's `+0x1e8`, 7, to its radius) and, finding one the world
     /// holds, moves away from it by its speed times `UnitAiTuning::ship_evade_reach` along the line between
-    /// them (`evasiveMoveTo`, slot 0x150 with both flags, [`UnitAi::evasive_move`]): true (6).
-    /// Else false (5).
+    /// them (`evasiveMoveTo`, slot 0x150 with both flags, [`UnitAi::evasive_move`]):
+    /// [`IdleOutcome::Acted`] (6). Else [`IdleOutcome::Idle`] (5).
     pub(super) fn ship_idle(
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if !player_kind.is_computer() || at.flags.contains(SurroundingFlags::GARRISONED) {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         let (classes, radius): (&[ClassId], f32) = if self.ai_kind == FISHING_AI {
             (
@@ -129,10 +131,10 @@ impl UnitAi {
         })?;
         self.alert(found, at.dt_seconds);
         let Some(id) = found.id else {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         };
         let Some(u) = side.seen_unit(id)? else {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         };
         let reach = (at.speed * unit_ai_tuning.ship_evade_reach).get();
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
@@ -141,7 +143,7 @@ impl UnitAi {
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Moves), at, ai, side)?;
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     }
 
     /// The siege unit's idle check (slot 72, `FUN_140c206b0`, factory type 0x10). Slot 0x250 first
@@ -169,17 +171,17 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
             && MasterKind::COMBAT <= at.kind
             && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         if self.stance == UnitStance::NoAttack {
             self.siege_no_attack(at, player_kind, side, ai)?;
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         let mut target = Self::top_target_in_range(at, side)?;
         if self.retarget_disabled != 0 && at.target.is_some() {
@@ -187,7 +189,7 @@ impl UnitAi {
             if let Some(t) = target
                 && side.reaches(t, at.weapon_range)?
             {
-                return Ok(false);
+                return Ok(IdleOutcome::Idle);
             }
             self.retarget_disabled = 0;
         }
@@ -198,9 +200,9 @@ impl UnitAi {
             target = self.siege_best(at, player_kind, side)?;
         }
         if let Some(t) = target
-            && self.siege_attack(t, at, ai, side)?
+            && self.siege_attack(t, at, ai, side)? == Answer::Taken
         {
-            return Ok(true);
+            return Ok(IdleOutcome::Acted);
         }
         self.siege_idle_end(at, player_kind, ai, side)
     }
@@ -208,7 +210,7 @@ impl UnitAi {
     /// [`UnitAi::siege_idle`]'s attack on `target` (slot 0xb8 forced, any 0,
     /// [`UnitAi::attack_object`]), a patrol order's patrol saved first: once it attacks, off the
     /// defend order (`0x2bd`) the order goes (`FUN_140c64b60` with −1, 0); a failed attack on a
-    /// patrol order loses the saved patrol. Whether it attacks.
+    /// patrol order loses the saved patrol. [`Answer::Taken`] when it attacks.
     ///
     /// # Errors
     ///
@@ -219,7 +221,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -232,7 +234,7 @@ impl UnitAi {
             if self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, OrderHistory::Skipped, ai);
             }
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         if matches!(
             self.current_order,
@@ -240,7 +242,7 @@ impl UnitAi {
         ) {
             self.zero_patrol();
         }
-        Ok(false)
+        Ok(Answer::NotTaken)
     }
 
     /// [`UnitAi::siege_idle`] in `NoAttack` (stance 3): it searches alone (slot 0x50 with mode 1
@@ -319,16 +321,16 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
         ) {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         if !player_kind.is_computer() {
             if at.group.is_some() {
-                return Ok(false);
+                return Ok(IdleOutcome::Idle);
             }
             if self.stance.leashed() {
                 let _ = self.walk_back(at, side, ai)?;
@@ -338,46 +340,47 @@ impl UnitAi {
     }
 
     /// The soldier's idle check (slot 72, `FUN_140c20db0`, factory type 13). Before its cap
-    /// (`FUN_140c41e50`, [`UnitAi::cap_human_order`]), a player that is out (`+0x89` 2; not held,
-    /// 0 in every player probed) would stop, and slot 0x250 (`FUN_140c5d9a0`) retries no order,
-    /// the soldier's slot 0x60 taking none as retryable. A Gaia unit stops unless it is of the combat type with `+0x924` 0 outside the
-    /// scenario modes (`FUN_141302540`); one in `NoAttack` (stance 3) searches and returns to its
-    /// state position ([`UnitAi::no_attack_idle`]); master 706 stops. Its target is the target of its top action
-    /// within its range (slot 400, slot 0x1e8) with retargeting on (`+0x1d6` 0), else its current
-    /// target; neither is modelled, nor a computer's branches (patrol data, priorities, evasion).
-    /// Without one, `bestUnitToAttack` from its place ([`Pick::Attack`]): an object found it attacks
-    /// (slot 0xb8 forced, [`UnitAi::attack_object`]; then, with retargeting on and off order
-    /// 0x2bd, the order goes) and processIdle produced (true); a patrol order's saved patrol data
-    /// is not modelled. Else a patrol order stops. The search leaves the alert mode clear, so `+0x1bc`
+    /// (`FUN_140c41e50`, [`UnitAi::cap_human_order`]), a player that is out (`+0x89` 2; not held, 0
+    /// in every player probed) would stop, and slot 0x250 (`FUN_140c5d9a0`) retries no order, the
+    /// soldier's slot 0x60 taking none as retryable. A Gaia unit stops unless it is of the combat
+    /// type with `+0x924` 0 outside the scenario modes (`FUN_141302540`); one in `NoAttack`
+    /// (stance 3) searches and returns to its state position ([`UnitAi::no_attack_idle`]); master
+    /// 706 stops. Its target is the target of its top action within its range (slot 400, slot
+    /// 0x1e8) with retargeting on (`+0x1d6` 0), else its current target; neither is modelled, nor a
+    /// computer's branches (patrol data, priorities, evasion). Without one, `bestUnitToAttack` from
+    /// its place ([`Pick::Attack`]): an object found it attacks (slot 0xb8 forced,
+    /// [`UnitAi::attack_object`]; then, with retargeting on and off order 0x2bd, the order goes)
+    /// and processIdle produced ([`IdleOutcome::Acted`]); a patrol order's saved patrol data is not
+    /// modelled. Else a patrol order stops. The search leaves the alert mode clear, so `+0x1bc`
     /// stays. Then, outside a unit group (`+0x6d0` −1; its test is not held), a unit in Defend or
-    /// `StandGround` (stance 1, 2) walks back to its state position ([`UnitAi::walk_back`]),
-    /// which leaves the result 5; a patrol path (`+0x1c0`) and the healer's ally search
-    /// (`FUN_140c16f00`, for a master with a task of action type 0x69) are not modelled.
+    /// `StandGround` (stance 1, 2) walks back to its state position ([`UnitAi::walk_back`]), which
+    /// leaves the result 5; a patrol path (`+0x1c0`) and the healer's ally search (`FUN_140c16f00`,
+    /// for a master with a task of action type 0x69) are not modelled.
     pub(super) fn soldier_idle(
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
             && MasterKind::COMBAT <= at.kind
             && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         if self.stance == UnitStance::NoAttack {
             return self
                 .no_attack_idle(at, player_kind, side, ai)
-                .map(|()| false);
+                .map(|()| IdleOutcome::Idle);
         }
         if at
             .roles
             .of_master(at.master)
             .contains(MasterRoles::IDLES_STILL)
         {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         // its target: with retargeting on, its top action's within its range (slot 400, slot
         // 0x1e8); with it off, its current target while the world holds it, else the top
@@ -396,9 +399,9 @@ impl UnitAi {
             None => self.soldier_best(at, player_kind, side)?,
         };
         if let Some(t) = target
-            && self.soldier_attack(t, at, ai, side)?
+            && self.soldier_attack(t, at, ai, side)? == Answer::Taken
         {
-            return Ok(true);
+            return Ok(IdleOutcome::Acted);
         }
         self.soldier_idle_end(at, ai, side)
     }
@@ -441,7 +444,7 @@ impl UnitAi {
     /// to save the patrol information in case the attack works."): slot 0xb8 forced
     /// (`FUN_140c17550`: the base's, then the unit's group); once it attacks, with retargeting on
     /// and off order 0x2bd the order goes (`FUN_140c64b60` with −1, 0); a failed attack on a
-    /// patrol order loses the saved patrol. Whether it attacks.
+    /// patrol order loses the saved patrol. [`Answer::Taken`] when it attacks.
     ///
     /// # Errors
     ///
@@ -452,7 +455,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -463,7 +466,7 @@ impl UnitAi {
             if self.retarget_disabled == 0 && self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, OrderHistory::Skipped, ai);
             }
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         // "Attack failed, so I'm nuking the saved patrol information."
         if matches!(
@@ -472,14 +475,14 @@ impl UnitAi {
         ) {
             self.zero_patrol();
         }
-        Ok(false)
+        Ok(Answer::NotTaken)
     }
 
     /// [`UnitAi::soldier_idle`]'s end without an attack: a patrol order stops there ("I have a
     /// patrol order, so I'm stopping here."); a unit in Defend or `StandGround` walks back to its
     /// state position ("returning to state pos.", its result not the processIdle's); then the
     /// saved patrol, if any, goes on (`restorePatrolInformation`: processIdle produced). Else
-    /// false.
+    /// [`IdleOutcome::Idle`].
     ///
     /// # Errors
     ///
@@ -490,25 +493,25 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         if matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
         ) {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         if self.stance.leashed() {
             let _ = self.walk_back(at, side, ai)?;
         }
-        if self.restore_patrol(at, ai, side)? {
-            return Ok(true);
+        if self.restore_patrol(at, ai, side)? == IdleOutcome::Acted {
+            return Ok(IdleOutcome::Acted);
         }
         if at.flags.contains(SurroundingFlags::TASK_0X69) {
             return Err(GenieError::unsupported(
                 "a healer's search for an ally to heal",
             ));
         }
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     }
 
     /// The soldier's idle check in `NoAttack` (stance 3, `FUN_140c20db0`: "searching and returning
@@ -572,15 +575,15 @@ impl UnitAi {
     /// 3) it only searches (slot 0x50 with mode 1 from its place, [`Pick::Look`] over its cared
     /// classes, which sets the alert mode) and gives 5; else `bestUnitToAttack` from its place
     /// ([`Pick::Attack`], as [`UnitAi::soldier_idle`]'s), then an object found is attacked
-    /// ([`UnitAi::attack_object`] forced, slot 0xb8, which then sets `+0x1d5`, not held). True
-    /// when it attacks (processIdle's 6).
+    /// ([`UnitAi::attack_object`] forced, slot 0xb8, which then sets `+0x1d5`, not held).
+    /// [`IdleOutcome::Acted`] when it attacks (processIdle's 6).
     pub(super) fn tower_idle(
         &mut self,
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         self.cap_human_order(side, rng)?;
         if self.stance == UnitStance::NoAttack {
@@ -593,7 +596,7 @@ impl UnitAi {
                 memory: Memory::default(),
             })?;
             self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         let found = side.closest(&Search {
             at: at.position.ground(),
@@ -616,12 +619,14 @@ impl UnitAi {
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
         let Some(id) = found.id else {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         };
         // slot 0xb8 with 1 (`+0x1d5` then 1, not held)
         Ok(
-            self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)?
-                == Answer::Taken,
+            match self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)? {
+                Answer::Taken => IdleOutcome::Acted,
+                Answer::NotTaken => IdleOutcome::Idle,
+            },
         )
     }
 

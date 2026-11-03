@@ -8,6 +8,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi, UnitSide};
@@ -198,9 +199,9 @@ impl UnitAi {
     /// (`0x1fa` with `0x262`) while the AI has an action other than a move (`0x262`, `0x268`,
     /// `0x2bf`, `0x2c0`) is ignored, answering 1 without joining the queue; any other joins the
     /// queue (`FUN_140c42470`, whose 0 on a failed allocation cannot happen) and answers 1.
-    pub fn accept(&mut self, n: Notify, unit_state: ObjectState) -> bool {
+    pub fn accept(&mut self, n: Notify, unit_state: ObjectState) -> Answer {
         if unit_state != ObjectState::Alive {
-            return false;
+            return Answer::NotTaken;
         }
         let action = self.current_action;
         let taken = match n.kind {
@@ -216,7 +217,7 @@ impl UnitAi {
                         Some(AiAction::Move | AiAction::MoveAside | AiAction::GroupAside)
                     )
                 {
-                    return true;
+                    return Answer::Taken;
                 }
                 true
             }
@@ -224,8 +225,10 @@ impl UnitAi {
         };
         if taken {
             self.append(n);
+            Answer::Taken
+        } else {
+            Answer::NotTaken
         }
-        taken
     }
 
     /// `FUN_140c42470`: a notify joins the queue; a full queue doubles its capacity, but while

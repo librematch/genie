@@ -19,6 +19,8 @@ use crate::pathing::ShortFound;
 use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::find::Hulls;
 use crate::pathing::hull_path::rounds::Rounds;
+use crate::pathing::hull_path::walks::Rays;
+use crate::pathing::hull_path::walks::Steps;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
 use crate::testing::class;
@@ -1747,7 +1749,7 @@ fn the_pather_float_tests_take_the_game_nan_paths() {
             direction: -1,
         })
         .unwrap();
-    assert!(
+    assert_eq!(
         p.side_points(
             HullIndex::new(0),
             root,
@@ -1756,7 +1758,8 @@ fn the_pather_float_tests_take_the_game_nan_paths() {
             0.5,
             None
         )
-        .unwrap()
+        .unwrap(),
+        Steps::Made
     );
     let mut at: Vec<Point> = open_nodes(&p, NodeList::WALKS)
         .iter()
@@ -1786,9 +1789,10 @@ fn the_pather_float_tests_take_the_game_nan_paths() {
         })
         .unwrap();
     let reach = Some((Point::new(5.0, 3.0), f32::NAN));
-    assert!(
+    assert_eq!(
         p.side_points(HullIndex::new(0), root, b, Point::new(5.0, 3.0), 0.5, reach)
-            .unwrap()
+            .unwrap(),
+        Steps::Made
     );
     assert_eq!(open_nodes(&p, NodeList::WALKS).len(), 3);
     // partway: an unordered end is nearer the goal than the start, and not within range
@@ -2090,7 +2094,7 @@ fn walk_out_rays_end_on_the_hull_edge_as_ways_out() {
     };
     let n = NUDGE;
     let (left, ends, open) = rays(None, PATHS);
-    assert_eq!((left, open), (true, 1));
+    assert_eq!((left, open), (Rays::LeftBoxes, 1));
     assert_eq!(
         ends,
         [
@@ -2104,7 +2108,7 @@ fn walk_out_rays_end_on_the_hull_edge_as_ways_out() {
         [Point::new(4.2, 4.0 - n), Point::new(4.2, 7.0 + n)]
     );
     let (left, ends, open) = rays(Some(Point::new(3.0, 5.5)), PATHS);
-    assert_eq!((left, ends.len(), open), (true, 0, 4));
+    assert_eq!((left, ends.len(), open), (Rays::LeftBoxes, 0, 4));
 }
 
 /// `pathWithinHull` out of a hull (`FUN_140f8cf00`) from (4.2, 5.5), inside the hull of (4, 4)

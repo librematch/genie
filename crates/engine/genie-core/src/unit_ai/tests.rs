@@ -2128,7 +2128,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     assert_eq!(
         run([700, -1], DistanceSquared::new(3.9)),
         (
-            true,
+            IdleOutcome::Acted,
             vec![(object_id(700), OrderForce::Unforced)],
             Some(AiAction::Attack),
             Some(object_id(700))
@@ -2136,13 +2136,13 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     );
     assert_eq!(
         run([700, -1], DistanceSquared::new(4.1)),
-        (false, vec![], None, None)
+        (IdleOutcome::Idle, vec![], None, None)
     );
     // any enemy: a third of 4
     assert_eq!(
         run([-1, 701], DistanceSquared::new(1.7)),
         (
-            true,
+            IdleOutcome::Acted,
             vec![(object_id(701), OrderForce::Unforced)],
             Some(AiAction::Attack),
             Some(object_id(701))
@@ -2150,7 +2150,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     );
     assert_eq!(
         run([-1, 701], DistanceSquared::new(1.8)),
-        (false, vec![], None, None)
+        (IdleOutcome::Idle, vec![], None, None)
     );
 }
 
@@ -4948,7 +4948,7 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
     );
-    assert_eq!(took, Ok(true));
+    assert_eq!(took, Ok(IdleOutcome::Acted));
     assert_eq!(fx, [Effect::ChangeOwner(PlayerId::new(2))]);
     assert_eq!(side.searches, [(6.0, ARTIFACT_CARED.to_vec(), false)]);
     for (players, id, owner) in [
@@ -4965,7 +4965,7 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx),
         );
-        assert_eq!((took, fx), (Ok(false), vec![]));
+        assert_eq!((took, fx), (Ok(IdleOutcome::Idle), vec![]));
     }
     // a moving one asks for the reach test
     let walking = Surroundings {
@@ -8226,7 +8226,7 @@ fn an_idle_transport_ship_check_caps_its_human_order_time_and_does_nothing() {
                 &mut rng(),
                 &mut With::new(&mut no_search, &mut fx)
             ),
-            Ok(false)
+            Ok(IdleOutcome::Idle)
         );
         assert_eq!(fx, Vec::new());
     }
@@ -8451,7 +8451,7 @@ fn human_player_king_idle_check_only_caps() {
             &mut r,
             &mut With::new(&mut no_search, &mut fx)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
     assert_eq!(r.draws, 0);
@@ -8476,7 +8476,7 @@ fn human_player_king_idle_check_only_caps() {
             &mut r,
             &mut With::new(&mut no_search, &mut Vec::new())
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     u.current_order = Some(OrderKind::Move);
     assert_eq!(
@@ -8486,7 +8486,7 @@ fn human_player_king_idle_check_only_caps() {
             &mut r,
             &mut With::new(&mut no_search, &mut Vec::new())
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
 }
 
@@ -9691,43 +9691,61 @@ fn the_unit_ai_notify_answers_whether_it_took_it() {
         ..idle(UnitAiKind::CIVILIAN)
     };
     let n = |caller, kind, p0| Notify::own(caller, kind, [p0, 0, 0]);
-    assert!(!u.accept(
-        n(object_id(70), NotifyKind::DAMAGED, 0),
-        ObjectState::Foundation
-    ));
-    assert!(!u.accept(
-        n(object_id(71), NotifyKind::NO_LONGER_ON_ME, 0),
-        ObjectState::Alive
-    ));
-    assert!(!u.accept(
-        n(
-            object_id(70),
-            NotifyKind::ACTION_INVALIDATED,
-            AiAction::Attack.value()
+    assert_eq!(
+        u.accept(
+            n(object_id(70), NotifyKind::DAMAGED, 0),
+            ObjectState::Foundation
         ),
-        ObjectState::Alive
-    ));
-    assert!(u.accept(
-        n(
-            object_id(70),
-            NotifyKind::ACTION_COMPLETED,
-            AiAction::Move.value()
+        Answer::NotTaken
+    );
+    assert_eq!(
+        u.accept(
+            n(object_id(71), NotifyKind::NO_LONGER_ON_ME, 0),
+            ObjectState::Alive
         ),
-        ObjectState::Alive
-    ));
+        Answer::NotTaken
+    );
+    assert_eq!(
+        u.accept(
+            n(
+                object_id(70),
+                NotifyKind::ACTION_INVALIDATED,
+                AiAction::Attack.value()
+            ),
+            ObjectState::Alive
+        ),
+        Answer::NotTaken
+    );
+    assert_eq!(
+        u.accept(
+            n(
+                object_id(70),
+                NotifyKind::ACTION_COMPLETED,
+                AiAction::Move.value()
+            ),
+            ObjectState::Alive
+        ),
+        Answer::Taken
+    );
     assert_eq!(u.notifies, Vec::new());
-    assert!(u.accept(
-        n(object_id(70), NotifyKind::NO_LONGER_ON_ME, 0),
-        ObjectState::Alive
-    ));
-    assert!(u.accept(
-        n(
-            object_id(70),
-            NotifyKind::ACTION_INVALIDATED,
-            AiAction::Gather.value()
+    assert_eq!(
+        u.accept(
+            n(object_id(70), NotifyKind::NO_LONGER_ON_ME, 0),
+            ObjectState::Alive
         ),
-        ObjectState::Alive
-    ));
+        Answer::Taken
+    );
+    assert_eq!(
+        u.accept(
+            n(
+                object_id(70),
+                NotifyKind::ACTION_INVALIDATED,
+                AiAction::Gather.value()
+            ),
+            ObjectState::Alive
+        ),
+        Answer::Taken
+    );
     assert_eq!(u.notifies.len(), 2);
 }
 
@@ -10011,7 +10029,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
             &mut rng(),
             &mut With::at(&mut side, &mut fx, &at)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(side.attacks, vec![(object_id(50), OrderForce::Forced)]);
     // too far: the search's 77
@@ -10029,7 +10047,7 @@ fn soldier_idle_check_attacks_its_top_action_target_in_range() {
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
 }
@@ -10058,13 +10076,19 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     let (mut u, mut at) = patroller(0);
     at.master = ids::SABOTEUR;
     let mut s = side(77);
-    assert_eq!(idle(&mut u, &at, &mut s, PlayerKind::Human), Ok(false));
+    assert_eq!(
+        idle(&mut u, &at, &mut s, PlayerKind::Human),
+        Ok(IdleOutcome::Idle)
+    );
     assert_eq!(s.attacks, []);
     let (mut u, mut at) = patroller(0);
     (u.current_order, u.retarget_disabled, u.current_target) = (None, 1, Some(object_id(60)));
     at.target = Some(Seen::default());
     let mut s = side(77);
-    assert_eq!(idle(&mut u, &at, &mut s, PlayerKind::Human), Ok(true));
+    assert_eq!(
+        idle(&mut u, &at, &mut s, PlayerKind::Human),
+        Ok(IdleOutcome::Acted)
+    );
     assert_eq!(
         (s.attacks, u.current_order),
         (vec![(object_id(60), OrderForce::Forced)], None)
@@ -10077,7 +10101,10 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         patrol: Some((PatrolPath::default(), WaypointIndex::of_data(3))),
         ..side(77)
     };
-    assert_eq!(idle(&mut u, &at, &mut s, PlayerKind::Human), Ok(false));
+    assert_eq!(
+        idle(&mut u, &at, &mut s, PlayerKind::Human),
+        Ok(IdleOutcome::Idle)
+    );
     assert_eq!((&u.patrol_path, u.patrol_waypoint.get()), (&None, 0));
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
@@ -10147,7 +10174,7 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(
         fx,
@@ -10169,7 +10196,7 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(u.current_order, Some(OrderKind::AttackMove));
 }
@@ -10708,7 +10735,7 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
             &mut r,
             &mut With::new(&mut Recorder::default(), &mut fx)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(
         (fx, r.draws),
@@ -10899,7 +10926,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(
         (fx, side.searched.len()),
@@ -10925,7 +10952,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(
         fx,
@@ -10964,7 +10991,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(side.searched[0].0, 5.0);
     assert_eq!(side.searched[0].1, TRADE_CART_CARED.to_vec());
@@ -11585,7 +11612,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
     assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
@@ -11612,7 +11639,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(fx.len(), 1);
     let mut fx = Vec::new();
@@ -11623,7 +11650,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert!(matches!(fx.last(), Some(Effect::Move(_))));
     // Gaia's that does not take owners by sight
@@ -11640,7 +11667,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
             &mut rng(),
             &mut With::new(&mut side, &mut Vec::new())
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!(side.searches, 0);
 }
@@ -11685,7 +11712,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     );
     assert_eq!((u.retarget_disabled, side.attacks.len()), (1, 0));
     let mut side = SiegeSide {
@@ -11699,7 +11726,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
             &mut rng(),
             &mut With::at(&mut side, &mut Vec::new(), &at)
         ),
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     );
     assert_eq!(
         (u.retarget_disabled, side.attacks.clone()),

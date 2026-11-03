@@ -8,6 +8,7 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::MasterKind;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
@@ -114,7 +115,8 @@ impl UnitAi {
     /// alert mode ([`UnitAi::alert`]). While the lists hold the objects of at most one player
     /// but Gaia (`DAT_143e6f92c` below 2, [`Found::players`]), the object found, when the world
     /// holds it and another player owns it, takes the artifact over: the unit's slot 0x70 to its
-    /// owner ([`Effect::ChangeOwner`]), and processIdle produced (6, true); else 5.
+    /// owner ([`Effect::ChangeOwner`]), and processIdle produced
+    /// ([`IdleOutcome::Acted`], 6); else 5.
     ///
     /// [`Found::players`]: crate::unit_ai::Found::players
     pub(super) fn artifact_idle(
@@ -122,7 +124,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius: search_radius(at.los, at.search_radius),
@@ -146,9 +148,9 @@ impl UnitAi {
             && u.owner != at.player
         {
             side.effect_now(Effect::ChangeOwner(u.owner), self, rng)?;
-            return Ok(true);
+            return Ok(IdleOutcome::Acted);
         }
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     }
 
     /// The artifact's slot 73 (`FUN_140c21d40`): its processIdle (slot 0x240 with 1,
@@ -161,7 +163,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
-        if self.artifact_idle(at, side, rng)? {
+        if self.artifact_idle(at, side, rng)? == IdleOutcome::Acted {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, rng)?;
             self.idle_timer = Millis::ZERO;

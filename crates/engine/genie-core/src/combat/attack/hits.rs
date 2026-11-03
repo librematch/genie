@@ -7,6 +7,7 @@ use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
+use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::Victim;
 use crate::combat::damage::{
     blast, building_elevation_factor, charge_hit, elevation_factor, shield, take,
@@ -124,7 +125,7 @@ pub(crate) fn strike(
         damage_tuning,
         ..
     } = layer;
-    if victim.kind == MasterKind::COMBAT && shield(victim, hit.kind) {
+    if victim.kind == MasterKind::COMBAT && shield(victim, hit.kind) == ShieldBlock::Blocked {
         let master_hp = i32::from(own.master_hp.get());
         victim
             .damaged
@@ -146,7 +147,7 @@ pub(crate) fn strike(
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
-        let _ = blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
+        blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
         if a.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }

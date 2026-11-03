@@ -12,6 +12,7 @@ use crate::map::TerrainMask;
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::movement::MoveAlgorithm;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
@@ -475,7 +476,10 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         target_position: beside.position,
         ..engagement()
     };
-    assert_eq!(retarget(&mut hunt, &beside, &close, &mut mover), Some(true));
+    assert_eq!(
+        retarget(&mut hunt, &beside, &close, &mut mover),
+        Some(MoveStart::Arrived)
+    );
     let attack = hunt.state.attack().copied().unwrap();
     assert_eq!(
         (

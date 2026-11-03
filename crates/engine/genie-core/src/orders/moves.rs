@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::ai_moves::MoveSprites;
+use crate::movement::ai_moves::MoveWith;
 use crate::movement::move_to::{MoveToAction, point_sprite};
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -305,7 +306,7 @@ impl World {
                 self.streams.get(Stream::Sprite),
             ),
         )?;
-        if sails {
+        if sails == MoveWith::Sails {
             self.transport_move(player, idx, m.point)?;
         }
         for id in builder_leaves {

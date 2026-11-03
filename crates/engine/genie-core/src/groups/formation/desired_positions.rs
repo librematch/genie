@@ -271,12 +271,12 @@ pub(super) fn transform_slot(
     transform_kind: TransformKind,
     (world_time, map): (WorldTime, GridSize),
     group_tuning: &GroupTuning,
-) -> Result<bool, GenieError> {
+) -> Result<(), GenieError> {
     if index < 0 || formation.slots.len() as i32 <= index {
-        return Ok(false);
+        return Ok(());
     }
     if sqrt(dot(point, point)).abs() < EPSILON {
-        return Ok(false);
+        return Ok(());
     }
     let slot = formation.slots.checked_mut(index as usize)?;
     if slot.transformed != 1 {
@@ -291,7 +291,7 @@ pub(super) fn transform_slot(
         slot.transformed = 1;
         slot.time = world_time;
     }
-    Ok(true)
+    Ok(())
 }
 
 /// `FindPointFromFront` (`FUN_141016990`): the point `distance` back along the stored

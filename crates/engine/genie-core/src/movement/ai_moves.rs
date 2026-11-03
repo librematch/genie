@@ -112,7 +112,7 @@ impl Unit {
             ),
         )?;
         torn_down(c, self, (leaves, releases))?;
-        if sails {
+        if sails == MoveWith::Sails {
             let sprite_rng = c.w.streams.get(Stream::Sprite);
             self.transport_sail(
                 actions,
@@ -146,10 +146,10 @@ impl Unit {
     /// started (slot 0x808, `FUN_14106e990`: its slot 0x70 sees an empty list; `FUN_140a977e0`
     /// starts an action of a unit below state 3, which the unit AI's moves are, and
     /// [`MoveToAction::to_point`]); one that ends at its start shows the standing sprite of the
-    /// unit's master in `look` ([`Unit::shows_standing_sprite`]). True when a Transport on top
-    /// takes the point, which the caller sails there ([`Unit::transport_sail`]). `motion` is
-    /// the unit's motion layer, `actions` its action layer and `unread` why the load could not
-    /// read it whole ([`crate::world::Unread`]).
+    /// unit's master in `look` ([`Unit::shows_standing_sprite`]). [`MoveWith::Sails`] when a
+    /// Transport on top takes the point, which the caller sails there ([`Unit::transport_sail`]).
+    /// `motion` is the unit's motion layer, `actions` its action layer and `unread` why the load
+    /// could not read it whole ([`crate::world::Unread`]).
     pub(crate) fn ai_move_with(
         &mut self,
         (actions, unread): (&mut Action, Option<&Unread>),
@@ -162,7 +162,7 @@ impl Unit {
             Releaser,
         ),
         (sprites, sprite_rng): (MoveSprites<'_>, &mut Well512),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveWith, GenieError> {
         let MoveSprites {
             masters,
             graphics,
@@ -180,7 +180,7 @@ impl Unit {
             && actions.top_action_kind() == Some(MOVE_TO)
             && actions.list.move_to().is_some_and(|mt| mt.point == m.point)
         {
-            return Ok(false);
+            return Ok(MoveWith::Walks);
         }
         match self.head_takes_point(
             (actions, unread),
@@ -193,16 +193,16 @@ impl Unit {
                 if let Some(t) = released {
                     releases.push((t, by));
                 }
-                return Ok(false);
+                return Ok(MoveWith::Walks);
             }
             PointMove::Repairs(released, left) => {
                 builder_leaves.extend(left);
                 if let Some(t) = released {
                     releases.push((t, by));
                 }
-                return Ok(false);
+                return Ok(MoveWith::Walks);
             }
-            PointMove::Sails => return Ok(true),
+            PointMove::Sails => return Ok(MoveWith::Sails),
             PointMove::Declined => {}
         }
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
@@ -215,7 +215,7 @@ impl Unit {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
         actions.list.set_move_to(Some(move_to));
-        Ok(false)
+        Ok(MoveWith::Walks)
     }
 
     /// The head action's slot 0x40 on a move to `point` without a target object (its second
@@ -553,6 +553,16 @@ impl Unit {
         motion.set_anim_speed(Speed::ZERO);
         Ok(())
     }
+}
+
+/// Whether the unit AI's move goes by sea or on foot ([`Unit::ai_move_with`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum MoveWith {
+    /// A Transport on top takes the point: the caller sails there.
+    Sails,
+    /// The unit moves itself, or nothing moves.
+    Walks,
 }
 
 /// What the head action's slot 0x40 did with a move to a point ([`Unit::head_takes_point`]).

@@ -107,6 +107,16 @@ fn show(
     Ok(())
 }
 
+/// Whether a halted Repair counted among its target's repairers ([`RepairAction::halt`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum RepairerCount {
+    /// It did: the caller lets it leave them.
+    Counted,
+    /// It did not.
+    NotCounted,
+}
+
 impl RepairAction {
     /// A Repair from the work command (the factory `FUN_140aca4b0` case 0x6a, `FUN_140ad7fa0`):
     /// its target `to`, whose place is its point, the task, not counted, not quiet; the start
@@ -616,14 +626,14 @@ impl RepairAction {
         Ok((old.map(RepairTargetId::id), counted))
     }
 
-    /// Slot 7 (`FUN_140adaa00`) as the unit's stop calls it: `set_state(2)`. Returns whether it
-    /// counted among its target's repairers before (the caller's to leave them) and the target
-    /// it still holds.
+    /// Slot 7 (`FUN_140adaa00`) as the unit's stop calls it: `set_state(2)`.
+    /// [`RepairerCount::Counted`] when it counted among its target's repairers before (the caller's
+    /// to leave them); the target stays.
     ///
     /// # Errors
     ///
     /// The unit's stop that the motion step does not model.
-    pub fn halt(&mut self, mover: Option<&mut Mover>) -> Result<bool, GenieError> {
+    pub fn halt(&mut self, mover: Option<&mut Mover>) -> Result<RepairerCount, GenieError> {
         let counted = replace(&mut self.counted, false);
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -631,6 +641,10 @@ impl RepairAction {
             m.stop()?;
         }
         self.state = RepairState::Halted;
-        Ok(counted)
+        Ok(if counted {
+            RepairerCount::Counted
+        } else {
+            RepairerCount::NotCounted
+        })
     }
 }

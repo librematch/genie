@@ -14,6 +14,7 @@ use crate::objects::masters::ClassId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::Attackers;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
@@ -314,19 +315,21 @@ impl UnitAi {
         self.patrol_waypoint = waypoint.unwrap_or(WaypointIndex::FIRST);
     }
 
-    /// `restorePatrolInformation` (`FUN_140c5e5b0`): without a saved patrol, false. Else the unit
+    /// `restorePatrolInformation` (`FUN_140c5e5b0`): without a saved patrol,
+    /// [`IdleOutcome::Idle`]. Else the unit
     /// walks it on ([`Effect::RestorePatrol`]); a unit in no group (the world's
     /// `FUN_14152ff40`) takes the patrol order back, the attack move's (733) when it attack-moves
     /// (`+0x7fb`), else 711 (leaving the other one redraws an adjusted idle timeout of exactly
-    /// 750, slot 0x1a8); the secondary timer is 750. True.
+    /// 750, slot 0x1a8); the secondary timer is 750.
+    /// [`IdleOutcome::Acted`].
     pub(super) fn restore_patrol(
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         if self.patrol_path.is_none() {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         side.effect_now(Effect::RestorePatrol, self, ai)?;
         if at.group.is_none() {
@@ -341,7 +344,7 @@ impl UnitAi {
             self.current_order = Some(order);
         }
         self.secondary_timer = Millis::new(750);
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     }
 
     /// What a `MoveTo`'s update in state 3 (`0x140aa2a70`) reads of its unit's AI for the path

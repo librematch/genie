@@ -1,6 +1,7 @@
 //! A gatherer's walk after a drop and the drop sites it walks to.
 
 use crate::GenieError;
+use crate::gathering::ActionEnd;
 use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
@@ -60,7 +61,7 @@ impl Unit {
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let by = self.releaser(c)?;
-        if self.after_drop_orders(c)? {
+        if self.after_drop_orders(c)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
         let Some(found) = self.after_drop_search(actions, c)? else {
@@ -73,8 +74,8 @@ impl Unit {
     /// The unit AI's queued orders after the drop: the orders on targets gone (a target the world
     /// does not hold, or one its sight sees past state 5) leave (`FUN_140c5de60`); with orders
     /// left the AI ends its order and action and the Gather is done (its deletion lets the drop
-    /// site go). True when it is.
-    fn after_drop_orders(&self, c: &mut Step<'_>) -> Result<bool, GenieError> {
+    /// site go). [`ActionEnd::Ends`] when it is.
+    fn after_drop_orders(&self, c: &mut Step<'_>) -> Result<ActionEnd, GenieError> {
         let spatial: &Spatial = &c.w.spatial;
         let gone = |id: Option<ObjectId>| match spatial.get(id) {
             None => true,
@@ -85,7 +86,7 @@ impl Unit {
                 .is_some_and(|s| ObjectState::Dead < s.state),
         };
         let Some(ai) = c.w.parts.unit_ai.get_mut(self.id) else {
-            return Ok(false);
+            return Ok(ActionEnd::GoesOn);
         };
         ai.orders.retain(|o| {
             !(matches!(
@@ -94,10 +95,10 @@ impl Unit {
             ) && gone(o.target))
         });
         if ai.orders.is_empty() {
-            return Ok(false);
+            return Ok(ActionEnd::GoesOn);
         }
         ai.end_order_and_action()?;
-        Ok(true)
+        Ok(ActionEnd::Ends)
     }
 
     /// The unit AI's `ClosestResourceObject` after the drop (slot 0x80: no drop site, any

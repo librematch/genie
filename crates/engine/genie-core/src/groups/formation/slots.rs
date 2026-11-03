@@ -44,6 +44,16 @@ pub enum SlotOrder {
     Closest,
 }
 
+/// Whether a formation's slots took their units anew ([`World::formation_transform`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum SlotFill {
+    /// They did (`*param_3`).
+    Anew,
+    /// They kept them.
+    Kept,
+}
+
 impl World {
     /// `FUN_141011300` of `object` (`param_1`, as the world's table gives it,
     /// [`World::world_object`]): -1 for none (a null object), else its master's sub-formation
@@ -441,7 +451,7 @@ impl World {
         group: GroupId,
         order: SlotOrder,
     ) -> Result<(), GenieError> {
-        if self.formation_transform(formation, group, order)? {
+        if self.formation_transform(formation, group, order)? == SlotFill::Anew {
             return Ok(());
         }
         formation.clear_units();

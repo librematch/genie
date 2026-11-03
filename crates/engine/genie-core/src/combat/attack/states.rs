@@ -5,13 +5,13 @@ use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::update::let_go;
-use crate::combat::attack::walks::MoveStart;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Engagement, Fight, HALF, NO_RANGE, NONE, set_walker_anim,
 };
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::rng::{Stream, Well512};
+use crate::movement::MoveStart;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::MoveToReads;

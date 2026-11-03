@@ -397,7 +397,8 @@ impl Walked {
                             continue;
                         }
                     } else if held.contains(ClassRoles::WALL) {
-                        if !self.note_wall(id, gap) {
+                        self.note_wall(id, gap);
+                        if !self.walls {
                             continue;
                         }
                     } else {
@@ -435,7 +436,8 @@ impl Walked {
                 if held.contains(ClassRoles::GATE) {
                     self.walls
                 } else if held.contains(ClassRoles::WALL) {
-                    self.note_wall(id, gap)
+                    self.note_wall(id, gap);
+                    self.walls
                 } else {
                     true
                 }
@@ -472,13 +474,12 @@ impl Walked {
         Ok(Some((t, gap, k)))
     }
 
-    /// A wall `id` at `gap`: the closest wall when it is the first or nearer; whether it counts
-    /// (only for a unit that attacks walls).
-    fn note_wall(&mut self, id: ObjectId, gap: Distance) -> bool {
+    /// A wall `id` at `gap`: the closest wall when it is the first or nearer (it counts only for a
+    /// unit that attacks walls, `walls`).
+    fn note_wall(&mut self, id: ObjectId, gap: Distance) {
         if self.wall.1 < Distance::ZERO || gap < self.wall.1 {
             self.wall = (Some(id), gap);
         }
-        self.walls
     }
 
     /// The answer without a target: the closest wall for a unit that attacks walls, else none.

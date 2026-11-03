@@ -6,6 +6,7 @@ use crate::combat::attack::ATTACK;
 use crate::combat::missile::MISSILE;
 use crate::construction::FoundationId;
 use crate::construction::repair::REPAIR;
+use crate::construction::repair::RepairerCount;
 use crate::construction::wait_solidify::WAIT_SOLIDIFY;
 use crate::garrison::ENTER;
 use crate::gathering::DropSiteId;
@@ -39,6 +40,17 @@ use crate::world::slots::PlayerSlots;
 /// A halt of a top action finds the unit without that action.
 const NO_TOP_ACTION: GenieError =
     GenieError::unreachable("a halted unit without the top action it halts");
+
+/// Whether the stop keeps the unit's action list (its top action's slot 0x38,
+/// [`World::halt_top_action`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum StopList {
+    /// The slot answered 1: the list stays.
+    Keeps,
+    /// The list is cleared.
+    Clears,
+}
 
 impl World {
     /// `FUN_141613ed0`: a defeated player's objects in its live list's order. A villager, a
@@ -119,11 +131,11 @@ impl World {
                 "a stop of an action of type 0x7c or 0x7d",
             ));
         }
-        let keeps = self.halt_top_action(p, idx)?;
+        let list = self.halt_top_action(p, idx)?;
         // The livestock's class, whose unit AI a stop leaves alone (`FUN_14108c050`: raw `-0xe72`).
         // The trade carts' class, which keep their actions while they carry goods (`FUN_14106a940`).
         // The trade action's type (`0x6f`), whose load keeps a stopped unit's AI going.
-        if keeps
+        if list == StopList::Keeps
             && self
                 .model
                 .roles
@@ -136,7 +148,7 @@ impl World {
         }
         // FUN_14106fa60: the list stays when the top action's slot 0x38 answered true and the
         // unit is no trade cart with goods (FUN_14106a940)
-        if !keeps {
+        if list == StopList::Clears {
             self.clear_actions(p, idx)?;
         }
         let unit = self.players.live_mut(p, idx)?;
@@ -168,31 +180,31 @@ impl World {
         })
     }
 
-    /// The top action's slot 0x38 before the stop clears the list (`FUN_140a97770`): false
-    /// without one, or for a `MoveTo`, an Explore or an Enter (the base's, `FUN_140a7bbe0`). A
-    /// human player's Hunt (`FUN_140ac79b0`) goes to state 2 (`0x140ac60e0` case 2): its
-    /// sub-actions go, the unit stands with the hunt's sprite (slot 0x68 with
-    /// `FUN_140ac5210`'s), its target goes (slot 0x68 with none, [`World::release`]) and its
-    /// second target (`FUN_140a7a190` with none), its point and timer clear; then the pasture it
-    /// tends lets it go (`FUN_141189ca0` with −1), and the answer is true. The Fly (Bird), the
-    /// missile's, the Make and the wait for a foundation keep the base's too; the Gather, the
+    /// The top action's slot 0x38 before the stop clears the list (`FUN_140a97770`):
+    /// [`StopList::Clears`] without one, or for a `MoveTo`, an Explore or an Enter (the base's,
+    /// `FUN_140a7bbe0`). A human player's Hunt (`FUN_140ac79b0`) goes to state 2 (`0x140ac60e0`
+    /// case 2): its sub-actions go, the unit stands with the hunt's sprite (slot 0x68 with
+    /// `FUN_140ac5210`'s), its target goes (slot 0x68 with none, [`World::release`]) and its second
+    /// target (`FUN_140a7a190` with none), its point and timer clear; then the pasture it tends
+    /// lets it go (`FUN_141189ca0` with −1), and the answer is [`StopList::Keeps`]. The Fly (Bird),
+    /// the missile's, the Make and the wait for a foundation keep the base's too; the Gather, the
     /// Build, the Attack and the Artifact halt ([`World::halt_other`]).
     pub(super) fn halt_top_action(
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<StopList, GenieError> {
         let player_kind = self.players.player(p)?.kind;
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
         let unit = self.players.live_mut(p, idx)?;
         let Some(kind) = self.parts.actions_of(unit.id).top_action_kind() else {
-            return Ok(false);
+            return Ok(StopList::Clears);
         };
         match kind {
             MOVE_TO | EXPLORE | ENTER | FLY | MISSILE | MAKE | WAIT_SOLIDIFY => {
-                return Ok(false);
+                return Ok(StopList::Clears);
             }
             HUNT => {}
             _ => return self.halt_other(p, idx, kind),
@@ -238,12 +250,12 @@ impl World {
         for t in released.into_iter().flatten() {
             self.release(t, by)?;
         }
-        Ok(true)
+        Ok(StopList::Keeps)
     }
 
-    /// Slot 0x38 of the top actions with their own besides the Hunt's, each true: the Gather's
-    /// (`FUN_140a8e1b0`, [`crate::gathering::gather::GatherAction::halt`]: its target and second
-    /// target go, [`World::release`]), the Build's (`FUN_140ab0350`,
+    /// Slot 0x38 of the top actions with their own besides the Hunt's, each [`StopList::Keeps`]:
+    /// the Gather's (`FUN_140a8e1b0`, [`crate::gathering::gather::GatherAction::halt`]: its target
+    /// and second target go, [`World::release`]), the Build's (`FUN_140ab0350`,
     /// [`crate::construction::build::BuildAction::halt`]: a counted builder leaves its foundation's
     /// builders, [`World::leave_builders`], before the rest; the foundation goes), the Attack's
     /// (`FUN_140a82ac0`, [`crate::combat::attack::Attack::halt`]) and the Artifact's
@@ -256,7 +268,7 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
         kind: ActionKind,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<StopList, GenieError> {
         let by = self.releaser(p, idx)?;
         let master_id = self.players.live(p, idx)?.life.master_id;
         let standing = self.master(p, master_id)?.standing_sprite;
@@ -287,7 +299,7 @@ impl World {
                 ));
             }
         }
-        Ok(true)
+        Ok(StopList::Keeps)
     }
 
     /// [`World::halt_other`] of a Gather: it halts with `standing` (the task's
@@ -370,7 +382,7 @@ impl World {
             .repair_mut()
             .ok_or(NO_TOP_ACTION)?;
         let target = repair.target;
-        if repair.halt(self.parts.motion.mover_mut(unit.id))? {
+        if repair.halt(self.parts.motion.mover_mut(unit.id))? == RepairerCount::Counted {
             self.leave_builders(target)?;
         }
         self.standing_sprite(p, idx)

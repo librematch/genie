@@ -70,6 +70,16 @@ pub struct GameState {
     pub groups: Option<UnitGroups>,
 }
 
+/// Whether a forced player ran again ([`World::force_player_values`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+enum Restart {
+    /// It had stopped: it took the game's values and runs again.
+    Restarted,
+    /// It was running.
+    Running,
+}
+
 impl World {
     /// The objects' inside lists in the game's order (`+0x2f8`, the tick oracle's dump): each
     /// container listed takes the order when it holds the same objects. Returns how many did.
@@ -121,14 +131,14 @@ impl World {
                 continue;
             };
             // an error here belongs to the player, not to an object
-            let stopped = match self.force_player_values(p, game) {
-                Ok(stopped) => stopped,
+            let restart = match self.force_player_values(p, game) {
+                Ok(restart) => restart,
                 Err(e) => {
                     notes.push((p, None, e));
                     continue;
                 }
             };
-            if let Err(e) = self.force_objects(p, theirs, (game, stopped), &mut notes) {
+            if let Err(e) = self.force_objects(p, theirs, (game, restart), &mut notes) {
                 notes.push((p, None, e));
             }
             for g in theirs.iter().map(|g| &g.unit) {
@@ -176,12 +186,16 @@ impl World {
 
     /// Player `p`'s forced values: a stopped player takes the game's resources, pending debit
     /// and technologies and runs again; every player takes its game status and resignation, and
-    /// its first unmodelled part goes. True when it had stopped.
+    /// its first unmodelled part goes. [`Restart::Restarted`] when it had stopped.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    fn force_player_values(&mut self, p: PlayerId, game: &GameState) -> Result<bool, GenieError> {
+    fn force_player_values(
+        &mut self,
+        p: PlayerId,
+        game: &GameState,
+    ) -> Result<Restart, GenieError> {
         let player = self.players.player_mut(p)?;
         let stopped = player.stopped;
         if stopped {
@@ -204,26 +218,33 @@ impl World {
         }
         // each update's first unmodelled part is its own: a freeze's would hide a later stop
         player.unsupported = None;
-        Ok(stopped)
+        Ok(if stopped {
+            Restart::Restarted
+        } else {
+            Restart::Running
+        })
     }
 
     /// Player `p`'s live objects against the game's (`theirs`): an object that froze (or whose
-    /// player had `stopped`, or that the game's `resync` names) takes the game's
-    /// ([`World::take_game_object`]); one the game no longer holds leaves the world. A dead
-    /// object never freezes, but one the game resyncs takes its state too. An object that
-    /// changed hands or masters stays, noted.
+    /// player restarted, [`Restart::Restarted`], or that the game's `resync` names) takes the
+    /// game's ([`World::take_game_object`]); one the game no longer holds leaves the world. A dead
+    /// object never freezes, but one the game resyncs takes its state too. An object that changed
+    /// hands or masters stays, noted.
     fn force_objects(
         &mut self,
         p: PlayerId,
         theirs: &[Object],
-        (game, stopped): (&GameState, bool),
+        (game, restart): (&GameState, Restart),
         notes: &mut Vec<(PlayerId, Option<ObjectId>, GenieError)>,
     ) -> Result<(), GenieError> {
         let mut i = ListIndex::FIRST;
         while self.players.player(p)?.objects.holds(i) {
             let unit = &self.players.live(p, i)?;
             let resync = game.resync.contains(&unit.id);
-            let (id, frozen) = (unit.id, stopped || unit.stopped || resync);
+            let (id, frozen) = (
+                unit.id,
+                restart == Restart::Restarted || unit.stopped || resync,
+            );
             // a dead object never freezes, but one that differs takes the game's state too
             // (a felled tree's wood that a frozen gatherer did not take)
             if !frozen || (!unit.life.is_alive() && !resync) {
@@ -527,7 +548,10 @@ mod tests {
             ListIndex::new(0),
             GenieError::unsupported("a part"),
         ));
-        assert!(!t.force_player_values(PlayerId::new(1), &game).unwrap());
+        assert_eq!(
+            t.force_player_values(PlayerId::new(1), &game).unwrap(),
+            Restart::Running
+        );
         let player = &t.players[1];
         assert_eq!(player.resources(), before);
         assert_eq!(
@@ -539,7 +563,10 @@ mod tests {
         );
         assert!(player.unsupported.is_none());
         t.players[1].stopped = true;
-        assert!(t.force_player_values(PlayerId::new(1), &game).unwrap());
+        assert_eq!(
+            t.force_player_values(PlayerId::new(1), &game).unwrap(),
+            Restart::Restarted
+        );
         let player = &t.players[1];
         assert_eq!(
             (

@@ -15,6 +15,7 @@ use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
@@ -595,7 +596,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
         let produced = self.process_idle(at, player_kind, ai, side)?;
-        if !produced {
+        if produced == IdleOutcome::Idle {
             let m = self.move_to(AiMove {
                 point: self.target_point,
                 range: at.weapon_range,

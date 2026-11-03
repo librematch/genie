@@ -51,6 +51,7 @@ use crate::gathering::closest_resource::search_origin;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
 use crate::gathering::drop_sites::SiteSearch;
+use crate::gathering::farm_queue::Reseed;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::WalkEnd;
 use crate::gathering::gather::unit::give_load;
@@ -289,6 +290,7 @@ use crate::world::parts::{Object, Part, PartTable, no_own_masters};
 use crate::world::player::Player;
 use crate::world::settings::FarmMode;
 use crate::world::settings::OptionFlags;
+use crate::world::world_update::ListCount;
 use ids::FISH_TRAP;
 use std::iter::{once, repeat_n};
 use std::sync::Arc;
@@ -7865,7 +7867,7 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
             ListIndex::new(0),
             FoundationId::new(object_id(99_999))
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     without_build_tasks(&mut t);
     assert_eq!(
@@ -7874,7 +7876,7 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
             ListIndex::new(0),
             FoundationId::new(object_id(10028))
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
     // with a task it builds as the builder 118
@@ -7885,7 +7887,7 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
             ListIndex::new(0),
             FoundationId::new(object_id(10028))
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].life.master_id,
@@ -7992,7 +7994,7 @@ fn the_unit_ai_view_answers_the_build_command_before_it_runs() {
             ListIndex::new(0),
             FoundationId::new(object_id(10028))
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     for id in [83, 118, 212] {
         let m = Arc::make_mut(&mut t.model.masters[1])
@@ -14236,18 +14238,21 @@ fn the_list_loop_runs_its_count_again_only_after_leave() {
     use crate::objects::unit::Outcome;
     let mut t = house_builder();
     let n = t.players[1].objects.len();
-    assert!(
+    assert_eq!(
         t.file_step(PlayerId::new(1), ListIndex::new(0), Outcome::Stay)
-            .unwrap()
+            .unwrap(),
+        ListCount::GoesOn
     );
-    assert!(
+    assert_eq!(
         t.file_step(PlayerId::new(1), ListIndex::new(0), Outcome::Sleep)
-            .unwrap()
+            .unwrap(),
+        ListCount::GoesOn
     );
     assert_eq!(t.players[1].objects.len(), n - 1);
-    assert!(
-        !t.file_step(PlayerId::new(1), ListIndex::new(0), Outcome::Leave)
-            .unwrap()
+    assert_eq!(
+        t.file_step(PlayerId::new(1), ListIndex::new(0), Outcome::Leave)
+            .unwrap(),
+        ListCount::Again
     );
     assert_eq!(t.players[1].objects.len(), n - 2);
 }
@@ -17656,7 +17661,7 @@ fn without_farm_to_make_the_farmer_idles() {
 
 /// [`reseed_world`] with one farm queued, `setup` run on it, then the reseed itself
 /// ([`World::reseed`]): its answer and the count of player 1's objects after it.
-fn reseeded(setup: impl FnOnce(&mut World)) -> (Result<bool, GenieError>, usize) {
+fn reseeded(setup: impl FnOnce(&mut World)) -> (Result<Reseed, GenieError>, usize) {
     let mut t = reseed_world();
     t.players[1].farm_queue = QueueCount::of_data(1);
     setup(&mut t);
@@ -17707,7 +17712,7 @@ fn reseed_without_farm_to_make_makes_nothing() {
         },
     ];
     for setup in none {
-        assert_eq!(reseeded(setup), (Ok(false), 1));
+        assert_eq!(reseeded(setup), (Ok(Reseed::NotMade), 1));
     }
 }
 
@@ -17734,7 +17739,10 @@ fn fishing_ship_reseeds_fish_trap() {
     let mut t = reseed_world();
     ship(&mut t);
     t.players[1].fish_trap_queue = QueueCount::of_data(2);
-    assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
+    assert_eq!(
+        t.reseed(PlayerId::new(1), ListIndex::new(0)),
+        Ok(Reseed::Made)
+    );
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[1], p.fish_trap_queue),
@@ -17748,7 +17756,10 @@ fn fishing_ship_reseeds_fish_trap() {
     let mut t = reseed_world();
     ship(&mut t);
     t.players[1].auto_queues.set(AutoQueues::FISH_TRAPS, true);
-    assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
+    assert_eq!(
+        t.reseed(PlayerId::new(1), ListIndex::new(0)),
+        Ok(Reseed::Made)
+    );
     let p = &t.players[1];
     assert_eq!(
         (p.attributes[1], p.fish_trap_queue),
@@ -17801,8 +17812,8 @@ fn reseed_placement_passes_over_the_old_farm() {
                 .target = GatherTargetId::of_field(target);
         }
     };
-    assert_eq!(reseeded(old_farm(12557)), (Ok(true), 3));
-    assert_eq!(reseeded(old_farm(-1)), (Ok(false), 2));
+    assert_eq!(reseeded(old_farm(12557)), (Ok(Reseed::Made), 3));
+    assert_eq!(reseeded(old_farm(-1)), (Ok(Reseed::NotMade), 2));
 }
 
 /// A committing BUILD (`+0x1f` 0) to a builder whose unit AI holds an order not ready

@@ -50,7 +50,7 @@ mod walks;
 use self::drop_off::DROP_WAIT;
 pub use self::drop_off::Dropped;
 pub use self::hunt_state::HuntState;
-pub use self::outcomes::{HuntEnd, HuntGather, TreeSearch};
+pub use self::outcomes::{HuntGather, TreeSearch};
 pub use self::sprites::{HuntSprites, walk_sprite};
 pub(crate) use self::sprites::{asked_drop_off, resource_kind, stand_sprite};
 pub use self::start::{HuntChase, HuntMove, HuntRetarget, HuntStart, PointWalk, PointWalker};

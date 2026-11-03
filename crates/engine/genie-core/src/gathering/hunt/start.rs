@@ -13,6 +13,7 @@ use crate::gathering::hunt::{HuntAction, HuntTask, Lead, Quarry};
 use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
 use crate::map::Position;
+use crate::movement::MoveStart;
 use crate::movement::move_to::GiveUp;
 use crate::movement::move_to::MoveToAction;
 use crate::movement::move_to::Patience;
@@ -136,7 +137,8 @@ impl HuntAction {
     /// target of another, unallied player (or of class 49) that is not dead yet is attacked first
     /// (`set_state` 12). `player_type` is the owner's type (`FUN_141659cf0` tests it); `carry_rule` the
     /// game settings' test `FUN_141302150`, with which a hunter drops another resource it carries
-    /// (a computer player's does when it carries none).
+    /// (a computer player's does when it carries none). With the hunt, how its Attack's `MoveTo`
+    /// started (a walk to a drop site is under way).
     pub(crate) fn start(
         start: HuntStart<'_>,
         attack: &Engagement,
@@ -144,7 +146,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<(Self, bool), GenieError> {
+    ) -> Result<(Self, MoveStart), GenieError> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -200,14 +202,14 @@ impl HuntAction {
             hunt.target_class = None;
             hunt.carry_to = Some(DropSiteId::new(target.id));
             hunt.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
-            return Ok((hunt, false));
+            return Ok((hunt, MoveStart::UnderWay));
         }
         let chase = HuntChase {
             target,
             player,
             walks: &walks,
         };
-        let arrived = hunt.chase(
+        let move_start = hunt.chase(
             chase,
             attack,
             arms,
@@ -219,7 +221,7 @@ impl HuntAction {
             },
             hunt_tuning,
         )?;
-        Ok((hunt, arrived))
+        Ok((hunt, move_start))
     }
 
     /// `set_state(4)` (`0x140ac60e0` case 4): the sub-actions go (an Attack's `MoveTo` stops the
@@ -228,7 +230,8 @@ impl HuntAction {
     /// `HuntTuning::own_livestock_range` to the livestock (`FUN_140aa0df0`; its start `0x140aa2100`: a unit
     /// within 0.01 of the target's footprint is there already). A target not dead yet of another,
     /// unallied player (or of class 49) is attacked first: `set_state(12)` (case 0xc) with an
-    /// Attack of the master's ranges. A live allied one fails the hunt (`set_state` 13).
+    /// Attack of the master's ranges. A live allied one fails the hunt (`set_state` 13). How the
+    /// Attack's `MoveTo` started: a walk and a failed hunt are under way.
     pub(crate) fn chase(
         &mut self,
         chase: HuntChase<'_>,
@@ -237,7 +240,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveStart, GenieError> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -268,18 +271,18 @@ impl HuntAction {
             };
             let move_to = self.move_to_object(to, range, mover, walks, move_to_tuning)?;
             self.state = HuntState::Walk { move_to };
-            return Ok(false);
+            return Ok(MoveStart::UnderWay);
         }
         if !roles.of_class(target.class).contains(ClassRoles::FARM) && target.allied {
             // LAB_140ac679d: set_state(13): the timer clears; the unit's sprite (slot 0x68 with
             // FUN_140ac5210's) is the caller's
             self.state = HuntState::Failed;
             self.timer = Seconds::ZERO;
-            return Ok(false);
+            return Ok(MoveStart::UnderWay);
         }
         self.state = HuntState::Attack { attack: None };
         let reads = walks.live(mover);
-        let (a, arrived) = Attack::start(
+        let (a, move_start) = Attack::start(
             target.id,
             attack,
             arms,
@@ -292,19 +295,20 @@ impl HuntAction {
             },
         )?;
         self.state = HuntState::Attack { attack: Some(a) };
-        Ok(arrived)
+        Ok(move_start)
     }
 
-    /// Slot 9 (`0x140ac97c0`), the work command's new target for the hunt it keeps: true when the
-    /// hunt takes it. A building whose top action is an Unpack ([`ActionKind::UNPACK`], 125) takes it to `set_state` 15,
-    /// not modelled. Its own player's drop site (one of its master's, `drops_here`,
-    /// `FUN_14109d4f0`) while it carries something (`held`) takes the load there: the target goes
-    /// (slot 0x68 with none; the caller releases it), the timer and the point clear, the drop site
-    /// becomes the second target (`FUN_140a7a190`) with its class, and `set_state(8)`. Another target
-    /// becomes the hunt's (slot 0x68, `FUN_140ac7980`; the caller releases the old target and takes
-    /// the new) and the hunt starts over at `set_state(4)`. Its own target changes nothing. Some
-    /// when it took the target, true when its Attack's `MoveTo` starts arrived (the caller shows
-    /// the idle sprite, [`crate::combat::attack::show_arrived`]).
+    /// Slot 9 (`0x140ac97c0`), the work command's new target for the hunt it keeps: some when the
+    /// hunt takes it. A building whose top action is an Unpack ([`ActionKind::UNPACK`], 125) takes
+    /// it to `set_state` 15, not modelled. Its own player's drop site (one of its master's,
+    /// `drops_here`, `FUN_14109d4f0`) while it carries something (`held`) takes the load there: the
+    /// target goes (slot 0x68 with none; the caller releases it), the timer and the point clear,
+    /// the drop site becomes the second target (`FUN_140a7a190`) with its class, and
+    /// `set_state(8)`. Another target becomes the hunt's (slot 0x68, `FUN_140ac7980`; the caller
+    /// releases the old target and takes the new) and the hunt starts over at `set_state(4)`. Its
+    /// own target changes nothing. Some when it took the target, [`MoveStart::Arrived`] when its
+    /// Attack's `MoveTo` starts arrived (the caller shows the idle sprite,
+    /// [`crate::combat::attack::show_arrived`]).
     pub(crate) fn retarget(
         &mut self,
         retarget: HuntRetarget<'_>,
@@ -313,7 +317,7 @@ impl HuntAction {
         mover: &mut Mover,
         layer: BeginLayer<'_>,
         hunt_tuning: &HuntTuning,
-    ) -> Result<Option<bool>, GenieError> {
+    ) -> Result<Option<MoveStart>, GenieError> {
         let BeginLayer {
             roles,
             attack_tuning,
@@ -340,7 +344,7 @@ impl HuntAction {
             self.carry_to = Some(DropSiteId::new(target.id));
             self.target_class = Some(target.class);
             self.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
-            return Ok(Some(false));
+            return Ok(Some(MoveStart::UnderWay));
         }
         if self.target.map(HuntTargetId::id) == Some(target.id) {
             return Ok(None);

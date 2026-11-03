@@ -877,7 +877,7 @@ mod tests {
         let mut s = state(ResearchState::Researching);
         assert_eq!(
             refunded(&mut s, tech_id(22), Amount::ZERO),
-            (Ok(true), Amount::new(90.0), Amount::ZERO)
+            (Ok(Refund::Refunded), Amount::new(90.0), Amount::ZERO)
         );
         assert_eq!(
             (s.state, s.research_done),
@@ -886,12 +886,12 @@ mod tests {
         let mut s = state(ResearchState::Queued);
         assert_eq!(
             refunded(&mut s, tech_id(22), Amount::new(0.75)),
-            (Ok(true), Amount::new(67.0), Amount::ZERO)
+            (Ok(Refund::Refunded), Amount::new(67.0), Amount::ZERO)
         );
         let mut s = state(ResearchState::Queued);
         assert_eq!(
             refunded(&mut s, tech_id(101), Amount::new(0.75)),
-            (Ok(true), Amount::new(90.0), Amount::ZERO)
+            (Ok(Refund::Refunded), Amount::new(90.0), Amount::ZERO)
         );
         // the scaled amount wraps at 16 bits: 40000 is -25536
         let mut s = TechState {
@@ -904,12 +904,12 @@ mod tests {
         };
         assert_eq!(
             refunded(&mut s, tech_id(22), Amount::new(2.0)),
-            (Ok(true), Amount::new(-25_536.0), Amount::ZERO)
+            (Ok(Refund::Refunded), Amount::new(-25_536.0), Amount::ZERO)
         );
         let mut s = state(ResearchState::Researched);
         assert_eq!(
             refunded(&mut s, tech_id(22), Amount::ZERO),
-            (Ok(false), Amount::ZERO, Amount::ZERO)
+            (Ok(Refund::NoneQueued), Amount::ZERO, Amount::ZERO)
         );
         assert_eq!(
             (s.state, s.research_done),

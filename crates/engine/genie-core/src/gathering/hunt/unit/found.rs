@@ -7,6 +7,7 @@ use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::Quarry;
 use crate::math::rng::Stream;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
@@ -108,7 +109,7 @@ impl Unit {
                 "a hunter without its hunt or movement state",
             ));
         };
-        if let Some(arrived) = hunt.retarget(
+        if let Some(move_start) = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
                 player: c.player,
@@ -125,7 +126,7 @@ impl Unit {
             },
             &c.w.model.tuning.hunt,
         )? {
-            if arrived {
+            if move_start == MoveStart::Arrived {
                 show_arrived(
                     &arms,
                     &mut self.sprite,

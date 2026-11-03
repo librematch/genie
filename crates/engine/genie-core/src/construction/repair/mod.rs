@@ -37,7 +37,7 @@ pub(crate) mod payment;
 mod repair_state;
 pub(crate) mod unit;
 
-pub use self::action::work_amount;
+pub use self::action::{RepairerCount, work_amount};
 pub use self::payment::{
     BUILDING_REPAIR_COST, Payer, RepairFrom, RepairOutcome, Repaired, UNIT_REPAIR_COST,
     repair_building, repair_unit,

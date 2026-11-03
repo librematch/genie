@@ -20,6 +20,16 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 
+/// Whether the object list's loop counts on past the object it filed ([`World::file_step`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum ListCount {
+    /// Past it: the slot holds the next object, or the object waits for the next tick.
+    GoesOn,
+    /// Not past it: it left, and the list's last object took its slot.
+    Again,
+}
+
 impl World {
     /// One world update of `dt` game milliseconds without commands.
     pub fn tick(&mut self, dt: Millis) {
@@ -141,7 +151,7 @@ impl World {
                 u.update(a, c, &roles, slots)
             }) {
                 Ok(s) => {
-                    if self.file_step(p, s.slot, s.outcome)? {
+                    if self.file_step(p, s.slot, s.outcome)? == ListCount::GoesOn {
                         i = i.next();
                     }
                 }
@@ -154,12 +164,12 @@ impl World {
         Ok(())
     }
 
-    /// Files object `i` of player `p` by the step it finished (the list's loop,
-    /// `FUN_141166550`): one that leaves goes from its list, a sleeper to the sleeping list, a
-    /// captured building or unit to its new owner. Returns whether the loop's count goes on: not
-    /// past one that leaves (the game's loop runs its count again, the list's last object in the
-    /// slot), past any other (a sleeper's slot holds the last object too, whose update waits
-    /// for the next tick).
+    /// Files object `i` of player `p` by the step it finished (the list's loop, `FUN_141166550`):
+    /// one that leaves goes from its list, a sleeper to the sleeping list, a captured building or
+    /// unit to its new owner. Answers whether the loop's count goes on ([`ListCount`]): not past
+    /// one that leaves (the game's loop runs its count again, the list's last object in the slot),
+    /// past any other (a sleeper's slot holds the last object too, whose update waits for the next
+    /// tick).
     ///
     /// # Errors
     ///
@@ -169,7 +179,7 @@ impl World {
         p: PlayerId,
         i: ListIndex,
         outcome: Outcome,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<ListCount, GenieError> {
         match outcome {
             Outcome::Leave => {
                 let gone = self.swap_remove_live(p, i)?;
@@ -182,7 +192,7 @@ impl World {
                         .get_or_insert((self.ticks, i, e));
                 }
                 // the list's last object took its place
-                Ok(false)
+                Ok(ListCount::Again)
             }
             Outcome::Sleep => {
                 // the list's remove (FUN_1411664a0) puts its last object in the sleeper's place,
@@ -200,7 +210,7 @@ impl World {
                 tracker.remove(asleep.unit.id, k);
                 tracker.add(asleep.unit.id, k);
                 let _ = self.push_asleep(p, asleep)?;
-                Ok(true)
+                Ok(ListCount::GoesOn)
             }
             Outcome::Captured(Captured { new, building, .. }) if building => {
                 // a building's slot 0x70 (FUN_1411cd860), whole: its annexes, its lists' moves
@@ -216,13 +226,13 @@ impl World {
                         .unsupported
                         .get_or_insert((self.ticks, i, e));
                 }
-                Ok(true)
+                Ok(ListCount::GoesOn)
             }
             Outcome::Captured(taken) => {
                 self.hand_over_units(p, i, taken)?;
-                Ok(true)
+                Ok(ListCount::GoesOn)
             }
-            Outcome::Stay => Ok(true),
+            Outcome::Stay => Ok(ListCount::GoesOn),
         }
     }
 

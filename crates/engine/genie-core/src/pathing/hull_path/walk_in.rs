@@ -3,6 +3,8 @@
 use crate::GenieError;
 use crate::map::Rect;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
+use crate::pathing::hull_path::walks::Rays;
+use crate::pathing::hull_path::walks::Steps;
 use crate::pathing::hull_path::{
     HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS, Point, SIDES,
     Target, WalkResult, Waypoints, Within,
@@ -92,7 +94,7 @@ impl HullPather<'_> {
             if !self.in_area(at) {
                 break;
             }
-            left_boxes |= self.cast_into(hull, node, to, &mut ways)?;
+            left_boxes |= self.cast_into(hull, node, to, &mut ways)? == Rays::LeftBoxes;
         }
         let result = if *ways.count < 1 {
             WalkResult::NoWay
@@ -128,7 +130,7 @@ impl HullPather<'_> {
             return Ok((inside, false));
         }
         self.close(NodeList::WALKS, root)?;
-        let mut made = self.first_steps(hull, root, from, Some(to))?;
+        let mut made = self.first_steps(hull, root, from, Some(to))? == Steps::Made;
         let bounds = match target {
             None => {
                 self.hulls
@@ -147,21 +149,22 @@ impl HullPather<'_> {
                 )
             }
         };
-        made |= self.side_points(hull, root, bounds, to, hull_path_tuning.entrance_step, None)?;
+        made |= self.side_points(hull, root, bounds, to, hull_path_tuning.entrance_step, None)?
+            == Steps::Made;
         Ok((inside, !made))
     }
 
-    /// The rays of the walk into a hull's `node` toward each side it may cast to: onto a box
-    /// they go on from the box's side; one that leaves the boxes ends on the hull's edge, a way
-    /// in kept in `ways` (nudged back into the hull) while it has room. True when a ray left the
-    /// boxes.
+    /// The rays of the walk into a hull's `node` toward each side it may cast to: onto a box they
+    /// go on from the box's side; one that leaves the boxes ends on the hull's edge, a way in kept
+    /// in `ways` (nudged back into the hull) while it has room. [`Rays::LeftBoxes`] when a ray left
+    /// the boxes.
     fn cast_into(
         &mut self,
         hull: HullIndex,
         node: NodeIndex,
         to: Point,
         ways: &mut Ways<'_>,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Rays, GenieError> {
         let at = self.nodes.checked(node)?.at;
         let mut left_boxes = false;
         {
@@ -214,6 +217,10 @@ impl HullPather<'_> {
                 }
             }
         }
-        Ok(left_boxes)
+        Ok(if left_boxes {
+            Rays::LeftBoxes
+        } else {
+            Rays::InBoxes
+        })
     }
 }

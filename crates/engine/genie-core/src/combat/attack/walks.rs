@@ -8,6 +8,7 @@ use crate::combat::attack::{ATTACK_WITHOUT_TARGET, Attack, AttackReads};
 use crate::map::Distance;
 use crate::map::Position;
 use crate::movement::Me;
+use crate::movement::MoveStart;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::move_to::{GiveUp, MoveTo, MoveToAction, MoveToReads, SpriteReads, WalkTo};
@@ -53,15 +54,6 @@ pub(super) fn move_reads<'g>(
 /// A unit that does not move.
 pub(crate) fn speed_of(mover: Option<&Mover>) -> Result<Speed, GenieError> {
     Ok(mover.ok_or(ATTACKER_UNMOVING)?.stats.speed)
-}
-
-/// How the Attack's `MoveTo` to its target started ([`Attack::walk_to_target`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum MoveStart {
-    /// Within 0.01 of the target's footprint: state 1.
-    Arrived,
-    /// Walking (state 3, or 13 without speed), or no `MoveTo` (the list deleted it).
-    UnderWay,
 }
 
 impl Attack {

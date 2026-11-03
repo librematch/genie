@@ -56,6 +56,7 @@ If the object's action walks, the action runs the motion step. The planners that
 | [`levels.rs`](levels.rs) | The levels of a unit's path data by their role: the walked level and its parent. |
 | [`long_walk.rs`](long_walk.rs) | A step's reach of its waypoint, the long pather's walker and the units whose tiles it lowers. |
 | [`mod.rs`](mod.rs) | A unit's movement (`RGE_Moving_Object`, MovingObject.cpp in 158041): the velocity step that moves it along its forward vector, and the motion step that steers it along its path. |
+| [`move_start.rs`](move_start.rs) | How a `MoveTo` to a target started. |
 | [`new_path.rs`](new_path.rs) | A new level's path: no path, its link under the walked level, the short pather's ignore list and a blocked start. |
 | [`path_counts.rs`](path_counts.rs) | A path level's link to its parent and the plans it may still try; a mover's wait delays and substitute count. |
 | [`path_end.rs`](path_end.rs) | The reach test, a `MoveTo`'s path end that follows its target, the top path and the pauses. |

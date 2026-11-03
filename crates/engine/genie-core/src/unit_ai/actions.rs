@@ -14,6 +14,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::Answer;
 use crate::unit_ai::GroupState;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -75,7 +76,7 @@ impl UnitAi {
         let attack = AiAction::Attack.value();
         if p0 == attack && (order == Some(OrderKind::Attack) || action == Some(AiAction::Attack)) {
             let produced = self.process_idle(at, player_kind, ai, side)?;
-            if produced {
+            if produced == IdleOutcome::Acted {
                 return Ok(PRODUCED);
             }
             if player_kind.is_computer() {
@@ -141,7 +142,7 @@ impl UnitAi {
                 ));
             }
             let produced = self.process_idle(at, player_kind, ai, side)?;
-            if produced {
+            if produced == IdleOutcome::Acted {
                 return Ok(GO_ON);
             }
             if player_kind.is_computer() {
@@ -203,7 +204,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         if order == Some(OrderKind::Attack) && p1 == attack {
-            if self.process_idle(at, player_kind, ai_rng, side)? {
+            if self.process_idle(at, player_kind, ai_rng, side)? == IdleOutcome::Acted {
                 return Ok(PRODUCED);
             }
             self.remove_target();

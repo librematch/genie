@@ -1,6 +1,7 @@
 //! What an order's processing answers ([`OrderOutcome`]) and what an order slot or a unit's
 //! command answers ([`Answer`]); what slot 73's checks answer ([`RetargetCheck`],
-//! [`MiscEnd`]) and the walk back to the state position ([`WalkBack`]).
+//! [`MiscEnd`]), the walk back to the state position ([`WalkBack`]) and processIdle's
+//! answer ([`IdleOutcome`]).
 
 /// What slot 0x230 (`FUN_140c5c170`, [`crate::unit_ai::UnitAi::process_order`]) answers for an
 /// order: the queue keeps an order that is not ready and drops the others; one taken ends the
@@ -25,6 +26,17 @@ pub enum Answer {
     NotTaken,
     /// 1: the slot takes it.
     Taken,
+}
+
+/// What processIdle (slot 72, [`crate::unit_ai::UnitAi::process_idle`]) and the checks it
+/// runs answer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum IdleOutcome {
+    /// 6: the check produced an action.
+    Acted,
+    /// 5: it did not.
+    Idle,
 }
 
 impl OrderOutcome {

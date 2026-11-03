@@ -57,6 +57,16 @@ enum Queue {
     FishTraps,
 }
 
+/// Whether a farmer's reseed made a farm's foundation ([`World::reseed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(crate) enum Reseed {
+    /// The foundation was made: the farmer builds it.
+    Made,
+    /// None was made.
+    NotMade,
+}
+
 impl World {
     /// `FUN_141617130`: player `p` buys `count` of master `master` (the farm 0x32 or the pasture
     /// 0x761) for its mill's queue ([`World::buy_ahead`]).
@@ -291,19 +301,19 @@ impl World {
     /// `+0xcb8`, which only a pasture fills: a farm's is empty, and a pasture's gather is not
     /// modelled) would build it too; then the gatherer's ignore list empties (`FUN_141197da0`)
     /// and its slot 0x128 sends it to build the foundation at the spot ([`World::build_task`],
-    /// [`World::build_directly`]). True when the foundation was made.
-    pub(crate) fn reseed(&mut self, p: PlayerId, idx: ListIndex) -> Result<bool, GenieError> {
+    /// [`World::build_directly`]). [`Reseed::Made`] when the foundation was made.
+    pub(crate) fn reseed(&mut self, p: PlayerId, idx: ListIndex) -> Result<Reseed, GenieError> {
         let unit = &self.players.live(p, idx)?;
         let Some(gather) = self.parts.actions_of(unit.id).list.gather().copied() else {
-            return Ok(false);
+            return Ok(Reseed::NotMade);
         };
         let farm = gather.farm;
         if farm.x() == NO_FARM {
-            return Ok(false);
+            return Ok(Reseed::NotMade);
         }
         let class = unit.master(self.master_tables(), p)?.class;
         let Some((master, auto, queue)) = self.reseed_choice(p, class)? else {
-            return Ok(false);
+            return Ok(Reseed::NotMade);
         };
         // the farm's scan passes over the old target and, for a building, its annexes; the fish
         // trap's over nothing
@@ -328,10 +338,10 @@ impl World {
             .placement_code_beside(p, master, farm, true, &own)?
             .is_allowed()
         {
-            return Ok(false);
+            return Ok(Reseed::NotMade);
         }
         let Some(from_queue) = self.pay_for_reseed(p, (master, auto, queue))? else {
-            return Ok(false);
+            return Ok(Reseed::NotMade);
         };
         let made = self.master(p, master)?;
         let ai = Ok(unit_ai_kind(made, master, &self.model.roles));
@@ -351,7 +361,7 @@ impl World {
         let site = (p, FoundationId::new(foundation), master);
         let task = self.build_task(p, id, site, at)?;
         self.build_directly(p, idx, task, site, at)?;
-        Ok(true)
+        Ok(Reseed::Made)
     }
 
     /// What a reseeding gatherer of `class` makes ([`World::reseed`]): the master, whether the
@@ -453,7 +463,7 @@ impl World {
         idx: ListIndex,
         end: WalkEnd,
     ) -> Result<(), GenieError> {
-        if self.reseed(p, idx)? {
+        if self.reseed(p, idx)? == Reseed::Made {
             return Ok(());
         }
         let by = self.releaser(p, idx)?;

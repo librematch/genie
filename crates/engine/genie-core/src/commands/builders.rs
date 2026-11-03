@@ -32,6 +32,7 @@ use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
@@ -391,23 +392,23 @@ impl World {
         Ok(())
     }
 
-    /// The unit's build command (slot 0x380, `FUN_14120d410`, forced) on `foundation`: nothing
-    /// for a foundation the world does not hold (`FUN_1415417a0`); a Build on top takes it (its
-    /// slot 0x48, [`World::build_take`]); without one its slot 0x820 with any action type and
-    /// the switch ([`task_search`] on the foundation and its main building; the switch, slot
-    /// 0x90 with 0, [`World::change_master`]) finds a task, and a Build action on it
-    /// (`FUN_140aad4e0` with that task, whatever its type) replaces the unit's actions. True
-    /// when it builds (slot 0x380's 1); false for the foundation gone or no task (its 0, which
-    /// the Gather's `set_state(6)` ignores and `BuildObject` reads first,
+    /// The unit's build command (slot 0x380, `FUN_14120d410`, forced) on `foundation`: nothing for
+    /// a foundation the world does not hold (`FUN_1415417a0`); a Build on top takes it (its slot
+    /// 0x48, [`World::build_take`]); without one its slot 0x820 with any action type and the switch
+    /// ([`task_search`] on the foundation and its main building; the switch, slot 0x90 with 0,
+    /// [`World::change_master`]) finds a task, and a Build action on it (`FUN_140aad4e0` with that
+    /// task, whatever its type) replaces the unit's actions. [`Answer::Taken`] when it builds (slot
+    /// 0x380's 1); [`Answer::NotTaken`] for the foundation gone or no task (its 0, which the
+    /// Gather's `set_state(6)` ignores and `BuildObject` reads first,
     /// [`crate::unit_ai::UnitSide::builds`]).
     pub(crate) fn build_command(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         foundation: FoundationId,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if self.object(foundation).is_none() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         if self
             .parts
@@ -416,7 +417,7 @@ impl World {
             == Some(ActionKind::BUILD)
         {
             let _ = self.build_take(player, idx, foundation.id())?;
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         let gone = FOUNDATION_GONE;
         let (fp, f) = self.object(foundation).ok_or_else(|| gone.clone())?;
@@ -475,7 +476,7 @@ impl World {
             &self.model.roles,
         )?
         else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let builder = switch.unwrap_or(actor.master);
         let to = WalkTo {
@@ -512,6 +513,6 @@ impl World {
             .of_mut(self.players.live(player, idx)?.id)?
             .list
             .set_build(Some(build));
-        Ok(true)
+        Ok(Answer::Taken)
     }
 }

@@ -46,6 +46,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
+use crate::players::game_status::stops::StopList;
 use crate::players::history::{Event, EventKind, HistoryEntry, Population, TimeSlice};
 use crate::players::relation_row;
 use crate::production::Batch;
@@ -388,15 +389,27 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
     ));
     t.set_motion(object_id(33), Some(Motion::Moving(walker())));
-    assert_eq!(t.halt_other(PlayerId::new(1), gather, GATHER), Ok(true));
+    assert_eq!(
+        t.halt_other(PlayerId::new(1), gather, GATHER),
+        Ok(StopList::Keeps)
+    );
     assert_eq!(
         t.halt_other(PlayerId::new(1), build, ActionKind::BUILD),
-        Ok(true)
+        Ok(StopList::Keeps)
     );
-    assert_eq!(t.halt_other(PlayerId::new(1), repair, REPAIR), Ok(true));
-    assert_eq!(t.halt_other(PlayerId::new(1), attack, ATTACK), Ok(true));
+    assert_eq!(
+        t.halt_other(PlayerId::new(1), repair, REPAIR),
+        Ok(StopList::Keeps)
+    );
+    assert_eq!(
+        t.halt_other(PlayerId::new(1), attack, ATTACK),
+        Ok(StopList::Keeps)
+    );
     let kind = ARTIFACT_KIND;
-    assert_eq!(t.halt_other(PlayerId::new(1), artifact, kind), Ok(true));
+    assert_eq!(
+        t.halt_other(PlayerId::new(1), artifact, kind),
+        Ok(StopList::Keeps)
+    );
     let objects = &t.players[1].objects;
     assert_eq!(
         t.parts

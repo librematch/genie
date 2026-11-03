@@ -9,6 +9,7 @@ use crate::map::Distance;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::rng::Stream;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
@@ -349,7 +350,7 @@ impl World {
             ));
         };
         let unit_player = player;
-        if let Some(arrived) = hunt.retarget(
+        if let Some(move_start) = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
                 player: unit_player,
@@ -366,7 +367,7 @@ impl World {
             },
             &self.model.tuning.hunt,
         )? {
-            if arrived {
+            if move_start == MoveStart::Arrived {
                 show_arrived(
                     &arms,
                     &mut unit.sprite,

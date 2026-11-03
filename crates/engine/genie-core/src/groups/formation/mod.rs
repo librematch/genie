@@ -24,7 +24,7 @@ use self::desired_positions::{RIGHT_ANGLE, transform_slot};
 pub use self::desired_positions::{find_point_from_front, on_last_high_level_waypoint};
 #[cfg(test)]
 use self::passability::{cell_mark, count_up, passability_box, slot_tile};
-pub use self::slots::SlotOrder;
+pub use self::slots::{SlotFill, SlotOrder};
 #[cfg(test)]
 use crate::groups::UnitGroup;
 use crate::math::image::group::EPSILON as GROUP_EPSILON;

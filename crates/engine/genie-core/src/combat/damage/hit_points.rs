@@ -20,21 +20,31 @@ pub enum HitKind {
     Missile,
 }
 
+/// Whether a shield blocked a hit ([`shield`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum ShieldBlock {
+    /// It spent a charge on the hit.
+    Blocked,
+    /// The hit gets through.
+    Passes,
+}
+
 /// `FUN_14108d8a0`: a shield blocks the hit: a target whose master's charge type is 5 against a
 /// melee hit (4 against a missile) spends a charge of 1 when it has one (`COMISS 1.0, charge`,
 /// `JA` past: a NaN charge blocks too). The type-5 shield's local-player statistics
 /// (`FUN_140a497f0`) change no simulation state (FD-037-D20). A target without combat values has
 /// charge type 0.
-pub fn shield(v: &mut Victim, hit: HitKind) -> bool {
+pub fn shield(v: &mut Victim, hit: HitKind) -> ShieldBlock {
     let kind = match hit {
         HitKind::Melee => ChargeKind::MELEE_SHIELD,
         HitKind::Missile => ChargeKind::MISSILE_SHIELD,
     };
     if v.source.charge_kind == kind && at_most_or_unordered(1.0, v.source.charge.get()) {
         v.source.charge -= Charge::new(1.0);
-        return true;
+        return ShieldBlock::Blocked;
     }
-    false
+    ShieldBlock::Passes
 }
 
 /// `FUN_141202a80`: the hit points the master's `invulnerability_level` keeps (a share of its hit

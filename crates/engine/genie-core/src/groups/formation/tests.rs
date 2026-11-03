@@ -5,6 +5,7 @@ use crate::groups::GroupTarget;
 use crate::groups::Layout;
 use crate::groups::TransformKind;
 use crate::groups::formation::LineKind;
+use crate::groups::formation::SlotFill;
 use crate::groups::formation::SlotOrder;
 use crate::groups::{LinePoint, Member, PointLine, UnitGroups, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
@@ -586,16 +587,17 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
         (turned.x() - 5.0).abs() < 1e-6 && (turned.y() - 6.0).abs() < 1e-6,
         "{turned:?}"
     );
-    assert_eq!(run(3), (false, BVector::new(6.0, 0.0, 5.0), 2));
-    assert_eq!(run(2), (false, BVector::new(10.0, 0.0, 9.0), 2));
+    assert_eq!(run(3), (SlotFill::Kept, BVector::new(6.0, 0.0, 5.0), 2));
+    assert_eq!(run(2), (SlotFill::Kept, BVector::new(10.0, 0.0, 9.0), 2));
     // facing back: the slot takes its (only) unit anew
     let mut f = Formation::new();
     f.transform_kind = TransformKind::Unturned;
     f.transform_orientation = BVector::new(0.0, 0.0, -1.0);
     f.slots = vec![slot_at(BVector::ZERO, 1)];
-    assert!(
+    assert_eq!(
         t.formation_transform(&mut f, group_id(1), SlotOrder::Closest)
-            .unwrap()
+            .unwrap(),
+        SlotFill::Anew
     );
     assert_eq!(
         (f.slots[0].unit_id, f.slots[0].position_filled),

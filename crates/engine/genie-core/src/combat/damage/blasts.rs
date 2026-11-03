@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::damage::HitKind;
 use crate::combat::damage::HitLayer;
+use crate::combat::damage::ShieldBlock;
 use crate::combat::damage::{
     Attacker, Kill, Victim, armor_damage, bonus_damage, charge_hit, elevation_factor,
     facing_offset, kill_bonus, lose, shield, take,
@@ -155,8 +156,8 @@ pub(super) fn blast_tiles(center: Position, r: Distance) -> (Tile, Tile) {
 /// adds its loss to it; the main building of an annex it reaches is among `targets`. The compares
 /// are the assembly's: a NaN gap past a radius is 0 (`COMISS`/`JBE`), a NaN square distance is
 /// beyond the radius (`JBE`), a NaN facet offset stays in a cone (`JA` past, both the narrow and
-/// the wide one), a NaN `area_damage` leaves the factor as it is. Answers whether the radius is
-/// above 0 (or NaN: `COMISS 0, r`/`JC`), which neither caller reads.
+/// the wide one), a NaN `area_damage` leaves the factor as it is. Neither caller reads the
+/// game's answer (whether the radius is above 0, or NaN: `COMISS 0, r`/`JC`): the port has none.
 pub fn blast(
     attacker: &mut Victim,
     center: Position,
@@ -165,11 +166,11 @@ pub fn blast(
     targets: &mut [&mut Victim],
     factor: f32,
     layer: HitLayer<'_>,
-) -> Result<bool, GenieError> {
+) -> Result<(), GenieError> {
     let a = attacker.source;
     let r = a.area_effect;
     if !below_or_unordered(0.0, r.get()) {
-        return Ok(false);
+        return Ok(());
     }
     let wide = if a.blast_level.contains(BlastLevel::CONE) {
         r
@@ -204,7 +205,7 @@ pub fn blast(
     for i in 0..targets.len() {
         blast_one(attacker, targets, i, (&blast, &weapons), layer)?;
     }
-    Ok(true)
+    Ok(())
 }
 
 /// One blast as each object reads it ([`blast`]): the attacker's values at its start, its
@@ -289,7 +290,7 @@ pub(super) fn blast_one(
     let Some(d2) = blast_distance2(t, b.center, b.r.get()) else {
         return Ok(());
     };
-    if MasterKind::COMBAT <= t.kind && shield(t, HitKind::Melee) {
+    if MasterKind::COMBAT <= t.kind && shield(t, HitKind::Melee) == ShieldBlock::Blocked {
         return Ok(());
     }
     let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), hit, damage_tuning);

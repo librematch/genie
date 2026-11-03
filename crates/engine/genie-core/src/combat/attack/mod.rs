@@ -12,7 +12,6 @@
 //! [`crate::combat::damage`]'s).
 
 use crate::GenieError;
-use crate::combat::attack::walks::MoveStart;
 use crate::combat::damage::Victim;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -20,6 +19,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, TargetMoved};
 use crate::objects::ObjectId;
@@ -236,15 +236,12 @@ enum Begun {
 }
 
 impl Begun {
-    /// The unit's last `MoveTo` started arrived.
-    const fn arrived(self) -> bool {
-        matches!(
-            self,
-            Self::Moves {
-                start: MoveStart::Arrived,
-                ..
-            }
-        )
+    /// How the unit's last `MoveTo` started: under way for a unit that cannot move.
+    const fn start(self) -> MoveStart {
+        match self {
+            Self::Moves { start, .. } => start,
+            Self::Ready | Self::Failed => MoveStart::UnderWay,
+        }
     }
 
     /// readyToAttack's `set_state(13)` came before the start's `set_state(4)`.

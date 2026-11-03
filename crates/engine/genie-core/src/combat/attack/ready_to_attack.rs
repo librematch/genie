@@ -6,7 +6,6 @@ use crate::combat::MissileCount;
 use crate::combat::attack::Aim;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
-use crate::combat::attack::walks::MoveStart;
 use crate::combat::attack::{
     Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, TARGET_GONE, face_target,
     move_reads,
@@ -17,6 +16,7 @@ use crate::map::Tile;
 use crate::map::spatial::{Placed, Spatial};
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::math::rng::Well512;
+use crate::movement::MoveStart;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::footprint_gap;

@@ -2,6 +2,7 @@ use super::*;
 use crate::combat::damage::ArmorPair;
 use crate::construction::MainBuildingId;
 use crate::construction::repair::RepairFrom;
+use crate::construction::repair::RepairerCount;
 use crate::gathering::hunt::tests::walker;
 use crate::map::TerrainFlags;
 use crate::math::rng::Well512;
@@ -1005,7 +1006,7 @@ fn halt_stops_the_repair_and_answers_whether_it_counted() {
         counted: true,
         ..started()
     };
-    assert_eq!(r.halt(Some(&mut mover)), Ok(true));
+    assert_eq!(r.halt(Some(&mut mover)), Ok(RepairerCount::Counted));
     assert_eq!(
         (r.state, r.counted, r.state.move_to().copied(), r.target),
         (
@@ -1015,7 +1016,7 @@ fn halt_stops_the_repair_and_answers_whether_it_counted() {
             Some(RepairTargetId::new(object_id(20)))
         )
     );
-    assert_eq!(r.halt(None), Ok(false));
+    assert_eq!(r.halt(None), Ok(RepairerCount::NotCounted));
 }
 
 /// `set_state(4)` from a new target: the old `MoveTo` to the point goes, a new walk to the

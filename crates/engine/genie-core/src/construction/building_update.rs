@@ -523,7 +523,7 @@ impl Unit {
             roles,
         );
         let mut targets: Vec<&mut Victim> = c.blasted.iter_mut().collect();
-        let _ = blast(
+        blast(
             &mut own,
             self.position(),
             Some(self.id),

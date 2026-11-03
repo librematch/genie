@@ -12,6 +12,7 @@ use crate::objects::WorkerCount;
 use crate::players::PlayerKind;
 use crate::players::QueryRelation;
 use crate::unit_ai::AlertMode;
+use crate::unit_ai::IdleOutcome;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
 use crate::unit_ai::SurroundingFlags;
@@ -31,23 +32,27 @@ use std::cmp::Ordering;
 impl UnitAi {
     /// The boar's idle check (slot 72, `FUN_140c1e630`): `FUN_140c41e50` first
     /// ([`UnitAi::cap_human_order`]). A furious boar, or any in mode 1, stays. Then one draw of
-    /// `0..81` widens its leash: outside it, a boar not yet heading home goes home; inside, once
-    /// in 7 checks (a second draw) it goes home from more than 2 tiles away, or wanders up to 3
-    /// tiles (two more draws). Its moves keep its height. True when it produced an action (6, not
-    /// 5): every way but staying and the 6 in 7 checks inside the leash that do nothing,
-    /// including the one heading home already.
+    /// `0..81` widens its leash: outside it, a boar not yet heading home goes home; inside, once in
+    /// 7 checks (a second draw) it goes home from more than 2 tiles away, or wanders up to 3 tiles
+    /// (two more draws). Its moves keep its height. [`IdleOutcome::Acted`] when it produced an
+    /// action (6, not 5): every way but staying and the 6 in 7 checks inside the leash that do
+    /// nothing, including the one heading home already.
     pub(super) fn boar_idle(
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         self.cap_human_order(side, ai)?;
         let (produced, moved) = self.boar_wander(at, ai);
         if let Some(m) = moved {
             side.effect_now(Effect::Move(m), self, ai)?;
         }
-        Ok(produced)
+        Ok(if produced {
+            IdleOutcome::Acted
+        } else {
+            IdleOutcome::Idle
+        })
     }
 
     /// [`UnitAi::boar_idle`] past its cap: whether it produced an action, and its move.
@@ -134,14 +139,15 @@ impl UnitAi {
     /// not here), at its height, through `evasiveMoveTo` (slot 0x150, [`UnitAi::evasive_move`])
     /// with arguments 5 and 6 1 and 0 (`[RSP+0x20]`, `[RSP+0x28]`): an object on its own point
     /// gives coordinates that are not numbers, which become its own place plus or minus one;
-    /// the point is held on the map and the unit moves there. True (6).
+    /// the point is held on the map and the unit moves there. The game's answer, always 6, is the
+    /// caller's.
     pub(super) fn evade(
         &mut self,
         at: &Surroundings,
         other: Position,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<(), GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let reach = (at.speed * unit_ai_tuning.evade_reach).get();
@@ -149,7 +155,7 @@ impl UnitAi {
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Kept), at, ai, side)?;
-        Ok(true)
+        Ok(())
     }
 
     pub(super) fn hunted_idle(
@@ -158,7 +164,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if roles.of_some_class(at.class).contains(ClassRoles::KING) {
@@ -171,7 +177,7 @@ impl UnitAi {
                     "a computer player's king's idle check (FUN_140c16930, slot 0x7e8)",
                 ));
             }
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         self.hunted_wander(at, ai, side)
     }
@@ -182,7 +188,7 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let h = self.hunted.ok_or(GenieError::unsupported(
             "a hunted animal without its origin",
         ))?;
@@ -200,7 +206,7 @@ impl UnitAi {
                 if let Some(m) = self.move_to(go_home) {
                     side.effect_now(Effect::Move(m), self, ai)?;
                 }
-                return Ok(true);
+                return Ok(IdleOutcome::Acted);
             }
         }
         if at.flags.contains(SurroundingFlags::MODE_1) {
@@ -235,7 +241,8 @@ impl UnitAi {
             let other = found
                 .position
                 .ok_or(GenieError::unsupported("a found object without its place"))?;
-            return self.evade(at, other, ai, side);
+            self.evade(at, other, ai, side)?;
+            return Ok(IdleOutcome::Acted);
         }
         let r = ai.rand15();
         if r.is_multiple_of(BOAR_WANDER) {
@@ -245,7 +252,7 @@ impl UnitAi {
                 if let Some(m) = self.move_to(go_home) {
                     side.effect_now(Effect::Move(m), self, ai)?;
                 }
-                return Ok(true);
+                return Ok(IdleOutcome::Acted);
             }
             let step = |ai: &mut Well512| {
                 let n = (ai.rand15() % (2 * HUNTED_STEP as u32)) as i32;
@@ -264,9 +271,9 @@ impl UnitAi {
             if let Some(m) = wander {
                 side.effect_now(Effect::Move(m), self, ai)?;
             }
-            return Ok(true);
+            return Ok(IdleOutcome::Acted);
         }
-        Ok(false)
+        Ok(IdleOutcome::Idle)
     }
 
     /// The lion's idle check (slot 72, `FUN_140c1fb70`, factory type 5: wolves, bears).
@@ -277,14 +284,15 @@ impl UnitAi {
     /// `FUN_14118f8c0`, against the reach squared) it attacks (`AttackObject`, slot 0xb8, not
     /// forced, [`UnitAi::attack_object`]): the reach is its line of sight, outside mode 1 half
     /// of it, or a third of it when it found no villager. The scenario modes' reach (a third by
-    /// a setting's `+0x10` of 4) is not modelled. True (6) once it called `AttackObject`,
-    /// whatever that did; false (5) when it found nothing within its reach.
+    /// a setting's `+0x10` of 4) is not modelled. [`IdleOutcome::Acted`] (6) once it called
+    /// `AttackObject`, whatever that did; [`IdleOutcome::Idle`] (5) when it found nothing within
+    /// its reach.
     pub(super) fn lion_idle(
         &mut self,
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<IdleOutcome, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let slots = at.slots;
         self.cap_human_order(side, ai)?;
@@ -333,15 +341,15 @@ impl UnitAi {
             }
         }
         let Some(id) = found.id else {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         };
         let Some(t) = side.seen_unit(id)? else {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         };
         if Distance::ZERO <= reach && reach.squared() < t.gap_squared {
-            return Ok(false);
+            return Ok(IdleOutcome::Idle);
         }
         let _ = self.attack_object(id, OrderForce::Unforced, TargetRules::Own, at, side)?;
-        Ok(true)
+        Ok(IdleOutcome::Acted)
     }
 }

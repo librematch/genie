@@ -151,6 +151,16 @@ pub enum Walking {
     Walk(Option<Position>),
 }
 
+/// Whether the Enter's walk again put the unit inside ([`EnterAction::again`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub(super) enum EnterAgain {
+    /// The unit was in reach and entered.
+    Entered,
+    /// It walks or waits on.
+    Walks,
+}
+
 impl EnterAction {
     /// The factory's constructor (`FUN_140a855d0`): the target (an annex's main building, the
     /// caller's, as its add, slot 0x178), the point [`meeting`] gives at the target's height,
@@ -386,7 +396,8 @@ impl EnterAction {
     ) -> Result<(), GenieError> {
         let roles = &c.w.model.roles.clone();
         let walked_again = self.target_moved(t);
-        let entered = walked_again && self.again(c, unit, actions, t, reads, roles)?;
+        let entered =
+            walked_again && self.again(c, unit, actions, t, reads, roles)? == EnterAgain::Entered;
         let code = self.move_to_update(c, unit, me, reads)?;
         match code.get() {
             // the walk again's enter put the unit inside, at the target's place: still in reach,
@@ -471,8 +482,8 @@ impl EnterAction {
     /// point at once: it tests that it reaches within 1 of the point's tile (slot 0x3d8,
     /// `FUN_14114ffc0` with the point truncated), then moves there (slot 0x340,
     /// [`crate::world::World::move_transport`], the unit lent to the world). A transport that
-    /// cannot reach it makes `set_state(13)`, which is not modelled. True when
-    /// the unit entered.
+    /// cannot reach it makes `set_state(13)`, which is not modelled. [`EnterAgain::Entered`]
+    /// when the unit entered.
     ///
     /// # Errors
     ///
@@ -485,7 +496,7 @@ impl EnterAction {
         t: &EnterTarget,
         reads: &EnterReads,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<EnterAgain, GenieError> {
         if self.state.move_to().is_some()
             && let Some(m) = c.w.parts.mover_mut(unit.id)
         {
@@ -535,7 +546,7 @@ impl EnterAction {
         match walking {
             Walking::Enter => {
                 self.enter_at_once(actions, c, unit, roles)?;
-                return Ok(true);
+                return Ok(EnterAgain::Entered);
             }
             Walking::Walk(Some(at)) => {
                 let target = self.target;
@@ -547,7 +558,7 @@ impl EnterAction {
             }
             Walking::Walk(None) => {}
         }
-        Ok(false)
+        Ok(EnterAgain::Walks)
     }
 
     /// The enter at once (`FUN_140a867b0` into the target, then `set_state(1)`:

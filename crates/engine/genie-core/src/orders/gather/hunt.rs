@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::gathering::hunt::{HuntAction, HuntStart, HuntTask, Quarry};
 use crate::math::rng::Stream;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectKey;
@@ -82,7 +83,7 @@ impl World {
         )?;
         let mover = self.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
         let mut held = unit.life.held();
-        let (hunt, arrived) = HuntAction::start(
+        let (hunt, move_start) = HuntAction::start(
             HuntStart {
                 task,
                 target: quarry,
@@ -108,7 +109,7 @@ impl World {
         } = held;
         // an Attack whose MoveTo started arrived: the unit shows the idle sprite (slot 0x68) and
         // its `+0x7b8` clears (`Attack::arrived_sprite`)
-        if arrived {
+        if move_start == MoveStart::Arrived {
             let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
             new_sprite(
                 &mut unit.sprite,

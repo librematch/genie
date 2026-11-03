@@ -4,14 +4,15 @@ use crate::GenieError;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
+use crate::gathering::ActionEnd;
 use crate::gathering::closest_resource::herded;
 use crate::gathering::hunt::HuntChase;
-use crate::gathering::hunt::HuntEnd;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::{HuntTask, NO_HUNT, Quarry, stand_sprite};
 use crate::map::Distance;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
 use crate::math::rng::Stream;
+use crate::movement::MoveStart;
 use crate::movement::Speed;
 use crate::movement::{Me, Planning};
 use crate::objects::ActionState;
@@ -237,7 +238,7 @@ impl Unit {
                 .hunt_back_to_target(actions, c, roles)
                 .map(|()| HeadCode::Keeps);
         }
-        if self.hunt_drop_orders(c)? == HuntEnd::Ends {
+        if self.hunt_drop_orders(c)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
         let (found, kind) = self.hunt_next_search(actions, c, roles)?;
@@ -343,7 +344,8 @@ impl Unit {
                 move_to_tuning: &c.w.model.tuning.move_to,
             },
             &c.w.model.tuning.hunt,
-        )? {
+        )? == MoveStart::Arrived
+        {
             return Err(GenieError::unsupported(
                 "a hunt's Attack whose MoveTo starts arrived after its drop-off",
             ));
@@ -360,8 +362,8 @@ impl Unit {
     /// target is gone (the world does not hold it, or its sight sees it past state 5) leave
     /// (`FUN_140c5de60`); with orders left the AI's order and action clear (`FUN_140c64b60`,
     /// `FUN_140c64b50`) and the hunt ends (`set_state(1)`; its update returns 1, whose deletion
-    /// lets the drop site go): its unit AI runs the queued order ([`HuntEnd::Ends`]).
-    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<HuntEnd, GenieError> {
+    /// lets the drop site go): its unit AI runs the queued order ([`ActionEnd::Ends`]).
+    fn hunt_drop_orders(&self, c: &mut Step<'_>) -> Result<ActionEnd, GenieError> {
         let ai =
             c.w.parts
                 .unit_ai
@@ -387,10 +389,10 @@ impl Unit {
             ) && gone(o.target))
         });
         if ai.orders.is_empty() {
-            return Ok(HuntEnd::GoesOn);
+            return Ok(ActionEnd::GoesOn);
         }
         ai.end_order_and_action()?;
-        Ok(HuntEnd::Ends)
+        Ok(ActionEnd::Ends)
     }
 
     /// The search after the drop by the target class (the AI's target's, else the hunt's

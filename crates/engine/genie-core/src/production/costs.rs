@@ -14,6 +14,7 @@ use crate::players::attribute::AttributeId;
 use crate::production::CostCount;
 use crate::production::Payment;
 use crate::production::QueuedUnits;
+use crate::production::Refund;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Attributes, TechDef, TechState, is_age};
@@ -98,20 +99,20 @@ pub fn refund_master(
 /// `.dat` costs (each entry with an attribute and a paid flag: its amount plus the state's
 /// adjustment, which the research cost modifier, attribute 85 above 0 and not for an age,
 /// scales truncated to 16 bits), straight into the attributes, and is in state 1 with no work
-/// done. True when it was; in another state nothing happens.
+/// done ([`Refund::Refunded`]); in another state nothing happens ([`Refund::NoneQueued`]).
 pub fn refund_tech(
     state: &mut TechState,
     def: &TechDef,
     tech: TechId,
     attributes: &mut dyn Attributes,
     slots: Slots,
-) -> Result<bool, GenieError> {
+) -> Result<Refund, GenieError> {
     use crate::math::conversions::cvttss2si;
     if !matches!(
         state.state,
         ResearchState::Researching | ResearchState::Queued
     ) {
-        return Ok(false);
+        return Ok(Refund::NoneQueued);
     }
     let modifier = if is_age(tech) {
         0.0
@@ -135,7 +136,7 @@ pub fn refund_tech(
     }
     state.state = ResearchState::Available;
     state.research_done = Seconds::ZERO;
-    Ok(true)
+    Ok(Refund::Refunded)
 }
 
 /// The cost multiplier `FUN_14162ef60`'s callers pass (`DAT_14330eb8c`, 1.0).

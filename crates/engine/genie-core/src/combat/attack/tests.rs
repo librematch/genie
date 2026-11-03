@@ -5,7 +5,6 @@ use crate::combat::abilities::Look;
 use crate::combat::attack::Armament;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackerFlags;
-use crate::combat::attack::walks::MoveStart;
 use crate::combat::damage::Allied;
 use crate::combat::damage::HitKind;
 use crate::combat::missile::StrikeResult;
@@ -23,6 +22,7 @@ use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::MoveAlgorithm;
+use crate::movement::MoveStart;
 use crate::movement::TurnRate;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::{
