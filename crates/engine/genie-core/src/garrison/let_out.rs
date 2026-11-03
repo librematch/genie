@@ -22,6 +22,7 @@ use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
+use crate::production::spawn::FinderUse;
 use crate::unit_ai::StopOrder;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
@@ -322,7 +323,7 @@ impl World {
                         ai.remove_target();
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
-                    self.gather(up, ui, g, bid, OrderSource::Queued, false)?;
+                    self.gather(up, ui, g, bid, OrderSource::Queued, FinderUse::Skips)?;
                     return Ok(true);
                 }
                 g.point.ground()

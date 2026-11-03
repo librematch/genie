@@ -101,6 +101,15 @@ pub struct Ghost {
     pub state: ObjectState,
 }
 
+/// Whether a building's annex link is made, or not yet (during a load, before the rehook).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AnnexLink {
+    /// It is made.
+    Made,
+    /// Not yet.
+    Pending,
+}
+
 impl World {
     /// The vision mask of player `p` (`player+0x2a8`, [`crate::vision`]).
     fn vision_mask(&self, p: PlayerId) -> VisionBits {
@@ -217,22 +226,22 @@ impl World {
     /// `FUN_1411cc980`: a building its owner watches: not of class 51 or 54, not desolid
     /// (`+0xc60`), not an annex (`+0xbb8`, but a gate's), not master 1808.
     fn watches_building(&self, p: PlayerId, id: ObjectId) -> Result<bool, GenieError> {
-        self.watches_building_at(p, id, true)
+        self.watches_building_at(p, id, AnnexLink::Made)
     }
 
-    /// [`World::watches_building`], with the annex link made (`linked`) or, during a load before
-    /// the rehook, not yet: then an annex passes too.
+    /// [`World::watches_building`], with the annex link made or, during a load before the rehook,
+    /// not yet ([`AnnexLink`]): then an annex passes too.
     fn watches_building_at(
         &self,
         p: PlayerId,
         id: ObjectId,
-        linked: bool,
+        link: AnnexLink,
     ) -> Result<bool, GenieError> {
         let Some((_, u)) = self.object(id) else {
             return Ok(false);
         };
         let m = u.master(self.master_tables(), p)?;
-        let annex = linked && self.parts.building_of(u.id).annex_of.is_some();
+        let annex = link == AnnexLink::Made && self.parts.building_of(u.id).annex_of.is_some();
         Ok(
             !self.model.roles.of_class(m.class).contains(ClassRoles::UNWATCHED)
             && !self.parts.building_of(u.id).construction.is_some_and(|c| c.desolid)
@@ -302,7 +311,9 @@ impl World {
                 }
                 // a building's load constructor (FUN_1411ac170, type 80 only): FUN_1411cc980
                 // before the rehook links its annexes
-                if kind == MasterKind::BUILDING && self.watches_building_at(p, id, false)? {
+                if kind == MasterKind::BUILDING
+                    && self.watches_building_at(p, id, AnnexLink::Pending)?
+                {
                     let _ = self.watch(p, id, tile)?;
                 }
             }

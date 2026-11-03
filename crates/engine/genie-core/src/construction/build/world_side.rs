@@ -35,6 +35,16 @@ use crate::world::parts::Part;
 use crate::world::slots::PlayerSlots;
 use crate::world::{Player, World};
 
+/// How the player's slot 0x1c0 (`FUN_14162ce00`) makes an object: finished (its flag: the
+/// footprint cleared, a building worked at once) or plain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MakeMode {
+    /// Finished.
+    Finished,
+    /// Plain.
+    Plain,
+}
+
 impl World {
     /// What a built building's storage gave its owner leaves (`FUN_1411e63f0`, then
     /// `FUN_1411e6580`, [`crate::objects::lifecycle::death_parts::storage_leaves`]) outside its update.
@@ -294,7 +304,7 @@ impl World {
                 "a stack unit's completion with other players' units on it (+0xce0)",
             ));
         }
-        let Some(new) = self.make_new_object(p, stack.master, stack.at, true)? else {
+        let Some(new) = self.make_new_object(p, stack.master, stack.at, MakeMode::Finished)? else {
             return Ok(());
         };
         // the old building keeps the new object's id (`+0xcb0`, FUN_1411c5f70)
@@ -391,11 +401,12 @@ impl World {
         Ok(())
     }
 
-    /// The player's slot 0x1c0 (`FUN_14162ce00`) for `master` at `at`: the master's slot 0x40
-    /// makes the object (none for a master the player has not got, `FUN_141666a60`); with its
-    /// flag its footprint is cleared with `param_6` ([`crate::world::World::clear_footprint`]) and
-    /// a building is worked 10000 seconds at once ([`crate::world::World::work_building`]: a stack
-    /// unit completes there); a master that gathers by itself joins the visible-resource lists
+    /// The player's slot 0x1c0 (`FUN_14162ce00`) for `master` at `at`: the master's slot 0x40 makes
+    /// the object (none for a master the player has not got, `FUN_141666a60`); with its flag
+    /// ([`MakeMode::Finished`]) its footprint is cleared with `param_6`
+    /// ([`crate::world::World::clear_footprint`]) and a building is worked 10000 seconds at once
+    /// ([`crate::world::World::work_building`]: a stack unit completes there); a master that
+    /// gathers by itself joins the visible-resource lists
     /// ([`crate::world::World::made_new_object`]). The editor's part (mode 4) never runs in a game.
     /// Its id.
     ///
@@ -408,7 +419,7 @@ impl World {
         p: PlayerId,
         master: MasterId,
         at: Position,
-        flagged: bool,
+        mode: MakeMode,
     ) -> Result<Option<ObjectId>, GenieError> {
         let Some(made) = player_master(&self.model.masters, p, master).cloned() else {
             return Ok(None);
@@ -418,7 +429,7 @@ impl World {
         if made.kind == MasterKind::COMBAT {
             let idx = self.combat_object(p, master, &made, at)?;
             let id = self.players.live(p, idx)?.id;
-            if flagged {
+            if mode == MakeMode::Finished {
                 self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
@@ -431,7 +442,7 @@ impl World {
         if made.kind != MasterKind::BUILDING {
             let idx = self.plain_object(p, master, &made, at, Facing::Drawn)?;
             let id = self.players.live(p, idx)?.id;
-            if flagged {
+            if mode == MakeMode::Finished {
                 self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
@@ -441,7 +452,7 @@ impl World {
         }
         let ai = Ok(unit_ai_kind(&made, master, &self.model.roles));
         let (id, _) = self.make_building(p, master, ai, at)?;
-        if flagged {
+        if mode == MakeMode::Finished {
             self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             // the building made on a flagged stack is the foundation its work builds
             let _ = self.work_building(

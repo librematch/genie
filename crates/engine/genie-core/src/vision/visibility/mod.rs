@@ -47,7 +47,7 @@ mod explore;
 mod object_events;
 mod sight;
 
-pub use self::object_events::sight_taker;
+pub use self::object_events::{Seeing, sight_taker};
 pub use self::sight::LosSight;
 pub use self::sight::MasterChange;
 use crate::math::fmath::{at_most_or_unordered, sqrt};

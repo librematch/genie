@@ -57,6 +57,16 @@ pub fn sight_taker(
         .find(|&q| q != owner && mask.intersects(VisionBits::visible(q)))
 }
 
+/// Whether an object sees (state 2, not inside another): an ownership change moves only a seeing
+/// object's sight.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Seeing {
+    /// It sees.
+    Sees,
+    /// It does not.
+    Blind,
+}
+
 impl Visibility {
     /// `RGE_Combat_Object::update`'s sight (`0x14107dfb0`, after the actions): the object's mask
     /// is the unified map's word at its tile with those of its UMV entry's tiles on the map; an
@@ -212,18 +222,18 @@ impl Visibility {
         }
     }
 
-    /// An ownership change's sight (`FUN_14120f800`, once the new owner has the master): an
-    /// object that `sees` (state 2 and not inside another) loses its sight on the old owner's map
-    /// (slot 0x1d8 with the old owner) and gains it on the new one's (slot 0x1d0) with `los`, the
-    /// line of sight of the master of its own the change gave it (a livestock's takes the new
-    /// owner's).
+    /// An ownership change's sight (`FUN_14120f800`, once the new owner has the master): an object
+    /// that sees ([`Seeing::Sees`]: state 2 and not inside another) loses its sight on the old
+    /// owner's map (slot 0x1d8 with the old owner) and gains it on the new one's (slot 0x1d0) with
+    /// `los`, the line of sight of the master of its own the change gave it (a livestock's takes
+    /// the new owner's).
     pub fn owner_changed(
         &mut self,
         id: ObjectId,
         position: Position,
         radius: Footprint,
         (new, los): (PlayerId, f32),
-        sees: bool,
+        sees: Seeing,
         sight: SightLayer<'_>,
     ) -> Result<(), GenieError> {
         let SightLayer {
@@ -233,7 +243,7 @@ impl Visibility {
         if !self.seers.contains_key(id) {
             return Ok(());
         }
-        if sees {
+        if sees == Seeing::Sees {
             self.sight_off(
                 id,
                 position,
@@ -250,7 +260,7 @@ impl Visibility {
             s.player = new;
             s.los = Distance::new(los);
         }
-        if sees {
+        if sees == Seeing::Sees {
             let _ = self.sight_on(
                 id,
                 position,

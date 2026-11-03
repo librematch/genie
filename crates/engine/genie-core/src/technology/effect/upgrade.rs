@@ -2,6 +2,7 @@
 //! kinds and a negative cost's entries.
 
 use crate::GenieError;
+use crate::construction::build::world_side::MakeMode;
 use crate::garrison::ContainerId;
 use crate::map::Point;
 use crate::math::rng::Stream;
@@ -23,6 +24,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::UpgradeMode;
 use crate::technology::effect::attribute_modifier::EffectHook;
+use crate::technology::upgrade::UpgradeMaster;
 use crate::technology::{CostEdit, CostUnits, ObjectsKind};
 use crate::world::Player;
 use crate::world::World;
@@ -98,7 +100,11 @@ impl World {
                     .is_some_and(|e| d.copy_id != e.copy_id)
             });
         let dead = dead.cloned();
-        let keep = mode.keeps_masters();
+        let keep = if mode.keeps_masters() {
+            UpgradeMaster::Kept
+        } else {
+            UpgradeMaster::Replaced
+        };
         let (old, new) = (old.clone(), new.clone());
         if mode.one_object()
             && let Some(id) = object
@@ -114,7 +120,7 @@ impl World {
         }
         // the upgrades to 0x67f and 0x6a1 move the tracker's list of `from` (FUN_14104fd10)
         self.track_move_upgraded(p, from, to)?;
-        if keep
+        if keep == UpgradeMaster::Kept
             && old.kind == new.kind
             && let Some(m) = Arc::make_mut(self.model.masters.checked_mut(p.index())?).get_mut(from)
         {
@@ -133,7 +139,7 @@ impl World {
             let reads = self.master_read(p, u)?;
             if upgradable(reads.kind, u.life.state) {
                 self.set_part(id, Part::OwnMaster(Box::new(reads.clone())))?;
-                self.upgrade_object(p, place, (&reads, new), true)?;
+                self.upgrade_object(p, place, (&reads, new), UpgradeMaster::Kept)?;
                 if let Some(own) = self.parts.own_master.get_mut(id) {
                     own.copy_from(new);
                 }
@@ -148,7 +154,7 @@ impl World {
     fn upgrade_walk(
         &mut self,
         p: PlayerId,
-        (from, mode, keep): (MasterId, UpgradeMode, bool),
+        (from, mode, keep): (MasterId, UpgradeMode, UpgradeMaster),
         Masters { old, new, dead }: Masters<'_>,
     ) -> Result<(), GenieError> {
         use crate::technology::upgrade::upgradable;
@@ -173,7 +179,7 @@ impl World {
                 && upgradable(own.kind, state)
             {
                 let own = own.clone();
-                self.upgrade_object(p, place, (&own, new), true)?;
+                self.upgrade_object(p, place, (&own, new), UpgradeMaster::Kept)?;
                 if let Some(m) = self.parts.own_master.get_mut(id) {
                     m.copy_from(new);
                 }
@@ -310,7 +316,8 @@ impl World {
                     break;
                 };
                 let position = building.position();
-                let Some(new) = self.make_new_object(owner, made, position, true)? else {
+                let Some(new) = self.make_new_object(owner, made, position, MakeMode::Finished)?
+                else {
                     continue;
                 };
                 let Some((bp, bu)) = self.object(b) else {

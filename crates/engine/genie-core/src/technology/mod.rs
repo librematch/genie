@@ -319,22 +319,21 @@ impl TechState {
         Some((attribute, v, c.paid))
     }
 
-    /// The research test (`FUN_1413cd600` without a building's holdings, `param_4` and
-    /// `param_5` 0): a technology not in state 1 passes only with `repeat` (`param_6`), a state
-    /// other than −1 and 0 and multiple researches allowed, or of the shared kind; then each
-    /// paid cost needs the player's attribute to hold at least its amount. The game's
-    /// per-technology overrides (`FUN_140f39f40` on the game's `+0x18`) are not held: none
-    /// (probed for Loom, 22).
+    /// The research test (`FUN_1413cd600` without a building's holdings, `param_4` and `param_5`
+    /// 0): a technology not in state 1 passes only with [`Repeat::Allowed`] (`param_6`), a state
+    /// other than −1 and 0 and multiple researches allowed, or of the shared kind; then each paid
+    /// cost needs the player's attribute to hold at least its amount. The game's per-technology
+    /// overrides (`FUN_140f39f40` on the game's `+0x18`) are not held: none (probed for Loom, 22).
     pub fn can_research(
         &self,
         def: &TechDef,
         factors: (f32, i16),
-        repeat: bool,
+        repeat: Repeat,
         attribute: &dyn Fn(AttributeId) -> Result<Amount, GenieError>,
     ) -> Result<bool, GenieError> {
         let shared = def.kind == TechKind::SHARED;
         if self.state != ResearchState::Available
-            && (!repeat
+            && (repeat == Repeat::Denied
                 || self.state == ResearchState::Disabled
                 || self.state == ResearchState::Unavailable
                 || !self.allow_multiple)
@@ -368,7 +367,7 @@ impl TechState {
         &mut self,
         def: &TechDef,
         factors: (f32, i16),
-        repeat: bool,
+        repeat: Repeat,
         building: MasterId,
         attributes: &mut dyn Attributes,
         slots: Slots,
@@ -409,16 +408,37 @@ impl TechState {
 
     /// `FUN_1413d1050`: the technology may be queued again (not of the shared kind, multiple
     /// researches allowed, and its researches queued and done below its cap with `stack`, or
-    /// below 0x100 under the player's `+0x648`, `many`).
+    /// below 0x100 under the player's `+0x648`, [`RepeatLimit::Raised`]).
     #[must_use]
-    pub fn repeatable(&self, def: &TechDef, many: bool) -> bool {
+    pub fn repeatable(&self, def: &TechDef, limit: RepeatLimit) -> bool {
         if def.kind == TechKind::SHARED || !self.allow_multiple {
             return false;
         }
         let done = i32::from(self.pending.get()) + i32::from(self.times_researched.get());
         let capped = done < i32::from(self.research_cap.limit());
-        (self.stack && capped) || (many && done < 0x100)
+        (self.stack && capped) || (limit == RepeatLimit::Raised && done < 0x100)
     }
+}
+
+/// Whether the research test lets a technology not in state 1 pass again (`FUN_1413cd600`'s
+/// `param_6`, `FUN_14162fd90`'s and `FUN_1413d1740`'s repeat flag): a repeatable one
+/// ([`TechState::repeatable`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Repeat {
+    /// It may pass again.
+    Allowed,
+    /// Only a technology in state 1 passes.
+    Denied,
+}
+
+/// The researches [`TechState::repeatable`] allows: below the technology's own cap with its
+/// `stack`, or also below 0x100 (the player's `+0x648` set, which genie's player does not hold).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepeatLimit {
+    /// Its own cap.
+    Own,
+    /// Below 0x100 as well.
+    Raised,
 }
 
 /// The player's attributes as a technology's costs read and write them.
@@ -505,7 +525,7 @@ mod tests {
                 .map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
-        assert!(!s.repeatable(&d, false));
+        assert!(!s.repeatable(&d, RepeatLimit::Own));
         // the game's attributes in 3842 (80 food, 157 wood, 200 stone, 100 gold) and after it
         let mut held = Held([
             Amount::new(79.956_116),
@@ -514,7 +534,14 @@ mod tests {
             Amount::new(100.0),
         ]);
         assert_eq!(
-            s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held, slots()),
+            s.pay(
+                &d,
+                (0.0, 1),
+                Repeat::Denied,
+                ids::TOWN_CENTRE,
+                &mut held,
+                slots()
+            ),
             Ok(true)
         );
         assert_eq!(held.0, amounts([79.956_116, 157.05705, 200.0, 50.0]));
@@ -524,7 +551,14 @@ mod tests {
         );
         // queued, it may not be researched again
         assert_eq!(
-            s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held, slots()),
+            s.pay(
+                &d,
+                (0.0, 1),
+                Repeat::Denied,
+                ids::TOWN_CENTRE,
+                &mut held,
+                slots()
+            ),
             Ok(false)
         );
         // its queue entry records the 50 gold, which its start finds paid
@@ -559,12 +593,26 @@ mod tests {
         ]);
         // the test asks for 50 wood: 30 is too little
         assert_eq!(
-            s.pay(&d, (0.0, 1), false, ids::TOWN_CENTRE, &mut held, slots()),
+            s.pay(
+                &d,
+                (0.0, 1),
+                Repeat::Denied,
+                ids::TOWN_CENTRE,
+                &mut held,
+                slots()
+            ),
             Ok(false)
         );
         // the modifier scales the amount (truncated) before the test
         assert_eq!(
-            s.pay(&d, (0.5, 1), false, ids::TOWN_CENTRE, &mut held, slots()),
+            s.pay(
+                &d,
+                (0.5, 1),
+                Repeat::Denied,
+                ids::TOWN_CENTRE,
+                &mut held,
+                slots()
+            ),
             Ok(true)
         );
         assert_eq!(held.0, amounts([0.0, 5.0, 0.0, 100.0]));

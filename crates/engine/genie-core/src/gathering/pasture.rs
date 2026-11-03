@@ -4,6 +4,7 @@
 //! pasture's food.
 
 use crate::GenieError;
+use crate::construction::build::world_side::MakeMode;
 use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Point;
@@ -134,7 +135,9 @@ impl World {
                 let p = points.checked(i)?;
                 (p.x(), p.y())
             };
-            if let Some(new) = self.make_new_object(p, kind, Position::new(x, y, at.z()), false)? {
+            if let Some(new) =
+                self.make_new_object(p, kind, Position::new(x, y, at.z()), MakeMode::Plain)?
+            {
                 let _ = points.remove(i);
                 if let Some((_, layer)) = self.object_and_layer_mut(id)? {
                     layer.livestock.push(new);

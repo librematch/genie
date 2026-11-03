@@ -2,6 +2,7 @@
 //! and the way back.
 
 use crate::GenieError;
+use crate::commands::UnitOrderAction;
 use crate::gathering::DropSiteId;
 use crate::gathering::drop_sites::DropMeasure;
 use crate::gathering::drop_sites::SitePlace;
@@ -44,20 +45,20 @@ use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 
 impl World {
-    /// `UNIT_ORDER`'s drop-off of a carrying unit without a gather action on top
-    /// (`FUN_14161e370`'s case 8, past the Gather, Hunt and Build): a master with drop sites
-    /// (`FUN_14109e210`: one not below 0) searches them from the unit ([`World::ordered_drop_site`]);
-    /// with none found, or without drop sites, the drop-site table's nearest building for the
-    /// resource it holds from its class ([`World::table_drop_site`]); with none, nothing. A unit
-    /// (type 70 and up) then works on it (slot 0x7e8 at (−1, −1, −1): no carried-resource test,
-    /// the task filter 110 for a load of meat, wood or food, kinds 15, 1 and 0, else 5;
-    /// [`World::order_work`]) and, for the drop-off 8 (`way_back`), queues its way back to work
+    /// `UNIT_ORDER`'s drop-off of a carrying unit without a gather action on top (`FUN_14161e370`'s
+    /// case 8, past the Gather, Hunt and Build): a master with drop sites (`FUN_14109e210`: one not
+    /// below 0) searches them from the unit ([`World::ordered_drop_site`]); with none found, or
+    /// without drop sites, the drop-site table's nearest building for the resource it holds from
+    /// its class ([`World::table_drop_site`]); with none, nothing. A unit (type 70 and up) then
+    /// works on it (slot 0x7e8 at (−1, −1, −1): no carried-resource test, the task filter 110 for a
+    /// load of meat, wood or food, kinds 15, 1 and 0, else 5; [`World::order_work`]) and, for the
+    /// drop-off 8 ([`UnitOrderAction::DropOffAndBack`]), queues its way back to work
     /// ([`World::queue_way_back`]).
     pub(super) fn drop_off_unasked(
         &mut self,
         p: PlayerId,
         idx: ListIndex,
-        way_back: bool,
+        action: UnitOrderAction,
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(p, idx)?;
         let master = unit.master(self.master_tables(), p)?;
@@ -94,7 +95,7 @@ impl World {
             source: OrderSource::Queued,
         };
         self.order_work(p, idx, &work)?;
-        if way_back {
+        if action == UnitOrderAction::DropOffAndBack {
             self.queue_way_back(p, idx)?;
         }
         Ok(())

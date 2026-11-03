@@ -25,6 +25,16 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::generated::MovementTuning;
 
+/// Whether slot 195's turn ([`Mover::turn_toward`]) took the whole angle or fell short of it (the
+/// angle above the most, clipped), which brakes the unit ([`Mover::control_speed`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Turn {
+    /// The whole angle.
+    Whole,
+    /// Clipped to the most.
+    Clipped,
+}
+
 impl Mover {
     /// The walk's kept hits (`0x141150f00` after its first hit loop, which took them into the
     /// include list with their temporary shapes, [`include_kept`]): each hit but the walked
@@ -130,14 +140,14 @@ impl Mover {
 
     /// Turn toward `direction` (slot 195, [`Mover::turn_toward`], from the flat forward vector
     /// renormalised, with [`Mover::turn_dt`]), then the yaw by the turn ([`Mover::yaw`]) unless
-    /// the walked level's flags have bit 0 and the turn is 0. Returns whether the turn fell short
-    /// (the angle was above the most), which brakes the unit ([`Mover::control_speed`]).
+    /// the walked level's flags have bit 0 and the turn is 0. Returns the turn's reach ([`Turn`]),
+    /// whose clip brakes the unit ([`Mover::control_speed`]).
     pub(super) fn steer(
         &mut self,
         direction: BVector,
         dt: Seconds,
         movement_tuning: &MovementTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Turn, GenieError> {
         let mut flat = self.forward;
         flat = flat.with_height(0.0);
         let flat = normalize(flat);
@@ -173,15 +183,15 @@ impl Mover {
         forward: BVector,
         direction: BVector,
         dt: Seconds,
-    ) -> (Angle, bool) {
+    ) -> (Angle, Turn) {
         let angle = angle_between(direction, forward);
         let most = self.stats.turn_rate * dt;
         let (mut turn, clipped) = if at_most_or_unordered(angle, most.get()) {
-            (Angle::new(angle), false)
+            (Angle::new(angle), Turn::Whole)
         } else if angle < 0.0 {
-            (-most, true)
+            (-most, Turn::Clipped)
         } else {
-            (most, true)
+            (most, Turn::Clipped)
         };
         if 0.0 < cross(direction, forward).height() {
             turn = -turn;
@@ -255,7 +265,7 @@ impl Mover {
     /// unless the waypoint lies inside the turning circle, where it brakes. The way to the
     /// waypoint and the circle start where the unit last moved to (`+0x824`,
     /// [`Mover::moved_at`]).
-    pub(super) fn control_speed(&mut self, waypoint: BVector, clipped: bool) {
+    pub(super) fn control_speed(&mut self, waypoint: BVector, clipped: Turn) {
         let position = self.moved_at.vector();
         let Some(v) = self.velocity.as_mut() else {
             self.velocity = Some(Velocity {
@@ -264,7 +274,7 @@ impl Mover {
             });
             return;
         };
-        if clipped {
+        if clipped == Turn::Clipped {
             v.acceleration = v.acceleration.with_y(-f32::MAX);
             v.velocity = v.velocity.with_y(0.0);
             return;

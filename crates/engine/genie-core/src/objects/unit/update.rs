@@ -17,6 +17,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit, loses_actions};
 use crate::ownership::capture::Captured;
+use crate::unit_ai::UnitAi;
 use crate::unit_ai::task_finder::world::wait_progress;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
@@ -60,10 +61,7 @@ impl Unit {
         roles: &Roles,
     ) -> Result<Option<Outcome>, GenieError> {
         self.death_blast(actions, c, roles)?;
-        if self.go_to_sleep(
-            c.w.parts.mover_of(self.id),
-            c.w.parts.unit_ai.contains(self.id),
-        )? {
+        if self.go_to_sleep(c.w.parts.mover_of(self.id), c.w.parts.unit_ai.get(self.id))? {
             return Ok(None);
         }
         self.take_sprite_facets(c.w.parts.mover_mut(self.id));
@@ -214,12 +212,12 @@ impl Unit {
     pub(crate) fn go_to_sleep(
         &mut self,
         mover: Option<&Mover>,
-        has_ai: bool,
+        ai: Option<&UnitAi>,
     ) -> Result<bool, GenieError> {
         if !self.life.goto_sleep {
             return Ok(false);
         }
-        if self.life.class != Class::Static || mover.is_some() || has_ai {
+        if self.life.class != Class::Static || mover.is_some() || ai.is_some() {
             return Err(GenieError::unsupported(
                 "an object above the static type goes to sleep",
             ));

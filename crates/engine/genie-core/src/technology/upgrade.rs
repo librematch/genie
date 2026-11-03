@@ -78,9 +78,20 @@ fn keeps_unit_ai(roles: &Roles, new: ClassId, old: ClassId) -> bool {
         || (new.contains(ClassRoles::SHARES_UNIT_AI) && old.contains(ClassRoles::SHARES_UNIT_AI))
 }
 
+/// Whether an upgraded object keeps its master (the upgrade's modes −1 and 3, whose master then
+/// copies the new one) or takes the new master.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UpgradeMaster {
+    /// Its master stays.
+    Kept,
+    /// The new master replaces it.
+    Replaced,
+}
+
 impl World {
     /// Slot 0x98 of player `p`'s object at `place`, whose master `old` upgrades to `new`; with
-    /// `keep` (the upgrade's modes −1 and 3, whose master then copies `new`) its master stays.
+    /// [`UpgradeMaster::Kept`] (the upgrade's modes −1 and 3, whose master then copies `new`) its
+    /// master stays.
     /// In the game's order, outermost class first:
     ///
     /// - a building (`FUN_1411c4660`) showing `old`'s construction sprite shows `new`'s (slot
@@ -91,11 +102,11 @@ impl World {
     ///   0x8a8 rebuilds what the object keeps of `new`'s tasks, which the slice reads from the
     ///   master;
     /// - an action object (`FUN_14106a530`): each action takes `new`'s task of its type, class
-    ///   and target (`FUN_140a97970`, [`World::actions_take_master`]); without `keep` a top
+    ///   and target (`FUN_140a97970`, [`World::actions_take_master`]); with [`UpgradeMaster::Replaced`] a top
     ///   action of a type `new` has no task for stops the object (slot 0x148);
     /// - a moving object (`FUN_14114cb80`) showing `old`'s walking or running sprite shows
     ///   `new`'s;
-    /// - the static object (`FUN_141186580`): without `keep` a combat object leaves its class
+    /// - the static object (`FUN_141186580`): with [`UpgradeMaster::Replaced`] a combat object leaves its class
     ///   counters ([`crate::objects::lifecycle::death_parts::count_class`] with −1) and a villager's load goes to its
     ///   player (slot 0xf8 with 1 and 1, the foods as food; the statistics are not
     ///   simulation); on the map in state 2 its sight goes and comes with `new`'s line of sight
@@ -103,7 +114,7 @@ impl World {
     ///   the damage sprites at full hit points first, [`damage_sprites`]); showing `old`'s
     ///   standing, second standing, dying or undead sprite it shows `new`'s; a combat object of
     ///   two masters with charges takes the change of the maximum (`+0x9e0`); in state 2 the
-    ///   damage sprites again with `new`; without `keep` the master is `new` and the class
+    ///   damage sprites again with `new`; with [`UpgradeMaster::Replaced`] the master is `new` and the class
     ///   counters take it back (+1);
     /// - a combat object whose class changes takes a new unit AI ([`class_changes`],
     ///   `FUN_141215a90`); a building with an adjacent mode turns its facets (`FUN_1411ce890`,
@@ -122,7 +133,7 @@ impl World {
         p: PlayerId,
         place: Place,
         (old, new): (&Master, &Master),
-        keep: bool,
+        keep: UpgradeMaster,
     ) -> Result<(), GenieError> {
         let kind = old.kind;
         if MasterKind::BUILDING <= kind {
@@ -157,12 +168,12 @@ impl World {
             self.upgrade_moving_sprite(place, (old, new))?;
         }
         // the static object's part
-        if !keep {
+        if keep == UpgradeMaster::Replaced {
             self.hand_in_load(p, place, old)?;
         }
         self.upgrade_sight(place, (old, new), keep)?;
         self.upgrade_hit_points(place, (old, new))?;
-        if !keep {
+        if keep == UpgradeMaster::Replaced {
             self.object_at_mut(place)?.life.master_id = new.id;
             if MasterKind::COMBAT <= kind {
                 count_class(
@@ -186,10 +197,10 @@ impl World {
         &mut self,
         place: Place,
         (old, new): (&Master, &Master),
-        keep: bool,
+        keep: UpgradeMaster,
     ) -> Result<(), GenieError> {
         self.actions_take_master(place, old, new)?;
-        if !keep
+        if keep == UpgradeMaster::Replaced
             && let Some(top) = self
                 .parts
                 .actions_of(self.object_at(place)?.id)
@@ -276,14 +287,14 @@ impl World {
         Ok(())
     }
 
-    /// An upgrade's sight (`FUN_141186580`): an object in state 2 on the map, not inside
-    /// another, takes its sight off and on again with its line of sight moved by the change
-    /// from `old`'s to `new`'s (slots 0x1d8 and 0x1d0); without `keep` its seer takes `new`'s id.
+    /// An upgrade's sight (`FUN_141186580`): an object in state 2 on the map, not inside another,
+    /// takes its sight off and on again with its line of sight moved by the change from `old`'s to
+    /// `new`'s (slots 0x1d8 and 0x1d0); with [`UpgradeMaster::Replaced`] its seer takes `new`'s id.
     fn upgrade_sight(
         &mut self,
         place: Place,
         (old, new): (&Master, &Master),
-        keep: bool,
+        keep: UpgradeMaster,
     ) -> Result<(), GenieError> {
         let id = self.object_at(place)?.id;
         let u = self.object_at(place)?;
@@ -313,7 +324,7 @@ impl World {
             )?;
             if let Some(s) = sight.seer_mut(id) {
                 s.los = los;
-                if !keep {
+                if keep == UpgradeMaster::Replaced {
                     s.master = new.id;
                 }
             }
@@ -1455,7 +1466,8 @@ mod tests {
         };
         let place = Place::Live(PlayerId::new(1), ListIndex::new(0));
         let mut kept = t.clone();
-        kept.upgrade_actions(place, (&old, &bare), true).unwrap();
+        kept.upgrade_actions(place, (&old, &bare), UpgradeMaster::Kept)
+            .unwrap();
         assert!(
             kept.parts
                 .actions_of(kept.players[1].objects[ListIndex::new(0)].id)
@@ -1464,7 +1476,8 @@ mod tests {
                 .is_some()
         );
         let mut same = t.clone();
-        same.upgrade_actions(place, (&old, &old), false).unwrap();
+        same.upgrade_actions(place, (&old, &old), UpgradeMaster::Replaced)
+            .unwrap();
         assert!(
             same.parts
                 .actions_of(same.players[1].objects[ListIndex::new(0)].id)
@@ -1472,7 +1485,8 @@ mod tests {
                 .gather()
                 .is_some()
         );
-        t.upgrade_actions(place, (&old, &bare), false).unwrap();
+        t.upgrade_actions(place, (&old, &bare), UpgradeMaster::Replaced)
+            .unwrap();
         assert!(
             t.parts
                 .actions_of(t.players[1].objects[ListIndex::new(0)].id)
@@ -1614,7 +1628,7 @@ mod tests {
             line_of_sight: Distance::new(6.0),
             ..Master::default()
         };
-        let sighted = |state: ObjectState, inside: Option<ObjectId>, keep: bool| {
+        let sighted = |state: ObjectState, inside: Option<ObjectId>, keep: UpgradeMaster| {
             let mut u = object(10, master_id(4), state, HitPoints::new(10.0));
             u.place_for_test(Position::new(5.5, 5.5, 0.0));
             u.life.inside = inside.map(ContainerId::new);
@@ -1678,19 +1692,23 @@ mod tests {
             seer.map(|s| (s.los, s.master))
         };
         assert_eq!(
-            sighted(ObjectState::Alive, None, false),
+            sighted(ObjectState::Alive, None, UpgradeMaster::Replaced),
             Some((Distance::new(7.0), master_id(5)))
         );
         assert_eq!(
-            sighted(ObjectState::Alive, None, true),
+            sighted(ObjectState::Alive, None, UpgradeMaster::Kept),
             Some((Distance::new(7.0), master_id(4)))
         );
         assert_eq!(
-            sighted(ObjectState::Alive, Some(object_id(99)), false),
+            sighted(
+                ObjectState::Alive,
+                Some(object_id(99)),
+                UpgradeMaster::Replaced
+            ),
             Some((Distance::new(5.0), master_id(4)))
         );
         assert_eq!(
-            sighted(ObjectState::DyingSprite, None, false),
+            sighted(ObjectState::DyingSprite, None, UpgradeMaster::Replaced),
             Some((Distance::new(5.0), master_id(4)))
         );
     }

@@ -26,7 +26,6 @@
     clippy::similar_names,
     clippy::suspicious_operation_groupings,
     clippy::struct_excessive_bools,
-    clippy::fn_params_excessive_bools,
     clippy::useless_let_if_seq,
     clippy::unused_self,
     // the contexts are bundles of references, passed by value

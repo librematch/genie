@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::MissileCount;
+use crate::combat::attack::Armament;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{AttackReads, Fight};
 use crate::combat::damage::Victim;
@@ -81,8 +82,15 @@ impl Unit {
             return self.attack_walks_unseen(actions, c, me, master_class, roles);
         }
         let attack = actions.list.attack_mut().ok_or(NO_ATTACK)?;
-        let (code, disarmed) =
-            attack.update_targetless(c.dt.seconds(), armed, c.w.parts.motion_mut(self.id))?;
+        let (code, disarmed) = attack.update_targetless(
+            c.dt.seconds(),
+            if armed {
+                Armament::Armed
+            } else {
+                Armament::Unarmed
+            },
+            c.w.parts.motion_mut(self.id),
+        )?;
         if disarmed {
             let posted = attack.disarmed(
                 &mut self.sprite,

@@ -26,6 +26,7 @@ use crate::players::game_status::GameStatus;
 use crate::vision::SightLayer;
 use crate::vision::own_masks;
 use crate::vision::visibility::MasterChange;
+use crate::vision::visibility::Seeing;
 use crate::vision::visibility::Visibility;
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::index::ObjectsRef;
@@ -191,15 +192,15 @@ impl Spatial {
             .map_or(Ok(()), |v| v.records_owner(id, new))
     }
 
-    /// An ownership change's world part (`FUN_14120f800`, once the new owner has the master):
-    /// the object's place takes the new owner, and an object that `sees` moves its sight to the
-    /// new owner's map with `los` ([`Visibility::owner_changed`]).
+    /// An ownership change's world part (`FUN_14120f800`, once the new owner has the master): the
+    /// object's place takes the new owner, and an object that sees ([`Seeing::Sees`]) moves its
+    /// sight to the new owner's map with `los` ([`Visibility::owner_changed`]).
     pub fn change_owner(
         &mut self,
         id: ObjectId,
         new: PlayerId,
         los: Distance,
-        sees: bool,
+        sees: Seeing,
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {

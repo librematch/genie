@@ -52,6 +52,7 @@ mod states;
 mod unit;
 mod unit_ai_side;
 mod update;
+pub use self::update::Armament;
 mod walk_and_swing;
 mod walks;
 mod work_slots;

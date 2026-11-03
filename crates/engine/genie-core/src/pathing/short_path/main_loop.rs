@@ -115,10 +115,12 @@ impl Search<'_> {
             let poly = self.poly(pi)?.clone();
             if forward {
                 self.rewalk_corner(&walk, &poly, (fv, gf), (WalkDir::Forward, e, fv))?;
-                (fv, gf, alive_f) = self.rewalk_advance(&walk, &poly, (fv, gf), true)?;
+                (fv, gf, alive_f) =
+                    self.rewalk_advance(&walk, &poly, (fv, gf), WalkDir::Forward)?;
             } else {
                 self.rewalk_corner(&walk, &poly, (bv, gb), (WalkDir::Backward, bv, next0))?;
-                (bv, gb, alive_b) = self.rewalk_advance(&walk, &poly, (bv, gb), false)?;
+                (bv, gb, alive_b) =
+                    self.rewalk_advance(&walk, &poly, (bv, gb), WalkDir::Backward)?;
             }
         }
     }
@@ -178,7 +180,7 @@ impl Search<'_> {
         walk: &Rewalk,
         poly: &Poly,
         (from, g): (VertexIndex, FixedDistance),
-        forward: bool,
+        dir: WalkDir,
     ) -> Result<(VertexIndex, FixedDistance, bool), GenieError> {
         let m = walk.count;
         // the costs as the search holds them, the vertices from the walk's copy
@@ -186,7 +188,7 @@ impl Search<'_> {
         let (mut vi, mut g) = (from, g);
         let mut at = poly.vertex(from)?;
         loop {
-            vi = if forward {
+            vi = if dir == WalkDir::Forward {
                 vi.next_in(m)
             } else {
                 vi.prev_in(m)

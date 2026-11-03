@@ -77,7 +77,7 @@ pub fn take(
                 factor,
                 blast_taken,
             };
-            take_building(t, src, others, strike, true, layer).map(|_| ())
+            take_building(t, src, others, strike, HitRoute::Dealt, layer).map(|_| ())
         }
         _ => {
             take_static(t, &src.source, weapons, factor, roles);
@@ -136,35 +136,45 @@ fn kill_counts(
     ])
 }
 
-/// A building's slot 0xe8 (`FUN_1411cea90`), `forward` the flag every caller sets (clear for the
-/// main building's hit an annex forwards). Its wake from semi-asleep (`+0xc98`: the flag cleared,
-/// `FUN_14119deb0` with 0, the owner's `+0x80` list, `FUN_14107db90`) never runs here: only the
-/// building's load sets that flag (`FUN_1411df160` -> `FUN_1411ddd20` with the save's
-/// `temp_semi_asleep`), and no saved building of the 158041 recordings has it (1473 headers read);
-/// the slice does not hold it. With `forward`, an annex (`+0xbb8`) gives the hit to its main
-/// building among `others` (whose slot 0xe8 runs with the flag clear and the same `blast_taken`)
-/// and takes its hit points when that hit got past its hit point test. Else at 0 hit points or
-/// fewer (`COMISS 0, hp` / `JNC`: a NaN goes on) nothing happens. The damage ([`damage`]); without
-/// a blast's damage so far (`UCOMISS blast_taken, 0`: exactly 0), a hit that took less than its
-/// least ([`ONE`]; `DamageTuning::least_class_hit` from the
-/// [`ClassRoles::LEAST_HIT`](crate::world::layer::ClassRoles::LEAST_HIT) under the game's setting
-/// `+0x680` at 1) takes the least again (slot 0xb0 with it; `COMISS least, lost` / `JBE` past). Not
-/// held: the statistics (`FUN_1417783d0`) and the local player's telemetry (`FUN_140a4b540`). A
-/// player's building (`+0x718` above 0) left below 1 hit point (`COMISS 1, hp` / `JBE` past) is
-/// razed ([`Razed`]): a castle's or a wonder's history event; but for an annex or a wall (class
-/// 27), the razing counts, or a trebuchet's kill counts unless its kill is counted (`+0x954`, which
-/// its damage's kill sets: slot 0x8b0's `FUN_14107da00`; a building at 0 hit points takes no hit,
-/// so no earlier one did), then the kill bonus ([`kill_bonus`]) and the razing values (172, 153).
-/// Then `damaged_lately_timer` (`+0x30d`) is 60 and its annexes take its hit points (the write-back
-/// gives them to those `others` does not hold, [`Building::struck`]); with `forward`, an attacker
-/// of type 50 and up leaves a building of 1 hit point or more (`COMISS hp, 1` / `JC` past) to its
-/// effects ([`attack_effects`]). Answers whether the hit got past the hit point test.
+/// How a hit reaches a building's slot 0xe8 (`FUN_1411cea90`): as dealt (its flag set, which
+/// every caller sets) or forwarded by an annex to its main building (the flag clear).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum HitRoute {
+    /// As dealt.
+    Dealt,
+    /// Forwarded by an annex.
+    Forwarded,
+}
+
+/// A building's slot 0xe8 (`FUN_1411cea90`), its flag the hit's `route` ([`HitRoute`]). Its wake
+/// from semi-asleep (`+0xc98`: the flag cleared, `FUN_14119deb0` with 0, the owner's `+0x80` list,
+/// `FUN_14107db90`) never runs here: only the building's load sets that flag (`FUN_1411df160` ->
+/// `FUN_1411ddd20` with the save's `temp_semi_asleep`), and no saved building of the 158041
+/// recordings has it (1473 headers read); the slice does not hold it. A hit [`HitRoute::Dealt`] to
+/// an annex (`+0xbb8`) gives the hit to its main building among `others` (whose slot 0xe8 runs with
+/// the flag clear and the same `blast_taken`) and takes its hit points when that hit got past its
+/// hit point test. Else at 0 hit points or fewer (`COMISS 0, hp` / `JNC`: a NaN goes on) nothing
+/// happens. The damage ([`damage`]); without a blast's damage so far (`UCOMISS blast_taken, 0`:
+/// exactly 0), a hit that took less than its least ([`ONE`]; `DamageTuning::least_class_hit` from
+/// the [`ClassRoles::LEAST_HIT`](crate::world::layer::ClassRoles::LEAST_HIT) under the game's
+/// setting `+0x680` at 1) takes the least again (slot 0xb0 with it; `COMISS least, lost` / `JBE`
+/// past). Not held: the statistics (`FUN_1417783d0`) and the local player's telemetry
+/// (`FUN_140a4b540`). A player's building (`+0x718` above 0) left below 1 hit point (`COMISS 1, hp`
+/// / `JBE` past) is razed ([`Razed`]): a castle's or a wonder's history event; but for an annex or
+/// a wall (class 27), the razing counts, or a trebuchet's kill counts unless its kill is counted
+/// (`+0x954`, which its damage's kill sets: slot 0x8b0's `FUN_14107da00`; a building at 0 hit
+/// points takes no hit, so no earlier one did), then the kill bonus ([`kill_bonus`]) and the razing
+/// values (172, 153). Then `damaged_lately_timer` (`+0x30d`) is 60 and its annexes take its hit
+/// points (the write-back gives them to those `others` does not hold, [`Building::struck`]); a
+/// dealt hit's attacker of type 50 and up leaves a building of 1 hit point or more (`COMISS hp, 1`
+/// / `JC` past) to its effects ([`attack_effects`]). Answers whether the hit got past the hit point
+/// test.
 pub(super) fn take_building(
     t: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
     strike: Strike<'_>,
-    forward: bool,
+    route: HitRoute,
     layer: HitLayer<'_>,
 ) -> Result<bool, GenieError> {
     let HitLayer {
@@ -179,7 +189,9 @@ pub(super) fn take_building(
     } = strike;
     let before = t.hp;
     let main = t.building.as_ref().and_then(|b| b.main);
-    if forward && let Some(main) = main {
+    if route == HitRoute::Dealt
+        && let Some(main) = main
+    {
         return forward_to_main(t, src, others, strike, main, layer);
     }
     if HitPoints::ZERO >= t.hp {
@@ -242,7 +254,8 @@ pub(super) fn take_building(
     for a in others.iter_mut().filter(|a| annexes.contains(&a.id)) {
         a.hp = t.hp;
     }
-    if forward && MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
+    if route == HitRoute::Dealt && MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE)
+    {
         attack_effects(&src.source, t)?;
     }
     Ok(true)
@@ -265,7 +278,7 @@ fn forward_to_main(
         .position(|v| v.id == main.id())
         .ok_or(NOT_HELD)?;
     let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
-    let struck = take_building(&mut m, src, others, strike, false, layer);
+    let struck = take_building(&mut m, src, others, strike, HitRoute::Forwarded, layer);
     let annexed = m
         .building
         .as_ref()

@@ -50,6 +50,7 @@ use crate::testing::class::NO_CLASS;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
+use crate::unit_ai::UnitAi;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
@@ -83,17 +84,17 @@ fn static_object_flagged_to_sleep_ends_its_update() {
         ..Unit::default()
     };
     let mut u = flagged(Class::Static);
-    assert_eq!(u.go_to_sleep(None, false), Ok(true));
+    assert_eq!(u.go_to_sleep(None, None), Ok(true));
     assert!(!u.life.goto_sleep);
-    assert_eq!(u.go_to_sleep(None, false), Ok(false));
+    assert_eq!(u.go_to_sleep(None, None), Ok(false));
     let mut animated = flagged(Class::Animated);
     assert_eq!(
-        animated.go_to_sleep(None, false).unwrap_err().reason(),
+        animated.go_to_sleep(None, None).unwrap_err().reason(),
         "an object above the static type goes to sleep"
     );
     // a static object flagged with movement state or a unit AI is not modelled either
-    let walker = walker();
-    for (mover, ai) in [(Some(&walker), false), (None, true)] {
+    let (walker, unit_ai) = (walker(), UnitAi::default());
+    for (mover, ai) in [(Some(&walker), None), (None, Some(&unit_ai))] {
         assert!(flagged(Class::Static).go_to_sleep(mover, ai).is_err());
     }
 }

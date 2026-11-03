@@ -253,8 +253,12 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
     };
     t.model.drop_sites = Arc::new(vec![tc.clone()]);
     assert!(
-        t.drop_off_unasked(PlayerId::new(0), ListIndex::new(0), true)
-            .is_ok()
+        t.drop_off_unasked(
+            PlayerId::new(0),
+            ListIndex::new(0),
+            UnitOrderAction::DropOffAndBack
+        )
+        .is_ok()
     );
     t.model.drop_sites = Arc::new(vec![
         tc,
@@ -325,8 +329,12 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
     );
     let before = t.players[0].objects[ListIndex::new(0)].clone();
     assert!(
-        t.drop_off_unasked(PlayerId::new(0), ListIndex::new(0), true)
-            .is_ok()
+        t.drop_off_unasked(
+            PlayerId::new(0),
+            ListIndex::new(0),
+            UnitOrderAction::DropOffAndBack
+        )
+        .is_ok()
     );
     assert_eq!(t.players[0].objects[ListIndex::new(0)], before);
 }

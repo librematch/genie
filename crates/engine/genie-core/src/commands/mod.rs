@@ -28,6 +28,7 @@ pub mod gather_point;
 mod gather_point_state;
 pub mod go_back_to_work;
 mod ground;
+pub(crate) use self::ground::RecordDrop;
 mod new_building;
 pub mod order;
 mod packet_values;

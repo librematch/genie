@@ -31,21 +31,30 @@ pub const fn tile_record_id(tile: Tile) -> RecordId {
     RecordId::Tile(tile)
 }
 
+/// Where the old short pather's query stops: at its first hit (`FUN_141052350`) or at the 25th
+/// (`FUN_141051900`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum HitLimit {
+    /// The first hit.
+    First,
+    /// The 25th.
+    Most,
+}
+
 impl Spatial {
     /// The old short pather's line queries (flags 0x40: moving objects left out, every kind
     /// tested), after `FUN_141052b90` put the temporary records (kind 3, the tile's box) of the
     /// walk's box, grown by `buffer`, that the unit's `mask` lacks ([`Spatial::put_tile_records`];
     /// they stay with those of the pather's earlier walks until `FindShortPath` removes them,
-    /// [`Spatial::clear_tile_records`]): the records whose box, grown by `buffer`, meets
-    /// the walk `a` -> `b` (`FUN_1410512f0`, a circle's `FUN_141051630` alike), whose cell the
-    /// query visits ([`Spatial::visits`]) and whose id is not in `ignore` (the manager's list
-    /// `+0x2c`, the pather's). An object that moves (its record's
-    /// `+3` bit 0x10, set from slot 0x5c8 at the end of its update, [`Gait::moving`]) is left
-    /// out, as is a gate the player may pass (slot 0x678, not modelled). `first` stops at the
-    /// first hit (`FUN_141052350`); else at the 25th (`FUN_141051900`). The hits are in the
-    /// tiles' row order, then by id; the game's are in its grid's order, which its callers do not
-    /// read. A walk whose grown box leaves the map is blocked (`FUN_141052350`) or meets the
-    /// map's edge records first ([`Spatial::edge_records`]).
+    /// [`Spatial::clear_tile_records`]): the records whose box, grown by `buffer`, meets the walk
+    /// `a` -> `b` (`FUN_1410512f0`, a circle's `FUN_141051630` alike), whose cell the query visits
+    /// ([`Spatial::visits`]) and whose id is not in `ignore` (the manager's list `+0x2c`, the
+    /// pather's). An object that moves (its record's `+3` bit 0x10, set from slot 0x5c8 at the end
+    /// of its update, [`Gait::moving`]) is left out, as is a gate the player may pass (slot 0x678,
+    /// not modelled). [`HitLimit::First`] stops at the first hit (`FUN_141052350`); else at the
+    /// 25th (`FUN_141051900`). The hits are in the tiles' row order, then by id; the game's are in
+    /// its grid's order, which its callers do not read. A walk whose grown box leaves the map is
+    /// blocked (`FUN_141052350`) or meets the map's edge records first ([`Spatial::edge_records`]).
     ///
     /// [`Gait::moving`]: crate::map::spatial::Gait::moving
     pub(super) fn pather_query(
@@ -55,7 +64,7 @@ impl Spatial {
         buffer: Option<Distance>,
         mask: TerrainMask,
         (ignore, by_id): (&[RecordId], ObjectsRef<'_>),
-        first: bool,
+        limit: HitLimit,
     ) -> Result<Vec<Hit>, GenieError> {
         const MOST_HITS: usize = 25;
         let roles = by_id.roles();
@@ -70,7 +79,7 @@ impl Spatial {
         let mut hits = Vec::new();
         if grown.leaves_map(self.map) {
             hits = self.edge_records(grown, QUERY_HITS);
-            if first {
+            if limit == HitLimit::First {
                 return Ok(hits);
             }
         }
@@ -89,7 +98,7 @@ impl Spatial {
                 && meets(ObstructionKind::KIND_3, bx)
             {
                 hits.push(Hit { id, bounds: bx });
-                if first || MOST_HITS <= hits.len() {
+                if limit == HitLimit::First || MOST_HITS <= hits.len() {
                     return Ok(hits);
                 }
             }
@@ -125,7 +134,7 @@ impl Spatial {
                 id: RecordId::from(id),
                 bounds: bx,
             });
-            if first || MOST_HITS <= hits.len() {
+            if limit == HitLimit::First || MOST_HITS <= hits.len() {
                 break;
             }
         }
@@ -144,7 +153,7 @@ impl Spatial {
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         Ok(!self
-            .pather_query(a, b, buffer, mask, (ignore, by_id), true)?
+            .pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::First)?
             .is_empty())
     }
 
@@ -159,7 +168,7 @@ impl Spatial {
         ignore: &[RecordId],
         by_id: ObjectsRef<'_>,
     ) -> Result<Vec<Hit>, GenieError> {
-        self.pather_query(a, b, buffer, mask, (ignore, by_id), false)
+        self.pather_query(a, b, buffer, mask, (ignore, by_id), HitLimit::Most)
     }
 }
 

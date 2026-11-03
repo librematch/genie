@@ -19,6 +19,7 @@ use crate::unit_ai::NotifyKind;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
 use crate::vision::SightShape;
+use crate::vision::visibility::Seeing;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
@@ -597,7 +598,11 @@ pub(crate) fn change_hands(
         own.line_of_sight = to.line_of_sight;
     }
     let los = own.line_of_sight;
-    let sees = u.life.state == ObjectState::Alive && u.life.inside.is_none();
+    let sees = if u.life.state == ObjectState::Alive && u.life.inside.is_none() {
+        Seeing::Sees
+    } else {
+        Seeing::Blind
+    };
     spatial.change_owner(u.id, new, los, sees, roles, visibility_tuning)?;
     if let Some(a) = actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;

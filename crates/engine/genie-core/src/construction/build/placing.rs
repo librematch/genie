@@ -2,6 +2,7 @@
 //! work, the walk off the footprint (state 223) and back.
 
 use crate::GenieError;
+use crate::commands::RecordDrop;
 use crate::construction::FootprintWaits;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
@@ -98,7 +99,7 @@ impl BuildAction {
         let cleared_ids: Vec<ObjectId> = cleared.iter().map(|cl| cl.id).collect();
         let occupants = site_occupants(c, site, &placed, &cleared_ids, reads)?;
         for cl in cleared {
-            c.w.clear_object(cl, true)?;
+            c.w.clear_object(cl, RecordDrop::Dropped)?;
         }
         let parts = self.part_tests(c, builder, actions, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may

@@ -31,6 +31,16 @@ use crate::world::layer::ClassRoles;
 /// (10, `FUN_140ace9c0`'s test) or fewer than its capacity.
 const FORCED_ENTRY_BELOW: InsideCount = InsideCount::new(10);
 
+/// Whether a gather point's walk asks the unit's garrison finder first (a new unit's) or goes to
+/// slot 0x128 at once (an unloaded unit's).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FinderUse {
+    /// It asks the finder.
+    Asks,
+    /// It skips it.
+    Skips,
+}
+
 impl World {
     /// `FUN_140ace9c0` with a gather point without a target, and an unloaded unit's move
     /// (`FUN_1411e7220`): the unit waits to move (slot 0x2a0 with 1) and takes slot 0x128
@@ -202,7 +212,7 @@ impl World {
     /// its own task list's garrison finder (filter 3, [`World::garrison_task_found`]) decides: a
     /// task found is worked at once (slot 0x7e8 with filter 3, outside slot 0x128: `+0xa14` 1);
     /// else, and for any other target, slot 0x128 works it (`source`, any task). An unloaded
-    /// unit's caller goes to slot 0x128 at once (`finder` clear). A gather point on its own
+    /// unit's caller goes to slot 0x128 at once ([`FinderUse::Skips`]). A gather point on its own
     /// building takes the unit in at once ([`World::enter_forced`]) while the building holds
     /// fewer than 10 or fewer than its capacity.
     pub(crate) fn gather(
@@ -212,7 +222,7 @@ impl World {
         g: GatherPoint,
         building: ObjectId,
         source: OrderSource,
-        finder: bool,
+        finder: FinderUse,
     ) -> Result<(), GenieError> {
         // the walk's place is the point on the ground (height 0)
         let at = g.point.with_z(0.0);
@@ -245,7 +255,9 @@ impl World {
         if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
             m.waiting = 1;
         }
-        let garrison = finder && on_building && self.garrison_task_found(p, new, target, at)?;
+        let garrison = finder == FinderUse::Asks
+            && on_building
+            && self.garrison_task_found(p, new, target, at)?;
         let work = Work {
             target: Some(target),
             point: at,

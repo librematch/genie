@@ -304,7 +304,7 @@ impl World {
             }
             match self.drop_off_ask(p, idx, (asks, way_back))? {
                 Some(ask) => self.asked_drop_off(p, idx, ask)?,
-                None => self.drop_off_unasked(p, idx, way_back)?,
+                None => self.drop_off_unasked(p, idx, action)?,
             }
         }
         Ok(())

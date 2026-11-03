@@ -41,6 +41,16 @@ use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
 use crate::world::layer::ClassRoles;
 
+/// Whether a footprint clearing's object lost its record already: the builder's clearing in the
+/// Build's update drops it (`FUN_141189670`), and the object then has `+0x686` set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum RecordDrop {
+    /// The builder dropped it.
+    Dropped,
+    /// It is still held.
+    Held,
+}
+
 impl World {
     /// `FUN_14123bb20`'s sending off (with `DAT_1439e60e2` 1) of the units on `foundation`'s
     /// footprint: each of type 30 or more in state 2 whose top action is not on the foundation,
@@ -292,7 +302,7 @@ impl World {
             &self.model.tuning.build,
         )?;
         for cl in cleared {
-            self.clear_object(cl, false)?;
+            self.clear_object(cl, RecordDrop::Held)?;
             if by == Clearer::Constructor {
                 continue;
             }
@@ -329,16 +339,20 @@ impl World {
         )?))
     }
 
-    /// An object the footprint clearing deletes ([`crate::construction::build::Cleared`]): a wall first goes
-    /// through the building's delete core (`FUN_1411ccbb0`, [`World::remove_building`]), then
-    /// its destroy (slot 0xd0, [`World::destroy`]). The builder's clearing (`roo_done`) dropped
-    /// its record in the Build's update already (`FUN_141189670`): `+0x686` is set
-    /// (`FUN_141189b60` with 1).
+    /// An object the footprint clearing deletes ([`crate::construction::build::Cleared`]): a wall
+    /// first goes through the building's delete core (`FUN_1411ccbb0`, [`World::remove_building`]),
+    /// then its destroy (slot 0xd0, [`World::destroy`]). The builder's clearing
+    /// ([`RecordDrop::Dropped`]) dropped its record in the Build's update already
+    /// (`FUN_141189670`): `+0x686` is set (`FUN_141189b60` with 1).
     ///
     /// # Errors
     ///
     /// An object the slice does not hold, and what the deletes do not model.
-    pub(crate) fn clear_object(&mut self, cl: Cleared, roo_done: bool) -> Result<(), GenieError> {
+    pub(crate) fn clear_object(
+        &mut self,
+        cl: Cleared,
+        record: RecordDrop,
+    ) -> Result<(), GenieError> {
         let (owner, _) = self.object(cl.id).ok_or(GenieError::unsupported(
             "a footprint clearing of an object the slice does not hold",
         ))?;
@@ -346,7 +360,9 @@ impl World {
             self.remove_building(owner, cl.id)?;
         }
         self.destroy(owner, cl.id)?;
-        if roo_done && let Some((_, u)) = self.object_mut(cl.id) {
+        if record == RecordDrop::Dropped
+            && let Some((_, u)) = self.object_mut(cl.id)
+        {
             u.roo_called = true;
         }
         Ok(())

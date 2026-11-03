@@ -12,6 +12,7 @@ use crate::map::spatial::Tiles;
 use crate::map::spatial::{Gait, Obstruction, Placed};
 use crate::math::fmath::{cross, minss, normalize};
 use crate::movement::LevelFlags;
+use crate::movement::Turn;
 use crate::movement::WaypointLevel;
 use crate::movement::move_to::MoveWaitState;
 use crate::movement::move_to::Patience;
@@ -1108,7 +1109,7 @@ fn nan_most_turns_the_whole_angle_unclipped() {
             Seconds::ZERO,
             &tuning().movement
         ),
-        Ok(false)
+        Ok(Turn::Whole)
     );
     assert!(m.forward.get().iter().all(|c| c.is_finite()));
     assert!(0.99 < m.forward.y());
@@ -1121,7 +1122,7 @@ fn nan_most_turns_the_whole_angle_unclipped() {
             Seconds::new(0.02),
             &tuning().movement
         ),
-        Ok(true)
+        Ok(Turn::Clipped)
     );
     assert!(m.forward.y().abs() < 0.03);
 }
@@ -1136,17 +1137,17 @@ fn turn_toward_direction_is_signed_and_clipped_by_the_turn_rate() {
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     assert_eq!(
         m.turn_toward(x, z, Seconds::new(0.5)),
-        (Angle::new(-0.5), true)
+        (Angle::new(-0.5), Turn::Clipped)
     );
     assert_eq!(
         m.turn_toward(z, x, Seconds::new(0.5)),
-        (Angle::new(0.5), true)
+        (Angle::new(0.5), Turn::Clipped)
     );
     let (turn, clipped) = m.turn_toward(x, z, Seconds::new(2.0));
-    assert!(!clipped);
+    assert_eq!(clipped, Turn::Whole);
     assert_eq!(turn, Angle::new(-FRAC_PI_2));
     // a NaN most turns the whole angle (JBE on unordered)
-    assert!(!m.turn_toward(x, z, Seconds::new(f32::NAN)).1);
+    assert_eq!(m.turn_toward(x, z, Seconds::new(f32::NAN)).1, Turn::Whole);
     assert_eq!(
         m.turn_dt(Seconds::new(0.02), &tuning().movement),
         Seconds::new(0.02)
@@ -2573,10 +2574,10 @@ fn the_step_and_the_speed_control_start_where_the_unit_last_moved_to() {
     m.stats.turn_radius = Distance::new(2.0);
     m.stats.turn_radius_speed = Speed::new(1.0);
     m.right = BVector::new(0.0, 0.0, -1.0);
-    m.control_speed(BVector::new(10.5, 0.0, 19.2), false);
+    m.control_speed(BVector::new(10.5, 0.0, 19.2), Turn::Whole);
     assert_eq!(m.velocity.as_ref().unwrap().acceleration.y(), -f32::MAX);
     m.velocity.as_mut().unwrap().acceleration = BVector::ZERO;
-    m.control_speed(BVector::new(12.0, 0.0, 17.0), false);
+    m.control_speed(BVector::new(12.0, 0.0, 17.0), Turn::Whole);
     assert_eq!(m.velocity.as_ref().unwrap().acceleration.y(), f32::MAX);
 }
 

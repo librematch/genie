@@ -18,6 +18,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
 use crate::technology::Effect;
+use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Attributes, TechKind, TechState, factors};
@@ -327,7 +328,7 @@ impl World {
         debit_listed(self.players.player_mut(player)?, listed);
         let owner = self.players.player(player)?;
         let state = owner.techs.checked(tech)?;
-        let repeatable = state.repeatable(def, false);
+        let repeatable = state.repeatable(def, RepeatLimit::Own);
         if def.kind == TechKind::SHARED {
             return Err(GenieError::unsupported(
                 "RESEARCH of the shared kind (FUN_1411c3fd0 over the packet's buildings)",

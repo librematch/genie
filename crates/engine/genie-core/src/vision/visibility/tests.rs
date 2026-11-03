@@ -16,6 +16,7 @@ use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
+use crate::vision::visibility::Seeing;
 use crate::world::GameMode;
 
 fn world(players: PlayerId) -> Visibility {
@@ -278,7 +279,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         at,
         Footprint::new(0.2, 0.2),
         (PlayerId::new(1), 3.0),
-        true,
+        Seeing::Sees,
         SightLayer {
             roles: &roles(),
             visibility_tuning: tuning().visibility,
@@ -295,7 +296,7 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         at,
         Footprint::new(0.2, 0.2),
         (PlayerId::new(2), 4.0),
-        false,
+        Seeing::Blind,
         SightLayer {
             roles: &roles(),
             visibility_tuning: tuning().visibility,

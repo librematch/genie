@@ -1,6 +1,7 @@
 use super::*;
 use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
+use crate::combat::attack::Armament;
 use crate::combat::attack::AtOnce;
 use crate::combat::damage::Allied;
 use crate::combat::damage::HitKind;
@@ -1939,13 +1940,13 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
     let mut motion = Motion::Animated(Animated::new(Speed::new(0.5)));
     assert_eq!(
         a.clone()
-            .update_targetless(Seconds::new(0.028), true, motion.lent()),
+            .update_targetless(Seconds::new(0.028), Armament::Armed, motion.lent()),
         Err(GenieError::unsupported(
             "an Attack without a target in a state but 1"
         ))
     );
     assert_eq!(
-        a.update_targetless(Seconds::new(0.028), false, motion.lent()),
+        a.update_targetless(Seconds::new(0.028), Armament::Unarmed, motion.lent()),
         Ok((UpdateCode::Done, true))
     );
     assert_eq!(a.state, AttackState::Done);
@@ -3467,7 +3468,9 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
         );
         set(&mut rig);
         let code = rig
-            .run(20, |c, u, _, f, r| a.ends_early(c, u, f, r, true, &roles()))
+            .run(20, |c, u, _, f, r| {
+                a.ends_early(c, u, f, r, ObjectState::Alive, &roles())
+            })
             .unwrap();
         ((code, rig.posted()), a)
     };
@@ -3522,7 +3525,9 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.arms.sprite = Some(STANDING);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| {
+        a.ready_step(c, u, f, r, ObjectState::Alive)
+    });
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::UnderWay), AttackState::Swing)
@@ -3537,7 +3542,9 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         true,
         (AttackState::Ready, Voice::Loud),
     );
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
+    let code = rig.run(20, |c, u, _, f, r| {
+        a.ready_step(c, u, f, r, ObjectState::Dead)
+    });
     assert_eq!(
         (code, a.state.bare()),
         (Ok(UpdateCode::Code5), AttackState::Done)
@@ -3553,7 +3560,9 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
         (AttackState::Ready, Voice::Loud),
     );
     a.point = Position::from([NONE; 3]);
-    let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
+    let code = rig.run(20, |c, u, _, f, r| {
+        a.ready_step(c, u, f, r, ObjectState::Alive)
+    });
     assert_eq!(
         (code, a.state.bare()),
         (

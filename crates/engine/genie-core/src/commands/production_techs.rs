@@ -10,6 +10,8 @@ use crate::players::attribute::AttributeId;
 use crate::production::QueueButton;
 use crate::production::QueuedUnits;
 use crate::production::{Queue, as_entry_costs, same_costs};
+use crate::technology::Repeat;
+use crate::technology::RepeatLimit;
 use crate::technology::TechId;
 use crate::technology::{Attributes, TechDef, factors};
 use crate::world::World;
@@ -52,7 +54,11 @@ impl World {
             n = cap.wrapping_sub(done);
         }
         // FUN_14162fd90's repeat flag: the player's +0x648 (not held) or FUN_1413d1050
-        let repeat = state.repeatable(def, false);
+        let repeat = if state.repeatable(def, RepeatLimit::Own) {
+            Repeat::Allowed
+        } else {
+            Repeat::Denied
+        };
         let building = owner.objects.checked(i)?.life.master_id;
         n = pay_researches(owner, (def, tech), repeat, building, n, self.model.slots)?;
         if n <= 0 {
@@ -96,7 +102,7 @@ impl World {
 fn pay_researches(
     owner: &mut Player,
     (def, tech): (&TechDef, TechId),
-    repeat: bool,
+    repeat: Repeat,
     building: MasterId,
     n: i16,
     slots: Slots,

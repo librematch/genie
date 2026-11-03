@@ -12,6 +12,8 @@ use crate::production::{Entry, Production, refund_tech};
 use crate::production::{MakeTech, MakeTechState, Making};
 use crate::technology::Effect;
 use crate::technology::EffectId;
+use crate::technology::Repeat;
+use crate::technology::RepeatLimit;
 use crate::technology::ResearchState;
 use crate::technology::TechId;
 use crate::technology::{Location, ResearchCount, TechDef, TechKind, is_age};
@@ -107,7 +109,7 @@ impl World {
         let rate = self.parts.combat_of(building.id).work_rate_powerup
             + self.master(p, master)?.action_part().work_rate;
         let state = owner.techs.checked(t)?;
-        let repeatable = state.repeatable(def, false);
+        let repeatable = state.repeatable(def, RepeatLimit::Own);
         let shared = def.kind == TechKind::SHARED;
         let time_modifier = owner.get(self.model.slots.attribute.research_time_modifier)?;
         let location = state
@@ -135,22 +137,28 @@ impl World {
                     "a research done 0x100 times (set_state 1)",
                 ));
             }
-            self.research_done(p, i, r.tech, master, repeatable)?;
+            let repeat = if repeatable {
+                Repeat::Allowed
+            } else {
+                Repeat::Denied
+            };
+            self.research_done(p, i, r.tech, master, repeat)?;
             return Ok(UpdateCode::Done);
         }
         Ok(UpdateCode::UnderWay)
     }
 
     /// The research's end in its update (`0x140ad2a20`) once its progress reaches its time:
-    /// `FUN_1413d1740` (with `repeat`, the player's `+0x648` or [`TechState::repeatable`]): a
-    /// technology in state 2 (or with `repeat`) whose work done reaches the `.dat`'s time at the
-    /// building (−1 without), times the research time modifier (attribute 86, above 0, not an
-    /// age), plus the location's adjustment, is done ([`World::complete_research`]); else, or
-    /// without `repeat`, it is left. Then the action takes state 1 (the event 100 and the
-    /// computer players' slot 0x3a8 are not held) and the building's unit AI is told 0x1fa with
-    /// the action value 0x26c. Last, attribute 269 (the Spanish's 300) names an effect of the
-    /// world's table ([`Model::effects`](genie_model::model::Model::effects), slot 0x10) the player gets with the building as its
-    /// object ([`World::do_effect`]).
+    /// `FUN_1413d1740` (with [`Repeat::Allowed`], the player's `+0x648` or
+    /// [`TechState::repeatable`]): a technology in state 2 (or with [`Repeat::Allowed`]) whose work
+    /// done reaches the `.dat`'s time at the building (−1 without), times the research time
+    /// modifier (attribute 86, above 0, not an age), plus the location's adjustment, is done
+    /// ([`World::complete_research`]); else, or with [`Repeat::Denied`], it is left. Then the
+    /// action takes state 1 (the event 100 and the computer players' slot 0x3a8 are not held) and
+    /// the building's unit AI is told 0x1fa with the action value 0x26c. Last, attribute 269 (the
+    /// Spanish's 300) names an effect of the world's table
+    /// ([`Model::effects`](genie_model::model::Model::effects), slot 0x10) the player gets with the
+    /// building as its object ([`World::do_effect`]).
     ///
     /// [`TechState::repeatable`]: crate::technology::TechState::repeatable
     pub(super) fn research_done(
@@ -159,14 +167,14 @@ impl World {
         i: ListIndex,
         t: TechId,
         master: MasterId,
-        repeat: bool,
+        repeat: Repeat,
     ) -> Result<(), GenieError> {
         use crate::technology::Attributes;
         let (tech, t) = (t, t.index());
         let owner = self.players.player(p)?;
         let state = owner.techs.checked(t)?;
         let def = self.model.techs.checked(t)?;
-        if state.state == ResearchState::Researching || repeat {
+        if state.state == ResearchState::Researching || repeat == Repeat::Allowed {
             let mut time = def
                 .locations
                 .iter()
@@ -179,7 +187,7 @@ impl World {
             let adjustment = state
                 .location(master)
                 .map_or(Seconds::ZERO, |l| l.adjustment);
-            if repeat || Seconds::new(time) + adjustment <= state.research_done {
+            if repeat == Repeat::Allowed || Seconds::new(time) + adjustment <= state.research_done {
                 let _ = self.complete_research(p, tech, Some(master))?;
             }
         }

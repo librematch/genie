@@ -87,6 +87,7 @@ use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
+use crate::production::spawn::FinderUse;
 use crate::test_ids::carrying;
 use crate::test_ids::class_of;
 use crate::test_ids::group_id;
@@ -2061,7 +2062,7 @@ fn gather_point_on_its_own_building_takes_the_new_unit_in() {
         g,
         object_id(100),
         OrderSource::Direct,
-        true,
+        FinderUse::Asks,
     )
     .unwrap();
     let v = &t.players[1].objects[idx];

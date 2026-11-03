@@ -45,20 +45,30 @@ use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
 
+/// Whether a unit can attack (`FUN_14120ea30`): a building without it ends its Attack.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Armament {
+    /// It can.
+    Armed,
+    /// It cannot.
+    Unarmed,
+}
+
 impl Attack {
     /// The update of an Attack whose target is gone (its target −1 after [`Attack::lost`]): the
     /// timer runs and, past the target's checks, state 1 (case 0) stops the unit's animation and
-    /// returns 1: the list deletes the Attack. A building that cannot attack (`armed` false,
-    /// `FUN_14120ea30`) ends instead (`set_state(1)`: the caller's [`Attack::disarmed`]) and
-    /// returns 1, true. The other states without a target are not modelled.
+    /// returns 1: the list deletes the Attack. A building that cannot attack
+    /// ([`Armament::Unarmed`], `FUN_14120ea30`) ends instead (`set_state(1)`: the caller's
+    /// [`Attack::disarmed`]) and returns 1, true. The other states without a target are not
+    /// modelled.
     pub fn update_targetless(
         &mut self,
         dt: Seconds,
-        armed: bool,
+        armed: Armament,
         mut motion: MotionMut<'_>,
     ) -> Result<(UpdateCode, bool), GenieError> {
         self.timer += dt;
-        if !armed {
+        if armed == Armament::Unarmed {
             self.state = AttackState::Done;
             return Ok((UpdateCode::Done, true));
         }
@@ -171,7 +181,8 @@ impl Attack {
         self.timer += c.dt.seconds();
         // a dead tree (class 15) up to state 5 keeps a non-villager's attack going: its update
         // goes on, the target not alive (`0x140a8342e`)
-        let alive = f.victim.state <= ObjectState::Alive;
+        let target_state = f.victim.state;
+        let alive = target_state <= ObjectState::Alive;
         let gone = !alive
             && (!roles.of_class(f.victim.class).contains(ClassRoles::TREE)
                 || roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
@@ -186,7 +197,7 @@ impl Attack {
         {
             return Ok(code);
         }
-        if let Some(code) = self.ends_early(c, unit, f, r, alive, roles)? {
+        if let Some(code) = self.ends_early(c, unit, f, r, target_state, roles)? {
             return Ok(code);
         }
         match self.state {
@@ -200,7 +211,7 @@ impl Attack {
             AttackState::Move { .. }
             | AttackState::GotoSeen { .. }
             | AttackState::GotoPoint { .. } => self.walk(c, unit, me, f, r, (t.position, t.radius)),
-            AttackState::Ready => self.ready_step(c, unit, f, r, alive),
+            AttackState::Ready => self.ready_step(c, unit, f, r, target_state),
             AttackState::Swing => self.swing(c, unit, actions, f, r),
             AttackState::Killed => self.killed_step(c, unit),
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
@@ -325,15 +336,16 @@ impl Attack {
         Ok(None)
     }
 
-    /// The update's ends before the state's step (Some with the update's code): an allied
-    /// target, a target inside another and a building that cannot attack.
+    /// The update's ends before the state's step (Some with the update's code), the target in
+    /// `target_state` as the update read it: an allied target, a target inside another and a
+    /// building that cannot attack.
     pub(super) fn ends_early(
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-        alive: bool,
+        target_state: ObjectState,
         roles: &Roles,
     ) -> Result<Option<UpdateCode>, GenieError> {
         // LAB_140a834ab: a live target (state 0 to 2) of a player's unit (+0x718 not 0) that
@@ -346,7 +358,11 @@ impl Attack {
             .intersects(ClassRoles::LIVESTOCK | ClassRoles::FARM)
             && self.same_owner;
         let rng = c.w.streams.get(Stream::Sprite);
-        if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
+        if target_state <= ObjectState::Alive
+            && f.own.player != PlayerId::new(0)
+            && !spared
+            && f.victim.allied.by_attacker
+        {
             self.finish(
                 unit,
                 c.w.parts.motion_mut(unit.id),
@@ -403,21 +419,21 @@ impl Attack {
     }
 
     /// State 6's step (case 5): readyToAttack ready swings ([`Attack::set_swing`]), waiting
-    /// waits, away follows the target ([`Attack::follow`]); ready on a target no longer alive (a
-    /// dead tree) ends the attack with code 5.
+    /// waits, away follows the target ([`Attack::follow`]); ready on a target no longer alive
+    /// (`target_state` past 2, a dead tree) ends the attack with code 5.
     pub(super) fn ready_step(
         &mut self,
         c: &mut Step<'_>,
         unit: &mut Unit,
         f: &Fight,
         r: &AttackReads,
-        alive: bool,
+        target_state: ObjectState,
     ) -> Result<UpdateCode, GenieError> {
         let sprite_tuning = c.w.model.tuning.sprite;
         let mut g = c.w.attack_ground(unit.id);
         match self.ready_to_attack(unit, &mut g, f, r, AtOnce::Tested)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
-            Readiness::Ready if !alive => {
+            Readiness::Ready if ObjectState::Alive < target_state => {
                 self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
                 return Ok(UpdateCode::Code5);
             }

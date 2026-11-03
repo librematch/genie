@@ -26,6 +26,7 @@ use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
+use crate::production::spawn::FinderUse;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::unit_ai_kind;
@@ -140,7 +141,14 @@ impl World {
             self.hand_queue(p, new, &queue, position.z())?;
         } else if let Some(gather) = gather.filter(|g| g.state == GatherPointState::Point) {
             // only a state of 1 sends it (`FUN_140ace9c0`'s `+0xc30 != 1` return)
-            self.gather(p, new, gather, building_id, OrderSource::Direct, true)?;
+            self.gather(
+                p,
+                new,
+                gather,
+                building_id,
+                OrderSource::Direct,
+                FinderUse::Asks,
+            )?;
         }
         // FUN_140ace760: the new unit's tasks that spawn more (action type 0x9c)
         let now = self.players.live(p, new)?.life.master_id;

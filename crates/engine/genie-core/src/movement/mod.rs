@@ -68,6 +68,7 @@ use genie_model::movement::move_stats;
 mod path_counts;
 mod unit;
 mod walk;
+pub use self::walk::Turn;
 mod waypoint;
 mod waypoint_index;
 mod waypoint_level;

@@ -10,6 +10,7 @@
 //! lets the spot try its next candidate.
 
 mod gather_walk;
+pub(crate) use self::gather_walk::FinderUse;
 mod make_action;
 mod new_unit;
 mod objects;
