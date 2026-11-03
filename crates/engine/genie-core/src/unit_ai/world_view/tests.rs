@@ -14,6 +14,7 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassAmount;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Masters;
 use crate::objects::masters::ObjectFlags;
@@ -45,7 +46,10 @@ use std::sync::Arc;
 #[test]
 fn the_attacks_sum_is_the_positive_ones() {
     let m = |weapons: Vec<ClassAmount>| Master {
-        weapons,
+        combat: Some(CombatPart {
+            weapons,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     assert_eq!(
@@ -297,9 +301,12 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
         class: class::VILLAGER,
         object_flags: ObjectFlags::SCOUT,
         hit_points: MasterHitPoints::of_data(25),
-        weapons: vec![ClassAmount::new(4, 3), ClassAmount::new(21, 6)],
-        armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
-        weapon_range: Distance::ZERO,
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 3), ClassAmount::new(21, 6)],
+            armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
+            weapon_range: Distance::ZERO,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     assert!(harmless(villager.clone()));
@@ -310,17 +317,39 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
     };
     assert!(!with(&|m| m.object_flags = ObjectFlags::NONE));
     assert!(!with(&|m| m.copy_id = Some(ids::VILLAGER_FEMALE)));
-    assert!(!with(&|m| m.weapons = vec![ClassAmount::new(4, 5)]));
+    assert!(!with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapons = vec![ClassAmount::new(4, 5)]));
     // an attack of 4 below 60 hit points
-    assert!(with(&|m| m.weapons = vec![ClassAmount::new(4, 4)]));
-    assert!(!with(&|m| (m.weapons, m.hit_points) =
-        (vec![ClassAmount::new(4, 4)], MasterHitPoints::of_data(60))));
-    assert!(with(&|m| (m.weapons, m.hit_points) =
-        (vec![ClassAmount::new(4, 3)], MasterHitPoints::of_data(60))));
-    assert!(!with(&|m| m.armors = vec![ClassAmount::new(4, 1)]));
-    assert!(with(&|m| m.weapon_range = Distance::new(0.5)));
-    assert!(!with(&|m| m.weapon_range = Distance::new(0.6)));
-    assert!(!with(&|m| m.weapon_range = Distance::new(f32::NAN)));
+    assert!(with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapons = vec![ClassAmount::new(4, 4)]));
+    assert!(!with(&|m| {
+        m.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 4)];
+        m.hit_points = MasterHitPoints::of_data(60);
+    }));
+    assert!(with(&|m| {
+        m.combat.get_or_insert_with(Default::default).weapons = vec![ClassAmount::new(4, 3)];
+        m.hit_points = MasterHitPoints::of_data(60);
+    }));
+    assert!(!with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .armors = vec![ClassAmount::new(4, 1)]));
+    assert!(with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapon_range = Distance::new(0.5)));
+    assert!(!with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapon_range = Distance::new(0.6)));
+    assert!(!with(&|m| m
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapon_range = Distance::new(f32::NAN)));
 }
 
 /// What the statistics read of a candidate (`FUN_140c44680`'s reads): soldier 123 (master 4,
@@ -336,10 +365,13 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         kind: MasterKind::COMBAT,
         class,
         radius: Footprint::new(0.3, 0.3),
-        weapons,
-        reload: Seconds::new(2.0),
-        // no terrain defense bonus: the damage reads no terrain
-        terrain_bonus: RestrictionField::NONE,
+        combat: Some(CombatPart {
+            weapons,
+            reload: Seconds::new(2.0),
+            // no terrain defense bonus: the damage reads no terrain
+            terrain_bonus: RestrictionField::NONE,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let unit = |id, x, master_id| Unit {

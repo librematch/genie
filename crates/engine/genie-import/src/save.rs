@@ -36,6 +36,7 @@ use genie_model::objects::masters::ChargeKind;
 use genie_model::objects::masters::ChargeTarget;
 use genie_model::objects::masters::ClassAmount;
 use genie_model::objects::masters::CombatAbility;
+use genie_model::objects::masters::CombatPart;
 use genie_model::objects::masters::CostAmount;
 use genie_model::objects::masters::DamageShare;
 use genie_model::objects::masters::FormationClass;
@@ -310,37 +311,42 @@ pub fn work_masters(
                 .and_then(|r| r.rge_master_missile_object.as_deref())
                 .map(|mm| &mm.rge_master_combat_object)
         });
+        // the combat layer is the save's RGE combat part: a master without one has no attack,
+        // armor or blast, whatever its copy's are
         if let Some(rc) = rge_combat {
-            work.weapon_range = Distance::new(rc.weapon_range);
-            work.min_range = Distance::new(rc.minimum_weapon_range);
-            work.missile = MasterField::of_data(rc.missile_id);
-            work.weapon_offset =
+            let p = work.combat.get_or_insert_with(CombatPart::absent);
+            p.weapon_range = Distance::new(rc.weapon_range);
+            p.min_range = Distance::new(rc.minimum_weapon_range);
+            p.missile = MasterField::of_data(rc.missile_id);
+            p.weapon_offset =
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
-            work.missed_spread = MissSpread::new(rc.missed_missile_spread);
-            work.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
-            work.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
-            work.interrupt_frame = Frame::of_data(rc.interrupt_frame);
-            work.hit_chance = HitChance::of_data(rc.base_hit_chance);
-            work.reload = Seconds::new(rc.speed_of_attack);
-            work.weapons = rc
+            p.missed_spread = MissSpread::new(rc.missed_missile_spread);
+            p.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
+            p.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
+            p.interrupt_frame = Frame::of_data(rc.interrupt_frame);
+            p.hit_chance = HitChance::of_data(rc.base_hit_chance);
+            p.reload = Seconds::new(rc.speed_of_attack);
+            p.weapons = rc
                 .weapon
                 .iter()
                 .map(|&w| ClassAmount::new((w & 0xffff) as i16, (w >> 16) as i16))
                 .collect();
-            work.base_armor = DamageAmount::new(rc.base_armor);
-            work.armors = rc
+            p.base_armor = DamageAmount::new(rc.base_armor);
+            p.armors = rc
                 .armor
                 .iter()
                 .map(|&a| ClassAmount::new((a & 0xffff) as i16, (a >> 16) as i16))
                 .collect();
-            work.resistance = DamageShare::new(rc.bonus_damage_resistance);
-            work.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
-            work.reflection = DamageShare::new(rc.damage_reflection);
-            work.friendly_fire = DamageShare::new(rc.friendly_fire_damage);
-            work.area_effect = Distance::new(rc.area_effect_range);
-            work.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
-            work.area_damage = DamageShare::new(rc.area_damage);
-            work.garrison_firepower = Firepower::new(rc.garrison_firepower);
+            p.resistance = DamageShare::new(rc.bonus_damage_resistance);
+            p.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
+            p.reflection = DamageShare::new(rc.damage_reflection);
+            p.friendly_fire = DamageShare::new(rc.friendly_fire_damage);
+            p.area_effect = Distance::new(rc.area_effect_range);
+            p.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
+            p.area_damage = DamageShare::new(rc.area_damage);
+            p.garrison_firepower = Firepower::new(rc.garrison_firepower);
+        } else {
+            work.combat = None;
         }
         work.storage = s
             .attribute

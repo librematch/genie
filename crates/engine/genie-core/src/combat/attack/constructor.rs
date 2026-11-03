@@ -465,13 +465,13 @@ pub fn arms_looking(
         move_sprite: g(moving)
             .or_else(|| g(running(master, look)))
             .or_else(|| g(walking(master, look, false, roles))),
-        sprite: g(sprites.proceeding).or_else(|| g(master.attack_sprite)),
-        second_sprite: g(master.attack_sprite2),
+        sprite: g(sprites.proceeding).or_else(|| g(master.combat_part().attack_sprite)),
+        second_sprite: g(master.combat_part().attack_sprite2),
         idle_sprite: g(master.standing_sprite),
         idle_attack_sprite: g(master.creatable_part().idle_attack_sprite),
-        missile: master.missile.master(),
-        fire_frame: master.fire_frame,
-        interrupt_frame: master.interrupt_frame,
+        missile: master.combat_part().missile.master(),
+        fire_frame: master.combat_part().fire_frame,
+        interrupt_frame: master.combat_part().interrupt_frame,
     }
 }
 
@@ -497,8 +497,8 @@ pub fn engagement(
         position: me.position,
         target_position: them.position,
         speed,
-        range: master.weapon_range,
-        min_range: master.min_range,
+        range: master.combat_part().weapon_range,
+        min_range: master.combat_part().min_range,
         can_move: ai
             .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE),
         stance: ai.map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),

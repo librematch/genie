@@ -235,7 +235,7 @@ impl World {
             snow: Snow::None,
             master,
             class: m.class,
-            terrain_bonus: m.terrain_bonus,
+            terrain_bonus: m.combat_part().terrain_bonus,
             mode_680: self.mode_680,
         };
         self.spatial

@@ -1,7 +1,7 @@
 //! A `.dat` master's work-command values (genie-core's [`work::Master`]): its tasks with their
 //! sound events, its costs in their slots and the rest the work command reads.
 
-use genie_dat::de::{Creatable, Sound, Task, Unit};
+use genie_dat::de::{Creatable, Sound, Task, Type50, Unit};
 use genie_model::GenieError;
 use genie_model::combat::Firepower;
 use genie_model::combat::MissileCount;
@@ -180,17 +180,9 @@ pub(super) fn dat_work(
         }),
         hit_points: MasterHitPoints::of_data(unit.hit_points),
         capacity: CarryCapacity::of_data(unit.resource_capacity),
-        attack_sprite2: unit
-            .type50
-            .as_ref()
-            .and_then(|t| t.attack_graphic2)
-            .and_then(SpriteId::of_data),
         clearance: Footprint::from(unit.clearance_size),
         outline: Radii::from(unit.outline_size).ground(),
         outline_height: Distance::new(Radii::from(unit.outline_size).z()),
-        terrain_bonus: RestrictionField::of_data(
-            unit.type50.as_ref().map_or(-1, |t| t.defense_terrain_bonus),
-        ),
         // the save's facet counts; which `.dat` field the loader reads into `+0x982` is not
         // known (MISSING.md)
         building: unit.building.as_ref().map(|b| work::BuildingMaster {
@@ -227,14 +219,22 @@ pub(super) fn dat_work(
         ]),
         death_sprite: SpriteId::of_data(unit.dying_graphic),
         death_spawns: [unit.dead_unit_id, unit.blood_unit_id].map(MasterId::of_data),
-        garrison_firepower: unit
-            .type50
-            .as_ref()
-            .and_then(|t| t.garrison_firepower)
-            .map_or(Firepower::ZERO, Firepower::new),
         creatable: unit.creatable.as_ref().map(dat_creatable).transpose()?,
+        combat: unit.type50.as_ref().map(dat_combat),
         ..work::Master::default()
     })
+}
+
+/// The combat layer of a `.dat` unit's type-50 section ([`work::CombatPart`]): the values the
+/// import reads of it, its second attack sprite, terrain bonus and garrison firepower (the save
+/// holds the rest, `genie_import::save`).
+fn dat_combat(t: &Type50) -> work::CombatPart {
+    work::CombatPart {
+        attack_sprite2: t.attack_graphic2.and_then(SpriteId::of_data),
+        terrain_bonus: RestrictionField::of_data(t.defense_terrain_bonus),
+        garrison_firepower: t.garrison_firepower.map_or(Firepower::ZERO, Firepower::new),
+        ..work::CombatPart::default()
+    }
 }
 
 /// The creatable layer of a `.dat` unit's creatable section ([`work::CreatablePart`]): its

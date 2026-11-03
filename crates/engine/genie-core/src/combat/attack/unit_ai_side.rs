@@ -265,7 +265,7 @@ impl UnitView<'_, '_> {
         };
         let unit = &mut *self.unit;
         let wielder = Wielder {
-            area_effect: master.area_effect,
+            area_effect: master.combat_part().area_effect,
             speed: self
                 .c
                 .w

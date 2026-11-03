@@ -45,8 +45,11 @@ pub fn attack_rate(
     garrison_tuning: &GarrisonTuning,
 ) -> DamageRate {
     // COMISS reload, 0 and COMISS range, 1.0, each with JBE
-    if at_most_or_unordered(master.reload.get(), 0.0)
-        || at_most_or_unordered(master.weapon_range.get(), garrison_tuning.rate_range)
+    if at_most_or_unordered(master.combat_part().reload.get(), 0.0)
+        || at_most_or_unordered(
+            master.combat_part().weapon_range.get(),
+            garrison_tuning.rate_range,
+        )
     {
         return DamageRate::ZERO;
     }
@@ -63,7 +66,7 @@ pub fn attack_rate(
         });
     let sum = volley.map_or_else(
         || {
-            weapons_sum(&master.weapons, |c| {
+            weapons_sum(&master.combat_part().weapons, |c| {
                 matches!(
                     c,
                     DamageClass::MELEE
@@ -74,12 +77,12 @@ pub fn attack_rate(
             })
         },
         |v| {
-            weapons_sum(&v.weapons, |c| {
+            weapons_sum(&v.combat_part().weapons, |c| {
                 matches!(c, DamageClass::PIERCE | DamageClass::CLASS_38)
             })
         },
     );
-    DamageRate::new(sum / (master.reload - reload_powerup).get())
+    DamageRate::new(sum / (master.combat_part().reload - reload_powerup).get())
 }
 
 /// Whether the player's master table has a slot for `id` (`0 <= id < player+0x20`), as far as
@@ -97,7 +100,7 @@ pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
 /// 38 amounts, over its reload (none at most 1e-7).
 #[must_use]
 pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> DamageRate {
-    let g = master.garrison_firepower.get();
+    let g = master.combat_part().garrison_firepower.get();
     // COMISS 0, g; JC: an unordered firepower goes on
     if g <= 0.0 {
         return DamageRate::new(g.abs());
@@ -111,11 +114,11 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
             .creatable_part()
             .volley_missile
             .filter(|&id| in_table(masters, id))
-            .or_else(|| master.missile.master())
+            .or_else(|| master.combat_part().missile.master())
             .and_then(|id| masters.get(id));
         if let Some(m) = missile {
             let extra = cvttss2si(master.creatable_part().volley_fire.get() - ONE_MISSILE);
-            for &ClassAmount { class, amount } in &m.weapons {
+            for &ClassAmount { class, amount } in &m.combat_part().weapons {
                 if matches!(class, DamageClass::PIERCE | DamageClass::CLASS_38) {
                     // IMUL EAX, R8D then CVTDQ2PS
                     sum += i32::from(amount.get()).wrapping_mul(extra) as f32;
@@ -124,7 +127,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
         }
     }
     // one sum, the missile's amounts first
-    for &ClassAmount { class, amount } in &master.weapons {
+    for &ClassAmount { class, amount } in &master.combat_part().weapons {
         if matches!(
             class,
             DamageClass::MELEE
@@ -135,7 +138,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
             sum += amount.as_f32();
         }
     }
-    let reload = (master.reload - reload_powerup).get();
+    let reload = (master.combat_part().reload - reload_powerup).get();
     if reload <= EPSILON {
         return DamageRate::ZERO;
     }

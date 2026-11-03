@@ -57,7 +57,7 @@ pub fn follow_moving(
         MasterAttribute::UNIT_TRAIT | MasterAttribute::TRAIT_PIECE => {
             stats.fast_turn = master.object_flags.contains(ObjectFlags::SHIP);
         }
-        MasterAttribute::MAXIMUM_RANGE => stats.weapon_range = master.weapon_range,
+        MasterAttribute::MAXIMUM_RANGE => stats.weapon_range = master.combat_part().weapon_range,
         _ => {}
     }
     if matches!(

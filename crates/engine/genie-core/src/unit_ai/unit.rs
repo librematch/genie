@@ -153,13 +153,13 @@ impl Unit {
             size: master.map_or(Footprint::ZERO, |m| m.radius),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             search_radius: master.map_or(Distance::ZERO, |m| m.search_radius),
-            weapon_range: master.map_or(Distance::ZERO, |m| m.weapon_range),
+            weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
             interruptible,
             task_0x99: master.is_some_and(|m| m.tasks.iter().any(|t| t.action_kind == CART_TASK)),
             garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
-            ranged: master.is_some_and(|m| m.missile.master().is_some()),
+            ranged: master.is_some_and(|m| m.combat_part().missile.master().is_some()),
             firepower: c.w.parts.combat_of(self.id).firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,
@@ -201,7 +201,7 @@ impl Unit {
                 }),
             top_target: actions
                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
-            min_range: master.map_or(Distance::ZERO, |m| m.min_range),
+            min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
             attack_moving: c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
             moved_at: c
                 .w

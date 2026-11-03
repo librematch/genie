@@ -226,7 +226,10 @@ impl Unit {
         if !(0.0 < stats.radius.x() && 0.0 < stats.radius.y()) {
             return Ok(());
         }
-        let blast_level = self.master(c.w.master_tables(), c.player)?.blast_level;
+        let blast_level = self
+            .master(c.w.master_tables(), c.player)?
+            .combat_part()
+            .blast_level;
         let met = self.missile_meets(stats, old, c)?;
         for &(id, player, kind, level) in &met {
             if action.state == MissileState::Done {
@@ -401,7 +404,7 @@ impl Unit {
                     "a missile's shooter outside its list",
                 ))?;
         let master = shooter.master(MasterTables::new(masters, &parts.own_master), p)?;
-        if Distance::ZERO < master.area_effect {
+        if Distance::ZERO < master.combat_part().area_effect {
             return Err(GenieError::unsupported(
                 "a missile of a shooter with an area effect",
             ));
@@ -430,7 +433,7 @@ impl Unit {
             at: self.position(),
             from_z: Some(action.origin.position.z()),
             missile: true,
-            chance: master.hit_chance,
+            chance: master.combat_part().hit_chance,
         };
         let object = streams.get(Stream::Object);
         let struck = strike(
@@ -486,7 +489,7 @@ impl Unit {
             ));
         }
         let master = self.master(c.w.master_tables(), c.player)?;
-        if Distance::ZERO < master.area_effect {
+        if Distance::ZERO < master.combat_part().area_effect {
             return Err(GenieError::unsupported(
                 "a shooterless missile with an area effect",
             ));
@@ -518,7 +521,7 @@ impl Unit {
             at: self.position(),
             from_z: None,
             missile: true,
-            chance: master.hit_chance,
+            chance: master.combat_part().hit_chance,
         };
         let object = c.w.streams.get(Stream::Object);
         let struck = strike(
@@ -584,7 +587,7 @@ impl Unit {
             };
             let area = blaster
                 .and_then(|id| player_master(&c.w.model.masters, c.player, id))
-                .map(|m| m.area_effect)
+                .map(|m| m.combat_part().area_effect)
                 .ok_or(GenieError::unsupported(
                     "a landed missile's blast of a master the slice does not have",
                 ))?;

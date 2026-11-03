@@ -221,7 +221,7 @@ impl World {
         let own = Own {
             id: master.id,
             kind: master.kind,
-            blast_level: master.blast_level,
+            blast_level: master.combat_part().blast_level,
             radius: master.radius,
         };
         let mut rewards = Vec::new();

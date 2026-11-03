@@ -584,7 +584,7 @@ fn member_totals(
 /// `FUN_14108d960`), any other's 0 (`FUN_14106ff50`).
 pub(crate) fn weapon_range(master: &Master) -> Distance {
     if COMBAT_KINDS.contains(&master.kind) {
-        master.weapon_range
+        master.combat_part().weapon_range
     } else {
         Distance::ZERO
     }
@@ -606,6 +606,7 @@ mod tests {
     use crate::objects::masters::ChargeKind;
     use crate::objects::masters::ChargeTarget;
     use crate::objects::masters::ClassId;
+    use crate::objects::masters::CombatPart;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FormationClass;
     use crate::objects::masters::MasterId;
@@ -745,11 +746,14 @@ mod tests {
             kind: MasterKind::COMBAT,
             class,
             line_of_sight: Distance::new(4.0),
-            weapon_range: Distance::new(1.0),
             radius: Footprint::new(0.2, 0.2),
             creatable: Some(CreatablePart {
                 formation_category: FormationClass::of_data(1),
                 ..CreatablePart::default()
+            }),
+            combat: Some(CombatPart {
+                weapon_range: Distance::new(1.0),
+                ..CombatPart::default()
             }),
             ..Master::default()
         };
@@ -927,8 +931,11 @@ mod tests {
                 id: ids::ID_7,
                 kind: MasterKind::COMBAT,
                 class: class::CLASS_0,
-                weapon_range: Distance::new(6.0),
                 radius: Footprint::new(0.3, 0.3),
+                combat: Some(CombatPart {
+                    weapon_range: Distance::new(6.0),
+                    ..CombatPart::default()
+                }),
                 ..Master::default()
             };
             *masters = Arc::new(Masters::new(masters.iter().cloned().chain([archer])));

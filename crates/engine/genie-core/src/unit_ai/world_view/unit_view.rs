@@ -147,8 +147,11 @@ impl UnitView<'_, '_> {
         if let Some((tq, t)) = actions.top_target().and_then(find) {
             let tm = t.master(self.c.w.master_tables(), tq)?;
             let gap = footprint_gap_squared(u.position(), m.radius, t.position(), tm.radius);
-            let in_range = gap <= m.weapon_range.squared() && m.min_range.squared() <= gap;
-            let spared = patrolling && tm.kind == MasterKind::BUILDING && tm.weapons.is_empty();
+            let in_range = gap <= m.combat_part().weapon_range.squared()
+                && m.combat_part().min_range.squared() <= gap;
+            let spared = patrolling
+                && tm.kind == MasterKind::BUILDING
+                && tm.combat_part().weapons.is_empty();
             if in_range && !spared {
                 return Ok(false);
             }

@@ -143,8 +143,12 @@ impl World {
             self.parts.combat_mut(id)?.firepower +=
                 new.creatable_part().volley_fire - old.creatable_part().volley_fire;
         }
-        if MasterKind::RGE_COMBAT <= kind && new.attack_sprite.is_some() {
-            self.show_if(place, old.attack_sprite, new.attack_sprite)?;
+        if MasterKind::RGE_COMBAT <= kind && new.combat_part().attack_sprite.is_some() {
+            self.show_if(
+                place,
+                old.combat_part().attack_sprite,
+                new.combat_part().attack_sprite,
+            )?;
         }
         if MasterKind::ACTION <= kind {
             self.upgrade_actions(place, (old, new), keep)?;
@@ -485,10 +489,10 @@ impl World {
         let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
         let sprites = MasterSprites {
             moving: g(new.move_sprite),
-            attack: g(new.attack_sprite),
+            attack: g(new.combat_part().attack_sprite),
             standing: g(new.standing_sprite),
             idle_attack: g(new.creatable_part().idle_attack_sprite),
-            second: g(new.attack_sprite2),
+            second: g(new.combat_part().attack_sprite2),
             combat: MasterKind::COMBAT <= new.kind,
         };
         let id = self.object_at(place)?.id;

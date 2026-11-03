@@ -252,7 +252,7 @@ impl Unit {
             snow: Snow::None,
             master: m.id,
             class: m.class,
-            terrain_bonus: m.terrain_bonus,
+            terrain_bonus: m.combat_part().terrain_bonus,
             mode_680: c.w.mode_680,
         };
         c.w.spatial

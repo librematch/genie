@@ -124,6 +124,7 @@ use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FlyMode;
@@ -2685,7 +2686,10 @@ fn repair_world() -> World {
     (c.progress, c.desolid) = (Seconds::new(1.0), false);
     for masters in &mut t.model.masters {
         let builder = Arc::make_mut(masters).get_mut(ids::BUILDER).unwrap();
-        builder.weapon_range = Distance::new(0.5);
+        builder
+            .combat
+            .get_or_insert_with(Default::default)
+            .weapon_range = Distance::new(0.5);
         builder.tasks.push(Task {
             id: task_id(4),
             work_val1: WorkValue::new(0.5),
@@ -6691,7 +6695,7 @@ fn repairer_world(orders: Vec<QueuedOrder>, repairer: bool) -> World {
         for masters in &mut t.model.masters {
             let mut m = masters.get(VILLAGER_MALE).unwrap().clone();
             m.id = master_id(156);
-            m.weapon_range = Distance::new(0.5);
+            m.combat.get_or_insert_with(Default::default).weapon_range = Distance::new(0.5);
             m.tasks.push(Task {
                 id: task_id(4),
                 work_val1: WorkValue::new(0.5),
@@ -14089,10 +14093,13 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
         id: ids::CASTLE,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        weapons: vec![ClassAmount::new(3, 11)],
         creatable: Some(CreatablePart {
             cost: costs(&[(attribute::STONE, 650, true), (attribute::FOOD, 10, false)]),
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(3, 11)],
+            ..CombatPart::default()
         }),
         ..Master::default()
     };
@@ -14261,7 +14268,10 @@ fn trebuchet_is_master_of_class_51_or_54_with_weapon() {
     let m = |kind, class, weapons: Vec<ClassAmount>| Master {
         kind,
         class,
-        weapons,
+        combat: Some(CombatPart {
+            weapons,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     assert!(is_trebuchet(
@@ -14768,11 +14778,14 @@ fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
         kind: MasterKind::COMBAT,
         class: class::CLASS_35,
         hit_points: MasterHitPoints::of_data(45),
-        weapons: vec![ClassAmount::new(4, 100)],
-        area_effect: Distance::new(2.0),
-        area_damage: DamageShare::new(1.0),
-        missile: MasterField::NONE,
         death_sprite: Some(SpriteId::named(1751)),
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(4, 100)],
+            area_effect: Distance::new(2.0),
+            area_damage: DamageShare::new(1.0),
+            missile: MasterField::NONE,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let wall = Master {
@@ -14780,8 +14793,11 @@ fn petard_below_1_hit_point_blasts_about_itself_then_dies() {
         kind: MasterKind::BUILDING,
         class: class::WALL,
         hit_points: MasterHitPoints::of_data(1800),
-        armors: vec![ClassAmount::new(4, 0)],
-        terrain_bonus: RestrictionField::NONE,
+        combat: Some(CombatPart {
+            armors: vec![ClassAmount::new(4, 0)],
+            terrain_bonus: RestrictionField::NONE,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let unit = |id, master, hp, position| Unit {
@@ -16353,9 +16369,12 @@ fn scout_attack_on(
         kind: MasterKind::COMBAT,
         class: class::CLASS_47,
         standing_sprite: Some(SpriteId::named(300)),
-        attack_sprite: Some(SpriteId::named(301)),
-        weapon_range: Distance::new(1.0),
-        reload: Seconds::new(2.0),
+        combat: Some(CombatPart {
+            attack_sprite: Some(SpriteId::named(301)),
+            weapon_range: Distance::new(1.0),
+            reload: Seconds::new(2.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let wolf = Master {
@@ -16480,9 +16499,12 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
         kind: MasterKind::COMBAT,
         class: class::CLASS_47,
         standing_sprite: Some(SpriteId::named(300)),
-        attack_sprite: Some(SpriteId::named(301)),
-        weapon_range: Distance::new(1.0),
-        reload: Seconds::new(2.0),
+        combat: Some(CombatPart {
+            attack_sprite: Some(SpriteId::named(301)),
+            weapon_range: Distance::new(1.0),
+            reload: Seconds::new(2.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let wolf = Master {
@@ -16593,11 +16615,14 @@ fn villager_attack_command_switches_it_to_the_villager_first() {
         task_by_group: TaskGroup::MALE_VILLAGERS,
         hit_points: MasterHitPoints::of_data(25),
         standing_sprite: Some(SpriteId::named(300)),
-        attack_sprite: Some(SpriteId::named(301)),
-        weapon_range: Distance::new(0.5),
-        reload: Seconds::new(2.0),
         storage,
         moving: Some(walker().stats),
+        combat: Some(CombatPart {
+            attack_sprite: Some(SpriteId::named(301)),
+            weapon_range: Distance::new(0.5),
+            reload: Seconds::new(2.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let (unit, attacked, housed, tracker) = attack_by(
@@ -16666,8 +16691,11 @@ fn help_view<R>(
         id: ids::ID_448,
         kind: MasterKind::COMBAT,
         class: class::CLASS_47,
-        weapon_range: Distance::new(1.0),
-        weapons: vec![ClassAmount::new(4, 3)],
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(1.0),
+            weapons: vec![ClassAmount::new(4, 3)],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let wolf = Master {
@@ -18044,12 +18072,6 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_points: MasterHitPoints::of_data(30),
         radius: Footprint::new(0.2, 0.2),
         standing_sprite: Some(SpriteId::named(300)),
-        attack_sprite: Some(SpriteId::named(301)),
-        missile: MasterField::of(Some(master_id(363))),
-        weapon_offset: Offset::new(0.0, 0.0, 1.0),
-        weapon_range: Distance::new(4.0),
-        reload: Seconds::new(2.0),
-        hit_chance: HitChance::of_data(hit_chance),
         moving: Some(walker().stats),
         creatable: Some(CreatablePart {
             max_volley: MissileCount::of_data(max_volley),
@@ -18059,6 +18081,15 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
                 start: Distance::ZERO,
             },
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            attack_sprite: Some(SpriteId::named(301)),
+            missile: MasterField::of(Some(master_id(363))),
+            weapon_offset: Offset::new(0.0, 0.0, 1.0),
+            weapon_range: Distance::new(4.0),
+            reload: Seconds::new(2.0),
+            hit_chance: HitChance::of_data(hit_chance),
+            ..CombatPart::default()
         }),
         ..Master::default()
     };
@@ -18092,7 +18123,10 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         hit_points: MasterHitPoints::of_data(5),
         radius: Footprint::new(0.2, 0.2),
         height: Distance::new(1.5),
-        terrain_bonus: RestrictionField::NONE,
+        combat: Some(CombatPart {
+            terrain_bonus: RestrictionField::NONE,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     Masters::new([archer, arrow, deer])
@@ -18373,6 +18407,8 @@ fn missed_missile_strays_and_lands_on_the_ground() {
         Arc::make_mut(m)
             .get_mut(master_id(4))
             .unwrap()
+            .combat
+            .get_or_insert_with(Default::default)
             .missed_spread = MissSpread::new(2.0);
     }
     for _ in 0..6 {
@@ -18479,8 +18515,16 @@ fn volley_own_missiles_hit_without_the_shooter() {
         let mut all: Vec<Master> = m.iter().cloned().collect();
         let own = Master {
             id: master_id(364),
-            // a missile master that names a missile of its own always hits (`a.missile` 0 or more)
-            missile: MasterField::of(Some(master_id(0))),
+            combat: Some(CombatPart {
+                // a missile master that names a missile of its own always hits (`a.missile` 0 or more)
+                missile: MasterField::of(Some(master_id(0))),
+                ..m.get(master_id(363))
+                    .unwrap()
+                    .clone()
+                    .combat
+                    .clone()
+                    .unwrap_or_default()
+            }),
             ..m.get(master_id(363)).unwrap().clone()
         };
         all.push(own);

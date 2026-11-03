@@ -226,7 +226,7 @@ impl World {
         let repair = RepairAction::start(
             to,
             repair_task,
-            master.weapon_range,
+            master.combat_part().weapon_range,
             &move_reads,
             &self.model.tuning.move_to,
         )?;

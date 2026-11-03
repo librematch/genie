@@ -263,7 +263,7 @@ impl World {
         if *range < reach {
             *range = reach;
         }
-        Ok(gap <= reach_squared && master.min_range.squared() <= gap)
+        Ok(gap <= reach_squared && master.combat_part().min_range.squared() <= gap)
     }
 
     /// `FUN_1415cd0d0` of the member master `master` of player `player` with the order's task

@@ -55,6 +55,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::GarrisonCapacity;
@@ -1222,21 +1223,27 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
     let arrow = Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
-        weapons: vec![ClassAmount::new(3, 5)],
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(3, 5)],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let tc = Master {
         id: ids::TOWN_CENTRE,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        reload: Seconds::new(2.0),
-        weapon_range: Distance::new(6.0),
-        weapons: vec![ClassAmount::new(3, 5)],
         creatable: Some(CreatablePart {
             volley_missile: Some(master_id(54)),
             volley_fire: Firepower::new(1.0),
             max_volley: MissileCount::of_data(11),
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapon_range: Distance::new(6.0),
+            weapons: vec![ClassAmount::new(3, 5)],
+            ..CombatPart::default()
         }),
         ..Master::default()
     };
@@ -1244,15 +1251,18 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         id: ids::VILLAGER_MALE,
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
-        reload: Seconds::new(2.0),
-        weapons: vec![
-            ClassAmount::new(11, 3),
-            ClassAmount::new(4, 3),
-            ClassAmount::new(13, 6),
-            ClassAmount::new(24, 0),
-            ClassAmount::new(17, 0),
-        ],
-        garrison_firepower: Firepower::new(-2.5),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapons: vec![
+                ClassAmount::new(11, 3),
+                ClassAmount::new(4, 3),
+                ClassAmount::new(13, 6),
+                ClassAmount::new(24, 0),
+                ClassAmount::new(17, 0),
+            ],
+            garrison_firepower: Firepower::new(-2.5),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([arrow, tc.clone(), villager.clone()]);
@@ -1279,7 +1289,10 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
     );
     // one above 0 times the melee, pierce, class 31 and 38 amounts over the reload
     let armed = Master {
-        garrison_firepower: Firepower::new(0.5),
+        combat: Some(CombatPart {
+            garrison_firepower: Firepower::new(0.5),
+            ..villager.combat.clone().unwrap_or_default()
+        }),
         ..villager
     };
     assert_eq!(
@@ -1295,13 +1308,16 @@ fn town_center() -> Master {
         id: ids::TOWN_CENTRE,
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        reload: Seconds::new(2.0),
-        weapon_range: Distance::new(6.0),
-        weapons: vec![ClassAmount::new(3, 5)],
         creatable: Some(CreatablePart {
             volley_missile: Some(master_id(54)),
             volley_fire: Firepower::new(1.0),
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapon_range: Distance::new(6.0),
+            weapons: vec![ClassAmount::new(3, 5)],
+            ..CombatPart::default()
         }),
         ..Master::default()
     }
@@ -1314,11 +1330,14 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     let arrow = Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
-        weapons: vec![
-            ClassAmount::new(3, 5),
-            ClassAmount::new(4, 7),
-            ClassAmount::new(38, 2),
-        ],
+        combat: Some(CombatPart {
+            weapons: vec![
+                ClassAmount::new(3, 5),
+                ClassAmount::new(4, 7),
+                ClassAmount::new(38, 2),
+            ],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([arrow, town_center()]);
@@ -1334,8 +1353,11 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     );
     for (reload, range) in [(f32::NAN, 6.0), (2.0, f32::NAN), (0.0, 6.0), (2.0, 1.0)] {
         let tc = Master {
-            reload: Seconds::new(reload),
-            weapon_range: Distance::new(range),
+            combat: Some(CombatPart {
+                reload: Seconds::new(reload),
+                weapon_range: Distance::new(range),
+                ..town_center().combat.clone().unwrap_or_default()
+            }),
             ..town_center()
         };
         assert_eq!(
@@ -1348,13 +1370,16 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     // classes 4 and 6 sum their own melee, pierce, 31 and 38 amounts, not the missile's
     let infantry = Master {
         class: class::CLASS_6,
-        weapons: vec![
-            ClassAmount::new(4, 4),
-            ClassAmount::new(3, 1),
-            ClassAmount::new(31, 2),
-            ClassAmount::new(38, 1),
-            ClassAmount::new(11, 9),
-        ],
+        combat: Some(CombatPart {
+            weapons: vec![
+                ClassAmount::new(4, 4),
+                ClassAmount::new(3, 1),
+                ClassAmount::new(31, 2),
+                ClassAmount::new(38, 1),
+                ClassAmount::new(11, 9),
+            ],
+            ..town_center().combat.unwrap_or_default()
+        }),
         ..town_center()
     };
     assert_eq!(
@@ -1376,17 +1401,23 @@ fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     let missile = Master {
         id: ids::FARM,
         kind: MasterKind::MISSILE,
-        weapons: vec![ClassAmount::new(3, 6)],
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(3, 6)],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let volley = Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
-        weapons: vec![
-            ClassAmount::new(3, 2),
-            ClassAmount::new(38, 1),
-            ClassAmount::new(4, 9),
-        ],
+        combat: Some(CombatPart {
+            weapons: vec![
+                ClassAmount::new(3, 2),
+                ClassAmount::new(38, 1),
+                ClassAmount::new(4, 9),
+            ],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let unarmed = Master {
@@ -1397,14 +1428,17 @@ fn volley_missile_slot_the_table_holds_is_taken_even_when_it_is_empty() {
     let archer = |volley_missile| Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
-        reload: Seconds::new(2.0),
-        weapons: vec![ClassAmount::new(3, 4)],
-        missile: MasterField::of(Some(ids::FARM)),
-        garrison_firepower: Firepower::new(1.0),
         creatable: Some(CreatablePart {
             volley_fire: Firepower::new(3.0),
             volley_missile,
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapons: vec![ClassAmount::new(3, 4)],
+            missile: MasterField::of(Some(ids::FARM)),
+            garrison_firepower: Firepower::new(1.0),
+            ..CombatPart::default()
         }),
         ..Master::default()
     };
@@ -1443,18 +1477,24 @@ fn the_extra_missiles_truncate_and_multiply_as_the_game_does() {
     let volley = |amount| Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
-        weapons: vec![ClassAmount::new(3, amount)],
+        combat: Some(CombatPart {
+            weapons: vec![ClassAmount::new(3, amount)],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let tower = Master {
         id: master_id(79),
         kind: MasterKind::COMBAT,
-        reload: Seconds::new(1.0),
-        garrison_firepower: Firepower::new(1.0),
         creatable: Some(CreatablePart {
             volley_fire: Firepower::new(1e10),
             volley_missile: Some(master_id(54)),
             ..CreatablePart::default()
+        }),
+        combat: Some(CombatPart {
+            reload: Seconds::new(1.0),
+            garrison_firepower: Firepower::new(1.0),
+            ..CombatPart::default()
         }),
         ..Master::default()
     };
@@ -1491,19 +1531,25 @@ fn share_is_at_least_zero_and_transforming_master_takes_its_other_form_as_its_fl
         id: master_id(1120),
         kind: MasterKind::COMBAT,
         class: class::CLASS_0,
-        reload: Seconds::new(2.0),
-        weapons: vec![ClassAmount::new(3, 2)],
-        garrison_firepower: Firepower::new(1.0),
         object_flags: ObjectFlags::from_bits_retain(8 | (1122 << 16)),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapons: vec![ClassAmount::new(3, 2)],
+            garrison_firepower: Firepower::new(1.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let mounted = Master {
         id: master_id(1122),
         kind: MasterKind::COMBAT,
         class: class::CLASS_36,
-        reload: Seconds::new(2.0),
-        weapons: vec![ClassAmount::new(3, 6)],
-        garrison_firepower: Firepower::new(1.0),
+        combat: Some(CombatPart {
+            reload: Seconds::new(2.0),
+            weapons: vec![ClassAmount::new(3, 6)],
+            garrison_firepower: Firepower::new(1.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let masters = Masters::new([foot.clone(), mounted.clone()]);

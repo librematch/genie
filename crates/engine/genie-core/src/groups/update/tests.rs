@@ -50,6 +50,7 @@ use crate::objects::layers::Static;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -806,7 +807,10 @@ fn each_line_takes_its_units_least_range() {
     let combat = |id: MasterId, kind: MasterKind, range: Distance| Master {
         id,
         kind,
-        weapon_range: range,
+        combat: Some(CombatPart {
+            weapon_range: range,
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     t.model.masters = vec![
@@ -2181,14 +2185,14 @@ fn gate_out_of_reach_is_struck_at_its_nearest_part() {
     // within its weapon range and above the least one: the gate itself
     t.link_test_annex(object_id(21), object_id(20));
     let mut m4 = t.model.masters[1].get(master_id(4)).unwrap().clone();
-    m4.weapon_range = Distance::new(10.0);
+    m4.combat.get_or_insert_with(Default::default).weapon_range = Distance::new(10.0);
     t.model.masters[1] = Arc::new(Masters::new([m4.clone()]));
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),
         object_id(20)
     );
     // below the least range (a squared 3.9 against 5 squared) it is out of reach again
-    m4.min_range = Distance::new(5.0);
+    m4.combat.get_or_insert_with(Default::default).min_range = Distance::new(5.0);
     t.model.masters[1] = Arc::new(Masters::new([m4]));
     assert_eq!(
         t.gate_part(object_id(11), object_id(20)).unwrap(),

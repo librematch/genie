@@ -203,11 +203,12 @@ fn of_type(kind: MasterKind) -> Master {
 /// A field of a master, read as an `f32`.
 type Read = fn(&Master) -> f32;
 
-/// A master of `kind` with three storage entries, a paid food cost, 10 hit points, two damage
-/// sprites and two train locations (the second of each selected).
+/// A master of `kind` with its kind's layers ([`Master::of_kind`]): three storage entries, 10 hit
+/// points, two damage sprites and, with the creatable layer, a paid food cost and two train
+/// locations (the second of each selected).
 fn stocked(kind: MasterKind) -> Master {
+    let base = Master::of_kind(kind);
     Master {
-        kind,
         hit_points: MasterHitPoints::of_data(10),
         storage: vec![
             (Some(player_attribute::FOOD), Amount::new(1.0), 1),
@@ -216,13 +217,13 @@ fn stocked(kind: MasterKind) -> Master {
         ],
         damage_graphics: vec![DamageGraphic::default(); 2],
         damage_graphic_entry: DamageGraphicEntry::of_data(1),
-        creatable: Some(CreatablePart {
+        creatable: base.creatable.as_ref().map(|_| CreatablePart {
             cost: costs(&[(player_attribute::FOOD, 1, true)]),
             train_locations: vec![TrainLocation::default(); 2],
             train_location_entry: TrainLocationEntry::of_data(1),
             ..CreatablePart::default()
         }),
-        ..Master::default()
+        ..base
     }
 }
 
@@ -452,13 +453,15 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
 #[test]
 fn combat_multiply_takes_percentage_of_the_class_amount() {
     let mut m = of_type(MasterKind::RGE_COMBAT);
-    m.armors = vec![ClassAmount::new(4, 3), ClassAmount::new(3, 5)];
-    m.weapons = vec![ClassAmount::new(4, 7), ClassAmount::new(21, 0)];
+    m.combat.get_or_insert_with(Default::default).armors =
+        vec![ClassAmount::new(4, 3), ClassAmount::new(3, 5)];
+    m.combat.get_or_insert_with(Default::default).weapons =
+        vec![ClassAmount::new(4, 7), ClassAmount::new(21, 0)];
     // class 3 at 150%: 5 x 1.5 + 0.5 = 8; class 4 at 50%: 7 x 0.5 + 0.5 = 4
     m.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x396_i16), &world(false));
     m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x432_i16), &world(false));
     assert_eq!(
-        (m.armors.clone(), m.weapons[0]),
+        (m.combat_part().armors.clone(), m.combat_part().weapons[0]),
         (
             vec![ClassAmount::new(4, 3), ClassAmount::new(3, 8)],
             ClassAmount::new(4, 4)
@@ -466,7 +469,7 @@ fn combat_multiply_takes_percentage_of_the_class_amount() {
     );
     m.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x996_i16), &world(false));
     assert_eq!(
-        m.armors,
+        m.combat_part().armors,
         vec![ClassAmount::new(4, 3), ClassAmount::new(3, 8)]
     );
     let raised = AttributeWorld {
@@ -474,7 +477,7 @@ fn combat_multiply_takes_percentage_of_the_class_amount() {
         ..world(false)
     };
     m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x15c8_i16), &raised);
-    assert_eq!(m.weapons[1], ClassAmount::new(21, 0));
+    assert_eq!(m.combat_part().weapons[1], ClassAmount::new(21, 0));
 }
 
 /// `FUN_1410c12b0`, `FUN_1410c16e0` and `FUN_1410c1bf0`: each RGE combat attribute's field
@@ -490,117 +493,117 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::ATTACK_RELOAD_TIME,
-            |m| m.reload.get(),
+            |m| m.combat_part().reload.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ACCURACY_PERCENT,
-            |m| f32::from(m.hit_chance.get()),
+            |m| f32::from(m.combat_part().hit_chance.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MAXIMUM_RANGE,
-            |m| m.weapon_range.get(),
+            |m| m.combat_part().weapon_range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BASE_ARMOR,
-            |m| m.base_armor.as_f32(),
+            |m| m.combat_part().base_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::PROJECTILE_UNIT,
-            |m| f32::from(m.missile.get()),
+            |m| f32::from(m.combat_part().missile.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::TERRAIN_DEFENSE_BONUS,
-            |m| f32::from(m.terrain_bonus.get()),
+            |m| f32::from(m.combat_part().terrain_bonus.get()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::MINIMUM_RANGE,
-            |m| m.min_range.get(),
+            |m| m.combat_part().min_range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BLAST_WIDTH,
-            |m| m.area_effect.get(),
+            |m| m.combat_part().area_effect.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BONUS_DAMAGE_RESISTANCE,
-            |m| m.resistance.get(),
+            |m| m.combat_part().resistance.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FRAME_DELAY,
-            |m| m.fire_frame.as_f32(),
+            |m| m.combat_part().fire_frame.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::BLAST_ATTACK_LEVEL,
-            |m| f32::from(m.blast_level.bits()),
+            |m| f32::from(m.combat_part().blast_level.bits()),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_ATTACK,
-            |m| m.shown.attack.as_f32(),
+            |m| m.combat_part().shown.attack.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_RANGE,
-            |m| m.shown.range.get(),
+            |m| m.combat_part().shown.range.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::SHOWN_MELEE_ARMOR,
-            |m| m.shown.melee_armor.as_f32(),
+            |m| m.combat_part().shown.melee_armor.as_f32(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::COMBAT_ABILITY,
-            |m| f32::from(m.combat_ability.bits()),
+            |m| f32::from(m.combat_part().combat_ability.bits()),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::ATTACK_DISPERSION,
-            |m| m.missed_spread.get(),
+            |m| m.combat_part().missed_spread.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::ATTACK_GRAPHIC,
-            |m| sprite_value(m.attack_sprite),
+            |m| sprite_value(m.combat_part().attack_sprite),
             [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::AREA_DAMAGE,
-            |m| m.area_damage.get(),
+            |m| m.combat_part().area_damage.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DAMAGE_REFLECTION,
-            |m| m.reflection.get(),
+            |m| m.combat_part().reflection.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::FRIENDLY_FIRE_DAMAGE,
-            |m| m.friendly_fire.get(),
+            |m| m.combat_part().friendly_fire.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::GARRISON_FIREPOWER,
-            |m| m.garrison_firepower.get(),
+            |m| m.combat_part().garrison_firepower.get(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DISPLACEMENT_X,
-            |m| m.weapon_offset.x(),
+            |m| m.combat_part().weapon_offset.x(),
             [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DISPLACEMENT_Z,
-            |m| m.weapon_offset.z(),
+            |m| m.combat_part().weapon_offset.z(),
             [3.0, 5.0, 10.0],
         ),
     ];
@@ -755,7 +758,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::ATTACK_GRAPHIC_2,
-            |m| sprite_value(m.attack_sprite2),
+            |m| sprite_value(m.combat_part().attack_sprite2),
             [3.0, 5.0, 5.0],
         ),
         (
@@ -898,16 +901,17 @@ fn capped_speed_stops_at_its_type_cap() {
 #[test]
 fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
     let mut m = of_type(MasterKind::COMBAT);
-    m.armors = vec![
+    m.combat.get_or_insert_with(Default::default).armors = vec![
         ClassAmount::new(4, 1),
         ClassAmount::new(3, 2),
         ClassAmount::new(3, 9),
     ];
-    m.weapons = vec![ClassAmount::new(4, 6), ClassAmount::new(3, 0)];
+    m.combat.get_or_insert_with(Default::default).weapons =
+        vec![ClassAmount::new(4, 6), ClassAmount::new(3, 0)];
     // class 3, 1 more (0x301)
     m.add_attribute(MasterAttribute::ARMOR, 769.0, &world(false));
     assert_eq!(
-        m.armors,
+        m.combat_part().armors,
         vec![
             ClassAmount::new(4, 1),
             ClassAmount::new(3, 3),
@@ -916,16 +920,16 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
     );
     // −0x402: class 4, 2 less
     m.add_attribute(MasterAttribute::ARMOR, -1026.0, &world(false));
-    assert_eq!(m.armors[0], ClassAmount::new(4, -1));
+    assert_eq!(m.combat_part().armors[0], ClassAmount::new(4, -1));
     m.set_attribute(MasterAttribute::ARMOR, 1029.0, &world(false));
-    assert_eq!(m.armors[0], ClassAmount::new(4, 5));
+    assert_eq!(m.combat_part().armors[0], ClassAmount::new(4, 5));
     // 150 %: 6 × 1.5 + 0.5 = 9.5
     m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x496_i16), &world(false));
-    assert_eq!(m.weapons[0], ClassAmount::new(4, 9));
+    assert_eq!(m.combat_part().weapons[0], ClassAmount::new(4, 9));
     // a NaN takes the negative branch: class 0, amount 0, which no entry has
     m.add_attribute(MasterAttribute::ATTACK, f32::NAN, &world(false));
     assert_eq!(
-        m.weapons,
+        m.combat_part().weapons,
         vec![ClassAmount::new(4, 9), ClassAmount::new(3, 0)]
     );
     // a handicap of 1.5 raises a class at 0 (not 3, 4, 31 or 33)
@@ -933,16 +937,17 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
         handicap: Some(1.5),
         ..world(false)
     };
-    m.weapons = vec![ClassAmount::new(4, 0), ClassAmount::new(21, 0)];
+    m.combat.get_or_insert_with(Default::default).weapons =
+        vec![ClassAmount::new(4, 0), ClassAmount::new(21, 0)];
     m.set_attribute(MasterAttribute::ATTACK, f32::from(0x406_i16), &raised);
     m.set_attribute(MasterAttribute::ATTACK, f32::from(0x1506_i16), &raised);
     assert_eq!(
-        m.weapons,
+        m.combat_part().weapons,
         vec![ClassAmount::new(4, 6), ClassAmount::new(21, 9)]
     );
     // once above 0 the add adds
     m.add_attribute(MasterAttribute::ATTACK, f32::from(0x1502_i16), &raised);
-    assert_eq!(m.weapons[1], ClassAmount::new(21, 11));
+    assert_eq!(m.combat_part().weapons[1], ClassAmount::new(21, 11));
 }
 
 /// The RGE combat master's multiply rounds most shorts by 0.5 but multiplies the frame delay
@@ -950,19 +955,19 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
 #[test]
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
     let mut m = of_type(MasterKind::RGE_COMBAT);
-    m.base_armor = DamageAmount::new(3);
-    m.fire_frame = Frame::of_data(5);
-    m.shown.attack = DamageAmount::new(7);
+    m.combat.get_or_insert_with(Default::default).base_armor = DamageAmount::new(3);
+    m.combat.get_or_insert_with(Default::default).fire_frame = Frame::of_data(5);
+    m.combat.get_or_insert_with(Default::default).shown.attack = DamageAmount::new(7);
     m.multiply_attribute(MasterAttribute::BASE_ARMOR, 1.5, &world(false));
-    assert_eq!(m.base_armor, DamageAmount::new(5));
+    assert_eq!(m.combat_part().base_armor, DamageAmount::new(5));
     m.multiply_attribute(MasterAttribute::FRAME_DELAY, 2.9, &world(false));
-    assert_eq!(m.fire_frame, Frame::of_data(10));
+    assert_eq!(m.combat_part().fire_frame, Frame::of_data(10));
     m.multiply_attribute(MasterAttribute::SHOWN_ATTACK, 3.5, &world(false));
-    assert_eq!(m.shown.attack, DamageAmount::new(21));
+    assert_eq!(m.combat_part().shown.attack, DamageAmount::new(21));
     m.add_attribute(MasterAttribute::ROTATION_SPEED, 0.25, &world(false));
     assert_eq!(m.turn_speed, Seconds::new(0.25));
     m.set_attribute(MasterAttribute::DISPLACEMENT_Y, 0.75, &world(false));
-    assert_eq!(m.weapon_offset, Offset::new(0.0, 0.75, 0.0));
+    assert_eq!(m.combat_part().weapon_offset, Offset::new(0.0, 0.75, 0.0));
 }
 
 /// `FUN_1410d5b50`: a missile master's smart mode takes the multiply's amount; its arc
@@ -980,13 +985,13 @@ fn missile_smart_mode_multiply_sets_it() {
         radius: Radii::ZERO,
         fly_mode: FlyMode::GROUND,
     });
-    m.reload = Seconds::new(2.0);
+    m.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
     m.multiply_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
     m.multiply_attribute(MasterAttribute::PROJECTILE_ARC, 0.5, &world(false));
     m.multiply_attribute(MasterAttribute::ATTACK_RELOAD_TIME, 0.5, &world(false));
     let s = m.missile_stats.unwrap();
     assert_eq!(
-        (s.smart_mode, s.arc, m.reload),
+        (s.smart_mode, s.arc, m.combat_part().reload),
         (
             SmartMode::from_bits_retain(3),
             ArcRatio::new(0.25),
@@ -1372,7 +1377,10 @@ fn an_id_field_keeps_negative_value_through_an_add() {
         m.set_attribute(a, -3.0, &w);
     }
     assert_eq!(
-        (m.missile.master(), m.terrain_bonus.restriction()),
+        (
+            m.combat_part().missile.master(),
+            m.combat_part().terrain_bonus.restriction()
+        ),
         (None, None)
     );
     for a in [
@@ -1381,12 +1389,15 @@ fn an_id_field_keeps_negative_value_through_an_add() {
     ] {
         m.add_attribute(a, 5.0, &w);
     }
-    assert_eq!(m.missile.master(), Some(master_id(2)));
-    assert_eq!(m.terrain_bonus.restriction(), RestrictionId::of_data(2));
+    assert_eq!(m.combat_part().missile.master(), Some(master_id(2)));
+    assert_eq!(
+        m.combat_part().terrain_bonus.restriction(),
+        RestrictionId::of_data(2)
+    );
     // 2 × −2 + 0.5 truncates to −3, kept: plus 4 is 1
     m.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &w);
     m.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &w);
-    assert_eq!(m.missile.get(), 1);
+    assert_eq!(m.combat_part().missile.get(), 1);
     let mut t = of_type(MasterKind::MOVING);
     t.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &w);
     t.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &w);
@@ -1444,7 +1455,7 @@ fn the_action_and_moving_setters_change_their_values() {
 fn the_combat_master_own_values_change() {
     let mut m = of_type(MasterKind::COMBAT);
     m.hit_points = MasterHitPoints::of_data(100);
-    m.attack_sprite2 = Some(SpriteId::named(10));
+    m.combat.get_or_insert_with(Default::default).attack_sprite2 = Some(SpriteId::named(10));
     m.set_attribute(MasterAttribute::HERO_STATUS, 1.0, &world(false));
     m.add_attribute(MasterAttribute::HERO_STATUS, 4.0, &world(false));
     m.set_attribute(MasterAttribute::MAXIMUM_CHARGE, 10.0, &world(false));
@@ -1521,7 +1532,7 @@ fn the_combat_master_own_values_change() {
         (
             m.creatable_part().volley_fire,
             m.creatable_part().max_volley,
-            m.attack_sprite2
+            m.combat_part().attack_sprite2
         ),
         (
             Firepower::new(2.0),
@@ -1575,7 +1586,7 @@ fn the_missile_building_and_animated_setters() {
             ArcRatio::new(0.5)
         )
     );
-    assert_eq!(m.weapon_range, Distance::new(5.0));
+    assert_eq!(m.combat_part().weapon_range, Distance::new(5.0));
     let mut b = of_type(MasterKind::BUILDING);
     b.building = Some(BuildingMaster::default());
     b.add_attribute(MasterAttribute::BUILDING_ICON_OVERRIDE, 3.0, &world(false));

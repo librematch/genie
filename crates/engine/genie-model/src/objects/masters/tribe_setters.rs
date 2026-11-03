@@ -199,7 +199,9 @@ impl Master {
                 }
             }
             MasterAttribute::ATTACK_GRAPHIC_2 => {
-                set_sprite(&mut self.attack_sprite2, cvttss2si(v), world);
+                if let Some(p) = self.combat.as_mut() {
+                    set_sprite(&mut p.attack_sprite2, cvttss2si(v), world);
+                }
             }
             _ => {}
         }
@@ -300,7 +302,11 @@ impl Master {
                     t.time = t.time.plus(low16(v));
                 }
             }
-            MasterAttribute::ATTACK_GRAPHIC_2 => add_sprite(&mut self.attack_sprite2, v, world),
+            MasterAttribute::ATTACK_GRAPHIC_2 => {
+                if let Some(p) = self.combat.as_mut() {
+                    add_sprite(&mut p.attack_sprite2, v, world);
+                }
+            }
             MasterAttribute::ABILITY_BUTTON_ICON_ID
             | MasterAttribute::ABILITY_SHORT_TOOLTIP_ID
             | MasterAttribute::ABILITY_EXTENDED_TOOLTIP_ID

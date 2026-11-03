@@ -1,16 +1,13 @@
 //! A master and the players' tables of them: the `.dat`'s unit records as the engine reads them (FD-046).
 
-use crate::combat::Firepower;
-use crate::combat::missile::{MissSpread, MissileStats};
+use crate::combat::missile::MissileStats;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GroundOffset;
-use crate::map::Offset;
 use crate::map::RestrictionId;
 use crate::map::TerrainId;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
-use crate::objects::Frame;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
@@ -21,18 +18,15 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::lifecycle::MasterData;
 use crate::objects::masters::AdjacentMode;
 use crate::objects::masters::BlastDefense;
-use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::CarryCapacity;
-use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
-use crate::objects::masters::CombatAbility;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::DamageAmount;
 use crate::objects::masters::DamageGraphic;
 use crate::objects::masters::DamageGraphicEntry;
-use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::GarrisonCapacity;
@@ -40,10 +34,8 @@ use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::GhostMode;
 use crate::objects::masters::HillMode;
-use crate::objects::masters::HitChance;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
-use crate::objects::masters::MasterField;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MinimapMode;
@@ -52,7 +44,6 @@ use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
-use crate::objects::masters::RestrictionField;
 use crate::objects::masters::RunPattern;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::Task;
@@ -93,7 +84,7 @@ impl Master {
             sprites.extend([self.move_sprite, self.run_sprite]);
         }
         if MasterKind::RGE_COMBAT <= self.kind {
-            sprites.push(self.attack_sprite);
+            sprites.push(self.combat_part().attack_sprite);
         }
         for t in &self.tasks {
             sprites.extend(t.sprites.ids());
@@ -209,14 +200,10 @@ pub struct Master {
     /// The `.dat`'s `drop_sites` (`+0x7a0`..`+0x7a8`, `FUN_14109d4f0`): the buildings a unit of
     /// this master takes its load to.
     pub drop_sites: Vec<MasterId>,
-    /// The hit points (`+0x530`) and the build time: the first train location's train time
-    /// (`+0x898`'s first entry), 0 without one.
+    /// The hit points (`+0x530`).
     pub hit_points: MasterHitPoints,
-    /// The combat master's `weapon_range` (`+0x828`, object slot 0x230) and
-    /// `minimum_weapon_range` (`+0x850`, slot 0x240).
-    pub weapon_range: Distance,
-    /// `minimum_weapon_range` (`+0x850`, slot 0x240).
-    pub min_range: Distance,
+    /// The combat layer (types 50 and up but 90, `+0x7f8`..`+0x87f`): attack, armor, blast; None for other masters.
+    pub combat: Option<CombatPart>,
     /// `+0x61c`, `attribute_max_amount`: how much an object of this master carries.
     pub capacity: CarryCapacity,
     /// `+0x688`, `+0x68c`: the `.dat`'s `outline_size` (x, y), an obstruction-type-11 object's
@@ -228,9 +215,6 @@ pub struct Master {
     /// `+0x5fc`, `clearance_size`: a completed building's foundation terrain covers its position
     /// plus and minus this.
     pub clearance: Footprint,
-    /// `+0x820`, the `.dat`'s `defense_terrain_bonus` (a terrain restriction): a completed
-    /// building keeps to restore a tile's terrain whose value in it is neither 0 nor 1.
-    pub terrain_bonus: RestrictionField,
     /// What a building's completion reads (type 80), None for other masters.
     pub building: Option<BuildingMaster>,
     /// The resource storage (`attribute_type_held`, `attribute_amount_held`, `attribute_flag`:
@@ -242,34 +226,8 @@ pub struct Master {
     pub damage_sprites: bool,
     /// The `.dat`'s `fly_mode` (`+0x608`): 1 flies above the ground (a bird's Fly lifts it).
     pub fly_mode: FlyMode,
-    /// What a hit on an object of this master reads (`FUN_141082530`): its armor classes (class,
-    /// amount; `+0x808`, count `+0x802`), its base armor for a class it does not list (`+0x800`),
-    /// `bonus_damage_resistance` (`+0x824`), `combat_ability` (`+0x840`), `damage_reflection`
-    /// (`+0x864`), `invulnerability_level` (`+0x930`: a hit point floor, `FUN_141202a80`) and
-    /// `special_attack_flag` (`+0x8d8`), `friendly_fire_damage` (`+0x868`), its special graphic
-    /// (`+0x8e8`, the `.dat`'s `special_graphic`) and `area_effect_object_level` (`+0x62b`, the
-    /// blasts that reach it); and what an attacker of it reads: `area_effect_range` (`+0x82c`),
-    /// `area_effect_level` (`+0x830`), `area_damage` (`+0x834`), `max_charge` (`+0x918`) and
-    /// `charge_target` (`+0x924`).
-    pub base_armor: DamageAmount,
-    /// Its armor classes (class, amount; `+0x808`, count `+0x802`).
-    pub armors: Vec<ClassAmount>,
-    /// `bonus_damage_resistance` (`+0x824`).
-    pub resistance: DamageShare,
-    /// `combat_ability` (`+0x840`).
-    pub combat_ability: CombatAbility,
-    /// `damage_reflection` (`+0x864`).
-    pub reflection: DamageShare,
-    /// `friendly_fire_damage` (`+0x868`).
-    pub friendly_fire: DamageShare,
     /// `area_effect_object_level` (`+0x62b`): the blasts that reach it.
     pub blast_defense: BlastDefense,
-    /// `area_effect_range` (`+0x82c`): its blast's radius.
-    pub area_effect: Distance,
-    /// `area_effect_level` (`+0x830`).
-    pub blast_level: BlastLevel,
-    /// `area_damage` (`+0x834`).
-    pub area_damage: DamageShare,
     /// `+0x5d4`, `obj_max` (the `.dat`'s `garrison_capacity`): a building that garrisons takes a
     /// gather point (`FUN_140e7e9a0`).
     pub garrison: GarrisonCapacity,
@@ -306,12 +264,8 @@ pub struct Master {
     pub death_spawns: [Option<MasterId>; 2],
     /// What a dead object's steps read of the master.
     pub life: Option<MasterData>,
-    /// What a combat master's attack reads: its standing sprite (`+0x470`), its attack sprite
-    /// (`+0x7f8`, `fight_sprite_id`), a second attack sprite
-    /// (`+0x878`, the `.dat`'s `attack_graphic2`), `missile_id`, `fire_missile_at_frame`,
-    /// `interrupt_frame`, `base_hit_chance`, `speed_of_attack` (the reload time) and its weapons
-    /// (class, amount); and the sprite it waits with between swings (`+0x910`, the `.dat`'s
-    /// `idle_attack_graphic`, −1 for none).
+    /// Its standing sprite (`+0x470`, −1 for none), which a combat master's attack shows too
+    /// ([`CombatPart`]).
     pub standing_sprite: Option<SpriteId>,
     /// Its second standing sprite (`+0x478`, the `.dat`'s `standing_graphic[1]`), whose idle
     /// animation the object swaps in (`0x141071880`); None for none.
@@ -321,31 +275,6 @@ pub struct Master {
     pub move_sprite: Option<SpriteId>,
     /// Its running sprite (`+0x750`), −1 for none.
     pub run_sprite: Option<SpriteId>,
-    /// Its attack sprite (`+0x7f8`, `fight_sprite_id`).
-    pub attack_sprite: Option<SpriteId>,
-    /// A second attack sprite (`+0x878`).
-    pub attack_sprite2: Option<SpriteId>,
-    /// `missile_id`, −1 for none: every short the effects leave in it is kept.
-    pub missile: MasterField,
-    /// `fire_missile_at_frame`.
-    pub fire_frame: Frame,
-    /// `interrupt_frame`.
-    pub interrupt_frame: Frame,
-    /// `base_hit_chance`.
-    pub hit_chance: HitChance,
-    /// `speed_of_attack`: the reload time.
-    pub reload: Seconds,
-    /// Its weapons (class, amount).
-    pub weapons: Vec<ClassAmount>,
-    /// Where its missile starts from its place, turned by its facing (`+0x844`..`+0x84c`,
-    /// `weapon_offset`), and how far a missed missile strays per tile of the way
-    /// (`missed_missile_spread`, `+0x860`).
-    pub weapon_offset: Offset,
-    /// How far a missed missile strays per tile of the way (`missed_missile_spread`, `+0x860`).
-    pub missed_spread: MissSpread,
-    /// `garrison_firepower` (`+0x870`): what a unit adds to the volleys of a building it is
-    /// inside; one at most 0 adds its magnitude.
-    pub garrison_firepower: Firepower,
     /// A missile master's flight (type 60, [`crate::combat::missile::MissileStats`]).
     pub missile_stats: Option<MissileStats>,
     /// What a unit of this master moves with, its speed with the master's walking sprite (the
@@ -379,9 +308,6 @@ pub struct Master {
     pub trail: Trail,
     /// `+0x7b9`, `run_pattern`.
     pub run_pattern: RunPattern,
-    /// `+0x856`, `+0x858` and `+0x854`: the attack, range and melee armor a combat master shows
-    /// (`orig_weapon`, `orig_weapon_range`, `orig_armor`).
-    pub shown: Shown,
 }
 
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's

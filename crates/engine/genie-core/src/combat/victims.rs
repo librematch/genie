@@ -129,9 +129,13 @@ impl World {
         p: PlayerId,
         target: Option<ObjectId>,
     ) -> Result<Vec<Victim>, GenieError> {
-        let reach = Some(unit.master(self.master_tables(), p)?.area_effect)
-            .filter(|&r| Distance::ZERO < r)
-            .map(|r| r + Distance::new(6.0) + Distance::new(2.0));
+        let reach = Some(
+            unit.master(self.master_tables(), p)?
+                .combat_part()
+                .area_effect,
+        )
+        .filter(|&r| Distance::ZERO < r)
+        .map(|r| r + Distance::new(6.0) + Distance::new(2.0));
         let mut near: Vec<Victim> = Vec::new();
         if let Some(reach) = reach {
             let (x, y) = (unit.position().x(), unit.position().y());
@@ -590,7 +594,7 @@ pub(crate) fn is_trebuchet(master: &Master, roles: &Roles) -> bool {
         && roles
             .of_class(master.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-        && !master.weapons.is_empty()
+        && !master.combat_part().weapons.is_empty()
 }
 
 /// `master`'s paid cost (`+0x880`: each entry with a resource and the paid flag), summed as

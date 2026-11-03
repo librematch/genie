@@ -136,12 +136,12 @@ impl Unit {
             attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| {
                 m.creatable_part().attack_priority
             }),
-            missile: master.and_then(|m| m.missile.master()),
-            range: master.map_or(Distance::ZERO, |m| m.weapon_range),
-            min_range: master.map_or(Distance::ZERO, |m| m.min_range),
+            missile: master.and_then(|m| m.combat_part().missile.master()),
+            range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
+            min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
             charge_kind: master.map_or(ChargeKind::NONE, |m| m.creatable_part().charge_kind),
-            area_effect: master.map_or(Distance::ZERO, |m| m.area_effect),
-            blast_level: master.map_or(BlastLevel::NONE, |m| m.blast_level),
+            area_effect: master.map_or(Distance::ZERO, |m| m.combat_part().area_effect),
+            blast_level: master.map_or(BlastLevel::NONE, |m| m.combat_part().blast_level),
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             position: self.position(),
             radius: master.map_or(Footprint::ZERO, |m| m.radius),

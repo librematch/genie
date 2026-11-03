@@ -49,7 +49,8 @@ use crate::world::player::AiSettings;
 
 /// Slot 0x228 (`FUN_141084070`): the sum of master `m`'s attacks above 0 (`COMISS`), from +0.
 pub(super) fn attacks(m: &Master) -> f32 {
-    m.weapons
+    m.combat_part()
+        .weapons
         .iter()
         .filter(|w| DamageAmount::ZERO < w.amount)
         .fold(0.0, |sum, w| sum + w.amount.as_f32())
@@ -330,7 +331,7 @@ impl WorldPicker<'_> {
                 .creatable_part()
                 .charge_projectile
                 .and_then(|id| player_master(self.every.players, q, id))
-                .map(|m| &m.weapons[..]),
+                .map(|m| &m.combat_part().weapons[..]),
             charge_event: om.creatable_part().charge_event,
             range_powerup: self.parts.combat_of(o.id).range_powerup,
         };
@@ -560,7 +561,7 @@ impl AttackPicker for WorldPicker<'_> {
             damage,
             hp: t.life.hp,
             reload: self.parts.combat_of(me.id).reload_stinger
-                + (mm.reload - self.parts.combat_of(me.id).reload_powerup),
+                + (mm.combat_part().reload - self.parts.combat_of(me.id).reload_powerup),
             workable: self.converts(self.me, id, false, roles, unit_ai_tuning)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
@@ -572,16 +573,19 @@ impl AttackPicker for WorldPicker<'_> {
     fn armored(&mut self, id: ObjectId) -> Result<bool, GenieError> {
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let class3 = m
+            .combat_part()
             .armors
             .iter()
             .filter(|a| a.class == DamageClass::PIERCE)
             .map(|a| a.amount)
             .max();
         let armor = class3.unwrap_or_else(|| {
-            m.armors.iter().fold(
-                m.base_armor,
-                |best, a| if best < a.amount { a.amount } else { best },
-            )
+            m.combat_part()
+                .armors
+                .iter()
+                .fold(m.combat_part().base_armor, |best, a| {
+                    if best < a.amount { a.amount } else { best }
+                })
         });
         Ok(DamageAmount::new(100) <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
     }
@@ -590,7 +594,7 @@ impl AttackPicker for WorldPicker<'_> {
     fn weapon_range(&mut self, id: ObjectId) -> Result<Distance, GenieError> {
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         Ok(if MasterKind::RGE_COMBAT <= m.kind {
-            m.weapon_range
+            m.combat_part().weapon_range
         } else {
             Distance::ZERO
         })

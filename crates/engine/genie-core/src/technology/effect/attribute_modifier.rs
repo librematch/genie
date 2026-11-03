@@ -116,7 +116,7 @@ impl World {
         };
         let masters = self.model.masters.checked(p.index())?;
         let master = u.master(self.master_tables(), p)?;
-        if u.garrison.is_empty() || at_most_or_unordered(master.reload.get(), 0.0) {
+        if u.garrison.is_empty() || at_most_or_unordered(master.combat_part().reload.get(), 0.0) {
             return Ok(());
         }
         let rate = attack_rate(
@@ -218,10 +218,10 @@ impl World {
         }
         let sprites = MasterSprites {
             moving: g(master.move_sprite),
-            attack: g(master.attack_sprite),
+            attack: g(master.combat_part().attack_sprite),
             standing: g(master.standing_sprite),
             idle_attack: g(master.creatable_part().idle_attack_sprite),
-            second: g(master.attack_sprite2),
+            second: g(master.combat_part().attack_sprite2),
             combat: MasterKind::COMBAT <= master.kind,
         };
         // the object the read above found: its action layer

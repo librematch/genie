@@ -50,6 +50,7 @@ use crate::objects::lifecycle::Lifecycle;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
@@ -1004,10 +1005,16 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         .get_mut(master_id(4))
         .unwrap();
     soldier.standing_sprite = Some(SpriteId::named(300));
-    soldier.attack_sprite = Some(SpriteId::named(301));
+    soldier
+        .combat
+        .get_or_insert_with(Default::default)
+        .attack_sprite = Some(SpriteId::named(301));
     soldier.move_sprite = Some(SpriteId::named(302));
-    soldier.weapon_range = Distance::ZERO;
-    soldier.reload = Seconds::new(2.0);
+    soldier
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapon_range = Distance::ZERO;
+    soldier.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
     soldier.moving = Some(walker.stats);
     t.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(126),
@@ -3740,9 +3747,12 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
         id,
         kind: MasterKind::COMBAT,
         class,
-        weapon_range: Distance::new(5.0),
-        min_range: Distance::new(2.0),
         radius: Footprint::new(0.2, 0.2),
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(5.0),
+            min_range: Distance::new(2.0),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     t.model.masters = vec![

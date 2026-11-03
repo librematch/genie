@@ -122,7 +122,7 @@ impl Unit {
                 "a charged hit (slot 0x2f8 with charge types 6 and 7)",
             ));
         }
-        let missile = master.missile.master().is_some();
+        let missile = master.combat_part().missile.master().is_some();
         // what the rest reads of the master, before the notify changes the unit
         let notifies = roles
             .of_master(master.id)
@@ -143,7 +143,10 @@ impl Unit {
         let (first, extra) = if master.creatable_part().max_volley == MissileCount::ZERO {
             (true, 0)
         } else {
-            let full = master.combat_ability.contains(CombatAbility::FULL_VOLLEY);
+            let full = master
+                .combat_part()
+                .combat_ability
+                .contains(CombatAbility::FULL_VOLLEY);
             self.volley_shots(
                 c,
                 (
@@ -266,25 +269,32 @@ impl Unit {
                 .map(|m| m.angle)
                 .ok_or(GenieError::unsupported("a ranged unit that does not move"))?;
         let shot = Shot {
-            made: master.missile.master().ok_or(GenieError::missing_data(
-                "a ranged unit whose master has no missile",
-            ))?,
-            at: spawn_point(self.position(), facing, master.weapon_offset),
+            made: master
+                .combat_part()
+                .missile
+                .master()
+                .ok_or(GenieError::missing_data(
+                    "a ranged unit whose master has no missile",
+                ))?,
+            at: spawn_point(self.position(), facing, master.combat_part().weapon_offset),
             point: aimed.position,
             reach: reach(
                 master.radius,
-                master.weapon_range,
+                master.combat_part().weapon_range,
                 &c.w.model.tuning.missile,
             ),
             shooter: true,
             aimer: Aimer {
-                hit_chance: master.hit_chance,
-                spread: master.missed_spread,
+                hit_chance: master.combat_part().hit_chance,
+                spread: master.combat_part().missed_spread,
                 class: master.class,
             },
             attack_count: c.w.parts.combat_of(self.id).attack_count,
         };
-        let (weapon_range, blast_level) = (master.weapon_range, master.blast_level);
+        let (weapon_range, blast_level) = (
+            master.combat_part().weapon_range,
+            master.combat_part().blast_level,
+        );
         self.launch(c, aimed, &shot, roles)?;
         if !roles
             .of_master(self.life.master_id)
@@ -341,7 +351,7 @@ impl Unit {
         let at = volley_spawn_point(
             self.position(),
             facing,
-            master.weapon_offset,
+            master.combat_part().weapon_offset,
             master.creatable_part().volley_spread.start,
             scatter,
             building.then_some(aimed.position.ground()),
@@ -352,11 +362,14 @@ impl Unit {
             .and_then(|id| masters.get(id));
         let made = match volley {
             Some(v) => v,
-            None if master.missile.master().is_some() => {
-                master.missile.master().and_then(|m| masters.get(m)).ok_or(
-                    GenieError::unsupported("a missile its player's masters do not have"),
-                )?
-            }
+            None if master.combat_part().missile.master().is_some() => master
+                .combat_part()
+                .missile
+                .master()
+                .and_then(|m| masters.get(m))
+                .ok_or(GenieError::unsupported(
+                    "a missile its player's masters do not have",
+                ))?,
             None => {
                 return Err(GenieError::unsupported(
                     "a volley's extra missile of a master without a missile",
@@ -379,13 +392,13 @@ impl Unit {
             point: spawn_point(aimed.position, facing, scatter.with_height(0.0)),
             reach: volley_reach(
                 master.radius,
-                master.weapon_range,
+                master.combat_part().weapon_range,
                 &c.w.model.tuning.missile,
             ),
             shooter,
             aimer: Aimer {
-                hit_chance: aimer.hit_chance,
-                spread: aimer.missed_spread,
+                hit_chance: aimer.combat_part().hit_chance,
+                spread: aimer.combat_part().missed_spread,
                 class: aimer.class,
             },
             attack_count: AttackCount::ZERO,
@@ -441,7 +454,7 @@ pub(crate) fn armed(
         || roles
             .of_class(master.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-        || master.missile.master().is_some()
+        || master.combat_part().missile.master().is_some()
         || Firepower::new(turn_tuning.armed_firepower) < firepower
 }
 

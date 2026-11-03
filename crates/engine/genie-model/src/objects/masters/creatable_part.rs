@@ -10,6 +10,7 @@ use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ChargeTarget;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::ConversionAdjust;
 use crate::objects::masters::CostSlot;
 use crate::objects::masters::DamageAmount;
@@ -107,12 +108,14 @@ pub struct CreatablePart {
 static ABSENT: LazyLock<CreatablePart> = LazyLock::new(CreatablePart::default);
 
 impl Master {
-    /// A master of type `kind` with the defaults of the layers its type holds (the creatable
-    /// layer for [`MasterKind::has_creatable_layer`]).
+    /// A master of type `kind` with the defaults of the layers its type holds (the combat layer
+    /// for [`MasterKind::has_combat_layer`], the creatable one for
+    /// [`MasterKind::has_creatable_layer`]).
     #[must_use]
     pub fn of_kind(kind: MasterKind) -> Self {
         Self {
             kind,
+            combat: kind.has_combat_layer().then(CombatPart::default),
             creatable: kind.has_creatable_layer().then(CreatablePart::default),
             ..Self::default()
         }

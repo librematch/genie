@@ -45,6 +45,7 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::DamageShare;
 use crate::objects::masters::FlyMode;
 use crate::objects::masters::MasterField;
@@ -1978,7 +1979,10 @@ fn an_attack_walks_with_the_unit_running_or_walking_slot() {
     let master = Master {
         move_sprite: Some(SpriteId::named(10)),
         run_sprite: Some(SpriteId::named(11)),
-        attack_sprite: Some(SpriteId::named(12)),
+        combat: Some(CombatPart {
+            attack_sprite: Some(SpriteId::named(12)),
+            ..CombatPart::default()
+        }),
         ..Master::default()
     };
     let a = arms(&master, &graphics, TaskSprites::NONE, None, &roles());
@@ -2565,6 +2569,8 @@ fn disarmed_building_targetless_attack_ends_standing_and_posts_0x1fb() {
         Arc::make_mut(masters)
             .get_mut(ids::TOWN_CENTRE)
             .unwrap()
+            .combat
+            .get_or_insert_with(Default::default)
             .missile = MasterField::NONE;
     }
     let centre = &mut t.players[1].objects[ListIndex::new(2)];

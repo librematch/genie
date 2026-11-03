@@ -119,7 +119,7 @@ pub(super) fn lay_foundation(
                 snow: c.snow,
                 master: master.id,
                 class: master.class,
-                terrain_bonus: master.terrain_bonus,
+                terrain_bonus: master.combat_part().terrain_bonus,
                 mode_680,
             },
             &model.roles,

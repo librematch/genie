@@ -31,6 +31,7 @@ use crate::objects::layers::{Action, Combat, Motion, Static};
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::MasterId;
@@ -431,7 +432,10 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         hit_points: MasterHitPoints::of_data(25),
-        armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
+        combat: Some(CombatPart {
+            armors: vec![ClassAmount::new(4, 0), ClassAmount::new(3, 0)],
+            ..CombatPart::default()
+        }),
         ..Master::default()
     }]))];
     let loom = [
@@ -451,7 +455,7 @@ fn loom_adds_hit_points_to_its_villagers_and_their_master_and_armor_to_the_maste
     assert_eq!(hp, [40.0, 16.0]);
     let m = t.model.masters[0].get(ids::VILLAGER_MALE).unwrap();
     assert_eq!(
-        (m.hit_points, m.armors.clone()),
+        (m.hit_points, m.combat_part().armors.clone()),
         (
             MasterHitPoints::of_data(40),
             vec![ClassAmount::new(4, 1), ClassAmount::new(3, 2)]
@@ -648,13 +652,31 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     )]);
     let mut tower_master = combat(master_id(79), class::TOWER, 1020);
     tower_master.kind = MasterKind::BUILDING;
-    tower_master.reload = Seconds::new(2.0);
-    tower_master.weapon_range = Distance::new(8.0);
-    tower_master.weapons = vec![ClassAmount::new(3, 5)];
+    tower_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .reload = Seconds::new(2.0);
+    tower_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapon_range = Distance::new(8.0);
+    tower_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapons = vec![ClassAmount::new(3, 5)];
     let mut archer_master = combat(master_id(4), class::CLASS_0, 30);
-    archer_master.reload = Seconds::new(2.0);
-    archer_master.weapons = vec![ClassAmount::new(3, 4)];
-    archer_master.garrison_firepower = Firepower::new(1.0);
+    archer_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .reload = Seconds::new(2.0);
+    archer_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapons = vec![ClassAmount::new(3, 4)];
+    archer_master
+        .combat
+        .get_or_insert_with(Default::default)
+        .garrison_firepower = Firepower::new(1.0);
     t.model.masters = vec![Arc::new(Masters::new([archer_master, tower_master]))];
     // the tower's rate: 5 / 2 = 2.5; the archer's share 4 / 2 / 2.5 = 0.8, then 6 / 2 / 2.5
     t.do_effect(
@@ -664,7 +686,11 @@ fn change_moves_the_shares_of_the_units_inside_building() {
     )
     .unwrap();
     assert_eq!(
-        t.model.masters[0].get(master_id(4)).unwrap().weapons,
+        t.model.masters[0]
+            .get(master_id(4))
+            .unwrap()
+            .combat_part()
+            .weapons,
         [ClassAmount::new(3, 6)]
     );
     assert_eq!(
@@ -1581,14 +1607,17 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
     let mut militia = combat(master_id(74), class::CLASS_6, 40);
     militia.available = true;
     let mut man_at_arms = combat(master_id(75), class::CLASS_6, 45);
-    man_at_arms.weapons = vec![ClassAmount::new(4, 6)];
+    man_at_arms
+        .combat
+        .get_or_insert_with(Default::default)
+        .weapons = vec![ClassAmount::new(4, 6)];
     man_at_arms.available = false;
     t.model.masters = vec![Arc::new(Masters::new([militia, man_at_arms]))];
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
         .unwrap();
     let m = t.model.masters[0].get(master_id(74)).unwrap();
     assert_eq!(
-        (m.id, m.hit_points, m.weapons.clone()),
+        (m.id, m.hit_points, m.combat_part().weapons.clone()),
         (
             master_id(74),
             MasterHitPoints::of_data(45),

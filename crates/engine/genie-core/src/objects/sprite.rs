@@ -386,7 +386,7 @@ pub fn running(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
 /// else its master's (`+0x7f8`, `fight_sprite_id`).
 #[must_use]
 pub fn attacking(master: &Master, look: Option<&Look>) -> Option<SpriteId> {
-    look.map_or_else(|| master.attack_sprite, |l| l.attacking)
+    look.map_or_else(|| master.combat_part().attack_sprite, |l| l.attacking)
 }
 
 /// Slot 0x7a0 of a combat object (`FUN_1412027d0`): its terrain look's dying sprite (`+0x980`),
@@ -429,6 +429,7 @@ mod tests {
     use crate::gathering::hunt::tests::walker;
     use crate::movement::Speed;
     use crate::objects::FacetCount;
+    use crate::objects::masters::CombatPart;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::MasterKind;
     use crate::objects::masters::TaskSprites;
@@ -733,7 +734,6 @@ mod tests {
             undead_sprite: None,
             move_sprite: Some(SpriteId::named(10)),
             run_sprite: Some(SpriteId::named(11)),
-            attack_sprite: Some(SpriteId::named(12)),
             building: Some(BuildingMaster {
                 destruction_sprite: Some(SpriteId::named(389)),
                 construction_sprite: None,
@@ -742,6 +742,10 @@ mod tests {
             creatable: Some(CreatablePart {
                 build_time: WholeSeconds::of_data(50),
                 ..CreatablePart::default()
+            }),
+            combat: Some(CombatPart {
+                attack_sprite: Some(SpriteId::named(12)),
+                ..CombatPart::default()
             }),
             ..Master::default()
         }

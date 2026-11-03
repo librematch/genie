@@ -846,7 +846,10 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
     );
     // a house's cost: 25 wood paid; the unpaid entry does not count
     master.clearance = Footprint::new(1.0, 1.0);
-    master.terrain_bonus = RestrictionField::of_data(4);
+    master
+        .combat
+        .get_or_insert_with(Default::default)
+        .terrain_bonus = RestrictionField::of_data(4);
     master.storage = vec![
         (Some(attribute::HEADROOM), Amount::new(5.0), 4),
         (None, Amount::ZERO, 0),

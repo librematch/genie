@@ -327,8 +327,8 @@ impl AttackReads {
                 .and_then(|s| graphics.get(s))
                 .copied(),
             volleys: masters.table.is_some_and(|m| volleys(master, m)),
-            reload: combat.reload_stinger + (master.reload - combat.reload_powerup),
-            hit_chance: master.hit_chance,
+            reload: combat.reload_stinger + (master.combat_part().reload - combat.reload_powerup),
+            hit_chance: master.combat_part().hit_chance,
             armed: armed(master, combat.firepower, roles, turn_tuning),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_type,

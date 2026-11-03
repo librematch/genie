@@ -97,16 +97,17 @@ pub(crate) fn victim_of(
     } else {
         ElevationBonus::default()
     };
-    let defense = if master.terrain_bonus.restriction().is_none() || u.life.inside.is_some() {
-        Some(1.0)
-    } else {
-        terrain.and_then(|t| {
-            t.defense(
-                master.terrain_bonus,
-                Tile::new(u.position().x() as i32, u.position().y() as i32),
-            )
-        })
-    };
+    let defense =
+        if master.combat_part().terrain_bonus.restriction().is_none() || u.life.inside.is_some() {
+            Some(1.0)
+        } else {
+            terrain.and_then(|t| {
+                t.defense(
+                    master.combat_part().terrain_bonus,
+                    Tile::new(u.position().x() as i32, u.position().y() as i32),
+                )
+            })
+        };
     let tasks = |kind: ActionKind| master.tasks.iter().any(|t| t.action_kind == kind);
     Victim {
         id: u.id,
@@ -142,12 +143,12 @@ pub(crate) fn victim_of(
             kind,
             class: master.class,
             master_id: master.id,
-            ability: master.combat_ability,
-            missile: master.missile.master(),
-            weapon_range: master.weapon_range,
-            area_effect: master.area_effect,
-            blast_level: master.blast_level,
-            area_damage: master.area_damage,
+            ability: master.combat_part().combat_ability,
+            missile: master.combat_part().missile.master(),
+            weapon_range: master.combat_part().weapon_range,
+            area_effect: master.combat_part().area_effect,
+            blast_level: master.combat_part().blast_level,
+            area_damage: master.combat_part().area_damage,
             charge_kind: master.creatable_part().charge_kind,
             max_charge: master.creatable_part().max_charge,
             charge_target: master.creatable_part().charge_target,
@@ -161,7 +162,7 @@ pub(crate) fn victim_of(
             // a missile's own (its part): its own strike sets it ([`Unit::own_strike`])
             fired_from: None,
         },
-        weapons: master.weapons.clone(),
+        weapons: master.combat_part().weapons.clone(),
         master_hp: master.hit_points,
         bonus_tasks: master
             .tasks
@@ -171,15 +172,15 @@ pub(crate) fn victim_of(
             .collect(),
         // a combat object's slot 0xf0 is FUN_141082530 (types 50 and up)
         armored: (MasterKind::RGE_COMBAT <= kind).then(|| Armored {
-            armors: master.armors.clone(),
-            base_armor: master.base_armor,
-            terrain_bonus: master.terrain_bonus,
-            resistance: master.resistance,
-            ability: master.combat_ability,
-            reflection: master.reflection,
+            armors: master.combat_part().armors.clone(),
+            base_armor: master.combat_part().base_armor,
+            terrain_bonus: master.combat_part().terrain_bonus,
+            resistance: master.combat_part().resistance,
+            ability: master.combat_part().combat_ability,
+            reflection: master.combat_part().reflection,
             invulnerability: master.creatable_part().invulnerability,
             special_attack: master.creatable_part().special_attack,
-            friendly_fire: master.friendly_fire,
+            friendly_fire: master.combat_part().friendly_fire,
             special_graphic: master.creatable_part().special_sprite.is_some(),
             terrain: defense,
             armor_powerups: combat.armor_powerups,
