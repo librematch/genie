@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::AttackTargetId;
 use crate::combat::Firepower;
 use crate::combat::attack::ATTACK;
 use crate::construction::FoundationId;
@@ -41,6 +42,9 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Master, Task};
+use crate::objects::sprite::Graphic;
+use crate::objects::unit::UnitFlags;
+use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
 use crate::orders::Dispatch;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -87,6 +91,7 @@ use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::test_sides::With;
 use crate::unit_ai::update::UpdateTail;
+use crate::vision::VisionBits;
 use crate::world::World;
 
 /// Surroundings with nothing in them but build 158041's roles and slots.
@@ -339,74 +344,6 @@ impl UnitSide for Recorder {
     }
 }
 
-/// A unit that calls for help: whether the world holds the attacker, the searches it ran
-/// (classes and radius) and the attackers its walk got.
-struct HelpSide {
-    holds: bool,
-    searches: Vec<(Vec<ClassId>, f32)>,
-    walks: Vec<ObjectId>,
-}
-
-impl UnitSide for HelpSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
-        self.searches
-            .push((search.classes.to_vec(), search.radius.get()));
-        Ok(Found {
-            id: None,
-            enemies: true,
-            position: None,
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(0),
-            retries: [None; 3],
-        })
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok(self.holds.then_some(UnitSeen {
-            id,
-            class: class::CLASS_35,
-            owner: PlayerId::new(0),
-            combat_level: CombatLevel::NONE,
-            state: ObjectState::DyingSprite,
-            target: None,
-            gap_squared: DistanceSquared::ZERO,
-            position: Position::new(101.5, 158.5, 0.0),
-            hp: HitPoints::ZERO,
-            master: ids::ID_0,
-            kind: MasterKind::of_data(0),
-            main: None,
-            allied: false,
-        }))
-    }
-    fn call_for_help(&mut self, attacker: ObjectId) -> Result<(), GenieError> {
-        self.walks.push(attacker);
-        Ok(())
-    }
-}
-
 /// The priest's slot 0x1b8 (`FUN_140c1af00`): faith asked unless `any`; never Gaia, sheep,
 /// town centres, walls or a master whose hero flag forbids it; the convert task's attribute
 /// (`+0x26`) must be above 0 for the object's class.
@@ -613,7 +550,9 @@ fn the_retarget_entries_expire_and_dead_target_empties_them() {
 /// unit searches from its place (slot 0x50, mode 1) over the classes its constructor gave
 /// it within its search radius (the line of sight plus 1 when farther; plus 7 for the
 /// villager and the fishing ship), the search sets the alert mode, and the walk of its lists
-/// looks for helpers. 426048706's gate 7558 (a building, p3) in update 4.
+/// looks for helpers. 426048706's gate 7558 (a building) in update 4, here player 1's at
+/// (124.5, 174.5), attacked by player 2's soldier 7955 two tiles east; a free soldier of its
+/// own in its lists answers, whose answer is not modelled (its error shows the walk met it).
 #[test]
 fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
     let at = Surroundings {
@@ -626,35 +565,22 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
-    let mut gone = HelpSide {
-        holds: false,
-        searches: Vec::new(),
-        walks: Vec::new(),
+    let area = |ai_kind, class| {
+        let at = Surroundings {
+            class: Some(class),
+            ..at.clone()
+        };
+        let (cared, radius) = idle(ai_kind).search_area(&at, PlayerKind::Human);
+        (cared.to_vec(), radius.get())
     };
-    let mut gate = idle(UnitAiKind::Building);
-    gate.ask_for_help(object_id(7955), &at, PlayerKind::Human, &mut gone)
-        .unwrap();
-    assert_eq!((gone.searches.len(), gone.walks.len()), (0, 0));
-    let mut side = HelpSide {
-        holds: true,
-        searches: Vec::new(),
-        walks: Vec::new(),
-    };
-    gate.ask_for_help(object_id(7955), &at, PlayerKind::Human, &mut side)
-        .unwrap();
-    assert_eq!(side.searches, [(BUILDING_CARED.to_vec(), 7.0)]);
-    assert_eq!(side.walks, [object_id(7955)]);
-    assert_eq!(gate.alert_mode, AlertMode::Alert);
-    let mut villager = idle(UnitAiKind::Civilian);
-    let mut side = HelpSide {
-        holds: true,
-        searches: Vec::new(),
-        walks: Vec::new(),
-    };
-    villager
-        .ask_for_help(object_id(7955), &at, PlayerKind::Human, &mut side)
-        .unwrap();
-    assert_eq!(side.searches, [(CIVILIAN_CARED.to_vec(), 14.0)]);
+    assert_eq!(
+        area(UnitAiKind::Building, class::GATE),
+        (BUILDING_CARED.to_vec(), 7.0)
+    );
+    assert_eq!(
+        area(UnitAiKind::Civilian, class::GATE),
+        (CIVILIAN_CARED.to_vec(), 14.0)
+    );
     for (ai_kind, class, cared) in [
         (
             UnitAiKind::Transport,
@@ -665,29 +591,84 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         (UnitAiKind::Trade, class::TRADE_BOAT, &TRADE_SHIP_CARED[..]),
         (UnitAiKind::Trade, class::TRADE_CART, &TRADE_CART_CARED[..]),
     ] {
-        let at = Surroundings {
-            class: Some(class),
-            ..at.clone()
-        };
-        let mut side = HelpSide {
-            holds: true,
-            searches: Vec::new(),
-            walks: Vec::new(),
-        };
-        idle(ai_kind)
-            .ask_for_help(object_id(7955), &at, PlayerKind::Human, &mut side)
-            .unwrap();
-        assert_eq!(side.searches, [(cared.to_vec(), 7.0)]);
+        assert_eq!(area(ai_kind, class), (cared.to_vec(), 7.0));
     }
-    let mut side = HelpSide {
-        holds: true,
-        searches: Vec::new(),
-        walks: Vec::new(),
+    assert_eq!(
+        area(UnitAiKind::Fishing, class::GATE),
+        (FISHING_CARED.to_vec(), 14.0)
+    );
+    // the gate on a world: the attacker, its helper, both in player 1's lists
+    let gate = Master {
+        id: master_id(88),
+        kind: MasterKind::BUILDING,
+        class: class::GATE,
+        radius: Footprint::new(0.5, 0.5),
+        height: Distance::new(2.0),
+        hit_points: MasterHitPoints::of_data(2750),
+        line_of_sight: Distance::new(6.0),
+        action: Some(ActionPart {
+            search_radius: Distance::new(4.0),
+            ..ActionPart::default()
+        }),
+        ..Master::default()
     };
-    idle(UnitAiKind::Fishing)
-        .ask_for_help(object_id(7955), &at, PlayerKind::Human, &mut side)
-        .unwrap();
-    assert_eq!(side.searches, [(FISHING_CARED.to_vec(), 14.0)]);
+    let seen = Some(VisionBits::visible(player_id(1)));
+    let ask = |attacker: bool, helper: bool| {
+        let mut scene = Scene::open(GridSize::new(200, 200))
+            .players(2)
+            .thing(SceneThing {
+                ai: Some(idle(UnitAiKind::Building)),
+                ..SceneThing::new(
+                    7558,
+                    player_id(1),
+                    gate.clone(),
+                    Position::new(124.5, 174.5, 0.0),
+                )
+            });
+        if attacker {
+            scene = scene.thing(SceneThing {
+                seen_by: seen,
+                ..SceneThing::new(
+                    7955,
+                    player_id(2),
+                    walker(5, class::CLASS_6),
+                    Position::new(126.5, 174.5, 0.0),
+                )
+            });
+        }
+        if helper {
+            scene = scene.thing(SceneThing {
+                ai: Some(idle(UnitAiKind::Soldier)),
+                seen_by: seen,
+                ..SceneThing::new(
+                    7960,
+                    player_id(1),
+                    walker(6, class::CLASS_6),
+                    Position::new(124.5, 176.5, 0.0),
+                )
+            });
+        }
+        let mut w = scene.build();
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(7558)),
+            |ai, at, side, kind, _| ai.ask_for_help(object_id(7955), at, kind, side),
+        );
+        (r, w)
+    };
+    let alert = |w: &World| w.parts.unit_ai.get(object_id(7558)).unwrap().alert_mode;
+    // an attacker the world does not hold: no search
+    let (r, w) = ask(false, false);
+    assert_eq!(r, Ok(()));
+    assert!(w.spatial.searched().is_none());
+    assert_eq!(alert(&w), AlertMode::Calm);
+    // the search finds the enemy and the alert mode follows
+    let (r, w) = ask(true, false);
+    assert_eq!(r, Ok(()));
+    assert!(w.spatial.searched().is_some());
+    assert_eq!(alert(&w), AlertMode::Alert);
+    // the walk meets the idle soldier within reach
+    assert_eq!(ask(true, true).0, helper_answers());
 }
 
 /// A villager of player 1: a walking civilian of radius 0.2 on land.
@@ -2075,133 +2056,112 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
     assert_eq!(side.attacks, []);
 }
 
-/// A lion's world: the answers of its two searches (a villager, then any enemy), the object
-/// it then reads, and the attack commands it gave.
-struct LionSide {
-    found: [i32; 2],
-    searches: usize,
-    seen: UnitSeen,
-    attacks: Vec<(ObjectId, OrderForce)>,
+/// The standing sprite of the tests' attackers: 10 frames of 16 facets, looped.
+const STANDING: Graphic = Graphic {
+    id: SpriteId::named(7),
+    frames: Frame::of_data(10),
+    facets: FacetCount::of_data(16),
+    speed_multiplier: SpeedMultiplier::ONE,
+    frame_duration: Seconds::new(0.1),
+    replay_delay: Seconds::ZERO,
+    flags: SpriteFlags::ANIMATED,
+};
+
+/// Gaia's wolf 20 (master 126, a predator of line of sight 4 and search radius 1, standing on
+/// [`STANDING`]) at (20, 20), its unit AI `ai`, and player 1's `prey` (id, class, x) at
+/// (x, 20), each a walker in Gaia's lists. The wolf's last human order time is past the cap.
+fn wolf_world(ai: UnitAi, prey: &[(i32, ClassId, f32)]) -> World {
+    let wolf = Master {
+        line_of_sight: Distance::new(4.0),
+        standing_sprite: Some(STANDING.id),
+        action: Some(ActionPart {
+            search_radius: Distance::new(1.0),
+            ..ActionPart::default()
+        }),
+        ..walker(126, class::PREDATOR)
+    };
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .graphic(STANDING)
+        .thing(SceneThing {
+            ai: Some(ai),
+            sprite: Some(STANDING.id),
+            ..SceneThing::new(20, PlayerId::GAIA, wolf, Position::new(20.0, 20.0, 0.0))
+        });
+    for &(id, class, x) in prey {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
+            ..SceneThing::new(
+                id,
+                player_id(1),
+                walker(i16::try_from(id).expect("a master's id"), class),
+                Position::new(x, 20.0, 0.0),
+            )
+        });
+    }
+    let mut w = scene.build();
+    w.players[0]
+        .objects
+        .by_id_mut(object_id(20))
+        .unwrap()
+        .last_human_order = WorldTime::from_millis(9000);
+    w
 }
 
-impl UnitSide for LionSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        let id = self.found[self.searches];
-        self.searches += 1;
-        Ok(Found {
-            id: ObjectId::of_field(id),
-            enemies: id != -1,
-            position: Some(Position::ORIGIN),
-            fresh: true,
-            players: 0,
-            distance: WholeDistance::of_data(-1),
-            retries: [None; 3],
-        })
-    }
-    fn attack(
-        &mut self,
-        target: ObjectId,
-        force: OrderForce,
-        _: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
-        self.attacks.push((target, force));
-        Ok(Attacked {
-            attacks: true,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok((id == self.seen.id).then_some(self.seen))
-    }
-}
-
-/// The lion's idle check (`FUN_140c1fb70`): a villager it finds within half its line of
-/// sight (outside mode 1) it attacks, not forced; finding none, any enemy within a third.
+/// The lion's idle check (`FUN_140c1fb70`): the cap on its last human order time first
+/// (`FUN_140c41e50`); a villager it finds within half its line of sight (outside mode 1) it
+/// attacks, not forced; finding none, any enemy within a third. Both radii 0.2: the gap is
+/// the centres' distance less 0.4.
 #[test]
 fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
-    let run = |found: [i32; 2], gap_squared: DistanceSquared| {
-        let mut lion = idle(UnitAiKind::Lion);
-        let at = Surroundings {
-            los: Distance::new(4.0),
-            search_radius: Distance::new(1.0),
-            roles: roles(),
-            slots: slots(),
-            unit_ai_tuning: tuning().unit_ai,
-            ..Surroundings::default()
-        };
-        let mut side = LionSide {
-            found,
-            searches: 0,
-            seen: UnitSeen {
-                id: object_id(found[0].max(found[1])),
-                class: class::VILLAGER,
-                owner: PlayerId::new(1),
-                state: ObjectState::Alive,
-                gap_squared,
-                ..UnitSeen::default()
-            },
-            attacks: Vec::new(),
-        };
-        let mut fx = Vec::new();
-        let produced = lion
-            .lion_idle(&at, &mut rng(), &mut With::new(&mut side, &mut fx))
-            .unwrap();
-        // FUN_140c41e50 first
-        assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-        (
-            produced,
-            side.attacks,
-            lion.current_action,
-            lion.current_target,
+    let run = |prey: (i32, ClassId, f32)| {
+        let mut w = wolf_world(idle(UnitAiKind::Lion), &[prey]);
+        let produced = run_ai(
+            &mut w,
+            (PlayerId::GAIA, object_id(20)),
+            |ai, at, side, _, rng| ai.lion_idle(at, rng, side),
         )
+        .unwrap();
+        let wolf = w.players[0].objects.by_id(object_id(20)).unwrap();
+        assert_eq!(wolf.last_human_order, HUMAN_ORDER_CAP);
+        let attacks = w
+            .parts
+            .actions
+            .of(object_id(20))
+            .list
+            .attack()
+            .and_then(|a| a.target)
+            .map(AttackTargetId::id);
+        let ai = w.parts.unit_ai.get(object_id(20)).unwrap();
+        (produced, attacks, ai.current_action, ai.current_target)
     };
-    // a villager: the reach is 2 (half of 4); slot 0xb8 then gives 6 whatever it did
+    // a villager: the reach is 2 (half of 4), its gap 1.9; slot 0xb8 then gives 6 whatever it
+    // did
     assert_eq!(
-        run([700, -1], DistanceSquared::new(3.9)),
+        run((700, class::VILLAGER, 22.3)),
         (
             IdleOutcome::Acted,
-            vec![(object_id(700), OrderForce::Unforced)],
+            Some(object_id(700)),
             Some(AiAction::Attack),
             Some(object_id(700))
         )
     );
     assert_eq!(
-        run([700, -1], DistanceSquared::new(4.1)),
-        (IdleOutcome::Idle, vec![], None, None)
+        run((700, class::VILLAGER, 22.5)),
+        (IdleOutcome::Idle, None, None, None)
     );
-    // any enemy: a third of 4
+    // any enemy: a third of 4, the gaps 1.2 and 1.4
     assert_eq!(
-        run([-1, 701], DistanceSquared::new(1.7)),
+        run((701, class::CLASS_6, 21.6)),
         (
             IdleOutcome::Acted,
-            vec![(object_id(701), OrderForce::Unforced)],
+            Some(object_id(701)),
             Some(AiAction::Attack),
             Some(object_id(701))
         )
     );
     assert_eq!(
-        run([-1, 701], DistanceSquared::new(1.8)),
-        (IdleOutcome::Idle, vec![], None, None)
+        run((701, class::CLASS_6, 21.8)),
+        (IdleOutcome::Idle, None, None, None)
     );
 }
 
@@ -6723,24 +6683,65 @@ fn making_building_runs_process_idle_only_without_target() {
 /// value, its research's 620), a builder and a hunter sent off a footprint, a hunt without
 /// an order after `HuntObject`, a villager waiting for its foundation (734/634 with the
 /// foundation), a boar moved aside off its attacker (-1/703).
+/// Unit 9 of `player` at (20, 20), a walker of class `class` (master 4), busy with its
+/// `MoveTo` following its target, its unit AI `ai`; the target `target` (id, owner, class) at
+/// (24, 20), alive, a walker of master 5.
+fn busy_on_target(
+    (player, players): (PlayerId, u8),
+    class: ClassId,
+    ai: UnitAi,
+    (target, owner, target_class): (i32, PlayerId, ClassId),
+) -> World {
+    let follow = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            target: Some(object_id(target)),
+            point: Position::new(24.0, 20.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
+    };
+    let unit = SceneThing {
+        ai: Some(ai),
+        actions: Some(follow),
+        ..SceneThing::new(9, player, walker(4, class), Position::new(20.0, 20.0, 0.0))
+    };
+    Scene::open(GridSize::new(64, 64))
+        .players(players)
+        .thing(unit)
+        .thing(SceneThing::new(
+            target,
+            owner,
+            walker(5, target_class),
+            Position::new(24.0, 20.0, 0.0),
+        ))
+        .build()
+}
+
+/// [`busy_on_target`]'s unit runs its full update ([`UnitAi::update`], 10 ms at `now`): its
+/// answer and the world.
+fn update_busy(
+    mut w: World,
+    player: PlayerId,
+    now: WorldTime,
+) -> (Result<Option<AfterOrder>, GenieError>, World) {
+    let r = run_ai(&mut w, (player, object_id(9)), |ai, at, side, kind, rng| {
+        ai.update(Millis::new(10), now, kind, at, rng, side)
+    });
+    (r, w)
+}
+
+/// The point and target of the `MoveTo` of unit 9 of `w`.
+fn following(w: &World) -> Option<(Position, Option<ObjectId>)> {
+    w.parts
+        .actions
+        .of(object_id(9))
+        .list
+        .move_to()
+        .map(|m| (m.point, m.target))
+}
+
 #[test]
 fn unit_ai_with_target_runs_its_update_on_any_order() {
-    let at = Surroundings {
-        flags: SurroundingFlags::BUSY,
-        player: PlayerId::new(1),
-        state: ObjectState::Alive,
-        target: Some(Seen {
-            state: ObjectState::Alive,
-            kind: MasterKind::COMBAT,
-            owner: PlayerId::new(2),
-            class: class::VILLAGER,
-            ..Seen::default()
-        }),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
     for (ai_kind, order, action) in [
         (
             UnitAiKind::Tower,
@@ -6772,7 +6773,7 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
         ),
         (UnitAiKind::Boar, None, Some(AiAction::MoveAside)),
     ] {
-        let mut u = UnitAi {
+        let u = UnitAi {
             ai_kind,
             current_order: order,
             current_action: action,
@@ -6783,17 +6784,22 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
             home: (ai_kind == UnitAiKind::Boar).then(Home::default),
             ..UnitAi::default()
         };
-        let r = u.update_fx(
-            Millis::new(10),
-            WorldTime::from_millis(100),
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut TailSide::default(),
+        let w = busy_on_target(
+            (player_id(1), 2),
+            class::CLASS_6,
+            u,
+            (14230, player_id(2), class::PREDATOR),
         );
-        assert_eq!(r, Ok(Vec::new()), "{ai_kind} {order:?} {action:?}");
+        let (r, w) = update_busy(w, player_id(1), WorldTime::from_millis(100));
+        assert_eq!(r, Ok(None), "{ai_kind} {order:?} {action:?}");
+        // no call on the unit: it follows its target still
         assert_eq!(
-            u.current_target,
+            following(&w),
+            Some((Position::new(24.0, 20.0, 0.0), Some(object_id(14230)))),
+            "{ai_kind} {order:?} {action:?}"
+        );
+        assert_eq!(
+            w.parts.unit_ai.get(object_id(9)).unwrap().current_target,
             Some(object_id(14230)),
             "{ai_kind} {order:?} {action:?}"
         );
@@ -8328,43 +8334,24 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
 /// one's point.
 #[test]
 fn wolf_whose_attack_target_died_attacks_the_next_villager() {
-    let mut u = UnitAi {
+    let u = UnitAi {
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(50)),
         target_point: Position::new(5.0, 6.0, 0.0),
         ..idle(UnitAiKind::Lion)
     };
-    let at = Surroundings {
-        los: Distance::new(4.0),
-        search_radius: Distance::new(1.0),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let mut side = LionSide {
-        found: [700, -1],
-        searches: 0,
-        seen: UnitSeen {
-            id: object_id(700),
-            class: class::VILLAGER,
-            owner: PlayerId::new(1),
-            state: ObjectState::Alive,
-            gap_squared: DistanceSquared::new(1.0),
-            ..UnitSeen::default()
-        },
-        attacks: Vec::new(),
-    };
-    let mut fx = Vec::new();
-    u.next_after_kill(
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
+    // villager 700 a gap of 1 off
+    let mut w = wolf_world(u, &[(700, class::VILLAGER, 21.4)]);
+    run_ai(
+        &mut w,
+        (PlayerId::GAIA, object_id(20)),
+        |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
     )
     .unwrap();
-    assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-    assert_eq!(side.attacks, Vec::new());
+    let wolf = w.players[0].objects.by_id(object_id(20)).unwrap();
+    assert_eq!(wolf.last_human_order, HUMAN_ORDER_CAP);
+    assert!(w.parts.actions.of(object_id(20)).list.attack().is_none());
+    let u = w.parts.unit_ai.get(object_id(20)).unwrap();
     assert_eq!(
         (u.current_action, u.current_target),
         (Some(AiAction::Attack), Some(object_id(50)))
@@ -8559,18 +8546,23 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
     let mut u = idle(UnitAiKind::Civilian);
     let mut side = Recorder::default();
     let mut fx = Vec::new();
-    let mut nobody = LionSide {
-        found: [-1, -1],
-        searches: 0,
-        seen: UnitSeen::default(),
-        attacks: Vec::new(),
-    };
+    // an object the world does not hold
+    let mut w = Scene::open(GridSize::new(64, 64))
+        .thing(SceneThing {
+            ai: Some(idle(UnitAiKind::Civilian)),
+            ..SceneThing::new(
+                10041,
+                player_id(1),
+                villager_master(),
+                Position::new(20.0, 20.0, 0.0),
+            )
+        })
+        .build();
     assert_eq!(
-        u.civilian_attack(
-            object_id(9999),
-            &at(0),
-            &mut With::new(&mut nobody, &mut fx),
-            &mut rng()
+        run_ai(
+            &mut w,
+            (player_id(1), object_id(10041)),
+            |ai, at, side, _, rng| ai.civilian_attack(object_id(9999), at, side, rng)
         ),
         Ok(Answer::NotTaken)
     );
@@ -11776,61 +11768,6 @@ fn priest_retargets_but_on_an_order_on_target() {
     ));
 }
 
-/// A side for the full update's tail: the unit's top action's target now, the objects'
-/// flags and states.
-#[derive(Default)]
-struct TailSide {
-    top: Option<ObjectId>,
-    flags: Vec<(ObjectId, TargetFlags)>,
-    states: Vec<(ObjectId, ObjectState)>,
-}
-
-impl UnitSide for TailSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn top_target_now(&mut self) -> Result<Option<ObjectId>, GenieError> {
-        Ok(self.top)
-    }
-    fn target_flags(&mut self, id: ObjectId) -> Result<Option<TargetFlags>, GenieError> {
-        Ok(self.flags.iter().find(|f| f.0 == id).map(|f| f.1))
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok(self
-            .states
-            .iter()
-            .find(|s| s.0 == id)
-            .map(|&(id, state)| UnitSeen {
-                id,
-                state,
-                ..UnitSeen::default()
-            }))
-    }
-}
-
 /// A target the tail lets be: a player's, targetable and attackable, outside a pasture.
 const PLAIN: TargetFlags = TargetFlags {
     owner: PlayerId::new(2),
@@ -11851,21 +11788,76 @@ fn on_target(action: Option<AiAction>) -> UnitAi {
     }
 }
 
-fn tail(u: &mut UnitAi, player: PlayerId, flags: TargetFlags, fx: &mut Vec<Effect>) {
-    let at = Surroundings {
-        player,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+/// Object `id` at `at` as `flags` make it: their owner, its master's kind (master `id`, a
+/// walker of class 6), its flag bytes, its capture flag and its pasture.
+fn target_thing(id: i32, flags: TargetFlags, at: Position) -> SceneThing {
+    let mut bits = UnitFlags::empty();
+    bits.set(UnitFlags::UNTARGETABLE, flags.untargetable);
+    bits.set(UnitFlags::ATTACKABLE, flags.attackable);
+    let master = Master {
+        kind: flags.kind,
+        ..walker(i16::try_from(id).expect("a master's id"), class::CLASS_6)
     };
-    let mut side = TailSide {
-        top: Some(object_id(500)),
-        flags: vec![(object_id(500), flags)],
-        ..TailSide::default()
+    SceneThing {
+        flags: bits,
+        capture: flags.capture,
+        pasture: flags.pasture,
+        ..SceneThing::new(id, flags.owner, master, at)
+    }
+}
+
+/// Unit 40 of `player` at (14, 10), a walker of class 6 (master 4) whose `MoveTo` follows
+/// object `follows` (none: no action), its unit AI [`on_target`]'s with `action`; object 500
+/// at (10, 10) as `flags` make it ([`target_thing`]).
+fn tail_scene(
+    player: PlayerId,
+    action: Option<AiAction>,
+    flags: TargetFlags,
+    follows: Option<i32>,
+) -> Scene {
+    let follow = |id| Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            target: Some(object_id(id)),
+            point: Position::new(10.0, 10.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
     };
-    u.top_target_tail(&at, &mut With::new(&mut side, fx), &mut rng())
-        .unwrap();
+    let unit = SceneThing {
+        ai: Some(on_target(action)),
+        actions: follows.map(follow),
+        ..SceneThing::new(
+            40,
+            player,
+            walker(4, class::CLASS_6),
+            Position::new(14.0, 10.0, 0.0),
+        )
+    };
+    Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .thing(unit)
+        .thing(target_thing(500, flags, Position::new(10.0, 10.0, 0.0)))
+}
+
+/// The tail's checks of the top action's target ([`UnitAi::top_target_tail`]) on
+/// [`tail_scene`]'s unit following object 500: the world after them.
+fn tail(player: PlayerId, action: Option<AiAction>, flags: TargetFlags) -> World {
+    let mut w = tail_scene(player, action, flags, Some(500)).build();
+    run_ai(&mut w, (player, object_id(40)), |ai, at, side, _, rng| {
+        ai.top_target_tail(at, side, rng)
+    })
+    .unwrap();
+    w
+}
+
+/// Whether unit 40 of `w` stopped: no action left.
+fn stopped(w: &World) -> bool {
+    w.parts.actions.of(object_id(40)).top_action().is_none()
+}
+
+/// Unit 40's unit AI in `w`.
+fn ai_of(w: &World) -> &UnitAi {
+    w.parts.unit_ai.get(object_id(40)).unwrap()
 }
 
 #[test]
@@ -11877,10 +11869,9 @@ fn the_tail_stops_gaia_unit_on_gaia_object_others_can_take_again() {
         capture: CaptureKind::Again,
         ..PLAIN
     };
-    let mut u = on_target(Some(AiAction::Attack));
-    let mut fx = Vec::new();
-    tail(&mut u, PlayerId::new(0), again, &mut fx);
-    assert_eq!(fx, [Effect::Stop]);
+    let w = tail(PlayerId::new(0), Some(AiAction::Attack), again);
+    assert!(stopped(&w));
+    let u = ai_of(&w);
     assert_eq!(
         (u.current_target, u.last_target),
         (None, Some(object_id(500)))
@@ -11914,11 +11905,9 @@ fn the_tail_stops_gaia_unit_on_gaia_object_others_can_take_again() {
             },
         ),
     ] {
-        let mut u = on_target(Some(AiAction::Attack));
-        let mut fx = Vec::new();
-        tail(&mut u, PlayerId::new(player), flags, &mut fx);
-        assert_eq!(fx, Vec::<Effect>::new(), "{player} {flags:?}");
-        assert_eq!(u.current_target, Some(object_id(500)));
+        let w = tail(PlayerId::new(player), Some(AiAction::Attack), flags);
+        assert!(!stopped(&w), "{player} {flags:?}");
+        assert_eq!(ai_of(&w).current_target, Some(object_id(500)));
     }
 }
 
@@ -11930,84 +11919,82 @@ fn the_tail_stops_work_on_target_without_its_targeting_flag() {
         untargetable: true,
         ..PLAIN
     };
+    let player = PlayerId::new(1);
     for action in [Some(AiAction::Gather), Some(AiAction::Attack), None] {
-        let mut u = on_target(action);
-        let mut fx = Vec::new();
-        tail(&mut u, PlayerId::new(1), untargetable, &mut fx);
-        assert_eq!(fx, [Effect::Stop], "{action:?}");
-        assert_eq!(u.current_target, None);
+        let w = tail(player, action, untargetable);
+        assert!(stopped(&w), "{action:?}");
+        assert_eq!(ai_of(&w).current_target, None);
     }
-    let mut u = on_target(Some(AiAction::Trade));
-    let mut fx = Vec::new();
-    tail(&mut u, PlayerId::new(1), untargetable, &mut fx);
-    assert_eq!(fx, Vec::<Effect>::new());
+    assert!(!stopped(&tail(player, Some(AiAction::Trade), untargetable)));
     // one in a pasture stays
-    let mut u = on_target(Some(AiAction::Gather));
-    tail(
-        &mut u,
-        PlayerId::new(1),
-        TargetFlags {
-            pasture: Some(PastureId::new(object_id(77))),
-            ..untargetable
-        },
-        &mut fx,
-    );
-    assert_eq!(fx, Vec::<Effect>::new());
+    let penned = TargetFlags {
+        pasture: Some(PastureId::new(object_id(77))),
+        ..untargetable
+    };
+    assert!(!stopped(&tail(player, Some(AiAction::Gather), penned)));
     // one that cannot be attacked (+0x68a 0) stops only the attack
     let unattackable = TargetFlags {
         attackable: false,
         ..PLAIN
     };
-    let mut u = on_target(Some(AiAction::Gather));
-    tail(&mut u, PlayerId::new(1), unattackable, &mut fx);
-    assert_eq!(fx, Vec::<Effect>::new());
-    let mut u = on_target(Some(AiAction::Attack));
-    tail(&mut u, PlayerId::new(1), unattackable, &mut fx);
-    assert_eq!(fx, [Effect::Stop]);
+    assert!(!stopped(&tail(
+        player,
+        Some(AiAction::Gather),
+        unattackable
+    )));
+    assert!(stopped(&tail(player, Some(AiAction::Attack), unattackable)));
     // both: the second test reads the action value the first stop left (−1), so an
-    // untargetable target stops it again
+    // untargetable target stops it again, the second stop's last action the first's −1
     let both = TargetFlags {
         owner: PlayerId::new(0),
         capture: CaptureKind::Again,
         untargetable: true,
         ..PLAIN
     };
-    let mut u = on_target(Some(AiAction::Attack));
-    let mut fx = Vec::new();
-    tail(&mut u, PlayerId::new(0), both, &mut fx);
-    assert_eq!(fx, [Effect::Stop, Effect::Stop]);
+    let w = tail(PlayerId::new(0), Some(AiAction::Attack), both);
+    assert!(stopped(&w));
+    let u = ai_of(&w);
     assert_eq!((u.current_action, u.last_action), (None, None));
+    // an attackable-only failure after the first stop: the action value is −1, one stop
     let unattackable_again = TargetFlags {
         untargetable: false,
         attackable: false,
         ..both
     };
-    let mut u = on_target(Some(AiAction::Attack));
-    let mut fx = Vec::new();
-    tail(&mut u, PlayerId::new(0), unattackable_again, &mut fx);
-    assert_eq!(fx, [Effect::Stop]);
+    let w = tail(PlayerId::new(0), Some(AiAction::Attack), unattackable_again);
+    assert!(stopped(&w));
+    let u = ai_of(&w);
+    assert_eq!(
+        (u.current_action, u.last_action),
+        (None, Some(AiAction::Attack))
+    );
 }
 
+/// The tail reads the top target as the update's calls left it: they ran at once on the unit
+/// (here one call, then the tail).
 #[test]
 fn the_tail_reads_the_top_target_the_update_commands_left() {
     let untargetable = TargetFlags {
         untargetable: true,
         ..PLAIN
     };
-    let at = Surroundings {
-        player: PlayerId::new(1),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let mut side = TailSide {
-        top: Some(object_id(500)),
-        flags: vec![
-            (object_id(500), untargetable),
-            (object_id(600), untargetable),
-        ],
-        ..TailSide::default()
+    let player = PlayerId::new(1);
+    let after = |action, follows: Option<i32>, pending: Option<Effect>| {
+        let mut w = tail_scene(player, action, untargetable, follows)
+            .thing(target_thing(
+                600,
+                untargetable,
+                Position::new(12.0, 10.0, 0.0),
+            ))
+            .build();
+        run_ai(&mut w, (player, object_id(40)), |ai, at, side, _, rng| {
+            if let Some(e) = pending {
+                side.effect_now(e, ai, rng)?;
+            }
+            ai.top_target_tail(at, side, rng)
+        })
+        .unwrap();
+        w
     };
     // a move to a point, a stop or an explore left no object to test
     for pending in [
@@ -12020,52 +12007,30 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
             pace: Pace::Run,
         }),
     ] {
-        let mut u = on_target(Some(AiAction::Gather));
-        let mut fx = vec![pending];
-        u.top_target_tail(&at, &mut With::new(&mut side, &mut fx), &mut rng())
-            .unwrap();
-        assert_eq!(fx, [pending]);
+        let w = after(Some(AiAction::Gather), None, Some(pending));
+        assert_eq!(
+            ai_of(&w).current_action,
+            Some(AiAction::Gather),
+            "{pending:?}"
+        );
     }
-    // a move to an object holds it
-    let mut u = on_target(Some(AiAction::Move));
+    // a move to an object holds it: the tail stops the unit on its untargetable target
     let to = Effect::MoveToObject {
         target: object_id(600),
         state: ObjectState::Alive,
         range: Distance::new(2.0),
     };
-    let mut fx = vec![to];
-    u.top_target_tail(&at, &mut With::new(&mut side, &mut fx), &mut rng())
-        .unwrap();
-    assert_eq!(fx, [to, Effect::Stop]);
-    // a hunt the update gave holds its target too
-    let mut u = on_target(Some(AiAction::Hunt));
-    let hunt = Effect::Command(AiCommand::HuntObject(object_id(600)));
-    let mut fx = vec![hunt];
-    u.top_target_tail(&at, &mut With::new(&mut side, &mut fx), &mut rng())
-        .unwrap();
-    assert_eq!(fx, [hunt, Effect::Stop]);
-    // no top action, or one the world no longer holds: nothing
-    let mut u = on_target(Some(AiAction::Gather));
-    let mut fx = Vec::new();
-    u.top_target_tail(
-        &at,
-        &mut With::new(
-            &mut TailSide {
-                top: Some(object_id(700)),
-                ..TailSide::default()
-            },
-            &mut fx,
-        ),
-        &mut rng(),
-    )
-    .unwrap();
-    u.top_target_tail(
-        &at,
-        &mut With::new(&mut TailSide::default(), &mut fx),
-        &mut rng(),
-    )
-    .unwrap();
-    assert_eq!(fx, Vec::<Effect>::new());
+    let w = after(Some(AiAction::Move), None, Some(to));
+    assert!(stopped(&w));
+    assert_eq!(
+        (ai_of(&w).current_action, ai_of(&w).current_target),
+        (None, None)
+    );
+    // no top action, or one on an object the world no longer holds: nothing
+    for follows in [None, Some(700)] {
+        let w = after(Some(AiAction::Gather), follows, None);
+        assert_eq!(ai_of(&w).current_action, Some(AiAction::Gather));
+    }
 }
 
 #[test]
@@ -12085,33 +12050,48 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
         order(OrderKind::Build, 4),
         order(OrderKind::Build, 5),
     ];
-    let mut side = TailSide {
-        states: vec![
-            (object_id(1), ObjectState::Foundation),
-            (object_id(2), ObjectState::Alive),
-            (object_id(3), ObjectState::Alive),
-            (object_id(5), ObjectState::Foundation),
-        ],
-        ..TailSide::default()
+    let left = |ai: UnitAi| {
+        let (house, _) = house_and_tree();
+        let at = |x| Position::new(x, 20.0, 0.0);
+        let site = |id, x| SceneThing {
+            desolid: true,
+            state: ObjectState::Foundation,
+            ..SceneThing::new(id, player_id(1), house.clone(), at(x))
+        };
+        let mut w = Scene::open(GridSize::new(64, 64))
+            .thing(SceneThing {
+                ai: Some(ai),
+                ..SceneThing::new(40, player_id(1), villager_master(), at(30.0))
+            })
+            .thing(site(1, 10.0))
+            .thing(SceneThing::new(2, player_id(1), house.clone(), at(14.0)))
+            .thing(SceneThing::new(3, player_id(1), house.clone(), at(18.0)))
+            .thing(site(5, 22.0))
+            .build();
+        run_ai(
+            &mut w,
+            (player_id(1), object_id(40)),
+            |ai, _, side, _, _| ai.drop_started_builds(side),
+        )
+        .unwrap();
+        let orders = &w.parts.unit_ai.get(object_id(40)).unwrap().orders;
+        orders.iter().map(|o| o.target).collect::<Vec<_>>()
     };
-    let mut u = UnitAi {
+    let u = UnitAi {
         orders: queue.clone(),
         ..idle(UnitAiKind::Civilian)
     };
-    u.drop_started_builds(&mut side).unwrap();
-    let left: Vec<Option<ObjectId>> = u.orders.iter().map(|o| o.target).collect();
     assert_eq!(
-        left,
+        left(u),
         [Some(object_id(1)), Some(object_id(3)), Some(object_id(5))]
     );
     // on the build order the queue stays
-    let mut u = UnitAi {
+    let u = UnitAi {
         current_order: Some(OrderKind::Build),
         orders: queue,
         ..idle(UnitAiKind::Civilian)
     };
-    u.drop_started_builds(&mut side).unwrap();
-    assert_eq!(u.orders.len(), 5);
+    assert_eq!(left(u).len(), 5);
 }
 
 #[test]
@@ -12352,7 +12332,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
     // records (6)/426406723's villagers attacking (order 700, action 600, a target), busy: the
     // update runs whole (the civilian's processMisc, the idle part keeping the timer of a
     // player's unit with an action at 0)
-    let mut u = UnitAi {
+    let u = UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(18842)),
@@ -12360,34 +12340,19 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
         idle_timer: Millis::new(400),
         ..idle(UnitAiKind::Civilian)
     };
-    let at = Surroundings {
-        flags: SurroundingFlags::BUSY,
-        player: PlayerId::new(3),
-        class: Some(class::VILLAGER),
-        state: ObjectState::Alive,
-        target: Some(Seen {
-            state: ObjectState::Alive,
-            kind: MasterKind::COMBAT,
-            owner: PlayerId::new(0),
-            class: class::PREDATOR,
-            ..Seen::default()
-        }),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let fx = u
-        .update_fx(
-            Millis::new(10),
-            WorldTime::from_millis(1000),
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut TailSide::default(),
-        )
-        .unwrap();
-    assert_eq!(fx, Vec::<Effect>::new());
+    let w = busy_on_target(
+        (player_id(3), 3),
+        class::VILLAGER,
+        u,
+        (18842, PlayerId::GAIA, class::PREDATOR),
+    );
+    let (r, w) = update_busy(w, player_id(3), WorldTime::from_millis(1000));
+    assert_eq!(r, Ok(None));
+    assert_eq!(
+        following(&w),
+        Some((Position::new(24.0, 20.0, 0.0), Some(object_id(18842))))
+    );
+    let u = w.parts.unit_ai.get(object_id(9)).unwrap();
     assert_eq!(u.idle_timer, Millis::ZERO);
     assert_eq!(
         (u.current_order, u.current_action, u.current_target),
@@ -12895,26 +12860,45 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
         );
         assert_eq!(u, idle(UnitAiKind::Priest));
     }
-    // the unit's commands the slice models on no unit
-    let mut u = idle(UnitAiKind::Priest);
+    // the heal command the unit gives on a unit the world holds is not modelled
     let o = queued(OrderKind::Heal, 70);
-    let at = no_surroundings();
-    let mut tail = TailSide::default();
-    assert!(
-        u.process_order(
-            &o,
-            Some((&at, PlayerKind::Human)),
-            None,
-            &mut rng(),
-            &mut With::new(&mut tail, &mut Vec::new()),
-            AiLayer {
-                roles: &roles(),
-                slots: slots(),
-                unit_ai_tuning: &tuning().unit_ai
-            }
+    let priest = SceneThing {
+        ai: Some(idle(UnitAiKind::Priest)),
+        ..SceneThing::new(
+            40,
+            player_id(1),
+            walker(125, class::MONK),
+            Position::new(10.0, 30.0, 0.0),
         )
-        .is_err()
+    };
+    let mut w = Scene::open(GridSize::new(64, 64))
+        .thing(priest)
+        .thing(SceneThing::new(
+            70,
+            player_id(1),
+            villager_master(),
+            Position::new(12.5, 30.5, 0.0),
+        ))
+        .build();
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(40)),
+        |ai, at, side, kind, rng| {
+            ai.process_order(
+                &o,
+                Some((at, kind)),
+                None,
+                rng,
+                side,
+                AiLayer {
+                    roles: &roles(),
+                    slots: slots(),
+                    unit_ai_tuning: &tuning().unit_ai,
+                },
+            )
+        },
     );
+    assert_eq!(r, Err(UNMODELLED_COMMAND));
 }
 
 #[test]

@@ -9,6 +9,7 @@
 use crate::construction::BuilderCount;
 use crate::construction::build::Construction;
 use crate::garrison::ContainerId;
+use crate::gathering::PastureId;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -27,6 +28,7 @@ use crate::map::terrain::TileTerrain;
 use crate::map::terrain::{Terrain, TerrainKind};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
+use crate::math::rng::Well512;
 use crate::movement::Me;
 use crate::movement::MoveAlgorithm;
 use crate::movement::MoveState;
@@ -39,6 +41,7 @@ use crate::objects::ActionState;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::SpriteId;
 use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Animated, Static};
@@ -50,6 +53,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::{Master, Masters};
+use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
@@ -147,13 +151,20 @@ pub struct Thing {
     pub inside: Option<ContainerId>,
     /// Its action layer, none for an empty one.
     pub actions: Option<Action>,
+    /// Its combat layer's capture flag (`+0x924`).
+    pub capture: CaptureKind,
+    /// The pasture it stands in (`+0x790`).
+    pub pasture: Option<PastureId>,
+    /// Its sprite, started on the scene's graphic of that id ([`Scene::graphic`]); none for
+    /// an object without one.
+    pub sprite: Option<SpriteId>,
 }
 
 impl Thing {
-    /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points,
-    /// outside the sight registry, not a foundation, without a unit AI, flags or actions, on
-    /// the map. A moving master's object stands with its movement state ([`Mover`]) at its
-    /// place.
+    /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points, outside
+    /// the sight registry, not a foundation, attackable (the flag a spawn gives a new object),
+    /// without a unit AI, other flags, actions, capture flag or pasture, on the map. A moving
+    /// master's object stands with its movement state ([`Mover`]) at its place.
     ///
     /// # Panics
     ///
@@ -170,9 +181,12 @@ impl Thing {
             seen_by: None,
             desolid: false,
             ai: None,
-            flags: UnitFlags::empty(),
+            flags: UnitFlags::ATTACKABLE,
             inside: None,
             actions: None,
+            capture: CaptureKind::None,
+            pasture: None,
+            sprite: None,
         }
     }
 }
@@ -197,6 +211,8 @@ pub struct Scene {
     relations: Vec<(PlayerId, PlayerId, Relation)>,
     /// The players' types [`Scene::kind`] set.
     kinds: Vec<(PlayerId, PlayerKind)>,
+    /// The graphics' table [`Scene::graphic`] fills.
+    graphics: Vec<Graphic>,
     things: Vec<Thing>,
 }
 
@@ -217,6 +233,7 @@ impl Scene {
             players: 1,
             relations: Vec::new(),
             kinds: Vec::new(),
+            graphics: Vec::new(),
             things: Vec::new(),
         }
     }
@@ -344,6 +361,14 @@ impl Scene {
         self
     }
 
+    /// The graphics' table holds `graphic`: a master's sprite and an object's
+    /// ([`Thing::sprite`]).
+    #[must_use]
+    pub fn graphic(mut self, graphic: Graphic) -> Self {
+        self.graphics.push(graphic);
+        self
+    }
+
     /// The object `thing` stands on the map, after the objects placed before it on its tile.
     #[must_use]
     pub fn thing(mut self, thing: Thing) -> Self {
@@ -420,6 +445,9 @@ impl Scene {
         for (i, &t) in self.rocks.iter().enumerate() {
             let id = ObjectId::try_from(FIRST_ROCK + i as i32).expect("a valid id");
             w.spatial.insert(id, rock(t));
+        }
+        if !self.graphics.is_empty() {
+            w.model.graphics = Arc::new(self.graphics.iter().map(|g| (g.id, *g)).collect());
         }
         if self.scout.is_some() || !self.things.is_empty() {
             let masters = self.masters();
@@ -658,7 +686,14 @@ fn place_thing(w: &mut World, thing: Thing) {
         flags,
         inside,
         ref actions,
+        capture,
+        pasture,
+        sprite,
     } = thing;
+    let sprite = sprite.map(|id| {
+        let graphic = *w.model.graphics.get(id).expect("the scene's graphic");
+        ActiveSprite::start(graphic, &mut Well512::default(), w.model.tuning.sprite)
+    });
     let unit = Unit {
         id,
         place: Static::at(at),
@@ -670,6 +705,8 @@ fn place_thing(w: &mut World, thing: Thing) {
             ..Lifecycle::default()
         },
         flags,
+        pasture,
+        sprite,
         ..Unit::default()
     };
     let mut object = if desolid {
@@ -689,6 +726,12 @@ fn place_thing(w: &mut World, thing: Thing) {
     let _ = w
         .push_live(player, object)
         .expect("the object joins its player");
+    if capture != CaptureKind::None {
+        w.parts
+            .combat_mut(id)
+            .expect("the object's combat layer")
+            .capture_flag = capture;
+    }
     let solid = 0.0 < master.radius.x() && 0.0 < master.radius.y() && master.is_tall();
     let placed = Placed {
         position: at,
