@@ -455,7 +455,7 @@ impl World {
                 g.differentiator_id = commands;
             }
             if order.lock_line {
-                self.lock_formation(id, FormationKind::LINE)?;
+                self.lock_formation(id, FormationKind::Line)?;
             }
             // a queued order's new group first takes its first unit's target, not queued and
             // direct

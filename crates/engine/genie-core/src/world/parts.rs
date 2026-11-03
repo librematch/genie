@@ -1073,7 +1073,7 @@ mod tests {
     /// A gather point at `x` on no target.
     fn gather_point(x: f32) -> GatherPoint {
         GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(x, 1.0, 0.0),
             target: None,
             target_master: None,

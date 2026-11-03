@@ -164,7 +164,7 @@ impl Fly {
                 if let FlyState::Flying { move_to: m } = &mut self.state {
                     *m = move_to;
                 }
-                if code == UpdateCode::UNDER_WAY {
+                if code == UpdateCode::UnderWay {
                     return Ok(());
                 }
                 if EPSILON < rest.get() {

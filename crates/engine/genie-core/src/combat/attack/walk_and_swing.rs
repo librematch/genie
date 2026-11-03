@@ -75,11 +75,11 @@ impl Attack {
                     return self.arrived_at_seen(c, unit, f, r, target);
                 }
                 self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
-                Ok(UpdateCode::UNDER_WAY)
+                Ok(UpdateCode::UnderWay)
             }
             3 => self.walk_failed(c, unit),
             4 => Err(QUIET_CODE),
-            _ => Ok(UpdateCode::UNDER_WAY),
+            _ => Ok(UpdateCode::UnderWay),
         }
     }
 
@@ -102,10 +102,10 @@ impl Attack {
         let reach = squared_reach(self.range, &c.w.model.tuning.attack);
         if reach.get().abs() <= EPSILON || reach < footprint_gap_squared(at, ground, target, radius)
         {
-            return Ok(UpdateCode::UNDER_WAY);
+            return Ok(UpdateCode::UnderWay);
         }
         self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     }
 
     /// The failed `MoveTo` (its update returns 3 without a notify, it being quiet):
@@ -132,7 +132,7 @@ impl Attack {
                 [600, 0, 0],
             )?;
         }
-        Ok(UpdateCode::FAILED)
+        Ok(UpdateCode::Failed)
     }
 
     /// State 7 (case 6). A melee swing counts down and lands its hit when its sprite reaches the
@@ -157,7 +157,7 @@ impl Attack {
         } else {
             self.swing_after_hit(c, unit, f, r, sprite)?;
         }
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     }
 
     /// The swing before its hit (state 7 with the hit pending): a melee swing counts down; at the

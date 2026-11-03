@@ -118,15 +118,15 @@ pub(crate) fn column_line_slots(
         s.active = 0;
     }
     formation.kind = if column {
-        FormationKind::COLUMN
+        FormationKind::Column
     } else if flanked {
-        FormationKind::FLANKED
+        FormationKind::Flanked
     } else if staggered {
-        FormationKind::STAGGERED
+        FormationKind::Staggered
     } else {
-        FormationKind::LINE
+        FormationKind::Line
     };
-    formation.transform_kind = TransformKind::BY_LINES;
+    formation.transform_kind = TransformKind::ByLines;
     formation.maximum_width = max_width;
     formation.maximum_depth = depth;
     formation.number_lines = depth;
@@ -486,11 +486,11 @@ impl World {
         }
         let after_column = matches!(
             formation.kind,
-            FormationKind::LINE | FormationKind::STAGGERED | FormationKind::FLANKED
+            FormationKind::Line | FormationKind::Staggered | FormationKind::Flanked
         ) && g
             .previous_formation
             .as_ref()
-            .is_some_and(|p| p.kind == FormationKind::COLUMN);
+            .is_some_and(|p| p.kind == FormationKind::Column);
         self.lay_units(formation, group, after_column)?;
         Ok(true)
     }

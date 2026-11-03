@@ -356,7 +356,7 @@ impl UnitAi {
             && at.unit(met).is_some()
             && self.retarget_disabled == 0
             && self.current_order.is_none()
-            && self.stance == UnitStance::AGGRESSIVE
+            && self.stance == UnitStance::Aggressive
         {
             // slot 0xb8 forced, by the type
             let _ = self.attack_slot(met, false, at, side, rng)?;

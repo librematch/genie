@@ -246,7 +246,7 @@ impl Unit {
                     let result = self.missile_strike(actions, action, fired, c, roles)?;
                     action.result = result;
                     if !stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
-                        && result != StrikeResult::SHIELDED
+                        && result != StrikeResult::Shielded
                     {
                         self.end_missile(action);
                     }
@@ -265,7 +265,7 @@ impl Unit {
                     action.result = result;
                     // the master's dying sprite plays there (a sprite of its own, not held)
                     if (stats.vanish_mode.contains(VanishMode::PASSES_THROUGH)
-                        || result == StrikeResult::SHIELDED)
+                        || result == StrikeResult::Shielded)
                         && blast_level.reaches(level)
                     {
                         continue;
@@ -579,7 +579,7 @@ impl Unit {
         if action.state == MissileState::Done {
             return Ok(());
         }
-        if action.result != StrikeResult::SHIELDED {
+        if action.result != StrikeResult::Shielded {
             let blaster = if !charge && action.fired_from.is_some() {
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?
                     .own(action.fired_from)
@@ -630,7 +630,7 @@ impl Unit {
         {
             let result = self.missile_strike(actions, action, fired, c, roles)?;
             action.result = result;
-            if result != StrikeResult::SHIELDED {
+            if result != StrikeResult::Shielded {
                 self.end_missile(action);
             }
         }

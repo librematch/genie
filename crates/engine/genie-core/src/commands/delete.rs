@@ -80,7 +80,7 @@ impl World {
         // A player's game status once it lost (`+0x89`).
         // A town centre's master whose delete also tells the world's `+0x820` (`FUN_1414615d0`).
         let lost_ally =
-            self.players.player(owner)?.game_status == GameStatus::LOST && mutual(player, owner);
+            self.players.player(owner)?.game_status == GameStatus::Lost && mutual(player, owner);
         if owner != player && !self.settings.cheats_enabled && !lost_ally {
             return Ok(());
         }
@@ -92,7 +92,7 @@ impl World {
                 .roles
                 .of_class(master.class)
                 .contains(ClassRoles::UNDELETABLE)
-            || self.parts.combat_of(unit.id).capture_flag == CaptureKind::AGAIN
+            || self.parts.combat_of(unit.id).capture_flag == CaptureKind::Again
         {
             return Ok(());
         }

@@ -82,7 +82,7 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
     let mut turns = slice(&save, None).unwrap();
     let mut after = same(&save, &turns);
     turns.game_state = PlayState::of_data(2);
-    after.game.statuses = vec![(GameStatus::PLAYING, false), (GameStatus::WON, false)];
+    after.game.statuses = vec![(GameStatus::Playing, false), (GameStatus::Won, false)];
     turns.players[1].freezes.push((
         Tick::new(5),
         object_id(7),

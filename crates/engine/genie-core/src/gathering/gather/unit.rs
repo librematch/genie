@@ -192,7 +192,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
             farm_stops: c.w.settings.walkable_farms,
             player_kind: c.w.players.player(c.player)?.kind,
             stop_productivity: productivity_of(

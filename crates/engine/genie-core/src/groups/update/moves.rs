@@ -347,7 +347,7 @@ impl World {
             if self.object(m.id).is_none() {
                 continue;
             }
-            if m.specific_move.reason != MoveReason::ASIDE {
+            if m.specific_move.reason != MoveReason::Aside {
                 // slot 0x608 (FUN_1411581e0): the unit's own motion step (FUN_141150f00), then
                 // its facet from its angle (FUN_14114d8b0, not held)
                 if self.member_step(m.id)? {
@@ -357,7 +357,7 @@ impl World {
                         .checked_mut(i - 1)?
                         .specific_move = SpecificMove {
                         path_id: MovePath::NONE,
-                        reason: MoveReason::NONE,
+                        reason: MoveReason::None,
                         ..SpecificMove::default()
                     };
                     continue;
@@ -390,7 +390,7 @@ impl World {
             if !below_or_unordered(0.0, timer.get()) {
                 g.members.checked_mut(i - 1)?.specific_move = SpecificMove {
                     path_id: MovePath::NONE,
-                    reason: MoveReason::NONE,
+                    reason: MoveReason::None,
                     ..SpecificMove::default()
                 };
                 if self.object(m.id).is_some()

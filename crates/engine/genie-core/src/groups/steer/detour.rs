@@ -111,7 +111,7 @@ impl World {
             }
             let goal = (way.goal, ROUND_TIMER, ROUND_TIMER);
             let _ =
-                self.set_specific_move(group, id, (MovePath::NONE, MoveReason::DETOUR), goal)?;
+                self.set_specific_move(group, id, (MovePath::NONE, MoveReason::Detour), goal)?;
         }
         self.set_slot_state(group, slot, SlotState::Steering)?;
         self.stop_member(id)?;

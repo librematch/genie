@@ -84,7 +84,7 @@ impl World {
         let horde = g
             .current_formation
             .as_ref()
-            .is_some_and(|f| f.kind == FormationKind::HORDE);
+            .is_some_and(|f| f.kind == FormationKind::Horde);
         if (g.motion.flags.contains(MotionFlags::NEW)
             && !g.flags.contains(GroupFlags::PLACED)
             && !horde)
@@ -427,7 +427,7 @@ impl World {
             if g.current_command == ATTACK
                 && g.current_formation
                     .as_ref()
-                    .is_some_and(|f| f.kind == FormationKind::KIND_6)
+                    .is_some_and(|f| f.kind == FormationKind::Kind6)
             {
                 refill = true;
             } else if at_most_or_unordered(

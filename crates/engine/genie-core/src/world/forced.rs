@@ -515,7 +515,7 @@ mod tests {
             resources: vec![[0.0; 4], [1.0, 2.0, 3.0, 4.0]],
             pending_debit: vec![[Amount::ZERO; 4], [Amount::new(5.0); 4]],
             techs: vec![vec![], vec![TechState::default(); 2]],
-            statuses: vec![(GameStatus::PLAYING, false), (GameStatus::LOST, true)],
+            statuses: vec![(GameStatus::Playing, false), (GameStatus::Lost, true)],
             ..GameState::default()
         };
         let mut t = forage_world();
@@ -530,7 +530,7 @@ mod tests {
         assert_eq!(player.resources(), before);
         assert_eq!(
             (player.game_status, player.resigned),
-            (GameStatus::LOST, true)
+            (GameStatus::Lost, true)
         );
         assert!(player.unsupported.is_none());
         t.players[1].stopped = true;
@@ -576,7 +576,7 @@ mod tests {
             ..GameState::default()
         };
         let gather = GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(30.0, 80.0, 0.0),
             target: None,
             target_master: None,

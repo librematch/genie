@@ -257,7 +257,7 @@ fn member_own_move_is_set_or_ended() {
         t.set_specific_move(
             group_id(1),
             object_id(10),
-            (MovePath::of_data(7), MoveReason::DETOUR),
+            (MovePath::of_data(7), MoveReason::Detour),
             (BVector::new(1.0, 2.0, 3.0), 3.0, 2.5)
         )
         .unwrap()
@@ -268,7 +268,7 @@ fn member_own_move_is_set_or_ended() {
         SpecificMove {
             active: 1,
             path_id: MovePath::of_data(7),
-            reason: MoveReason::DETOUR,
+            reason: MoveReason::Detour,
             goal: BVector::new(1.0, 2.0, 3.0),
             timer: Seconds::new(3.0),
             consecutive_move_failures: 4,
@@ -280,7 +280,7 @@ fn member_own_move_is_set_or_ended() {
         t.set_specific_move(
             group_id(1),
             object_id(10),
-            (MovePath::of_data(7), MoveReason::NONE),
+            (MovePath::of_data(7), MoveReason::None),
             (BVector::from([1.0; 3]), 1.0, 1.0)
         )
         .unwrap()
@@ -290,7 +290,7 @@ fn member_own_move_is_set_or_ended() {
         own,
         SpecificMove {
             path_id: MovePath::NONE,
-            reason: MoveReason::NONE,
+            reason: MoveReason::None,
             ..SpecificMove::default()
         }
     );
@@ -298,7 +298,7 @@ fn member_own_move_is_set_or_ended() {
         !t.set_specific_move(
             group_id(1),
             object_id(12),
-            (MovePath::of_data(0), MoveReason::DETOUR),
+            (MovePath::of_data(0), MoveReason::Detour),
             (BVector::ZERO, 0.0, 0.0)
         )
         .unwrap()
@@ -311,7 +311,7 @@ fn member_own_move_is_set_or_ended() {
         !t.set_specific_move(
             group_id(1),
             object_id(99),
-            (MovePath::of_data(0), MoveReason::DETOUR),
+            (MovePath::of_data(0), MoveReason::Detour),
             (BVector::ZERO, 0.0, 0.0)
         )
         .unwrap()
@@ -344,7 +344,7 @@ fn member_in_place_or_failing_too_often() {
     let own = g.members[0].specific_move;
     assert_eq!(
         (own.active, own.path_id, own.reason),
-        (1, MovePath::NONE, MoveReason::ASIDE)
+        (1, MovePath::NONE, MoveReason::Aside)
     );
     assert_eq!(
         (own.goal, own.timer, own.distance),
@@ -376,7 +376,7 @@ fn member_in_place_or_failing_too_often() {
         t.groups.get(group_id(1)).unwrap().members[0]
             .specific_move
             .reason,
-        MoveReason::ASIDE
+        MoveReason::Aside
     );
 }
 
@@ -607,7 +607,7 @@ fn blocked_way_to_the_slot_goes_round() {
         ),
         (
             1,
-            MoveReason::DETOUR,
+            MoveReason::Detour,
             Seconds::new(3.0),
             Distance::new(3.0),
             1
@@ -668,7 +668,7 @@ fn the_members_moves_end_wait_or_stop() {
         m.specific_move = SpecificMove {
             active: 1,
             path_id: MovePath::of_data(3),
-            reason: MoveReason::DETOUR,
+            reason: MoveReason::Detour,
             timer: Seconds::new(1.0),
             distance: Distance::new(2.0),
             ..SpecificMove::default()
@@ -680,7 +680,7 @@ fn the_members_moves_end_wait_or_stop() {
         g.members[0].specific_move,
         SpecificMove {
             path_id: MovePath::NONE,
-            reason: MoveReason::NONE,
+            reason: MoveReason::None,
             ..SpecificMove::default()
         }
     );
@@ -689,7 +689,7 @@ fn the_members_moves_end_wait_or_stop() {
         Point::new(10.0, 5.0)
     );
     assert_eq!(g.members[1].specific_move.timer, Seconds::new(1.0 - DT));
-    assert_eq!(g.members[1].specific_move.reason, MoveReason::DETOUR);
+    assert_eq!(g.members[1].specific_move.reason, MoveReason::Detour);
     assert_eq!(
         t.parts.unit_ai.get(unit(&t, 11).id).unwrap().state_position,
         Point::ORIGIN
@@ -710,7 +710,7 @@ fn the_members_moves_end_wait_or_stop() {
     let own = t2.groups.get(group_id(1)).unwrap().members[1].specific_move;
     assert_eq!(
         (own.active, own.path_id, own.reason),
-        (0, MovePath::NONE, MoveReason::NONE)
+        (0, MovePath::NONE, MoveReason::None)
     );
     assert_eq!(mover(&t2, 11).animated.speed, Speed::new(0.0));
     assert_eq!(

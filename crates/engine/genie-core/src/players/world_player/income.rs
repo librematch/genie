@@ -32,7 +32,7 @@ impl World {
             if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
             }
-            self.add_resource(p, kind, rate / MINUTE, ResourceStat::GATHERED, true)?;
+            self.add_resource(p, kind, rate / MINUTE, ResourceStat::Gathered, true)?;
         }
         Ok(())
     }
@@ -73,7 +73,7 @@ impl World {
             p,
             self.model.slots.attribute.food,
             Amount::new(rate * (time * grows)),
-            ResourceStat::GATHERED,
+            ResourceStat::Gathered,
             true,
         )?;
         Ok(())
@@ -109,7 +109,7 @@ impl World {
                         p,
                         self.model.slots.attribute.gold_gathered,
                         amount,
-                        ResourceStat::GATHERED,
+                        ResourceStat::Gathered,
                         share,
                     )?;
                 }
@@ -119,7 +119,7 @@ impl World {
                 p,
                 self.model.slots.attribute.gathered.offset(kind.index())?,
                 amount,
-                ResourceStat::GATHERED,
+                ResourceStat::Gathered,
                 share,
             )?;
         }

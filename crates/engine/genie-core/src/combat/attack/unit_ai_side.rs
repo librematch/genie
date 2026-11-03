@@ -275,7 +275,7 @@ impl UnitView<'_, '_> {
             position: unit.position(),
             radius: master.radius,
         };
-        let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE;
+        let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::Defensive;
         let attack = self.actions.list.attack_mut().ok_or(NO_ATTACK)?;
         let w = attack.work(Some(target_mark), main, &wielder, |_| can_move, roles);
         let by = Releaser {

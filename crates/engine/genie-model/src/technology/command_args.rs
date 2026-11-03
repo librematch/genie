@@ -11,26 +11,69 @@ use serde::Serialize;
 /// away from 1), any other adds. Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct ChangeMode(u8);
+#[serde(from = "u8", into = "u8")]
+pub enum ChangeMode {
+    /// 0: the value becomes the amount.
+    #[default]
+    Set,
+    /// 1: the amount adds to the value (as every byte not named here).
+    Add,
+    /// 2: the value grows by the amount less 1 times the `.dat`'s value.
+    Scale,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(UnnamedChangeMode),
+}
+
+/// A raw value of [`ChangeMode`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnnamedChangeMode(u8);
 
 impl ChangeMode {
-    /// 0: the value becomes the amount.
-    pub const SET: Self = Self(0);
-    /// 1: the amount adds to the value (as every byte not named here).
-    pub const ADD: Self = Self(1);
-    /// 2: the value grows by the amount less 1 times the `.dat`'s value.
-    pub const SCALE: Self = Self(2);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: u8) -> Self {
+        match value {
+            0 => Self::Set,
+            1 => Self::Add,
+            2 => Self::Scale,
+            other => Self::Other(UnnamedChangeMode(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> u8 {
+        match self {
+            Self::Set => 0,
+            Self::Add => 1,
+            Self::Scale => 2,
+            Self::Other(UnnamedChangeMode(value)) => value,
+        }
+    }
 
     /// The mode of the command's byte `value`.
     #[must_use]
     pub const fn of_data(value: u8) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The byte, as the `.dat` holds it.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self.raw()
+    }
+}
+
+impl From<u8> for ChangeMode {
+    /// The value of a serialized raw `value`.
+    fn from(value: u8) -> Self {
+        Self::of_raw(value)
+    }
+}
+
+impl From<ChangeMode> for u8 {
+    /// The raw value it serializes as.
+    fn from(value: ChangeMode) -> Self {
+        value.raw()
     }
 }
 
@@ -38,33 +81,88 @@ impl ChangeMode {
 /// argument. The cost modes (0 to 3, `0x4000` to `0x4003`, `0xd` to `0x11`) and the research
 /// time modes (−1 to −3) map to a [`ChangeMode`]; the others name a field. Every short is kept.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct ModifyMode(i16);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(from = "i16", into = "i16")]
+pub enum ModifyMode {
+    /// 4: the location's building.
+    Building,
+    /// 5: the location's button.
+    Button,
+    /// 9: the stacking.
+    Stacking,
+    /// 10: the research cap.
+    ResearchCap,
+    /// 12: the state.
+    State,
+    /// 18: the effect override.
+    EffectOverride,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(UnnamedModifyMode),
+}
+
+/// A raw value of [`ModifyMode`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnnamedModifyMode(i16);
 
 impl ModifyMode {
-    /// 4: the location's building.
-    pub const BUILDING: Self = Self(4);
-    /// 5: the location's button.
-    pub const BUTTON: Self = Self(5);
-    /// 9: the stacking.
-    pub const STACKING: Self = Self(9);
-    /// 10: the research cap.
-    pub const RESEARCH_CAP: Self = Self(10);
-    /// 12: the state.
-    pub const STATE: Self = Self(12);
-    /// 18: the effect override.
-    pub const EFFECT_OVERRIDE: Self = Self(18);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i16) -> Self {
+        match value {
+            4 => Self::Building,
+            5 => Self::Button,
+            9 => Self::Stacking,
+            10 => Self::ResearchCap,
+            12 => Self::State,
+            18 => Self::EffectOverride,
+            other => Self::Other(UnnamedModifyMode(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i16 {
+        match self {
+            Self::Building => 4,
+            Self::Button => 5,
+            Self::Stacking => 9,
+            Self::ResearchCap => 10,
+            Self::State => 12,
+            Self::EffectOverride => 18,
+            Self::Other(UnnamedModifyMode(value)) => value,
+        }
+    }
 
     /// The mode of the command's short `value`.
     #[must_use]
     pub const fn of_data(value: i16) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The short, as the `.dat` holds it.
     #[must_use]
     pub const fn get(self) -> i16 {
-        self.0
+        self.raw()
+    }
+}
+
+impl Default for ModifyMode {
+    /// The zero value, as zeroed memory holds it.
+    fn default() -> Self {
+        Self::of_raw(0)
+    }
+}
+
+impl From<i16> for ModifyMode {
+    /// The value of a serialized raw `value`.
+    fn from(value: i16) -> Self {
+        Self::of_raw(value)
+    }
+}
+
+impl From<ModifyMode> for i16 {
+    /// The raw value it serializes as.
+    fn from(value: ModifyMode) -> Self {
+        value.raw()
     }
 }
 
@@ -140,9 +238,9 @@ mod tests {
     /// and its low 16 bits differ past a short.
     #[test]
     fn the_command_arguments_keep_the_data_values() {
-        assert_eq!(ChangeMode::of_data(2), ChangeMode::SCALE);
+        assert_eq!(ChangeMode::of_data(2), ChangeMode::Scale);
         assert_eq!(ChangeMode::of_data(7).get(), 7);
-        assert_eq!(ModifyMode::of_data(12), ModifyMode::STATE);
+        assert_eq!(ModifyMode::of_data(12), ModifyMode::State);
         assert_eq!(ModifyMode::of_data(-2).get(), -2);
         assert_eq!(
             [0, -3, 2].map(|l| ModifyLocation::of_data(l).entry()),
@@ -153,5 +251,23 @@ mod tests {
         assert_eq!(DisabledTech::of_data(7).whole(), TechId::of_data(7));
         assert_eq!(DisabledTech::NONE.whole(), None);
         assert_eq!(DisabledTech::NONE.get(), -1);
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_change_mode_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3] {
+            assert_eq!(ChangeMode::of_raw(value).raw(), value);
+        }
+        assert!(matches!(ChangeMode::of_raw(3), ChangeMode::Other(_)));
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_modify_mode_value_maps_to_its_variant_and_back() {
+        for value in [4, 5, 9, 10, 12, 18, 0] {
+            assert_eq!(ModifyMode::of_raw(value).raw(), value);
+        }
+        assert!(matches!(ModifyMode::of_raw(0), ModifyMode::Other(_)));
     }
 }

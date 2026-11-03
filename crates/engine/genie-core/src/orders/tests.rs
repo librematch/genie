@@ -634,7 +634,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
 /// clears `+0x7b8`; the Attack waits in state 4 for the `MoveTo`'s end.
 #[test]
 fn work_attack_on_touching_target_starts_its_move_to_arrived() {
-    let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
+    let (mut t, task) = work_attack(UnitStance::Aggressive);
     t.start_attack(
         PlayerId::new(1),
         ListIndex::new(0),
@@ -680,7 +680,7 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
 /// does not keep it.
 #[test]
 fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
-    let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
+    let (mut t, task) = work_attack(UnitStance::Aggressive);
     let at = Position::new(10.4, 10.0, 0.0);
     t.start_attack(
         PlayerId::new(1),
@@ -740,7 +740,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
 /// place and class; a target or a main building the slice does not hold fails.
 #[test]
 fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
-    let (mut t, _) = work_attack(UnitStance::AGGRESSIVE);
+    let (mut t, _) = work_attack(UnitStance::Aggressive);
     let aim = t.attack_aim(object_id(50)).unwrap();
     assert_eq!(
         (aim.owner, aim.class, aim.fog_visibility),
@@ -791,7 +791,7 @@ fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
 /// A soldier without a unit AI only takes the target.
 #[test]
 fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
-    let (mut t, _) = work_attack(UnitStance::AGGRESSIVE);
+    let (mut t, _) = work_attack(UnitStance::Aggressive);
     annexed(&mut t);
     t.world_time = WorldTime::from_millis(1730);
     let aim = t.attack_aim(object_id(61)).unwrap();
@@ -869,7 +869,7 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
         (0.5, AttackState::Ready, false, 300),
         (0.0, AttackState::Swing, true, 301),
     ] {
-        let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
+        let (mut t, task) = work_attack(UnitStance::Aggressive);
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         let id = unit.id;
         t.parts.set_unit_ai(id, None);
@@ -2258,7 +2258,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     let mut fx: Vec<Effect> = Vec::new();
     set_stance(
         &mut ai,
-        UnitStance::DEFENSIVE,
+        UnitStance::Defensive,
         (Point::new(3.0, 4.0), Some(class::CLASS_6)),
         &mut fx,
         &mut Well512::default(),
@@ -2267,7 +2267,7 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     .unwrap();
     assert_eq!(
         (ai.stance, ai.state_position),
-        (UnitStance::DEFENSIVE, Point::new(3.0, 4.0))
+        (UnitStance::Defensive, Point::new(3.0, 4.0))
     );
     assert_eq!(
         (ai.current_action, ai.current_target),
@@ -2276,14 +2276,14 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
     assert_eq!(fx, []);
     set_stance(
         &mut ai,
-        UnitStance::NO_ATTACK,
+        UnitStance::NoAttack,
         (Point::new(3.0, 5.0), Some(class::CLASS_6)),
         &mut fx,
         &mut Well512::default(),
         &roles(),
     )
     .unwrap();
-    assert_eq!(ai.stance, UnitStance::NO_ATTACK);
+    assert_eq!(ai.stance, UnitStance::NoAttack);
     // order 700 is the action's (600 + 100): the stop ends it, the state position the place
     assert_eq!((ai.current_order, ai.current_action), (None, None));
     assert_eq!(
@@ -2335,23 +2335,19 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
             .unwrap()
             .stance
     };
-    t.unit_ai_state(
-        player_id(1),
-        &object_ids([11, 30]),
-        UnitStance::STAND_GROUND,
-    )
-    .unwrap();
+    t.unit_ai_state(player_id(1), &object_ids([11, 30]), UnitStance::StandGround)
+        .unwrap();
     assert_eq!(
         (stance(&t, 1), stance(&t, 2)),
-        (UnitStance::STAND_GROUND, UnitStance::AGGRESSIVE)
+        (UnitStance::StandGround, UnitStance::Aggressive)
     );
     t.settings.cheats_enabled = true;
-    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::DEFENSIVE)
+    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::Defensive)
         .unwrap();
-    assert_eq!(stance(&t, 2), UnitStance::AGGRESSIVE);
-    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::NO_ATTACK)
+    assert_eq!(stance(&t, 2), UnitStance::Aggressive);
+    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::NoAttack)
         .unwrap();
-    assert_eq!(stance(&t, 2), UnitStance::NO_ATTACK);
+    assert_eq!(stance(&t, 2), UnitStance::NoAttack);
 }
 
 /// `FUN_1411a6a70` on a unit inside a building (`+0x2f0` set, `+0x2e8` 0): no sight slots and
@@ -4221,17 +4217,14 @@ fn formation_of_soldiers_makes_one_group_locked_to_its_kind() {
     t.form_formation(
         player_id(1),
         &object_ids([11, 12, 13]),
-        FormationKind::USER_DEFINED,
+        FormationKind::UserDefined,
     )
     .unwrap();
     let g = &t.groups.groups;
     assert_eq!(g.len(), 1);
     let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
-    assert_eq!(
-        g[0].formation_locked_kind,
-        Some(FormationKind::USER_DEFINED)
-    );
+    assert_eq!(g[0].formation_locked_kind, Some(FormationKind::UserDefined));
     assert_eq!(g[0].differentiator_id, Differentiator::of_data(0));
     assert_eq!(g[0].differentiator_groups, [g[0].id]);
     assert_eq!(t.groups.commands, Differentiator::of_data(1));
@@ -4239,13 +4232,13 @@ fn formation_of_soldiers_makes_one_group_locked_to_its_kind() {
     t.form_formation(
         player_id(1),
         &object_ids([11, 12, 13]),
-        FormationKind::KIND_6,
+        FormationKind::Kind6,
     )
     .unwrap();
     assert_eq!(t.groups.groups.len(), 1);
     assert_eq!(
         t.groups.groups[0].formation_locked_kind,
-        Some(FormationKind::KIND_6)
+        Some(FormationKind::Kind6)
     );
     assert_eq!(
         t.groups.groups[0].differentiator_id,
@@ -4275,7 +4268,7 @@ fn formation_stops_the_units_that_march_and_ignores_gone_ones() {
     t.form_formation(
         player_id(1),
         &object_ids([11, 12]),
-        FormationKind::USER_DEFINED,
+        FormationKind::UserDefined,
     )
     .unwrap();
     let marched = &t.players[1].objects[ListIndex::new(0)];
@@ -4294,7 +4287,7 @@ fn formation_stops_the_units_that_march_and_ignores_gone_ones() {
     t.form_formation(
         player_id(1),
         &object_ids([70, 71]),
-        FormationKind::USER_DEFINED,
+        FormationKind::UserDefined,
     )
     .unwrap();
     assert_eq!(t.groups.commands, before);
@@ -5347,7 +5340,7 @@ fn drop_off_order_fails_on_what_it_does_not_hold() {
 fn an_attack_task_start_ends_where_the_start_does() {
     use crate::combat::attack::AttackState;
     let started = |ai: bool, at: f32| {
-        let (mut t, task) = work_attack(UnitStance::AGGRESSIVE);
+        let (mut t, task) = work_attack(UnitStance::Aggressive);
         let unit = &mut t.players[1].objects[ListIndex::new(0)];
         if !ai {
             t.parts.set_unit_ai(unit.id, None);

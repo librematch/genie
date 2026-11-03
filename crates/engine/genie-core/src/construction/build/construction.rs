@@ -148,9 +148,9 @@ pub(super) fn completion_counts(
     let history = {
         let held = roles.of_master(master.id);
         if held.contains(MasterRoles::CASTLE) {
-            Some(EventKind::CASTLE_BUILT)
+            Some(EventKind::CastleBuilt)
         } else if held.contains(MasterRoles::WONDER) {
-            Some(EventKind::WONDER_BUILT)
+            Some(EventKind::WonderBuilt)
         } else {
             None
         }

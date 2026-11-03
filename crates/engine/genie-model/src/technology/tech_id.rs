@@ -44,7 +44,7 @@ impl TechId {
     /// The last age technology.
     pub const LAST_AGE: Self = Self(103);
     /// Castle Age (`0x66`), whose RESEARCH marks the treaty monitor in game mode 16
-    /// ([`crate::world::GameMode::ONE_UNIT`]).
+    /// ([`crate::world::GameMode::OneUnit`]).
     pub const CASTLE_AGE: Self = Self(0x66);
 
     /// Its place in a table by technology id.

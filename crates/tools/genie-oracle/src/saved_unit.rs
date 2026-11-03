@@ -243,7 +243,7 @@ fn row(
         work_rate_powerup: object
             .combat()
             .map_or(WorkRate::ZERO, |c| WorkRate::new(c.work_rate_powerup)),
-        capture_flag: object.combat().map_or(CaptureKind::NONE, |c| {
+        capture_flag: object.combat().map_or(CaptureKind::None, |c| {
             CaptureKind::of_data(c.rge_combat_object.capture_flag)
         }),
         hp_powerup: object.combat().map_or(HpPowerup::NONE, |c| HpPowerup {

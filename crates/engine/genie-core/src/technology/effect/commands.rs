@@ -30,9 +30,9 @@ impl World {
         let wanted: &[Relation] = match party {
             Party::Own => return vec![p],
             Party::Gaia => return vec![PlayerId::GAIA],
-            Party::Allies => &[Relation::ALLY],
-            Party::Enemies => &[Relation::ENEMY, Relation::RELATION_4],
-            Party::Neutrals => &[Relation::NEUTRAL],
+            Party::Allies => &[Relation::Ally],
+            Party::Enemies => &[Relation::Enemy, Relation::Relation4],
+            Party::Neutrals => &[Relation::Neutral],
         };
         PlayerId::each(self.players.len())
             .skip(1)

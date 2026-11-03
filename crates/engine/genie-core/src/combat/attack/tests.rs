@@ -621,7 +621,7 @@ pub(crate) fn reads() -> AttackReads {
         player_kind: PlayerKind::Human,
         world_time: WorldTime::ZERO,
         can_move: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         state_position: Point::ORIGIN,
         queue_empty: true,
         ai_order: AiOrder::Idle,
@@ -1287,7 +1287,7 @@ fn an_attack_on_target_out_of_sight_fails() {
     };
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let got = run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true);
-    assert_eq!(got, (Ok(UpdateCode::FAILED), true, true, false, failed));
+    assert_eq!(got, (Ok(UpdateCode::Failed), true, true, false, failed));
     assert_eq!((a.target, a.state), (None, AttackState::Failed));
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(run(&mut a, class::PREDATOR, Some(BOAR_AI), false).3);
@@ -1296,14 +1296,14 @@ fn an_attack_on_target_out_of_sight_fails() {
     assert_eq!((lion.2, lion.3, lion.4), (true, false, vec![]));
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     let alone = run(&mut a, class::PREDATOR, None, true);
-    assert_eq!((alone.0, alone.3), (Ok(UpdateCode::FAILED), false));
+    assert_eq!((alone.0, alone.3), (Ok(UpdateCode::Failed), false));
     let mut a = Attack {
         voice: Voice::Quiet,
         ..own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0))
     };
     assert_eq!(
         run(&mut a, class::CLASS_6, Some(UnitAiKind::SOLDIER), true),
-        (Ok(UpdateCode::FAILED), false, false, false, vec![])
+        (Ok(UpdateCode::Failed), false, false, false, vec![])
     );
     let mut a = own_attack(77, AttackState::Move { move_to: None }, Distance::new(1.0));
     assert!(
@@ -1320,8 +1320,8 @@ fn an_attack_on_target_out_of_sight_fails() {
 fn ready_to_attack_on_target_out_of_sight_fails_or_waits() {
     let at = Position::new(11.0, 10.0, 0.0);
     for (stance, fails) in [
-        (UnitStance::AGGRESSIVE, false),
-        (UnitStance::STAND_GROUND, true),
+        (UnitStance::Aggressive, false),
+        (UnitStance::StandGround, true),
     ] {
         let mut world = world_with(7, PlayerId::new(2), class::CLASS_6, at);
         world.sight = Some(sight(false));
@@ -1414,7 +1414,7 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
             a.range
         ),
         (
-            UpdateCode::UNDER_WAY,
+            UpdateCode::UnderWay,
             AttackState::GotoSeen { move_to: None },
             now_at,
             Some((now_at, MoveTo::Start)),
@@ -1434,7 +1434,7 @@ fn an_attack_waits_where_it_last_saw_its_target_and_follows_it_seen_again() {
                 a.range
             ),
             (
-                UpdateCode::UNDER_WAY,
+                UpdateCode::UnderWay,
                 AttackState::Move { move_to: None },
                 Some(MoveTo::Start),
                 Distance::new(3.0)
@@ -1481,7 +1481,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         Distance::new(2.0),
         PlayerKind::Human,
     );
-    assert_eq!(code, UpdateCode::UNDER_WAY);
+    assert_eq!(code, UpdateCode::UnderWay);
     assert!(
         !matches!(
             a.state.bare(),
@@ -1505,7 +1505,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
             posted
         ),
         (
-            UpdateCode::UNDER_WAY,
+            UpdateCode::UnderWay,
             AttackState::GotoPoint { move_to: None },
             Some((at, MoveTo::Start)),
             Distance::new(4.0),
@@ -1538,7 +1538,7 @@ fn an_attack_arrived_where_it_saw_its_target_looks_again() {
         assert_eq!(
             (code, a.state.bare(), a.target, let_go, posted),
             (
-                UpdateCode::FAILED,
+                UpdateCode::Failed,
                 AttackState::Failed,
                 None,
                 true,
@@ -1669,7 +1669,7 @@ fn an_attack_in_state_without_case_returns_0() {
     let code = rig.run(20, |c, u, actions, f, r| {
         a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
-    assert_eq!(code, Ok(UpdateCode::UNDER_WAY));
+    assert_eq!(code, Ok(UpdateCode::UnderWay));
     assert_eq!((a.state, a.timer), (AttackState::New, Seconds::new(0.02)));
 }
 
@@ -1716,13 +1716,13 @@ fn an_attack_on_target_its_player_counts_as_its_own_ends() {
             PlayerId::new(1),
             Voice::Quiet
         ),
-        (UpdateCode::DONE, AttackState::Done, vec![])
+        (UpdateCode::Done, AttackState::Done, vec![])
     );
     // a unit's own Attack posts 0x1fb with 600 and its target
     assert_eq!(
         run(class::LIVESTOCK, true, false, PlayerId::new(1), Voice::Loud),
         (
-            UpdateCode::DONE,
+            UpdateCode::Done,
             AttackState::Done,
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 7, 0])]
         )
@@ -1730,24 +1730,24 @@ fn an_attack_on_target_its_player_counts_as_its_own_ends() {
     // its own livestock or farm when it began: spared
     assert_eq!(
         run(class::LIVESTOCK, true, true, PlayerId::new(1), Voice::Quiet).0,
-        UpdateCode::UNDER_WAY
+        UpdateCode::UnderWay
     );
     assert_eq!(
         run(class::FARM, true, true, PlayerId::new(1), Voice::Quiet).0,
-        UpdateCode::UNDER_WAY
+        UpdateCode::UnderWay
     );
     // another class whatever it began on; an enemy's or Gaia's unit's go on
     assert_eq!(
         run(class::CLASS_6, true, true, PlayerId::new(1), Voice::Quiet).0,
-        UpdateCode::DONE
+        UpdateCode::Done
     );
     assert_eq!(
         run(class::CLASS_6, false, false, PlayerId::new(1), Voice::Quiet).0,
-        UpdateCode::UNDER_WAY
+        UpdateCode::UnderWay
     );
     assert_eq!(
         run(class::CLASS_6, true, false, PlayerId::new(0), Voice::Quiet).0,
-        UpdateCode::UNDER_WAY
+        UpdateCode::UnderWay
     );
 }
 
@@ -1774,7 +1774,7 @@ fn sub_action_attack_after_its_kill_posts_0x1fb_and_returns_5() {
     let code = rig.run(20, |c, u, actions, f, r| {
         a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
-    assert_eq!(code, Ok(UpdateCode::CODE_5));
+    assert_eq!(code, Ok(UpdateCode::Code5));
     assert_eq!((a.state, a.target), (AttackState::Done, None));
     assert_eq!(
         rig.posted(),
@@ -1816,19 +1816,19 @@ fn dead_tree_keeps_soldier_attack_until_it_is_ready() {
     };
     assert_eq!(
         run(class::CLASS_6, ObjectState::Dying),
-        (UpdateCode::CODE_5, AttackState::Done, false)
+        (UpdateCode::Code5, AttackState::Done, false)
     );
     assert_eq!(
         run(class::CLASS_6, ObjectState::Dead),
-        (UpdateCode::CODE_5, AttackState::Done, false)
+        (UpdateCode::Code5, AttackState::Done, false)
     );
     assert_eq!(
         run(class::VILLAGER, ObjectState::Dying),
-        (UpdateCode::CODE_5, AttackState::Done, true)
+        (UpdateCode::Code5, AttackState::Done, true)
     );
     assert_eq!(
         run(class::CLASS_6, ObjectState::Undead),
-        (UpdateCode::CODE_5, AttackState::Done, true)
+        (UpdateCode::Code5, AttackState::Done, true)
     );
 }
 
@@ -1863,7 +1863,7 @@ fn swing_that_fails_its_interrupt_check_stays_failed() {
     let code = rig.run(20, |c, u, actions, f, r| {
         a.update(c, u, actions, me(1, AttackState::Ready), f, r)
     });
-    assert_eq!(code, Ok(UpdateCode::UNDER_WAY));
+    assert_eq!(code, Ok(UpdateCode::UnderWay));
     assert_eq!(a.state, AttackState::Failed);
     assert_eq!(rig.posted(), vec![(NotifyKind::OUT_OF_REACH, [0; 3])]);
     assert_eq!(rig.sprite(), Some(STANDING.id));
@@ -1941,7 +1941,7 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
     );
     assert_eq!(
         a.update_targetless(Seconds::new(0.028), false, motion.lent()),
-        Ok((UpdateCode::DONE, true))
+        Ok((UpdateCode::Done, true))
     );
     assert_eq!(a.state, AttackState::Done);
     let (mut sprite, mut rng) = (None, Well512::default());
@@ -2131,14 +2131,9 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
         .unwrap()
     };
     for e in [
-        engaged(Distance::new(0.5), 1.2, false, UnitStance::STAND_GROUND),
-        engaged(Distance::new(0.5), 0.0, true, UnitStance::AGGRESSIVE),
-        engaged(
-            Distance::new(f32::NAN),
-            1.2,
-            false,
-            UnitStance::STAND_GROUND,
-        ),
+        engaged(Distance::new(0.5), 1.2, false, UnitStance::StandGround),
+        engaged(Distance::new(0.5), 0.0, true, UnitStance::Aggressive),
+        engaged(Distance::new(f32::NAN), 1.2, false, UnitStance::StandGround),
     ] {
         let c = start(e);
         assert_eq!(
@@ -2155,7 +2150,7 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
         Distance::new(3.0),
         1.2,
         false,
-        UnitStance::STAND_GROUND,
+        UnitStance::StandGround,
     ));
     assert_eq!(
         (away.ready, away.failed, away.posted),
@@ -2164,7 +2159,7 @@ fn the_start_of_unit_that_cannot_move_goes_ready_in_reach_and_fails_out_of_it() 
     assert_eq!(away.attack.point, Position::new(NONE, NONE, NONE));
     let close = start(Engagement {
         min_range: Distance::new(1.0),
-        ..engaged(Distance::new(0.5), 1.2, false, UnitStance::STAND_GROUND)
+        ..engaged(Distance::new(0.5), 1.2, false, UnitStance::StandGround)
     });
     assert_eq!(
         (close.ready, close.failed, close.posted),
@@ -2209,14 +2204,14 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
     };
     assert_eq!(
         start(
-            engaged(Distance::new(0.5), 1.2, true, UnitStance::AGGRESSIVE),
+            engaged(Distance::new(0.5), 1.2, true, UnitStance::Aggressive),
             true
         ),
         (false, vec![], false)
     );
     let close = Engagement {
         min_range: Distance::new(1.0),
-        ..engaged(Distance::new(0.5), 1.2, true, UnitStance::AGGRESSIVE)
+        ..engaged(Distance::new(0.5), 1.2, true, UnitStance::Aggressive)
     };
     assert_eq!(
         start(close, true),
@@ -2224,21 +2219,21 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
     );
     assert_eq!(
         start(
-            engaged(Distance::new(3.0), 1.2, true, UnitStance::AGGRESSIVE),
+            engaged(Distance::new(3.0), 1.2, true, UnitStance::Aggressive),
             true
         ),
         (false, vec![(NotifyKind::OUT_OF_REACH, [0; 3])], true)
     );
     assert_eq!(
         start(
-            engaged(Distance::new(3.0), 1.2, true, UnitStance::AGGRESSIVE),
+            engaged(Distance::new(3.0), 1.2, true, UnitStance::Aggressive),
             false
         ),
         (false, vec![], true)
     );
     assert_eq!(
         start(
-            engaged(Distance::new(3.0), 1.2, true, UnitStance::STAND_GROUND),
+            engaged(Distance::new(3.0), 1.2, true, UnitStance::StandGround),
             false
         ),
         (true, vec![], false)
@@ -2246,14 +2241,14 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
     // stance 1: the target 3 from the centre stays within 1 + 5, 7 from it does not
     assert_eq!(
         start(
-            engaged(Distance::new(3.0), 1.2, true, UnitStance::DEFENSIVE),
+            engaged(Distance::new(3.0), 1.2, true, UnitStance::Defensive),
             true
         ),
         (false, vec![(NotifyKind::OUT_OF_REACH, [0; 3])], true)
     );
     let far = Engagement {
         state_position: Point::new(3.0, 10.0),
-        ..engaged(Distance::new(3.0), 1.2, true, UnitStance::DEFENSIVE)
+        ..engaged(Distance::new(3.0), 1.2, true, UnitStance::Defensive)
     };
     assert_eq!(
         start(far, true),
@@ -2261,7 +2256,7 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
     );
     // a target out of sight of a unit that cannot follow it fails
     let mut mover = soldier_mover(1.2);
-    let e = engaged(Distance::new(3.0), 1.2, false, UnitStance::STAND_GROUND);
+    let e = engaged(Distance::new(3.0), 1.2, false, UnitStance::StandGround);
     let world = world_with(7, PlayerId::new(2), class::CLASS_6, e.target_position);
     let c = own_start(
         &world,
@@ -2281,7 +2276,7 @@ fn the_start_of_unit_that_may_move_turns_to_state_4_whatever_ready_to_attack_fou
 fn the_start_faces_the_target_but_for_masters_1704_and_1706() {
     let north = Engagement {
         target_position: Position::new(10.0, 10.5, 0.0),
-        ..engaged(Distance::new(0.5), 0.0, false, UnitStance::STAND_GROUND)
+        ..engaged(Distance::new(0.5), 0.0, false, UnitStance::StandGround)
     };
     let world = world_with(7, PlayerId::new(2), class::CLASS_6, north.target_position);
     let angle = |master| {
@@ -2331,7 +2326,7 @@ fn gate_reach_is_to_its_nearest_part() {
     let world = gated();
     let e = Engagement {
         target_class: class::GATE,
-        ..engaged(Distance::new(3.0), 0.0, false, UnitStance::STAND_GROUND)
+        ..engaged(Distance::new(3.0), 0.0, false, UnitStance::StandGround)
     };
     let mut walker = soldier_mover(0.0);
     let c = own_start_among(
@@ -2528,7 +2523,7 @@ fn ready_to_attack_leash_fails_target_too_far_from_the_unit_ai_point() {
             0.8,
             victim,
         );
-        (rig.r.stance, rig.r.state_position) = (UnitStance::DEFENSIVE, centre);
+        (rig.r.stance, rig.r.state_position) = (UnitStance::Defensive, centre);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
             .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, false))
@@ -2943,7 +2938,7 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
     assert_eq!(
         start(Distance::new(0.1)),
         (
-            UpdateCode::UNDER_WAY,
+            UpdateCode::UnderWay,
             Some((MoveTo::Moving, MoveWaitState::AskedAgain)),
             Some(SpriteId::named(301)),
             Speed::new(1.0),
@@ -2954,7 +2949,7 @@ fn an_attack_move_to_starts_running_or_arrives_in_range() {
     assert_eq!(
         (code, move_to, shown, anim),
         (
-            UpdateCode::UNDER_WAY,
+            UpdateCode::UnderWay,
             Some((MoveTo::Arrived, MoveWaitState::AskedAgain)),
             None,
             Speed::new(1.0)
@@ -3187,7 +3182,7 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
             posted
         ),
         (
-            Ok(UpdateCode::UNDER_WAY),
+            Ok(UpdateCode::UnderWay),
             Some(MoveTo::Moving),
             AttackState::Move { move_to: None },
             vec![]
@@ -3207,7 +3202,7 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
     assert_eq!(
         (code, a.state.bare(), stopped),
         (
-            Ok(UpdateCode::UNDER_WAY),
+            Ok(UpdateCode::UnderWay),
             AttackState::GotoSeen { move_to: None },
             true
         )
@@ -3216,7 +3211,7 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
     assert_eq!(
         (code, a.state.bare()),
         (
-            Ok(UpdateCode::UNDER_WAY),
+            Ok(UpdateCode::UnderWay),
             AttackState::GotoSeen { move_to: None }
         )
     );
@@ -3224,7 +3219,7 @@ fn an_attack_walk_walks_waits_arrives_or_fails() {
     assert_eq!(
         (code, a.state.bare(), posted),
         (
-            Ok(UpdateCode::FAILED),
+            Ok(UpdateCode::Failed),
             AttackState::Failed,
             vec![(NotifyKind::ACTION_FAILED, [600, 0, 0])]
         )
@@ -3269,7 +3264,7 @@ fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     assert_eq!(
         gone(MoveTo::Moving, Voice::Loud),
         (
-            UpdateCode::UNDER_WAY,
+            UpdateCode::UnderWay,
             AttackState::GotoSeen { move_to: None },
             Some(MoveTo::Moving),
             vec![]
@@ -3278,7 +3273,7 @@ fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     assert_eq!(
         gone(MoveTo::Arrived, Voice::Loud),
         (
-            UpdateCode::DONE,
+            UpdateCode::Done,
             AttackState::Done,
             None,
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])]
@@ -3286,12 +3281,12 @@ fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     );
     assert_eq!(
         gone(MoveTo::Arrived, Voice::Quiet),
-        (UpdateCode::DONE, AttackState::Done, None, vec![])
+        (UpdateCode::Done, AttackState::Done, None, vec![])
     );
     assert_eq!(
         gone(MoveTo::Failed, Voice::Loud),
         (
-            UpdateCode::FAILED,
+            UpdateCode::Failed,
             AttackState::Failed,
             None,
             vec![(NotifyKind::ACTION_FAILED, [600, 0, 0])]
@@ -3299,7 +3294,7 @@ fn an_attack_without_target_walks_to_where_it_saw_it_and_ends_there() {
     );
     assert_eq!(
         gone(MoveTo::Failed, Voice::Quiet),
-        (UpdateCode::FAILED, AttackState::Failed, None, vec![])
+        (UpdateCode::Failed, AttackState::Failed, None, vec![])
     );
 }
 
@@ -3346,7 +3341,7 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
     let code = rig.run(20, |c, u, _, f, r| a.target_died(c, u, f, r, &roles()));
     assert_eq!(
         (code, rig.workers(7, PlayerId::new(0)), a.state),
-        (Ok(UpdateCode::CODE_5), Some(0), AttackState::Done)
+        (Ok(UpdateCode::Code5), Some(0), AttackState::Done)
     );
     let (mut rig, mut a) = on_target(dead(0), true, (AttackState::Ready, Voice::Quiet));
     rig.f.own.class = class::VILLAGER;
@@ -3359,7 +3354,7 @@ fn an_attack_whose_target_died_lets_it_go_and_ends() {
             a.state
         ),
         (
-            Ok(UpdateCode::CODE_5),
+            Ok(UpdateCode::Code5),
             -1,
             Position::from([NONE; 3]),
             AttackState::Done
@@ -3410,7 +3405,7 @@ fn an_attack_on_moved_target_follows_waits_or_fails() {
     assert_eq!(
         (code, a.state.bare(), a.seen),
         (
-            Some(UpdateCode::UNDER_WAY),
+            Some(UpdateCode::UnderWay),
             AttackState::Move { move_to: None },
             Position::new(13.0, 10.0, 0.0)
         )
@@ -3427,13 +3422,13 @@ fn an_attack_on_moved_target_follows_waits_or_fails() {
     let (code, a) = run(AttackState::Move { move_to: None }, false, PlayerId::new(0));
     assert_eq!(
         (code, a.state.bare()),
-        (Some(UpdateCode::FAILED), AttackState::Failed)
+        (Some(UpdateCode::Failed), AttackState::Failed)
     );
     let (code, a) = run(AttackState::Move { move_to: None }, false, PlayerId::new(1));
     assert_eq!(
         (code, a.state.bare()),
         (
-            Some(UpdateCode::UNDER_WAY),
+            Some(UpdateCode::UnderWay),
             AttackState::GotoSeen { move_to: None }
         )
     );
@@ -3475,7 +3470,7 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
     assert_eq!(
         (code, a.state, posted),
         (
-            Some(UpdateCode::DONE),
+            Some(UpdateCode::Done),
             AttackState::Done,
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 7, 0])]
         )
@@ -3484,18 +3479,18 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
     assert_eq!(
         (code, a.state, posted),
         (
-            Some(UpdateCode::CODE_4),
+            Some(UpdateCode::Code4),
             AttackState::Done,
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 7, 0])]
         )
     );
     let ((code, _), _) = run(|rig| (rig.f.victim.inside, rig.r.queue_empty) = (true, false));
-    assert_eq!(code, Some(UpdateCode::CODE_4));
+    assert_eq!(code, Some(UpdateCode::Code4));
     let ((code, posted), a) = run(|rig| rig.r.armed = false);
     assert_eq!(
         (code, a.state, posted),
         (
-            Some(UpdateCode::DONE),
+            Some(UpdateCode::Done),
             AttackState::Done,
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 7, 0])]
         )
@@ -3525,7 +3520,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, true));
     assert_eq!(
         (code, a.state.bare()),
-        (Ok(UpdateCode::UNDER_WAY), AttackState::Swing)
+        (Ok(UpdateCode::UnderWay), AttackState::Swing)
     );
     let (mut rig, mut a) = on_target(
         (
@@ -3540,7 +3535,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     let code = rig.run(20, |c, u, _, f, r| a.ready_step(c, u, f, r, false));
     assert_eq!(
         (code, a.state.bare()),
-        (Ok(UpdateCode::CODE_5), AttackState::Done)
+        (Ok(UpdateCode::Code5), AttackState::Done)
     );
     let (mut rig, mut a) = on_target(
         (
@@ -3557,7 +3552,7 @@ fn ready_attack_swings_ends_on_dead_tree_or_follows() {
     assert_eq!(
         (code, a.state.bare()),
         (
-            Ok(UpdateCode::UNDER_WAY),
+            Ok(UpdateCode::UnderWay),
             AttackState::Move { move_to: None }
         )
     );
@@ -3585,7 +3580,7 @@ fn killing_attack_ends_once_its_swing_looped() {
             a.state
         ),
         (
-            Ok(UpdateCode::CODE_2),
+            Ok(UpdateCode::Code2),
             Some(0),
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])],
             -1,
@@ -3605,7 +3600,7 @@ fn killing_attack_ends_once_its_swing_looped() {
             a.state,
             ObjectId::field(a.target.map(AttackTargetId::id))
         ),
-        (Ok(UpdateCode::UNDER_WAY), AttackState::Killed, 7)
+        (Ok(UpdateCode::UnderWay), AttackState::Killed, 7)
     );
 }
 
@@ -3663,7 +3658,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         assert_eq!(
             (waiting.0, waiting.1, waiting.3, waiting.4, waiting.5),
             (
-                Ok(UpdateCode::CODE_5),
+                Ok(UpdateCode::Code5),
                 waits.clone(),
                 Some(0),
                 AttackState::GotoSeen { move_to: None },
@@ -3672,11 +3667,11 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         );
     }
     let posted_1fa = vec![(NotifyKind::ACTION_COMPLETED, [600, 0, 0])];
-    let stance_1 = lost(order, |rig| rig.r.stance = UnitStance::DEFENSIVE);
+    let stance_1 = lost(order, |rig| rig.r.stance = UnitStance::Defensive);
     assert_eq!(
         (stance_1.0, stance_1.1, stance_1.2, stance_1.3, stance_1.4),
         (
-            Ok(UpdateCode::CODE_5),
+            Ok(UpdateCode::Code5),
             posted_1fa,
             true,
             Some(0),
@@ -3684,7 +3679,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         )
     );
     let villager = lost(AiOrder::Absent, |rig| rig.f.own.class = class::VILLAGER);
-    assert_eq!((villager.0, villager.2), (Ok(UpdateCode::CODE_5), false));
+    assert_eq!((villager.0, villager.2), (Ok(UpdateCode::Code5), false));
     let posted_1fb = vec![(NotifyKind::ACTION_INVALIDATED, [600, 0, 0x202])];
     assert_eq!(lost(AiOrder::Idle, |_| {}).1, posted_1fb);
     assert_eq!(
@@ -3694,7 +3689,7 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
     let queued = lost(order, |rig| rig.r.queue_empty = false);
     assert_eq!(
         (queued.0, queued.1, queued.2),
-        (Ok(UpdateCode::CODE_5), vec![], true)
+        (Ok(UpdateCode::Code5), vec![], true)
     );
     // a villager's unit AI keeps Gaia's target
     let gaia = |rig: &mut Rig| {

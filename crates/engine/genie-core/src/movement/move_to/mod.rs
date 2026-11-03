@@ -108,7 +108,7 @@ impl MoveWait {
         if !matches!(self.state, MoveWaitState::Never) || !waits {
             return MoveTo::Failed;
         }
-        self.delay = if stance.below(UnitStance::STAND_GROUND) {
+        self.delay = if stance.below(UnitStance::StandGround) {
             Seconds::new(1.0)
         } else {
             Seconds::new(2.0)
@@ -603,7 +603,7 @@ mod tests {
         };
         let gives_up = GiveUp {
             waits: true,
-            stance: UnitStance::AGGRESSIVE,
+            stance: UnitStance::Aggressive,
         };
         let mut ai = None;
         let mut update = |m: &mut MoveToAction| {
@@ -618,12 +618,12 @@ mod tests {
                 &mut inbox,
             )
         };
-        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
         assert_eq!(
             (m.state, m.wait.state),
             (MoveTo::Moving, MoveWaitState::AskedAgain)
         );
-        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
         assert_eq!(m.state, MoveTo::Moving);
         // the walk is a tenth of a second: the wait of 0.15 asks again on its second update
         m.state = MoveTo::Waiting;
@@ -632,20 +632,20 @@ mod tests {
             timer: Seconds::ZERO,
             delay: Seconds::new(0.15),
         };
-        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
         assert_eq!(
             (m.state, m.wait.timer),
             (MoveTo::Waiting, Seconds::new(0.1))
         );
-        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
         assert_eq!((m.state, m.wait.timer), (MoveTo::Start, Seconds::ZERO));
         m.wait.timer = Seconds::new(f32::NAN);
         m.state = MoveTo::Waiting;
-        assert_eq!(update(&mut m), Ok(UpdateCode::UNDER_WAY));
+        assert_eq!(update(&mut m), Ok(UpdateCode::UnderWay));
         assert_eq!(m.state, MoveTo::Waiting);
         for (state, code) in [
-            (MoveTo::Arrived, UpdateCode::DONE),
-            (MoveTo::Failed, UpdateCode::FAILED),
+            (MoveTo::Arrived, UpdateCode::Done),
+            (MoveTo::Failed, UpdateCode::Failed),
         ] {
             m.state = state;
             assert_eq!(update(&mut m), Ok(code));
@@ -663,19 +663,19 @@ mod tests {
     #[test]
     fn human_villager_moveto_waits_once_before_it_fails() {
         let mut wait = MoveWait::default();
-        assert_eq!(wait.give_up(true, UnitStance::AGGRESSIVE), MoveTo::Waiting);
+        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Waiting);
         assert_eq!(
             (wait.state, wait.delay),
             (MoveWaitState::Waiting, Seconds::new(1.0))
         );
-        assert_eq!(wait.give_up(true, UnitStance::AGGRESSIVE), MoveTo::Failed);
+        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Failed);
         assert_eq!(
-            MoveWait::default().give_up(false, UnitStance::AGGRESSIVE),
+            MoveWait::default().give_up(false, UnitStance::Aggressive),
             MoveTo::Failed
         );
         let mut guarded = MoveWait::default();
         assert_eq!(
-            guarded.give_up(true, UnitStance::STAND_GROUND),
+            guarded.give_up(true, UnitStance::StandGround),
             MoveTo::Waiting
         );
         assert_eq!(guarded.delay, Seconds::new(2.0));
@@ -689,12 +689,12 @@ mod tests {
         let mut wait = MoveWait::default();
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::Never);
-        assert_eq!(wait.give_up(true, UnitStance::AGGRESSIVE), MoveTo::Waiting);
+        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Waiting);
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::AskedAgain);
         wait.ask_again();
         assert_eq!(wait.state, MoveWaitState::AskedAgain);
-        assert_eq!(wait.give_up(true, UnitStance::AGGRESSIVE), MoveTo::Failed);
+        assert_eq!(wait.give_up(true, UnitStance::Aggressive), MoveTo::Failed);
     }
 
     pub(super) fn sheep(x: f32, y: f32) -> Placed {
@@ -761,16 +761,16 @@ mod tests {
         let off = Position::new(30.6, 88.0, 0.0);
         assert_eq!(
             walk_on(TargetMoved::AsksAgain, false),
-            (Ok(UpdateCode::UNDER_WAY), MoveTo::Start, vec![], false, off)
+            (Ok(UpdateCode::UnderWay), MoveTo::Start, vec![], false, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Ignores, false),
-            (Ok(UpdateCode::UNDER_WAY), MoveTo::Moving, vec![], true, off)
+            (Ok(UpdateCode::UnderWay), MoveTo::Moving, vec![], true, off)
         );
         assert_eq!(
             walk_on(TargetMoved::Follows, false),
             (
-                Ok(UpdateCode::UNDER_WAY),
+                Ok(UpdateCode::UnderWay),
                 MoveTo::Moving,
                 vec![],
                 true,
@@ -780,7 +780,7 @@ mod tests {
         assert_eq!(
             walk_on(TargetMoved::Follows, true),
             (
-                Ok(UpdateCode::UNDER_WAY),
+                Ok(UpdateCode::UnderWay),
                 MoveTo::Start,
                 vec![NotifyKind::TARGET_MOVED],
                 true,
@@ -825,12 +825,12 @@ mod tests {
         );
         assert_eq!(
             checked(Voice::Quiet, 10028, Some(ObjectState::Removed)),
-            (Some(UpdateCode::CODE_5), -1, vec![])
+            (Some(UpdateCode::Code5), -1, vec![])
         );
         let invalidated = (NotifyKind::ACTION_INVALIDATED, [0x262, -1, 0]);
         assert_eq!(
             checked(Voice::Loud, 10028, Some(ObjectState::Removed)),
-            (Some(UpdateCode::CODE_4), -1, vec![invalidated])
+            (Some(UpdateCode::Code4), -1, vec![invalidated])
         );
         // through the sub-action's update, before its state's case
         let mut rig = WalkRig::on_the_path();
@@ -851,7 +851,7 @@ mod tests {
         );
         assert_eq!(
             (code, ObjectId::field(m.target), m.state),
-            (Ok(UpdateCode::CODE_5), -1, MoveTo::Moving)
+            (Ok(UpdateCode::Code5), -1, MoveTo::Moving)
         );
         let mut loud = MoveToAction {
             target: Some(object_id(10028)),
@@ -901,23 +901,23 @@ mod tests {
         };
         assert_eq!(
             update(Voice::Quiet, MoveTo::Arrived),
-            (UpdateCode::DONE, vec![])
+            (UpdateCode::Done, vec![])
         );
         assert_eq!(
             update(Voice::Quiet, MoveTo::Failed),
-            (UpdateCode::FAILED, vec![])
+            (UpdateCode::Failed, vec![])
         );
         assert_eq!(
             update(Voice::Loud, MoveTo::Arrived),
             (
-                UpdateCode::DONE,
+                UpdateCode::Done,
                 vec![(NotifyKind::ACTION_COMPLETED, [0x262, 0, 0])]
             )
         );
         assert_eq!(
             update(Voice::Loud, MoveTo::Failed),
             (
-                UpdateCode::FAILED,
+                UpdateCode::Failed,
                 vec![(NotifyKind::ACTION_FAILED, [0x262, 0, 0])]
             )
         );

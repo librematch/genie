@@ -369,8 +369,8 @@ impl PathData {
     /// A new level (`FUN_140f8f670`) with a new path (`FUN_14152eea0`, flags 6, made `now`).
     pub(crate) const fn new(now: WorldTime) -> Self {
         Self {
-            level: WaypointLevel::WALKED,
-            linked_kind: LinkedPathKind::NONE,
+            level: WaypointLevel::Walked,
+            linked_kind: LinkedPathKind::None,
             points: Vec::new(),
             has_path: true,
             path_flags: PathFlags::NEW,
@@ -394,8 +394,8 @@ impl PathData {
     #[must_use]
     pub const fn without_path() -> Self {
         Self {
-            level: WaypointLevel::WALKED,
-            linked_kind: LinkedPathKind::NONE,
+            level: WaypointLevel::Walked,
+            linked_kind: LinkedPathKind::None,
             points: Vec::new(),
             has_path: false,
             path_flags: PathFlags::NONE,

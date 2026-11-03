@@ -220,7 +220,7 @@ fn the_trickles_give_sixtieth_of_their_rate_each_second() {
         [166, 167, 168, 169, 49].map(|k| p.attributes[k]),
         amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
-    t.players[1].game_status = GameStatus::LOST;
+    t.players[1].game_status = GameStatus::Lost;
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(t.players[1].attributes[3], Amount::new(1.0));
 }
@@ -283,7 +283,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(10.0),
-        ResourceStat::GATHERED,
+        ResourceStat::Gathered,
         true,
     )
     .unwrap();
@@ -295,7 +295,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         PlayerId::new(1),
         attribute::FOOD,
         Amount::new(-20.0),
-        ResourceStat::GATHERED,
+        ResourceStat::Gathered,
         true,
     )
     .unwrap();
@@ -310,7 +310,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         PlayerId::new(1),
         attribute::WOOD,
         Amount::new(4.0),
-        ResourceStat::GATHERED,
+        ResourceStat::Gathered,
         true,
     )
     .unwrap();
@@ -412,7 +412,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     t.reindex();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::Lost);
     assert_eq!(t.players[1].attributes[45], Amount::ZERO);
     // one that a villager keeps plays on
     let mut t = world();
@@ -426,7 +426,7 @@ fn player_without_an_object_that_keeps_it_loses() {
     t.reindex();
     t.players[1].attributes[45] = Amount::new(1.0);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::PLAYING);
+    assert_eq!(t.players[1].game_status, GameStatus::Playing);
     assert_eq!(t.players[1].attributes[45], Amount::new(1.0));
 }
 
@@ -523,13 +523,13 @@ fn sudden_death_and_regicide_end_player_their_ways() {
     t.players[1].tracker.add(object_id(5), tc_key);
     t.update_world_player(PlayerId::new(1)).unwrap();
     assert!(t.players[1].sudden_death_eliminable);
-    assert_eq!(t.players[1].game_status, GameStatus::PLAYING);
+    assert_eq!(t.players[1].game_status, GameStatus::Playing);
     assert_eq!(t.first_town_centre(PlayerId::new(1)), Some(object_id(5)));
     // the town centre falls (state 3): the villager no longer keeps the player
     t.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Dying;
     assert_eq!(t.first_town_centre(PlayerId::new(1)), None);
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::Lost);
     // regicide (sub-mode bit 2): no king, a villager notwithstanding
     let mut t = world();
     t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
@@ -537,7 +537,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
     t.players[1].objects = vec![object(1, ids::VILLAGER_MALE, ObjectState::Alive)].into();
     t.reindex();
     t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].game_status, GameStatus::LOST);
+    assert_eq!(t.players[1].game_status, GameStatus::Lost);
     let mut t2 = world();
     t2.settings.game_mode = GameMode::of_data(1);
     t2.players[1].tracker.add(
@@ -550,7 +550,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
         },
     );
     t2.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t2.players[1].game_status, GameStatus::PLAYING);
+    assert_eq!(t2.players[1].game_status, GameStatus::Playing);
 }
 
 /// `FUN_141625a20`'s count: masters of type 70 and up, had, not disabled, trained at the

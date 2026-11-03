@@ -84,9 +84,9 @@ impl World {
         {
             let attribute = |i: usize| me.attributes.get(i).copied().unwrap_or(Amount::ZERO);
             let allies = |q: PlayerId| {
-                me.relations.get(q) == Some(&Relation::ALLY)
+                me.relations.get(q) == Some(&Relation::Ally)
                     && self.players.player(q).ok().and_then(|o| o.relations.get(p))
-                        == Some(&Relation::ALLY)
+                        == Some(&Relation::Ally)
             };
             let mine = masks.checked_mut(p)?;
             if me.allied_vision {
@@ -236,7 +236,7 @@ mod tests {
         let mut t = teams();
         t.players[3]
             .relations
-            .set(PlayerId::new(1), Relation::ENEMY);
+            .set(PlayerId::new(1), Relation::Enemy);
         t.players[2].allied_vision = false;
         t.rebuild_vision().unwrap();
         assert_eq!(

@@ -96,9 +96,9 @@ impl World {
             )?;
         }
         let age = match t {
-            101 => Some(EventKind::FEUDAL_AGE),
-            102 => Some(EventKind::CASTLE_AGE),
-            103 => Some(EventKind::IMPERIAL_AGE),
+            101 => Some(EventKind::FeudalAge),
+            102 => Some(EventKind::CastleAge),
+            103 => Some(EventKind::ImperialAge),
             _ => None,
         };
         if let Some(kind) = age {
@@ -376,13 +376,13 @@ impl World {
                 continue;
             }
             *adj = match mode {
-                ChangeMode::SCALE => {
+                ChangeMode::Scale => {
                     let half = if amount < 1.0 { -0.5 } else { 0.5 };
                     let delta = (amount - 1.0) * cost.amount.as_f32() + half;
                     adj.plus(cvttss2si(delta) as i16)
                 }
                 // CVTTSS2SI's 32 bits, the low word added (0x1413d11a6, 0x1413d11be)
-                ChangeMode::SET => {
+                ChangeMode::Set => {
                     CostAmount::of_data((cvttss2si(amount) as i16).wrapping_sub(cost.amount.get()))
                 }
                 _ => adj.plus(cvttss2si(amount) as i16),
@@ -484,7 +484,7 @@ impl World {
         {
             // game mode 11 never enables it; any other asks a settings flag (their `+0x18`'s
             // `+0x7c`, bit 1, FUN_141324b60), which is not held
-            if self.settings.game_mode == GameMode::SUDDEN_DEATH {
+            if self.settings.game_mode == GameMode::SuddenDeath {
                 return Ok(());
             }
             return Err(GenieError::unsupported(

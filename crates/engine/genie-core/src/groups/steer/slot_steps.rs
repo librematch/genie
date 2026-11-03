@@ -421,10 +421,10 @@ impl World {
             .members
             .checked_mut(index)?
             .specific_move;
-        *own = if reason == MoveReason::NONE {
+        *own = if reason == MoveReason::None {
             SpecificMove {
                 path_id: MovePath::NONE,
-                reason: MoveReason::NONE,
+                reason: MoveReason::None,
                 ..SpecificMove::default()
             }
         } else {

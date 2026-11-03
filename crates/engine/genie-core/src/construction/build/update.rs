@@ -390,7 +390,7 @@ impl BuildAction {
                 .parts
                 .unit_ai
                 .get(builder.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
         })
     }
 

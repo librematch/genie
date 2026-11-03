@@ -70,7 +70,7 @@ impl World {
             start_work_due: false,
             mode_680: Mode680::ZERO,
             spawned_relics: RelicCount::ZERO,
-            game_state: PlayState::PLAYING,
+            game_state: PlayState::Playing,
             victory_conquest: false,
             zones: Zones::default(),
             recycling: Recycling::default(),

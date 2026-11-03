@@ -36,7 +36,7 @@ pub(crate) fn update_sub_actions(
     how: ListUpdate,
 ) -> Result<UpdateCode, GenieError> {
     let Some(move_to) = list else {
-        return Ok(UpdateCode::DONE);
+        return Ok(UpdateCode::Done);
     };
     let held = c.w.object_state(move_to.target);
     let (mut walk, beside) = c.w.walk_beside(c.pace()?, &mut unit.place, me);

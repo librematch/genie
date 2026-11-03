@@ -110,7 +110,7 @@ impl ActiveSprite {
             last_frame: graphic.first_frame(),
             changed: false,
             looped: false,
-            animate: AnimateState::PLAYING,
+            animate: AnimateState::Playing,
             speed: Speed::ZERO,
         };
         if f64::from(s.interval.get()) < 0.001 {
@@ -163,7 +163,7 @@ impl ActiveSprite {
             last_frame: frame,
             changed: false,
             looped: false,
-            animate: AnimateState::STOPPED,
+            animate: AnimateState::Stopped,
             speed: Speed::ZERO,
         }
     }
@@ -224,7 +224,7 @@ impl ActiveSprite {
     /// or stops on it when played once.
     pub fn update(&mut self, dt: Seconds, speed: Speed, sprite_tuning: SpriteTuning) {
         // a static sprite's update (`FUN_1413b5330`) does nothing
-        if !self.graphic.animated() || self.animate == AnimateState::STOPPED {
+        if !self.graphic.animated() || self.animate == AnimateState::Stopped {
             return;
         }
         self.changed = false;
@@ -274,9 +274,9 @@ impl ActiveSprite {
             let mut f;
             // COMISS/JBE at 0x1413b521f: an unordered delay loops at once
             if at_most_or_unordered(g.replay_delay.get(), 0.0)
-                || self.animate == AnimateState::DELAYED
+                || self.animate == AnimateState::Delayed
             {
-                self.animate = AnimateState::PLAYING;
+                self.animate = AnimateState::Playing;
                 f = self.frame % g.frames;
                 if f < Frame::ZERO {
                     f = f + g.frames;
@@ -288,7 +288,7 @@ impl ActiveSprite {
                 }
                 stop = false;
                 self.looped = false;
-                self.animate = AnimateState::DELAYED;
+                self.animate = AnimateState::Delayed;
                 self.interval = Seconds::new(
                     g.replay_delay.get() - (at - g.frames).as_f32() * g.frame_duration.get(),
                 );
@@ -305,7 +305,7 @@ impl ActiveSprite {
             }
         }
         if stop && g.flags.contains(SpriteFlags::ONCE) {
-            self.animate = AnimateState::STOPPED;
+            self.animate = AnimateState::Stopped;
             self.frame = if forward {
                 last.max(Frame::ZERO)
             } else {

@@ -1060,7 +1060,7 @@ fn transport_takes_its_base_alone() {
     let m = t.state.move_to().copied().unwrap();
     assert_eq!(
         (t.state.bare(), t.mode, m.state, m.voice),
-        (sailing, TransportMode::NEW, MoveTo::Moving, Voice::Quiet)
+        (sailing, TransportMode::New, MoveTo::Moving, Voice::Quiet)
     );
     assert!(!t.retarget);
     assert_eq!(

@@ -147,8 +147,8 @@ fn gather_point_takes_its_saved_state() {
         gather_point(&barracks).map(|g| g.map(|g| g.state))
     };
     assert_eq!(with(0), Ok(None));
-    assert_eq!(with(1), Ok(Some(GatherPointState::POINT)));
-    assert_eq!(with(0xff), Ok(Some(GatherPointState::KEPT)));
+    assert_eq!(with(1), Ok(Some(GatherPointState::Point)));
+    assert_eq!(with(0xff), Ok(Some(GatherPointState::Kept)));
     assert!(with(0x100).is_err());
     assert_eq!(gather_point(&combat_object(5, 83)), Ok(None));
 }

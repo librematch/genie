@@ -394,7 +394,7 @@ impl WorldPicker<'_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(id))
-            .map_or(CaptureKind::NONE, |s| s.capture);
+            .map_or(CaptureKind::None, |s| s.capture);
         let target = Target {
             owner,
             class: m.class,
@@ -475,7 +475,7 @@ impl AttackPicker for WorldPicker<'_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(id))
-            .map_or(CaptureKind::NONE, |s| s.capture);
+            .map_or(CaptureKind::None, |s| s.capture);
         let a = self.attacker;
         Ok(Some(Thing {
             owner,

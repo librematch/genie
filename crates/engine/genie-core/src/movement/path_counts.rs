@@ -7,34 +7,64 @@ use crate::pathing::DelayCount;
 /// waypoint reached, 2 has the parent ask again (a looping parent moves on first), 3 has it ask
 /// again; any other value hands nothing over.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct LinkedPathKind(i32);
+pub enum LinkedPathKind {
+    /// No link (0).
+    #[default]
+    None,
+    /// The parent's waypoint is reached (1).
+    ReachesWaypoint,
+    /// The parent asks again, a looping one moving on first (2).
+    MovesOn,
+    /// The parent asks again (3).
+    AsksAgain,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`LinkedPathKind`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(i32);
 
 impl LinkedPathKind {
-    /// No link (0).
-    pub const NONE: Self = Self(0);
-    /// The parent's waypoint is reached (1).
-    pub const REACHES_WAYPOINT: Self = Self(1);
-    /// The parent asks again, a looping one moving on first (2).
-    pub const MOVES_ON: Self = Self(2);
-    /// The parent asks again (3).
-    pub const ASKS_AGAIN: Self = Self(3);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i32) -> Self {
+        match value {
+            0 => Self::None,
+            1 => Self::ReachesWaypoint,
+            2 => Self::MovesOn,
+            3 => Self::AsksAgain,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::ReachesWaypoint => 1,
+            Self::MovesOn => 2,
+            Self::AsksAgain => 3,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
 
     /// The link of the save's int `value`.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The int.
     #[must_use]
     pub const fn get(self) -> i32 {
-        self.0
+        self.raw()
     }
 }
 
 impl genie_diff::Diff for LinkedPathKind {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+        self.raw().diff(&other.raw(), d);
     }
 }
 
@@ -175,6 +205,7 @@ impl StepPlans {
 
 #[cfg(test)]
 mod tests {
+    use crate::movement::LinkedPathKind;
     use crate::movement::{PlanTries, StepPlans, WaitDelays};
 
     /// A level's tries run out at 0; the delays wrap as a byte.
@@ -190,5 +221,17 @@ mod tests {
     fn step_plans_count_up() {
         assert_eq!(StepPlans::ZERO.plus_one().plus_one(), StepPlans::new(2));
         assert!(StepPlans::new(2) < StepPlans::new(3));
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_linked_path_kind_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3, 4] {
+            assert_eq!(LinkedPathKind::of_raw(value).raw(), value);
+        }
+        assert!(matches!(
+            LinkedPathKind::of_raw(4),
+            LinkedPathKind::Other(_)
+        ));
     }
 }

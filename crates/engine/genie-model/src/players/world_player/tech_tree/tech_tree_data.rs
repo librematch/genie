@@ -112,15 +112,15 @@ impl TechTree {
             };
             if let Some(b) = buildings.iter().find(|b| b.id == q.building) {
                 let unit = b.units.iter().find(|u| u.id == q.unit);
-                let age = unit.map_or(Age::DEFAULT, |u| u.age);
+                let age = unit.map_or(Age::Default, |u| u.age);
                 if q.settings.last_age().before() < age {
                     return Found::OutOfAges;
                 }
                 let [feudal, castle, imperial] = q.ages_out;
                 let out = unit.is_some_and(|u| {
-                    (u.age == Age::FEUDAL && feudal)
-                        || (u.age == Age::CASTLE && (feudal || castle))
-                        || (u.age == Age::IMPERIAL && (feudal || castle || imperial))
+                    (u.age == Age::Feudal && feudal)
+                        || (u.age == Age::Castle && (feudal || castle))
+                        || (u.age == Age::Imperial && (feudal || castle || imperial))
                 });
                 if out {
                     return Found::OutOfAges;

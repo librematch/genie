@@ -93,7 +93,7 @@ impl Mover {
                 "a path request in game type 12 (its tile escape)",
             ));
         }
-        if w.level == WaypointLevel::TOP && TILE_PATHER {
+        if w.level == WaypointLevel::Top && TILE_PATHER {
             self.first_plan(me, world, plan, w, np, by_id)?;
         }
         let tail = match self.short_tail(me, world, plan, w, np, by_id)? {
@@ -104,7 +104,7 @@ impl Mover {
             return Ok(Some(step));
         }
         if (!np.found || too_short(&np.path, movement_tuning))
-            && w.level == WaypointLevel::TOP
+            && w.level == WaypointLevel::Top
             && TILE_PATHER
         {
             self.tile_again(me, world, plan, w, np, by_id)?;
@@ -210,7 +210,7 @@ impl Mover {
         }
         let level = self.paths.walked_mut()?;
         if r == Found::Nearest
-            && (level.level != WaypointLevel::TOP || level.flags.contains(LevelFlags::NEAREST))
+            && (level.level != WaypointLevel::Top || level.flags.contains(LevelFlags::NEAREST))
         {
             return Ok(());
         }
@@ -221,7 +221,7 @@ impl Mover {
             np.path.points.clear();
         }
         np.found = !farther;
-        if !target_moves && !farther && level.level == WaypointLevel::TOP && r == Found::Nearest {
+        if !target_moves && !farther && level.level == WaypointLevel::Top && r == Found::Nearest {
             level.flags |= LevelFlags::NEAREST;
         }
         Ok(())

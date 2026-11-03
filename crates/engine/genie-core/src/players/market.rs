@@ -208,11 +208,11 @@ impl World {
                 p,
                 self.model.slots.attribute.gold,
                 Amount::new(gold),
-                ResourceStat::GATHERED,
+                ResourceStat::Gathered,
                 true,
             )?;
             let lot = volume.negated_f32();
-            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
+            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::None, true)?;
         }
         Ok(())
     }
@@ -258,7 +258,7 @@ impl World {
                 p,
                 self.model.slots.attribute.gold,
                 Amount::new(-paid),
-                ResourceStat::NONE,
+                ResourceStat::None,
                 true,
             )?;
             self.market.trade(
@@ -267,7 +267,7 @@ impl World {
                 &self.model.roles,
                 &self.model.tuning.market,
             );
-            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
+            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::None, true)?;
         }
         Ok(())
     }

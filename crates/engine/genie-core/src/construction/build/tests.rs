@@ -992,14 +992,14 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             complete(ids::CASTLE, &castle(), main),
             (
                 vec![(134, 1.0), (173, 1.0), (184, 650.0)],
-                vec![EventKind::CASTLE_BUILT]
+                vec![EventKind::CastleBuilt]
             )
         );
         assert_eq!(
             complete(ids::WONDER, &wonder(), main),
             (
                 vec![(42, 1.0), (174, 1.0), (184, 2000.0)],
-                vec![EventKind::WONDER_BUILT]
+                vec![EventKind::WonderBuilt]
             )
         );
     }

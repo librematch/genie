@@ -208,9 +208,9 @@ pub(super) fn take_building(
         let event = {
             let held = roles.of_master(t.master_id);
             if held.contains(MasterRoles::CASTLE) {
-                Some(EventKind::CASTLE_DESTROYED)
+                Some(EventKind::CastleDestroyed)
             } else if held.contains(MasterRoles::WONDER) {
-                Some(EventKind::WONDER_DESTROYED)
+                Some(EventKind::WonderDestroyed)
             } else {
                 None
             }

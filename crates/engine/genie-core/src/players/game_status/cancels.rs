@@ -440,7 +440,7 @@ impl World {
         idx: ListIndex,
         index: UnitIndex,
     ) -> Result<(), GenieError> {
-        if self.settings.game_mode != GameMode::ONE_UNIT {
+        if self.settings.game_mode != GameMode::OneUnit {
             return Ok(());
         }
         let attribute =

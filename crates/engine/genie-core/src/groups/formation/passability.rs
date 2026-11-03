@@ -92,7 +92,7 @@ impl World {
         formation.number_transformed_slots = 0;
         let capacity = formation.slot_capacity() as i32;
         match formation.transform_kind {
-            TransformKind::BY_LINES => {
+            TransformKind::ByLines => {
                 for i in 0..formation.number_lines.max(0) {
                     if capacity <= formation.number_transformed_slots {
                         break;
@@ -121,7 +121,7 @@ impl World {
                             &rotation,
                             point,
                             k as i32,
-                            TransformKind::BY_LINES,
+                            TransformKind::ByLines,
                             world,
                             &self.model.tuning.group,
                         );
@@ -131,8 +131,8 @@ impl World {
                     }
                 }
             }
-            kind @ (TransformKind::TURNED | TransformKind::AT_TARGET | TransformKind::UNTURNED) => {
-                let point = if kind == TransformKind::AT_TARGET {
+            kind @ (TransformKind::Turned | TransformKind::AtTarget | TransformKind::Unturned) => {
+                let point = if kind == TransformKind::AtTarget {
                     g.current_target.original_position
                 } else {
                     position

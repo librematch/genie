@@ -141,16 +141,16 @@ pub(super) fn pass(
             return Ok(Pass::Done(true));
         }
         let linked = motion.paths.checked(0)?.linked_kind;
-        if linked == LinkedPathKind::REACHES_WAYPOINT || flags.contains(LevelFlags::MET_TARGET) {
+        if linked == LinkedPathKind::ReachesWaypoint || flags.contains(LevelFlags::MET_TARGET) {
             let _ = motion.paths.remove(0);
             return Ok(Pass::Reached);
         }
-        if linked == LinkedPathKind::MOVES_ON || linked == LinkedPathKind::ASKS_AGAIN {
+        if linked == LinkedPathKind::MovesOn || linked == LinkedPathKind::AsksAgain {
             let _ = motion.paths.remove(0);
             let patrols = lead.group.as_ref().is_some_and(LeadGroup::patrols);
             let parent = motion.paths.checked_mut(0)?;
             parent.state = PathState::WantsPath;
-            if linked == LinkedPathKind::MOVES_ON && parent.has_path {
+            if linked == LinkedPathKind::MovesOn && parent.has_path {
                 if parent.path_flags.contains(PathFlags::LOOPS) {
                     let w = parent.waypoint;
                     parent.waypoint = parent.looping_next(w);
@@ -227,13 +227,13 @@ pub(super) fn reached(
     }
     let level = motion.paths.checked_mut(0)?;
     if level.waypoint.within(level.points.len()) {
-        if level.level != WaypointLevel::WALKED {
+        if level.level != WaypointLevel::Walked {
             level.state = PathState::WantsPath;
         }
     } else if EPSILON <= beyond
         && (target.is_some()
             || group_tuning.close <= beyond
-            || level.level == WaypointLevel::WALKED)
+            || level.level == WaypointLevel::Walked)
         && EPSILON <= d
     {
         level.waypoint = level.waypoint.previous();

@@ -124,7 +124,7 @@ fn harmless(master: Master) -> bool {
         speed: Speed::new(0.8),
         scenario: false,
         firepower: Firepower::new(0.0),
-        capture: CaptureKind::NONE,
+        capture: CaptureKind::None,
     };
     let none = ObjectList::default();
     let foreign = Foreign {
@@ -146,7 +146,7 @@ fn harmless(master: Master) -> bool {
         unit: &me,
         actions: &Action::default(),
         attributes: &[],
-        relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
+        relations: &ByPlayer::new(vec![Relation::Ally, Relation::Ally, Relation::Ally]),
         ai_settings: AiSettings::default(),
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,
@@ -236,7 +236,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
         speed: Speed::new(1.0),
         scenario: false,
         firepower: Firepower::new(0.0),
-        capture: CaptureKind::NONE,
+        capture: CaptureKind::None,
     };
     let foreign = Foreign {
         before: &before,
@@ -257,7 +257,7 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
         unit: &me,
         actions: &Action::default(),
         attributes: &[],
-        relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
+        relations: &ByPlayer::new(vec![Relation::Ally, Relation::Ally, Relation::Ally]),
         ai_settings: AiSettings::default(),
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,
@@ -430,7 +430,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         speed: Speed::new(1.0),
         scenario: false,
         firepower: Firepower::new(0.0),
-        capture: CaptureKind::NONE,
+        capture: CaptureKind::None,
     };
     let none = ObjectList::default();
     let foreign = Foreign {
@@ -452,7 +452,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         unit: &me,
         actions: &Action::default(),
         attributes: &[],
-        relations: &ByPlayer::new(vec![Relation::ALLY, Relation::ALLY, Relation::ALLY]),
+        relations: &ByPlayer::new(vec![Relation::Ally, Relation::Ally, Relation::Ally]),
         ai_settings: AiSettings::default(),
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,

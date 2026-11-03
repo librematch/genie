@@ -150,7 +150,7 @@ impl Settings {
     #[must_use]
     pub fn carry_rule(&self) -> bool {
         self.villager_force_drop
-            && self.game_mode != GameMode::KING_OF_THE_HILL
+            && self.game_mode != GameMode::KingOfTheHill
             && !self.game_mode.standard()
     }
 
@@ -158,8 +158,8 @@ impl Settings {
     /// later age than the one before it is not in the tree ([`crate::players::world_player`]).
     #[must_use]
     pub fn last_age(&self) -> Age {
-        if self.ending_age == Age::DEFAULT {
-            Age::POST_IMPERIAL
+        if self.ending_age == Age::Default {
+            Age::PostImperial
         } else {
             self.ending_age
         }
@@ -177,7 +177,7 @@ impl Settings {
     /// bit 2: a player without a king (master 434) loses.
     #[must_use]
     pub fn regicide(&self) -> bool {
-        self.game_mode == GameMode::REGICIDE
+        self.game_mode == GameMode::Regicide
             || self.sub_game_mode_flag.contains(SubModeFlags::REGICIDE)
     }
 
@@ -186,7 +186,7 @@ impl Settings {
     /// villagers to work (`genie_core::orders::start_work`).
     #[must_use]
     pub fn empire_wars(&self) -> bool {
-        self.game_mode == GameMode::EMPIRE_WARS
+        self.game_mode == GameMode::EmpireWars
             || self.sub_game_mode_flag.contains(SubModeFlags::EMPIRE_WARS)
     }
 
@@ -194,7 +194,7 @@ impl Settings {
     /// Death (11) or the sub-mode's bit 1: a player who had a town centre loses without one.
     #[must_use]
     pub fn sudden_death(&self) -> bool {
-        self.game_mode == GameMode::SUDDEN_DEATH
+        self.game_mode == GameMode::SuddenDeath
             || self.sub_game_mode_flag.contains(SubModeFlags::SUDDEN_DEATH)
     }
 
@@ -288,7 +288,7 @@ mod tests {
             ending_age: Age::of_data(ending_age),
             ..Settings::default()
         };
-        assert_eq!(with(0).last_age(), Age::POST_IMPERIAL);
+        assert_eq!(with(0).last_age(), Age::PostImperial);
         for age in [1, 2, 4, 6, -1] {
             assert_eq!(with(age).last_age(), Age::of_data(age));
         }

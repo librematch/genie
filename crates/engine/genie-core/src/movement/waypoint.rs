@@ -85,8 +85,8 @@ impl Mover {
         let parent_is_level_1 = self
             .paths
             .get(1)
-            .is_some_and(|p| p.level == WaypointLevel::PLANNED && !p.points.is_empty());
-        if self.paths.walked()?.level == WaypointLevel::WALKED
+            .is_some_and(|p| p.level == WaypointLevel::Planned && !p.points.is_empty());
+        if self.paths.walked()?.level == WaypointLevel::Walked
             && parent_is_level_1
             && self.look_ahead(me, world, by_id)?
         {
@@ -126,7 +126,7 @@ impl Mover {
         }
         let level = self.paths.walked_mut()?;
         if level.waypoint.within(level.points.len()) {
-            if level.level != WaypointLevel::WALKED {
+            if level.level != WaypointLevel::Walked {
                 level.state = PathState::WantsPath;
             }
             return Ok(Next::Dispatch);
@@ -134,14 +134,14 @@ impl Mover {
         if EPSILON <= beyond.get()
             && (goal.target.is_some()
                 || movement_tuning.close <= beyond.get()
-                || level.level == WaypointLevel::WALKED)
+                || level.level == WaypointLevel::Walked)
         {
             if EPSILON <= back.get() {
                 level.waypoint = level.waypoint.previous();
                 level.state = PathState::WantsPath;
                 return Ok(Next::Dispatch);
             }
-            if level.level == WaypointLevel::TOP {
+            if level.level == WaypointLevel::Top {
                 return self.level_2_short(me, world, goal, by_id);
             }
         }
@@ -203,7 +203,7 @@ impl Mover {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
         let next = level.waypoint.next();
-        if level.level == WaypointLevel::WALKED || !next.within(level.points.len()) {
+        if level.level == WaypointLevel::Walked || !next.within(level.points.len()) {
             return Ok(());
         }
         let d = sub(at.vector(), *level.points.checked(next.get() as usize)?);
@@ -412,11 +412,11 @@ impl Mover {
             return Ok(Next::Done(Motion::Arrived));
         }
         match level.linked_kind {
-            LinkedPathKind::REACHES_WAYPOINT => {
+            LinkedPathKind::ReachesWaypoint => {
                 let _ = self.paths.remove(0);
                 self.paths.walked_mut()?.flags |= LevelFlags::REACHED;
             }
-            LinkedPathKind::MOVES_ON => {
+            LinkedPathKind::MovesOn => {
                 let _ = self.paths.remove(0);
                 let parent = self.paths.walked_mut()?;
                 parent.state = PathState::WantsPath;
@@ -425,7 +425,7 @@ impl Mover {
                     parent.waypoint = parent.looping_next(parent.waypoint);
                 }
             }
-            LinkedPathKind::ASKS_AGAIN => {
+            LinkedPathKind::AsksAgain => {
                 let _ = self.paths.remove(0);
                 self.paths.walked_mut()?.state = PathState::WantsPath;
             }

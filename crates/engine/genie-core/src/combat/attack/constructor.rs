@@ -321,7 +321,7 @@ impl Attack {
         let mut failed_first = false;
         let mut ready_end = false;
         if target_owner != PlayerId::GAIA && !visible {
-            if e.stance == UnitStance::AGGRESSIVE && Speed::ZERO < e.speed && e.can_move {
+            if e.stance == UnitStance::Aggressive && Speed::ZERO < e.speed && e.can_move {
                 self.state = AttackState::GotoSeen { move_to: None };
                 self.range = e.range;
                 self.walk_to_seen(
@@ -341,7 +341,7 @@ impl Attack {
             if self.voice.is_loud() {
                 posted.push((NotifyKind::OUT_OF_REACH, [0; 3]));
             }
-            if (e.stance == UnitStance::DEFENSIVE
+            if (e.stance == UnitStance::Defensive
                 && self.off_leash(e.target_position, e.state_position, attack_tuning))
                 || !movable
             {
@@ -500,8 +500,8 @@ pub fn engagement(
         range: master.combat_part().weapon_range,
         min_range: master.combat_part().min_range,
         can_move: ai
-            .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE),
-        stance: ai.map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+            .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::Defensive),
+        stance: ai.map_or(UnitStance::Aggressive, |ai| ai.stance),
         state_position: ai.map_or(Point::ORIGIN, |ai| ai.state_position),
         world_time,
         master: master.id,

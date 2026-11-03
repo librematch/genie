@@ -222,7 +222,7 @@ impl UnitAi {
         let captured_again = at.player == PlayerId::GAIA
             && t.owner == PlayerId::GAIA
             && MasterKind::COMBAT <= t.kind
-            && t.capture == CaptureKind::AGAIN;
+            && t.capture == CaptureKind::Again;
         let action = if captured_again {
             None
         } else {

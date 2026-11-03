@@ -131,7 +131,7 @@ impl UnitAi {
         // (restorePatrolInformation): "That's too far out, returning to patrol." (10); within
         // it the defend stance ends slot 73 (9), stand ground goes on to the retarget check
         if let Some(saved) = self.patrol_path.as_ref().filter(|_| leashed) {
-            let leash = if self.stance == UnitStance::DEFENSIVE {
+            let leash = if self.stance == UnitStance::Defensive {
                 Distance::new(unit_ai_tuning.defend_patrol_leash)
             } else {
                 Distance::new(unit_ai_tuning.stand_ground_patrol_leash)
@@ -142,11 +142,11 @@ impl UnitAi {
                 let _ = self.restore_patrol(at, ai, side)?;
                 return Ok(true);
             }
-            if self.stance == UnitStance::DEFENSIVE {
+            if self.stance == UnitStance::Defensive {
                 return Ok(true);
             }
         }
-        if leashed && self.stance == UnitStance::DEFENSIVE && self.patrol_path.is_none() {
+        if leashed && self.stance == UnitStance::Defensive && self.patrol_path.is_none() {
             // the defend stance's: a unit more than 5 tiles (DAT_142ed6f20, squared) from its
             // state position stops (slot 0xb0 with 1), forgets its target and walks back ("We're
             // too far out, returning."), then on to the retarget check
@@ -158,7 +158,7 @@ impl UnitAi {
             }
         }
         if leashed
-            && self.stance == UnitStance::STAND_GROUND
+            && self.stance == UnitStance::StandGround
             && self.patrol_path.is_none()
             && !matches!(
                 self.current_action,
@@ -240,7 +240,7 @@ impl UnitAi {
         self.add_retries(&found);
         self.attack_search_alert(found, player_kind, unit_ai_tuning)?;
         let keeps =
-            search.building && player_kind.is_computer() && self.stance == UnitStance::AGGRESSIVE;
+            search.building && player_kind.is_computer() && self.stance == UnitStance::Aggressive;
         let new = Self::world_object(found.id, at, side)?;
         if !keeps
             && self.current_order == Some(OrderKind::Attack)
@@ -333,7 +333,7 @@ impl UnitAi {
             return Ok(None);
         }
         // a unit in stand ground or no attack with an order goes no further
-        if UnitStance::DEFENSIVE < self.stance && self.current_order.is_some() {
+        if UnitStance::Defensive < self.stance && self.current_order.is_some() {
             return Ok(None);
         }
         // "I have an game attack action without an order ... inAttackWorkState"

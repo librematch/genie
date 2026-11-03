@@ -168,7 +168,7 @@ impl UnitAi {
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
-        if self.stance == UnitStance::NO_ATTACK {
+        if self.stance == UnitStance::NoAttack {
             self.siege_no_attack(at, player_kind, side, ai)?;
             return Ok(false);
         }
@@ -350,7 +350,7 @@ impl UnitAi {
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
-        if self.stance == UnitStance::NO_ATTACK {
+        if self.stance == UnitStance::NoAttack {
             return self
                 .no_attack_idle(at, player_kind, side, ai)
                 .map(|()| false);
@@ -562,7 +562,7 @@ impl UnitAi {
     ) -> Result<bool, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         self.cap_human_order(side, rng)?;
-        if self.stance == UnitStance::NO_ATTACK {
+        if self.stance == UnitStance::NoAttack {
             let found = side.closest(&Search {
                 at: at.position.ground(),
                 radius: attack_search_radius(at),

@@ -104,7 +104,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
             standing: own.standing_sprite,
             restriction: own.terrain_restriction,
         })

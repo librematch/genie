@@ -123,7 +123,7 @@ impl Attack {
         let (target, t) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
         if target_unseen(g.map, f, &t)? {
-            if r.stance == UnitStance::AGGRESSIVE && Speed::ZERO < speed && r.can_move {
+            if r.stance == UnitStance::Aggressive && Speed::ZERO < speed && r.can_move {
                 self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics, move_to_tuning)?;
                 return Ok(Readiness::Waiting);
             }
@@ -174,7 +174,7 @@ impl Attack {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }
-            if (r.stance == UnitStance::DEFENSIVE
+            if (r.stance == UnitStance::Defensive
                 && self.off_leash(t.position, r.state_position, attack_tuning))
                 || speed == Speed::ZERO
                 || !r.can_move

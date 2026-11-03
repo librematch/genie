@@ -60,7 +60,7 @@ impl TransportAction {
     pub const fn on_task(task: Option<TaskId>, at: Position) -> Self {
         Self {
             state: TransportState::New,
-            mode: TransportMode::NEW,
+            mode: TransportMode::New,
             point: at,
             retarget: false,
             task,
@@ -163,7 +163,7 @@ impl TransportAction {
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         self.point = point;
-        self.mode = TransportMode::MOVE;
+        self.mode = TransportMode::Move;
         self.set_state(
             TransportState::Sail { move_to: None },
             ship,
@@ -216,7 +216,7 @@ impl TransportAction {
         transport_tuning: &TransportTuning,
         move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
-        self.mode = TransportMode::WORK;
+        self.mode = TransportMode::Work;
         let (x, y) = (point.x(), point.y());
         let zone = shore.zone(point.tile())?;
         let (ux, uy) = (ship.position.x(), ship.position.y());
@@ -296,7 +296,7 @@ impl TransportAction {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
                 self.unload(c, unit, actions)?;
-                Ok(UpdateCode::UNDER_WAY)
+                Ok(UpdateCode::UnderWay)
             }
         }
     }
@@ -355,7 +355,7 @@ impl TransportAction {
         let (transport_tuning, move_to_tuning, sprite_tuning) =
             (&tuning.transport, &tuning.move_to, tuning.sprite);
         let (changed, code) = match self.state {
-            TransportState::Done => return Ok(Updated::Code(UpdateCode::DONE)),
+            TransportState::Done => return Ok(Updated::Code(UpdateCode::Done)),
             TransportState::SailToUnload { .. } | TransportState::Sail { .. }
                 if (1..=5).contains(&walked.get()) =>
             {
@@ -366,7 +366,7 @@ impl TransportAction {
                 };
                 (
                     self.set_state(next, ship, shore, transport_tuning, move_to_tuning)?,
-                    UpdateCode::UNDER_WAY,
+                    UpdateCode::UnderWay,
                 )
             }
             // Failed: the update returns 3.
@@ -384,7 +384,7 @@ impl TransportAction {
                     NotifyKind::ACTION_FAILED,
                     [AiAction::Transport.value(), 0, 0],
                 )?;
-                return Ok(Updated::Code(UpdateCode::FAILED));
+                return Ok(Updated::Code(UpdateCode::Failed));
             }
             TransportState::Unload => {
                 let (x, y) = (self.point.x(), self.point.y());
@@ -412,9 +412,9 @@ impl TransportAction {
                 if cannot_unload {
                     alert_owner(player_kind)?;
                 }
-                return Ok(Updated::Code(UpdateCode::UNDER_WAY));
+                return Ok(Updated::Code(UpdateCode::UnderWay));
             }
-            _ => (Changed::default(), UpdateCode::UNDER_WAY),
+            _ => (Changed::default(), UpdateCode::UnderWay),
         };
         stand((unit, motion.reborrow()), changed, look, sprite_tuning)?;
         Ok(Updated::Code(code))
@@ -492,7 +492,7 @@ impl TransportAction {
         me: Me,
     ) -> Result<UpdateCode, GenieError> {
         let Some(state) = self.state.move_to().map(|m| m.state) else {
-            return Ok(UpdateCode::DONE);
+            return Ok(UpdateCode::Done);
         };
         let start = state == MoveTo::Start;
         let walks = start || state == MoveTo::Moving;

@@ -565,7 +565,7 @@ impl UnitGroup {
         self.members
             .iter()
             .find(|m| m.id == id)
-            .map_or(MoveReason::NONE, |m| m.specific_move.reason)
+            .map_or(MoveReason::None, |m| m.specific_move.reason)
     }
 
     /// `FUN_1410177f0`: unit `id` is in its place, its first slot (`mUnitID`) in the current

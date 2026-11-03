@@ -379,7 +379,7 @@ pub fn siege_can_attack(
     if roles
         .of_class(t.class)
         .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
-        || s.stance == UnitStance::NO_ATTACK
+        || s.stance == UnitStance::NoAttack
         || !siege_in_reach(me, s, t, unit_ai_tuning)?
     {
         return Ok(false);
@@ -426,13 +426,13 @@ pub(super) fn siege_in_reach(
         range += Distance::new(unit_ai_tuning.gaia_target_reach);
     }
     match s.stance {
-        UnitStance::STAND_GROUND
+        UnitStance::StandGround
             if s.order != Some(OrderKind::Defend)
                 && !at_most_or_unordered(gap.get(), range.get()) =>
         {
             Ok(false)
         }
-        UnitStance::DEFENSIVE => {
+        UnitStance::Defensive => {
             if matches!(s.order, Some(OrderKind::Patrol | OrderKind::AttackMove)) || s.patrol_path {
                 defend_patrol_range()?;
             }

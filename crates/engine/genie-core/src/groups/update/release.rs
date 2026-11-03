@@ -119,7 +119,7 @@ impl World {
             })?;
         record.specific_move = SpecificMove {
             path_id: MovePath::NONE,
-            reason: MoveReason::NONE,
+            reason: MoveReason::None,
             ..SpecificMove::default()
         };
         Ok(())

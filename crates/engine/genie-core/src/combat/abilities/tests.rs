@@ -799,7 +799,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
                 started: true,
             }),
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::BUILDING,
         },
     );

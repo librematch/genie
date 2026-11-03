@@ -94,11 +94,11 @@ impl UnitAi {
                     leash: new.hunt_range,
                 });
                 if roles.of_class(new.class).contains(ClassRoles::KING) {
-                    made.stance = UnitStance::AGGRESSIVE;
+                    made.stance = UnitStance::Aggressive;
                 }
             }
             BOAR_AI => {
-                made.stance = UnitStance::AGGRESSIVE;
+                made.stance = UnitStance::Aggressive;
                 made.home = Some(Home {
                     origin: new.position,
                     furious: false,
@@ -106,13 +106,13 @@ impl UnitAi {
                 });
             }
             UnitAiKind::LION => {
-                made.stance = UnitStance::AGGRESSIVE;
+                made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(LION_IDLE_TIMEOUT, ai);
             }
             // the base's stance 3
             UnitAiKind::RANGED_6 | UnitAiKind::RANGED_7 => {}
             UnitAiKind::PRIEST => {
-                made.stance = UnitStance::DEFENSIVE;
+                made.stance = UnitStance::Defensive;
                 made.set_idle_timeout(PRIEST_IDLE_TIMEOUT, ai);
             }
             SOLDIER_AI => {
@@ -125,20 +125,20 @@ impl UnitAi {
                 made.stance = soldier_stance(new, roles);
             }
             ARTIFACT_AI => {
-                made.stance = UnitStance::AGGRESSIVE;
+                made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(ARTIFACT_IDLE_TIMEOUT, ai);
             }
             TOWER_AI => {
-                made.stance = UnitStance::AGGRESSIVE;
+                made.stance = UnitStance::Aggressive;
                 made.set_idle_timeout(TOWER_IDLE_TIMEOUT, ai);
             }
             UnitAiKind::SIEGE => {
                 made.stance = siege_stance(new, roles);
                 made.set_idle_timeout(SIEGE_IDLE_TIMEOUT, ai);
             }
-            UnitAiKind::LIVESTOCK => made.stance = UnitStance::DEFENSIVE,
+            UnitAiKind::LIVESTOCK => made.stance = UnitStance::Defensive,
             // 3, 8, 0xa, 0xb, 0xc, 0x11 and 0x12
-            _ => made.stance = UnitStance::AGGRESSIVE,
+            _ => made.stance = UnitStance::Aggressive,
         }
         Some(made)
     }
@@ -176,9 +176,9 @@ impl UnitAi {
             look_around_timeout: Millis::new(1000),
             last_retarget_time,
             retarget_timer,
-            stance: UnitStance::NO_ATTACK,
+            stance: UnitStance::NoAttack,
             // the constructor's word at +0x1d4 (0x140c2e080)
-            formation_kind: FormationKind::HORDE,
+            formation_kind: FormationKind::Horde,
             // the object's place
             state_position: position.ground(),
             retarget_disabled: 0,

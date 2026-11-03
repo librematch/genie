@@ -113,7 +113,7 @@ impl World {
             sight: self
                 .spatial
                 .tile_sight(viewer, Tile::new(cvttss2si(x), cvttss2si(y)))
-                .unwrap_or(TileSight::UNKNOWN),
+                .unwrap_or(TileSight::Unknown),
         })
     }
 

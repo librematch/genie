@@ -231,7 +231,7 @@ impl Mover {
         let Some(level) = self
             .paths
             .first()
-            .filter(|l| l.level == WaypointLevel::WALKED && !l.points.is_empty())
+            .filter(|l| l.level == WaypointLevel::Walked && !l.points.is_empty())
         else {
             return Ok(false);
         };
@@ -301,9 +301,9 @@ impl Mover {
         let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
         self.paths = vec![PathData {
             level: if planned {
-                WaypointLevel::TOP
+                WaypointLevel::Top
             } else {
-                WaypointLevel::WALKED
+                WaypointLevel::Walked
             },
             points,
             has_path: true,
@@ -387,7 +387,7 @@ impl Mover {
         };
         let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
         self.paths = vec![PathData {
-            level: WaypointLevel::TOP,
+            level: WaypointLevel::Top,
             points: path.points,
             path_flags,
             waypoint: if ask.resume == WaypointIndex::NONE {
@@ -547,7 +547,7 @@ impl Mover {
         // (FUN_141017590): a member on one of reason 0 keeps buildings, walls and gates alone
         let own_move = groups
             .and_then(|gs| gs.get(me.group?))
-            .is_some_and(|g| g.member_reason(me.id) == MoveReason::DETOUR);
+            .is_some_and(|g| g.member_reason(me.id) == MoveReason::Detour);
         let mut target_hit = false;
         let mut kept = Vec::new();
         for &hit in hits {

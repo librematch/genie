@@ -68,7 +68,7 @@ fn saved_building_parts_are_its_object_s() {
     let g = o.parts.gather_point.unwrap();
     assert_eq!(
         (g.state, g.point.x(), g.target),
-        (GatherPointState::POINT, 3.5, None)
+        (GatherPointState::Point, 3.5, None)
     );
     assert!(o.parts.dead_master.is_none());
     let disabled = o.parts.production.map(|p| p.disabled_techs);

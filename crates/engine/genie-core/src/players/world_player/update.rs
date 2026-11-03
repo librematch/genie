@@ -112,7 +112,7 @@ impl World {
             return Ok(());
         }
         self.defeat_check(p)?;
-        if self.players.player(p)?.game_status == GameStatus::PLAYING {
+        if self.players.player(p)?.game_status == GameStatus::Playing {
             self.trickles(p)?;
             self.mill_food(p, time)?;
         }
@@ -165,7 +165,7 @@ impl World {
                 player.sudden_death_eliminable = true;
             }
         }
-        if self.players.player(p)?.game_status == GameStatus::LOST {
+        if self.players.player(p)?.game_status == GameStatus::Lost {
             return Ok(());
         }
         let kingless = self.settings.regicide()
@@ -176,7 +176,7 @@ impl World {
                 .list(ListKey::master(self.model.slots.master.king))
                 .is_empty();
         if !stays || kingless {
-            self.set_status(p, GameStatus::LOST)?;
+            self.set_status(p, GameStatus::Lost)?;
             set(
                 &mut self.players.player_mut(p)?.attributes,
                 self.model.slots.attribute.survival,

@@ -58,7 +58,7 @@ impl World {
     /// SET GATHER POINT's handler ([`GatherPointCommand`], `FUN_140e7e9a0`).
     ///
     /// The point's x and y always take the packet's; its target and master do too unless the
-    /// state is [`GatherPointState::KEPT`] (a target of −1 at (−1, −1) clears the point, state 0; any
+    /// state is [`GatherPointState::Kept`] (a target of −1 at (−1, −1) clears the point, state 0; any
     /// other point makes the state 1 unless it is kept). With `own` the object itself is the
     /// target (`FUN_1411c7ff0`: its position, its id and master unless kept, state 1 even when it
     /// was kept). The z stays what the point held, 0 for none.
@@ -86,7 +86,7 @@ impl World {
             }
             let unit = &self.players.live(player, i)?;
             let old = self.parts.gather_point.get(unit.id).copied();
-            let kept = old.is_some_and(|g| g.state == GatherPointState::KEPT);
+            let kept = old.is_some_and(|g| g.state == GatherPointState::Kept);
             let z = old.map_or(0.0, |g| g.point.z());
             let gather = if own {
                 let (target, target_master) = match old {
@@ -94,7 +94,7 @@ impl World {
                     _ => (Some(unit.id), Some(unit.life.master_id)),
                 };
                 Some(GatherPoint {
-                    state: GatherPointState::POINT,
+                    state: GatherPointState::Point,
                     point: unit.position().with_z(z),
                     target,
                     target_master,
@@ -108,9 +108,9 @@ impl World {
                 };
                 Some(GatherPoint {
                     state: if kept {
-                        GatherPointState::KEPT
+                        GatherPointState::Kept
                     } else {
-                        GatherPointState::POINT
+                        GatherPointState::Point
                     },
                     point: Position::new(x, y, z),
                     target,
@@ -350,7 +350,7 @@ impl World {
         if self.queue_research(player, i, tech_id, r.shift)? {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
-            if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::ONE_UNIT {
+            if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::OneUnit {
                 return Err(GenieError::unsupported(
                     "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
                 ));

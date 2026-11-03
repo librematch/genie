@@ -220,7 +220,7 @@ mod spatial {
             out.unit_diplomacy
                 .get(PlayerId::new(1))
                 .map(ByPlayer::values),
-            Some(&[Some(UnitRelation::GAIA), Some(UnitRelation::OWN)][..])
+            Some(&[Some(UnitRelation::Gaia), Some(UnitRelation::Own)][..])
         );
     }
 

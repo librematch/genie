@@ -463,14 +463,14 @@ mod tests {
         // 1 is 1.8 off along x, 2 is 3.3 off along y (beyond 3.2), 3 is at the corner and beyond
         // the rounding
         assert_eq!(
-            found[UnitRelation::ENEMY]
+            found[UnitRelation::Enemy]
                 .iter()
                 .map(|x| x.id)
                 .collect::<Vec<_>>(),
             [object_id(1)]
         );
         assert_eq!(
-            found[UnitRelation::OWN]
+            found[UnitRelation::Own]
                 .iter()
                 .map(|x| x.id)
                 .collect::<Vec<_>>(),
@@ -478,7 +478,7 @@ mod tests {
         );
         // the edge distances, the overlap along y included: (1.8, -0.2)
         assert!(
-            (found[UnitRelation::ENEMY][0].distance - Distance::new((1.8f32 * 1.8 + 0.04).sqrt()))
+            (found[UnitRelation::Enemy][0].distance - Distance::new((1.8f32 * 1.8 + 0.04).sqrt()))
                 .get()
                 .abs()
                 < 1e-6
@@ -534,9 +534,9 @@ mod tests {
                     mode: 1,
                     classes: &[class_id(4)],
                     relations: &ByPlayer::new(vec![
-                        Some(UnitRelation::OWN),
-                        Some(UnitRelation::ENEMY),
-                        Some(UnitRelation::ENEMY),
+                        Some(UnitRelation::Own),
+                        Some(UnitRelation::Enemy),
+                        Some(UnitRelation::Enemy),
                     ]),
                     size: Footprint::new(0.2, 0.2),
                     wanted: 0xff,
@@ -547,7 +547,7 @@ mod tests {
             .unwrap();
         // the box reaches 44.2 along x: 1's edge is 43.3 off, 2's 49.8
         assert_eq!(
-            found[UnitRelation::ENEMY]
+            found[UnitRelation::Enemy]
                 .iter()
                 .map(|x| x.id)
                 .collect::<Vec<_>>(),
@@ -577,9 +577,9 @@ mod tests {
                     mode: 0,
                     classes: &[class_id(4)],
                     relations: &ByPlayer::new(vec![
-                        Some(UnitRelation::OWN),
-                        Some(UnitRelation::ENEMY),
-                        Some(UnitRelation::ENEMY),
+                        Some(UnitRelation::Own),
+                        Some(UnitRelation::Enemy),
+                        Some(UnitRelation::Enemy),
                     ]),
                     size: Footprint::new(0.2, 0.2),
                     wanted: 0xff,
@@ -591,7 +591,7 @@ mod tests {
         // the centre is 5 off, beyond 3.2, but the edge is 3 off: the 7-tile margin keeps it in
         // the box
         assert_eq!(
-            found[UnitRelation::ENEMY]
+            found[UnitRelation::Enemy]
                 .iter()
                 .map(|x| x.id)
                 .collect::<Vec<_>>(),

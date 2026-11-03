@@ -77,7 +77,7 @@ impl Mover {
                         "a looping level without a path pauses the unit",
                     ));
                 }
-                if WaypointLevel::PLANNED < level.level || !top_has_more {
+                if WaypointLevel::Planned < level.level || !top_has_more {
                     return Err(GenieError::unsupported(
                         "a level without a path stops the unit",
                     ));
@@ -119,15 +119,15 @@ impl Mover {
         new.range = level.range;
         new.target = level.target;
         new.waypoint = WaypointIndex::SECOND;
-        if level.level == WaypointLevel::TOP && planned {
+        if level.level == WaypointLevel::Top && planned {
             new.length = path.length;
             new.points = path.points;
             new.state = PathState::WantsPath;
-            new.level = WaypointLevel::PLANNED;
+            new.level = WaypointLevel::Planned;
             new.linked_kind = if found {
-                LinkedPathKind::REACHES_WAYPOINT
+                LinkedPathKind::ReachesWaypoint
             } else {
-                LinkedPathKind::MOVES_ON
+                LinkedPathKind::MovesOn
             };
             self.paths.insert(0, new);
             return Ok(if SHORT_PATHER || LONG_PATHER {
@@ -152,11 +152,11 @@ impl Mover {
         new.length = path.length;
         new.points = path.points;
         new.state = PathState::Walking;
-        new.level = WaypointLevel::WALKED;
+        new.level = WaypointLevel::Walked;
         new.linked_kind = if !found || partial {
-            LinkedPathKind::MOVES_ON
+            LinkedPathKind::MovesOn
         } else {
-            LinkedPathKind::REACHES_WAYPOINT
+            LinkedPathKind::ReachesWaypoint
         };
         if !solid {
             // the walked level lets its path go (FUN_140f95b70): it holds none (path id -1),

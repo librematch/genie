@@ -271,7 +271,7 @@ pub fn capture_kind(
     master: MasterId,
     roles: &Roles,
 ) -> CaptureKind {
-    let mut kind = CaptureKind::NONE;
+    let mut kind = CaptureKind::None;
     if (player == PlayerId::GAIA
         && !roles.of_class(class).contains(ClassRoles::GAIA_KEPT)
         && !roles.of_master(master).contains(MasterRoles::MONUMENT))
@@ -279,15 +279,15 @@ pub fn capture_kind(
             .of_master(master)
             .contains(MasterRoles::TORCH_CONVERTING)
     {
-        kind = CaptureKind::BY_SIGHT;
+        kind = CaptureKind::BySight;
     }
     if player == PlayerId::GAIA && roles.of_master(master).contains(MasterRoles::HORSE) {
-        kind = CaptureKind::BY_SIGHT;
+        kind = CaptureKind::BySight;
     }
     if roles.of_class(class).contains(ClassRoles::LIVESTOCK)
         || roles.of_class(class).contains(ClassRoles::ARTIFACT)
     {
-        kind = CaptureKind::LIVESTOCK;
+        kind = CaptureKind::Livestock;
     }
     kind
 }

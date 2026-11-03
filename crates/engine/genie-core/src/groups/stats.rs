@@ -343,7 +343,7 @@ impl World {
             "a group member's search that reads the registry's last answer (before any query)",
         ))?;
         if fresh {
-            let enemies = !lists[UnitRelation::ENEMY].is_empty();
+            let enemies = !lists[UnitRelation::Enemy].is_empty();
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.alert_mode = enemies;
                 if enemies {
@@ -352,9 +352,9 @@ impl World {
             }
         }
         for list in [
-            UnitRelation::ENEMY,
-            UnitRelation::NEUTRAL,
-            UnitRelation::ALLY,
+            UnitRelation::Enemy,
+            UnitRelation::Neutral,
+            UnitRelation::Ally,
         ] {
             for record in &lists[list] {
                 let Some(object) = self.world_object(record.id) else {
@@ -367,7 +367,7 @@ impl World {
                 if ObjectState::Dying <= state {
                     continue;
                 }
-                if list == UnitRelation::NEUTRAL {
+                if list == UnitRelation::Neutral {
                     let class = self
                         .master(object.player(), object.master_id(self.model.slots))?
                         .class;
@@ -471,7 +471,7 @@ impl World {
         };
         let mut d = sub(view.at, slot.transform_position);
         d = d.with_height(0.0);
-        let limit = if f.kind == FormationKind::STAGGERED
+        let limit = if f.kind == FormationKind::Staggered
             || !below_or_unordered(largest, self.model.tuning.group.wide_radius)
         {
             self.model.tuning.group.far_wide
@@ -1043,7 +1043,7 @@ mod tests {
             .current_formation
             .as_mut()
             .unwrap()
-            .kind = FormationKind::STAGGERED;
+            .kind = FormationKind::Staggered;
         let _ = t.statistics_only(group_id(1), true).unwrap();
         assert_eq!(ids(&t), [object_id(11), object_id(10)]);
         let mut t = world(2.5, [10, 11]);

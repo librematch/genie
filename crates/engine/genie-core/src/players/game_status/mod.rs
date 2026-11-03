@@ -23,38 +23,66 @@ use crate::world::WorldTime;
 /// A player's game status (`game_status`, `+0x89`, saved): playing, won or lost. Every byte is
 /// kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct GameStatus(u8);
+pub enum GameStatus {
+    /// 0: the player still plays.
+    #[default]
+    Playing,
+    /// 1: the player won.
+    Won,
+    /// 2: the player lost (or resigned).
+    Lost,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`GameStatus`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(u8);
 
 impl GameStatus {
-    /// 0: the player still plays.
-    pub const PLAYING: Self = Self(0);
-    /// 1: the player won.
-    pub const WON: Self = Self(1);
-    /// 2: the player lost (or resigned).
-    pub const LOST: Self = Self(2);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: u8) -> Self {
+        match value {
+            0 => Self::Playing,
+            1 => Self::Won,
+            2 => Self::Lost,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> u8 {
+        match self {
+            Self::Playing => 0,
+            Self::Won => 1,
+            Self::Lost => 2,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
 
     /// The status of the save's byte `value`.
     #[must_use]
     pub const fn of_data(value: u8) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// Whether the player's game ended: won or lost.
     #[must_use]
     pub const fn ended(self) -> bool {
-        matches!(self, Self::WON | Self::LOST)
+        matches!(self, Self::Won | Self::Lost)
     }
 
     /// The byte, as the save holds it.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self.raw()
     }
 }
 
 impl genie_diff::Diff for GameStatus {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+        self.raw().diff(&other.raw(), d);
     }
 }
 
@@ -141,13 +169,13 @@ impl Count {
         relations: (Relation, Relation),
     ) {
         match status {
-            GameStatus::PLAYING => {
+            GameStatus::Playing => {
                 self.playing += 1;
                 if self.first != PlayerId::GAIA && self.side != 0 {
                     // another side unless the two count each other's victory as their own
                     if allied_victory == 0
-                        || !matches!(relations.0, Relation::ALLY)
-                        || !matches!(relations.1, Relation::ALLY)
+                        || !matches!(relations.0, Relation::Ally)
+                        || !matches!(relations.1, Relation::Ally)
                     {
                         self.side = -1;
                     }
@@ -156,9 +184,9 @@ impl Count {
                     self.first = i;
                 }
             }
-            GameStatus::WON => self.won += 1,
-            GameStatus::LOST => self.lost += 1,
-            _ => {}
+            GameStatus::Won => self.won += 1,
+            GameStatus::Lost => self.lost += 1,
+            GameStatus::Other(_) => {}
         }
     }
 }

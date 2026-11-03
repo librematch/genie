@@ -126,7 +126,7 @@ impl Visibility {
             old: old & VisionBits::VISIBLE_HALF,
             new: mask,
         })?;
-        Ok((s.capture == CaptureKind::BY_SIGHT).then_some(mask))
+        Ok((s.capture == CaptureKind::BySight).then_some(mask))
     }
 
     /// The registry's part of a combat object's new place (`FUN_14108c320`): its records follow.

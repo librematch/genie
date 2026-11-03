@@ -139,12 +139,12 @@ fn member_reason_is_its_own_move_s() {
         ..Member::default()
     };
     group.members = vec![
-        with_reason(object_id(10), MoveReason::ASIDE),
-        with_reason(object_id(11), MoveReason::DETOUR),
+        with_reason(object_id(10), MoveReason::Aside),
+        with_reason(object_id(11), MoveReason::Detour),
     ];
-    assert_eq!(group.member_reason(object_id(10)), MoveReason::ASIDE);
-    assert_eq!(group.member_reason(object_id(11)), MoveReason::DETOUR);
-    assert_eq!(group.member_reason(object_id(12)), MoveReason::NONE);
+    assert_eq!(group.member_reason(object_id(10)), MoveReason::Aside);
+    assert_eq!(group.member_reason(object_id(11)), MoveReason::Detour);
+    assert_eq!(group.member_reason(object_id(12)), MoveReason::None);
 }
 
 /// `FUN_1410177f0`: the first slot of the current formation (`+0x128`) that holds the unit

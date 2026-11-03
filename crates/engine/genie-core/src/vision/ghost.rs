@@ -813,7 +813,7 @@ mod tests {
                 explored: true,
                 building: None,
                 umv: 1,
-                capture: CaptureKind::NONE,
+                capture: CaptureKind::None,
                 kind: MasterKind::BUILDING,
             },
         );

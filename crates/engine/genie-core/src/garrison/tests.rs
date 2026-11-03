@@ -2046,7 +2046,7 @@ fn gather_point_on_its_own_building_takes_the_new_unit_in() {
     let idx = t.players[1].objects.last_place().unwrap();
     let state = t.players[1].objects[idx].life.state;
     let g = GatherPoint {
-        state: GatherPointState::POINT,
+        state: GatherPointState::Point,
         point: Position::new(10.0, 10.0, 0.0),
         target: Some(object_id(100)),
         target_master: Some(TC),
@@ -3198,7 +3198,7 @@ fn an_unload_command_sends_transport_toward_the_shore() {
         ),
         (
             TransportState::SailToUnload { move_to: None },
-            TransportMode::WORK,
+            TransportMode::Work,
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start),
             false
@@ -3336,7 +3336,7 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         ),
         (
             TransportState::Sail { move_to: None },
-            TransportMode::NEW,
+            TransportMode::New,
             Some(task_id(7)),
             Position::new(14.5, 10.5, 0.0),
             Some(MoveTo::Start)
@@ -3364,7 +3364,7 @@ fn work_command_on_land_point_makes_transport_that_sails_there() {
         (again.state.bare(), again.mode, again.task),
         (
             TransportState::Sail { move_to: None },
-            TransportMode::WORK,
+            TransportMode::Work,
             tr.task
         )
     );
@@ -3412,7 +3412,7 @@ fn trade_boat_work_at_its_own_market_makes_new_transport() {
             .list
             .transport()
             .map(|tr| tr.mode),
-        Some(TransportMode::NEW)
+        Some(TransportMode::New)
     );
     let ai = t.parts.unit_ai.get(ship.id).unwrap();
     assert_eq!(
@@ -3439,7 +3439,7 @@ fn trade_boat_work_at_its_own_market_makes_new_transport() {
             .list
             .transport()
             .map(|tr| tr.mode),
-        Some(TransportMode::WORK)
+        Some(TransportMode::Work)
     );
 }
 
@@ -3515,7 +3515,7 @@ fn transport_beside_the_shore_puts_its_units_ashore() {
         ),
         (
             TransportState::Sail { move_to: None },
-            TransportMode::MOVE,
+            TransportMode::Move,
             Position::new(5.5, 5.5, 0.0),
             Some(MoveTo::Start),
             None
@@ -3648,14 +3648,14 @@ fn unit_inside_an_ally_transport_unloaded_goes_ashore() {
         let _ = t.push_live(PlayerId::new(2), ship).unwrap();
         t.players[1].relations = relation_row([3, 0, 0, 3]);
         t.players[2].relations = ByPlayer::new(vec![
-            Relation::ENEMY,
+            Relation::Enemy,
             if both_ways {
-                Relation::RELATION_4
+                Relation::Relation4
             } else {
-                Relation::ENEMY
+                Relation::Enemy
             },
-            Relation::ALLY,
-            Relation::ENEMY,
+            Relation::Ally,
+            Relation::Enemy,
         ]);
         t
     };
@@ -3948,7 +3948,7 @@ fn unit_let_out_toward_nothing_stops_and_keeps_its_stance() {
         Some(UnitAi {
             current_action: Some(AiAction::Gather),
             current_target: Some(object_id(77)),
-            stance: UnitStance::DEFENSIVE,
+            stance: UnitStance::Defensive,
             ..UnitAi::default()
         }),
     );
@@ -4259,7 +4259,7 @@ fn let_out_beside_second_centre(
         Some(UnitAi {
             current_action: Some(AiAction::Gather),
             current_target: Some(object_id(77)),
-            stance: UnitStance::DEFENSIVE,
+            stance: UnitStance::Defensive,
             ..UnitAi::default()
         }),
     );
@@ -4306,7 +4306,7 @@ fn unit_let_out_works_its_record_or_the_gather_point_target() {
         t.set_part(
             id,
             Part::GatherPoint(Some(GatherPoint {
-                state: GatherPointState::POINT,
+                state: GatherPointState::Point,
                 target: Some(object_id(101)),
                 point: Position::new(16.0, 4.0, 0.0),
                 target_master: Some(TC),
@@ -4341,7 +4341,7 @@ fn gather_point_of_state_0xff_replaces_the_point_of_let_out() {
     };
     let given = Point::new(4.5, 4.5);
     let none = Point::new(NO_POINT, NO_POINT);
-    let kept = at(GatherPointState::KEPT, Some(object_id(101)));
+    let kept = at(GatherPointState::Kept, Some(object_id(101)));
     assert_eq!(
         let_out_aim(kept, given, object_id(100)),
         LetOutAim::Point(Point::new(16.0, 4.0))
@@ -4350,7 +4350,7 @@ fn gather_point_of_state_0xff_replaces_the_point_of_let_out() {
         let_out_aim(kept, none, object_id(100)),
         LetOutAim::Point(Point::new(16.0, 4.0))
     );
-    let one = at(GatherPointState::POINT, Some(object_id(101)));
+    let one = at(GatherPointState::Point, Some(object_id(101)));
     assert_eq!(
         let_out_aim(one, none, object_id(100)),
         LetOutAim::Target(one.unwrap())
@@ -4362,7 +4362,7 @@ fn gather_point_of_state_0xff_replaces_the_point_of_let_out() {
     // on the building itself, or without a gather point, the point stays
     assert_eq!(
         let_out_aim(
-            at(GatherPointState::POINT, Some(object_id(100))),
+            at(GatherPointState::Point, Some(object_id(100))),
             none,
             object_id(100)
         ),
@@ -4393,14 +4393,14 @@ fn building_lets_out_the_units_of_player_no_longer_its_ally() {
         PlayerId::new(1),
         object_id(100),
         PlayerId::new(2),
-        Relation::ALLY,
+        Relation::Ally,
     )
     .unwrap();
     t.notify_of_relation(
         PlayerId::new(1),
         object_id(100),
         PlayerId::new(3),
-        Relation::ENEMY,
+        Relation::Enemy,
     )
     .unwrap();
     assert_eq!(held(&t), (Some(container_id(100)), vec![object_id(2000)]));
@@ -4408,7 +4408,7 @@ fn building_lets_out_the_units_of_player_no_longer_its_ally() {
         PlayerId::new(1),
         object_id(100),
         PlayerId::new(2),
-        Relation::ENEMY,
+        Relation::Enemy,
     )
     .unwrap();
     assert_eq!(held(&t), (None, vec![]));
@@ -4418,7 +4418,7 @@ fn building_lets_out_the_units_of_player_no_longer_its_ally() {
         PlayerId::new(2),
         object_id(2000),
         PlayerId::new(1),
-        Relation::ALLY,
+        Relation::Ally,
     )
     .unwrap();
     assert_eq!(held(&t).0, Some(container_id(100)));
@@ -4426,7 +4426,7 @@ fn building_lets_out_the_units_of_player_no_longer_its_ally() {
         PlayerId::new(2),
         object_id(2000),
         PlayerId::new(1),
-        Relation::ENEMY,
+        Relation::Enemy,
     )
     .unwrap();
     assert_eq!(held(&t), (None, vec![]));
@@ -4454,7 +4454,7 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
             PlayerId::new(2),
             object_id(2000),
             PlayerId::new(1),
-            Relation::ENEMY
+            Relation::Enemy
         ),
         unload
     );
@@ -4463,7 +4463,7 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
             PlayerId::new(1),
             object_id(200),
             PlayerId::new(2),
-            Relation::ENEMY
+            Relation::Enemy
         ),
         unload
     );
@@ -4472,7 +4472,7 @@ fn siege_tower_unload_on_new_relation_is_not_modelled() {
             PlayerId::new(1),
             object_id(200),
             PlayerId::new(2),
-            Relation::ALLY
+            Relation::Ally
         ),
         Ok(())
     );
@@ -4507,7 +4507,7 @@ fn market_tells_computer_ally_of_its_tile() {
             PlayerId::new(1),
             object_id(100),
             PlayerId::new(2),
-            Relation::ALLY,
+            Relation::Ally,
         )
         .unwrap();
         t.spatial.sight.unwrap().new_tiles[2].clone()
@@ -4538,9 +4538,9 @@ fn the_sub_action_list_update_of_an_empty_list_is_1_and_of_an_arrived_move_to_to
             update_sub_actions(list, c, u, me, ListUpdate::default())
         })
     };
-    assert_eq!(update(&mut None), Ok(UpdateCode::DONE));
+    assert_eq!(update(&mut None), Ok(UpdateCode::Done));
     let mut arrived = enter_of_move(MoveTo::Arrived);
-    assert_eq!(update(&mut arrived), Ok(UpdateCode::DONE));
+    assert_eq!(update(&mut arrived), Ok(UpdateCode::Done));
 }
 
 /// A quiet `MoveTo` to ship 200 in `state`.

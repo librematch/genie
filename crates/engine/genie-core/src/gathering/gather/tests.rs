@@ -58,7 +58,7 @@ fn reads() -> GatherReads {
         class: class::VILLAGER,
         defaults: MoveDefaults::default(),
         master: ids::VILLAGER_MALE,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         farm_stops: false,
         player_kind: PlayerKind::Human,
         stop_productivity: Amount::new(1.0),

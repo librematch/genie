@@ -53,14 +53,14 @@ impl World {
             return self.lock_formation(group, FormationKind::of_vote(best));
         }
         if let Some(g) = self.groups.get_mut(group) {
-            g.formation_locked_kind = Some(FormationKind::HORDE);
+            g.formation_locked_kind = Some(FormationKind::Horde);
         }
         self.update_desired_positions(group, None)?;
-        self.stances_state(group, FormationKind::HORDE)?;
+        self.stances_state(group, FormationKind::Horde)?;
         // FUN_1415417a0 finds sleeping members too
         for &id in &ids {
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
-                ai.formation_kind = FormationKind::HORDE;
+                ai.formation_kind = FormationKind::Horde;
             }
         }
         Ok(())
@@ -104,9 +104,9 @@ impl World {
             }
         }
         self.groups.held_mut(group)?.desired_spacing = spacing;
-        let own_choice = matches!(kind, FormationKind::COLUMN | FormationKind::LINE);
+        let own_choice = matches!(kind, FormationKind::Column | FormationKind::Line);
         let locked = if own_choice {
-            FormationKind::HORDE
+            FormationKind::Horde
         } else {
             kind
         };
@@ -141,13 +141,13 @@ impl World {
             }
         }
         let stance = if ids.is_empty() || (n[1] <= n[0] && n[2] <= n[0] && n[3] <= n[0]) {
-            UnitStance::AGGRESSIVE
+            UnitStance::Aggressive
         } else if n[2] <= n[1] && n[3] <= n[1] {
-            UnitStance::DEFENSIVE
+            UnitStance::Defensive
         } else if n[3] <= n[2] {
-            UnitStance::STAND_GROUND
+            UnitStance::StandGround
         } else {
-            UnitStance::NO_ATTACK
+            UnitStance::NoAttack
         };
         if let Some(g) = self.groups.get_mut(group) {
             g.stance = Some(stance);

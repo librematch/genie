@@ -96,10 +96,8 @@ impl UnitAi {
                 ));
             }
         }
-        if matches!(
-            self.stance,
-            UnitStance::STAND_GROUND | UnitStance::NO_ATTACK
-        ) && at.player != PlayerId::GAIA
+        if matches!(self.stance, UnitStance::StandGround | UnitStance::NoAttack)
+            && at.player != PlayerId::GAIA
         {
             return Ok(false);
         }
@@ -144,7 +142,7 @@ impl UnitAi {
         }
         let mut ex = x - (vx / d) * reach;
         let mut ey = y - (vy / d) * reach;
-        if at.player != PlayerId::GAIA && self.stance == UnitStance::DEFENSIVE {
+        if at.player != PlayerId::GAIA && self.stance == UnitStance::Defensive {
             let gx = self.state_position.x() - ex;
             let gy = self.state_position.y() - ey;
             if unit_ai_tuning.run_leash < sqrt(gy * gy + gx * gx) {

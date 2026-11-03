@@ -345,7 +345,7 @@ impl NewObject {
                 .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
                 .map_or(Distance::ZERO, |t| t.work_range),
             player_kind: PlayerKind::Human,
-            posture: Posture::AGGRESSIVE,
+            posture: Posture::Aggressive,
             age: Amount::ZERO,
         }
     }
@@ -375,27 +375,27 @@ pub(super) fn soldier_stance(new: &NewObject, roles: &Roles) -> UnitStance {
         && new.copy_id == Some(new.master)
         && new.age == Amount::ZERO
     {
-        return UnitStance::STAND_GROUND;
+        return UnitStance::StandGround;
     }
     if !new.player_kind.is_computer()
         && roles
             .of_master(new.master)
             .contains(MasterRoles::DEFENSIVE_SOLDIER)
     {
-        return UnitStance::DEFENSIVE;
+        return UnitStance::Defensive;
     }
     if !new.player_kind.is_computer() && roles.of_class(new.class).contains(ClassRoles::NO_ATTACK) {
-        return UnitStance::NO_ATTACK;
+        return UnitStance::NoAttack;
     }
     // TEST 9, then a signed byte at least 0 or bit 3 clear
     if new.hero_flag.grants(HeroFlags::DEFENSIVE) {
-        return UnitStance::DEFENSIVE;
+        return UnitStance::Defensive;
     }
     if roles
         .of_class(new.class)
         .contains(ClassRoles::NO_ATTACK_UNLESS_HERO)
     {
-        return UnitStance::NO_ATTACK;
+        return UnitStance::NoAttack;
     }
     new.posture.stance()
 }
@@ -409,12 +409,12 @@ pub(super) fn siege_stance(new: &NewObject, roles: &Roles) -> UnitStance {
             .of_class(new.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
     {
-        return UnitStance::AGGRESSIVE;
+        return UnitStance::Aggressive;
     }
     if roles.of_class(new.class).contains(ClassRoles::SCORPION) {
         return new.posture.stance();
     }
-    UnitStance::DEFENSIVE
+    UnitStance::Defensive
 }
 
 /// A ship's draw on a missile's warning (`0x20f`, `processNotify`): `r * 100 / 0x7fff` below

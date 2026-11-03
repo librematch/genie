@@ -419,8 +419,8 @@ pub(super) enum LetOutAim {
 }
 
 /// The aim of a let-out toward `point` ([`NO_POINT`] for none) from the building `building`
-/// with `gather`: a gather point of state 1 ([`GatherPointState::POINT`]) gives a unit without a
-/// point its target, one of state 0xff ([`GatherPointState::KEPT`]) its x and y whatever point
+/// with `gather`: a gather point of state 1 ([`GatherPointState::Point`]) gives a unit without a
+/// point its target, one of state 0xff ([`GatherPointState::Kept`]) its x and y whatever point
 /// was given, else the point.
 pub(super) fn let_out_aim(
     gather: Option<GatherPoint>,
@@ -430,12 +430,12 @@ pub(super) fn let_out_aim(
     match gather {
         Some(g)
             if point.x() == NO_POINT
-                && g.state == GatherPointState::POINT
+                && g.state == GatherPointState::Point
                 && g.target != Some(building) =>
         {
             LetOutAim::Target(g)
         }
-        Some(g) if g.state == GatherPointState::KEPT => LetOutAim::Point(g.point.ground()),
+        Some(g) if g.state == GatherPointState::Kept => LetOutAim::Point(g.point.ground()),
         _ => LetOutAim::Point(point),
     }
 }

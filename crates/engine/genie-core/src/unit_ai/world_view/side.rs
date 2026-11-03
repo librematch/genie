@@ -146,9 +146,9 @@ impl UnitSide for UnitView<'_, '_> {
             .unit
             .master(self.c.w.master_tables(), self.player)?
             .radius;
-        for r in lists[UnitRelation::OWN]
+        for r in lists[UnitRelation::Own]
             .iter()
-            .chain(&lists[UnitRelation::ALLY])
+            .chain(&lists[UnitRelation::Ally])
         {
             if r.id == me {
                 continue;

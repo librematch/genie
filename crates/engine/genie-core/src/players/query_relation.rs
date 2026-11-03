@@ -35,10 +35,10 @@ impl QueryRelation {
     #[must_use]
     pub const fn list(self) -> UnitRelation {
         match self {
-            Self::Friends => UnitRelation::ALLY,
-            Self::Neutrals => UnitRelation::NEUTRAL,
-            Self::Enemies => UnitRelation::ENEMY,
-            Self::Itself => UnitRelation::OWN,
+            Self::Friends => UnitRelation::Ally,
+            Self::Neutrals => UnitRelation::Neutral,
+            Self::Enemies => UnitRelation::Enemy,
+            Self::Itself => UnitRelation::Own,
         }
     }
 
@@ -47,10 +47,10 @@ impl QueryRelation {
     #[must_use]
     pub const fn keeps(self, relation: UnitRelation) -> bool {
         match self {
-            Self::Friends => matches!(relation, UnitRelation::OWN | UnitRelation::ALLY),
-            Self::Neutrals => matches!(relation, UnitRelation::NEUTRAL),
-            Self::Enemies => matches!(relation, UnitRelation::ENEMY),
-            Self::Itself => matches!(relation, UnitRelation::OWN),
+            Self::Friends => matches!(relation, UnitRelation::Own | UnitRelation::Ally),
+            Self::Neutrals => matches!(relation, UnitRelation::Neutral),
+            Self::Enemies => matches!(relation, UnitRelation::Enemy),
+            Self::Itself => matches!(relation, UnitRelation::Own),
         }
     }
 }

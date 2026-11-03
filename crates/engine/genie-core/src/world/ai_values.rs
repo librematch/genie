@@ -28,25 +28,57 @@ impl Percent {
 /// A player's local targeting mode (`local_targeting_mode`, setting 9): which target scores
 /// its targeting factor scales. Mode 1 scales the kill-time score's top, mode 2 an armored
 /// entry's total; another mode scales none.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct TargetingMode(i32);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TargetingMode {
+    /// Mode 1: the kill-time score's top.
+    KillTime,
+    /// Mode 2: the total of an entry whose shown armor is at least 100.
+    Armored,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`TargetingMode`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(i32);
 
 impl TargetingMode {
-    /// Mode 1: the kill-time score's top.
-    pub const KILL_TIME: Self = Self(1);
-    /// Mode 2: the total of an entry whose shown armor is at least 100.
-    pub const ARMORED: Self = Self(2);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i32) -> Self {
+        match value {
+            1 => Self::KillTime,
+            2 => Self::Armored,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i32 {
+        match self {
+            Self::KillTime => 1,
+            Self::Armored => 2,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
 
     /// The mode of the int `value`: every int is one.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The int.
     #[must_use]
     pub const fn get(self) -> i32 {
-        self.0
+        self.raw()
+    }
+}
+
+impl Default for TargetingMode {
+    /// The zero value, as zeroed memory holds it.
+    fn default() -> Self {
+        Self::of_raw(0)
     }
 }
 
@@ -96,7 +128,7 @@ impl genie_diff::Diff for Percent {
 
 impl genie_diff::Diff for TargetingMode {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+        self.raw().diff(&other.raw(), d);
     }
 }
 
@@ -121,9 +153,18 @@ mod tests {
     fn the_ai_settings_keep_their_values() {
         assert_eq!(Percent::new(150).as_f32(), 150.0);
         assert!(Percent::new(5) < Percent::new(6));
-        assert_eq!(TargetingMode::of_data(2), TargetingMode::ARMORED);
-        assert_ne!(TargetingMode::default(), TargetingMode::KILL_TIME);
+        assert_eq!(TargetingMode::of_data(2), TargetingMode::Armored);
+        assert_ne!(TargetingMode::default(), TargetingMode::KillTime);
         assert_eq!(LureDestination::of_data(3).get(), 3);
         assert_eq!(VillagerGarrison::of_data(-1).get(), -1);
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_targeting_mode_value_maps_to_its_variant_and_back() {
+        for value in [1, 2, 0] {
+            assert_eq!(TargetingMode::of_raw(value).raw(), value);
+        }
+        assert!(matches!(TargetingMode::of_raw(0), TargetingMode::Other(_)));
     }
 }

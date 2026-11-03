@@ -122,7 +122,7 @@ impl World {
                     .checked_mut(index)?
                     .specific_move = SpecificMove {
                     path_id: MovePath::NONE,
-                    reason: MoveReason::NONE,
+                    reason: MoveReason::None,
                     ..SpecificMove::default()
                 };
             }
@@ -318,7 +318,7 @@ impl World {
             let _ = self.set_specific_move(
                 group,
                 id,
-                (MovePath::NONE, MoveReason::ASIDE),
+                (MovePath::NONE, MoveReason::Aside),
                 (at, self.model.tuning.group.aside_timer, 0.0),
             )?;
             self.stop_member(id)?;

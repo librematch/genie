@@ -3,62 +3,115 @@
 
 use serde::Deserialize;
 use serde::Serialize;
+use std::cmp::Ordering;
 
 /// A game mode (`mGameMode`, the options' `+0x34`), named by aoc-mgz's game types; mode 9 and
 /// 14 have no name there, and 16 is the mode whose QUEUE trains one military unit at a time
 /// early on.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct GameMode(i32);
-
-impl GameMode {
+pub enum GameMode {
     /// Random Map (0).
-    pub const RANDOM_MAP: Self = Self(0);
+    #[default]
+    RandomMap,
     /// Regicide (1): a player loses with the last king ([`crate::world::settings::Settings::regicide`]).
-    pub const REGICIDE: Self = Self(1);
+    Regicide,
     /// Death Match (2).
-    pub const DEATH_MATCH: Self = Self(2);
+    DeathMatch,
     /// Scenario (3).
-    pub const SCENARIO: Self = Self(3);
+    Scenario,
     /// Campaign (4).
-    pub const CAMPAIGN: Self = Self(4);
+    Campaign,
     /// King of the Hill (5).
-    pub const KING_OF_THE_HILL: Self = Self(5);
+    KingOfTheHill,
     /// Wonder Race (6).
-    pub const WONDER_RACE: Self = Self(6);
+    WonderRace,
     /// Defend the Wonder (7).
-    pub const DEFEND_THE_WONDER: Self = Self(7);
+    DefendTheWonder,
     /// Turbo Random Map (8).
-    pub const TURBO_RANDOM_MAP: Self = Self(8);
+    TurboRandomMap,
     /// Capture the Relic (10).
-    pub const CAPTURE_THE_RELIC: Self = Self(10);
+    CaptureTheRelic,
     /// Sudden Death (11): a player loses with the last town centre.
-    pub const SUDDEN_DEATH: Self = Self(11);
+    SuddenDeath,
     /// Battle Royale (12), whose status changes shrink the map.
-    pub const BATTLE_ROYALE: Self = Self(12);
+    BattleRoyale,
     /// Empire Wars (13), whose first update puts the villagers to work.
-    pub const EMPIRE_WARS: Self = Self(13);
+    EmpireWars,
     /// Co-op Campaign (15).
-    pub const CO_OP_CAMPAIGN: Self = Self(15);
+    CoOpCampaign,
     /// Mode 16, whose QUEUE trains one military unit at a time in the first age
     /// (`FUN_141614450`).
-    pub const ONE_UNIT: Self = Self(16);
+    OneUnit,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(UnnamedGameMode),
+}
+
+/// A raw value of [`GameMode`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnnamedGameMode(i32);
+
+impl GameMode {
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i32) -> Self {
+        match value {
+            0 => Self::RandomMap,
+            1 => Self::Regicide,
+            2 => Self::DeathMatch,
+            3 => Self::Scenario,
+            4 => Self::Campaign,
+            5 => Self::KingOfTheHill,
+            6 => Self::WonderRace,
+            7 => Self::DefendTheWonder,
+            8 => Self::TurboRandomMap,
+            10 => Self::CaptureTheRelic,
+            11 => Self::SuddenDeath,
+            12 => Self::BattleRoyale,
+            13 => Self::EmpireWars,
+            15 => Self::CoOpCampaign,
+            16 => Self::OneUnit,
+            other => Self::Other(UnnamedGameMode(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i32 {
+        match self {
+            Self::RandomMap => 0,
+            Self::Regicide => 1,
+            Self::DeathMatch => 2,
+            Self::Scenario => 3,
+            Self::Campaign => 4,
+            Self::KingOfTheHill => 5,
+            Self::WonderRace => 6,
+            Self::DefendTheWonder => 7,
+            Self::TurboRandomMap => 8,
+            Self::CaptureTheRelic => 10,
+            Self::SuddenDeath => 11,
+            Self::BattleRoyale => 12,
+            Self::EmpireWars => 13,
+            Self::CoOpCampaign => 15,
+            Self::OneUnit => 16,
+            Self::Other(UnnamedGameMode(value)) => value,
+        }
+    }
 
     /// The mode of the options' int `value`: every int is one.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The int.
     #[must_use]
     pub const fn get(self) -> i32 {
-        self.0
+        self.raw()
     }
 
     /// `FUN_141302540`: a scenario mode: Scenario, Campaign, King of the Hill or Co-op Campaign.
     #[must_use]
     pub const fn scenario(self) -> bool {
-        matches!(self.0, 3 | 4 | 5 | 15)
+        matches!(self.raw(), 3 | 4 | 5 | 15)
     }
 
     /// `FUN_141302450`: the mode's descriptor (`DAT_143f6b330[mode]`, the first for a mode
@@ -66,75 +119,163 @@ impl GameMode {
     /// argument): all but the scenario modes 3, 4, 5, 14 and 15.
     #[must_use]
     pub const fn standard(self) -> bool {
-        !matches!(self.0, 3 | 4 | 5 | 14 | 15)
+        !matches!(self.raw(), 3 | 4 | 5 | 14 | 15)
     }
 }
 
 /// An age option (`mStartingAge`, `+0x3c`, and `mEndingAge`, `+0x40`), and a tech tree unit's
 /// age: 0 the mode's default, 2 Feudal, 3 Castle, 4 Imperial, 5 post-Imperial, 6.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-pub struct Age(i32);
+#[serde(from = "i32", into = "i32")]
+pub enum Age {
+    /// The mode's default (0).
+    #[default]
+    Default,
+    /// The Feudal Age (2).
+    Feudal,
+    /// The Castle Age (3).
+    Castle,
+    /// The Imperial Age (4).
+    Imperial,
+    /// The post-Imperial Age (5), `FUN_1412fc110`'s last age for an ending age of 0.
+    PostImperial,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(UnnamedAge),
+}
+
+/// A raw value of [`Age`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnnamedAge(i32);
 
 impl Age {
-    /// The mode's default (0).
-    pub const DEFAULT: Self = Self(0);
-    /// The Feudal Age (2).
-    pub const FEUDAL: Self = Self(2);
-    /// The Castle Age (3).
-    pub const CASTLE: Self = Self(3);
-    /// The Imperial Age (4).
-    pub const IMPERIAL: Self = Self(4);
-    /// The post-Imperial Age (5), `FUN_1412fc110`'s last age for an ending age of 0.
-    pub const POST_IMPERIAL: Self = Self(5);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i32) -> Self {
+        match value {
+            0 => Self::Default,
+            2 => Self::Feudal,
+            3 => Self::Castle,
+            4 => Self::Imperial,
+            5 => Self::PostImperial,
+            other => Self::Other(UnnamedAge(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i32 {
+        match self {
+            Self::Default => 0,
+            Self::Feudal => 2,
+            Self::Castle => 3,
+            Self::Imperial => 4,
+            Self::PostImperial => 5,
+            Self::Other(UnnamedAge(value)) => value,
+        }
+    }
 
     /// The age of the int `value`: every int is one.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The int.
     #[must_use]
     pub const fn get(self) -> i32 {
-        self.0
+        self.raw()
     }
 
     /// The age before it (the int less 1, wrapping).
     #[must_use]
     pub const fn before(self) -> Self {
-        Self(self.0.wrapping_sub(1))
+        Self::of_raw(self.raw().wrapping_sub(1))
+    }
+}
+
+impl From<i32> for Age {
+    /// The value of a serialized raw `value`.
+    fn from(value: i32) -> Self {
+        Self::of_raw(value)
+    }
+}
+
+impl From<Age> for i32 {
+    /// The raw value it serializes as.
+    fn from(value: Age) -> Self {
+        value.raw()
+    }
+}
+
+impl PartialOrd for Age {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Age {
+    /// The game's order: by the raw value.
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.raw().cmp(&other.raw())
     }
 }
 
 /// The visibility option (`mVisibilityType`, `+0x48`): normal, explored or all visible.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Visibility(i32);
+pub enum Visibility {
+    /// Normal (0).
+    #[default]
+    Normal,
+    /// Explored (1).
+    Explored,
+    /// All visible (2).
+    AllVisible,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(UnnamedVisibility),
+}
+
+/// A raw value of [`Visibility`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct UnnamedVisibility(i32);
 
 impl Visibility {
-    /// Normal (0).
-    pub const NORMAL: Self = Self(0);
-    /// Explored (1).
-    pub const EXPLORED: Self = Self(1);
-    /// All visible (2).
-    pub const ALL_VISIBLE: Self = Self(2);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: i32) -> Self {
+        match value {
+            0 => Self::Normal,
+            1 => Self::Explored,
+            2 => Self::AllVisible,
+            other => Self::Other(UnnamedVisibility(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> i32 {
+        match self {
+            Self::Normal => 0,
+            Self::Explored => 1,
+            Self::AllVisible => 2,
+            Self::Other(UnnamedVisibility(value)) => value,
+        }
+    }
 
     /// The visibility of the options' int `value`: every int is one.
     #[must_use]
     pub const fn of_data(value: i32) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The int.
     #[must_use]
     pub const fn get(self) -> i32 {
-        self.0
+        self.raw()
     }
 
     /// The players have explored the whole map from the start (explored or all visible).
     #[must_use]
     pub const fn explored_all(self) -> bool {
-        matches!(self.0, 1 | 2)
+        matches!(self.raw(), 1 | 2)
     }
 }
 
@@ -232,12 +373,39 @@ mod tests {
             assert!(GameMode::of_data(m).scenario() && !GameMode::of_data(m).standard());
         }
         assert!(!GameMode::of_data(14).scenario() && !GameMode::of_data(14).standard());
-        assert!(GameMode::RANDOM_MAP.standard() && !GameMode::RANDOM_MAP.scenario());
-        assert_eq!(GameMode::default(), GameMode::RANDOM_MAP);
-        assert!(Age::FEUDAL < Age::CASTLE && Age::IMPERIAL < Age::POST_IMPERIAL);
-        assert_eq!(Age::POST_IMPERIAL.before(), Age::IMPERIAL);
-        assert!(Visibility::EXPLORED.explored_all() && Visibility::ALL_VISIBLE.explored_all());
-        assert!(!Visibility::NORMAL.explored_all());
+        assert!(GameMode::RandomMap.standard() && !GameMode::RandomMap.scenario());
+        assert_eq!(GameMode::default(), GameMode::RandomMap);
+        assert!(Age::Feudal < Age::Castle && Age::Imperial < Age::PostImperial);
+        assert_eq!(Age::PostImperial.before(), Age::Imperial);
+        assert!(Visibility::Explored.explored_all() && Visibility::AllVisible.explored_all());
+        assert!(!Visibility::Normal.explored_all());
         assert!(!TreatyLength::NONE.holds() && TreatyLength::of_minutes(10).holds());
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_age_value_maps_to_its_variant_and_back() {
+        for value in [0, 2, 3, 4, 5, 1] {
+            assert_eq!(Age::of_raw(value).raw(), value);
+        }
+        assert!(matches!(Age::of_raw(1), Age::Other(_)));
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_visibility_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3] {
+            assert_eq!(Visibility::of_raw(value).raw(), value);
+        }
+        assert!(matches!(Visibility::of_raw(3), Visibility::Other(_)));
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_game_mode_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 9] {
+            assert_eq!(GameMode::of_raw(value).raw(), value);
+        }
+        assert!(matches!(GameMode::of_raw(9), GameMode::Other(_)));
     }
 }

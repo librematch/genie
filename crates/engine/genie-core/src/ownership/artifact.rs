@@ -598,7 +598,7 @@ impl Unit {
                 .map(|s| s.capture);
         let combat = MasterKind::COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
         let r = ArtifactReads {
-            searches: !(combat && capture == Some(CaptureKind::NONE)),
+            searches: !(combat && capture == Some(CaptureKind::None)),
             by,
         };
         // written back before an error too: the stop's context reads the list

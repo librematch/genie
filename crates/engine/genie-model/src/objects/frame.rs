@@ -116,32 +116,60 @@ impl genie_diff::Diff for Frame {
 /// A sprite's animation state (`animate_flag`, `+0x36`): stopped, playing or waiting out its
 /// replay delay. Every byte is kept.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct AnimateState(u8);
+pub enum AnimateState {
+    /// 0: stopped (a static sprite's, or one played once to its end).
+    #[default]
+    Stopped,
+    /// 1: playing.
+    Playing,
+    /// 2: past its last frame, waiting out the replay delay.
+    Delayed,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`AnimateState`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(u8);
 
 impl AnimateState {
-    /// 0: stopped (a static sprite's, or one played once to its end).
-    pub const STOPPED: Self = Self(0);
-    /// 1: playing.
-    pub const PLAYING: Self = Self(1);
-    /// 2: past its last frame, waiting out the replay delay.
-    pub const DELAYED: Self = Self(2);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: u8) -> Self {
+        match value {
+            0 => Self::Stopped,
+            1 => Self::Playing,
+            2 => Self::Delayed,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> u8 {
+        match self {
+            Self::Stopped => 0,
+            Self::Playing => 1,
+            Self::Delayed => 2,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
 
     /// The state of the save's byte `value`.
     #[must_use]
     pub const fn of_data(value: u8) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 
     /// The byte, as the save holds it.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self.raw()
     }
 }
 
 impl genie_diff::Diff for AnimateState {
     fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+        self.raw().diff(&other.raw(), d);
     }
 }
 
@@ -174,8 +202,17 @@ mod tests {
     /// The animation state keeps its byte.
     #[test]
     fn the_animation_state_keeps_its_byte() {
-        assert_eq!(AnimateState::of_data(2), AnimateState::DELAYED);
-        assert_eq!(AnimateState::default(), AnimateState::STOPPED);
-        assert_eq!(AnimateState::PLAYING.get(), 1);
+        assert_eq!(AnimateState::of_data(2), AnimateState::Delayed);
+        assert_eq!(AnimateState::default(), AnimateState::Stopped);
+        assert_eq!(AnimateState::Playing.get(), 1);
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_animate_state_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3] {
+            assert_eq!(AnimateState::of_raw(value).raw(), value);
+        }
+        assert!(matches!(AnimateState::of_raw(3), AnimateState::Other(_)));
     }
 }

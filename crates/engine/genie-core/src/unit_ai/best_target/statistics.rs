@@ -305,7 +305,7 @@ impl Statistics {
             self.moving_distance.least.get(),
         );
         for e in &mut self.entries {
-            let top = if mode == TargetingMode::KILL_TIME {
+            let top = if mode == TargetingMode::KillTime {
                 factor.as_f32() * PER_CENT
             } else {
                 1.0
@@ -339,7 +339,7 @@ impl Statistics {
                 TargetScore::new(weights[k].get() * best_target_tuning.score)
             });
             e.total = ((e.kill_score + e.distance_score) + e.weight) + e.bonus;
-            if mode == TargetingMode::ARMORED && armored(e.id)? {
+            if mode == TargetingMode::Armored && armored(e.id)? {
                 e.total *= factor.as_f32() * PER_CENT;
             }
         }

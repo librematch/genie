@@ -254,7 +254,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
         };
         let dropped = hunt.update_drop(c, self, me, site, who);
         if let Some(h) = actions.list.hunt_mut() {
@@ -296,7 +296,7 @@ impl Unit {
             NotifyKind::ACTION_FAILED,
             [AiAction::Hunt.value(), 0, 0],
         )?;
-        Ok(HeadCode::of(UpdateCode::FAILED))
+        Ok(HeadCode::of(UpdateCode::Failed))
     }
 
     /// States 15 and 11: the walk to a point
@@ -325,7 +325,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
         };
         let walked = hunt.update_point_walk(c, self, me, who);
         if let Some(h) = actions.list.hunt_mut() {

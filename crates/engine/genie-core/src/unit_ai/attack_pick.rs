@@ -282,7 +282,7 @@ impl Seeker {
     /// unit groups): with an order, or without one in a stance below 2.
     #[must_use]
     pub const fn can_move(&self) -> bool {
-        self.order.is_some() || self.stance.below(UnitStance::STAND_GROUND)
+        self.order.is_some() || self.stance.below(UnitStance::StandGround)
     }
 }
 
@@ -483,7 +483,7 @@ pub fn soldier_can_attack(
     if t.kind == MasterKind::BUILDING && t.desolid {
         return Ok(false);
     }
-    if s.stance == UnitStance::NO_ATTACK {
+    if s.stance == UnitStance::NoAttack {
         return Ok(false);
     }
     if !stance_reaches(me, s, t, unit_ai_tuning)? {
@@ -533,12 +533,12 @@ pub(super) fn stance_reaches(
     let d2 = point_gap_squared(s.state_position, t.position, t.radius);
     let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
     match s.stance {
-        UnitStance::STAND_GROUND
+        UnitStance::StandGround
             if !matches!(s.order, Some(OrderKind::Defend)) && reach.squared() < d2 =>
         {
             return Ok(false);
         }
-        UnitStance::DEFENSIVE => {
+        UnitStance::Defensive => {
             if matches!(s.order, Some(OrderKind::Patrol | OrderKind::AttackMove)) || s.patrol_path {
                 defend_patrol_range()?;
             }

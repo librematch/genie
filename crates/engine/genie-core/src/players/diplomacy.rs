@@ -46,15 +46,15 @@ const REVEAL_UNIT: usize = 204;
 #[must_use]
 pub fn unit_kind(p: PlayerId, q: PlayerId, relation: Relation) -> UnitRelation {
     if q == PlayerId::GAIA {
-        UnitRelation::GAIA
+        UnitRelation::Gaia
     } else if p == q {
-        UnitRelation::OWN
+        UnitRelation::Own
     } else if relation.allied(true) {
-        UnitRelation::ALLY
-    } else if relation == Relation::NEUTRAL {
-        UnitRelation::NEUTRAL
+        UnitRelation::Ally
+    } else if relation == Relation::Neutral {
+        UnitRelation::Neutral
     } else {
-        UnitRelation::ENEMY
+        UnitRelation::Enemy
     }
 }
 
@@ -83,7 +83,7 @@ impl World {
             .diplomacy
             .get(q)
             .copied()
-            .unwrap_or(Stance::NONE)
+            .unwrap_or(Stance::None)
             != stance
         {
             self.set_stance(p, q, stance)?;
@@ -169,7 +169,7 @@ impl World {
         }
         let inside = u.life.inside;
         let (position, garrison) = (u.position(), u.garrison.clone());
-        if relation != Relation::ALLY {
+        if relation != Relation::Ally {
             self.leave_foreign_holder(p, id, q, inside)?;
             // The market (master 84), whose owner's diplomacy change toward a computer player shows it to
             // that player's tile list.
@@ -185,7 +185,7 @@ impl World {
         if kind != MasterKind::BUILDING {
             return Ok(());
         }
-        if relation == Relation::ALLY {
+        if relation == Relation::Ally {
             if self
                 .model
                 .roles
@@ -334,7 +334,7 @@ impl World {
             for j in players.clone() {
                 let both = |a: PlayerId, b: PlayerId| {
                     self.players.player(a).is_ok_and(|pl| {
-                        pl.relations.get(b) == Some(&Relation::ALLY) && pl.allied_victory == 1
+                        pl.relations.get(b) == Some(&Relation::Ally) && pl.allied_victory == 1
                     })
                 };
                 if j != i && self.team(j) < Team::FIRST && both(i, j) && both(j, i) {
@@ -402,7 +402,7 @@ mod tests {
         let player = |p: usize| Player {
             attributes: vec![Amount::ZERO; 300],
             relations: relation_row((0..4).map(|q| if q == p { 0 } else { 3 })),
-            diplomacy: ByPlayer::new(vec![Stance::NONE; 9]),
+            diplomacy: ByPlayer::new(vec![Stance::None; 9]),
             ..Player::default()
         };
         let mut t = World::new(
@@ -420,7 +420,7 @@ mod tests {
                         Some(unit_kind(
                             PlayerId::new(p),
                             PlayerId::new(q),
-                            Relation::ENEMY,
+                            Relation::Enemy,
                         ))
                     })
                     .collect()
@@ -434,32 +434,32 @@ mod tests {
     #[test]
     fn the_queries_kind_follows_the_relation() {
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(0), Relation::ALLY),
-            UnitRelation::GAIA
+            unit_kind(PlayerId::new(1), PlayerId::new(0), Relation::Ally),
+            UnitRelation::Gaia
         );
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(1), Relation::ENEMY),
-            UnitRelation::OWN
+            unit_kind(PlayerId::new(1), PlayerId::new(1), Relation::Enemy),
+            UnitRelation::Own
         );
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::ALLY),
-            UnitRelation::ALLY
+            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::Ally),
+            UnitRelation::Ally
         );
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::RELATION_4),
-            UnitRelation::ALLY
+            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::Relation4),
+            UnitRelation::Ally
         );
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::NEUTRAL),
-            UnitRelation::NEUTRAL
+            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::Neutral),
+            UnitRelation::Neutral
         );
         assert_eq!(
             unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::from(2)),
-            UnitRelation::ENEMY
+            UnitRelation::Enemy
         );
         assert_eq!(
-            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::ENEMY),
-            UnitRelation::ENEMY
+            unit_kind(PlayerId::new(1), PlayerId::new(2), Relation::Enemy),
+            UnitRelation::Enemy
         );
     }
 
@@ -469,66 +469,66 @@ mod tests {
     #[test]
     fn diplomacy_change_sets_the_stance_and_the_relation() {
         let mut t = world();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::ALLY)
+        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally)
             .unwrap();
         assert_eq!(
             t.players[1].diplomacy.get(PlayerId::new(2)),
-            Some(&Stance::ALLY)
+            Some(&Stance::Ally)
         );
         assert_eq!(
             t.players[1].relations.get(PlayerId::new(2)),
-            Some(&Relation::ALLY)
+            Some(&Relation::Ally)
         );
         assert_eq!(
             t.players[2].relations.get(PlayerId::new(1)),
-            Some(&Relation::ENEMY)
+            Some(&Relation::Enemy)
         );
         assert_eq!(
             t.spatial
                 .relations
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
-            Some(&Relation::ALLY)
+            Some(&Relation::Ally)
         );
         assert_eq!(
             t.spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::ALLY))
+            Some(&Some(UnitRelation::Ally))
         );
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::NEUTRAL)
+        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Neutral)
             .unwrap();
         assert_eq!(
             t.players[1].diplomacy.get(PlayerId::new(2)),
-            Some(&Stance::NEUTRAL)
+            Some(&Stance::Neutral)
         );
         assert_eq!(
             t.spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::NEUTRAL))
+            Some(&Some(UnitRelation::Neutral))
         );
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::ENEMY)
+        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Enemy)
             .unwrap();
         assert_eq!(
             t.players[1].diplomacy.get(PlayerId::new(2)),
-            Some(&Stance::ENEMY)
+            Some(&Stance::Enemy)
         );
         assert_eq!(
             t.players[1].relations.get(PlayerId::new(2)),
-            Some(&Relation::ENEMY)
+            Some(&Relation::Enemy)
         );
         assert_eq!(
             t.spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
-            Some(&Some(UnitRelation::ENEMY))
+            Some(&Some(UnitRelation::Enemy))
         );
         let before = t.players.clone();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(9), Stance::ALLY)
+        t.set_diplomacy(PlayerId::new(1), PlayerId::new(9), Stance::Ally)
             .unwrap();
         assert_eq!(t.players, before);
     }
@@ -538,9 +538,9 @@ mod tests {
     #[test]
     fn mutual_allies_with_allied_victory_form_team() {
         let mut t = world();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(3), Stance::ALLY)
+        t.set_diplomacy(PlayerId::new(1), PlayerId::new(3), Stance::Ally)
             .unwrap();
-        t.set_diplomacy(PlayerId::new(3), PlayerId::new(1), Stance::ALLY)
+        t.set_diplomacy(PlayerId::new(3), PlayerId::new(1), Stance::Ally)
             .unwrap();
         assert_eq!(t.teams.map(Team::get), [1; 8]);
         t.players[1].allied_victory = 1;
@@ -583,9 +583,9 @@ mod tests {
         for (a, b) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
             for (x, y) in [(a, b), (b, a)] {
                 let row = &mut t.players[usize::from(x)].relations;
-                *row = ByPlayer::new(vec![Relation::ENEMY; 9]);
-                row.set(PlayerId::new(x), Relation::ALLY);
-                row.set(PlayerId::new(y), Relation::ALLY);
+                *row = ByPlayer::new(vec![Relation::Enemy; 9]);
+                row.set(PlayerId::new(x), Relation::Ally);
+                row.set(PlayerId::new(y), Relation::Ally);
             }
         }
         t.resolve_teams();
@@ -602,7 +602,7 @@ mod tests {
         t.players[2].attributes[REVEAL_UNIT] = Amount::new(-1.0);
         assert_eq!(t.reveal_units(), Err(REVEAL_UNITS));
         assert_eq!(
-            t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::ALLY),
+            t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally),
             Err(REVEAL_UNITS)
         );
     }

@@ -328,7 +328,7 @@ fn the_unit_lists_keep_their_counted_ids() {
         Command::UnitAiState(UnitAiStateCommand {
             player: player_id(3),
             units: unit_list(object_ids([34])),
-            state: UnitStance::STAND_GROUND,
+            state: UnitStance::StandGround,
         })
     );
     let scout = packets::AutoScout {
@@ -375,7 +375,7 @@ fn the_unit_lists_keep_their_counted_ids() {
         Command::FormFormation(FormFormationCommand {
             player: player_id(3),
             units: unit_list(object_ids([37, 38])),
-            formation: FormationKind::STAGGERED,
+            formation: FormationKind::Staggered,
         })
     );
     let gather = packets::SetGatherState {
@@ -392,7 +392,7 @@ fn the_unit_lists_keep_their_counted_ids() {
         Command::SetGatherState(SetGatherStateCommand {
             player: player_id(4),
             units: unit_list(object_ids([39, 40])),
-            state: Some(GatherPointState::KEPT),
+            state: Some(GatherPointState::Kept),
         })
     );
     let stop = packets::Stop {
@@ -900,7 +900,7 @@ fn flare_trade_and_game_keep_their_fields() {
             .unwrap(),
             Command::Game(GameCommand {
                 issuer: player_id(2),
-                sub: GameSub::SPEED,
+                sub: GameSub::Speed,
                 player: 3,
                 a: -1,
                 speed: 1.7,

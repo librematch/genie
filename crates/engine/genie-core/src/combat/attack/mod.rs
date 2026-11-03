@@ -334,8 +334,8 @@ impl AttackReads {
             player_kind,
             world_time: now,
             can_move: ai
-                .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::DEFENSIVE),
-            stance: ai.map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::Defensive),
+            stance: ai.map_or(UnitStance::Aggressive, |ai| ai.stance),
             state_position: ai.map_or(Point::ORIGIN, |ai| ai.state_position),
             queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),

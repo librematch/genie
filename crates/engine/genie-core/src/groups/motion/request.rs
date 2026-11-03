@@ -89,11 +89,11 @@ pub(super) fn request(
         way: ground(waypoint, at),
     };
     let mut plan = PathSoFar::default();
-    if leg.level == WaypointLevel::TOP {
+    if leg.level == WaypointLevel::Top {
         tile_plan(lead, world, &leg, target, &mut plan, by_id)?;
     }
     let level = motion.paths.checked(0)?;
-    let (short_range, beyond) = if leg.level == WaypointLevel::TOP
+    let (short_range, beyond) = if leg.level == WaypointLevel::Top
         && level.waypoint == WaypointIndex::last_of(level.points.len())
     {
         (leg.range, leg.way - leg.range)
@@ -413,7 +413,7 @@ pub(super) fn link(
     now: WorldTime,
 ) -> Result<Option<Pass>, GenieError> {
     let level = motion.paths.checked(0)?;
-    if (level.level == WaypointLevel::TOP && !found) || path.points.len() < 2 {
+    if (level.level == WaypointLevel::Top && !found) || path.points.len() < 2 {
         if !found {
             if level.continue_counter < LAST_TRIES {
                 if level.waypoint.at_or_past_last(level.points.len()) {
@@ -426,7 +426,7 @@ pub(super) fn link(
                         .paths
                         .last()
                         .is_some_and(|t| t.has_path && !t.waypoint.at_or_past_last(t.points.len()));
-                    if level.level < WaypointLevel::TOP && top_has_more {
+                    if level.level < WaypointLevel::Top && top_has_more {
                         motion.paths.checked_mut(0)?.state = PathState::Unplanned;
                         return Ok(Some(Pass::Next));
                     }
@@ -451,7 +451,7 @@ pub(super) fn link(
     // A level's plans (`FUN_140f8f670`, `FUN_140f9b800`).
     // A new path's flags (`FUN_14152eea0`).
     level.continue_counter = PlanTries::FULL;
-    let (range, target, top) = (level.range, level.target, level.level == WaypointLevel::TOP);
+    let (range, target, top) = (level.range, level.target, level.level == WaypointLevel::Top);
     let new = PathData {
         points: path.points,
         has_path: true,
@@ -467,14 +467,14 @@ pub(super) fn link(
             PathState::Walking
         },
         level: if top && planned {
-            WaypointLevel::PLANNED
+            WaypointLevel::Planned
         } else {
-            WaypointLevel::WALKED
+            WaypointLevel::Walked
         },
         linked_kind: if found {
-            LinkedPathKind::REACHES_WAYPOINT
+            LinkedPathKind::ReachesWaypoint
         } else {
-            LinkedPathKind::MOVES_ON
+            LinkedPathKind::MovesOn
         },
         ..PathData::without_path()
     };

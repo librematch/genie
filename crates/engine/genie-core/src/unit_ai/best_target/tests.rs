@@ -794,23 +794,23 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     };
     let me = soldier();
     assert_eq!(
-        checked(&me, &thing, UnitRelation::ENEMY, &[]),
+        checked(&me, &thing, UnitRelation::Enemy, &[]),
         (true, vec!['a', 'f'])
     );
     assert_eq!(
-        checked(&me, &thing, UnitRelation::NEUTRAL, &[]),
+        checked(&me, &thing, UnitRelation::Neutral, &[]),
         (true, vec!['a', 'f', 'n'])
     );
     assert_eq!(
-        checked(&me, &thing, UnitRelation::NEUTRAL, &['a']),
+        checked(&me, &thing, UnitRelation::Neutral, &['a']),
         (false, vec!['a'])
     );
     assert_eq!(
-        checked(&me, &thing, UnitRelation::NEUTRAL, &['f']),
+        checked(&me, &thing, UnitRelation::Neutral, &['f']),
         (false, vec!['a', 'f'])
     );
     assert_eq!(
-        checked(&me, &thing, UnitRelation::NEUTRAL, &['n']),
+        checked(&me, &thing, UnitRelation::Neutral, &['n']),
         (false, vec!['a', 'f', 'n'])
     );
     let building = Searcher {
@@ -818,7 +818,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
         ..soldier()
     };
     assert_eq!(
-        checked(&building, &thing, UnitRelation::ENEMY, &[]),
+        checked(&building, &thing, UnitRelation::Enemy, &[]),
         (true, vec!['a'])
     );
     for t in [
@@ -839,7 +839,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
             ..thing
         },
     ] {
-        assert_eq!(checked(&me, &t, UnitRelation::ENEMY, &[]), (false, vec![]));
+        assert_eq!(checked(&me, &t, UnitRelation::Enemy, &[]), (false, vec![]));
     }
 }
 

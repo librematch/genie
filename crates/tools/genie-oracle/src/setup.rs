@@ -211,7 +211,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
                 victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
                 fealty: Fealty::of_data(p.world_player().fealty as i16),
                 // the load sets it 0 (`FUN_14163e970`)
-                posture: Posture::AGGRESSIVE,
+                posture: Posture::Aggressive,
                 dodge_chance: Chance::of_data(p.world_player().chance_to_dodge_missiles),
                 keep_distance_chance: Chance::of_data(
                     p.world_player().chance_for_archers_to_maintain_distance,

@@ -224,7 +224,7 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
     assert_eq!(
         t.players[1].history.events,
         [Event {
-            kind: EventKind::DEFEAT,
+            kind: EventKind::Defeat,
             time_slice: TimeSlice::of_data(4),
             world_time: WorldTime::from_millis(5_000),
             data1: 3.0,
@@ -1110,7 +1110,7 @@ fn resignation_cancels_the_queues_and_the_last_side_wins() {
     let p = &t.players[1];
     assert_eq!(
         (p.game_status, p.resigned, p.dropped),
-        (GameStatus::LOST, true, false)
+        (GameStatus::Lost, true, false)
     );
     assert_eq!(p.attributes[0], Amount::new(46.0));
     assert_eq!(
@@ -1135,7 +1135,7 @@ fn resignation_cancels_the_queues_and_the_last_side_wins() {
     assert_eq!(t.game_state, PlayState::of_data(1));
     assert_eq!(
         (t.players[1].game_status, t.players[2].game_status),
-        (GameStatus::LOST, GameStatus::WON)
+        (GameStatus::Lost, GameStatus::Won)
     );
 }
 
@@ -1168,45 +1168,45 @@ fn one_side_left_after_resignation_ends_conquest_game() {
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
-        GameStatus::LOST,
+        GameStatus::Lost,
         0,
-        (Relation::ALLY, Relation::ALLY),
+        (Relation::Ally, Relation::Ally),
     );
     c.add(
         PlayerId::new(2),
-        GameStatus::PLAYING,
+        GameStatus::Playing,
         0,
-        (Relation::ALLY, Relation::ALLY),
+        (Relation::Ally, Relation::Ally),
     );
     assert_eq!((c.playing, c.side, c.lost, c.won), (1, 1, 1, 0));
     // two players still playing, enemies: two sides
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
-        GameStatus::PLAYING,
+        GameStatus::Playing,
         0,
-        (Relation::ALLY, Relation::ALLY),
+        (Relation::Ally, Relation::Ally),
     );
     c.add(
         PlayerId::new(2),
-        GameStatus::PLAYING,
+        GameStatus::Playing,
         0,
-        (Relation::ENEMY, Relation::ENEMY),
+        (Relation::Enemy, Relation::Enemy),
     );
     assert_eq!((c.playing, c.side), (2, -1));
     // allies with the allied victory are one side
     let mut c = Count::default();
     c.add(
         PlayerId::new(1),
-        GameStatus::PLAYING,
+        GameStatus::Playing,
         1,
-        (Relation::ALLY, Relation::ALLY),
+        (Relation::Ally, Relation::Ally),
     );
     c.add(
         PlayerId::new(2),
-        GameStatus::PLAYING,
+        GameStatus::Playing,
         1,
-        (Relation::ALLY, Relation::ALLY),
+        (Relation::Ally, Relation::Ally),
     );
     assert_eq!((c.playing, c.side), (2, 1));
 }
@@ -1214,11 +1214,11 @@ fn one_side_left_after_resignation_ends_conquest_game() {
 /// A game status keeps the game's byte; won and lost are the ended ones.
 #[test]
 fn game_status_keeps_its_byte_and_knows_the_ended_ones() {
-    assert_eq!(GameStatus::of_data(2), GameStatus::LOST);
-    assert_eq!(GameStatus::WON.get(), 1);
-    assert_eq!(GameStatus::default(), GameStatus::PLAYING);
-    assert!(GameStatus::WON.ended() && GameStatus::LOST.ended());
-    assert!(!GameStatus::PLAYING.ended() && !GameStatus::of_data(3).ended());
+    assert_eq!(GameStatus::of_data(2), GameStatus::Lost);
+    assert_eq!(GameStatus::Won.get(), 1);
+    assert_eq!(GameStatus::default(), GameStatus::Playing);
+    assert!(GameStatus::Won.ended() && GameStatus::Lost.ended());
+    assert!(!GameStatus::Playing.ended() && !GameStatus::of_data(3).ended());
 }
 
 /// The victory state and the fealty keep their saved values: met is 2, a fealty names a player
@@ -1230,4 +1230,13 @@ fn the_victory_state_and_the_fealty_keep_their_values() {
     assert!(Fealty::of_data(3).names_player());
     assert!(!Fealty::of_data(0).names_player() && !Fealty::of_data(-1).names_player());
     assert_eq!(Fealty::of_data(-1).get(), -1);
+}
+
+/// Each named value and one the set names nowhere go to their variant and back.
+#[test]
+fn every_game_status_value_maps_to_its_variant_and_back() {
+    for value in [0, 1, 2, 3] {
+        assert_eq!(GameStatus::of_raw(value).raw(), value);
+    }
+    assert!(matches!(GameStatus::of_raw(3), GameStatus::Other(_)));
 }

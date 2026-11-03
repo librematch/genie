@@ -41,7 +41,7 @@ use crate::world::{FrameSeed, Player, World};
 fn game_of(issuer: u8) -> GameCommand {
     GameCommand {
         issuer: player_id(issuer),
-        sub: GameSub::DIPLOMACY,
+        sub: GameSub::Diplomacy,
         player: 0,
         a: 0,
         speed: 0.0,
@@ -210,7 +210,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
         Command::UnitAiState(UnitAiStateCommand {
             player: player_id(p),
             units: unit_list(object_ids(ids.clone())),
-            state: UnitStance::DEFENSIVE,
+            state: UnitStance::Defensive,
         }),
         Command::UnitOrder(UnitOrderCommand {
             player: player_id(p),

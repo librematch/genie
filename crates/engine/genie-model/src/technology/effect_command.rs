@@ -548,7 +548,7 @@ mod tests {
                 tech: TechId::of_data(7),
                 resource: None,
                 amount: 3.0,
-                mode: ChangeMode::SCALE,
+                mode: ChangeMode::Scale,
             }
         );
         assert_eq!(

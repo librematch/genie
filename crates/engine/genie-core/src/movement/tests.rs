@@ -2213,7 +2213,7 @@ fn level_without_path_marks_its_waypoint_pauses_or_waits() {
             .is_err()
     );
     assert!(out(&|m| m.attack_moving = true).0.is_err());
-    assert!(out(&|m| m.paths[0].level = WaypointLevel::TOP).0.is_err());
+    assert!(out(&|m| m.paths[0].level = WaypointLevel::Top).0.is_err());
     let (r, m) = out(&|m| m.paths[0].waypoint = WaypointIndex::of_data(0));
     assert!(matches!(r, Ok(AfterRequest::Again)));
     assert_eq!(m.paths[0].flags, LevelFlags::REACHED);
@@ -3528,10 +3528,10 @@ fn request_spends_try_and_gives_up_or_goes_on_without_more() {
     assert_eq!((m.paths.len(), m.paths[0].state), (1, PathState::GaveUp));
     assert_eq!(m.animated.speed, Speed::new(0.0));
     let mut m = last_try();
-    m.paths[0].level = WaypointLevel::TOP;
+    m.paths[0].level = WaypointLevel::Top;
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::GaveUp)));
     let mut m = last_try();
-    m.paths[0].level = WaypointLevel::TOP;
+    m.paths[0].level = WaypointLevel::Top;
     m.paths[0].waypoint = WaypointIndex::of_data(0);
     assert_eq!(m.spend_try(), Ok(Some(AfterRequest::Again)));
     assert_eq!(
@@ -3550,7 +3550,7 @@ fn way_9177(goal: Goal<'_>, range: Distance) -> Way<'_> {
         waypoint: BVector::new(30.0, 0.0, 88.0),
         distance: ground(BVector::new(30.0, 0.0, 88.0), BVector::new(28.0, 0.0, 89.0)),
         radius: Distance::new(0.2),
-        level: WaypointLevel::WALKED,
+        level: WaypointLevel::Walked,
         range,
         target_id: None,
         trade_cart: false,
@@ -3650,7 +3650,7 @@ fn new_move_to_wait_lasts_second() {
         (MoveWaitState::Never, Seconds::ZERO, Seconds::new(1.0))
     );
     let mut wait = new;
-    let _ = wait.give_up(true, UnitStance::STAND_GROUND);
+    let _ = wait.give_up(true, UnitStance::StandGround);
     assert_eq!(
         (wait.state, wait.delay),
         (MoveWaitState::Waiting, Seconds::new(2.0))

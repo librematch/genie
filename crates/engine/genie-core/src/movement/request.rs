@@ -204,8 +204,8 @@ impl Mover {
         if level.continue_counter.left() {
             return Ok(None);
         }
-        if WaypointLevel::PLANNED < level.level || !top_has_more {
-            if level.level == WaypointLevel::TOP
+        if WaypointLevel::Planned < level.level || !top_has_more {
+            if level.level == WaypointLevel::Top
                 && !level.waypoint.at_or_past_last(level.points.len())
             {
                 level.flags |= LevelFlags::REACHED;
@@ -399,6 +399,6 @@ impl Mover {
         Ok(level.target.is_some()
             && level.waypoint == WaypointIndex::last_of(level.points.len())
             && way - level.range <= Distance::new(movement_tuning.short_reach)
-            && level.level == WaypointLevel::TOP)
+            && level.level == WaypointLevel::Top)
     }
 }

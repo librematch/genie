@@ -136,8 +136,8 @@ impl Unit {
         Ok(Some(match g.member_reason(self.id) {
             // A group member's own move's reasons slot 0x5e0 tells apart (`FUN_141017590`): moved aside,
             // and none.
-            MoveReason::ASIDE => GroupSpeed::Aside,
-            MoveReason::NONE => GroupSpeed::Free,
+            MoveReason::Aside => GroupSpeed::Aside,
+            MoveReason::None => GroupSpeed::Free,
             _ => GroupSpeed::OwnMove(g.motion.maximum_velocity_forward),
         }))
     }
@@ -184,7 +184,7 @@ impl Unit {
             c.w.parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance);
+                .map_or(UnitStance::Aggressive, |ai| ai.stance);
         self.own_move_gave_up(
             actions,
             c.w.parts.motion.layer_mut(self.id),

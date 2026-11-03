@@ -91,7 +91,7 @@ pub(super) fn may_attack(
     if me.kind == MasterKind::COMBAT && !world.spares_friends(id)? {
         return Ok(false);
     }
-    if relation == UnitRelation::NEUTRAL && !world.attacks_neutral(t.class)? {
+    if relation == UnitRelation::Neutral && !world.attacks_neutral(t.class)? {
         return Ok(false);
     }
     Ok(true)
@@ -359,9 +359,9 @@ impl Walked {
             best_target_tuning,
         } = layer;
         let lowest = if me.scenario && !me.player_kind.is_computer() {
-            UnitRelation::ALLY
+            UnitRelation::Ally
         } else {
-            UnitRelation::GAIA
+            UnitRelation::Gaia
         };
         for (relation, list) in lists.iter().rev() {
             if relation < lowest {

@@ -120,7 +120,7 @@ impl World {
         if !matches!(code.get(), 1..=3) {
             return Ok(());
         }
-        if code == UpdateCode::DONE {
+        if code == UpdateCode::Done {
             self.note_shared_research(p, i)?;
         }
         self.end_production_action(p, i)?;
@@ -302,7 +302,7 @@ impl World {
             .get(self.players.live(p, i)?.id)
             .and_then(|q| q.action);
         match action {
-            None => Ok(UpdateCode::DONE),
+            None => Ok(UpdateCode::Done),
             Some(Making::Unit(_)) => self.make_step(p, i, dt_seconds),
             Some(Making::Research(_)) => self.research_step(p, i, dt_seconds),
         }
@@ -330,9 +330,9 @@ impl World {
             return Err(NO_MAKE_ACTION);
         };
         match make.state {
-            MakeObjState::Done => return Ok(UpdateCode::DONE),
+            MakeObjState::Done => return Ok(UpdateCode::Done),
             MakeObjState::Making => {}
-            MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UNDER_WAY),
+            MakeObjState::New | MakeObjState::NoSpot => return Ok(UpdateCode::UnderWay),
         }
         let site = building.master(self.master_tables(), p)?;
         let rate =
@@ -351,7 +351,7 @@ impl World {
             m.progress = progress;
         }
         if below_or_unordered(progress.get(), time) {
-            return Ok(UpdateCode::UNDER_WAY);
+            return Ok(UpdateCode::UnderWay);
         }
         let pop = made.map_or(Amount::ZERO, |m| population(&m.storage, &self.model.roles));
         self.spawn(
@@ -370,7 +370,7 @@ impl World {
         {
             m.state = MakeObjState::Done;
         }
-        Ok(UpdateCode::DONE)
+        Ok(UpdateCode::Done)
     }
 
     /// The production list's first action goes (`FUN_140a98e20`, and `FUN_140a98620` for the
@@ -409,7 +409,7 @@ impl World {
             Making::Research(r) => return self.research_destroyed(p, i, &r),
         };
         if matches!(make.state, MakeObjState::Making | MakeObjState::NoSpot)
-            && self.game_state == PlayState::PLAYING
+            && self.game_state == PlayState::Playing
         {
             let made = make
                 .master

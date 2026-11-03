@@ -154,7 +154,7 @@ impl Unit {
                 .parts
                 .unit_ai
                 .get(self.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
             defaults: MoveDefaults::of(
                 master,
                 c.w.parts.combat_of(self.id).abilities.look.as_ref(),

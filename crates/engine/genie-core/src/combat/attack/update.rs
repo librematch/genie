@@ -58,7 +58,7 @@ impl Attack {
         self.timer += dt;
         if !armed {
             self.state = AttackState::Done;
-            return Ok((UpdateCode::DONE, true));
+            return Ok((UpdateCode::Done, true));
         }
         if self.state != AttackState::Done {
             return Err(GenieError::unsupported(
@@ -66,7 +66,7 @@ impl Attack {
             ));
         }
         motion.set_anim_speed(Speed::ZERO);
-        Ok((UpdateCode::DONE, false))
+        Ok((UpdateCode::Done, false))
     }
 
     /// The update (`0x140a82ae0`) of an Attack in state 5 or 11 whose target is gone (its target
@@ -111,11 +111,11 @@ impl Attack {
                     c.w.streams.get(Stream::Sprite),
                     c.w.model.tuning.sprite,
                 )?;
-                Ok(UpdateCode::DONE)
+                Ok(UpdateCode::Done)
             }
             3 => self.walk_failed(c, unit),
             4 => Err(QUIET_CODE),
-            _ => Ok(UpdateCode::UNDER_WAY),
+            _ => Ok(UpdateCode::UnderWay),
         }
     }
 
@@ -186,7 +186,7 @@ impl Attack {
             // case 0: the unit's animation stops; the list deletes the Attack
             AttackState::Done => {
                 set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
-                Ok(UpdateCode::DONE)
+                Ok(UpdateCode::Done)
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
             // 11) to where it was seen
@@ -205,11 +205,11 @@ impl Attack {
                     [600, 0, 0],
                 )?;
                 set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
-                Ok(UpdateCode::FAILED)
+                Ok(UpdateCode::Failed)
             }
             // the states without a case (0; 3, 8 to 10, 12, 14 and above, which no step sets)
             // return 0
-            AttackState::New => Ok(UpdateCode::UNDER_WAY),
+            AttackState::New => Ok(UpdateCode::UnderWay),
         }
     }
 
@@ -250,7 +250,7 @@ impl Attack {
             c.w.streams.get(Stream::Sprite),
             c.w.model.tuning.sprite,
         )?;
-        Ok(UpdateCode::CODE_5)
+        Ok(UpdateCode::Code5)
     }
 
     /// The update on a target `t` that moved from where it was seen; Some with the update's code
@@ -287,7 +287,7 @@ impl Attack {
                     .ok_or(ATTACKER_UNMOVING)?;
             let gap = footprint_gap(unit.place.position(), ground, t.position, t.radius);
             self.follow(unit, &mut c.w.attack_ground(unit.id), r, f, gap)?;
-            return Ok(Some(UpdateCode::UNDER_WAY));
+            return Ok(Some(UpdateCode::UnderWay));
         }
         if !seen
             && matches!(
@@ -312,7 +312,7 @@ impl Attack {
                     &c.w.model.graphics,
                     &c.w.model.tuning.move_to,
                 )?;
-                return Ok(Some(UpdateCode::UNDER_WAY));
+                return Ok(Some(UpdateCode::UnderWay));
             }
         }
         Ok(None)
@@ -353,7 +353,7 @@ impl Attack {
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
-            return Ok(Some(UpdateCode::DONE));
+            return Ok(Some(UpdateCode::Done));
         }
         // a target inside another (+0x2f0): the attack ends (set_state 1) and returns 4, which
         // keeps it in the list; a unit's own Attack (not quiet, +0x60) of a unit whose unit AI's
@@ -372,7 +372,7 @@ impl Attack {
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
-            return Ok(Some(UpdateCode::CODE_4));
+            return Ok(Some(UpdateCode::Code4));
         }
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
@@ -390,7 +390,7 @@ impl Attack {
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
             }
-            return Ok(Some(UpdateCode::DONE));
+            return Ok(Some(UpdateCode::Done));
         }
         Ok(None)
     }
@@ -412,7 +412,7 @@ impl Attack {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
                 self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
-                return Ok(UpdateCode::CODE_5);
+                return Ok(UpdateCode::Code5);
             }
             Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
             Readiness::Waiting => {}
@@ -420,7 +420,7 @@ impl Attack {
                 self.follow(unit, &mut g, r, f, gap)?;
             }
         }
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     }
 
     /// State 2's step (case 1, the target killed): once the swing's sprite looped the attack lets
@@ -436,7 +436,7 @@ impl Attack {
             .sprite
             .is_none_or(|sp| sp.looped || !sp.graphic.flags.contains(SpriteFlags::ANIMATED));
         if !done {
-            return Ok(UpdateCode::UNDER_WAY);
+            return Ok(UpdateCode::UnderWay);
         }
         // the target goes (slot 0x68 with none: a sub-action lets nothing go; the unit's
         // attack count clears, the caller's) and the attack ends (set_state 1); the Hunt's
@@ -454,7 +454,7 @@ impl Attack {
                 NotifyKind::ACTION_INVALIDATED,
                 [600, 0, 0x202],
             )?;
-            return Ok(UpdateCode::CODE_5);
+            return Ok(UpdateCode::Code5);
         }
         // a unit's own Attack (not quiet, `+0x60` 0): the target goes (slot 0x68 with
         // none), it posts 0x1fb with 600 and 0x202, ends (set_state 1) and returns 2,
@@ -472,7 +472,7 @@ impl Attack {
             c.w.streams.get(Stream::Sprite),
             c.w.model.tuning.sprite,
         )?;
-        Ok(UpdateCode::CODE_2)
+        Ok(UpdateCode::Code2)
     }
 
     /// `set_state(5)` (`0x140a820c0` case 5): the sub-actions go, the range is slot 0x238's
@@ -534,7 +534,7 @@ impl Attack {
     ) -> Result<UpdateCode, GenieError> {
         if sees(&c.w.spatial, f, target)? {
             self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
-            return Ok(UpdateCode::UNDER_WAY);
+            return Ok(UpdateCode::UnderWay);
         }
         if matches!(self.state, AttackState::GotoSeen { .. })
             && f.own.player != PlayerId::new(0)
@@ -553,7 +553,7 @@ impl Attack {
                 &c.w.model.graphics,
                 &c.w.model.tuning.move_to,
             )?;
-            return Ok(UpdateCode::UNDER_WAY);
+            return Ok(UpdateCode::UnderWay);
         }
         let target = self.target.take();
         if self.voice.is_loud() {
@@ -573,7 +573,7 @@ impl Attack {
                 [600, 0, 0],
             )?;
         }
-        Ok(UpdateCode::FAILED)
+        Ok(UpdateCode::Failed)
     }
 }
 

@@ -124,13 +124,13 @@ pub(crate) fn strike(
             .damaged
             .push((Some(own.id), [own.id.get(), own.hp.get() as i32, master_hp]));
         return Ok(Struck {
-            result: StrikeResult::SHIELDED,
+            result: StrikeResult::Shielded,
             executed: None,
         });
     }
     let a = own.source;
     let mut struck = Struck {
-        result: StrikeResult::HIT,
+        result: StrikeResult::Hit,
         executed: None,
     };
     if MasterKind::MISSILE <= a.kind

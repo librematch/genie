@@ -332,13 +332,13 @@ impl World {
                 };
                 match self.object(target) {
                     Some((_, t)) => Some(GatherPoint {
-                        state: GatherPointState::POINT,
+                        state: GatherPointState::Point,
                         point: Position::new(t.position().x(), t.position().y(), 0.0),
                         target,
                         target_master: Some(t.life.master_id),
                     }),
                     None => (g.point.x() != -1.0 && g.point.y() != -1.0).then_some(GatherPoint {
-                        state: GatherPointState::POINT,
+                        state: GatherPointState::Point,
                         point: Position::new(g.point.x(), g.point.y(), 0.0),
                         target: None,
                         target_master: None,

@@ -413,7 +413,7 @@ impl Unit {
             .sight
             .as_ref()
             .and_then(|v| v.seer(self.id))
-            .map_or(CaptureKind::NONE, |s| s.capture)
+            .map_or(CaptureKind::None, |s| s.capture)
     }
 
     /// One pass of the unit AI ([`Unit::ai_part`]) as the player `captured` names (its new

@@ -40,7 +40,7 @@ impl Unit {
         }
         // the sprite list's slot 0x20 on the current sprite (FUN_1413b38a0)
         let animating = self.sprite.is_some_and(|s| {
-            s.animate != AnimateState::STOPPED && s.graphic.flags.contains(SpriteFlags::ANIMATED)
+            s.animate != AnimateState::Stopped && s.graphic.flags.contains(SpriteFlags::ANIMATED)
         });
         let leaves =
             if self

@@ -30,10 +30,10 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 pub(super) const fn tech_cost_mode(mode: ModifyMode) -> Option<(Option<AttributeId>, ChangeMode)> {
     let mode = mode.get();
     match mode {
-        0..=3 => Some((Some(AttributeId::named(mode)), ChangeMode::SET)),
-        0x4000..=0x4003 => Some((Some(AttributeId::named(mode - 0x4000)), ChangeMode::ADD)),
-        0xd..=0x10 => Some((Some(AttributeId::named(mode - 0xd)), ChangeMode::SCALE)),
-        0x11 => Some((None, ChangeMode::SCALE)),
+        0..=3 => Some((Some(AttributeId::named(mode)), ChangeMode::Set)),
+        0x4000..=0x4003 => Some((Some(AttributeId::named(mode - 0x4000)), ChangeMode::Add)),
+        0xd..=0x10 => Some((Some(AttributeId::named(mode - 0xd)), ChangeMode::Scale)),
+        0x11 => Some((None, ChangeMode::Scale)),
         _ => None,
     }
 }
@@ -42,9 +42,9 @@ pub(super) const fn tech_cost_mode(mode: ModifyMode) -> Option<(Option<Attribute
 /// multiplies).
 pub(super) const fn tech_time_mode(mode: ModifyMode) -> Option<ChangeMode> {
     match mode.get() {
-        -1 => Some(ChangeMode::SET),
-        -2 => Some(ChangeMode::ADD),
-        -3 => Some(ChangeMode::SCALE),
+        -1 => Some(ChangeMode::Set),
+        -2 => Some(ChangeMode::Add),
+        -3 => Some(ChangeMode::Scale),
         _ => None,
     }
 }
@@ -143,8 +143,8 @@ impl World {
         let (tech, t) = (t, t.index());
         let short = cvttss2si(v) as i16;
         match mode {
-            ModifyMode::BUILDING => self.set_tech_building(p, tech, v, at)?,
-            ModifyMode::BUTTON => {
+            ModifyMode::Building => self.set_tech_building(p, tech, v, at)?,
+            ModifyMode::Button => {
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
                 for (i, l) in state.locations.iter_mut().enumerate() {
                     if at.is_none_or(|a| a == i) {
@@ -152,18 +152,18 @@ impl World {
                     }
                 }
             }
-            ModifyMode::STACKING => {
+            ModifyMode::Stacking => {
                 self.players.player_mut(p)?.techs.checked_mut(t)?.stack = v != 0.0;
             }
-            ModifyMode::RESEARCH_CAP => {
+            ModifyMode::ResearchCap => {
                 self.players
                     .player_mut(p)?
                     .techs
                     .checked_mut(t)?
                     .research_cap = ResearchCap::of_data(short);
             }
-            ModifyMode::STATE => self.set_tech_state(p, tech, v)?,
-            ModifyMode::EFFECT_OVERRIDE => {
+            ModifyMode::State => self.set_tech_state(p, tech, v)?,
+            ModifyMode::EffectOverride => {
                 // `FUN_1413d4320`: a researched technology gives its new effect at once, with no
                 // object
                 let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
@@ -173,7 +173,7 @@ impl World {
                     self.do_table_effect(p, effect, None)?;
                 }
             }
-            _ => {}
+            ModifyMode::Other(_) => {}
         }
         Ok(())
     }
@@ -309,7 +309,7 @@ impl World {
             };
             let short = |x: f32| f32::from(cvttss2si(x) as i16);
             let adjustment = match mode {
-                ChangeMode::SCALE => {
+                ChangeMode::Scale => {
                     let half = if below_or_unordered(v, ONE) {
                         -ROUND
                     } else {
@@ -317,7 +317,7 @@ impl World {
                     };
                     Seconds::new(short((v - ONE) * time + half)) + entry.adjustment
                 }
-                ChangeMode::SET => {
+                ChangeMode::Set => {
                     let s = if v == NO_TIME { 0 } else { cvttss2si(v) as i16 };
                     Seconds::new(f32::from(s) - time)
                 }
@@ -326,7 +326,7 @@ impl World {
             entry.adjustment = adjustment;
             let done = state.state == ResearchState::Available
                 && adjustment + Seconds::new(time) <= state.research_done
-                && (mode != ChangeMode::SET || v != NO_TIME);
+                && (mode != ChangeMode::Set || v != NO_TIME);
             if done {
                 let _ = self.complete_research(p, tech_id, None)?;
             }

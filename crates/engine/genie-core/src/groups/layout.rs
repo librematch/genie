@@ -76,17 +76,17 @@ pub(crate) fn slots_by_place(
         s.active = 0;
     }
     formation.kind = if user_defined {
-        FormationKind::USER_DEFINED
+        FormationKind::UserDefined
     } else {
-        FormationKind::HORDE
+        FormationKind::Horde
     };
     formation.maximum_width = -1;
     formation.maximum_depth = -1;
     formation.number_lines = 0;
     formation.transform_kind = if user_defined {
-        TransformKind::TURNED
+        TransformKind::Turned
     } else {
-        TransformKind::UNTURNED
+        TransformKind::Unturned
     };
     let position = group.motion.position[0];
     for (i, m) in members.iter().enumerate().take(n) {
@@ -215,9 +215,9 @@ pub(crate) fn phalanx_slots(
     for s in formation.every_slot_mut() {
         s.active = 0;
     }
-    formation.kind = FormationKind::PHALANX;
+    formation.kind = FormationKind::Phalanx;
     formation.use_slots(0);
-    formation.transform_kind = TransformKind::BY_LINES;
+    formation.transform_kind = TransformKind::ByLines;
     formation.maximum_width = lines;
     formation.maximum_depth = lines;
     formation.number_lines = lines;
@@ -543,8 +543,8 @@ pub(crate) fn box_slots(
         formation.use_slots(used);
     }
     formation.number_lines = 0;
-    formation.kind = FormationKind::BOX;
-    formation.transform_kind = TransformKind::TURNED;
+    formation.kind = FormationKind::Box;
+    formation.transform_kind = TransformKind::Turned;
     // CVTTSS2SI at 0x141012147 (a NaN or out of range width is i32::MIN)
     let width = cvttss2si(max_x - min_x);
     formation.maximum_width = width;
@@ -740,7 +740,7 @@ mod tests {
                 f.maximum_depth,
                 f.number_lines
             ),
-            (FormationKind::HORDE, TransformKind::UNTURNED, -1, -1, 0)
+            (FormationKind::Horde, TransformKind::Unturned, -1, -1, 0)
         );
         assert_eq!(f.slots.len(), 3);
         let s = &f.slots[0];
@@ -806,7 +806,7 @@ mod tests {
         );
         assert_eq!(
             (f.kind, f.transform_kind),
-            (FormationKind::USER_DEFINED, TransformKind::TURNED)
+            (FormationKind::UserDefined, TransformKind::Turned)
         );
         let offsets: Vec<BVector> = f.slots.iter().map(|s| s.offset).collect();
         assert_eq!(
@@ -1023,15 +1023,15 @@ mod tests {
         );
         assert_eq!(
             (f.kind, f.transform_kind),
-            (FormationKind::HORDE, TransformKind::UNTURNED)
+            (FormationKind::Horde, TransformKind::Unturned)
         );
         let mut f = Formation::new();
         assert!(t.create_udf(&mut f, &g).unwrap());
         assert_eq!(
             (f.kind, f.transform_kind, f.slots[3].unit_id),
             (
-                FormationKind::USER_DEFINED,
-                TransformKind::TURNED,
+                FormationKind::UserDefined,
+                TransformKind::Turned,
                 Some(object_id(12))
             )
         );
@@ -1067,7 +1067,7 @@ mod tests {
                 f.maximum_depth,
                 f.number_lines
             ),
-            (FormationKind::PHALANX, TransformKind::BY_LINES, 3, 3, 3)
+            (FormationKind::Phalanx, TransformKind::ByLines, 3, 3, 3)
         );
         let slots: Vec<(BVector, i32, i32)> = f
             .slots
@@ -1305,7 +1305,7 @@ mod tests {
         assert!(box_slots(&mut f, &g, WorldTime::from_millis(5), &tuning().group).unwrap());
         assert_eq!(
             (f.kind, f.transform_kind, f.maximum_width, f.maximum_depth),
-            (FormationKind::BOX, TransformKind::TURNED, 4, 4)
+            (FormationKind::Box, TransformKind::Turned, 4, 4)
         );
         let slots: Vec<(BVector, i32)> = f
             .slots

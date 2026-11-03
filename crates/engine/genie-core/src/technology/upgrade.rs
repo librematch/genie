@@ -1658,7 +1658,7 @@ mod tests {
                     explored: true,
                     building: None,
                     umv: 0,
-                    capture: CaptureKind::NONE,
+                    capture: CaptureKind::None,
                     kind: MasterKind::COMBAT,
                 },
             );

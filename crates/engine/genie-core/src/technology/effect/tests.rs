@@ -929,7 +929,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             explored: true,
             building: None,
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::STATIC,
         };
         v.add_seer(object_id(1), seer);
@@ -1159,7 +1159,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
         explored: true,
         building: None,
         umv: 0,
-        capture: CaptureKind::NONE,
+        capture: CaptureKind::None,
         kind: MasterKind::COMBAT,
     };
     v.add_seer(object_id(1), seer);
@@ -1969,7 +1969,7 @@ fn an_age_adds_its_event_to_the_history() {
     assert_eq!(
         t.players[0].history.events,
         [Event {
-            kind: EventKind::CASTLE_AGE,
+            kind: EventKind::CastleAge,
             time_slice: TimeSlice::of_data(20),
             world_time: WorldTime::from_millis(612_345),
             ..Event::default()

@@ -176,7 +176,7 @@ impl UnitView<'_, '_> {
             .sight
             .as_ref()
             .and_then(|v| v.seer(u.id))
-            .map_or(CaptureKind::NONE, |s| s.capture);
+            .map_or(CaptureKind::None, |s| s.capture);
         let me = u.attacker_of(
             actions,
             ai.ai_kind,

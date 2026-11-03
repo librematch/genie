@@ -38,39 +38,79 @@ use crate::world::slots::CheckedIndex;
 /// destroyed, a battle or a defeat. Every byte is a kind (a save may hold kinds the slice
 /// does not name).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
-pub struct EventKind(u8);
+pub enum EventKind {
+    /// Feudal Age reached (research 101).
+    #[default]
+    FeudalAge,
+    /// Castle Age reached (research 102).
+    CastleAge,
+    /// Imperial Age reached (research 103).
+    ImperialAge,
+    /// A wonder built (master 276); `data1` is its owner.
+    WonderBuilt,
+    /// A wonder destroyed, on its destroyer's history; `data1` is its owner.
+    WonderDestroyed,
+    /// A castle built (master 82); `data1` is its owner.
+    CastleBuilt,
+    /// A castle destroyed, on its destroyer's history; `data1` is its owner.
+    CastleDestroyed,
+    /// A battle: `data1` the opponent, `data2` its share of the player's value, `data3` 1.
+    Battle,
+    /// A defeat: `data1` the player with the most of attribute 300 + its own id, `data2` that value.
+    Defeat,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`EventKind`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(u8);
 
 impl EventKind {
-    /// Feudal Age reached (research 101).
-    pub const FEUDAL_AGE: Self = Self(0);
-    /// Castle Age reached (research 102).
-    pub const CASTLE_AGE: Self = Self(1);
-    /// Imperial Age reached (research 103).
-    pub const IMPERIAL_AGE: Self = Self(2);
-    /// A wonder built (master 276); `data1` is its owner.
-    pub const WONDER_BUILT: Self = Self(4);
-    /// A wonder destroyed, on its destroyer's history; `data1` is its owner.
-    pub const WONDER_DESTROYED: Self = Self(5);
-    /// A castle built (master 82); `data1` is its owner.
-    pub const CASTLE_BUILT: Self = Self(6);
-    /// A castle destroyed, on its destroyer's history; `data1` is its owner.
-    pub const CASTLE_DESTROYED: Self = Self(7);
-    /// A battle: `data1` the opponent, `data2` its share of the player's value, `data3` 1.
-    pub const BATTLE: Self = Self(11);
-    /// A defeat: `data1` the player with the most of attribute 300 + its own id, `data2` that value.
-    pub const DEFEAT: Self = Self(20);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: u8) -> Self {
+        match value {
+            0 => Self::FeudalAge,
+            1 => Self::CastleAge,
+            2 => Self::ImperialAge,
+            4 => Self::WonderBuilt,
+            5 => Self::WonderDestroyed,
+            6 => Self::CastleBuilt,
+            7 => Self::CastleDestroyed,
+            11 => Self::Battle,
+            20 => Self::Defeat,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> u8 {
+        match self {
+            Self::FeudalAge => 0,
+            Self::CastleAge => 1,
+            Self::ImperialAge => 2,
+            Self::WonderBuilt => 4,
+            Self::WonderDestroyed => 5,
+            Self::CastleBuilt => 6,
+            Self::CastleDestroyed => 7,
+            Self::Battle => 11,
+            Self::Defeat => 20,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
 
     /// Its value.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self.raw()
     }
 }
 
 impl From<u8> for EventKind {
     /// The kind a saved event's byte holds: every value is one.
     fn from(value: u8) -> Self {
-        Self(value)
+        Self::of_raw(value)
     }
 }
 
@@ -212,7 +252,7 @@ impl History {
                 data3: f32::from(data3),
             },
         );
-        if kind == EventKind::BATTLE {
+        if kind == EventKind::Battle {
             let _ = self.mark_new_battle();
         }
     }
@@ -226,7 +266,7 @@ impl History {
         let battles = self
             .events
             .iter()
-            .filter(|e| e.kind == EventKind::BATTLE)
+            .filter(|e| e.kind == EventKind::Battle)
             .count();
         let Some(new) = self.events.first_mut() else {
             return true;
@@ -243,7 +283,7 @@ impl History {
             if BATTLES_COMPARED <= seen {
                 break;
             }
-            if e.kind != EventKind::BATTLE {
+            if e.kind != EventKind::Battle {
                 continue;
             }
             seen += 1;
@@ -293,9 +333,9 @@ impl History {
     pub fn age_time(&self, current_age: Amount, world_time: WorldTime) -> u32 {
         let now = world_time.millis() / 1000;
         let kind = match cvttss2si(current_age.get()) {
-            1 => EventKind::FEUDAL_AGE,
-            2 => EventKind::CASTLE_AGE,
-            3 => EventKind::IMPERIAL_AGE,
+            1 => EventKind::FeudalAge,
+            2 => EventKind::CastleAge,
+            3 => EventKind::ImperialAge,
             _ => return now,
         };
         self.event_of_kind(kind)
@@ -471,7 +511,7 @@ impl History {
         self.events.insert(
             0,
             Event {
-                kind: EventKind::BATTLE,
+                kind: EventKind::Battle,
                 time_slice: TimeSlice::of_count(self.entries.len()),
                 world_time,
                 data1: opponent.index() as f32,
@@ -517,14 +557,14 @@ mod tests {
     /// A saved byte is its kind; the default is the Feudal Age's 0.
     #[test]
     fn saved_byte_is_its_event_kind() {
-        assert_eq!(EventKind::from(11), EventKind::BATTLE);
-        assert_eq!(EventKind::DEFEAT.get(), 20);
-        assert_eq!(EventKind::default(), EventKind::FEUDAL_AGE);
+        assert_eq!(EventKind::from(11), EventKind::Battle);
+        assert_eq!(EventKind::Defeat.get(), 20);
+        assert_eq!(EventKind::default(), EventKind::FeudalAge);
     }
 
     fn battle(data2: f32) -> Event {
         Event {
-            kind: EventKind::BATTLE,
+            kind: EventKind::Battle,
             data2,
             ..Event::default()
         }
@@ -571,7 +611,7 @@ mod tests {
     fn an_event_needs_an_entry_and_joins_the_head() {
         let mut h = History::default();
         h.add_event(
-            EventKind::CASTLE_BUILT,
+            EventKind::CastleBuilt,
             2.0,
             0.0,
             0,
@@ -580,14 +620,14 @@ mod tests {
         assert_eq!(h.events, []);
         h.entries = vec![HistoryEntry::default(); 3];
         h.add_event(
-            EventKind::FEUDAL_AGE,
+            EventKind::FeudalAge,
             0.0,
             0.0,
             0,
             WorldTime::from_millis(5000),
         );
         h.add_event(
-            EventKind::CASTLE_BUILT,
+            EventKind::CastleBuilt,
             2.0,
             0.5,
             7,
@@ -597,7 +637,7 @@ mod tests {
             h.events,
             vec![
                 Event {
-                    kind: EventKind::CASTLE_BUILT,
+                    kind: EventKind::CastleBuilt,
                     time_slice: TimeSlice::of_data(3),
                     world_time: WorldTime::from_millis(9000),
                     data1: 2.0,
@@ -605,7 +645,7 @@ mod tests {
                     data3: 7.0,
                 },
                 Event {
-                    kind: EventKind::FEUDAL_AGE,
+                    kind: EventKind::FeudalAge,
                     time_slice: TimeSlice::of_data(3),
                     world_time: WorldTime::from_millis(5000),
                     ..Event::default()
@@ -621,31 +661,31 @@ mod tests {
     fn fourth_battle_pushes_out_the_weakest_of_the_newest_three() {
         let mut h = with_entry();
         for d in [0.2, 0.9, 0.3] {
-            h.add_event(EventKind::BATTLE, 1.0, d, 0, WorldTime::ZERO);
+            h.add_event(EventKind::Battle, 1.0, d, 0, WorldTime::ZERO);
         }
         assert_eq!(h.events.len(), 3);
         assert!(h.events.iter().all(|e| e.data3 == 1.0));
         // the newest three are 0.5 (new), 0.3, 0.9: 0.3 lies furthest below
-        h.add_event(EventKind::BATTLE, 1.0, 0.5, 0, WorldTime::ZERO);
+        h.add_event(EventKind::Battle, 1.0, 0.5, 0, WorldTime::ZERO);
         let d: Vec<f32> = h.events.iter().map(|e| e.data2).collect();
         assert_eq!(d, vec![0.5, 0.9, 0.2]);
         // a new battle below the newest three goes itself; 0.2 is fourth and not compared
         h.events.insert(
             0,
             Event {
-                kind: EventKind::FEUDAL_AGE,
+                kind: EventKind::FeudalAge,
                 ..Event::default()
             },
         );
-        h.add_event(EventKind::BATTLE, 1.0, 0.4, 0, WorldTime::ZERO);
+        h.add_event(EventKind::Battle, 1.0, 0.4, 0, WorldTime::ZERO);
         assert_eq!(
             h.events
                 .iter()
-                .filter(|e| e.kind == EventKind::BATTLE)
+                .filter(|e| e.kind == EventKind::Battle)
                 .count(),
             3
         );
-        assert_eq!(h.events[0].kind, EventKind::FEUDAL_AGE);
+        assert_eq!(h.events[0].kind, EventKind::FeudalAge);
         // a NaN gap never qualifies
         h.events.insert(0, battle(f32::NAN));
         assert!(!h.mark_new_battle());
@@ -658,7 +698,7 @@ mod tests {
     fn equal_gaps_push_out_the_newer_battle() {
         let mut h = with_entry();
         h.events = vec![battle(0.1), Event::default(), battle(0.1), battle(0.9)];
-        h.add_event(EventKind::BATTLE, 3.0, 0.6, 0, WorldTime::ZERO);
+        h.add_event(EventKind::Battle, 3.0, 0.6, 0, WorldTime::ZERO);
         let d: Vec<f32> = h.events.iter().map(|e| e.data2).collect();
         assert_eq!(d, vec![0.6, 0.0, 0.1, 0.9]);
     }
@@ -670,19 +710,19 @@ mod tests {
         let h = History {
             events: vec![
                 Event {
-                    kind: EventKind::CASTLE_AGE,
+                    kind: EventKind::CastleAge,
                     time_slice: TimeSlice::of_data(4),
                     world_time: WorldTime::from_millis(9000),
                     ..Event::default()
                 },
                 Event {
-                    kind: EventKind::FEUDAL_AGE,
+                    kind: EventKind::FeudalAge,
                     time_slice: TimeSlice::of_data(2),
                     world_time: WorldTime::from_millis(4000),
                     ..Event::default()
                 },
                 Event {
-                    kind: EventKind::FEUDAL_AGE,
+                    kind: EventKind::FeudalAge,
                     time_slice: TimeSlice::of_data(2),
                     world_time: WorldTime::from_millis(1000),
                     ..Event::default()
@@ -691,10 +731,10 @@ mod tests {
             ..History::default()
         };
         assert_eq!(
-            h.event_of_kind(EventKind::FEUDAL_AGE).map(|e| e.world_time),
+            h.event_of_kind(EventKind::FeudalAge).map(|e| e.world_time),
             Some(WorldTime::from_millis(4000))
         );
-        assert_eq!(h.event_of_kind(EventKind::IMPERIAL_AGE), None);
+        assert_eq!(h.event_of_kind(EventKind::ImperialAge), None);
         assert_eq!(h.events_at(TimeSlice::of_data(2)), Some((2, 2)));
         assert_eq!(h.events_at(TimeSlice::of_data(4)), Some((1, 1)));
         assert_eq!(h.events_at(TimeSlice::of_data(3)), None);
@@ -705,7 +745,7 @@ mod tests {
     fn the_age_time_counts_from_the_age_event() {
         let h = History {
             events: vec![Event {
-                kind: EventKind::CASTLE_AGE,
+                kind: EventKind::CastleAge,
                 world_time: WorldTime::from_millis(600_999),
                 ..Event::default()
             }],
@@ -825,7 +865,7 @@ mod tests {
         assert_eq!(
             h.events,
             vec![Event {
-                kind: EventKind::BATTLE,
+                kind: EventKind::Battle,
                 time_slice: TimeSlice::of_data(2),
                 world_time: WorldTime::from_millis(60_000),
                 data1: 2.0,
@@ -882,5 +922,14 @@ mod tests {
         a[attribute::KILLS_VALUE.index()] = Amount::new(120.0);
         update(&mut h, &a, 0);
         assert_eq!(h.battle_flag, 0);
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_event_kind_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 4, 5, 6, 7, 11, 20, 3] {
+            assert_eq!(EventKind::of_raw(value).raw(), value);
+        }
+        assert!(matches!(EventKind::of_raw(3), EventKind::Other(_)));
     }
 }

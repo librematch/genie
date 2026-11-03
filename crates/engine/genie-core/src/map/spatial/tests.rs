@@ -1102,7 +1102,7 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
         Ok(vec![])
     );
     // an enemy's moving box grows in full
-    set_relation(&mut s, (2, 1), Relation::ENEMY);
+    set_relation(&mut s, (2, 1), Relation::Enemy);
     assert_eq!(
         s.walk_hits(WalkQuery {
             objects: objects.view(),
@@ -1426,7 +1426,7 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
     );
     assert_eq!(
         s.tile_sight(PlayerId::new(1), Tile::new(0, 0)),
-        Some(TileSight::UNKNOWN)
+        Some(TileSight::Unknown)
     );
 }
 
@@ -1499,11 +1499,11 @@ fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits
     assert_eq!(answers(PlayerId::new(0)), some([0, 0, 0x80, 0xf, 0, 0, 0]));
     assert_eq!(
         s.tile_sight(PlayerId::new(1), Tile::new(-1, 0)),
-        Some(TileSight::UNKNOWN)
+        Some(TileSight::Unknown)
     );
     assert_eq!(
         s.tile_sight(PlayerId::new(1), Tile::new(0, 1)),
-        Some(TileSight::UNKNOWN)
+        Some(TileSight::Unknown)
     );
     assert_eq!(
         Spatial::default().tile_sight(PlayerId::new(1), Tile::new(0, 0)),
@@ -1655,7 +1655,7 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         Ok(vec![object_id(9175)])
     );
     // allied both ways, the foundation occupies it; built (not desolid) too
-    set_relation(&mut s, (3, 2), Relation::ALLY);
+    set_relation(&mut s, (3, 2), Relation::Ally);
     assert_eq!(
         occupants(
             &s,
@@ -1663,7 +1663,7 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         ),
         Ok(vec![object_id(9175), object_id(33990)])
     );
-    set_relation(&mut s, (3, 2), Relation::ENEMY);
+    set_relation(&mut s, (3, 2), Relation::Enemy);
     assert_eq!(
         occupants(&s, look(ObjectState::Alive, MasterKind::BUILDING, false)),
         Ok(vec![object_id(9175), object_id(33990)])
@@ -2234,7 +2234,7 @@ const fn seer_in(state: ObjectState) -> Seer {
         explored: true,
         building: None,
         umv: 0,
-        capture: CaptureKind::NONE,
+        capture: CaptureKind::None,
         kind: MasterKind::COMBAT,
     }
 }

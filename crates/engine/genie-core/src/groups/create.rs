@@ -406,7 +406,7 @@ impl World {
             id,
             specific_move: SpecificMove {
                 path_id: MovePath::NONE,
-                reason: MoveReason::NONE,
+                reason: MoveReason::None,
                 ..SpecificMove::default()
             },
             seconds_since_attacking: seconds,
@@ -771,7 +771,7 @@ mod tests {
         }
         let asleep = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
         let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
-        t.stances_state(group_id(1), FormationKind::USER_DEFINED)
+        t.stances_state(group_id(1), FormationKind::UserDefined)
             .unwrap();
         assert_eq!(
             t.parts
@@ -779,7 +779,7 @@ mod tests {
                 .get(t.players[1].sleeping[ListIndex::new(0)].id)
                 .unwrap()
                 .formation_kind,
-            FormationKind::USER_DEFINED
+            FormationKind::UserDefined
         );
         assert_eq!(
             t.parts
@@ -787,7 +787,7 @@ mod tests {
                 .get(t.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
                 .formation_kind,
-            FormationKind::USER_DEFINED
+            FormationKind::UserDefined
         );
     }
 
@@ -807,24 +807,21 @@ mod tests {
                     }),
                 );
             }
-            t.stances_state(group_id(1), FormationKind::USER_DEFINED)
+            t.stances_state(group_id(1), FormationKind::UserDefined)
                 .unwrap();
             t.groups.get(group_id(1)).unwrap().stance
         };
         let (a, d, s) = (
-            UnitStance::AGGRESSIVE,
-            UnitStance::DEFENSIVE,
-            UnitStance::STAND_GROUND,
+            UnitStance::Aggressive,
+            UnitStance::Defensive,
+            UnitStance::StandGround,
         );
         assert_eq!(with([d, s, d]), Some(d));
         assert_eq!(with([s, s, a]), Some(s));
         assert_eq!(with([a, d, s]), Some(a));
-        assert_eq!(
-            with([UnitStance::NO_ATTACK; 3]),
-            Some(UnitStance::NO_ATTACK)
-        );
+        assert_eq!(with([UnitStance::NoAttack; 3]), Some(UnitStance::NoAttack));
         let mut t = three();
-        t.stances_state(group_id(1), FormationKind::USER_DEFINED)
+        t.stances_state(group_id(1), FormationKind::UserDefined)
             .unwrap();
         assert_eq!(t.groups.get(group_id(1)).unwrap().stance, Some(a));
     }
@@ -846,7 +843,7 @@ mod tests {
             }
         }
         t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;
-        let _ = t.lock_formation(group_id(1), FormationKind::LINE);
+        let _ = t.lock_formation(group_id(1), FormationKind::Line);
         let spacing = t.groups.get(group_id(1)).unwrap().desired_spacing;
         assert_eq!(spacing, Distance::new(0.2 * tuning().group.spacing_factor));
     }

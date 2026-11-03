@@ -113,7 +113,7 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
         Arc::new(Masters::new([villager, tree])),
     ];
     let g = GatherPoint {
-        state: GatherPointState::POINT,
+        state: GatherPointState::Point,
         point: Position::new(21.0, 21.0, 0.0),
         target: Some(object_id(5)),
         target_master: Some(master_id(349)),
@@ -754,8 +754,8 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
             .last()
             .and_then(|u| t.parts.mover_of(u.id).map(|m| m.waiting))
     };
-    assert_eq!(waits(GatherPointState::POINT), Some(1));
-    assert_eq!(waits(GatherPointState::KEPT), Some(0));
+    assert_eq!(waits(GatherPointState::Point), Some(1));
+    assert_eq!(waits(GatherPointState::Kept), Some(0));
 }
 
 /// Every candidate of `site`'s search for a unit of radius 0.5 (a step of 0.5, no gap), all

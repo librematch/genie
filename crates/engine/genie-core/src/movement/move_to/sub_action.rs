@@ -135,11 +135,11 @@ impl MoveToAction {
                     self.point = point;
                 }
                 self.state = started.unwrap_or_else(|| self.wait.give_up(waits, stance));
-                UpdateCode::UNDER_WAY
+                UpdateCode::UnderWay
             }
             MoveTo::Moving => {
                 match self.check_target(walk)? {
-                    Follow::Again => return Ok(UpdateCode::UNDER_WAY),
+                    Follow::Again => return Ok(UpdateCode::UnderWay),
                     Follow::Blocked => inbox.post(NotifyKind::TARGET_MOVED, [0, 0, 0])?,
                     Follow::Stays | Follow::PathEnd(_) => {}
                 }
@@ -148,7 +148,7 @@ impl MoveToAction {
                     Some(other) => self.state = other,
                     None => self.state = self.wait.give_up(waits, stance),
                 }
-                UpdateCode::UNDER_WAY
+                UpdateCode::UnderWay
             }
             MoveTo::Waiting => {
                 self.wait.timer += walk.dt;
@@ -156,15 +156,15 @@ impl MoveToAction {
                     self.wait.timer = Seconds::ZERO;
                     self.state = MoveTo::Start;
                 }
-                UpdateCode::UNDER_WAY
+                UpdateCode::UnderWay
             }
             MoveTo::Failed => {
                 self.post_end(inbox, NotifyKind::ACTION_FAILED)?;
-                UpdateCode::FAILED
+                UpdateCode::Failed
             }
             MoveTo::Arrived => {
                 self.post_end(inbox, NotifyKind::ACTION_COMPLETED)?;
-                UpdateCode::DONE
+                UpdateCode::Done
             }
         })
     }

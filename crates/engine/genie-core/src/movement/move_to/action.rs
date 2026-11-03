@@ -461,13 +461,13 @@ impl MoveToAction {
             Some(s) if ObjectState::Undead < s => {
                 self.target = None;
                 if self.voice.is_quiet() {
-                    return Ok(Some(UpdateCode::CODE_5));
+                    return Ok(Some(UpdateCode::Code5));
                 }
                 inbox.post(
                     NotifyKind::ACTION_INVALIDATED,
                     [AiAction::Move.value(), -1, 0],
                 )?;
-                Ok(Some(UpdateCode::CODE_4))
+                Ok(Some(UpdateCode::Code4))
             }
             Some(_) => Ok(None),
         }

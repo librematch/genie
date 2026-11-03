@@ -79,7 +79,7 @@ impl Spatial {
         let out = |o: usize| {
             players
                 .get(o)
-                .is_some_and(|q| q.game_status != GameStatus::PLAYING)
+                .is_some_and(|q| q.game_status != GameStatus::Playing)
         };
         // a frozen unit that could count (of the combat type and a class that counts) may have
         // moved onto the tiles
@@ -261,7 +261,7 @@ impl Spatial {
     #[must_use]
     pub fn tile_sight(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(TileSight::UNKNOWN);
+            return Some(TileSight::Unknown);
         };
         let VisionMasks {
             visible: seen,
@@ -273,12 +273,12 @@ impl Spatial {
         if seen.intersects(word & VisionBits::OBJECT_MASK)
             || (revealed && (explored || all_explored))
         {
-            return Some(TileSight::SEEN);
+            return Some(TileSight::Seen);
         }
         Some(if explored || all_explored {
-            TileSight::EXPLORED
+            TileSight::Explored
         } else {
-            TileSight::UNKNOWN
+            TileSight::Unknown
         })
     }
 
@@ -297,13 +297,13 @@ impl Spatial {
         player: PlayerId,
     ) -> Option<TileSight> {
         let Some(v) = self.sight.as_ref() else {
-            return Some(TileSight::UNKNOWN);
+            return Some(TileSight::Unknown);
         };
         if self
             .tile_sight(player, position.ground().tile())
             .is_some_and(TileSight::seen)
         {
-            return Some(TileSight::SEEN);
+            return Some(TileSight::Seen);
         }
         let umv = v.seer(id).is_some_and(|s| s.umv != 0);
         let mask = v
@@ -313,7 +313,7 @@ impl Spatial {
             .map_or(VisionBits::NONE, |e| e.mask);
         let VisionMasks { visible, explored } = self.vision(player);
         if umv && (visible.intersects(mask) || explored.intersects(mask)) {
-            return Some(TileSight::SEEN);
+            return Some(TileSight::Seen);
         }
         None
     }
@@ -326,7 +326,7 @@ impl Spatial {
     #[must_use]
     pub fn scout_sight(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(TileSight::UNKNOWN);
+            return Some(TileSight::Unknown);
         };
         let word = word & VisionBits::OBJECT_MASK;
         let VisionMasks {
@@ -334,11 +334,11 @@ impl Spatial {
             explored,
         } = self.vision(player);
         Some(if seen.intersects(word) {
-            TileSight::SEEN
+            TileSight::Seen
         } else if explored.intersects(word) {
-            TileSight::EXPLORED
+            TileSight::Explored
         } else {
-            TileSight::UNKNOWN
+            TileSight::Unknown
         })
     }
 
@@ -351,7 +351,7 @@ impl Spatial {
     #[must_use]
     pub fn visibility(&self, player: PlayerId, tile: Tile) -> Option<TileSight> {
         let Some(word) = Self::unified_word(self.sight.as_ref()?, tile) else {
-            return Some(TileSight::UNKNOWN);
+            return Some(TileSight::Unknown);
         };
         let word = word & VisionBits::OBJECT_MASK;
         let VisionMasks {
@@ -359,11 +359,11 @@ impl Spatial {
             explored,
         } = self.vision(player);
         Some(if seen.intersects(word) {
-            TileSight::SEEN
+            TileSight::Seen
         } else if explored.intersects(word) {
-            TileSight::EXPLORED
+            TileSight::Explored
         } else {
-            TileSight::UNKNOWN
+            TileSight::Unknown
         })
     }
 
@@ -393,7 +393,7 @@ impl Spatial {
             .ok_or(GenieError::unsupported(
                 "a test of explored tiles without the players' sight",
             ))?;
-        Ok(answer != TileSight::UNKNOWN)
+        Ok(answer != TileSight::Unknown)
     }
 
     /// [`Spatial::visibility`] is 0xf: player `player` sees `tile` now. False without the

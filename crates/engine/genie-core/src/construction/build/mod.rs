@@ -741,7 +741,7 @@ mod stack_tests {
         assert_eq!(
             t.players[1].history.events,
             [Event {
-                kind: EventKind::CASTLE_BUILT,
+                kind: EventKind::CastleBuilt,
                 time_slice: TimeSlice::of_data(1),
                 world_time: WorldTime::from_millis(912_000),
                 data1: 1.0,

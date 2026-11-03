@@ -355,7 +355,7 @@ impl Spatial {
                 let found = self.last_found()?;
                 Ok(Found {
                     id,
-                    enemies: !found[UnitRelation::ENEMY].is_empty(),
+                    enemies: !found[UnitRelation::Enemy].is_empty(),
                     position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: players_seen(found),
@@ -367,7 +367,7 @@ impl Spatial {
                 let found = self.last_found()?;
                 Ok(Found {
                     id: None,
-                    enemies: !found[UnitRelation::ENEMY].is_empty(),
+                    enemies: !found[UnitRelation::Enemy].is_empty(),
                     position: None,
                     fresh,
                     players: 0,
@@ -391,7 +391,7 @@ impl Spatial {
                 }
                 Ok(Found {
                     id,
-                    enemies: !self.last_found()?[UnitRelation::ENEMY].is_empty(),
+                    enemies: !self.last_found()?[UnitRelation::Enemy].is_empty(),
                     position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
                     fresh,
                     players: 0,

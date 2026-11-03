@@ -375,8 +375,8 @@ impl World {
         let previous_column = g
             .previous_formation
             .as_ref()
-            .is_some_and(|p| p.kind == FormationKind::COLUMN);
-        if matches!(formation.kind, FormationKind::COLUMN | FormationKind::BOX) || !previous_column
+            .is_some_and(|p| p.kind == FormationKind::Column);
+        if matches!(formation.kind, FormationKind::Column | FormationKind::Box) || !previous_column
         {
             return Ok(());
         }

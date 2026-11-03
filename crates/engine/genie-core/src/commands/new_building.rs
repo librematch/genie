@@ -287,7 +287,7 @@ impl World {
         let combat = Combat {
             builders: BuilderCount::of_data(0),
             work_rate_powerup: WorkRate::ZERO,
-            capture_flag: CaptureKind::NONE,
+            capture_flag: CaptureKind::None,
             hp_powerup: HpPowerup::default(),
             regen_timer: Seconds::ZERO,
             regen_powerup: Regeneration::ZERO,

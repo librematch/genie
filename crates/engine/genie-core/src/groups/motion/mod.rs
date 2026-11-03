@@ -145,11 +145,11 @@ impl Motion {
         if self.paths.len() < 2 {
             return Ok(());
         }
-        while self.paths.checked(0)?.level != WaypointLevel::TOP && 1 < self.paths.len() {
+        while self.paths.checked(0)?.level != WaypointLevel::Top && 1 < self.paths.len() {
             let _ = self.paths.remove(0);
         }
         let level = self.paths.checked_mut(0)?;
-        if level.level == WaypointLevel::TOP {
+        if level.level == WaypointLevel::Top {
             level.waypoint = WaypointIndex::SECOND;
             level.state = PathState::WantsPath;
             level.continue_counter = PlanTries::FULL;

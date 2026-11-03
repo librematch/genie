@@ -333,7 +333,7 @@ fn engagement() -> Engagement {
         range: Distance::ZERO,
         min_range: Distance::ZERO,
         can_move: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         state_position: Point::ORIGIN,
         world_time: WorldTime::ZERO,
         master: ids::VILLAGER_MALE,
@@ -954,7 +954,7 @@ fn walk_to_the_point_ends_in_search_or_done() {
     let walker_at = PointWalker {
         player_kind: PlayerKind::Human,
         villager: true,
-        stance: UnitStance::DEFENSIVE,
+        stance: UnitStance::Defensive,
     };
     let run = |h: &mut HuntAction, who: PointWalker| {
         let mut rig = Rig::on(Spatial::default(), 0.8, Victim::default());
@@ -1051,7 +1051,7 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
     let who = PointWalker {
         player_kind: PlayerKind::Human,
         villager: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
     };
     let drop = |h: &mut HuntAction, rig: &mut Rig| {
         (
@@ -1156,7 +1156,7 @@ fn hunter_walks_pass_on_the_units_in_their_way() {
     let who = PointWalker {
         player_kind: PlayerKind::Human,
         villager: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
     };
     let in_the_way = vec![
         (NotifyKind::IN_THE_WAY, [77, -1, -1]),
@@ -1812,7 +1812,7 @@ fn drop_off_gives_the_load_to_the_player() {
     let who = PointWalker {
         player_kind: PlayerKind::Human,
         villager: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
     };
     let drop = |rig: &mut Rig, hunt: &mut HuntAction, held: Held, site| {
         (
@@ -1998,7 +1998,7 @@ fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
     let who = PointWalker {
         player_kind: PlayerKind::Human,
         villager: true,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
     };
     let lost = || {
         let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));

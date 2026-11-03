@@ -351,7 +351,7 @@ impl UnitAi {
             .is_some_and(|a| ENDED_ACTIONS.contains(&a))
         {
             if self.current_action == Some(AiAction::MoveAside)
-                && self.stance == UnitStance::STAND_GROUND
+                && self.stance == UnitStance::StandGround
             {
                 self.state_position = at.position.ground();
             }

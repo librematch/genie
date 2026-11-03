@@ -98,9 +98,9 @@ impl World {
             return Err(NO_RESEARCH_ACTION);
         };
         match r.state {
-            MakeTechState::Done => return Ok(UpdateCode::DONE),
+            MakeTechState::Done => return Ok(UpdateCode::Done),
             MakeTechState::Researching => {}
-            MakeTechState::New => return Ok(UpdateCode::UNDER_WAY),
+            MakeTechState::New => return Ok(UpdateCode::UnderWay),
         }
         let (t, def) = self.research_tech(p, r.tech)?;
         let master = building.life.master_id;
@@ -136,9 +136,9 @@ impl World {
                 ));
             }
             self.research_done(p, i, r.tech, master, repeatable)?;
-            return Ok(UpdateCode::DONE);
+            return Ok(UpdateCode::Done);
         }
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     }
 
     /// The research's end in its update (`0x140ad2a20`) once its progress reaches its time:
@@ -270,7 +270,7 @@ impl World {
     ) -> Result<(), GenieError> {
         use crate::technology::Attributes;
         let (t, _) = self.research_tech(p, r.tech)?;
-        if r.state != MakeTechState::Done && self.game_state == PlayState::PLAYING {
+        if r.state != MakeTechState::Done && self.game_state == PlayState::Playing {
             self.research_failed(p, i, r, t)?;
         }
         let def = self.model.techs.checked(t)?;

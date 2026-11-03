@@ -310,9 +310,9 @@ impl World {
             self.update_desired_positions(
                 group,
                 Some(if column {
-                    FormationKind::COLUMN
+                    FormationKind::Column
                 } else {
-                    FormationKind::LINE
+                    FormationKind::Line
                 }),
             )?;
         }
@@ -599,7 +599,7 @@ impl World {
         let g = self.groups.held_mut(group)?;
         g.members.checked_mut(k)?.specific_move = SpecificMove {
             path_id: MovePath::NONE,
-            reason: MoveReason::NONE,
+            reason: MoveReason::None,
             ..SpecificMove::default()
         };
         Ok(())
@@ -655,7 +655,7 @@ fn move_level(
         level.state = PathState::WantsPath;
         level.continue_counter = PlanTries::FULL;
     }
-    level.level = WaypointLevel::TOP;
+    level.level = WaypointLevel::Top;
     level
 }
 /// The id of a queued command's target, which the world holds.

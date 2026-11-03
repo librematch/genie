@@ -162,7 +162,7 @@ impl Attack {
                 c.w.parts
                     .mover_of(unit.id)
                     .map_or(Speed::ZERO, |m| m.stats.speed);
-            if r.stance == UnitStance::AGGRESSIVE
+            if r.stance == UnitStance::Aggressive
                 && Speed::ZERO < speed
                 && !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
             {
@@ -183,7 +183,7 @@ impl Attack {
                     &c.w.model.graphics,
                     &c.w.model.tuning.move_to,
                 )?;
-                return Ok(UpdateCode::CODE_5);
+                return Ok(UpdateCode::Code5);
             }
             unit.post_own(
                 &mut c.w.parts.unit_ai,
@@ -203,7 +203,7 @@ impl Attack {
             c.w.streams.get(Stream::Sprite),
             c.w.model.tuning.sprite,
         )?;
-        Ok(UpdateCode::CODE_5)
+        Ok(UpdateCode::Code5)
     }
 
     /// The update's answer to a target out of sight ([`Attack::update`]): the target goes (slot
@@ -240,7 +240,7 @@ impl Attack {
             ));
         }
         if self.voice.is_quiet() {
-            return Ok(UpdateCode::FAILED);
+            return Ok(UpdateCode::Failed);
         }
         let_go(c, unit, target)?;
         if r.ai_order.has_ai() {
@@ -263,7 +263,7 @@ impl Attack {
                 [600, 0, 0],
             )?;
         }
-        Ok(UpdateCode::FAILED)
+        Ok(UpdateCode::Failed)
     }
 
     /// `set_state(1)` (case 1): the unit's animation runs at speed 1 and it takes the sprite it

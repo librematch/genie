@@ -283,7 +283,7 @@ impl ExploreAction {
                 .parts
                 .unit_ai
                 .get(explorer.id)
-                .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
+                .map_or(UnitStance::Aggressive, |ai| ai.stance),
         };
         let how = ListUpdate {
             gives_up,
@@ -856,11 +856,11 @@ mod tests {
             }
         );
         assert_eq!(
-            a.after_walk(UpdateCode::UNDER_WAY, &tuning().move_to),
+            a.after_walk(UpdateCode::UnderWay, &tuning().move_to),
             Ok(Owner::Nothing)
         );
         assert_eq!(
-            a.after_walk(UpdateCode::DONE, &tuning().move_to),
+            a.after_walk(UpdateCode::Done, &tuning().move_to),
             Ok(Owner::WantsPoint)
         );
         assert_eq!(a.state, ExploreState::Wait);

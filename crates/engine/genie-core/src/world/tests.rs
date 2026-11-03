@@ -2569,7 +2569,7 @@ fn unit_side_reads_the_other_players_relations_around_its_own() {
         foreign
             .player(PlayerId::new(0))
             .and_then(|p| p.relations.get(PlayerId::GAIA).copied()),
-        Some(Relation::ALLY)
+        Some(Relation::Ally)
     );
     assert!(foreign.player(PlayerId::new(1)).is_none());
     assert_eq!(
@@ -2582,7 +2582,7 @@ fn unit_side_reads_the_other_players_relations_around_its_own() {
     // the owner (1) counts player 2 as an ally (0), player 2 counts the owner an enemy (2)
     let world = SideWorld {
         player: PlayerId::new(1),
-        relations: &ByPlayer::new(vec![Relation::NEUTRAL, Relation::NEUTRAL, Relation::ALLY]),
+        relations: &ByPlayer::new(vec![Relation::Neutral, Relation::Neutral, Relation::Ally]),
         foreign,
         drop_sites: &[],
     };
@@ -6484,7 +6484,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
-                    CaptureKind::NONE,
+                    CaptureKind::None,
                     Firepower::ZERO,
                     c.w.parts
                         .mover_of(unit.id)
@@ -6543,7 +6543,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
-                    CaptureKind::NONE,
+                    CaptureKind::None,
                     Firepower::ZERO,
                     c.w.parts
                         .mover_of(unit.id)
@@ -6595,7 +6595,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     (PlayerId::new(1), PlayerKind::Human),
                     false,
                     (
-                        CaptureKind::NONE,
+                        CaptureKind::None,
                         Firepower::ZERO,
                         c.w.parts
                             .mover_of(unit.id)
@@ -6869,7 +6869,7 @@ fn villager_side<R>(
                 (PlayerId::new(1), PlayerKind::Human),
                 false,
                 (
-                    CaptureKind::NONE,
+                    CaptureKind::None,
                     Firepower::ZERO,
                     c.w.parts
                         .mover_of(unit.id)
@@ -11228,9 +11228,9 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11242,7 +11242,7 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             object_id(27530),
             &artifact_players(
                 &none,
-                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
+                &[GameStatus::Playing, GameStatus::Lost, GameStatus::Playing]
             ),
             &roles()
         ),
@@ -11256,9 +11256,9 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11270,7 +11270,7 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             object_id(27530),
             &artifact_players(
                 &none,
-                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::PLAYING]
+                &[GameStatus::Playing, GameStatus::Lost, GameStatus::Playing]
             ),
             &roles()
         ),
@@ -11281,7 +11281,7 @@ fn an_owner_search_passes_over_player_out_of_the_game() {
             object_id(27530),
             &artifact_players(
                 &none,
-                &[GameStatus::PLAYING, GameStatus::LOST, GameStatus::WON]
+                &[GameStatus::Playing, GameStatus::Lost, GameStatus::Won]
             ),
             &roles()
         ),
@@ -11313,9 +11313,9 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11328,9 +11328,9 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
             &artifact_players(
                 &[0.0, 0.0, 1.0],
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11343,9 +11343,9 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
             &artifact_players(
                 &[0.0, 1.0, 1.0],
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11372,9 +11372,9 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11396,9 +11396,9 @@ fn an_owner_search_keeps_the_owner_animal_unless_attribute_97_takes_it() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11429,9 +11429,9 @@ fn an_owner_search_unmodelled_parts_fail() {
             &s,
             object_id(99),
             &[
-                GameStatus::PLAYING,
-                GameStatus::PLAYING,
-                GameStatus::PLAYING
+                GameStatus::Playing,
+                GameStatus::Playing,
+                GameStatus::Playing
             ]
         ),
         "an owner search of an object the world does not hold"
@@ -11449,9 +11449,9 @@ fn an_owner_search_unmodelled_parts_fail() {
             &s,
             object_id(27530),
             &[
-                GameStatus::PLAYING,
-                GameStatus::PLAYING,
-                GameStatus::PLAYING
+                GameStatus::Playing,
+                GameStatus::Playing,
+                GameStatus::Playing
             ]
         ),
         "an owner search's unit of a player beyond the list"
@@ -11474,9 +11474,9 @@ fn an_owner_search_unmodelled_parts_fail() {
             &s,
             object_id(27530),
             &[
-                GameStatus::PLAYING,
-                GameStatus::PLAYING,
-                GameStatus::PLAYING
+                GameStatus::Playing,
+                GameStatus::Playing,
+                GameStatus::Playing
             ]
         ),
         "an owner search near a stopped unit that counts"
@@ -11521,9 +11521,9 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11537,9 +11537,9 @@ fn an_owner_search_counts_only_the_units_on_the_tiles_lists() {
             &artifact_players(
                 &none,
                 &[
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING,
-                    GameStatus::PLAYING
+                    GameStatus::Playing,
+                    GameStatus::Playing,
+                    GameStatus::Playing
                 ]
             ),
             &roles()
@@ -11653,7 +11653,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
         .with_combats([(
             object_id(21712),
             Combat {
-                capture_flag: CaptureKind::BY_SIGHT,
+                capture_flag: CaptureKind::BySight,
                 ..Default::default()
             },
         )])
@@ -11679,7 +11679,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
     let ids: Vec<ObjectId> = t.players[1].objects.iter().map(|u| u.id).collect();
     assert_eq!(ids, [object_id(500), object_id(21712)]);
     let archer = &t.players[1].objects[ListIndex::new(1)];
-    assert_eq!(t.parts.combat_of(archer.id).capture_flag, CaptureKind::NONE);
+    assert_eq!(t.parts.combat_of(archer.id).capture_flag, CaptureKind::None);
     assert_eq!(
         t.parts.own_master.get(archer.id).map(|m| m.fog_visibility),
         Some(FogVisibility::VISIBLE)
@@ -11687,7 +11687,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
     let v = t.spatial.sight.as_ref().unwrap();
     assert_eq!(
         v.seer(object_id(21712)).map(|s| (s.player, s.capture)),
-        Some((PlayerId::new(1), CaptureKind::NONE))
+        Some((PlayerId::new(1), CaptureKind::None))
     );
     assert_eq!(
         [t.players[0].attributes[40], t.players[1].attributes[40]],
@@ -11702,7 +11702,7 @@ fn gaia_archer_player_sees_goes_to_that_player() {
         t.parts
             .combat_of(t.players[0].objects[ListIndex::new(0)].id)
             .capture_flag,
-        CaptureKind::BY_SIGHT
+        CaptureKind::BySight
     );
     assert_eq!(
         t.spatial.get(object_id(21712)).map(|p| p.player),
@@ -11797,8 +11797,8 @@ fn teardown_world() -> World {
                 ]
                 .into(),
                 relations: ByPlayer::new(vec![
-                    Relation::ALLY,
-                    Relation::NEUTRAL,
+                    Relation::Ally,
+                    Relation::Neutral,
                     Relation::from(2),
                 ]),
                 ..Player::default()
@@ -11806,9 +11806,9 @@ fn teardown_world() -> World {
             Player {
                 objects: split.0.into(),
                 relations: ByPlayer::new(vec![
-                    Relation::ALLY,
+                    Relation::Ally,
                     Relation::from(2),
-                    Relation::NEUTRAL,
+                    Relation::Neutral,
                 ]),
                 ..Player::default()
             },
@@ -12928,10 +12928,10 @@ fn foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
                 ]
                 .into(),
                 relations: ByPlayer::new(vec![
-                    Relation::ALLY,
-                    Relation::ALLY,
+                    Relation::Ally,
+                    Relation::Ally,
                     Relation::from(2),
-                    Relation::RELATION_4,
+                    Relation::Relation4,
                 ]),
                 ..Player::default()
             },
@@ -12942,9 +12942,9 @@ fn foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
                 ]
                 .into(),
                 relations: ByPlayer::new(vec![
-                    Relation::ALLY,
+                    Relation::Ally,
                     Relation::from(2),
-                    Relation::ALLY,
+                    Relation::Ally,
                     Relation::from(2),
                 ]),
                 ..Player::default()
@@ -12952,10 +12952,10 @@ fn foundation_lists_its_unallied_takers_and_drops_them_when_they_let_it_go() {
             Player {
                 objects: vec![unit(object_id(50), VILLAGER_MALE)].into(),
                 relations: ByPlayer::new(vec![
-                    Relation::ALLY,
-                    Relation::RELATION_4,
+                    Relation::Ally,
+                    Relation::Relation4,
                     Relation::from(2),
-                    Relation::ALLY,
+                    Relation::Ally,
                 ]),
                 ..Player::default()
             },
@@ -13308,7 +13308,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
     t.set_part(
         object_id(7),
         Part::GatherPoint(Some(GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(12.0, 12.0, 0.0),
             target: None,
             target_master: None,
@@ -13360,7 +13360,7 @@ fn gaia_building_with_the_artifact_unit_ai_changes_hands_whole() {
             explored: true,
             building: None,
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::COMBAT,
         },
     );
@@ -13517,7 +13517,7 @@ fn gaia_torch_goes_to_the_one_player_near_it() {
             explored: true,
             building: None,
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::COMBAT,
         },
     );
@@ -13659,7 +13659,7 @@ fn gaia_sheep_player_stands_by_goes_to_it() {
             explored: true,
             building: None,
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::COMBAT,
         },
     );
@@ -14270,7 +14270,7 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
     b.razed.push(Razed {
         attacker_player: PlayerId::new(1),
         owner: PlayerId::new(2),
-        event: Some(EventKind::CASTLE_DESTROYED),
+        event: Some(EventKind::CastleDestroyed),
         adds: vec![
             (PlayerId::new(1), attribute::RAZINGS, Amount::new(1.0)),
             (PlayerId::new(2), attribute::RAZINGS_OTHER, Amount::new(1.0)),
@@ -14298,7 +14298,7 @@ fn razed_building_write_back_reaches_its_annexes_history_and_counts() {
     assert_eq!([attacker[170], owner[152]], amounts([1300.0, 650.0]));
     let event = t.players[1]
         .history
-        .event_of_kind(EventKind::CASTLE_DESTROYED)
+        .event_of_kind(EventKind::CastleDestroyed)
         .unwrap();
     assert_eq!(event.data1, 2.0);
 }
@@ -14494,7 +14494,7 @@ fn set_gather_point_takes_the_point_and_target_or_clears_it() {
     assert_eq!(
         gather_of(&t, 0, 0),
         Some(GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(107.2451, 46.075_863, 0.0),
             target: Some(object_id(9520)),
             target_master: Some(master_id(705)),
@@ -14550,12 +14550,12 @@ fn set_gather_state_makes_the_building_its_own_gather_point_or_clears_it() {
             target_master: Some(ids::TOWN_CENTRE),
         })
     };
-    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::POINT))]);
+    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::Point))]);
     assert_eq!(t.players[0].unsupported, None);
-    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::POINT));
+    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::Point));
     // the state byte is the state, 0xff included
-    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
-    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::KEPT));
+    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::Kept))]);
+    assert_eq!(gather_of(&t, 0, 0), own(GatherPointState::Kept));
     t.tick_with(Millis::new(25), &[set(None)]);
     assert_eq!(gather_of(&t, 0, 0), None);
 }
@@ -14568,7 +14568,7 @@ fn set_gather_state_leaves_building_that_takes_no_gather_point_and_gone_object()
     let mut house = gathering_centre(10909, Position::new(20.0, 30.0, 0.0));
     house.life.master_id = ids::HOUSE;
     let gather = Some(GatherPoint {
-        state: GatherPointState::POINT,
+        state: GatherPointState::Point,
         point: Position::new(5.0, 6.0, 0.0),
         target: None,
         target_master: None,
@@ -14589,7 +14589,7 @@ fn set_gather_state_leaves_building_that_takes_no_gather_point_and_gone_object()
         })
     };
     let held = gather_of(&t, 0, 0);
-    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::KEPT))]);
+    t.tick_with(Millis::new(25), &[set(Some(GatherPointState::Kept))]);
     assert_eq!(t.players[0].unsupported, None);
     assert_eq!(gather_of(&t, 0, 0), held);
     t.tick_with(Millis::new(25), &[set(None)]);
@@ -14603,7 +14603,7 @@ fn set_gather_state_leaves_building_that_takes_no_gather_point_and_gone_object()
 fn set_gather_point_keeps_the_target_of_kept_gather_point() {
     let tc = gathering_centre(9149, Position::new(104.0, 47.0, 0.5));
     let gather = Some(GatherPoint {
-        state: GatherPointState::KEPT,
+        state: GatherPointState::Kept,
         point: Position::new(104.0, 47.0, 0.5),
         target: Some(object_id(9149)),
         target_master: Some(ids::TOWN_CENTRE),
@@ -14631,7 +14631,7 @@ fn set_gather_point_keeps_the_target_of_kept_gather_point() {
     assert_eq!(
         gather_of(&t, 0, 0),
         Some(GatherPoint {
-            state: GatherPointState::KEPT,
+            state: GatherPointState::Kept,
             point: Position::new(107.25, 46.5, 0.5),
             target: Some(object_id(9149)),
             target_master: Some(ids::TOWN_CENTRE),
@@ -14642,7 +14642,7 @@ fn set_gather_point_keeps_the_target_of_kept_gather_point() {
     assert_eq!(
         gather_of(&t, 0, 0),
         Some(GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(104.0, 47.0, 0.5),
             target: Some(object_id(9520)),
             target_master: Some(ids::TOWN_CENTRE),
@@ -14695,7 +14695,7 @@ fn set_gather_point_takes_building_that_trains_without_garrisoning() {
     assert_eq!(
         gather_of(&t, 0, 0),
         Some(GatherPoint {
-            state: GatherPointState::POINT,
+            state: GatherPointState::Point,
             point: Position::new(20.5, 30.5, 0.0),
             target: None,
             target_master: None,
@@ -14720,7 +14720,7 @@ fn command_queue_takes_the_gather_point_first_then_the_steps() {
         ..UnitAi::default()
     };
     let gather = Some(GatherPoint {
-        state: GatherPointState::POINT,
+        state: GatherPointState::Point,
         point: Position::new(30.5, 40.5, 0.0),
         target: None,
         target_master: None,
@@ -15803,7 +15803,7 @@ fn cheat_code_does_nothing_without_the_game_cheats() {
     let before = t.players.clone();
     let cheat = Command::Game(GameCommand {
         issuer: player_id(1),
-        sub: GameSub::CHEAT,
+        sub: GameSub::Cheat,
         player: 1,
         a: 4,
         speed: 0.0,
@@ -16332,7 +16332,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
         &mut actions,
         motion.lent(),
         false,
-        UnitStance::AGGRESSIVE,
+        UnitStance::Aggressive,
         (
             OwnerMasters::new(no_own_masters(), Some(&masters)),
             &graphics,
@@ -16356,7 +16356,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
         &mut deer_actions,
         deer_motion.lent(),
         true,
-        UnitStance::AGGRESSIVE,
+        UnitStance::Aggressive,
         (
             OwnerMasters::new(no_own_masters(), Some(&masters)),
             &graphics,
@@ -16454,7 +16454,7 @@ fn on_side<R>(
                     speed: Speed::new(1.2),
                     scenario: false,
                     firepower: Firepower::new(0.0),
-                    capture: CaptureKind::NONE,
+                    capture: CaptureKind::None,
                 },
                 player: PlayerId::new(1),
                 player_kind: PlayerKind::Human,
@@ -16577,7 +16577,7 @@ fn scout_attack_on(
     );
     unit.parts.motion = Some(Motion::Moving(walker));
     let ai = UnitAi {
-        stance: UnitStance::STAND_GROUND,
+        stance: UnitStance::StandGround,
         current_order: None,
         ai_kind: UnitAiKind::SOLDIER,
         ..UnitAi::default()
@@ -16707,7 +16707,7 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
     );
     unit.parts.motion = Some(Motion::Moving(walker));
     let ai = UnitAi {
-        stance: UnitStance::STAND_GROUND,
+        stance: UnitStance::StandGround,
         current_order: None,
         ai_kind: UnitAiKind::SOLDIER,
         ..UnitAi::default()
@@ -16947,7 +16947,7 @@ fn ask_for_help_asks_only_an_idle_helper_that_may_attack() {
         current_order: None,
         current_action: None,
         current_target: None,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         ..UnitAi::default()
     };
     assert!(helper_free(idle.clone(), None));
@@ -16986,7 +16986,7 @@ fn helper_in_group_answers_only_while_its_group_patrols() {
         current_order: None,
         current_action: None,
         current_target: None,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         ..UnitAi::default()
     };
     let busy = UnitAi {
@@ -18475,7 +18475,7 @@ fn ranged_swing_fires_its_missile_which_flies_to_the_target_and_hits_it() {
         .list
         .missile()
         .map(|a| (a.state, a.result));
-    assert_eq!(action, Some((MissileState::Done, StrikeResult::HIT)));
+    assert_eq!(action, Some((MissileState::Done, StrikeResult::Hit)));
     for _ in 0..3 {
         t.tick(Millis::new(100));
     }
@@ -20097,7 +20097,7 @@ fn hunted_without_deer(setup: impl FnOnce(&mut Action, &mut UnitAi)) -> World {
             explored: false,
             building: None,
             umv: 0,
-            capture: CaptureKind::NONE,
+            capture: CaptureKind::None,
             kind: MasterKind::COMBAT,
         };
         sight.add_seer(object_id(id), deer);
@@ -20777,7 +20777,7 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
         *masters = Arc::new(Masters::new(masters.iter().cloned().chain([castle])));
     }
     t.players[1].objects[ListIndex::new(1)].life.master_id = ids::CASTLE;
-    let castle_built = EventKind::CASTLE_BUILT;
+    let castle_built = EventKind::CastleBuilt;
     assert_eq!(
         finish(&mut t),
         Ok((ObjectState::Alive, vec![(castle_built, 1.0)]))
@@ -22386,10 +22386,10 @@ fn the_command_phase_runs_each_unit_command_by_its_handler() {
             &Command::UnitAiState(UnitAiStateCommand {
                 player: player_id(1),
                 units: unit_list(v.clone()),
-                state: UnitStance::DEFENSIVE,
+                state: UnitStance::Defensive,
             }),
             PlayerId::new(1),
-            |w| w.unit_ai_state(player_id(1), &v, UnitStance::DEFENSIVE),
+            |w| w.unit_ai_state(player_id(1), &v, UnitStance::Defensive),
         ),
         routes(
             &t,
@@ -22562,9 +22562,9 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
         ),
         routes(
             &t,
-            &Command::Game(game(GameSub::DIPLOMACY)),
+            &Command::Game(game(GameSub::Diplomacy)),
             PlayerId::new(0),
-            |w| w.game(&game(GameSub::DIPLOMACY)),
+            |w| w.game(&game(GameSub::Diplomacy)),
         ),
         routes(
             &t,
@@ -22584,9 +22584,9 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
     cheats.settings.cheats_enabled = true;
     let cheat = |player| GameCommand {
         issuer: player_id(1),
-        sub: GameSub::CHEAT,
+        sub: GameSub::Cheat,
         player,
-        ..game(GameSub::DIPLOMACY)
+        ..game(GameSub::Diplomacy)
     };
     assert!(routes(
         &cheats,
@@ -22888,7 +22888,7 @@ fn call_for_help_walks_the_lists_for_free_helper_in_reach() {
         current_order: None,
         current_action: None,
         current_target: None,
-        stance: UnitStance::AGGRESSIVE,
+        stance: UnitStance::Aggressive,
         ..UnitAi::default()
     };
     let record = |id, x| Record {

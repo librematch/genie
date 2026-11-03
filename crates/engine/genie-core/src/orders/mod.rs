@@ -499,7 +499,7 @@ pub(crate) fn set_stance(
 ) -> Result<(), GenieError> {
     ai.stance = state;
     ai.state_position = place.0;
-    if state == UnitStance::NO_ATTACK
+    if state == UnitStance::NoAttack
         && (ai.current_order == Some(OrderKind::Attack)
             || ai.current_action == Some(AiAction::Attack))
     {

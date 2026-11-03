@@ -152,9 +152,9 @@ fn run_on(
     player_kind: PlayerKind,
 ) -> Result<Updated, GenieError> {
     let walked = match t.state.move_to().copied().map(|m| m.state) {
-        Some(MoveTo::Failed) => UpdateCode::FAILED,
-        Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => UpdateCode::UNDER_WAY,
-        None | Some(MoveTo::Arrived) => UpdateCode::DONE,
+        Some(MoveTo::Failed) => UpdateCode::Failed,
+        Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => UpdateCode::UnderWay,
+        None | Some(MoveTo::Arrived) => UpdateCode::Done,
     };
     let look = (Some(STANDING), &mut Well512::default());
     t.state_update(walked, (s, c), hull, look, player_kind, tuning())
@@ -224,7 +224,7 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     let mut t = TransportAction::new(s.position);
     assert_eq!(
         (t.state.bare(), t.mode, t.retarget),
-        (TransportState::New, TransportMode::NEW, false)
+        (TransportState::New, TransportMode::New, false)
     );
     // the list's add (first_in_stack with 1): set_state(11), its MoveTo to the shore point
     // on the way, none here, so the place itself
@@ -336,7 +336,7 @@ fn move_sails_to_its_point_and_stop_idles() {
     c.shore = Some(Point::new(19.5, 8.5));
     let mut t = TransportAction {
         state: TransportState::Unload,
-        mode: TransportMode::WORK,
+        mode: TransportMode::Work,
         ..TransportAction::new(s.position)
     };
     let changed = t
@@ -358,7 +358,7 @@ fn move_sails_to_its_point_and_stop_idles() {
         ),
         (
             TransportState::Sail { move_to: None },
-            TransportMode::MOVE,
+            TransportMode::Move,
             Position::new(19.5, 8.5, 2.0),
             Some(MoveTo::Start)
         )
@@ -394,7 +394,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         (t.state.bare(), t.mode, t.point),
         (
             TransportState::Unload,
-            TransportMode::WORK,
+            TransportMode::Work,
             Position::new(15.0, 8.5, 1.0)
         )
     );
@@ -466,7 +466,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         );
         assert_eq!(
             (t.state.bare(), t.mode, t.point),
-            (TransportState::New, TransportMode::WORK, s.position)
+            (TransportState::New, TransportMode::Work, s.position)
         );
     }
     // a NaN gap stays NaN (MAXSS) and is not within (COMISS/JC): it sails
@@ -548,10 +548,7 @@ fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water()
     };
     assert!(alerts(&t, &s, &mut coast(false)));
     let (r, Left { stands, .. }) = run(&mut t, &s, &mut coast(false));
-    assert_eq!(
-        (r, stands),
-        (Ok(Updated::Code(UpdateCode::UNDER_WAY)), true)
-    );
+    assert_eq!((r, stands), (Ok(Updated::Code(UpdateCode::UnderWay)), true));
     assert_eq!((t.state, t.retarget), (TransportState::Idle, false));
     // near, but zone 3 is not beside the footprint: over land at the point it tells the
     // owner, over water it waits silently
@@ -560,16 +557,13 @@ fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water()
     wet.flags = |_| TerrainFlags::WATER;
     assert!(!alerts(&unloading(), &s, &mut wet));
     let (r, Left { stands, .. }) = run(&mut unloading(), &s, &mut wet);
-    assert_eq!(
-        (r, stands),
-        (Ok(Updated::Code(UpdateCode::UNDER_WAY)), true)
-    );
+    assert_eq!((r, stands), (Ok(Updated::Code(UpdateCode::UnderWay)), true));
     // empty: nothing to unload, the action idles
     let mut t = unloading();
     assert!(!alerts(&t, &ship(false), &mut coast(true)));
     assert_eq!(
         run(&mut t, &ship(false), &mut coast(true)).0,
-        Ok(Updated::Code(UpdateCode::UNDER_WAY))
+        Ok(Updated::Code(UpdateCode::UnderWay))
     );
     assert_eq!(t.state, TransportState::Idle);
 }
@@ -618,7 +612,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     };
     assert_eq!(
         run(&mut t, &s, &mut c).0,
-        Ok(Updated::Code(UpdateCode::UNDER_WAY))
+        Ok(Updated::Code(UpdateCode::UnderWay))
     );
     assert_eq!(t.state, TransportState::Unload);
     // state 11 with an ended MoveTo: idle, the MoveTo gone (its teardown stops the unit)
@@ -657,14 +651,14 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     );
     assert_eq!(
         (r, stands, posted),
-        (Ok(Updated::Code(UpdateCode::FAILED)), true, vec![failed])
+        (Ok(Updated::Code(UpdateCode::Failed)), true, vec![failed])
     );
     assert_eq!(t.state, TransportState::Idle);
     // state 1 is done; an idle one does nothing
     t.state = TransportState::Done;
     assert_eq!(
         run(&mut t, &s, &mut c).0,
-        Ok(Updated::Code(UpdateCode::DONE))
+        Ok(Updated::Code(UpdateCode::Done))
     );
     t.state = TransportState::Idle;
     let (
@@ -675,7 +669,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
             posted,
         },
     ) = run(&mut t, &s, &mut c);
-    assert_eq!(r, Ok(Updated::Code(UpdateCode::UNDER_WAY)));
+    assert_eq!(r, Ok(Updated::Code(UpdateCode::UnderWay)));
     assert!(!stopped && !stands && posted.is_empty());
     // a hull showing a sprite without its standing one: not modelled
     let mut t = TransportAction {
@@ -686,7 +680,7 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     let look = (None, &mut Well512::default());
     assert!(
         t.state_update(
-            UpdateCode::DONE,
+            UpdateCode::Done,
             (&s, &mut c),
             (&mut unit, motion.lent(), &mut ais),
             look,
@@ -744,7 +738,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Start));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     );
     assert_eq!(
         t.state.move_to().copied().map(|m| m.state),
@@ -759,7 +753,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Moving));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     );
     assert_eq!(
         (t.state.move_to().copied().map(|m| m.state), walker.posted()),
@@ -770,7 +764,7 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     let mut t = sailing(Some(MoveTo::Waiting));
     assert_eq!(
         walker.run(100, |c, u, _, _, _| t.walk(c, u, me)),
-        Ok(UpdateCode::UNDER_WAY)
+        Ok(UpdateCode::UnderWay)
     );
     assert_eq!(
         (t.state.move_to().copied().map(|m| m.state), walker.posted()),
@@ -778,9 +772,9 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
     );
     // the ended, the failed and a missing MoveTo walk nothing
     for (move_to, code) in [
-        (Some(MoveTo::Arrived), UpdateCode::DONE),
-        (Some(MoveTo::Failed), UpdateCode::FAILED),
-        (None, UpdateCode::DONE),
+        (Some(MoveTo::Arrived), UpdateCode::Done),
+        (Some(MoveTo::Failed), UpdateCode::Failed),
+        (None, UpdateCode::Done),
     ] {
         let mut walker = rig();
         let mut t = sailing(move_to);

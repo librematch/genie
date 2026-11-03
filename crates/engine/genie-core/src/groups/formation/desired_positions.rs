@@ -77,8 +77,8 @@ impl World {
         let current = g
             .current_formation
             .as_ref()
-            .map_or(FormationKind::HORDE, |f| f.kind);
-        let mut kind = FormationKind::LINE;
+            .map_or(FormationKind::Horde, |f| f.kind);
+        let mut kind = FormationKind::Line;
         if let Some(path) = measured_path(&g.motion.paths) {
             let end = if 1 < path.points.len() {
                 *path.points.checked(path.points.len() - 1)?
@@ -103,22 +103,22 @@ impl World {
             let patrol =
                 top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
             if on_last_high_level_waypoint(&g.motion.paths) && !patrol {
-                if (current != FormationKind::COLUMN || column_to_line <= remaining)
-                    && (current == FormationKind::COLUMN || min_column <= remaining)
+                if (current != FormationKind::Column || column_to_line <= remaining)
+                    && (current == FormationKind::Column || min_column <= remaining)
                     && min_column < remaining
                     && column_to_line < remaining
                 {
-                    kind = FormationKind::COLUMN;
+                    kind = FormationKind::Column;
                 }
             } else {
-                kind = FormationKind::COLUMN;
+                kind = FormationKind::Column;
             }
         }
         if g.flags.contains(GroupFlags::LINE) {
-            kind = FormationKind::LINE;
+            kind = FormationKind::Line;
         }
         if self.horde_units_only(g)? {
-            kind = FormationKind::HORDE;
+            kind = FormationKind::Horde;
         }
         Ok(kind)
     }
@@ -138,7 +138,7 @@ impl World {
     ) -> Result<FormationKind, GenieError> {
         Ok(match (given, g.formation_locked_kind) {
             (Some(given), _) => given,
-            (None, None | Some(FormationKind::HORDE)) => self.own_formation_kind(g)?,
+            (None, None | Some(FormationKind::Horde)) => self.own_formation_kind(g)?,
             (None, Some(locked)) => locked,
         })
     }
@@ -180,7 +180,7 @@ impl World {
         let current_kind = g
             .current_formation
             .as_ref()
-            .map_or(FormationKind::HORDE, |f| f.kind);
+            .map_or(FormationKind::Horde, |f| f.kind);
         let renew = current_kind != kind || given.is_some();
         let laid_out = !renew
             && g.current_formation
@@ -196,33 +196,33 @@ impl World {
         }
         let mut f = g.current_formation.take().ok_or(NO_FORMATION)?;
         let result = match kind {
-            FormationKind::LINE
-            | FormationKind::STAGGERED
-            | FormationKind::FLANKED
-            | FormationKind::COLUMN
+            FormationKind::Line
+            | FormationKind::Staggered
+            | FormationKind::Flanked
+            | FormationKind::Column
                 if !laid_out =>
             {
                 self.create_column_line(
                     &mut f,
                     group,
-                    kind == FormationKind::COLUMN,
+                    kind == FormationKind::Column,
                     (
-                        kind == FormationKind::STAGGERED,
-                        kind == FormationKind::FLANKED,
+                        kind == FormationKind::Staggered,
+                        kind == FormationKind::Flanked,
                     ),
                 )
                 .map(|_| ())
             }
-            FormationKind::PHALANX if !laid_out => self.create_phalanx(&mut f, group).map(|_| ()),
-            FormationKind::BOX if !laid_out => self.create_box(&mut f, group).map(|_| ()),
+            FormationKind::Phalanx if !laid_out => self.create_phalanx(&mut f, group).map(|_| ()),
+            FormationKind::Box if !laid_out => self.create_box(&mut f, group).map(|_| ()),
             // true: the group has members; the transform after (`LAB_141040abf`)
-            FormationKind::HORDE if !laid_out => self
+            FormationKind::Horde if !laid_out => self
                 .groups
                 .held(group)
                 .and_then(|g| self.create_horde(&mut f, g))
                 .and_then(|_| self.formation_transform(&mut f, group, false))
                 .map(|_| ()),
-            FormationKind::USER_DEFINED if !laid_out => self
+            FormationKind::UserDefined if !laid_out => self
                 .groups
                 .held(group)
                 .and_then(|g| self.create_udf(&mut f, g))

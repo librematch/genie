@@ -930,7 +930,7 @@ fn the_relayout_follows_the_count_and_the_spacing() {
     let g = t.groups.get_mut(group_id(1)).unwrap();
     g.current_command = GroupCommandKind::ATTACK;
     g.current_formation = Some(Formation {
-        kind: FormationKind::KIND_6,
+        kind: FormationKind::Kind6,
         ..Formation::default()
     });
     set(&mut t, 0, 6.0);
@@ -1096,7 +1096,7 @@ fn standing_group_move_ends_or_goes_on() {
     g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
     g.current_formation = Some(Formation {
-        kind: FormationKind::COLUMN,
+        kind: FormationKind::Column,
         slots: vec![
             slot(Some(object_id(10)), SlotState::InPlace),
             slot(Some(object_id(11)), SlotState::InPlace),
@@ -1119,7 +1119,7 @@ fn standing_group_move_ends_or_goes_on() {
     g.current_command = GroupCommandKind::MOVE;
     g.motion.flags = MotionFlags::NONE;
     g.current_formation = Some(Formation {
-        kind: FormationKind::COLUMN,
+        kind: FormationKind::Column,
         slots: vec![slot(Some(object_id(10)), SlotState::Steering)],
         ..Formation::default()
     });
@@ -1190,7 +1190,7 @@ fn member_moved_aside_waits_out_its_timer() {
     let aside = SpecificMove {
         active: 1,
         path_id: MovePath::of_data(4),
-        reason: MoveReason::ASIDE,
+        reason: MoveReason::Aside,
         timer: Seconds::new(0.75),
         ..SpecificMove::default()
     };
@@ -1214,7 +1214,7 @@ fn member_moved_aside_waits_out_its_timer() {
         g.members[0].specific_move,
         SpecificMove {
             path_id: MovePath::NONE,
-            reason: MoveReason::NONE,
+            reason: MoveReason::None,
             ..SpecificMove::default()
         }
     );
@@ -1282,7 +1282,7 @@ fn member_own_move_walks_its_path() {
     t.groups.get_mut(group_id(1)).unwrap().members[0].specific_move = SpecificMove {
         active: 1,
         path_id: MovePath::NONE,
-        reason: MoveReason::DETOUR,
+        reason: MoveReason::Detour,
         timer: Seconds::new(3.0),
         distance: Distance::new(3.0),
         last_position: BVector::new(1.0, 0.0, 0.0),
@@ -1379,7 +1379,7 @@ fn an_idle_group_goes() {
     g.current_command = GroupCommandKind::NONE;
     g.flags = GroupFlags::NONE;
     g.current_formation = Some(Formation {
-        kind: FormationKind::COLUMN,
+        kind: FormationKind::Column,
         slots: vec![Slot {
             state: SlotState::InPlace,
             ..Slot::default()
@@ -1462,8 +1462,8 @@ fn group_steers_its_free_members_speeds_in_their_own_update() {
     g.owner = Some(PlayerId::new(9));
     g.motion.maximum_velocity_forward = Speed::new(0.9);
     g.members[0].specific_move.reason = MoveReason::of_data(1);
-    g.members[1].specific_move.reason = MoveReason::NONE;
-    g.members[2].specific_move.reason = MoveReason::DETOUR;
+    g.members[1].specific_move.reason = MoveReason::None;
+    g.members[2].specific_move.reason = MoveReason::Detour;
     let before: Vec<_> = object_id_list(10..=12)
         .into_iter()
         .map(|id| t.object(id).unwrap().1.position())
@@ -1507,8 +1507,8 @@ fn the_speed_slot_reads_the_group_that_steers_free_member() {
         }],
         ..Formation::default()
     });
-    g.members[0].specific_move.reason = MoveReason::ASIDE;
-    g.members[1].specific_move.reason = MoveReason::NONE;
+    g.members[0].specific_move.reason = MoveReason::Aside;
+    g.members[1].specific_move.reason = MoveReason::None;
     g.members[2].specific_move.reason = MoveReason::of_data(4);
     let groups = UnitGroups {
         groups: vec![g],
@@ -1865,8 +1865,8 @@ fn an_awake_group_members_walk_to_their_slots_and_its_due_orders_go() {
         };
         let g = t.groups.get_mut(group_id(1)).unwrap();
         g.current_formation = Some(Formation {
-            kind: FormationKind::LINE,
-            transform_kind: TransformKind::TURNED,
+            kind: FormationKind::Line,
+            transform_kind: TransformKind::Turned,
             transform_orientation: BVector::new(0.0, 0.0, 1.0),
             slots: vec![slot(1.0), slot(2.0), slot(3.0)],
             ..Formation::new()
@@ -2121,7 +2121,7 @@ fn unit_in_contact_releases_its_category() {
             .unwrap()
             .members
             .iter()
-            .all(|m| m.specific_move.reason == MoveReason::NONE)
+            .all(|m| m.specific_move.reason == MoveReason::None)
     );
 }
 

@@ -1,46 +1,79 @@
 //! What a player's queries make of another player's objects as one type, and the tables by it.
 
 use crate::players::ByPlayer;
+use std::cmp::Ordering;
 use std::ops::{Index, IndexMut};
 
 /// What a player's queries make of another player's objects (`player+0x278`, the save's
 /// `unit_diplomacy`, which `FUN_141676b80` writes from the relation): Gaia's, its own, an
 /// ally's, a neutral's or an enemy's. The visible-units query (`GetVisibleUnits`,
 /// `FUN_141288c00`) lists each object by it; a saved value past 4 lists nowhere.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UnitRelation(u8);
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum UnitRelation {
+    /// Gaia's objects (0).
+    Gaia,
+    /// Its own objects (1).
+    Own,
+    /// An ally's objects (2).
+    Ally,
+    /// A neutral's objects (3).
+    Neutral,
+    /// An enemy's objects (4).
+    Enemy,
+    /// A value the game names nowhere, as the save or the game holds it.
+    Other(Unnamed),
+}
+
+/// A raw value of [`UnitRelation`] that names none of its variants: only the set's own
+/// constructors make one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Unnamed(u8);
 
 impl UnitRelation {
-    /// Gaia's objects (0).
-    pub const GAIA: Self = Self(0);
-    /// Its own objects (1).
-    pub const OWN: Self = Self(1);
-    /// An ally's objects (2).
-    pub const ALLY: Self = Self(2);
-    /// A neutral's objects (3).
-    pub const NEUTRAL: Self = Self(3);
-    /// An enemy's objects (4).
-    pub const ENEMY: Self = Self(4);
+    /// The value of raw `value`: its variant, else `Other`.
+    const fn of_raw(value: u8) -> Self {
+        match value {
+            0 => Self::Gaia,
+            1 => Self::Own,
+            2 => Self::Ally,
+            3 => Self::Neutral,
+            4 => Self::Enemy,
+            other => Self::Other(Unnamed(other)),
+        }
+    }
+
+    /// Its raw value.
+    const fn raw(self) -> u8 {
+        match self {
+            Self::Gaia => 0,
+            Self::Own => 1,
+            Self::Ally => 2,
+            Self::Neutral => 3,
+            Self::Enemy => 4,
+            Self::Other(Unnamed(value)) => value,
+        }
+    }
+
     /// The relations in their lists' order.
     pub const ALL: [Self; 5] = [
-        Self::GAIA,
-        Self::OWN,
-        Self::ALLY,
-        Self::NEUTRAL,
-        Self::ENEMY,
+        Self::Gaia,
+        Self::Own,
+        Self::Ally,
+        Self::Neutral,
+        Self::Enemy,
     ];
 
     /// Its value.
     #[must_use]
     pub const fn get(self) -> u8 {
-        self.0
+        self.raw()
     }
 
     /// A saved value: 0 to 4 a relation, any other none.
     #[must_use]
     pub const fn of_field(value: i32) -> Option<Self> {
-        if 0 <= value && value <= Self::ENEMY.0 as i32 {
-            Some(Self(value as u8))
+        if 0 <= value && value <= Self::Enemy.raw() as i32 {
+            Some(Self::of_raw(value as u8))
         } else {
             None
         }
@@ -49,12 +82,25 @@ impl UnitRelation {
     /// Its bit in a query's mask of the relations it keeps (`1 << relation`).
     #[must_use]
     pub const fn bit(self) -> u8 {
-        1 << self.0
+        1 << self.raw()
     }
 
     /// Its list among the five.
     const fn index(self) -> usize {
-        self.0 as usize
+        self.raw() as usize
+    }
+}
+
+impl PartialOrd for UnitRelation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UnitRelation {
+    /// The game's order: by the raw value.
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.raw().cmp(&other.raw())
     }
 }
 
@@ -118,17 +164,26 @@ mod tests {
     /// 0 to 4 are the relations, in their lists' order, each with its bit; other values none.
     #[test]
     fn saved_value_is_relation_with_its_list_and_bit() {
-        assert_eq!(UnitRelation::of_field(4), Some(UnitRelation::ENEMY));
+        assert_eq!(UnitRelation::of_field(4), Some(UnitRelation::Enemy));
         assert_eq!(UnitRelation::of_field(5), None);
         assert_eq!(UnitRelation::of_field(-1), None);
-        assert_eq!(UnitRelation::ALLY.get(), 2);
-        assert_eq!(UnitRelation::NEUTRAL.bit(), 8);
+        assert_eq!(UnitRelation::Ally.get(), 2);
+        assert_eq!(UnitRelation::Neutral.bit(), 8);
         let mut lists = ByRelation::new([0, 1, 2, 3, 4]);
-        lists[UnitRelation::OWN] = 10;
-        assert_eq!(lists[UnitRelation::OWN], 10);
+        lists[UnitRelation::Own] = 10;
+        assert_eq!(lists[UnitRelation::Own], 10);
         assert_eq!(lists.values(), &[0, 10, 2, 3, 4]);
         let order: Vec<u8> = lists.iter().rev().map(|(r, _)| r.get()).collect();
         assert_eq!(order, [4, 3, 2, 1, 0]);
         assert_eq!(lists.map(|v| v * 2).values(), &[0, 20, 4, 6, 8]);
+    }
+
+    /// Each named value and one the set names nowhere go to their variant and back.
+    #[test]
+    fn every_unit_relation_value_maps_to_its_variant_and_back() {
+        for value in [0, 1, 2, 3, 4, 5] {
+            assert_eq!(UnitRelation::of_raw(value).raw(), value);
+        }
+        assert!(matches!(UnitRelation::of_raw(5), UnitRelation::Other(_)));
     }
 }

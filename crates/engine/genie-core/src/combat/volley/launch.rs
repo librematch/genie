@@ -206,7 +206,7 @@ impl Unit {
             ballistic_acceleration: Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: stats.hit_mode,
-            result: StrikeResult::NONE,
+            result: StrikeResult::None,
             origin: if shot.shooter {
                 Origin {
                     position: self.position(),

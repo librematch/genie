@@ -541,7 +541,7 @@ mod tests {
             ballistic_acceleration: Acceleration::ZERO,
             distance: Distance::ZERO,
             hit_mode: HitMode::TARGET_ALONE,
-            result: StrikeResult::NONE,
+            result: StrikeResult::None,
             origin: Origin::NONE,
             met: Vec::new(),
         };
