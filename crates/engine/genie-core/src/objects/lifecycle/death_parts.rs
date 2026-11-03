@@ -72,7 +72,10 @@ pub(crate) fn forget_resource(
     if id.is_recyclable() {
         return Ok(());
     }
-    if let (Some(m), Some(v)) = (master.filter(|m| m.auto_gather), spatial.sight.as_mut()) {
+    if let (Some(m), Some(v)) = (
+        master.filter(|m| m.auto_gather.is_on()),
+        spatial.sight.as_mut(),
+    ) {
         v.forget_resource(id, position, m.gather_group)?;
     }
     Ok(())

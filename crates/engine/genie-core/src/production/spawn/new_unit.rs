@@ -86,7 +86,7 @@ impl World {
         }
         let building = &self.players.live(p, i)?;
         let made = self.master(p, master)?.clone();
-        if made.recyclable {
+        if made.recyclable.recycled() {
             return Err(GenieError::unsupported(
                 "a new object of a recyclable master (a negative id)",
             ));
@@ -327,7 +327,7 @@ impl World {
                 "a spawn without the players' sight",
             ));
         }
-        if made.recyclable {
+        if made.recyclable.recycled() {
             return Err(GenieError::unsupported(
                 "a new object of a recyclable master (a negative id)",
             ));
@@ -366,7 +366,7 @@ impl World {
         );
         let _ = self.streams.get(Stream::Object).rand15();
         // its place, record, mesh shape and sight (new_position, slot 0x58, and FUN_141054fe0)
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
+        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
             position,
             radius: made.radius,
@@ -375,7 +375,7 @@ impl World {
             master,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
-            tall: made.tall,
+            tall: made.is_tall(),
             moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(

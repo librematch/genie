@@ -34,7 +34,7 @@ pub(super) const SPRITE_SHOWN: DamageSpriteMode = DamageSpriteMode::SHOWN;
 /// (`+0x681` set, or a resource class: those of [`ClassRoles::DAMAGE_BY_STORAGE`] and
 /// [`ClassRoles::DAMAGE_BY_STORAGE_DEAD`] in a state above 2).
 fn storage_share(master: &Master, state: ObjectState, roles: &Roles) -> bool {
-    master.auto_gather
+    master.auto_gather.is_on()
         || ((roles
             .of_class(master.class)
             .contains(ClassRoles::DAMAGE_BY_STORAGE)

@@ -376,7 +376,7 @@ impl World {
             master: made.id,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
-            tall: made.tall,
+            tall: made.is_tall(),
             moves: false,
             unknown: None,
             obstruction: (!desolid

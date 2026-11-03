@@ -897,7 +897,7 @@ mod clearing_tests {
             master: m.id,
             obstruction_kind: m.obstruction_kind,
             buildable_on: m.buildable_on,
-            tall: m.tall,
+            tall: m.is_tall(),
             moves: false,
             unknown: None,
             obstruction: None,
@@ -942,7 +942,6 @@ mod clearing_tests {
                 class: class::CLASS_40,
                 radius: Footprint::new(0.5, 0.5),
                 height: Distance::new(1.0),
-                tall: true,
                 obstruction_kind: ObstructionKind::TYPE_2,
                 buildable_on: BuildableOn::YES,
                 ..Master::default()

@@ -32,6 +32,7 @@ use genie_model::objects::SpriteId;
 use genie_model::objects::WorkRate;
 use genie_model::objects::facing::SpriteFacets;
 use genie_model::objects::masters::AnimatedPart;
+use genie_model::objects::masters::Availability;
 use genie_model::objects::masters::CarryCapacity;
 use genie_model::objects::masters::ChargeKind;
 use genie_model::objects::masters::ChargeTarget;
@@ -40,6 +41,7 @@ use genie_model::objects::masters::CombatAbility;
 use genie_model::objects::masters::CombatPart;
 use genie_model::objects::masters::CostAmount;
 use genie_model::objects::masters::DamageShare;
+use genie_model::objects::masters::DisableMode;
 use genie_model::objects::masters::FormationClass;
 use genie_model::objects::masters::GarrisonCapacity;
 use genie_model::objects::masters::GarrisonKinds;
@@ -246,15 +248,14 @@ pub fn work_masters(
         work.id = MasterId::of_data(s.id())?;
         work.class = ClassId::of_master(s.read_temp_5);
         work.radius = Footprint::new(s.radius_x, s.radius_y);
-        work.tall = 0.0 < s.radius_z;
         work.height = Distance::new(s.radius_z);
         work.obstruction_kind = ObstructionKind::from(s.obstruction_type);
         work.buildable_on = BuildableOn::of_data(s.can_be_built_on);
         work.obstruction_class = ObstructionClass::from(s.obstruction_class);
         work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
         work.hit_points = MasterHitPoints::of_data(s.read_temp_6);
-        work.available = s.available != 0;
-        work.disabled = s.disabled != 0;
+        work.available = Availability::of_data(s.available);
+        work.disabled = DisableMode::of_data(s.disabled);
         work.line_of_sight = Distance::new(s.los);
         work.capacity = CarryCapacity::of_data(s.attribute_max_amount);
         work.blast_defense = BlastDefense::new(s.area_effect_object_level);
@@ -411,7 +412,6 @@ pub fn work_masters(
                 vanish_mode: VanishMode::from_bits_retain(mm.missile_die_info),
                 arc: ArcRatio::new(mm.ballistics_ratio),
             });
-        work.damage_sprites = !s.damage_sprite.is_empty();
         // what the masters' attribute setters change: the top and turn speeds (+0x740,
         // +0x758), the damage sprites (+0x638) and the train locations (+0x898)
         work.animated = animated_master(m).map(|a| AnimatedPart {

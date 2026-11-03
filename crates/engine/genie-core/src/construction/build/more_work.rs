@@ -107,7 +107,7 @@ impl Unit {
                 untargetable: u.untargetable,
                 attribute: u.life.attribute_type,
                 amount: u.life.amount,
-                auto_gather: m.auto_gather,
+                auto_gather: m.auto_gather.is_on(),
                 gather_group: m.gather_group,
             })
         };

@@ -684,7 +684,6 @@ mod tests {
                     apply_mode: mode,
                 })
                 .to_vec(),
-            damage_sprites: true,
             building: Some(BuildingMaster {
                 construction_sprite: Some(SpriteId::named(id + 3000)),
                 ..BuildingMaster::default()

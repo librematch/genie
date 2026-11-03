@@ -82,7 +82,7 @@ impl World {
         self.completion_ground(p, id, &master, &building, &placed)?;
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
         u.life.state = ObjectState::Alive;
-        if building.disappears_when_built {
+        if building.disappears_when_built.disappears() {
             u.life.hp = HitPoints::ZERO;
         }
         self.spatial.sight_state(
@@ -94,7 +94,7 @@ impl World {
         if let Some(tech) = building.tech {
             self.research_built(p, tech)?;
         }
-        if building.disappears_when_built {
+        if building.disappears_when_built.disappears() {
             self.destroy(p, id)?;
         }
         Ok(())

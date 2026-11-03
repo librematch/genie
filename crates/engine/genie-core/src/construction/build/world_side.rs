@@ -420,7 +420,7 @@ impl World {
             if flagged {
                 self.clear_footprint(p, master, at.ground(), true)?;
             }
-            if made.auto_gather {
+            if made.auto_gather.is_on() {
                 self.made_new_object(p)?;
             }
             return Ok(Some(id));
@@ -433,7 +433,7 @@ impl World {
             if flagged {
                 self.clear_footprint(p, master, at.ground(), true)?;
             }
-            if made.auto_gather {
+            if made.auto_gather.is_on() {
                 self.made_new_object(p)?;
             }
             return Ok(Some(id));
@@ -448,7 +448,7 @@ impl World {
                 Seconds::new(self.model.tuning.build.stack_work),
             )?;
         }
-        if made.auto_gather {
+        if made.auto_gather.is_on() {
             if self.players.player(p)?.objects.last().map(|u| u.id) != Some(id) {
                 return Err(GenieError::unsupported(
                     "an auto-gathered new building with annexes (its visible resources)",

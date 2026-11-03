@@ -18,9 +18,13 @@ use genie_model::objects::WorkRate;
 use genie_model::objects::masters as work;
 use genie_model::objects::masters::ActionKind;
 use genie_model::objects::masters::AdjacentMode;
+use genie_model::objects::masters::AutoGatherMode;
+use genie_model::objects::masters::Availability;
+use genie_model::objects::masters::BuiltMode;
 use genie_model::objects::masters::CarryCapacity;
 use genie_model::objects::masters::CombatLevel;
 use genie_model::objects::masters::CostAmount;
+use genie_model::objects::masters::DisableMode;
 use genie_model::objects::masters::FogVisibility;
 use genie_model::objects::masters::GarrisonCapacity;
 use genie_model::objects::masters::GarrisonKinds;
@@ -32,6 +36,7 @@ use genie_model::objects::masters::ObjectFlags;
 use genie_model::objects::masters::ObstructionClass;
 use genie_model::objects::masters::ObstructionKind;
 use genie_model::objects::masters::PlacementTerrains;
+use genie_model::objects::masters::RecycleMode;
 use genie_model::objects::masters::RestrictionField;
 use genie_model::objects::masters::RunPattern;
 use genie_model::objects::masters::SoundEvents;
@@ -158,7 +163,6 @@ pub(super) fn dat_work(
         class: ClassId::of_master(unit.class),
         terrain_restriction: RestrictionId::of_field(unit.terrain_restriction)?,
         radius: Radii::from(unit.collision_size).ground(),
-        tall: 0.0 < Radii::from(unit.collision_size).z(),
         height: Distance::new(Radii::from(unit.collision_size).z()),
         obstruction_kind: ObstructionKind::from(unit.obstruction_type),
         buildable_on: BuildableOn::of_data(unit.can_be_built_on),
@@ -174,7 +178,7 @@ pub(super) fn dat_work(
         // known (MISSING.md)
         building: unit.building.as_ref().map(|b| work::BuildingMaster {
             adjacent_mode: AdjacentMode::of_data(b.adjacent_mode),
-            disappears_when_built: b.disappears_when_built != 0,
+            disappears_when_built: BuiltMode::of_data(b.disappears_when_built),
             stack_unit: MasterId::of_data(b.stack_unit_id),
             foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
             tech: TechId::of_data(b.tech_id),
@@ -190,13 +194,13 @@ pub(super) fn dat_work(
             ..work::BuildingMaster::default()
         }),
         garrison: GarrisonCapacity::of_data(unit.garrison_capacity),
-        recyclable: unit.recyclable != 0,
-        auto_gather: unit.enable_auto_gather != 0,
+        recyclable: RecycleMode::of_data(unit.recyclable),
+        auto_gather: AutoGatherMode::of_data(unit.enable_auto_gather),
         gather_group: GatherGroup::from(unit.resource_gather_group),
         hill_mode: HillMode::of_data(unit.hill_mode),
         fog_visibility: FogVisibility::of_data(unit.fog_visibility),
-        available: unit.enabled != 0,
-        disabled: unit.disabled != 0,
+        available: Availability::of_data(unit.enabled),
+        disabled: DisableMode::of_data(unit.disabled),
         ghost_on_death: GhostMode::of_data(unit.create_doppelganger_on_death),
         placement: PlacementTerrains::of_data([
             unit.placement_side_terrain[0],

@@ -1951,7 +1951,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     let mut masters = garrison_masters();
     if let Some(tc) = masters.get_mut(TC) {
         tc.radius = Footprint::new(2.0, 2.0);
-        tc.tall = true;
+        tc.height = Distance::new(1.0);
         tc.creatable
             .get_or_insert_with(Default::default)
             .volley_fire = Firepower::new(1.0);
@@ -1964,7 +1964,7 @@ pub(crate) fn sized_world(w: i32, h: i32) -> World {
     }
     if let Some(v) = masters.get_mut(VILLAGER) {
         v.radius = Footprint::new(0.2, 0.2);
-        v.tall = true;
+        v.height = Distance::new(1.0);
         v.move_stats = Some(standing());
     }
     t.model.masters = (0..4).map(|_| masters.clone()).map(Arc::new).collect();
@@ -3076,7 +3076,7 @@ fn coast_world(ship: Point) -> World {
         if let Some(s) = Arc::make_mut(m).get_mut(SHIP) {
             s.terrain_restriction = Some(RestrictionId::named(1));
             s.radius = Footprint::new(0.5, 0.5);
-            s.tall = true;
+            s.height = Distance::new(1.0);
             s.garrison = GarrisonCapacity::of_data(5);
             s.move_stats = Some(sails);
         }

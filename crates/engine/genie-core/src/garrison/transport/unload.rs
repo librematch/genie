@@ -443,7 +443,7 @@ impl World {
                 let placing = Placing {
                     player: p,
                     radius: made.radius,
-                    tall: made.tall,
+                    tall: made.is_tall(),
                     class: made.class,
                     restriction: values,
                     hill_mode: made.hill_mode,

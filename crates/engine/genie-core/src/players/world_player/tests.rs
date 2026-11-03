@@ -6,8 +6,11 @@ use crate::movement::explore::InfluenceMap;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::Availability;
+use crate::objects::masters::BuiltMode;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CreatablePart;
+use crate::objects::masters::DisableMode;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{BuildingMaster, Master, Masters};
@@ -85,7 +88,7 @@ fn master(id: MasterId, kind: MasterKind, class: ClassId) -> Master {
         id,
         kind,
         class,
-        available: true,
+        available: Availability::AVAILABLE,
         ..Master::default()
     }
 }
@@ -557,7 +560,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
 fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     let mut t = world();
     let site = BuildingMaster {
-        disappears_when_built: true,
+        disappears_when_built: BuiltMode::DISAPPEARS,
         stack_unit: Some(ids::TOWN_CENTRE),
         ..BuildingMaster::default()
     };
@@ -572,7 +575,7 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
             ..master(ids::VILLAGER_MALE, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
-            available: false,
+            available: Availability::UNAVAILABLE,
             creatable: Some(CreatablePart {
                 trained_at: vec![ids::TOWN_CENTRE],
                 ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
@@ -582,7 +585,7 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
             ..master(ids::MARKET, MasterKind::COMBAT, class::VILLAGER)
         },
         Master {
-            disabled: true,
+            disabled: DisableMode::DISABLED,
             creatable: Some(CreatablePart {
                 trained_at: vec![ids::TOWN_CENTRE],
                 ..master(master_id(85), MasterKind::COMBAT, class::VILLAGER)
@@ -624,7 +627,7 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
     // a builder with attribute 48 at 0 and the town centre not had: one more below the
     // town centre limit (218)
     let mut builder = masters;
-    builder.get_mut(ids::TOWN_CENTRE_621).unwrap().available = false;
+    builder.get_mut(ids::TOWN_CENTRE_621).unwrap().available = Availability::UNAVAILABLE;
     t.model.masters[1] = Arc::new(builder);
     t.players[1].attributes[218] = Amount::new(1.0);
     assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 1);
@@ -721,7 +724,7 @@ fn the_upgradable_count_follows_the_tech_tree() {
     let mut t = world();
     let masters = Masters::new([
         Master {
-            available: false,
+            available: Availability::UNAVAILABLE,
             creatable: Some(CreatablePart {
                 trained_at: vec![master_id(12)],
                 ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
@@ -731,7 +734,7 @@ fn the_upgradable_count_follows_the_tech_tree() {
             ..master(master_id(74), MasterKind::COMBAT, class::CLASS_6)
         },
         Master {
-            available: false,
+            available: Availability::UNAVAILABLE,
             creatable: Some(CreatablePart {
                 trained_at: vec![master_id(12)],
                 ..master(master_id(75), MasterKind::COMBAT, class::CLASS_6)
@@ -770,7 +773,7 @@ fn the_upgradable_count_follows_the_tech_tree() {
     Arc::make_mut(&mut t.model.masters[1])
         .get_mut(master_id(74))
         .unwrap()
-        .available = true;
+        .available = Availability::AVAILABLE;
     // 75: its link had, its technology not researched
     assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
     t.players[1].techs[150].state = ResearchState::Researched;

@@ -476,6 +476,7 @@ mod stack_tests {
     use crate::objects::layers::{Building, Static};
     use crate::objects::lifecycle::{Class, Lifecycle};
     use crate::objects::masters::BuildableOn;
+    use crate::objects::masters::BuiltMode;
     use crate::objects::masters::CreatablePart;
     use crate::objects::masters::FlyMode;
     use crate::objects::masters::MasterKind;
@@ -521,7 +522,6 @@ mod stack_tests {
             class: class::BUILDING,
             radius: Footprint::new(r, r),
             height: Distance::new(z),
-            tall: 0.0 < z,
             obstruction_kind: kind,
             obstruction_class: ObstructionClass::UNIT,
             hit_points: MasterHitPoints::of_data(hp),
@@ -559,7 +559,7 @@ mod stack_tests {
         );
         if let Some(b) = foundation.building.as_mut() {
             b.stack_unit = Some(ids::TOWN_CENTRE);
-            b.disappears_when_built = true;
+            b.disappears_when_built = BuiltMode::DISAPPEARS;
         }
         let mut tc = building(
             109,

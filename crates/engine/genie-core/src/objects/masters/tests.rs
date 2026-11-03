@@ -35,6 +35,8 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::WorkRate;
 use crate::objects::facing::SpriteFacets;
+use crate::objects::masters::Availability;
+use crate::objects::masters::DisableMode;
 use crate::objects::sprite::Graphic;
 use crate::players::Amount;
 use crate::players::CivId;
@@ -82,7 +84,7 @@ fn master(id: MasterId, task_by_group: u8, tasks: Vec<Task>) -> Master {
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         radius: Footprint::new(0.2, 0.2),
-        tall: true,
+        height: Distance::new(1.0),
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         obstruction_class: ObstructionClass::NONE,
@@ -110,7 +112,7 @@ fn house() -> Master {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
         radius: Footprint::new(1.0, 1.0),
-        tall: true,
+        height: Distance::new(1.0),
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         obstruction_class: ObstructionClass::UNIT,
@@ -382,13 +384,14 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::AVAILABLE_UNIT_FLAG,
-            |m| f32::from(u8::from(m.available)),
-            [1.0; 3],
+            |m| f32::from(m.available.get()),
+            // the byte the game keeps: an add wraps, a scale rounds (not a flag of 0 or 1)
+            [3.0, 5.0, 10.0],
         ),
         (
             MasterAttribute::DISABLED_UNIT_FLAG,
-            |m| f32::from(u8::from(m.disabled)),
-            [1.0; 3],
+            |m| f32::from(m.disabled.get()),
+            [3.0, 5.0, 5.0],
         ),
         (
             MasterAttribute::INTERFACE_KIND,
@@ -449,7 +452,7 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
             ObstructionKind::NONE
         )
     );
-    assert!(!m.available);
+    assert!(!m.available.is_available());
 }
 
 /// `FUN_1410c1bf0` on the armor and attack amounts: a percentage of the class's entry plus
@@ -860,9 +863,9 @@ fn the_static_setters_truncate_as_the_game_does() {
     assert_eq!(m.blast_defense, BlastDefense::new(5));
     // the available flag holds the byte's test against 0
     m.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 256.0, &world(false));
-    assert!(!m.available);
+    assert!(!m.available.is_available());
     m.add_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 1.0, &world(false));
-    assert!(m.available);
+    assert!(m.available.is_available());
 }
 
 /// `FUN_14152e360`: a sprite attribute takes an id only where the world's table holds a
@@ -1207,7 +1210,7 @@ fn the_damage_sprite_attributes_resize_and_select() {
         &Graphics::new(),
         None,
     );
-    assert!(!m.damage_sprites);
+    assert!(!m.has_damage_sprites());
 }
 
 /// `FUN_14123d310`: a building master's garrison heal rate, foundation and garrison type are
@@ -1349,7 +1352,7 @@ fn moving_master_derived_values_follow_its_attributes() {
     assert_eq!((s.base, s.speed), (Speed::new(1.1), Speed::new(1.1 * 1.5)));
     m.set_attribute(MasterAttribute::SIZE_Z, 1.0, &world(false));
     follow(&mut m, MasterAttribute::SIZE_Z, &graphics, None);
-    assert!(m.tall);
+    assert!(m.is_tall());
     assert_eq!(m.move_stats.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
     m.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 3.0, &world(false));
     follow(&mut m, MasterAttribute::RUNNING_GRAPHIC, &graphics, None);
@@ -1616,7 +1619,7 @@ fn master_copy_keeps_its_id_class_and_flags() {
         vec![task(ActionKind::COMBAT, -1, -1, 0.0)],
     );
     militia.class = class::CLASS_6;
-    militia.available = true;
+    militia.available = Availability::AVAILABLE;
     militia.base_id = Some(master_id(74));
     let mut man = master(
         master_id(75),
@@ -1628,13 +1631,13 @@ fn master_copy_keeps_its_id_class_and_flags() {
     );
     man.class = class::CLASS_7;
     man.hit_points = MasterHitPoints::of_data(45);
-    man.disabled = true;
+    man.disabled = DisableMode::DISABLED;
     militia.copy_from(&man);
     assert_eq!(
         (militia.id, militia.class, militia.base_id),
         (master_id(74), class::CLASS_6, Some(master_id(74)))
     );
-    assert!(militia.available && !militia.disabled);
+    assert!(militia.available.is_available() && !militia.disabled.is_disabled());
     assert_eq!(
         (militia.hit_points, militia.action_part().tasks.len()),
         (MasterHitPoints::of_data(45), 2)

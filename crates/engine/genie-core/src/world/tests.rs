@@ -117,8 +117,11 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::AutoGatherMode;
+use crate::objects::masters::Availability;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::BuildableOn;
+use crate::objects::masters::BuiltMode;
 use crate::objects::masters::CarryCapacity;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassAmount;
@@ -143,6 +146,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::masters::RecycleMode;
 use crate::objects::masters::RestrictionField;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskId;
@@ -636,7 +640,7 @@ pub(crate) fn builder_masters() -> Masters {
         kind: MasterKind::COMBAT,
         class: class::VILLAGER,
         radius: Footprint::new(0.2, 0.2),
-        tall: true,
+        height: Distance::new(1.0),
         obstruction_kind: ObstructionKind::NONE,
         buildable_on: BuildableOn::NO,
         obstruction_class: ObstructionClass::NONE,
@@ -704,7 +708,7 @@ pub(crate) fn builder_masters() -> Masters {
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             radius: Footprint::new(1.0, 1.0),
-            tall: true,
+            height: Distance::new(1.0),
             obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             obstruction_class: ObstructionClass::UNIT,
@@ -1623,9 +1627,9 @@ fn player_new_tiles_give_their_resources_to_its_lists() {
     };
     t.model.masters = vec![
         Arc::new(Masters::new([
-            master(master_id(411), true, GatherGroup::WOOD),
-            master(master_id(412), false, GatherGroup::WOOD),
-            master(master_id(413), true, GatherGroup::GOLD),
+            master(master_id(411), AutoGatherMode::ON, GatherGroup::WOOD),
+            master(master_id(412), AutoGatherMode::OFF, GatherGroup::WOOD),
+            master(master_id(413), AutoGatherMode::ON, GatherGroup::GOLD),
         ])),
         Arc::new(Masters::default()),
     ];
@@ -1724,7 +1728,7 @@ fn resource_leaves_the_lists_when_it_runs_out_or_is_deleted() {
     let master = |id, gather_group| Master {
         id,
         kind: MasterKind::STATIC,
-        auto_gather: true,
+        auto_gather: AutoGatherMode::ON,
         gather_group,
         ..Master::default()
     };
@@ -1794,11 +1798,16 @@ fn new_resource_joins_the_lists_of_the_players_that_explored_its_tile() {
         gather_group: GatherGroup::FISH,
         ..Master::default()
     };
-    t.model.masters =
-        vec![Masters::new([master(master_id(53), true), master(master_id(54), false)]); 3]
-            .into_iter()
-            .map(Arc::new)
-            .collect();
+    t.model.masters = vec![
+        Masters::new([
+            master(master_id(53), AutoGatherMode::ON),
+            master(master_id(54), AutoGatherMode::OFF)
+        ]);
+        3
+    ]
+    .into_iter()
+    .map(Arc::new)
+    .collect();
     placeable(&mut t);
     let v = t.spatial.sight.as_mut().unwrap();
     // players 0 and 2 explored the tile, player 1 did not
@@ -4582,7 +4591,7 @@ fn the_unit_ai_resource_search_finds_the_nearest_bush_it_reaches() {
     let mut t = forage_world();
     for masters in &mut t.model.masters {
         let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
-        (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FISH);
+        (bush.auto_gather, bush.gather_group) = (AutoGatherMode::ON, GatherGroup::FISH);
         // the walk reaches the forager's line of sight plus 5 tiles: 601 lies 7 away
         Arc::make_mut(masters)
             .get_mut(master_id(120))
@@ -4656,7 +4665,7 @@ fn cart_world() -> World {
     let mut t = forage_world();
     for masters in &mut t.model.masters {
         let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
-        (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
+        (bush.auto_gather, bush.gather_group) = (AutoGatherMode::ON, GatherGroup::FORAGE);
         let cart = Master {
             id: ids::MASTER_1808,
             kind: MasterKind::BUILDING,
@@ -5033,7 +5042,7 @@ fn the_load_mesh_takes_the_shapes_of_the_standing_tall_objects() {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
         radius: Footprint::new(1.0, 1.0),
-        tall: true,
+        height: Distance::new(1.0),
         obstruction_kind: ObstructionKind::TYPE_2,
         obstruction_class,
         ..Master::default()
@@ -6123,7 +6132,7 @@ fn lumber_world(near: f32) -> World {
             kind: MasterKind::STATIC,
             class: class::TREE,
             radius: Footprint::new(0.5, 0.5),
-            auto_gather: true,
+            auto_gather: AutoGatherMode::ON,
             gather_group: GatherGroup::WOOD,
             ..Master::default()
         };
@@ -9851,7 +9860,7 @@ fn the_forced_replay_removal_leaves_as_an_update_leave_does() {
     t.model.masters = vec![Arc::new(Masters::new([Master {
         id: master_id(54),
         kind: MasterKind::MISSILE,
-        recyclable: true,
+        recyclable: RecycleMode::RECYCLED,
         ..Master::default()
     }]))];
     t.players[0].watched.push(Watched {
@@ -9891,7 +9900,7 @@ fn one_player(objects: Vec<Unit>, resources: [f32; 4]) -> World {
     let trained = |id, time| Master {
         id,
         kind: MasterKind::COMBAT,
-        available: true,
+        available: Availability::AVAILABLE,
         creatable: Some(CreatablePart {
             trained_at: vec![ids::TOWN_CENTRE],
             train_locations: vec![TrainLocation {
@@ -14665,7 +14674,7 @@ fn set_gather_point_takes_building_that_trains_without_garrisoning() {
         Master {
             id: master_id(74),
             kind: MasterKind::COMBAT,
-            available: true,
+            available: Availability::AVAILABLE,
             creatable: Some(CreatablePart {
                 trained_at: vec![master_id(12)],
                 ..CreatablePart::default()
@@ -17357,10 +17366,9 @@ fn farm_masters() -> Masters {
         terrain_restriction: Some(RestrictionId::named(0)),
         base_id: Some(ids::FARM),
         class: class::FARM,
-        available: true,
+        available: Availability::AVAILABLE,
         radius: Footprint::new(1.5, 1.5),
         clearance: Footprint::new(1.5, 1.5),
-        tall: false,
         hit_points: MasterHitPoints::of_data(480),
         creatable: Some(CreatablePart {
             cost: costs(&[(attribute::WOOD, 60, true)]),
@@ -17598,7 +17606,7 @@ fn reseed_without_farm_to_make_makes_nothing() {
             Arc::make_mut(&mut t.model.masters[1])
                 .get_mut(ids::FARM)
                 .unwrap()
-                .available = false;
+                .available = Availability::UNAVAILABLE;
         },
     ];
     for setup in none {
@@ -18229,7 +18237,7 @@ fn archer_masters(hit_chance: i16, max_volley: u8, spread: f32) -> Masters {
         death_sprite: None,
         death_spawns: [None, None],
         life: Some(MasterData::default()),
-        recyclable: true,
+        recyclable: RecycleMode::RECYCLED,
         move_stats: Some(MoveStats {
             speed: Speed::new(7.0),
             base: Speed::new(7.0),
@@ -18758,7 +18766,8 @@ fn the_missile_chain_unmodelled_cases_stop_the_player_with_their_reason() {
         (
             |t| {
                 for m in &mut t.model.masters {
-                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().recyclable = false;
+                    Arc::make_mut(m).get_mut(master_id(363)).unwrap().recyclable =
+                        RecycleMode::KEPT;
                 }
             },
             "a missile of a master that is not recyclable",
@@ -19044,7 +19053,7 @@ fn forager_without_its_bush_after_the_drop_takes_the_next_one() {
         let mut t = foraging();
         for masters in &mut t.model.masters {
             let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
-            (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
+            (bush.auto_gather, bush.gather_group) = (AutoGatherMode::ON, GatherGroup::FORAGE);
             Arc::make_mut(masters)
                 .get_mut(master_id(120))
                 .unwrap()
@@ -20375,7 +20384,7 @@ fn built_the_centre(setup: impl FnOnce(&mut World)) -> (World, BuildSearched) {
     t.build_mesh().unwrap();
     for masters in &mut t.model.masters {
         let bush = Arc::make_mut(masters).get_mut(master_id(59)).unwrap();
-        (bush.auto_gather, bush.gather_group) = (true, GatherGroup::FORAGE);
+        (bush.auto_gather, bush.gather_group) = (AutoGatherMode::ON, GatherGroup::FORAGE);
         Arc::make_mut(masters)
             .get_mut(master_id(120))
             .unwrap()
@@ -20754,7 +20763,7 @@ fn building_completing_in_its_own_update_leaves_what_builder_completion_leaves()
             .building
             .as_mut()
             .unwrap();
-        b.disappears_when_built = true;
+        b.disappears_when_built = BuiltMode::DISAPPEARS;
     }
     assert_eq!(finish(&mut t), Ok((ObjectState::Removed, vec![])));
     let mut t = house_builder();
@@ -22107,7 +22116,7 @@ fn completion_parts_reach_their_owner() {
     let (t, r) = completed(|b| b.tech = Some(tech_id(0)));
     assert_eq!(r, Ok(()));
     assert_eq!(t.players[1].techs[0].state, ResearchState::Researched);
-    let (t, r) = completed(|b| b.disappears_when_built = true);
+    let (t, r) = completed(|b| b.disappears_when_built = BuiltMode::DISAPPEARS);
     assert_eq!(r, Ok(()));
     let house = &t.players[1].objects[ListIndex::new(1)].life;
     assert_eq!(

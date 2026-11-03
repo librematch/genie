@@ -28,11 +28,13 @@ use crate::objects::SpriteFlags;
 use crate::objects::SpriteId;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Action, Combat, Motion, Static};
+use crate::objects::masters::Availability;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassAmount;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
 use crate::objects::masters::CostAmount;
+use crate::objects::masters::DisableMode;
 use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -1116,7 +1118,7 @@ fn an_object_copies_of_its_master_follow_its_change() {
     );
     m.creatable.get_or_insert_with(Default::default).build_time = WholeSeconds::of_data(33);
     (m.obstruction_kind, m.obstruction_class) = (ObstructionKind::CIRCLE, ObstructionClass::UNIT);
-    (m.line_of_sight, m.tall) = (Distance::new(6.0), true);
+    (m.line_of_sight, m.height) = (Distance::new(6.0), Distance::new(1.0));
     t.model.masters = vec![Arc::new(Masters::new([
         m,
         combat(master_id(5), class::CLASS_6, 60),
@@ -1612,13 +1614,13 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
         vec![player],
     );
     let mut militia = combat(master_id(74), class::CLASS_6, 40);
-    militia.available = true;
+    militia.available = Availability::AVAILABLE;
     let mut man_at_arms = combat(master_id(75), class::CLASS_6, 45);
     man_at_arms
         .combat
         .get_or_insert_with(Default::default)
         .weapons = vec![ClassAmount::new(4, 6)];
-    man_at_arms.available = false;
+    man_at_arms.available = Availability::UNAVAILABLE;
     t.model.masters = vec![Arc::new(Masters::new([militia, man_at_arms]))];
     t.do_effect(PlayerId::new(0), &[attribute(3, 74, 75, -1, 0.0)], None)
         .unwrap();
@@ -1631,7 +1633,7 @@ fn an_upgrade_copies_the_new_master_into_the_old() {
             vec![ClassAmount::new(4, 6)]
         )
     );
-    assert!(m.available);
+    assert!(m.available.is_available());
     // mode 1 leaves the master
     Arc::make_mut(&mut t.model.masters[0])
         .get_mut(master_id(75))
@@ -1769,7 +1771,7 @@ fn the_enable_command_sets_available_unless_disabled() {
         vec![Player::default()],
     );
     let mut locked = combat(master_id(5), class::CLASS_6, 10);
-    locked.disabled = true;
+    locked.disabled = DisableMode::DISABLED;
     t.model.masters = vec![Arc::new(Masters::new([
         combat(master_id(4), class::CLASS_6, 10),
         locked,
@@ -1781,12 +1783,15 @@ fn the_enable_command_sets_available_unless_disabled() {
         None,
     )
     .unwrap();
-    let available: Vec<bool> = t.model.masters[0].iter().map(|m| m.available).collect();
+    let available: Vec<bool> = t.model.masters[0]
+        .iter()
+        .map(|m| m.available.is_available())
+        .collect();
     assert_eq!(available, [true, false, false]);
     t.settings.game_mode = GameMode::of_data(11);
     t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
         .unwrap();
-    assert!(!t.model.masters[0].get(master_id(0x26d)).unwrap().available);
+    assert!(!(t.model.masters[0].get(master_id(0x26d)).unwrap().available).is_available());
     t.settings.game_mode = GameMode::of_data(0);
     assert!(
         t.do_effect(PlayerId::new(0), &[attribute(2, 0x26d, 1, -1, 0.0)], None)
@@ -1794,7 +1799,7 @@ fn the_enable_command_sets_available_unless_disabled() {
     );
     t.do_effect(PlayerId::new(0), &[attribute(2, 4, 0, -1, 0.0)], None)
         .unwrap();
-    assert!(!t.model.masters[0].get(master_id(4)).unwrap().available);
+    assert!(!(t.model.masters[0].get(master_id(4)).unwrap().available).is_available());
 }
 
 /// A research whose effect reaches its building (the object `FUN_1413cdcd0` passes, which its

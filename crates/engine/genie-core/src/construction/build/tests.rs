@@ -763,7 +763,7 @@ fn built_master(id: MasterId, cost: &[(AttributeId, i16, bool)]) -> Master {
         class: class::BUILDING,
         building: Some(BuildingMaster {
             adjacent_mode: AdjacentMode::NONE,
-            disappears_when_built: false,
+            disappears_when_built: BuiltMode::STAYS,
             stack_unit: None,
             foundation_terrain: None,
             tech: None,
@@ -1293,6 +1293,7 @@ use crate::objects::FacetCount;
 use crate::objects::layers::{Building, Static};
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::BuildingMaster;
+use crate::objects::masters::BuiltMode;
 use crate::objects::sprite::Graphic;
 use crate::players::history::{EntryKind, Population};
 use crate::test_ids::adds;

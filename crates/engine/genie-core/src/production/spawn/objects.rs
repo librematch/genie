@@ -93,7 +93,7 @@ impl World {
         let placing = Placing {
             player: p,
             radius: made.radius,
-            tall: made.tall,
+            tall: made.is_tall(),
             class: made.class,
             restriction,
             hill_mode: made.hill_mode,
@@ -288,7 +288,7 @@ impl World {
         } else {
             None
         };
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
+        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
             position: at,
             radius: made.radius,
@@ -297,7 +297,7 @@ impl World {
             master,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
-            tall: made.tall,
+            tall: made.is_tall(),
             moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(
@@ -467,7 +467,7 @@ fn remains_supported(made: &Master) -> Result<(), GenieError> {
             "remains with hit points (the sleeping list)",
         ));
     }
-    if made.recyclable {
+    if made.recyclable.recycled() {
         return Err(GenieError::unsupported(
             "a new object of a recyclable master (a negative id)",
         ));

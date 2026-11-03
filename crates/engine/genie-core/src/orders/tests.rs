@@ -53,6 +53,7 @@ use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
+use crate::objects::masters::DamageGraphic;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::FormationClass;
 use crate::objects::masters::MasterKind;
@@ -2664,7 +2665,7 @@ fn master_change_unmodelled_parts_fail() {
         ..Unit::default()
     };
     let damaged = Master {
-        damage_sprites: true,
+        damage_graphics: vec![DamageGraphic::default()],
         ..old.clone()
     };
     let reason = |r: Result<_, GenieError>| r.unwrap_err().reason();

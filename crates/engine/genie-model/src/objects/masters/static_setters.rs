@@ -37,6 +37,7 @@ use crate::objects::masters::multiply_short;
 use crate::objects::masters::resize_damage_graphics;
 use crate::objects::masters::select_entry;
 use crate::objects::masters::set_sprite;
+use crate::objects::masters::{Availability, DisableMode};
 use crate::players::Amount;
 
 impl Master {
@@ -127,8 +128,8 @@ impl Master {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             // the save's byte, which the slice holds as its test against 0
-            MasterAttribute::AVAILABLE_UNIT_FLAG => self.available = low8(v) != 0,
-            MasterAttribute::DISABLED_UNIT_FLAG => self.disabled = low8(v) != 0,
+            MasterAttribute::AVAILABLE_UNIT_FLAG => self.available = Availability::of_data(low8(v)),
+            MasterAttribute::DISABLED_UNIT_FLAG => self.disabled = DisableMode::of_data(low8(v)),
             MasterAttribute::INTERFACE_KIND => self.unit_level = InterfaceKind::of_data(low8(v)),
             MasterAttribute::COMBAT_LEVEL => self.combat_level = CombatLevel::of_data(low8(v)),
             MasterAttribute::INTERACTION_MODE => {
@@ -264,10 +265,10 @@ impl Master {
                 self.add_damage_graphic(attribute, v, world);
             }
             MasterAttribute::AVAILABLE_UNIT_FLAG => {
-                self.available = u8::from(self.available).wrapping_add(low8(v)) != 0;
+                self.available = self.available.plus(low8(v));
             }
             MasterAttribute::DISABLED_UNIT_FLAG => {
-                self.disabled = u8::from(self.disabled).wrapping_add(low8(v)) != 0;
+                self.disabled = self.disabled.plus(low8(v));
             }
             MasterAttribute::INTERFACE_KIND => self.unit_level = self.unit_level.plus(low8(v)),
             MasterAttribute::COMBAT_LEVEL => self.combat_level = self.combat_level.plus(low8(v)),
@@ -388,7 +389,8 @@ impl Master {
                     BlastDefense::new(low8(f32::from(self.blast_defense.get()) * v));
             }
             MasterAttribute::AVAILABLE_UNIT_FLAG => {
-                self.available = low8(f32::from(u8::from(self.available)) * v + ROUND) != 0;
+                self.available =
+                    Availability::of_data(low8(f32::from(self.available.get()) * v + ROUND));
             }
             MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD => {
                 insert_damage_graphic(&mut self.damage_graphics, &mut self.damage_graphic_entry, v);

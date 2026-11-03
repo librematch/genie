@@ -547,7 +547,7 @@ impl World {
                         s.los = master.line_of_sight;
                     }
                 }
-                MasterAttribute::SIZE_Z => self.spatial.set_tall(id, master.tall),
+                MasterAttribute::SIZE_Z => self.spatial.set_tall(id, master.is_tall()),
                 _ => {}
             }
         }

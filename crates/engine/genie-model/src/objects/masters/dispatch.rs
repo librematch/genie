@@ -107,8 +107,7 @@ impl Master {
     /// The value attribute `attribute` changes that the masters' loader left at its default
     /// while what the slice derives from it holds another (the speed, `+0x740`, under a moving
     /// master's speeds; the turn speed, `+0x758`, under its turn time; the train locations under
-    /// their ids; the damage sprites under the flag that it has some): the change would derive
-    /// from the default. None when the master holds it.
+    /// their ids): the change would derive from the default. None when the master holds it.
     #[must_use]
     pub fn unloaded_for(&self, attribute: MasterAttribute) -> Option<&'static str> {
         use crate::objects::masters::MasterAttribute;
@@ -139,15 +138,6 @@ impl Master {
                     && !self.creatable_part().trained_at.is_empty() =>
             {
                 Some("a master's train locations (+0x898) the loader did not fill")
-            }
-            MasterAttribute::DAMAGE_GRAPHIC
-            | MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD
-            | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM
-            | MasterAttribute::DAMAGE_GRAPHIC_PERCENT
-            | MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE
-                if self.damage_graphics.is_empty() && self.damage_sprites =>
-            {
-                Some("a master's damage sprites (+0x638) the loader did not fill")
             }
             _ => None,
         }

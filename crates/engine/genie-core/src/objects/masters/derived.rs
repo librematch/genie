@@ -1,7 +1,6 @@
 //! The values the slice derives from a master after a change ([`follow`]): the
 //! sprites' speed and facets, a moving unit's values.
 
-use crate::map::Distance;
 use crate::map::terrain::Terrain;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
@@ -76,9 +75,10 @@ pub fn follow_moving(
 }
 
 /// The values the slice derives from master `master`'s after attribute `attribute` changed: its
-/// height test, whether it has damage sprites, its train locations' ids and first time, and what
-/// a unit moving with it reads ([`follow_moving`]); a missile's flight reads the master as it
-/// is ([`Master::missile_stats`]).
+/// train locations' ids and first time, and what a unit moving with it reads
+/// ([`follow_moving`]); its height test, its damage sprites' test and a missile's flight read
+/// the master as it is ([`Master::is_tall`], [`Master::has_damage_sprites`],
+/// [`Master::missile_stats`]).
 pub fn follow(
     master: &mut Master,
     attribute: MasterAttribute,
@@ -87,12 +87,6 @@ pub fn follow(
 ) {
     use crate::objects::masters::MasterAttribute;
     match attribute {
-        MasterAttribute::SIZE_X | MasterAttribute::SIZE_Y | MasterAttribute::SIZE_Z => {
-            master.tall = Distance::ZERO < master.height;
-        }
-        MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD | MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM => {
-            master.damage_sprites = !master.damage_graphics.is_empty();
-        }
         MasterAttribute::TRAIN_LOCATION
         | MasterAttribute::TRAIN_TIME
         | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD

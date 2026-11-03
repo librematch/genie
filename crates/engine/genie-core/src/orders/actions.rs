@@ -443,7 +443,7 @@ pub(crate) fn switch_master(
         unit.life.hp = HitPoints::new(f32::from(hp as i32 as i16));
         // FUN_1411859a0: the damage share picks the damage sprites; one that stays keeps them
         // (the object's `+0xd`, not held, taken to be the old master's share)
-        if (old.damage_sprites || next.damage_sprites)
+        if (old.has_damage_sprites() || next.has_damage_sprites())
             && (damage_share(old_hp, old.hit_points, old.class, roles)?
                 != damage_share(unit.life.hp, next.hit_points, next.class, roles)?)
         {
@@ -469,7 +469,7 @@ pub(crate) fn switch_master(
             placed.master = new;
             placed.obstruction_kind = next.obstruction_kind;
             placed.buildable_on = next.buildable_on;
-            placed.tall = next.tall;
+            placed.tall = next.is_tall();
             placed.moves = next.moves();
             if unit.life.inside.is_some() {
                 // inside another (`+0x2f0`) the unit has no tile (`+0x2e8` 0: no sight slots) and

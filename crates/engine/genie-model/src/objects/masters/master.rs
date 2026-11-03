@@ -48,6 +48,7 @@ use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::Task;
+use crate::objects::masters::{AutoGatherMode, Availability, BuiltMode, DisableMode, RecycleMode};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::production::{HotkeyId, LocationButton};
@@ -62,6 +63,20 @@ impl Master {
     pub fn default_task(&self) -> Option<&Task> {
         let action = self.action_part();
         action.tasks.get(action.default_task?.index())
+    }
+
+    /// Whether its objects count as tall on their tiles: its height (`radius_z`, `+0x5e0`) is
+    /// above 0.
+    #[must_use]
+    pub fn is_tall(&self) -> bool {
+        Distance::ZERO < self.height
+    }
+
+    /// Whether it has damage sprites (`+0x638`..`+0x640`), which a master change checks
+    /// (`FUN_1411859a0`).
+    #[must_use]
+    pub const fn has_damage_sprites(&self) -> bool {
+        !self.damage_graphics.is_empty()
     }
 
     /// Whether its objects move: a moving master (types 30 and up) whose speed (`+0x740`, the
@@ -111,7 +126,7 @@ pub struct BuildingMaster {
     /// `+0x980`, `adjacent_mode`: walls and gates join their neighbours (`FUN_1411ce890`).
     pub adjacent_mode: AdjacentMode,
     /// `+0x984`, `disappears_when_built`.
-    pub disappears_when_built: bool,
+    pub disappears_when_built: BuiltMode,
     /// `+0x986`, `stack_unit_id`: the building becomes another (−1 for none).
     pub stack_unit: Option<MasterId>,
     /// `+0x988`, `foundation_terrain_id` (the save's `on_build_make_tile`), none for −1.
@@ -168,8 +183,6 @@ pub struct Master {
     pub action: Option<ActionPart>,
     /// `radius_x`, `radius_y` (`+0x5d8`, `+0x5dc`).
     pub radius: Footprint,
-    /// `radius_z` (`+0x5e0`) is above 0: its objects count as tall on their tiles.
-    pub tall: bool,
     /// `radius_z` (`+0x5e0`): how high a missile may pass over its objects and hit them
     /// (`FUN_14113f740`).
     pub height: Distance,
@@ -213,9 +226,6 @@ pub struct Master {
     /// `+0x60a`, `+0x610`, `+0x628`): what an object of this master adds to its player's
     /// attributes, by its flag.
     pub storage: Vec<(Option<AttributeId>, Amount, u8)>,
-    /// The master has damage sprites (`+0x638`..`+0x640`): a master change checks them
-    /// (`FUN_1411859a0`).
-    pub damage_sprites: bool,
     /// The `.dat`'s `fly_mode` (`+0x608`): 1 flies above the ground (a bird's Fly lifts it).
     pub fly_mode: FlyMode,
     /// `area_effect_object_level` (`+0x62b`): the blasts that reach it.
@@ -225,10 +235,10 @@ pub struct Master {
     pub garrison: GarrisonCapacity,
     /// `+0x680`, the `.dat`'s `recyclable`: its objects take ids from the negative range
     /// (`FUN_1415301b0`).
-    pub recyclable: bool,
+    pub recyclable: RecycleMode,
     /// `+0x681`, `enable_auto_gather`: an object of it blocking a spawn point stays
     /// (`FUN_141194170`).
-    pub auto_gather: bool,
+    pub auto_gather: AutoGatherMode,
     /// `+0x683`, `resource_gather_group`: the resource kind a gatherer's search
     /// (`ClosestResourceObject`) takes it for ([`GatherGroup`]).
     pub gather_group: GatherGroup,
@@ -239,9 +249,9 @@ pub struct Master {
     pub fog_visibility: FogVisibility,
     /// `+0x5f0`, `available`: the player may make it (an effect's enable command, kind 2,
     /// changes it).
-    pub available: bool,
+    pub available: Availability,
     /// `+0x5f1`, `disabled`: an enable command leaves `available` as it is.
-    pub disabled: bool,
+    pub disabled: DisableMode,
     /// `+0x682`, `create_doppelganger_on_death`: 2 leaves ghosts of an object of it for the
     /// players who explored its tile but do not see it, at its death and once they lose sight
     /// of it (`genie_core::vision::ghost`).
@@ -288,7 +298,7 @@ pub struct Master {
     /// `+0x62e`, `map_draw_level` (the `.dat`'s `minimap_mode`).
     pub map_draw_level: MinimapMode,
     /// The damage sprites (`+0x638`, 16 bytes each; the save's `damage_sprite`), which
-    /// [`Master::damage_sprites`] follows.
+    /// [`Master::has_damage_sprites`] reads.
     pub damage_graphics: Vec<DamageGraphic>,
     /// `+0x731`, `mDamageSpriteEntryMod`: the damage sprite the attributes 91, 156 and 157 change.
     pub damage_graphic_entry: DamageGraphicEntry,
@@ -364,5 +374,33 @@ impl Masters {
     /// The master `id` to change, if the player has it.
     pub fn get_mut(&mut self, id: MasterId) -> Option<&mut Master> {
         self.by_id.get_mut(id.index())?.as_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::map::Distance;
+    use crate::objects::masters::DamageGraphic;
+    use crate::objects::masters::Master;
+
+    /// A master is tall while its height is above 0, so an effect on the height (`SIZE_Z`)
+    /// changes it with no flag to update; a NaN height is not tall (the import's `0 < z`).
+    #[test]
+    fn masters_are_tall_while_their_height_is_above_zero() {
+        let mut m = Master::default();
+        assert!(!m.is_tall());
+        m.height = Distance::new(0.5);
+        assert!(m.is_tall());
+        m.height = Distance::new(f32::NAN);
+        assert!(!m.is_tall());
+    }
+
+    /// A master has damage sprites while its damage graphics hold one.
+    #[test]
+    fn masters_have_damage_sprites_while_they_hold_one() {
+        let mut m = Master::default();
+        assert!(!m.has_damage_sprites());
+        m.damage_graphics.push(DamageGraphic::default());
+        assert!(m.has_damage_sprites());
     }
 }

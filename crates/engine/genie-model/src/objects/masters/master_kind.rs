@@ -104,6 +104,15 @@ impl MasterKind {
         self.0 == Self::MISSILE.0
     }
 
+    /// Whether a master of this type holds the building layer
+    /// ([`crate::objects::masters::BuildingMaster`], `TRIBE_Master_Building_Object`'s values,
+    /// `+0x980`..): the `.dat` reads the building section for the type 80 only; the save holds the
+    /// TRIBE building part for it.
+    #[must_use]
+    pub const fn has_building_layer(self) -> bool {
+        self.0 == Self::BUILDING.0
+    }
+
     /// Whether a master of this type holds the creatable layer (`TRIBE_Master_Combat_Object`'s
     /// values, `+0x880`..`+0x94f`): the `.dat` reads the creatable section for the types 70 and
     /// up but 90, one of the data's own types; the save holds the TRIBE combat part for 70 and 80.

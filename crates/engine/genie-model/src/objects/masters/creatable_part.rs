@@ -9,6 +9,7 @@ use crate::objects::SpriteId;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::AnimatedPart;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::BuildingMaster;
 use crate::objects::masters::COST_SLOTS;
 use crate::objects::masters::ChargeEvent;
 use crate::objects::masters::ChargeKind;
@@ -120,7 +121,8 @@ impl Master {
     /// [`MasterKind::has_moving_layer`], the action one for [`MasterKind::has_action_layer`], the
     /// combat one for [`MasterKind::has_combat_layer`], the missile one for
     /// [`MasterKind::has_missile_layer`], the creatable one for
-    /// [`MasterKind::has_creatable_layer`]).
+    /// [`MasterKind::has_creatable_layer`], the building one for
+    /// [`MasterKind::has_building_layer`]).
     #[must_use]
     pub fn of_kind(kind: MasterKind) -> Self {
         Self {
@@ -131,6 +133,7 @@ impl Master {
             combat: kind.has_combat_layer().then(CombatPart::default),
             missile: kind.has_missile_layer().then(MissilePart::default),
             creatable: kind.has_creatable_layer().then(CreatablePart::default),
+            building: kind.has_building_layer().then(BuildingMaster::default),
             ..Self::default()
         }
     }

@@ -149,7 +149,7 @@ impl World {
                 .production
                 .get(building.id)
                 .is_some_and(|p| p.available_units.contains(&unit_id));
-            if unit.available || listed {
+            if unit.available.is_available() || listed {
                 found.push(place);
             }
         }

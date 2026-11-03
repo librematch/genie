@@ -115,7 +115,7 @@ impl World {
         let recyclable = master.recyclable;
         let left = self.spatial.leave(gone.id);
         self.unwatch(p, gone.id)?;
-        if let Some(m) = missile.filter(|_| recyclable) {
+        if let Some(m) = missile.filter(|_| recyclable.recycled()) {
             self.recycling.missiles.push((gone.id, m.flying));
         }
         self.pathing.removed(gone.id);

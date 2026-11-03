@@ -111,7 +111,7 @@ impl PlaceMap for WorldMap<'_> {
                     master: placed.master,
                     buildable_on: placed.buildable_on,
                     obstruction_kind: placed.obstruction_kind,
-                    auto_gather: master.auto_gather,
+                    auto_gather: master.auto_gather.is_on(),
                     state: unit.life.state,
                     desolid: t
                         .parts

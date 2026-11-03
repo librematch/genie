@@ -205,7 +205,7 @@ impl World {
                 .with("unit", id)
                 .with("building", bid)
         })?;
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
+        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         placed.obstruction =
             (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
                 kind: made.obstruction_kind,
@@ -378,7 +378,7 @@ impl World {
         let from = placed.position;
         self.pathing.removed(id);
         self.spatial.remove(id);
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
+        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         placed.obstruction =
             (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
                 kind: made.obstruction_kind,

@@ -41,7 +41,7 @@ impl World {
                     continue;
                 };
                 let master = unit.master(self.master_tables(), owner)?;
-                if master.auto_gather {
+                if master.auto_gather.is_on() {
                     found.push((id, master.gather_group, unit.position()));
                 }
             }
@@ -77,7 +77,7 @@ impl World {
         let (id, at) = (u.id, u.position());
         let (x, y) = (at.x(), at.y());
         let master = u.master(self.master_tables(), p)?;
-        if !master.auto_gather {
+        if !master.auto_gather.is_on() {
             return Ok(());
         }
         let group = master.gather_group;

@@ -3,6 +3,7 @@
 
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::Availability;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -78,9 +79,10 @@ impl World {
     /// `FUN_141611520`). With `building` 118 (a builder), attribute 48 at 0 and the town centre
     /// 621 neither had nor its `+0x5f1` set, one more when the town centres
     /// ([`World::town_centre_count`]) are fewer than attribute 218. genie's masters keep `+0x5f0`
-    /// and `+0x5f1` as booleans ([`crate::objects::masters::Master::available`],
-    /// [`crate::objects::masters::Master::disabled`]), a set one as 1: the limit bits 1 to 3 are none, and
-    /// the limited units' tests not reached.
+    /// and `+0x5f1` as the data's bytes ([`crate::objects::masters::Master::available`],
+    /// [`crate::objects::masters::Master::disabled`]); the `.dat` and the saves hold 0 and 1 only,
+    /// so only an effect on the disabled flag sets the limit bits 1 to 3, and the limited units'
+    /// test of bit 3 is not ported (MISSING.md).
     #[must_use]
     pub fn trainable_count(&self, p: PlayerId, building: MasterId) -> i16 {
         let Some(masters) = self.model.masters.of(p) else {
@@ -88,9 +90,9 @@ impl World {
         };
         let mut count = 0i16;
         for m in masters.iter() {
-            let flags = u8::from(m.disabled);
+            let flags = m.disabled.get();
             if MasterKind::COMBAT <= m.kind
-                && m.available
+                && m.available.is_available()
                 && self.trains_at(m, building)
                 && flags & 1 == 0
             {
@@ -112,7 +114,7 @@ impl World {
             let a = &player.attributes;
             let centre = masters.get(self.model.slots.master.town_centre_621);
             if get(a, self.model.slots.attribute.no_town_centre) == Amount::ZERO
-                && centre.is_some_and(|c| !c.disabled && !c.available)
+                && centre.is_some_and(|c| !c.disabled.is_disabled() && !c.available.is_available())
                 && (self.town_centre_count(p) as f32)
                     < get(a, self.model.slots.attribute.town_centre_limit).get()
             {
@@ -168,7 +170,7 @@ impl World {
             if m.kind < MasterKind::COMBAT || !self.trains_at(m, building) {
                 continue;
             }
-            let flags = u8::from(m.disabled);
+            let flags = m.disabled.get();
             if flags & 6 != 0 {
                 count = count.wrapping_add(1);
                 continue;
@@ -189,7 +191,7 @@ impl World {
                 .master()
                 .and_then(|l| masters.get(l))
                 .map(|l| l.available);
-            if had.is_none_or(|a| a) {
+            if had.is_none_or(Availability::is_available) {
                 let tech = self.model.tech_tree.tech(&q);
                 if state(tech).is_none_or(|s| s == ResearchState::Researched) {
                     count = count.wrapping_add(1);
@@ -205,7 +207,7 @@ impl World {
             let a = &player.attributes;
             let centre = masters.get(self.model.slots.master.town_centre_621);
             if get(a, self.model.slots.attribute.no_town_centre) == Amount::ZERO
-                && centre.is_some_and(|c| !c.disabled && c.available)
+                && centre.is_some_and(|c| !c.disabled.is_disabled() && c.available.is_available())
                 && (self.town_centre_count(p) as f32)
                     < get(a, self.model.slots.attribute.town_centre_limit).get()
             {
@@ -232,7 +234,7 @@ impl World {
                 .of_class(b.class)
                 .contains(ClassRoles::BUILDING)
         }) && let Some(site) = b.building.as_ref()
-            && site.disappears_when_built
+            && site.disappears_when_built.disappears()
             && let Some(stack) = site.stack_unit
         {
             at = stack;

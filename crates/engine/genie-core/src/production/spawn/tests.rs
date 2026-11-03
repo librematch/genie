@@ -30,6 +30,7 @@ use crate::objects::masters::HillMode;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
+use crate::objects::masters::RecycleMode;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
@@ -1130,7 +1131,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         "remains with hit points (the sleeping list)"
     );
     assert_eq!(
-        reason(&|m| m.recyclable = true, Facing::Drawn),
+        reason(&|m| m.recyclable = RecycleMode::RECYCLED, Facing::Drawn),
         "a new object of a recyclable master (a negative id)"
     );
     assert_eq!(

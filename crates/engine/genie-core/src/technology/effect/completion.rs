@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
+use crate::objects::masters::Availability;
 use crate::objects::masters::CostAmount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -503,8 +504,8 @@ impl World {
         let m = Arc::make_mut(self.model.masters.checked_mut(p.index())?)
             .get_mut(master)
             .ok_or(NO_MASTER)?;
-        if !m.disabled {
-            m.available = enable != 0;
+        if !m.disabled.is_disabled() {
+            m.available = Availability::of_data(enable);
         }
         Ok(())
     }

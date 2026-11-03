@@ -74,7 +74,7 @@ impl Unit {
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
             "a missile master without its flight",
         ))?;
-        if !made.recyclable {
+        if !made.recyclable.recycled() {
             return Err(GenieError::unsupported(
                 "a missile of a master that is not recyclable",
             ));
@@ -144,7 +144,7 @@ impl Unit {
             position = position.with_z(grounded(position.z(), ground, false, stats.fly_mode));
         }
         mover.mark_move(position, c.w.world_time);
-        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.tall;
+        let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
             position,
             radius: made.radius,
@@ -153,7 +153,7 @@ impl Unit {
             master: made.id,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
-            tall: made.tall,
+            tall: made.is_tall(),
             moves: made.moves(),
             unknown: None,
             obstruction: (made.obstruction_kind != ObstructionKind::NONE && solid).then_some(

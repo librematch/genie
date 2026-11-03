@@ -236,7 +236,7 @@ impl World {
                 return Ok(true);
             }
         }
-        Ok(b.available)
+        Ok(b.available.is_available())
     }
 
     /// `FUN_141658b40`: the farm a reseeding villager of player `p` makes: the farm (0x32) when
@@ -488,6 +488,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::objects::masters::Availability;
     #[cfg(test)]
     use crate::objects::masters::BuildingMaster;
     use crate::objects::masters::ClassId;
@@ -637,7 +638,7 @@ mod tests {
         id: MasterId,
         class: ClassId,
         base: MasterId,
-        available: bool,
+        available: Availability,
         head: i16,
     ) -> Master {
         Master {
@@ -662,19 +663,55 @@ mod tests {
     fn master_can_be_made_by_its_base_availability() {
         let mut t = world(0.0);
         t.model.masters[1] = Arc::new(Masters::new([
-            building(FARM, class::FARM, FARM, true, -1),
-            building(PASTURE_1889, class::FARM, master_id(300), false, -1),
-            building(master_id(300), class::BUILDING, master_id(300), true, 301),
-            building(master_id(301), class::BUILDING, master_id(302), false, -1),
-            building(master_id(302), class::BUILDING, master_id(302), true, -1),
-            building(master_id(303), class::BUILDING, master_id(999), true, -1),
+            building(FARM, class::FARM, FARM, Availability::AVAILABLE, -1),
+            building(
+                PASTURE_1889,
+                class::FARM,
+                master_id(300),
+                Availability::UNAVAILABLE,
+                -1,
+            ),
+            building(
+                master_id(300),
+                class::BUILDING,
+                master_id(300),
+                Availability::AVAILABLE,
+                301,
+            ),
+            building(
+                master_id(301),
+                class::BUILDING,
+                master_id(302),
+                Availability::UNAVAILABLE,
+                -1,
+            ),
+            building(
+                master_id(302),
+                class::BUILDING,
+                master_id(302),
+                Availability::AVAILABLE,
+                -1,
+            ),
+            building(
+                master_id(303),
+                class::BUILDING,
+                master_id(999),
+                Availability::AVAILABLE,
+                -1,
+            ),
         ]));
         assert!(t.can_make(PlayerId::new(1), FARM).unwrap());
         // the pasture's base 300 heads 301, whose base 302 is available
         assert!(t.can_make(PlayerId::new(1), PASTURE_1889).unwrap());
         assert!(!t.can_make(PlayerId::new(1), ids::ID_1187).unwrap());
         assert!(!t.can_make(PlayerId::new(1), master_id(303)).unwrap());
-        t.model.masters[1] = Arc::new(Masters::new([building(FARM, class::FARM, FARM, false, -1)]));
+        t.model.masters[1] = Arc::new(Masters::new([building(
+            FARM,
+            class::FARM,
+            FARM,
+            Availability::UNAVAILABLE,
+            -1,
+        )]));
         assert!(!t.can_make(PlayerId::new(1), FARM).unwrap());
     }
 
@@ -687,7 +724,7 @@ mod tests {
             TOWN_CENTRE_621,
             class::BUILDING,
             TOWN_CENTRE_621,
-            false,
+            Availability::UNAVAILABLE,
             -1,
         )]));
         assert!(!t.can_make(PlayerId::new(1), TOWN_CENTRE_621).unwrap());
@@ -700,25 +737,41 @@ mod tests {
     #[test]
     fn reseed_makes_the_farm_else_the_pasture() {
         let mut t = world(0.0);
-        let masters = |farm: bool, pasture: bool, class: ClassId| {
+        let masters = |farm: Availability, pasture: Availability, class: ClassId| {
             Masters::new([
                 building(FARM, class, FARM, farm, -1),
                 building(PASTURE_1889, class::FARM, PASTURE_1889, pasture, -1),
             ])
         };
-        t.model.masters[1] = Arc::new(masters(true, true, class::FARM));
+        t.model.masters[1] = Arc::new(masters(
+            Availability::AVAILABLE,
+            Availability::AVAILABLE,
+            class::FARM,
+        ));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), Some(FARM));
-        t.model.masters[1] = Arc::new(masters(false, true, class::FARM));
+        t.model.masters[1] = Arc::new(masters(
+            Availability::UNAVAILABLE,
+            Availability::AVAILABLE,
+            class::FARM,
+        ));
         assert_eq!(
             t.reseed_master(PlayerId::new(1)).unwrap(),
             Some(PASTURE_1889)
         );
-        t.model.masters[1] = Arc::new(masters(true, true, class::BUILDING));
+        t.model.masters[1] = Arc::new(masters(
+            Availability::AVAILABLE,
+            Availability::AVAILABLE,
+            class::BUILDING,
+        ));
         assert_eq!(
             t.reseed_master(PlayerId::new(1)).unwrap(),
             Some(PASTURE_1889)
         );
-        t.model.masters[1] = Arc::new(masters(false, false, class::FARM));
+        t.model.masters[1] = Arc::new(masters(
+            Availability::UNAVAILABLE,
+            Availability::UNAVAILABLE,
+            class::FARM,
+        ));
         assert_eq!(t.reseed_master(PlayerId::new(1)).unwrap(), None);
     }
 
