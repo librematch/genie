@@ -8,6 +8,7 @@ use crate::construction::wait_solidify::{WAIT_SOLIDIFY, WaitSolidify};
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::gathering::gather::GATHER;
+use crate::gathering::hunt::HUNT;
 use crate::groups::{Member, Motion, UnitGroup};
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -34,6 +35,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ActionPart;
 use crate::objects::masters::AttackPriority;
+use crate::objects::masters::AutoGatherMode;
 use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassId;
@@ -69,6 +71,7 @@ use crate::test_ids::order_kind;
 use crate::test_ids::owner;
 use crate::test_ids::player_id;
 use crate::testing::ai::run_ai;
+use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::WONDER;
@@ -1190,307 +1193,378 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
     );
 }
 
-/// What [`UnitSide::closest_resource`] answers, and the searches asked (group, workers cap,
-/// drop site, current target).
-#[derive(Default)]
-struct ResourceSide {
-    /// What `ClosestResourceObject` finds.
-    resource: Option<Gatherable>,
-    /// The resource searches asked: kind, cap, drop site, current target.
-    searches: Vec<(GatherGroup, i32, Option<ObjectId>, Option<ObjectId>)>,
-    /// What `ClosestObject` finds (none: no search here).
-    closest: Option<Found>,
-    /// The foundation the builder's search finds and whether the unit reaches it (none: no
-    /// search here).
-    foundation: Option<(Option<ObjectId>, bool)>,
-    /// The build command finds no task (slot 0x380's 0).
-    no_build_task: bool,
-}
-
-impl UnitSide for ResourceSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
-        Ok(!self.no_build_task)
-    }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        self.closest
-            .ok_or(GenieError::unsupported("no search here"))
-    }
-    fn foundation_search(&mut self) -> Result<Option<ObjectId>, GenieError> {
-        self.foundation
-            .map(|(id, _)| id)
-            .ok_or(GenieError::unsupported("no search here"))
-    }
-    fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
-        Ok(self.foundation.is_some_and(|(_, reaches)| reaches))
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn closest_resource(
-        &mut self,
-        search: ResourceSearch,
-    ) -> Result<Option<Gatherable>, GenieError> {
-        assert_eq!(
-            (search.point, search.min_state),
-            (NO_POINT, ObjectState::Alive)
-        );
-        self.searches.push((
-            search.kind,
-            search.cap.get(),
-            search.site.map(DropSiteId::id),
-            search.current,
-        ));
-        Ok(self.resource)
+/// Villager 31237's master: [`villager_master`] of line of sight 4 that hunts deer (class 9) and
+/// boars (0x21), gathers bushes (7), stone (8), gold (32), trees (15) and farms (49), builds
+/// anything, and drops at the town centre.
+fn gatherer_master() -> Master {
+    let task = |action_kind, class: i16, attribute| Task {
+        action_kind,
+        object_group: Some(class_id(class)),
+        attribute_kind: Some(attribute),
+        work_range: Distance::new(0.5),
+        ..Task::default()
+    };
+    Master {
+        line_of_sight: Distance::new(4.0),
+        action: Some(ActionPart {
+            drop_sites: vec![ids::TOWN_CENTRE],
+            tasks: vec![
+                task(HUNT, 9, attribute::FOOD),
+                task(HUNT, 0x21, attribute::FOOD),
+                task(GATHER, 7, attribute::FOOD),
+                task(GATHER, 8, attribute::STONE),
+                task(GATHER, 32, attribute::GOLD),
+                task(GATHER, 15, attribute::WOOD),
+                task(GATHER, 49, attribute::FOOD),
+                build_task(),
+            ],
+            ..ActionPart::default()
+        }),
+        ..villager_master()
     }
 }
 
-/// What `ClosestObject` finds for the searches' tests: `id` at (5, 6), or none.
-fn found_at(id: i32) -> Found {
-    Found {
-        id: ObjectId::of_field(id),
-        enemies: false,
-        position: (id != -1).then_some(Position::new(5.0, 6.0, 0.0)),
-        fresh: true,
-        players: 0,
-        distance: WholeDistance::of_data(-1),
-        retries: [None; 3],
+/// Player 1's villager 31237 of master `villager` at (20, 20) on a map of 64 by 64, its unit
+/// AI `ai`, and its town centre 31247 at (26, 26); the `others`, each in player 1's lists.
+fn gather_world((villager, ai): (Master, UnitAi), others: &[SceneThing]) -> World {
+    gather_world_on(&[], (villager, ai), others)
+}
+
+/// [`gather_world`] with water on `water`.
+fn gather_world_on(
+    water: &[Tile],
+    (villager, ai): (Master, UnitAi),
+    others: &[SceneThing],
+) -> World {
+    let centre = Master {
+        id: ids::TOWN_CENTRE,
+        kind: MasterKind::BUILDING,
+        class: class::BUILDING,
+        radius: Footprint::new(2.0, 2.0),
+        height: Distance::new(3.0),
+        hit_points: MasterHitPoints::of_data(2400),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::ZERO)),
+        ..Master::default()
+    };
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .water(water.iter().copied())
+        .thing(SceneThing {
+            ai: Some(ai),
+            ..SceneThing::new(
+                31237,
+                player_id(1),
+                villager,
+                Position::new(20.0, 20.0, 0.0),
+            )
+        })
+        .thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..SceneThing::new(31247, player_id(1), centre, Position::new(26.0, 26.0, 0.0))
+        });
+    for thing in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..thing.clone()
+        });
     }
+    scene.build()
+}
+
+/// Gaia's resource `id` of class `class` (master `master`, of `kind`, which gatherers take up
+/// by themselves as `group`) at (x, y), holding `amount` of `attribute`.
+fn resource(
+    (id, master, class): (i32, i16, ClassId),
+    (kind, group): (MasterKind, GatherGroup),
+    (x, y): (f32, f32),
+    (attribute, amount): (AttributeId, f32),
+) -> SceneThing {
+    let m = Master {
+        id: master_id(master),
+        kind,
+        class,
+        radius: Footprint::new(0.5, 0.5),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(10),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        auto_gather: AutoGatherMode::ON,
+        gather_group: group,
+        ..Master::default()
+    };
+    SceneThing {
+        holds: Some((attribute, Amount::new(amount))),
+        ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+    }
+}
+
+/// Gaia's deer `id` (master 65, class 9) at (x, y), holding 100 food, its unit AI idle.
+fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneThing {
+    let m = Master {
+        id: master_id(65),
+        kind: MasterKind::COMBAT,
+        class: class_id(9),
+        radius: Footprint::new(0.2, 0.2),
+        height: Distance::new(1.0),
+        hit_points: MasterHitPoints::of_data(5),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::new(1.0))),
+        ..Master::default()
+    };
+    SceneThing {
+        ai: Some(idle(UnitAiKind::Hunted)),
+        holds: Some((attribute::FOOD, Amount::new(100.0))),
+        ..SceneThing::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+    }
+}
+
+/// Player 1's farm 12557 at (17, 24), holding 175 food.
+fn own_farm() -> SceneThing {
+    let m = Master {
+        id: ids::FARM,
+        kind: MasterKind::BUILDING,
+        class: class::FARM,
+        radius: Footprint::new(1.5, 1.5),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: Some(walking(Speed::ZERO)),
+        ..Master::default()
+    };
+    SceneThing {
+        holds: Some((attribute::FOOD, Amount::new(175.0))),
+        ..SceneThing::new(12557, player_id(1), m, Position::new(17.0, 24.0, 0.0))
+    }
+}
+
+/// A civilian of player 1 on the gather order with action `action`, its current target 28202,
+/// its target class `target` and last target class `last` (−1 for none).
+fn civilian(action: AiAction, target: i16, last: i16) -> UnitAi {
+    UnitAi {
+        ai_kind: UnitAiKind::Civilian,
+        current_order: Some(OrderKind::Gather),
+        current_action: Some(action),
+        current_target: Some(object_id(28202)),
+        target_class: class_of(target),
+        last_target_class: class_of(last),
+        ..UnitAi::default()
+    }
+}
+
+/// Villager 31237's notify 0x202 for action `action` with class `class` and drop site `site`.
+fn search_notify(action: i32, class: i32, site: i32) -> Notify {
+    Notify::own(
+        object_id(31237),
+        NotifyKind::REQUIRES_SEARCH,
+        [action, class, site],
+    )
+}
+
+/// What villager 31237 of `w` targets and does: its unit AI's current target, target class
+/// and action, and its top action's kind.
+fn gatherer_state(
+    w: &World,
+) -> (
+    Option<ObjectId>,
+    Option<ClassId>,
+    Option<AiAction>,
+    Option<ActionKind>,
+) {
+    let u = w.parts.unit_ai.get(object_id(31237)).unwrap();
+    (
+        u.current_target,
+        u.target_class,
+        u.current_action,
+        w.parts.actions.of(object_id(31237)).top_action_kind(),
+    )
+}
+
+/// Villager 31237's search of `w` on notify `n` by its action (`hunt`: [`UnitAi::hunter_search`],
+/// else [`UnitAi::gatherer_search`]).
+fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> Result<u32, GenieError> {
+    run_ai(
+        w,
+        (player_id(1), object_id(31237)),
+        |ai, at, side, kind, rng| {
+            if hunt {
+                ai.hunter_search(n, at, kind, side, rng)
+            } else {
+                ai.gatherer_search(n, at, kind, side, rng)
+            }
+        },
+    )
 }
 
 /// The villager's case 0x202 on its hunt ([`UnitAi::hunter_search`]): the class is the
 /// notify's, else the AI's target class, else its last; with none the target goes and the
 /// action stops. A class without a gather group (a deer, 9) takes `ClosestObject`: what it
-/// finds it hunts and the processing breaks; finding nothing a human player's villager does
-/// nothing more. A group's class searches by kind (a boar's 0x21: food, any workers). A
-/// computer player's villager finding nothing, a found object without its place and a farm
-/// found are not modelled.
+/// finds (deer 40) it hunts (its Hunt at once) and the processing breaks; finding nothing a
+/// human player's villager does nothing more. A group's class searches by kind (a boar's
+/// 0x21: food, any workers, from the notify's drop site). A computer player's villager finding
+/// nothing and a farm's search (its workers cap) are not modelled; every object a search finds
+/// has its place, so the double's placeless find is a case no world reaches.
 #[test]
 fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
-    let hunter = |target: i16, last: i16| UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_order: Some(OrderKind::Gather),
-        current_action: Some(AiAction::Hunt),
-        current_target: Some(object_id(28202)),
-        target_class: class_of(target),
-        last_target_class: class_of(last),
-        ..UnitAi::default()
+    let hunt = AiAction::Hunt.value();
+    let run = |ai: UnitAi, others: &[SceneThing], class: i32, kind: PlayerKind| {
+        let mut w = gather_world((gatherer_master(), ai), others);
+        w.players[1].kind = kind;
+        let r = gatherer_searches(&mut w, search_notify(hunt, class, 31247), true);
+        (r, gatherer_state(&w))
     };
-    let at = no_surroundings();
-    let n = |class| {
-        Notify::own(
-            object_id(31237),
-            NotifyKind::REQUIRES_SEARCH,
-            [AiAction::Hunt.value(), class, 31247],
+    let human = PlayerKind::Human;
+    let hunting = (
+        Some(object_id(40)),
+        class_of(9),
+        Some(AiAction::Hunt),
+        Some(HUNT),
+    );
+    let deer40 = [gaia_deer(40, (23.0, 20.0))];
+    assert_eq!(
+        run(civilian(AiAction::Hunt, -1, -1), &deer40, 9, human),
+        (Ok(BREAK), hunting)
+    );
+    assert_eq!(
+        run(civilian(AiAction::Hunt, 9, -1), &deer40, -1, human),
+        (Ok(BREAK), hunting)
+    );
+    assert_eq!(
+        run(civilian(AiAction::Hunt, -1, 9), &deer40, -1, human),
+        (Ok(BREAK), hunting)
+    );
+    assert_eq!(
+        run(civilian(AiAction::Hunt, -1, -1), &deer40, -1, human),
+        (Ok(GO_ON), (None, None, None, None))
+    );
+    let still = (Some(object_id(28202)), None, Some(AiAction::Hunt), None);
+    assert_eq!(
+        run(civilian(AiAction::Hunt, -1, -1), &[], 9, human),
+        (Ok(GO_ON), still)
+    );
+    assert_eq!(
+        run(
+            civilian(AiAction::Hunt, -1, -1),
+            &[],
+            9,
+            PlayerKind::Computer
         )
-    };
-    let search = |u: &mut UnitAi, side: &mut ResourceSide, class, computer| {
-        let mut fx = Vec::new();
-        let r = u.hunter_search(
-            n(class),
-            &at,
-            computer,
-            &mut With::new(side, &mut fx),
-            &mut rng(),
-        );
-        (r, fx)
-    };
-    let deer = || ResourceSide {
-        closest: Some(found_at(40)),
-        ..ResourceSide::default()
-    };
-    let mut u = hunter(-1, -1);
-    assert_eq!(
-        search(&mut u, &mut deer(), 9, PlayerKind::Human).0,
-        Ok(BREAK)
+        .0,
+        Err(GenieError::unsupported(
+            "a computer player's hunter that found nothing"
+        ))
     );
     assert_eq!(
-        (u.current_target, u.target_class),
-        (Some(object_id(40)), class_of(9))
+        run(civilian(AiAction::Hunt, -1, -1), &[own_farm()], 49, human).0,
+        Err(GenieError::unsupported(
+            "ClosestObject's workers cap (+0x644)"
+        ))
     );
-    let mut u = hunter(9, -1);
-    assert_eq!(
-        search(&mut u, &mut deer(), -1, PlayerKind::Human).0,
-        Ok(BREAK)
-    );
-    let mut u = hunter(-1, 9);
-    assert_eq!(
-        search(&mut u, &mut deer(), -1, PlayerKind::Human).0,
-        Ok(BREAK)
-    );
-    let mut u = hunter(-1, -1);
-    assert_eq!(
-        search(&mut u, &mut deer(), -1, PlayerKind::Human).0,
-        Ok(GO_ON)
-    );
-    assert_eq!((u.current_target, u.current_action), (None, None));
-    let mut none = ResourceSide {
-        closest: Some(found_at(-1)),
-        ..ResourceSide::default()
-    };
-    let mut u = hunter(-1, -1);
-    assert_eq!(
-        search(&mut u, &mut none, 9, PlayerKind::Human),
-        (Ok(GO_ON), vec![])
-    );
-    assert!(
-        search(&mut hunter(-1, -1), &mut none, 9, PlayerKind::Computer)
-            .0
-            .is_err()
-    );
-    let mut placeless = ResourceSide {
-        closest: Some(Found {
-            position: None,
-            ..found_at(40)
-        }),
-        ..ResourceSide::default()
-    };
-    assert!(
-        search(&mut hunter(-1, -1), &mut placeless, 9, PlayerKind::Human)
-            .0
-            .is_err()
-    );
-    assert!(
-        search(&mut hunter(-1, -1), &mut deer(), 49, PlayerKind::Human)
-            .0
-            .is_err()
-    );
-    let mut boar = ResourceSide::default();
-    assert_eq!(
-        search(&mut hunter(-1, -1), &mut boar, 0x21, PlayerKind::Human).0,
-        Ok(GO_ON)
+    // a boar's 0x21 searches by its kind from the drop site
+    let boar = resource(
+        (28500, 48, class_id(0x21)),
+        (MasterKind::STATIC, GatherGroup::FISH),
+        (24.0, 23.0),
+        (attribute::FOOD, 340.0),
     );
     assert_eq!(
-        boar.searches,
-        vec![(
-            GatherGroup::FISH,
-            -1,
-            Some(object_id(31247)),
-            Some(object_id(28202))
-        )]
+        run(civilian(AiAction::Hunt, -1, -1), &[boar], 0x21, human),
+        (
+            Ok(BREAK),
+            (
+                Some(object_id(28500)),
+                class_of(0x21),
+                Some(AiAction::Hunt),
+                Some(HUNT)
+            )
+        )
     );
 }
 
 /// The villager's case 0x202 on its gather ([`UnitAi::gatherer_search`]) beyond the bush:
 /// the class is the AI's target class, else its last, else the notify's; with none the
-/// target goes and the action stops. Stone (8) is searched below 4 workers. A farm (49, no
-/// gather group) takes `ClosestObject`, what it finds gathered; finding nothing a human
-/// player's villager does nothing more, a computer player's stops. A found object without
-/// its place is not modelled.
+/// target goes and the action stops. Stone (8) is searched below 4 workers: of two mines the
+/// nearer with 4 workers is passed for the farther with 3. A farm (49, no gather group) takes
+/// `ClosestObject`, what it finds gathered; finding nothing a human player's villager does
+/// nothing more, a computer player's stops. Every object a search finds has its place.
 #[test]
 fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
-    let gatherer = |target: i16, last: i16| UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_order: Some(OrderKind::Gather),
-        current_action: Some(AiAction::Gather),
-        current_target: Some(object_id(28202)),
-        target_class: class_of(target),
-        last_target_class: class_of(last),
-        ..UnitAi::default()
+    let gather = AiAction::Gather.value();
+    let run = |ai: UnitAi, others: &[SceneThing], class: i32, kind: PlayerKind| {
+        let mut w = gather_world((gatherer_master(), ai), others);
+        w.players[1].kind = kind;
+        let r = gatherer_searches(&mut w, search_notify(gather, class, 31247), false);
+        (r, gatherer_state(&w))
     };
-    let at = no_surroundings();
-    let n = |class| {
-        Notify::own(
-            object_id(31237),
-            NotifyKind::REQUIRES_SEARCH,
-            [AiAction::Gather.value(), class, 31247],
+    let human = PlayerKind::Human;
+    assert_eq!(
+        run(civilian(AiAction::Gather, -1, -1), &[], -1, human),
+        (Ok(GO_ON), (None, None, None, None))
+    );
+    let mine = |id: i32, at| {
+        resource(
+            (id, 102, class_id(8)),
+            (MasterKind::STATIC, GatherGroup::STONE),
+            at,
+            (attribute::STONE, 350.0),
         )
     };
-    let search = |u: &mut UnitAi, side: &mut ResourceSide, class, computer| {
-        let mut fx = Vec::new();
-        let r = u.gatherer_search(
-            n(class),
-            &at,
-            computer,
-            &mut With::new(side, &mut fx),
-            &mut rng(),
-        );
-        (r, fx)
-    };
-    let mut u = gatherer(-1, -1);
-    assert_eq!(
-        search(&mut u, &mut ResourceSide::default(), -1, PlayerKind::Human).0,
-        Ok(GO_ON)
+    let (_, (target, ..)) = run(
+        civilian(AiAction::Gather, -1, 8),
+        &[
+            SceneThing {
+                workers: WorkerCount::of_data(4),
+                ..mine(28400, (22.0, 22.0))
+            },
+            mine(28401, (24.0, 22.0)),
+        ],
+        -1,
+        human,
     );
-    assert_eq!((u.current_target, u.current_action), (None, None));
-    let mut stone = ResourceSide::default();
-    let _ = search(&mut gatherer(-1, 8), &mut stone, -1, PlayerKind::Human);
+    assert_eq!(target, Some(object_id(28401)));
     assert_eq!(
-        stone.searches,
-        vec![(
-            GatherGroup::STONE,
-            4,
-            Some(object_id(31247)),
-            Some(object_id(28202))
-        )]
-    );
-    let mut farm = ResourceSide {
-        closest: Some(found_at(12557)),
-        ..ResourceSide::default()
-    };
-    let mut u = gatherer(-1, -1);
-    let (r, fx) = search(&mut u, &mut farm, 49, PlayerKind::Human);
-    assert_eq!(
-        (r, fx),
+        run(civilian(AiAction::Gather, -1, -1), &[own_farm()], 49, human),
         (
             Ok(BREAK),
-            vec![Effect::Command(AiCommand::GatherObject(object_id(12557)))]
+            (
+                Some(object_id(12557)),
+                class_of(49),
+                Some(AiAction::Gather),
+                Some(GATHER)
+            )
         )
     );
-    let mut none = ResourceSide {
-        closest: Some(found_at(-1)),
-        ..ResourceSide::default()
-    };
-    let mut u = gatherer(-1, -1);
     assert_eq!(
-        search(&mut u, &mut none, 49, PlayerKind::Human),
-        (Ok(GO_ON), vec![])
+        run(civilian(AiAction::Gather, -1, -1), &[], 49, human),
+        (
+            Ok(GO_ON),
+            (Some(object_id(28202)), None, Some(AiAction::Gather), None)
+        )
     );
-    assert_eq!(u.current_target, Some(object_id(28202)));
-    let mut u = gatherer(-1, -1);
     assert_eq!(
-        search(&mut u, &mut none, 49, PlayerKind::Computer).0,
-        Ok(GO_ON)
-    );
-    assert_eq!(u.current_target, None);
-    let mut placeless = ResourceSide {
-        closest: Some(Found {
-            position: None,
-            ..found_at(40)
-        }),
-        ..ResourceSide::default()
-    };
-    assert!(
-        search(&mut gatherer(-1, -1), &mut placeless, 49, PlayerKind::Human)
-            .0
-            .is_err()
+        run(
+            civilian(AiAction::Gather, -1, -1),
+            &[],
+            49,
+            PlayerKind::Computer
+        ),
+        (Ok(GO_ON), (None, None, None, None))
     );
 }
 
+/// Player 1's house foundation 10028 at `at` (desolid, no build points).
+fn house_foundation((x, y): (f32, f32)) -> SceneThing {
+    let (house, _) = house_and_tree();
+    SceneThing {
+        desolid: true,
+        state: ObjectState::Foundation,
+        ..SceneThing::new(10028, player_id(1), house, Position::new(x, y, 0.0))
+    }
+}
+
 /// The villager's cases 0x1fb, 0x1fc and 0x202 by its action ([`UnitAi::villager_search`]):
-/// the hunt and the gather search as theirs; the builder takes the foundation its search
-/// finds and reaches (the processing breaks), finding none or not reaching it a human
-/// player's stops; the shepherd's search, a computer builder without a foundation and the
-/// explorer's search are not modelled.
+/// the hunt and the gather search as theirs (deer 40 found); the builder takes the foundation
+/// its search finds and reaches (its Build at once, the processing breaks); finding one it
+/// does not reach (on an island) or none, a human player's stops its actions (slot 0x3c0, the
+/// AI's target and action kept); the shepherd's search, a
+/// computer builder without a foundation and the explorer's search are not modelled.
 #[test]
 fn villager_searches_by_its_action() {
     let villager = |current_action| UnitAi {
@@ -1500,328 +1574,221 @@ fn villager_searches_by_its_action() {
         target_class: class_of(9),
         ..UnitAi::default()
     };
-    let at = Surroundings {
-        units: vec![UnitSeen {
-            id: object_id(10028),
-            class: class::BUILDING,
-            position: Position::new(7.0, 8.0, 0.0),
-            ..UnitSeen::default()
-        }],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let n = search_notify(0, -1, -1);
+    let run = |ai: UnitAi, others: &[SceneThing], water: &[Tile], kind: PlayerKind| {
+        let mut w = gather_world_on(water, (gatherer_master(), ai), others);
+        w.players[1].kind = kind;
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(31237)),
+            |ai, at, side, kind, rng| ai.villager_search(n, at, kind, side, rng),
+        );
+        (r, gatherer_state(&w))
     };
-    let n = Notify::own(object_id(31237), NotifyKind::REQUIRES_SEARCH, [0, -1, -1]);
-    let run = |u: &mut UnitAi, side: &mut ResourceSide, computer| {
-        let mut fx = Vec::new();
-        let r = u.villager_search(n, &at, computer, &mut With::new(side, &mut fx), &mut rng());
-        (r, fx)
-    };
-    let mut deer = ResourceSide {
-        closest: Some(found_at(40)),
-        ..ResourceSide::default()
-    };
+    let human = PlayerKind::Human;
+    let deer40 = [gaia_deer(40, (23.0, 20.0))];
     assert_eq!(
-        run(
-            &mut villager(Some(AiAction::Hunt)),
-            &mut deer,
-            PlayerKind::Human
-        )
-        .0,
+        run(villager(Some(AiAction::Hunt)), &deer40, &[], human).0,
         Ok(BREAK)
     );
-    let mut u = villager(Some(AiAction::Gather));
-    assert_eq!(run(&mut u, &mut deer, PlayerKind::Human).0, Ok(BREAK));
-    let building = |foundation| ResourceSide {
-        foundation: Some(foundation),
-        ..ResourceSide::default()
-    };
-    let mut u = villager(Some(AiAction::Build));
-    let (r, fx) = run(
-        &mut u,
-        &mut building((Some(object_id(10028)), true)),
-        PlayerKind::Human,
-    );
+    let (r, (target, ..)) = run(villager(Some(AiAction::Gather)), &deer40, &[], human);
+    assert_eq!((r, target), (Ok(BREAK), Some(object_id(40))));
+    let foundation = [house_foundation((22.5, 20.5))];
     assert_eq!(
-        (r, fx),
+        run(villager(Some(AiAction::Build)), &foundation, &[], human),
         (
             Ok(BREAK),
-            vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
-                object_id(10028)
-            )))]
+            (
+                Some(object_id(10028)),
+                class_of(3),
+                Some(AiAction::Build),
+                Some(ActionKind::BUILD)
+            )
         )
     );
-    assert_eq!(
-        (u.current_target, u.target_class),
-        (Some(object_id(10028)), class_of(3))
+    // on an island: found, not reached
+    let island = [house_foundation((17.5, 17.5))];
+    let ring: Vec<Tile> = (15..=19)
+        .flat_map(|x| [Tile::new(x, 15), Tile::new(x, 19)])
+        .chain((16..=18).flat_map(|y| [Tile::new(15, y), Tile::new(19, y)]))
+        .collect();
+    let stopped = (
+        Some(object_id(28202)),
+        class_of(9),
+        Some(AiAction::Build),
+        None,
     );
-    for foundation in [(Some(object_id(10028)), false), (None, false)] {
-        let mut u = villager(Some(AiAction::Build));
-        let got = run(&mut u, &mut building(foundation), PlayerKind::Human);
-        assert_eq!(got, (Ok(BREAK), vec![Effect::Stop]), "{foundation:?}");
-    }
-    let mut u = villager(Some(AiAction::Build));
+    assert_eq!(
+        run(villager(Some(AiAction::Build)), &island, &ring, human),
+        (Ok(BREAK), stopped)
+    );
+    assert_eq!(
+        run(villager(Some(AiAction::Build)), &[], &[], human),
+        (Ok(BREAK), stopped)
+    );
     assert!(
-        run(&mut u, &mut building((None, false)), PlayerKind::Computer)
-            .0
-            .is_err()
+        run(
+            villager(Some(AiAction::Build)),
+            &[],
+            &[],
+            PlayerKind::Computer
+        )
+        .0
+        .is_err()
     );
     for action in [AiAction::Shepherd, AiAction::Explore].map(Some) {
-        let mut u = villager(action);
-        assert!(
-            run(&mut u, &mut ResourceSide::default(), PlayerKind::Human)
-                .0
-                .is_err()
-        );
+        assert!(run(villager(action), &[], &[], human).0.is_err());
     }
 }
 
-/// `BuildObject` (slot 0xf0, `FUN_140c47d80`) whose build command answers 0 (slot 0x380: the
-/// foundation gone or no task for it) gives no command and leaves the AI as it was.
+/// `BuildObject` (slot 0xf0, `FUN_140c47d80`) whose build command answers 0 (slot 0x380: no
+/// task for the foundation, a villager that cannot build) gives no command and leaves the AI
+/// as it was; with a task it builds (its Build at once).
 #[test]
 fn build_object_whose_build_command_answers_0_changes_nothing() {
-    let at = Surroundings {
-        units: vec![UnitSeen {
-            id: object_id(10028),
-            class: class::BUILDING,
-            position: Position::new(7.0, 8.0, 0.0),
-            ..UnitSeen::default()
-        }],
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let mut side = ResourceSide {
-        no_build_task: true,
-        ..ResourceSide::default()
-    };
-    let mut u = UnitAi {
+    let u = UnitAi {
         ai_kind: UnitAiKind::Civilian,
         current_action: Some(AiAction::Gather),
         current_target: Some(object_id(28202)),
         target_class: class_of(9),
         ..UnitAi::default()
     };
-    let before = u.clone();
-    let mut fx = Vec::new();
+    let build = |villager: Master| {
+        let mut w = gather_world((villager, u.clone()), &[house_foundation((22.5, 20.5))]);
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(31237)),
+            |ai, at, side, _, rng| {
+                ai.build_object(
+                    FoundationId::new(object_id(10028)),
+                    OrderForce::Forced,
+                    at,
+                    side,
+                    rng,
+                )
+            },
+        );
+        (r, w)
+    };
+    let (r, w) = build(villager_master());
+    assert_eq!(r, Ok(Answer::NotTaken));
+    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&u));
+    assert_eq!(gatherer_state(&w).3, None);
+    let (r, w) = build(gatherer_master());
+    assert_eq!(r, Ok(Answer::Taken));
+    let (target, _, action, top) = gatherer_state(&w);
     assert_eq!(
-        u.build_object(
-            FoundationId::new(object_id(10028)),
-            OrderForce::Forced,
-            &at,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(Answer::NotTaken)
-    );
-    assert_eq!(fx, vec![]);
-    assert_eq!(u, before);
-    // with a task it builds
-    side.no_build_task = false;
-    assert_eq!(
-        u.build_object(
-            FoundationId::new(object_id(10028)),
-            OrderForce::Forced,
-            &at,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
-        Ok(Answer::Taken)
-    );
-    assert_eq!(
-        fx,
-        vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
-            object_id(10028)
-        )))]
-    );
-    assert_eq!(
-        (u.current_action, u.current_target),
-        (Some(AiAction::Build), Some(object_id(10028)))
+        (target, action, top),
+        (
+            Some(object_id(10028)),
+            Some(AiAction::Build),
+            Some(ActionKind::BUILD)
+        )
     );
 }
 
 /// The villager's notify 0x202 on its gather (the 4v4's forager 31237 after update 10822):
 /// its target class (7, a bush: gather group 1) names the search from the notify's drop
-/// site, any workers; what it finds it gathers, the AI's target and action taken.
+/// site, any workers; what it finds it gathers (its Gather at once), the AI's target, last
+/// target and point taken. Gold (32) is searched below 4 workers; finding nothing a human's
+/// villager stays as it is.
 #[test]
 fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
-    let bush = Gatherable {
-        id: object_id(28200),
-        position: Position::new(111.5, 16.5, 0.0),
-        class: class::CLASS_7,
-    };
-    let mut ai = UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_order: Some(OrderKind::Gather),
-        current_action: Some(AiAction::Gather),
-        current_target: Some(object_id(28202)),
-        target_class: class_of(7),
-        ..UnitAi::default()
-    };
-    let mut side = ResourceSide {
-        resource: Some(bush),
-        ..ResourceSide::default()
-    };
-    let mut fx = Vec::new();
-    let at = no_surroundings();
-    let n = Notify::own(
-        object_id(31237),
-        NotifyKind::REQUIRES_SEARCH,
-        [AiAction::Gather.value(), 7, 31247],
+    let bush = resource(
+        (28200, 59, class::CLASS_7),
+        (MasterKind::STATIC, GatherGroup::FORAGE),
+        (22.5, 23.5),
+        (attribute::FOOD, 125.0),
     );
+    let mut w = gather_world(
+        (gatherer_master(), civilian(AiAction::Gather, 7, -1)),
+        &[bush],
+    );
+    let gather = AiAction::Gather.value();
     assert_eq!(
-        ai.gatherer_search(
-            n,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
+        gatherer_searches(&mut w, search_notify(gather, 7, 31247), false),
         Ok(BREAK)
     );
     assert_eq!(
-        side.searches,
-        vec![(
-            GatherGroup::FORAGE,
-            -1,
-            Some(object_id(31247)),
-            Some(object_id(28202))
-        )]
-    );
-    assert_eq!(
-        fx,
-        vec![Effect::Command(AiCommand::GatherObject(object_id(28200)))]
-    );
-    assert_eq!(
-        (ai.current_target, ai.last_target, ai.target_point),
+        gatherer_state(&w),
         (
             Some(object_id(28200)),
-            Some(object_id(28202)),
-            Position::new(111.5, 16.5, 0.0)
+            class_of(7),
+            Some(AiAction::Gather),
+            Some(GATHER)
         )
     );
-    // gold is searched below 4 workers; finding nothing a human's villager stays as it is
-    let mut ai = UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_action: Some(AiAction::Gather),
-        target_class: class_of(32),
-        ..UnitAi::default()
-    };
-    let mut side = ResourceSide {
-        resource: None,
-        ..ResourceSide::default()
-    };
-    let mut fx = Vec::new();
-    let n = Notify::own(
-        object_id(31237),
-        NotifyKind::REQUIRES_SEARCH,
-        [AiAction::Gather.value(), 32, 0],
-    );
+    let u = w.parts.unit_ai.get(object_id(31237)).unwrap();
     assert_eq!(
-        ai.gatherer_search(
-            n,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
+        (u.last_target, u.target_point),
+        (Some(object_id(28202)), Position::new(22.5, 23.5, 0.0))
+    );
+    let goldless = UnitAi {
+        current_order: None,
+        current_target: None,
+        ..civilian(AiAction::Gather, 32, -1)
+    };
+    let mut w = gather_world((gatherer_master(), goldless.clone()), &[]);
+    assert_eq!(
+        gatherer_searches(&mut w, search_notify(gather, 32, 0), false),
         Ok(GO_ON)
     );
-    assert_eq!(
-        (side.searches[0].0, side.searches[0].1),
-        (GatherGroup::GOLD, 4)
-    );
-    assert_eq!(fx, Vec::new());
-    assert_eq!(ai.current_action, Some(AiAction::Gather));
+    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&goldless));
+    assert_eq!(gatherer_state(&w).3, None);
 }
 
 /// The villager's notify 0x202 on its hunt (`FUN_140c22bf0`, action 0x265) of a class the
 /// civilian's slot 0x1b0 names a kind of: `ClosestResourceObject` (slot 0x80) from the
-/// notify's drop site, kind 0 below 2 workers, another any; what it finds it hunts
-/// (`HuntObject`, slot 0xc8 with 1). Finding nothing a human player's villager stays.
+/// notify's drop site, kind 0 below 2 workers (of two trees the nearer with 2 workers is
+/// passed for the farther with 1), another any; what it finds it hunts (`HuntObject`, slot
+/// 0xc8 with 1: its Hunt at once). Finding nothing a human player's villager stays.
 #[test]
 fn hunter_of_kind_searches_by_it_from_its_drop_site() {
-    let tree = Gatherable {
-        id: object_id(28300),
-        position: Position::new(50.5, 60.5, 0.0),
-        class: class::TREE,
+    let tree = |id: i32, at| {
+        resource(
+            (id, 349, class::TREE),
+            (MasterKind::TREE, GatherGroup::WOOD),
+            at,
+            (attribute::WOOD, 100.0),
+        )
     };
-    let mut ai = UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_action: Some(AiAction::Hunt),
+    let hunter = UnitAi {
+        current_order: None,
         current_target: Some(object_id(28301)),
-        target_class: class_of(15),
-        ..UnitAi::default()
+        ..civilian(AiAction::Hunt, 15, -1)
     };
-    let mut side = ResourceSide {
-        resource: Some(tree),
-        ..ResourceSide::default()
-    };
-    let mut fx = Vec::new();
-    let at = no_surroundings();
-    let n = Notify::own(
-        object_id(31237),
-        NotifyKind::REQUIRES_SEARCH,
-        [0x265, 15, 31247],
-    );
+    let trees = [
+        SceneThing {
+            workers: WorkerCount::of_data(2),
+            ..tree(28300, (23.5, 23.5))
+        },
+        tree(28302, (24.5, 22.5)),
+    ];
+    let mut w = gather_world((gatherer_master(), hunter), &trees);
     assert_eq!(
-        ai.hunter_search(
-            n,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
+        gatherer_searches(&mut w, search_notify(0x265, 15, 31247), true),
         Ok(BREAK)
     );
     assert_eq!(
-        side.searches,
-        vec![(
-            GatherGroup::WOOD,
-            2,
-            Some(object_id(31247)),
-            Some(object_id(28301))
-        )]
+        gatherer_state(&w),
+        (
+            Some(object_id(28302)),
+            class_of(15),
+            Some(AiAction::Hunt),
+            Some(HUNT)
+        )
     );
-    // the AI's stop (slot 0xb0 with 1) reaches the unit before its hunt command
-    assert_eq!(
-        fx,
-        vec![
-            Effect::Stop,
-            Effect::Command(AiCommand::HuntObject(object_id(28300)))
-        ]
-    );
-    assert_eq!(ai.current_target, Some(object_id(28300)));
-    let mut ai = UnitAi {
-        ai_kind: UnitAiKind::Civilian,
-        current_action: Some(AiAction::Hunt),
+    let idle_hunter = UnitAi {
+        current_order: None,
         current_target: None,
-        ..UnitAi::default()
+        ..civilian(AiAction::Hunt, -1, -1)
     };
-    let mut side = ResourceSide {
-        resource: None,
-        ..ResourceSide::default()
-    };
-    let mut fx = Vec::new();
-    let n = Notify::own(
-        object_id(31237),
-        NotifyKind::REQUIRES_SEARCH,
-        [0x265, 32, -1],
-    );
+    let mut w = gather_world((gatherer_master(), idle_hunter.clone()), &[]);
     assert_eq!(
-        ai.hunter_search(
-            n,
-            &at,
-            PlayerKind::Human,
-            &mut With::new(&mut side, &mut fx),
-            &mut rng()
-        ),
+        gatherer_searches(&mut w, search_notify(0x265, 32, -1), true),
         Ok(GO_ON)
     );
-    assert_eq!(side.searches, vec![(GatherGroup::GOLD, -1, None, None)]);
-    assert_eq!(fx, Vec::new());
+    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&idle_hunter));
 }
 
 fn hit_boar() -> UnitAi {

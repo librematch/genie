@@ -43,6 +43,7 @@ use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::SpriteId;
+use crate::objects::WorkerCount;
 use crate::objects::layers::Action;
 use crate::objects::layers::Building;
 use crate::objects::layers::{Animated, Static};
@@ -59,11 +60,13 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
 use crate::pathing::Pathing;
+use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::players::Relation;
 use crate::players::Relations;
+use crate::players::attribute::AttributeId;
 use crate::players::{UnitRelation, UnitRelations};
 use crate::testing::class;
 use crate::unit_ai::UnitAi;
@@ -163,13 +166,19 @@ pub struct Thing {
     /// The main building it is an annex of (`+0xbb8`), none for an object that is none's; the
     /// scene links it into the main building's annexes (`+0xbc0`), as a save holds both.
     pub annex_of: Option<MainBuildingId>,
+    /// What it holds (`+0x308`, `+0x310`): a resource's attribute and amount, as a save holds
+    /// them; none for an object that holds nothing.
+    pub holds: Option<(AttributeId, Amount)>,
+    /// `+0x644`, `worker_num`: the actions that have it as their target, as a save holds them.
+    pub workers: WorkerCount,
 }
 
 impl Thing {
     /// Object `id` of `player` and `master` at `at`: alive, with its master's hit points, outside
     /// the sight registry, not a foundation, attackable (the flag a spawn gives a new object),
-    /// without a unit AI, other flags, actions, capture flag, pasture or main building, on the
-    /// map. A moving master's object stands with its movement state ([`Mover`]) at its place.
+    /// without a unit AI, other flags, actions, capture flag, pasture, main building, resource
+    /// or workers, on the map. A moving master's object stands with its movement state
+    /// ([`Mover`]) at its place.
     ///
     /// # Panics
     ///
@@ -193,6 +202,8 @@ impl Thing {
             pasture: None,
             sprite: None,
             annex_of: None,
+            holds: None,
+            workers: WorkerCount::ZERO,
         }
     }
 }
@@ -702,6 +713,8 @@ fn place_thing(w: &mut World, thing: Thing) {
         pasture,
         sprite,
         annex_of: _,
+        holds,
+        workers,
     } = thing;
     let sprite = sprite.map(|id| {
         let graphic = *w.model.graphics.get(id).expect("the scene's graphic");
@@ -715,11 +728,14 @@ fn place_thing(w: &mut World, thing: Thing) {
             hp,
             master_id: master.id,
             inside,
+            attribute_kind: holds.map(|(kind, _)| kind),
+            amount: holds.map_or(Amount::ZERO, |(_, amount)| amount),
             ..Lifecycle::default()
         },
         flags,
         pasture,
         sprite,
+        workers,
         ..Unit::default()
     };
     let mut object = if desolid {
