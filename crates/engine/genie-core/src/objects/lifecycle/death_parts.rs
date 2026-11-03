@@ -16,6 +16,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{OwnerMasters, cost_entries};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::PlayerKind;
@@ -116,7 +117,7 @@ pub(crate) fn combat_dies(
         return Err(GenieError::unsupported("a dying unit of class 1, 13 or 43"));
     }
     u.life.hp = HitPoints::ZERO;
-    if u.roo_called {
+    if u.flags.contains(UnitFlags::ROO_CALLED) {
         return Ok(());
     }
     let desolid = layer.construction.is_some_and(|c| c.desolid);
@@ -134,7 +135,7 @@ pub(crate) fn combat_dies(
     {
         v.unlink_building(u.position(), master.radius, visibility_tuning)?;
     }
-    u.roo_called = true;
+    u.flags.set(UnitFlags::ROO_CALLED, true);
     Ok(())
 }
 
@@ -310,7 +311,7 @@ pub(crate) fn clear_look_of(
     Ok(ClearLook {
         hp: u.life.hp,
         height: m.height,
-        roo_called: u.roo_called,
+        roo_called: u.flags.contains(UnitFlags::ROO_CALLED),
         kind: m.kind,
         state: u.life.state,
         desolid: layer.construction.is_some_and(|c| c.desolid),

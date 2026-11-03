@@ -10,6 +10,7 @@ use crate::players::Relation;
 use crate::players::game_status::VictoryState;
 use crate::players::game_status::{Count, DEFEAT_IDS, GameStatus, KILLS_OF, STOP_AFTER_MS};
 use crate::players::history::EventKind;
+use crate::world::Departures;
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
 use crate::world::{GameMode, PlayState};
@@ -64,8 +65,9 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "RESIGN of a player the slice does not have",
             ))?;
-        p.dropped = departure == Departure::Dropped;
-        p.resigned = true;
+        p.departures
+            .set(Departures::DROPPED, departure == Departure::Dropped);
+        p.departures.set(Departures::RESIGNED, true);
         self.set_status(player, GameStatus::Lost)
     }
 
@@ -85,7 +87,14 @@ impl World {
     /// defeat ([`World::defeat_event`]).
     pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> Result<(), GenieError> {
         let old = self.players.player(p)?.game_status;
-        if status != old && (!self.players.player(p)?.resigned || status == GameStatus::Lost) {
+        if status != old
+            && (!self
+                .players
+                .player(p)?
+                .departures
+                .contains(Departures::RESIGNED)
+                || status == GameStatus::Lost)
+        {
             self.players.player_mut(p)?.game_status = status;
         }
         let now = self.players.player(p)?.game_status;
@@ -125,7 +134,13 @@ impl World {
     /// player's); the first strictly above the best so far (`COMISS` with `JBE`, from 0) is the
     /// event's `data1`, its value through `CVTTSS2SI` its `data2`; none gives player 1 and 0.
     pub(crate) fn defeat_event(&mut self, p: PlayerId) -> Result<(), GenieError> {
-        if self.players.player(p)?.resigned || p == PlayerId::GAIA {
+        if self
+            .players
+            .player(p)?
+            .departures
+            .contains(Departures::RESIGNED)
+            || p == PlayerId::GAIA
+        {
             return Ok(());
         }
         let mut killer = 1u8;

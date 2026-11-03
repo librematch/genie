@@ -16,7 +16,6 @@
     clippy::cast_precision_loss,
     // the decompiled routines' names (dx, dy, x0, y1 …) and flag fields
     clippy::similar_names,
-    clippy::struct_excessive_bools,
     // a routine is ported whole, its documentation opens with the routine and its addresses
     clippy::too_many_lines,
     clippy::too_long_first_doc_paragraph

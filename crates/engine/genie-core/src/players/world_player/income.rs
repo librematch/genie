@@ -15,6 +15,7 @@ use crate::players::ResourceStat;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
 use crate::players::world_player::{EARLY_SCOUTING_MS, MINUTE, SECOND, get, set};
+use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
@@ -144,15 +145,15 @@ impl World {
         Ok(())
     }
 
-    /// The base player's attribute add (`FUN_14165d040`) of `amount` to attribute `kind` of
-    /// player `p`, for a kind out of 0 to the attribute count nothing: the attribute takes
-    /// `amount` plus its value. A computer player's resource fills its escrow: an `amount` above
-    /// 0 with a share above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the
-    /// resource (`JBE` skips a NaN) falls to it, or to 0 when the resource is below 0.
-    /// [`ResourceShare::Shared`], a player who shares its gathered resources (`+0x1426`,
-    /// [`crate::world::Player::sharing`]) gives each resource to the players, in order, it counts
-    /// as allies and who count it as theirs ([`World::shares_with`]): their slot 0xf8 with `stat`
-    /// and no sharing. Attribute 11's peak (`+0x6fc`, unsaved) is not held; no resource add
+    /// The base player's attribute add (`FUN_14165d040`) of `amount` to attribute `kind` of player
+    /// `p`, for a kind out of 0 to the attribute count nothing: the attribute takes `amount` plus
+    /// its value. A computer player's resource fills its escrow: an `amount` above 0 with a share
+    /// above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the resource (`JBE` skips
+    /// a NaN) falls to it, or to 0 when the resource is below 0. [`ResourceShare::Shared`], a
+    /// player who shares its gathered resources (`+0x1426`,
+    /// [`crate::world::AllySharing::RESOURCES`]) gives each resource to the players, in order, it
+    /// counts as allies and who count it as theirs ([`World::shares_with`]): their slot 0xf8 with
+    /// `stat` and no sharing. Attribute 11's peak (`+0x6fc`, unsaved) is not held; no resource add
     /// reaches it.
     pub(super) fn add_attribute_base(
         &mut self,
@@ -182,7 +183,10 @@ impl World {
                 };
             }
         }
-        if share == ResourceShare::Shared && player.sharing && kind.is_resource() {
+        if share == ResourceShare::Shared
+            && player.ally_sharing.contains(AllySharing::RESOURCES)
+            && kind.is_resource()
+        {
             for q in PlayerId::each(self.players.len()) {
                 if q != p && self.shares_with(p, q) {
                     self.add_resource(q, kind, amount, stat, ResourceShare::Unshared)?;

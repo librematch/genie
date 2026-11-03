@@ -17,6 +17,7 @@ use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
+use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -90,7 +91,7 @@ impl World {
                         == Some(&Relation::Ally)
             };
             let mine = masks.checked_mut(p)?;
-            if me.allied_vision {
+            if me.ally_sharing.contains(AllySharing::VISION) {
                 for q in PlayerId::each(n).skip(1) {
                     if q != p && allies(q) {
                         mine.visible |= VisionBits::visible(q);
@@ -195,7 +196,7 @@ mod tests {
     fn teams() -> World {
         let player = |relations: Vec<u8>| Player {
             relations: relation_row(relations),
-            allied_vision: true,
+            ally_sharing: AllySharing::VISION,
             attributes: vec![Amount::ZERO; 250],
             ..Player::default()
         };
@@ -238,7 +239,7 @@ mod tests {
         t.players[3]
             .relations
             .set(PlayerId::new(1), Relation::Enemy);
-        t.players[2].allied_vision = false;
+        t.players[2].ally_sharing.set(AllySharing::VISION, false);
         t.rebuild_vision().unwrap();
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(1)),

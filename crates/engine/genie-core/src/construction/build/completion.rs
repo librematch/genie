@@ -14,6 +14,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{BuildingMaster, Master};
+use crate::objects::unit::UnitFlags;
 use crate::players::PlayerId;
 use crate::players::diplomacy::REVEAL_UNITS;
 use crate::world::Seconds;
@@ -205,7 +206,7 @@ impl World {
         let (main, rice) = (layer.annex_of.is_some(), layer.rice);
         let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
         let hp = u.life.hp;
-        u.roo_called = true;
+        u.flags.set(UnitFlags::ROO_CALLED, true);
         if !main && let Some(v) = self.spatial.sight.as_mut() {
             v.unlink_building(placed.position, master.radius, self.model.tuning.visibility)?;
         }

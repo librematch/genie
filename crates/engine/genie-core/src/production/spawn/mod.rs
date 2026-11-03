@@ -12,9 +12,11 @@
 mod gather_walk;
 pub(crate) use self::gather_walk::FinderUse;
 mod make_action;
+mod near;
 mod new_unit;
 mod objects;
 mod placement_code;
+pub use self::near::{Near, NearFlags};
 mod placement_test;
 mod research;
 mod search;
@@ -23,13 +25,13 @@ mod world_map;
 
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
-pub use self::placement_test::{Near, PlaceMap, Placing, ZoneTest, build_placement, placement};
+pub use self::placement_test::{PlaceMap, Placing, ZoneTest, build_placement, placement};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]
 use self::search::{Spot, try_spot};
 use self::terrains::hill_fails;
-pub use self::terrains::{BuildSite, placement_terrains};
+pub use self::terrains::{BuildSite, SiteChecks, placement_terrains};
 pub(crate) use self::world_map::WorldMap;
 #[cfg(test)]
 use crate::GenieError;

@@ -29,6 +29,7 @@ use crate::objects::masters::TargetOwner;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters, Task, WorkValue};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::pathing::DelayCount;
 use crate::players::Amount;
 use crate::test_ids::class_id;
@@ -623,7 +624,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
     let target = Unit {
         id: object_id(60),
         place: Static::at(Position::new(40.0, 45.0, 0.0)),
-        attackable: true,
+        flags: UnitFlags::ATTACKABLE,
         life: Lifecycle {
             master_id: ids::HOUSE,
             state: ObjectState::Alive,

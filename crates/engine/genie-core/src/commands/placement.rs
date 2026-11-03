@@ -17,6 +17,7 @@ use crate::objects::masters::player_master;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
+use crate::production::spawn::SiteChecks;
 use crate::production::spawn::{BuildSite, WorldMap, build_placement};
 use crate::world::World;
 use crate::world::layer::MasterRoles;
@@ -143,16 +144,18 @@ impl World {
         let site = self.master(player, master)?;
         let build = BuildSite {
             player,
-            human,
+            checks: if human {
+                SiteChecks::HUMAN
+            } else {
+                SiteChecks::empty()
+            },
             radius: site.clearance,
             tall: site.is_tall(),
-            scans: false,
             class: site.class,
             obstructs: site.obstruction_kind.recorded(),
             restriction: self.site_restriction(site)?,
             hill_mode: site.hill_mode,
             placement: site.placement,
-            zones: false,
             own,
         };
         let map = WorldMap { turns: self };
@@ -165,14 +168,15 @@ impl World {
         )
     }
 
-    /// The Build's placement test of the building `placed` (`0x140aae200` case 7: its master's
-    /// slot 0x50, `FUN_14123aee0`, with `p6` 0, `p7` 0, `p8` 0, `p9` 0, `p10` 1, `p11` 1, the
-    /// building as `p12`, `p13` 1, `p14` 1): by the master's size radii, without the explored test
-    /// and the hill mode, with the static scans ([`crate::production::spawn::BuildSite::scans`]);
-    /// the scans pass over `own` (the building and its annexes); the updating builder must be
-    /// lent to its slot for them ([`crate::world::step::Step::lend`]). A `desolid` building's master is its copy without a height
-    /// (`FUN_1411cf770` writes `+0x5e0` 0), so the static scans do not run for it. 0 when the
-    /// building may stay, else the game's code.
+    /// The Build's placement test of the building `placed` (`0x140aae200` case 7: its master's slot
+    /// 0x50, `FUN_14123aee0`, with `p6` 0, `p7` 0, `p8` 0, `p9` 0, `p10` 1, `p11` 1, the building
+    /// as `p12`, `p13` 1, `p14` 1): by the master's size radii, without the explored test and the
+    /// hill mode, with the static scans
+    /// ([`SiteChecks::SCANS`](crate::production::spawn::SiteChecks::SCANS)); the scans pass over
+    /// `own` (the building and its annexes); the updating builder must be lent to its slot for them
+    /// ([`crate::world::step::Step::lend`]). A `desolid` building's master is its copy without a
+    /// height (`FUN_1411cf770` writes `+0x5e0` 0), so the static scans do not run for it. 0 when
+    /// the building may stay, else the game's code.
     ///
     /// # Errors
     ///
@@ -187,16 +191,14 @@ impl World {
         let site = self.master(player, placed.master)?;
         let test = BuildSite {
             player,
-            human: false,
+            checks: SiteChecks::SCANS,
             radius: site.radius,
             tall: site.is_tall() && !desolid,
-            scans: true,
             class: site.class,
             obstructs: site.obstruction_kind.recorded(),
             restriction: self.site_restriction(site)?,
             hill_mode: HillMode::ANY,
             placement: site.placement,
-            zones: false,
             own,
         };
         let map = WorldMap { turns: self };

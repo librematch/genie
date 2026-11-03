@@ -32,6 +32,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::player_master;
+use crate::objects::unit::UnitFlags;
 use crate::orders::nearest_table_site;
 use crate::orders::object_gone;
 use crate::players::AllyTest;
@@ -463,7 +464,7 @@ impl UnitSide for UnitView<'_, '_> {
     }
 
     fn set_under_attack(&mut self, value: bool) {
-        self.unit.under_attack = value;
+        self.unit.flags.set(UnitFlags::UNDER_ATTACK, value);
     }
 
     /// The unit's call its unit AI makes, at once ([`Unit::run_effect`]): the notifies held for
@@ -677,8 +678,8 @@ impl UnitSide for UnitView<'_, '_> {
             kind,
             capture: self.c.w.parts.combat_of(u.id).capture_flag,
             pasture: u.pasture,
-            untargetable: u.untargetable,
-            attackable: u.attackable,
+            untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
+            attackable: u.flags.contains(UnitFlags::ATTACKABLE),
         }))
     }
 }

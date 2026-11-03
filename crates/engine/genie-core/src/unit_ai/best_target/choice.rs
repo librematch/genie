@@ -10,6 +10,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::{ByRelation, UnitRelation};
+use crate::unit_ai::best_target::ThingFlags;
 use crate::unit_ai::best_target::{
     Ask, AttackCategory, Battlefield, EPSILON, EntryCount, STATISTICS, Searcher, Statistics, Thing,
     category,
@@ -62,10 +63,13 @@ pub(super) fn tested(
         return Ok(None);
     }
     let gaia_taken = !me.scenario && t.owner == PlayerId::GAIA && MasterKind::COMBAT <= t.kind;
-    if gaia_taken && t.capture {
+    if gaia_taken && t.capture.any() {
         return Ok(None);
     }
-    if !t.targetable || (!t.attackable && me.action == Some(AiAction::Attack)) || world.shuns(id)? {
+    if !t.flags.contains(ThingFlags::TARGETABLE)
+        || (!t.flags.contains(ThingFlags::ATTACKABLE) && me.action == Some(AiAction::Attack))
+        || world.shuns(id)?
+    {
         return Ok(None);
     }
     Ok(kept_by_owner_and_class(me, ask, &t, roles).then_some(t))
@@ -80,10 +84,10 @@ pub(super) fn may_attack(
     relation: UnitRelation,
     world: &mut dyn Battlefield,
 ) -> Result<bool, crate::GenieError> {
-    if !t.has_ai
+    if !t.flags.contains(ThingFlags::HAS_AI)
         || ObjectState::Dying <= t.state
-        || t.allied
-        || t.inside
+        || t.flags.contains(ThingFlags::ALLIED)
+        || t.flags.contains(ThingFlags::INSIDE)
         || !world.can_attack(id)?
     {
         return Ok(false);
@@ -105,7 +109,7 @@ pub(super) fn kept_by_owner_and_class(me: &Searcher, ask: &Ask, t: &Thing, roles
     if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
         return false;
     }
-    let captured = MasterKind::COMBAT <= t.kind && t.capture;
+    let captured = MasterKind::COMBAT <= t.kind && t.capture.any();
     // nothing held (`+0x310` at most 0) and not taken by sight
     let free = t.held <= Amount::ZERO && !captured;
     if me.player_kind.is_computer() && t.owner == PlayerId::GAIA && !free {
@@ -217,7 +221,7 @@ fn current_target(
     };
     Ok(world
         .thing(target)?
-        .filter(|t| t.state <= ObjectState::Alive && !t.allied)
+        .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(ThingFlags::ALLIED))
         .map(|t| (target, t)))
 }
 

@@ -16,6 +16,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::unit::UnitFlags;
 use crate::players::PlayerId;
 use crate::world::WholeSeconds;
 use crate::world::slots::CheckedIndex;
@@ -321,7 +322,7 @@ impl World {
                 self.pathing.tiles_changed(self.spatial.take_changes());
             }
             if let Some((_, u)) = self.object_mut(cl.id) {
-                u.roo_called = true;
+                u.flags.set(UnitFlags::ROO_CALLED, true);
             }
         }
         Ok(())
@@ -363,7 +364,7 @@ impl World {
         if record == RecordDrop::Dropped
             && let Some((_, u)) = self.object_mut(cl.id)
         {
-            u.roo_called = true;
+            u.flags.set(UnitFlags::ROO_CALLED, true);
         }
         Ok(())
     }

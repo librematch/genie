@@ -17,6 +17,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::{
     AiCommand, Attacked, Duel, Effect, Found, Gatherable, NearestAttacker, OffFootprint,
     PatrolPath, ResourceSearch, Search, Seeker, Surroundings, TargetFlags, UnitAi, UnitCommand,
@@ -162,8 +163,8 @@ impl<'s> With<'s> {
         at: &Surroundings,
     ) -> Self {
         Self {
-            busy: at.busy,
-            interruptible: at.interruptible,
+            busy: at.flags.contains(SurroundingFlags::BUSY),
+            interruptible: at.flags.contains(SurroundingFlags::INTERRUPTIBLE),
             top: at.top_target.map(|t| t.id),
             ..Self::new(side, fx)
         }

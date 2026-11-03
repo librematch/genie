@@ -29,6 +29,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::sync::Arc;
 
@@ -206,15 +207,14 @@ impl World {
     }
 
     /// `FUN_1413cce70` for player `p`'s technology `t`: each technology that requires it, by id
-    /// (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by
-    /// `+0x60` turns to −1 when it is another civ's (or its civ's under the full tech tree,
-    /// [`crate::world::settings::Settings::full_tech_tree`], while not of mode 1) or not for this game
-    /// mode; else with fewer of
-    /// its requirements researched than it needs it turns to 0 (from above 0), with them all to
-    /// 1 (from below 1) unless its research is done already (its work done reaching a
-    /// location's time), which completes it ([`World::complete_research`]). Each such technology, and each in
-    /// state 2, counts; none counted sets attribute 39 to 1 where it is 0. The game's lists hold
-    /// the dependents by id, as the `.dat`'s requirements give them.
+    /// (`+0x38`'s lists), not of the shared kind: one in state 0 or 1 and not held by `+0x60` turns
+    /// to −1 when it is another civ's (or its civ's under the full tech tree,
+    /// [`crate::world::settings::OptionFlags::FULL_TECH_TREE`], while not of mode 1) or not for
+    /// this game mode; else with fewer of its requirements researched than it needs it turns to 0
+    /// (from above 0), with them all to 1 (from below 1) unless its research is done already (its
+    /// work done reaching a location's time), which completes it ([`World::complete_research`]).
+    /// Each such technology, and each in state 2, counts; none counted sets attribute 39 to 1 where
+    /// it is 0. The game's lists hold the dependents by id, as the `.dat`'s requirements give them.
     pub(crate) fn update_dependents(
         &mut self,
         p: PlayerId,
@@ -301,7 +301,8 @@ impl World {
         let other_civ = match def.civ {
             None => false,
             Some(own) if own == civ => {
-                self.settings.full_tech_tree && def.mode != TechMode::KEPT_IN_FULL_TREE
+                self.settings.flags.contains(OptionFlags::FULL_TECH_TREE)
+                    && def.mode != TechMode::KEPT_IN_FULL_TREE
             }
             Some(_) => true,
         };

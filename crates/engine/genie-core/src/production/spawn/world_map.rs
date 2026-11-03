@@ -11,6 +11,7 @@ use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::NO_RELATIONS;
 use crate::players::PlayerId;
+use crate::production::spawn::NearFlags;
 use crate::production::spawn::{Near, PlaceMap};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::vision::{VisionBits, VisionMasks};
@@ -106,24 +107,52 @@ impl PlaceMap for WorldMap<'_> {
                     id,
                     position: placed.position,
                     radius: placed.radius,
-                    tall: placed.tall,
+                    flags: {
+                        let mut flags = NearFlags::empty();
+                        flags.set(NearFlags::TALL, placed.tall);
+                        flags.set(NearFlags::AUTO_GATHER, master.auto_gather.is_on());
+                        flags.set(
+                            NearFlags::DESOLID,
+                            t.parts
+                                .building_of(id)
+                                .construction
+                                .is_some_and(|c| c.desolid),
+                        );
+                        flags.set(
+                            NearFlags::MOVING,
+                            master
+                                .move_stats
+                                .as_ref()
+                                .is_some_and(|m| Speed::ZERO < m.speed),
+                        );
+                        flags.set(
+                            NearFlags::HOLDS,
+                            Amount::ZERO < unit.life.amount
+                                && unit
+                                    .life
+                                    .attribute_kind
+                                    .is_some_and(|k| k.is_resource() || k.is_food_load()),
+                        );
+                        flags.set(
+                            NearFlags::FOREST_TILE,
+                            t.spatial.terrain.as_ref().is_some_and(|ter| {
+                                ter.kind(Tile::new(
+                                    placed.position.x() as i32,
+                                    placed.position.y() as i32,
+                                ))
+                                .and_then(|k| ter.terrains.get(k.index()))
+                                .is_some_and(|k| k.forest)
+                            }),
+                        );
+                        flags
+                    },
                     kind: master.kind,
                     class: placed.class,
                     master: placed.master,
                     buildable_on: placed.buildable_on,
                     obstruction_kind: placed.obstruction_kind,
-                    auto_gather: master.auto_gather.is_on(),
                     state: unit.life.state,
-                    desolid: t
-                        .parts
-                        .building_of(id)
-                        .construction
-                        .is_some_and(|c| c.desolid),
                     player: owner,
-                    moving: master
-                        .move_stats
-                        .as_ref()
-                        .is_some_and(|m| Speed::ZERO < m.speed),
                     fog_visibility: master.fog_visibility,
                     fog_mask: t.spatial.sight.as_ref().and_then(|v| {
                         let umv = v.seer(id).map_or(0, |s| s.umv);
@@ -134,21 +163,8 @@ impl PlaceMap for WorldMap<'_> {
                                 .map_or(VisionBits::NONE, |e| e.mask)
                         })
                     }),
-                    holds: Amount::ZERO < unit.life.amount
-                        && unit
-                            .life
-                            .attribute_kind
-                            .is_some_and(|k| k.is_resource() || k.is_food_load()),
                     hp: unit.life.hp,
                     outline: master.outline.with_height(master.outline_height.get()),
-                    forest_tile: t.spatial.terrain.as_ref().is_some_and(|ter| {
-                        ter.kind(Tile::new(
-                            placed.position.x() as i32,
-                            placed.position.y() as i32,
-                        ))
-                        .and_then(|k| ter.terrains.get(k.index()))
-                        .is_some_and(|k| k.forest)
-                    }),
                 })
             })
             .collect()

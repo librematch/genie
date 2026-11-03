@@ -285,6 +285,25 @@ pub struct Engagement {
     pub same_owner: bool,
 }
 
+bitflags::bitflags! {
+    /// What the Attack reads of its unit, its master and its unit AI as yes or no
+    /// ([`AttackReads`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub(crate) struct AttackerFlags: u8 {
+        /// Its master has a volley missile (`+0x8d4`) or a charge projectile (`+0x928`) its player
+        /// has: a hit without a missile is a volley too (`FUN_14120c0a0`), not the melee hit.
+        const VOLLEYS = 1;
+        /// `FUN_14120ea30` for a building: it can attack (class 51 or 54, a missile, or a firepower
+        /// above 1); true for the others.
+        const ARMED = 1 << 1;
+        /// The unit AI's canMoveToAttack (slot 0x1d0, `FUN_140c48420`), which readyToAttack reads
+        /// of a target out of reach.
+        const CAN_MOVE = 1 << 2;
+        /// The unit has a unit AI whose order queue is empty (`FUN_140c564a0` is 0).
+        const QUEUE_EMPTY = 1 << 3;
+    }
+}
+
 /// What the Attack's update reads of its unit, its master, its unit AI and its owner, copied as
 /// the update starts ([`AttackReads::of`]).
 #[derive(Clone, Copy, Debug)]
@@ -292,17 +311,13 @@ pub(crate) struct AttackReads {
     /// Its master's standing sprite (`+0x470`), which slot 0x68 shows for no sprite
     /// (`FUN_141158620`).
     pub(crate) standing: Option<Graphic>,
-    /// Its master has a volley missile (`+0x8d4`) or a charge projectile (`+0x928`) its player
-    /// has: a hit without a missile is a volley too (`FUN_14120c0a0`), not the melee hit.
-    pub(crate) volleys: bool,
+    /// Its yes-or-no reads.
+    pub(crate) flags: AttackerFlags,
     /// Slot 0x218 (`FUN_141086c90`): the master's reload time (`speed_of_attack`) with the
     /// unit's reload stinger and powerup.
     pub(crate) reload: Seconds,
     /// The master's hit chance (`+0x83e`).
     pub(crate) hit_chance: HitChance,
-    /// `FUN_14120ea30` for a building: it can attack (class 51 or 54, a missile, or a firepower
-    /// above 1); true for the others.
-    pub(crate) armed: bool,
     /// The swing's own sprites ([`Attack::set_swing`]): its terrain look's attack sprite and its
     /// master's special graphic.
     pub(crate) swing_sprites: SwingSprites,
@@ -311,21 +326,17 @@ pub(crate) struct AttackReads {
     pub(crate) player_kind: PlayerKind,
     /// The world's time (`FUN_1415300d0`), which a facing over time and the reload read.
     pub(crate) world_time: WorldTime,
-    /// The unit AI's canMoveToAttack (slot 0x1d0, `FUN_140c48420`), which readyToAttack reads
-    /// of a target out of reach.
-    pub(crate) can_move: bool,
     /// The unit AI's stance (`+0x1a9`).
     pub(crate) stance: UnitStance,
     /// The unit AI's `state_position` (`+0x1ac`, `+0x1b0`), the centre of stance 1's leash.
     pub(crate) state_position: Point,
-    /// The unit has a unit AI whose order queue is empty (`FUN_140c564a0` is 0).
-    pub(crate) queue_empty: bool,
     /// The unit AI's order (`+0x3c`, `FUN_140c4cc20`).
     pub(crate) ai_order: AiOrder,
     /// The unit AI's factory type, None without a unit AI.
     pub(crate) ai_kind: Option<UnitAiKind>,
-    /// `FUN_1412161a0`: a volley is under way (`next_volley`, `+0xa04`, not 0).
-    pub(crate) volley_under_way: bool,
+    /// `next_volley` (`+0xa04`): the missiles of the volley under way already fired, which
+    /// `FUN_1412161a0` tests for 0.
+    pub(crate) next_volley: MissileCount,
     /// The sprites a `MoveTo` of the Attack takes when the Attack gives none: the defaults of the
     /// unit's master and terrain look.
     pub(crate) move_defaults: MoveDefaults,
@@ -349,21 +360,38 @@ impl AttackReads {
                 .standing_sprite
                 .and_then(|s| graphics.get(s))
                 .copied(),
-            volleys: masters.table.is_some_and(|m| volleys(master, m)),
+            flags: {
+                let mut flags = AttackerFlags::empty();
+                flags.set(
+                    AttackerFlags::VOLLEYS,
+                    masters.table.is_some_and(|m| volleys(master, m)),
+                );
+                flags.set(
+                    AttackerFlags::ARMED,
+                    armed(master, combat.firepower, roles, turn_tuning),
+                );
+                flags.set(
+                    AttackerFlags::CAN_MOVE,
+                    ai.is_some_and(|ai| {
+                        ai.current_order.is_some() || ai.stance <= UnitStance::Defensive
+                    }),
+                );
+                flags.set(
+                    AttackerFlags::QUEUE_EMPTY,
+                    ai.is_some_and(|ai| ai.orders.is_empty()),
+                );
+                flags
+            },
             reload: combat.reload_stinger + (master.combat_part().reload - combat.reload_powerup),
             hit_chance: master.combat_part().hit_chance,
-            armed: armed(master, combat.firepower, roles, turn_tuning),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_kind,
             world_time: now,
-            can_move: ai
-                .is_some_and(|ai| ai.current_order.is_some() || ai.stance <= UnitStance::Defensive),
             stance: ai.map_or(UnitStance::Aggressive, |ai| ai.stance),
             state_position: ai.map_or(Point::ORIGIN, |ai| ai.state_position),
-            queue_empty: ai.is_some_and(|ai| ai.orders.is_empty()),
             ai_order: AiOrder::of(ai),
             ai_kind: ai.map(|ai| ai.ai_kind),
-            volley_under_way: combat.next_volley != MissileCount::ZERO,
+            next_volley: combat.next_volley,
             move_defaults: MoveDefaults::of(master, combat.abilities.look.as_ref(), roles),
         }
     }

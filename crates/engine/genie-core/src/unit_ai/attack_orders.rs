@@ -17,6 +17,7 @@ use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::{
@@ -247,7 +248,7 @@ impl UnitAi {
     /// leaves the set (one an update).
     pub(super) fn keep_attackers(&mut self, at: &Surroundings, side: &mut dyn UnitSide) {
         if self.attackers.is_empty() {
-            if at.under_attack {
+            if at.flags.contains(SurroundingFlags::UNDER_ATTACK) {
                 side.set_under_attack(false);
             }
             return;

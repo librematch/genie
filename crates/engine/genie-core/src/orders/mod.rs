@@ -28,6 +28,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::pathing::tile_path::Found;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -440,7 +441,7 @@ impl World {
             hp: u.life.hp + self.parts.combat_of(u.id).hp_powerup.room(),
             max_hp: HitPoints::of_master(master.hit_points)
                 + self.parts.combat_of(u.id).hp_powerup.max,
-            attackable: u.attackable,
+            attackable: u.flags.contains(UnitFlags::ATTACKABLE),
             pasture: u.pasture,
             top_action: self.parts.actions_of(u.id).top_action_kind(),
         })

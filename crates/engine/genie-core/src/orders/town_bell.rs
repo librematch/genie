@@ -36,9 +36,8 @@ use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::{AiMove, OrderForce, Pace};
 use crate::world::World;
 use crate::world::index::Place;
-use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
-use crate::world::layer::Roles;
+use crate::world::layer::{ClassRoles, MasterRoles, Roles};
+use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
 use genie_diff::Diff;
 
@@ -246,10 +245,11 @@ const NO_POINT: f32 = GARRISON_NO_POINT;
 impl World {
     /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
     /// commanding `player`, or of any player while players may order each other's
-    /// ([`crate::world::settings::Settings::cheats_enabled`], `FUN_1412ffe00`; the cheat `+0xb12` is not held),
-    /// rings its owner's bell ([`Bell::Ring`], [`crate::world::World::ring_town_bell`]) or ends it
-    /// ([`crate::world::World::end_town_bell`]). A special object's (`+0x30c` bit 0) UI flag is
-    /// not simulation.
+    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`], `FUN_1412ffe00`; the cheat
+    /// `+0xb12` is not held), rings its owner's bell ([`Bell::Ring`],
+    /// [`crate::world::World::ring_town_bell`]) or ends it
+    /// ([`crate::world::World::end_town_bell`]). A special object's (`+0x30c` bit 0) UI flag is not
+    /// simulation.
     pub(crate) fn town_bell(
         &mut self,
         player: PlayerId,
@@ -259,7 +259,7 @@ impl World {
         let Some((owner, _)) = self.object(id) else {
             return Ok(());
         };
-        if owner != player && !self.settings.cheats_enabled {
+        if owner != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
             return Ok(());
         }
         match bell {
@@ -408,16 +408,16 @@ impl World {
         self.workers_back(owner)
     }
 
-    /// `ALL_BACK_TO_WORK` (`do_command` 0x8c; another player's object only while players may
-    /// order each other's, [`crate::world::settings::Settings::cheats_enabled`]; the cheat `+0xb12` is
+    /// `ALL_BACK_TO_WORK` (`do_command` 0x8c; another player's object only while players may order
+    /// each other's, [`crate::world::settings::OptionFlags::CHEATS_ENABLED`]; the cheat `+0xb12` is
     /// not held): `FUN_141617420` for the owner of object `id`, as the bell's end
     /// ([`crate::world::World::end_town_bell`]) without its flags: each of the owner's live
     /// objects, in the list's order, in state 2, not inside another (`+0x2f0`), of type 80, that
-    /// takes villagers (`FUN_1411ccb60` with 1) and is within `GarrisonTuning::town_bell_reach` of the object
-    /// (`COMISS`/`JC`: a NaN gap is out) lets its villagers and units of master 1808 out back to
-    /// work, from the last in; then the units its owner's tracker files under class 4 and master
-    /// 1808 not inside another go back from where they are. The game screen's flag (`+0x1874`) is
-    /// not simulation.
+    /// takes villagers (`FUN_1411ccb60` with 1) and is within `GarrisonTuning::town_bell_reach` of
+    /// the object (`COMISS`/`JC`: a NaN gap is out) lets its villagers and units of master 1808 out
+    /// back to work, from the last in; then the units its owner's tracker files under class 4 and
+    /// master 1808 not inside another go back from where they are. The game screen's flag
+    /// (`+0x1874`) is not simulation.
     pub(crate) fn all_back_to_work(
         &mut self,
         player: PlayerId,
@@ -426,7 +426,7 @@ impl World {
         let Some((owner, _)) = self.object(id) else {
             return Ok(());
         };
-        if owner != player && !self.settings.cheats_enabled {
+        if owner != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
             return Ok(());
         }
         let (at, radius) = self.ground(id)?;
@@ -915,6 +915,7 @@ mod tests {
         use crate::test_ids::object_id;
         use crate::test_ids::player_id;
         use crate::world::World;
+        use crate::world::settings::OptionFlags;
 
         fn enter(t: &World, id: i32) -> Option<ObjectId> {
             t.parts
@@ -968,7 +969,7 @@ mod tests {
             t.town_bell(player_id(2), object_id(100), Bell::Ring)
                 .unwrap();
             assert_eq!(enter(&t, 1000), None);
-            t.settings.cheats_enabled = true;
+            t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
             t.town_bell(player_id(2), object_id(100), Bell::Ring)
                 .unwrap();
             assert_eq!(enter(&t, 1000), Some(object_id(100)));

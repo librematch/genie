@@ -20,6 +20,7 @@ use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::GroupState;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
@@ -29,6 +30,7 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory,
@@ -205,11 +207,14 @@ impl UnitAi {
         if self.current_order.is_some() {
             return Ok(GO_ON);
         }
-        let held_by_group = at.group.is_some_and(|g| !g.idle) && !player_kind.is_computer();
+        let held_by_group =
+            at.group.is_some_and(|g| !g.contains(GroupState::IDLE)) && !player_kind.is_computer();
         if self.ai_kind == SIEGE_TOWER_AI && held_by_group {
             return Ok(GO_ON);
         }
-        if !at.busy || held_action_state(at.action_state)?.get() == 2 {
+        if !at.flags.contains(SurroundingFlags::BUSY)
+            || held_action_state(at.action_state)?.get() == 2
+        {
             let _ = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
         }
         Ok(BREAK)
@@ -460,7 +465,7 @@ impl UnitAi {
     ) -> Result<u32, GenieError> {
         let new = !self.attackers.contains(n.caller);
         alert_owner(player_kind)?;
-        if n.p[1] >= 1 && at.guest_computer {
+        if n.p[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
             alert_owner(PlayerKind::Computer)?;
         }
         if n.p[1] >= 1

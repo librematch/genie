@@ -14,6 +14,7 @@ use genie_core::players::PlayerId;
 use genie_core::players::PlayerKind;
 use genie_core::players::history::HistoryUpdates;
 use genie_core::technology::ResearchState;
+use genie_core::world::Departures;
 use genie_core::world::WorldTime;
 use genie_save::generated::world::{Action, Object, RgeAction, TechPlayerTree, TribeActionWonder};
 
@@ -108,7 +109,9 @@ fn the_slice_takes_the_worlds_and_the_players_fields() {
         p.resources().map(|r| r.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)
     );
-    assert!(p.dropped && !p.resigned);
+    assert!(
+        p.departures.contains(Departures::DROPPED) && !p.departures.contains(Departures::RESIGNED)
+    );
     assert_eq!(p.victory_times.ruins.get().to_bits(), 12.5_f32.to_bits());
     assert_eq!(p.victory_times.wonder.get().to_bits(), (-1.0_f32).to_bits());
     assert_eq!(
@@ -133,7 +136,10 @@ fn resign_is_not_drop() {
     let mut player = human(Vec::new());
     human_mut(&mut player).base.resigned = 1;
     let turns = slice(&header(vec![gaia(Vec::new()), player]), None).unwrap();
-    assert!(turns.players[1].resigned && !turns.players[1].dropped);
+    assert!(
+        turns.players[1].departures.contains(Departures::RESIGNED)
+            && !turns.players[1].departures.contains(Departures::DROPPED)
+    );
 }
 
 /// A saved technology state reads as its state (4, queued); one that names none (5) stops

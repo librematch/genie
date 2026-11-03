@@ -16,6 +16,7 @@ use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::masters::{MasterTables, Task};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, Relations};
@@ -141,7 +142,7 @@ pub(crate) fn task_target_with<'a>(
         held: u.life.held(),
         hp: u.life.hp + parts.combat_of(u.id).hp_powerup.room(),
         max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(u.id).hp_powerup.max,
-        attackable: u.attackable,
+        attackable: u.flags.contains(UnitFlags::ATTACKABLE),
         pasture: u.pasture,
         top_action: parts.actions_of(u.id).top_action_kind(),
     }))

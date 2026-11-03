@@ -38,9 +38,11 @@ use crate::testing::ids::BUILDER;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
 use crate::vision::visibility::{Visibility, VisibleMap};
+use crate::world::AllySharing;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
+use crate::world::settings::OptionFlags;
 use crate::world::settings::Settings;
 use crate::world::{Age, FrameSeed, GameMode, SubModeFlags, Visibility as WorldVisibility};
 use std::sync::Arc;
@@ -303,7 +305,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
     assert_eq!(t.players[1].escrow[0], Amount::ZERO);
     // sharing: 1 and 2 count each other, 3 counts 1 but not the other way round
     let mut t = world();
-    t.players[1].sharing = true;
+    t.players[1].ally_sharing.set(AllySharing::RESOURCES, true);
     t.players[1].relations = relation_row([1, 0, 0, 3]);
     t.players[2].relations = relation_row([1, 0, 0, 3]);
     t.players[3].relations = relation_row([1, 0, 3, 0]);
@@ -706,7 +708,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
     assert!(!tree.has(&late));
     // the full tech tree: civilisation 1 lacks the barracks, the fallback 0 has it
     let full = Settings {
-        full_tech_tree: true,
+        flags: OptionFlags::FULL_TECH_TREE,
         ..Settings::default()
     };
     let fell = TreeQuery {

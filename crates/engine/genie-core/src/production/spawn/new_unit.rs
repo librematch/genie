@@ -21,6 +21,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::orders::Dispatch;
 use crate::orders::OrderSource;
 use crate::players::Amount;
@@ -488,7 +489,7 @@ impl World {
                 master: made.life,
             },
             place: Static::at(position),
-            attackable: true,
+            flags: UnitFlags::ATTACKABLE,
             pasture: None,
             my_pasture: None,
             sprite: Some(sprite),

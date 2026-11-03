@@ -5,131 +5,28 @@ use crate::GenieError;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::Point;
-use crate::map::Position;
-use crate::map::Radii;
 use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
 use crate::objects::HitPoints;
-use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::FogVisibility;
 use crate::objects::masters::HillMode;
-use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
+use crate::production::spawn::SiteChecks;
 use crate::production::spawn::{BuildSite, Tested, hill_fails, placement_terrains};
-use crate::vision::{VisionBits, VisionMasks};
+use crate::production::spawn::{Near, NearFlags};
+use crate::vision::VisionMasks;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::SpawnTuning;
-
-/// An object near a candidate, as the placement test and the blocker test read it.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Near {
-    /// The object.
-    pub id: ObjectId,
-    /// Its place.
-    pub position: Position,
-    /// Its master's radii on the ground and whether its height radius is above 0.
-    pub radius: Footprint,
-    /// Its master's height radius is above 0.
-    pub tall: bool,
-    /// Its master's type (`+0x8`), class, id, `can_be_built_on` (`+0x5e9`), `obstruction_type`
-    /// (`+0x651`) and `enable_auto_gather` (`+0x681`).
-    pub kind: MasterKind,
-    /// Its master's class.
-    pub class: ClassId,
-    /// Its master.
-    pub master: MasterId,
-    /// Its master's `can_be_built_on` (`+0x5e9`).
-    pub buildable_on: BuildableOn,
-    /// Its master's `obstruction_type` (`+0x651`).
-    pub obstruction_kind: ObstructionKind,
-    /// Its master's `enable_auto_gather` (`+0x681`).
-    pub auto_gather: bool,
-    /// Its state (`+0x640`) and, for a building, its `desolid_flag` (`+0xc60`).
-    pub state: ObjectState,
-    /// A building's `desolid_flag` (`+0xc60`).
-    pub desolid: bool,
-    /// Its owner.
-    pub player: PlayerId,
-    /// Its master moves (speed above 0).
-    pub moving: bool,
-    /// Its master's `fog_visibility` (`+0x605`).
-    pub fog_visibility: FogVisibility,
-    /// A building's visibility mask (`+0x8f8`, the registry's) when its footprint has a UMV entry
-    /// (`+0x904` not 0); None otherwise.
-    pub fog_mask: Option<VisionBits>,
-    /// It holds an amount (`+0x310` above 0) of food, wood, stone or gold (its attribute,
-    /// `+0x308`, through `FUN_140fdd470` below 4: 0 to 3 and the meats 15 to 17).
-    pub holds: bool,
-    /// Its hit points.
-    pub hp: HitPoints,
-    /// The terrain of its tile (`+0x2e8`, taken as the tile it stands on) is a forest
-    /// ([`crate::map::terrain::TerrainKind::forest`]).
-    pub forest_tile: bool,
-    /// Its master's outline radii and height (`+0x688`, `+0x68c`, `+0x690`), BUILD's box for
-    /// obstruction types 11 to 13.
-    pub outline: Radii,
-}
-
-impl Near {
-    /// The blocker tests of `FUN_1411c5b60`: a building (`FUN_1411942c0`), a tree past state 2
-    /// (`FUN_141195660`), the relic (`FUN_141194e80`), and `FUN_141194170`'s master with
-    /// `enable_auto_gather` or of a class that stays from state 2 on (5, 9, 10, 29, 31, 33, 38,
-    /// 40, 41, 58, 61) or from state 3 on (7, 8, 15, 32, 48, 63).
-    #[must_use]
-    pub fn stays(&self, roles: &Roles) -> bool {
-        if self.kind == MasterKind::BUILDING
-            || (roles.of_class(self.class).contains(ClassRoles::TREE)
-                && ObjectState::Alive < self.state)
-            || roles.of_master(self.master).contains(MasterRoles::RELIC)
-        {
-            return true;
-        }
-        if self.auto_gather {
-            return true;
-        }
-        {
-            let held = roles.of_class(self.class);
-            if held.intersects(
-                ClassRoles::OCEAN_FISH
-                    | ClassRoles::PREY
-                    | ClassRoles::PREDATOR
-                    | ClassRoles::DOMESTIC_ANIMAL
-                    | ClassRoles::DEEP_SEA_FISH
-                    | ClassRoles::SHORE_FISH
-                    | ClassRoles::BIRD
-                    | ClassRoles::SALVAGE_PILE
-                    | ClassRoles::RESOURCE_PILE
-                    | ClassRoles::LIVESTOCK
-                    | ClassRoles::CONTROLLED_ANIMAL,
-            ) {
-                ObjectState::Unfinished < self.state
-            } else if held.intersects(
-                ClassRoles::FORAGE_BUSH
-                    | ClassRoles::STONE_MINE
-                    | ClassRoles::TREE
-                    | ClassRoles::GOLD_MINE
-                    | ClassRoles::ORE_MINE
-                    | ClassRoles::GOLD_FISH,
-            ) {
-                ObjectState::Alive < self.state
-            } else {
-                false
-            }
-        }
-    }
-}
 
 /// A unit to put down, beside a building or ashore, of a master that does not move (no
 /// terrain restriction to test its place by).
@@ -235,23 +132,23 @@ pub(super) fn overlapping(
     Ok(out)
 }
 
-/// BUILD's placement test (`FUN_140e7a400`'s call of the master's slot 0x50, the building
-/// master's `FUN_14123aee0` with BUILD's flags: `p6` human, `p7`, `p8`, `p9` 1, `p10` 0, `p11` 1,
-/// no object of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `p`, else the game's
-/// code. First the static test (`FUN_141123f80` through `FUN_141264db0`; their scans run only
-/// for the Build's test, [`BuildSite::scans`]) over the box of the site's radii: off the map 7; per tile, columns then rows, a terrain the
-/// restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the spawn's); a human who explored none of
-/// the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then the building master's scan of the tiles within 8 (rows, then columns; each
-/// tile's objects in its list's order): an object the player sees, or on a tile it never
-/// explored (the test's explored flag `+0x730` is set by then), or in the fog with a fog
-/// visibility, and only its own in the fog without one, that is below state 3 (another type
-/// below 7), standing (or the master obstructs, or it is below type 30), not a wall under its
-/// own gate, a desolid building only of an ally both ways, not a moving unit of the player, Gaia
-/// or a mutual ally, not a felled tree off a forest (at most 1 hit point; `+0x2e8` taken as its
-/// own tile), not buildable on, whose box with a
-/// height overlaps the clearance box: 6. Not modelled: the placement terrains, hill modes, the
-/// zone test (`FUN_1415c6400`), the editor (game mode 4), a fogged object of fog visibility 3,
-/// game type 7's test of allies.
+/// BUILD's placement test (`FUN_140e7a400`'s call of the master's slot 0x50, the building master's
+/// `FUN_14123aee0` with BUILD's flags: `p6` human, `p7`, `p8`, `p9` 1, `p10` 0, `p11` 1, no object
+/// of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `p`, else the game's code. First
+/// the static test (`FUN_141123f80` through `FUN_141264db0`; their scans run only for the Build's
+/// test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile, columns
+/// then rows, a terrain the restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the spawn's); a
+/// human who explored none of the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then the building
+/// master's scan of the tiles within 8 (rows, then columns; each tile's objects in its list's
+/// order): an object the player sees, or on a tile it never explored (the test's explored flag
+/// `+0x730` is set by then), or in the fog with a fog visibility, and only its own in the fog
+/// without one, that is below state 3 (another type below 7), standing (or the master obstructs, or
+/// it is below type 30), not a wall under its own gate, a desolid building only of an ally both
+/// ways, not a moving unit of the player, Gaia or a mutual ally, not a felled tree off a forest (at
+/// most 1 hit point; `+0x2e8` taken as its own tile), not buildable on, whose box with a height
+/// overlaps the clearance box: 6. Not modelled: the placement terrains, hill modes, the zone test
+/// (`FUN_1415c6400`), the editor (game mode 4), a fogged object of fog visibility 3, game type 7's
+/// test of allies.
 pub fn build_placement(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
@@ -262,7 +159,9 @@ pub fn build_placement(
     if let Some(code) = build_static_test(site, map, p, spawn_tuning)? {
         return Ok(code);
     }
-    if site.scans && static_scans_find(site, map, p, roles, spawn_tuning)? {
+    if site.checks.contains(SiteChecks::SCANS)
+        && static_scans_find(site, map, p, roles, spawn_tuning)?
+    {
         return Ok(PlacementCode::Blocked);
     }
     // FUN_14123aee0's scan
@@ -291,14 +190,14 @@ pub fn build_placement(
     Ok(PlacementCode::Allowed)
 }
 
-/// The static scans of the Build's test (`p11` and `p13` 1, [`BuildSite::scans`]), for a master with
-/// a height ([`BuildSite::tall`]) and radii: `FUN_141123f80`'s, then `FUN_141264db0`'s, each over
-/// the tiles within `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order) for an
-/// object other than the site's own (`p12`), below state 7, not buildable on, no desolid building
-/// (`FUN_141264db0`'s passes classes 51 and 54), with a height (`FUN_141123f80`'s gives a tree's
-/// farm and an obstructing building one, `FUN_141264db0`'s an obstructing building; the
-/// latter passes over the units, type 70), whose box overlaps the site's: true when one does
-/// (the game's code 6).
+/// The static scans of the Build's test (`p11` and `p13` 1, [`SiteChecks::SCANS`]), for a master
+/// with a height ([`BuildSite::tall`]) and radii: `FUN_141123f80`'s, then `FUN_141264db0`'s, each
+/// over the tiles within `SpawnTuning::reach` (rows, then columns; each tile's objects in its
+/// list's order) for an object other than the site's own (`p12`), below state 7, not buildable on,
+/// no desolid building (`FUN_141264db0`'s passes classes 51 and 54), with a height
+/// (`FUN_141123f80`'s gives a tree's farm and an obstructing building one, `FUN_141264db0`'s an
+/// obstructing building; the latter passes over the units, type 70), whose box overlaps the site's:
+/// true when one does (the game's code 6).
 fn static_scans_find(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
@@ -314,8 +213,8 @@ fn static_scans_find(
         let listed = !site.own.contains(&o.id)
             && o.state < ObjectState::Removed
             && !o.buildable_on.passed()
-            && (o.kind != MasterKind::BUILDING || !o.desolid);
-        let tall = o.tall
+            && (o.kind != MasterKind::BUILDING || !o.flags.contains(NearFlags::DESOLID));
+        let tall = o.flags.contains(NearFlags::TALL)
             || (roles.of_class(site.class).contains(ClassRoles::TREE)
                 && roles.of_class(o.class).contains(ClassRoles::FARM))
             || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
@@ -336,8 +235,9 @@ fn static_scans_find(
                 || roles
                     .of_class(o.class)
                     .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !o.desolid);
-        let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
+                || !o.flags.contains(NearFlags::DESOLID));
+        let tall = o.flags.contains(NearFlags::TALL)
+            || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall)
     };
     Ok(!overlapping(map, p, site.radius, &second, spawn_tuning)?.is_empty())
@@ -390,16 +290,17 @@ pub(super) fn build_static_test(
             if value <= spawn_tuning.passable {
                 return Ok(Some(PlacementCode::Terrain));
             }
-            explored = explored || (site.human && map.explored(site.player, tile));
+            explored = explored
+                || (site.checks.contains(SiteChecks::HUMAN) && map.explored(site.player, tile));
             if hill_fails(site.hill_mode, map, tile, Tile::new(x0, y1), base)? {
                 return Ok(Some(PlacementCode::Hill));
             }
         }
     }
-    if site.human && !explored {
+    if site.checks.contains(SiteChecks::HUMAN) && !explored {
         return Ok(Some(PlacementCode::Unexplored));
     }
-    if (0.0 < rx || 0.0 < ry) && site.zones {
+    if (0.0 < rx || 0.0 < ry) && site.checks.contains(SiteChecks::ZONES) {
         return Err(GenieError::unsupported(
             "BUILD's placement test in a zone mode",
         ));
@@ -487,12 +388,16 @@ pub(super) fn blocks_build(
             let oz = o.outline.z();
             (
                 o.outline.ground(),
-                0.0 < oz || (oz == 0.0 && (o.kind == MasterKind::BUILDING || o.holds)),
+                0.0 < oz
+                    || (oz == 0.0
+                        && (o.kind == MasterKind::BUILDING || o.flags.contains(NearFlags::HOLDS))),
             )
         } else {
             (
                 o.radius,
-                o.tall || o.kind == MasterKind::BUILDING || o.holds,
+                o.flags.contains(NearFlags::TALL)
+                    || o.kind == MasterKind::BUILDING
+                    || o.flags.contains(NearFlags::HOLDS),
             )
         };
     let r = site.radius;
@@ -515,7 +420,8 @@ pub(super) fn build_ignores(
     let player = site.player;
     let alive = o.state < ObjectState::Dying
         || (o.kind != MasterKind::BUILDING && o.state < ObjectState::Removed);
-    let standing = site.obstructs || o.kind < MasterKind::MOVING || !o.moving;
+    let standing =
+        site.obstructs || o.kind < MasterKind::MOVING || !o.flags.contains(NearFlags::MOVING);
     let gate_wall = roles.of_class(site.class).contains(ClassRoles::GATE)
         && roles.of_class(o.class).contains(ClassRoles::WALL)
         && o.player == player;
@@ -523,7 +429,7 @@ pub(super) fn build_ignores(
         && !roles
             .of_class(o.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-        && o.desolid
+        && o.flags.contains(NearFlags::DESOLID)
         && !(map.allied(player, o.player, AllyTest::WithRelation4)
             && map.allied(o.player, player, AllyTest::WithRelation4));
     !alive || !standing || gate_wall || foundation
@@ -542,7 +448,7 @@ pub(super) fn build_passes(
     // 7's own test of allies is not modelled)
     let passes = MasterKind::MOVING <= o.kind
         && o.state == ObjectState::Alive
-        && o.moving
+        && o.flags.contains(NearFlags::MOVING)
         && (o.player == player
             || o.player == PlayerId::GAIA
             || (map.allied(player, o.player, AllyTest::AlliesOnly)
@@ -553,7 +459,7 @@ pub(super) fn build_passes(
         || o.buildable_on.passed()
         || (roles.of_class(o.class).contains(ClassRoles::TREE)
             && o.hp <= HitPoints::new(1.0)
-            && !o.forest_tile)
+            && !o.flags.contains(NearFlags::FOREST_TILE))
 }
 
 /// The first object of a scan, which the game reports as the blocker: the tiles row by row, each
@@ -635,8 +541,8 @@ pub fn placement(
             let counts = |o: &Near| {
                 let listed = o.state < ObjectState::Removed
                     && !o.buildable_on.passed()
-                    && (o.kind != MasterKind::BUILDING || !o.desolid);
-                let tall = o.tall
+                    && (o.kind != MasterKind::BUILDING || !o.flags.contains(NearFlags::DESOLID));
+                let tall = o.flags.contains(NearFlags::TALL)
                     || (roles.of_class(me.class).contains(ClassRoles::TREE)
                         && roles.of_class(o.class).contains(ClassRoles::FARM))
                     || (o.kind == MasterKind::BUILDING
@@ -665,8 +571,9 @@ pub fn placement(
                 || roles
                     .of_class(o.class)
                     .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !o.desolid);
-        let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
+                || !o.flags.contains(NearFlags::DESOLID));
+        let tall = o.flags.contains(NearFlags::TALL)
+            || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall && me.tall)
     };
     let found = if me.tall && (0.0 < rx || 0.0 < ry) {

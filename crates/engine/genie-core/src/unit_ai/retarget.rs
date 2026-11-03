@@ -15,11 +15,13 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
 use crate::unit_ai::AttackChecks;
+use crate::unit_ai::GroupState;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::category;
@@ -39,7 +41,7 @@ impl UnitAi {
     /// Slot 73 (`0x140c567c0`, processMisc). Its order part first, by the order (an action's value
     /// plus 100 without one): the follow order's ([`UnitAi::follow`]) and the defend order's
     /// ([`UnitAi::defend_misc`]). Then the leash checks (not on the orders 0x2c7, 0x2dd and 0x323,
-    /// nor in a group that patrols, [`GroupState::patrol`](crate::unit_ai::GroupState::patrol)):
+    /// nor in a group that patrols, [`GroupState::PATROL`](crate::unit_ai::GroupState::PATROL)):
     /// stance 1's (Defend) stops a unit more than 5 tiles (`UnitAiTuning::defend_leash`, squared)
     /// from its state position, forgets its target and walks back ([`UnitAi::walk_back`]), then
     /// goes on. Stance 2's (stand ground) stops a unit with an action value (`+0x44`, not `0x2bf`
@@ -87,7 +89,9 @@ impl UnitAi {
         self.last_retarget_time = world_time;
         self.retarget_timer = Millis::new(750 + ai.rand15() % 500);
         let target = at.target.map(|t| (t.owner, t.class));
-        let listed = at.action_state.map(|_| at.attack_listed);
+        let listed = at
+            .action_state
+            .map(|_| at.flags.contains(SurroundingFlags::ATTACK_LISTED));
         if let Some(search) = self.retarget_outcome(
             target,
             at.weapon_range,
@@ -128,7 +132,7 @@ impl UnitAi {
                 self.current_order,
                 Some(OrderKind::Patrol | OrderKind::AttackMove)
             )
-            && !at.group.is_some_and(|g| g.patrol);
+            && !at.group.is_some_and(|g| g.contains(GroupState::PATROL));
         // with patrol information (+0x1c0) the leash is the distance from where the unit last
         // moved to (slot 0x520) to the patrol's path (FUN_140f95e10): beyond it the unit stops
         // (slot 0xb0 with 1), forgets its target and walks the patrol on
@@ -222,7 +226,9 @@ impl UnitAi {
             classes,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !player_kind.is_computer() {
+                lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
+                    && !player_kind.is_computer()
+                {
                     2
                 } else {
                     0

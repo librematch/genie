@@ -25,6 +25,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -97,17 +98,17 @@ impl World {
         Ok(())
     }
 
-    /// GATE (`do_command` case 0x72): the command's check refuses an object `id` the world does
-    /// not hold, or another player's while players may not order each other's units (the
-    /// setting `+0x1074`, [`crate::world::settings::Settings::cheats_enabled`]; the world's `+0xb12` cheat is not held).
-    /// The object, live or sleeping (`FUN_1415417a0`), of a master of type 80 toggles its gate
-    /// lock: slot 0x670 ([`lock_gate`]) with slot 0x668's value negated. Its sound (slot 0x4c0)
-    /// and the UI's flag are not held.
+    /// GATE (`do_command` case 0x72): the command's check refuses an object `id` the world does not
+    /// hold, or another player's while players may not order each other's units (the setting
+    /// `+0x1074`, [`crate::world::settings::OptionFlags::CHEATS_ENABLED`]; the world's `+0xb12`
+    /// cheat is not held). The object, live or sleeping (`FUN_1415417a0`), of a master of type 80
+    /// toggles its gate lock: slot 0x670 ([`lock_gate`]) with slot 0x668's value negated. Its sound
+    /// (slot 0x4c0) and the UI's flag are not held.
     pub(crate) fn gate(&mut self, player: PlayerId, id: ObjectId) -> Result<(), GenieError> {
         let Some((p, unit)) = self.object(id) else {
             return Ok(());
         };
-        if p != player && !self.settings.cheats_enabled {
+        if p != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
             return Ok(());
         }
         if unit.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
@@ -299,15 +300,14 @@ impl World {
         Ok(())
     }
 
-    /// The check of a command on units (STOP's `FUN_140e55a30` and `UNIT_AI_STATE`'s `FUN_140e55d30`,
-    /// twins of `FUN_140e558b0`) of the ids of `player`: of the first 60 (500 for a computer,
-    /// `FUN_141659cf0`) an id the world does not hold, or another player's without the setting
-    /// `+0x1074` ([`crate::world::settings::Settings::cheats_enabled`]), becomes none (the game's
-    /// −1); the ids past them stay unchecked. A human's command whose checked ids all went is
-    /// refused (None).
-    /// The packet's own tests (its size, a player the game lacks) are
-    /// [`World::read_units`]'s, and the world's `+0xb12` (the cheat that would let either
-    /// through) is not held.
+    /// The check of a command on units (STOP's `FUN_140e55a30` and `UNIT_AI_STATE`'s
+    /// `FUN_140e55d30`, twins of `FUN_140e558b0`) of the ids of `player`: of the first 60 (500 for
+    /// a computer, `FUN_141659cf0`) an id the world does not hold, or another player's without the
+    /// setting `+0x1074` ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`]), becomes none
+    /// (the game's −1); the ids past them stay unchecked. A human's command whose checked ids all
+    /// went is refused (None). The packet's own tests (its size, a player the game lacks) are
+    /// [`World::read_units`]'s, and the world's `+0xb12` (the cheat that would let either through)
+    /// is not held.
     ///
     /// # Errors
     ///
@@ -324,9 +324,9 @@ impl World {
         let mut ids = ids.to_vec();
         let mut dropped = 0;
         for id in ids.iter_mut().take(checked) {
-            let keep = self
-                .object(*id)
-                .is_some_and(|(p, _)| p == player || self.settings.cheats_enabled);
+            let keep = self.object(*id).is_some_and(|(p, _)| {
+                p == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
+            });
             if !keep {
                 *id = None;
                 dropped += 1;
@@ -344,7 +344,7 @@ impl World {
     /// the two count each other as allies ([`World::mutual_allies`]) and the command ties it to
     /// the issuer: `pick`'s player is the issuer (flag 1), or its object (flags 3 to 6) is the
     /// issuer's (`FUN_1415417a0`). Any other stays only with the setting `+0x1074`
-    /// ([`crate::world::settings::Settings::cheats_enabled`]). A human's command whose ids all
+    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`]). A human's command whose ids all
     /// went is refused (None). The packet's size tests are the decoder's, and the world's
     /// `+0xb12` is not held.
     ///
@@ -379,7 +379,9 @@ impl World {
         let mut dropped = 0;
         for id in &mut ids {
             let keep = self.place(*id).is_some_and(|p| {
-                p.player() == player || tied(p.player()) || self.settings.cheats_enabled
+                p.player() == player
+                    || tied(p.player())
+                    || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
             });
             if !keep {
                 *id = None;

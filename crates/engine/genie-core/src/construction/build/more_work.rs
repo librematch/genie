@@ -12,6 +12,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::pathing::tile_path::GridLevel;
@@ -106,7 +107,7 @@ impl Unit {
                 workers: u.workers,
                 position,
                 pasture: u.pasture,
-                untargetable: u.untargetable,
+                untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
                 attribute: u.life.attribute_kind,
                 amount: u.life.amount,
                 auto_gather: m.auto_gather.is_on(),

@@ -8,15 +8,10 @@ use genie_core::map::GridSize;
 use genie_core::map::Tile;
 use genie_core::map::WholeDistance;
 use genie_core::objects::ListIndex;
-use genie_core::players::Amount;
-use genie_core::players::Chance;
-use genie_core::players::CivId;
-use genie_core::players::EscrowShare;
-use genie_core::players::LotVolume;
-use genie_core::players::Team;
 use genie_core::players::game_status::Fealty;
 use genie_core::players::game_status::GameStatus;
 use genie_core::players::game_status::VictoryState;
+use genie_core::players::{Amount, Chance, CivId, EscrowShare, LotVolume, Team};
 use genie_core::world::FrameSeed;
 use genie_core::world::Millis;
 use genie_core::world::Model;
@@ -24,6 +19,7 @@ use genie_core::world::PlayState;
 use genie_core::world::Seconds;
 use genie_core::world::Tick;
 use genie_core::world::WorldTime;
+use genie_core::world::{AllySharing, AutoQueues, Departures};
 use genie_model::layer::BuildLayer;
 use genie_nickel::layer::build_layer;
 use std::sync::Arc;
@@ -59,7 +55,7 @@ use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::parts::ObjectParts;
 use genie_core::world::parts::Part;
-use genie_core::world::settings::{FarmMode, Settings};
+use genie_core::world::settings::{FarmMode, OptionFlags, Settings};
 use genie_core::world::{
     Age, ContentMode, Formations, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Unread,
     Visibility,
@@ -168,8 +164,15 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
                     .collect(),
                 civ,
                 relations: Relations::of_bytes(p.world_player().base.relation.iter().copied()),
-                auto_farm_queue: p.world_player().auto_farm_queue != 0,
-                auto_fishtrap_queue: p.world_player().auto_fish_trap_queue != 0,
+                auto_queues: {
+                    let mut flags = AutoQueues::empty();
+                    flags.set(AutoQueues::FARMS, p.world_player().auto_farm_queue != 0);
+                    flags.set(
+                        AutoQueues::FISH_TRAPS,
+                        p.world_player().auto_fish_trap_queue != 0,
+                    );
+                    flags
+                },
                 farm_queue: QueueCount::of_data(p.world_player().farm_queue_count),
                 fish_trap_queue: QueueCount::of_data(p.world_player().fish_trap_queue_count),
                 production_queue_on: p.world_player().prod_queue_on,
@@ -198,15 +201,32 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
                 stopped: false,
                 game_status: GameStatus::of_data(p.world_player().base.game_status),
                 // `+0x8b` holds the drop in its bit 1 (the load moves it to `+0x8c`)
-                resigned: p.world_player().base.resigned & 2 == 0
-                    && p.world_player().base.resigned != 0,
-                dropped: p.world_player().base.resigned & 2 != 0,
+                departures: {
+                    let mut flags = Departures::empty();
+                    flags.set(
+                        Departures::RESIGNED,
+                        p.world_player().base.resigned & 2 == 0
+                            && p.world_player().base.resigned != 0,
+                    );
+                    flags.set(Departures::DROPPED, p.world_player().base.resigned & 2 != 0);
+                    flags
+                },
                 allied_victory: p.world_player().base.allied_victory,
-                allied_vision: p.world_player().base.allied_los_enable != 0,
+                ally_sharing: {
+                    let mut flags = AllySharing::empty();
+                    flags.set(
+                        AllySharing::VISION,
+                        p.world_player().base.allied_los_enable != 0,
+                    );
+                    flags.set(
+                        AllySharing::RESOURCES,
+                        p.world_player().sharing_is_caring != 0,
+                    );
+                    flags
+                },
                 // the reveal of the enemies' town centres (attribute 209) is done once any
                 // mTCFlared bit is set; the saved map then already holds the revealed tiles
                 tc_flared: p.world_player().tc_flared.iter().map(|&b| b != 0).collect(),
-                sharing: p.world_player().sharing_is_caring != 0,
                 commodity_volume: LotVolume::of_data(p.world_player().commodity_volumn_delta),
                 victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
                 fealty: Fealty::of_data(p.world_player().fealty as i16),
@@ -520,18 +540,33 @@ pub const fn settings(o: &GameOptions) -> Settings {
         ending_age: Age::of_data(o.ending_age),
         visibility_kind: Visibility::of_data(o.visibility_kind),
         sub_game_mode_flag: SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
-        full_tech_tree: o.full_tech_tree_enabled != 0,
         farm_mode: FarmMode::of_option(o.walkable_farms),
         selected_content_mode: ContentMode::of_data(o.selected_content_mode),
-        villager_force_drop: o.villager_force_drop != 0,
-        cheats_enabled: o.cheats_enabled != 0,
         treaty_length: TreatyLength::of_minutes(o.treaty_length),
-        teams_locked: o.teams_locked != 0,
         starting_age: Age::of_data(o.starting_age),
         resource_level: ResourceLevel::of_data(o.resource_level),
-        turbo: o.turbo_enabled != 0,
-        shared_exploration: o.shared_exploration != 0,
-        antiquity: o.antiquity_mode != 0,
+        flags: option(OptionFlags::FULL_TECH_TREE, o.full_tech_tree_enabled)
+            .union(option(
+                OptionFlags::VILLAGER_FORCE_DROP,
+                o.villager_force_drop,
+            ))
+            .union(option(OptionFlags::CHEATS_ENABLED, o.cheats_enabled))
+            .union(option(OptionFlags::TEAMS_LOCKED, o.teams_locked))
+            .union(option(OptionFlags::TURBO, o.turbo_enabled))
+            .union(option(
+                OptionFlags::SHARED_EXPLORATION,
+                o.shared_exploration,
+            ))
+            .union(option(OptionFlags::ANTIQUITY, o.antiquity_mode)),
+    }
+}
+
+/// `flag` when the option's byte is not 0.
+const fn option(flag: OptionFlags, byte: u8) -> OptionFlags {
+    if byte != 0 {
+        flag
+    } else {
+        OptionFlags::empty()
     }
 }
 

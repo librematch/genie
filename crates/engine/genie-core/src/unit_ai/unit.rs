@@ -18,20 +18,21 @@ use crate::objects::masters::CombatLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::unit::object_master;
-use crate::objects::unit::{Outcome, Unit};
+use crate::objects::unit::{Outcome, Unit, UnitFlags, object_master};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::AllyTest;
 use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
 use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen, UnitSide};
 use crate::vision::visibility::sight_taker;
+use crate::world::AiSwitches;
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
@@ -135,8 +136,70 @@ impl Unit {
                 .map_or(Speed::ZERO, |m| m.stats.speed),
             map: c.w.spatial.map,
             dt_seconds: c.dt.seconds(),
-            mode_1: c.w.mode_680.is_one(),
-            busy,
+            flags: {
+                let mut flags = SurroundingFlags::empty();
+                flags.set(SurroundingFlags::MODE_1, c.w.mode_680.is_one());
+                flags.set(SurroundingFlags::BUSY, busy);
+                flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
+                flags.set(
+                    SurroundingFlags::TASK_0X99,
+                    master.is_some_and(|m| {
+                        m.action_part()
+                            .tasks
+                            .iter()
+                            .any(|t| t.action_kind == CART_TASK)
+                    }),
+                );
+                flags.set(SurroundingFlags::GARRISONED, self.life.inside.is_some());
+                flags.set(
+                    SurroundingFlags::RANGED,
+                    master.is_some_and(|m| m.combat_part().missile.master().is_some()),
+                );
+                flags.set(
+                    SurroundingFlags::SCENARIO,
+                    c.w.settings.game_mode.scenario(),
+                );
+                flags.set(
+                    SurroundingFlags::TASK_0X69,
+                    master.is_some_and(|m| {
+                        m.action_part()
+                            .tasks
+                            .iter()
+                            .any(|t| t.action_kind == ActionKind::HEAL)
+                    }),
+                );
+                flags.set(
+                    SurroundingFlags::UNDER_ATTACK,
+                    self.flags.contains(UnitFlags::UNDER_ATTACK),
+                );
+                flags.set(
+                    SurroundingFlags::ATTACK_LISTED,
+                    actions.list.attack().is_some(),
+                );
+                flags.set(
+                    SurroundingFlags::ATTACK_MOVING,
+                    c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
+                );
+                flags.set(
+                    SurroundingFlags::DISABLE_TOWER_PRIORITY,
+                    view.ai_settings
+                        .switches
+                        .contains(AiSwitches::DISABLE_TOWER_PRIORITY),
+                );
+                flags.set(
+                    SurroundingFlags::GUEST_COMPUTER,
+                    self.garrison.iter().any(|&g| {
+                        c.w.spatial.get(g).is_some_and(|p| {
+                            p.player != player
+                                && c.w
+                                    .players
+                                    .get(p.player.index())
+                                    .is_some_and(|q| q.kind.is_computer())
+                        })
+                    }),
+                );
+                flags
+            },
             player,
             class: match class {
                 Some(class) => Some(class),
@@ -155,30 +218,13 @@ impl Unit {
             los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
             search_radius: master.map_or(Distance::ZERO, |m| m.action_part().search_radius),
             weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
-            interruptible,
-            task_0x99: master.is_some_and(|m| {
-                m.action_part()
-                    .tasks
-                    .iter()
-                    .any(|t| t.action_kind == CART_TASK)
-            }),
-            garrisoned: self.life.inside.is_some(),
             state: self.life.state,
             kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
-            ranged: master.is_some_and(|m| m.combat_part().missile.master().is_some()),
             firepower: c.w.parts.combat_of(self.id).firepower,
             capture: self.capture_kind(c),
             master: self.life.master_id,
-            scenario: c.w.settings.game_mode.scenario(),
-            task_0x69: master.is_some_and(|m| {
-                m.action_part()
-                    .tasks
-                    .iter()
-                    .any(|t| t.action_kind == ActionKind::HEAL)
-            }),
             // a new owner sees the target with its own map
             target: self.ai_target(c, view.player)?,
-            under_attack: self.under_attack,
             id: self.id,
             anim_speed: c.w.parts.anim_speed_of(self.id),
             action_state: if c.w.parts.unread.contains(self.id) {
@@ -190,7 +236,6 @@ impl Unit {
                         .map_or(ActionState::NO_ACTION, |a| a.state),
                 )
             },
-            attack_listed: actions.list.attack().is_some(),
             units: self.named_units(
                 c,
                 changed_view(
@@ -200,19 +245,24 @@ impl Unit {
                 view,
                 master,
             )?,
-            group: (self.group.id)
-                .and_then(|id| c.w.groups.get(id))
-                .map(|g| GroupState {
-                    commanded: g.current_command != GroupCommandKind::NONE,
-                    idle: g.is_idle(),
-                    patrol: g.patrols(),
-                    moving: g.motion.moving(),
-                    member_moving: c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
-                }),
+            group: (self.group.id).and_then(|id| c.w.groups.get(id)).map(|g| {
+                let mut flags = GroupState::empty();
+                flags.set(
+                    GroupState::COMMANDED,
+                    g.current_command != GroupCommandKind::NONE,
+                );
+                flags.set(GroupState::IDLE, g.is_idle());
+                flags.set(GroupState::PATROL, g.patrols());
+                flags.set(GroupState::MOVING, g.motion.moving());
+                flags.set(
+                    GroupState::MEMBER_MOVING,
+                    c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
+                );
+                flags
+            }),
             top_target: actions
                 .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
             min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
-            attack_moving: c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
             moved_at: c
                 .w
                 .parts
@@ -229,16 +279,6 @@ impl Unit {
                 .players
                 .get(player.index())
                 .map_or(Chance::NONE, |q| q.keep_distance_chance),
-            disable_tower_priority: view.ai_settings.disable_tower_priority,
-            guest_computer: self.garrison.iter().any(|&g| {
-                c.w.spatial.get(g).is_some_and(|p| {
-                    p.player != player
-                        && c.w
-                            .players
-                            .get(p.player.index())
-                            .is_some_and(|q| q.kind.is_computer())
-                })
-            }),
             roles: c.w.model.roles.clone(),
             slots: c.w.model.slots,
             unit_ai_tuning: c.w.model.tuning.unit_ai,

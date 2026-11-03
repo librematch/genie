@@ -28,5 +28,5 @@ candidate by its attack category, its range and the unit AI's order history, the
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`ownership`](../../ownership/), [`players`](../../players/), [`world`](../../world/).
 <!-- /uses -->

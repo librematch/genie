@@ -137,15 +137,15 @@ impl World {
         self.shelter(player, &units, &shelters, ShelterReach::Far, dispatch)
     }
 
-    /// `SEEK_SHELTER` (0x2c, `FUN_140e6a3a0`), after the command's check (`FUN_140e558b0`): of
-    /// the first 60 `ids` (500 for a computer player), an id the world does not hold, and another
-    /// player's unit unless players may order each other's ([`crate::world::settings::Settings::cheats_enabled`],
-    /// `+0x1074`), are dropped ([`World::checked_units`]); with every id dropped the command does
-    /// nothing. Of the others, the villagers (class 4 of type 70) and the units of master 1808
-    /// seek shelter (a villager of master 1808 is listed twice) in the player's buildings that
-    /// take villagers: in the player's object order, those of type 80 in state 2, not inside
-    /// another (`+0x2f0`, `FUN_141188da0`), whose master's `garrison_type` has
-    /// [`crate::objects::masters::GarrisonKinds::VILLAGERS`]
+    /// `SEEK_SHELTER` (0x2c, `FUN_140e6a3a0`), after the command's check (`FUN_140e558b0`): of the
+    /// first 60 `ids` (500 for a computer player), an id the world does not hold, and another
+    /// player's unit unless players may order each other's
+    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`], `+0x1074`), are dropped
+    /// ([`World::checked_units`]); with every id dropped the command does nothing. Of the others,
+    /// the villagers (class 4 of type 70) and the units of master 1808 seek shelter (a villager of
+    /// master 1808 is listed twice) in the player's buildings that take villagers: in the player's
+    /// object order, those of type 80 in state 2, not inside another (`+0x2f0`, `FUN_141188da0`),
+    /// whose master's `garrison_type` has [`crate::objects::masters::GarrisonKinds::VILLAGERS`]
     /// (`FUN_1411ccb60` with 1), each with its count ([`World::garrisoned`]); then
     /// [`World::shelter`] (`FUN_141622450`).
     pub(crate) fn seek_shelter(

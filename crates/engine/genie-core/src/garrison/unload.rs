@@ -346,11 +346,11 @@ impl World {
         })
     }
 
-    /// `GO_BACK_TO_WORK` (`do_command` 0x80 with one object, 0x86 with several:
-    /// `FUN_141625590`) on the player's objects `ids` (another player's only while players may
-    /// order each other's, [`crate::world::settings::Settings::cheats_enabled`]; the cheat `+0xb12` is not held): a building
-    /// lets out, from the last in, each unit inside of type 70 or more that is a villager (class
-    /// 4) or of master 1808, back to its work ([`World::back_to_work`]).
+    /// `GO_BACK_TO_WORK` (`do_command` 0x80 with one object, 0x86 with several: `FUN_141625590`) on
+    /// the player's objects `ids` (another player's only while players may order each other's,
+    /// [`crate::world::settings::OptionFlags::CHEATS_ENABLED`]; the cheat `+0xb12` is not held): a
+    /// building lets out, from the last in, each unit inside of type 70 or more that is a villager
+    /// (class 4) or of master 1808, back to its work ([`World::back_to_work`]).
     pub(crate) fn go_back_to_work(
         &mut self,
         player: PlayerId,

@@ -11,6 +11,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResourceChange;
 use crate::technology::effect::attribute_modifier::EffectHook;
+use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -190,7 +191,10 @@ impl World {
     /// (the world's slot 0x78, `FUN_1415e92b0`) and its tile list refilled
     /// ([`World::refill_tiles`], `FUN_141285cb0`).
     pub(super) fn allied_vision_on(&mut self, p: PlayerId) -> Result<(), GenieError> {
-        self.players.player_mut(p)?.allied_vision = true;
+        self.players
+            .player_mut(p)?
+            .ally_sharing
+            .set(AllySharing::VISION, true);
         self.rebuild_vision()?;
         self.refill_tiles(p);
         Ok(())

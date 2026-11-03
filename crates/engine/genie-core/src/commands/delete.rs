@@ -21,6 +21,7 @@ use crate::objects::masters::GhostMode;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::cost_entries;
+use crate::objects::unit::UnitFlags;
 use crate::orders::object_gone;
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -31,6 +32,7 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
 
 /// The first master type a delete takes (`FUN_1416257c0`: above `0x45`).
@@ -56,7 +58,7 @@ impl DeleteCommand {
 impl World {
     /// `CANCEL_BUILD` for `player` on object `id`: the object must exist and be the player's,
     /// unless the setting `+0x1074` lets players order each other's
-    /// ([`crate::world::settings::Settings::cheats_enabled`]) or its owner lost and the two are
+    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`]) or its owner lost and the two are
     /// allies both ways (`FUN_14162ef10`). `FUN_1416257c0` then wants its deletion enabled
     /// (`+0x687`), a master of type 70 or more, a class other than
     /// [`ClassRoles::UNDELETABLE`](crate::world::layer::ClassRoles::UNDELETABLE)'s and a capture
@@ -81,11 +83,14 @@ impl World {
         // A town centre's master whose delete also tells the world's `+0x820` (`FUN_1414615d0`).
         let lost_ally =
             self.players.player(owner)?.game_status == GameStatus::Lost && mutual(player, owner);
-        if owner != player && !self.settings.cheats_enabled && !lost_ally {
+        if owner != player
+            && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
+            && !lost_ally
+        {
             return Ok(());
         }
         let master = unit.master(self.master_tables(), owner)?;
-        if unit.undeletable
+        if unit.flags.contains(UnitFlags::UNDELETABLE)
             || master.kind < DELETABLE_KIND
             || self
                 .model
@@ -165,7 +170,7 @@ impl World {
             self.remove_building(owner, oid)?;
             // its record went with it (`+0x686` set)
             if let Some((_, u)) = self.object_mut(oid) {
-                u.roo_called = true;
+                u.flags.set(UnitFlags::ROO_CALLED, true);
             }
         }
         Ok(())
@@ -758,12 +763,14 @@ mod tests {
             (HitPoints::ZERO, HitPoints::new(25.0), HitPoints::new(25.0))
         );
         // the setting +0x1074 lets a player delete another's
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         t.delete(player_id(1), object_id(20)).unwrap();
         assert_eq!(hp(&t, 2, ListIndex::new(0)), HitPoints::ZERO);
         // a unit whose deletion is disabled stays
         let mut t = game(0.0, true);
-        t.players[1].objects[ListIndex::new(0)].undeletable = true;
+        t.players[1].objects[ListIndex::new(0)]
+            .flags
+            .set(UnitFlags::UNDELETABLE, true);
         t.delete(player_id(1), object_id(10)).unwrap();
         assert_eq!(hp(&t, 1, ListIndex::new(0)), HitPoints::new(25.0));
     }
@@ -1098,7 +1105,11 @@ mod clearing_tests {
         .unwrap();
         let u = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
-            (u.life.state, u.life.hp, u.roo_called),
+            (
+                u.life.state,
+                u.life.hp,
+                u.flags.contains(UnitFlags::ROO_CALLED)
+            ),
             (ObjectState::Removed, HitPoints::ZERO, true)
         );
         let p = t.spatial.get(object_id(40)).unwrap();
@@ -1122,7 +1133,11 @@ mod clearing_tests {
         .unwrap();
         let u = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
-            (u.life.state, u.life.hp, u.roo_called),
+            (
+                u.life.state,
+                u.life.hp,
+                u.flags.contains(UnitFlags::ROO_CALLED)
+            ),
             (ObjectState::Removed, HitPoints::ZERO, true)
         );
     }

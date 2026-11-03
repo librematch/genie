@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::AttackTargetId;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Fight, NO_RANGE, NONE, Readiness, move_reads, set_walker_anim,
@@ -316,7 +317,7 @@ impl Attack {
             let gives_up = match r.ai_order {
                 AiOrder::Absent => false,
                 AiOrder::Idle => true,
-                AiOrder::Order(_) => !r.queue_empty,
+                AiOrder::Order(_) => !r.flags.contains(AttackerFlags::QUEUE_EMPTY),
             };
             if f.own.player == PlayerId::new(0) || gives_up {
                 return self.out_of_sight(c, unit, f, r, roles).map(Some);
@@ -388,7 +389,7 @@ impl Attack {
                 rng,
                 c.w.model.tuning.sprite,
             )?;
-            if self.voice.is_loud() && r.queue_empty {
+            if self.voice.is_loud() && r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
@@ -399,7 +400,7 @@ impl Attack {
         }
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
-        if !r.armed {
+        if !r.flags.contains(AttackerFlags::ARMED) {
             self.finish(
                 unit,
                 c.w.parts.motion_mut(unit.id),

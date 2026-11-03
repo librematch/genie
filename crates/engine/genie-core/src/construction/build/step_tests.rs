@@ -20,6 +20,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::BuildableOn;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
+use crate::objects::unit::UnitFlags;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::players::relation_row;
@@ -1037,7 +1038,11 @@ fn builder_set_state_7_clears_stump_and_joins() {
     assert_eq!(t.spatial.tiles().word(Tile::new(10, 10)).unwrap() >> 23, 0);
     let tree = t.players[0].objects.by_id(object_id(77)).unwrap();
     assert_eq!(
-        (tree.life.state, tree.life.hp, tree.roo_called),
+        (
+            tree.life.state,
+            tree.life.hp,
+            tree.flags.contains(UnitFlags::ROO_CALLED)
+        ),
         (ObjectState::Removed, HitPoints::ZERO, true)
     );
     let b = build(&t);

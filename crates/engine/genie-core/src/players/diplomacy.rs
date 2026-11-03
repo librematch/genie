@@ -31,6 +31,7 @@ use crate::vision::VisionBits;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::PlayerSlots;
 
 /// The reveal of a player's units of a kind to the others (its attribute 204 not 0,
@@ -315,13 +316,13 @@ impl World {
     }
 
     /// `FUN_1415e23f0`: the world's teams again, unless the options lock them (`mTeamsLocked`,
-    /// [`crate::world::settings::Settings::teams_locked`]). Every player's team is 1 (alone); then each
-    /// player past Gaia still alone, while teams 2 to 5 are left, takes into the next team every
-    /// other player still alone it and who count each other as allies (relation 0 both ways) and
-    /// who both have allied victory at 1 (`FUN_1416625a0`); with any taken, it joins that team
-    /// too and the next team is one more (past 5 none is left).
+    /// [`crate::world::settings::OptionFlags::TEAMS_LOCKED`]). Every player's team is 1 (alone);
+    /// then each player past Gaia still alone, while teams 2 to 5 are left, takes into the next
+    /// team every other player still alone it and who count each other as allies (relation 0 both
+    /// ways) and who both have allied victory at 1 (`FUN_1416625a0`); with any taken, it joins that
+    /// team too and the next team is one more (past 5 none is left).
     pub fn resolve_teams(&mut self) {
-        if self.settings.teams_locked {
+        if self.settings.flags.contains(OptionFlags::TEAMS_LOCKED) {
             return;
         }
         let players = PlayerId::each(self.players.len()).skip(1);
@@ -554,14 +555,14 @@ mod tests {
             t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
             [2, 1, 2]
         );
-        t.settings.teams_locked = true;
+        t.settings.flags.set(OptionFlags::TEAMS_LOCKED, true);
         t.players[3].allied_victory = 0;
         t.resolve_teams();
         assert_eq!(
             t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
             [2, 1, 2]
         );
-        t.settings.teams_locked = false;
+        t.settings.flags.set(OptionFlags::TEAMS_LOCKED, false);
         t.resolve_teams();
         assert_eq!(t.teams.map(Team::get), [1; 8]);
     }

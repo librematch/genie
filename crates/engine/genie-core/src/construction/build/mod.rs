@@ -484,6 +484,7 @@ mod stack_tests {
     use crate::objects::masters::ObstructionKind;
     use crate::objects::masters::{BuildingMaster, Masters};
     use crate::objects::unit::Unit;
+    use crate::objects::unit::UnitFlags;
     use crate::players::attribute::AttributeId;
     #[cfg(test)]
     use crate::players::history::{EntryKind, Event, EventKind, Population, TimeSlice};
@@ -843,7 +844,10 @@ mod stack_tests {
             (Amount::new(5.0), Amount::ZERO, Amount::ZERO)
         );
         let gone = unit(object_id(8759));
-        assert_eq!((gone.life.hp, gone.roo_called), (HitPoints::ZERO, true));
+        assert_eq!(
+            (gone.life.hp, gone.flags.contains(UnitFlags::ROO_CALLED)),
+            (HitPoints::ZERO, true)
+        );
         assert_eq!(t.spatial.get(object_id(8759)).unwrap().obstruction, None);
     }
 

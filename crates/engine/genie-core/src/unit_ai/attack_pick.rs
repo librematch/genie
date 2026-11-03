@@ -224,6 +224,23 @@ pub struct Attacker {
     pub capture: CaptureKind,
 }
 
+bitflags::bitflags! {
+    /// What an attack pick reads of an object as yes or no ([`Target`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AttackTargetFlags: u8 {
+        /// It has a unit AI (`+0x6b0`).
+        const HAS_AI = 1;
+        /// It is inside another (`+0x2f0`).
+        const INSIDE = 1 << 1;
+        /// `+0x689`, `unit_targeting_flag`.
+        const TARGETING = 1 << 2;
+        /// `+0x68a`, `unit_attackable_flag`.
+        const ATTACKABLE = 1 << 3;
+        /// `+0xc60`, `desolid_flag`: a foundation no builder has started.
+        const DESOLID = 1 << 4;
+    }
+}
+
 /// What a unit AI's attack check and `bestUnitToAttack` read of an object it found: the owner's
 /// id, the master's class, type, id and `combat_level` (`+0x62c`), and the object's `+0x924`,
 /// unit AI (`+0x6b0`), container (`+0x2f0`), targeting and attackable flags (`+0x689`,
@@ -242,16 +259,8 @@ pub struct Target {
     pub combat_level: CombatLevel,
     /// The object's `+0x924`.
     pub capture: CaptureKind,
-    /// It has a unit AI (`+0x6b0`).
-    pub has_ai: bool,
-    /// It is inside another (`+0x2f0`).
-    pub inside: bool,
-    /// `+0x689`, `unit_targeting_flag`.
-    pub targeting: bool,
-    /// `+0x68a`, `unit_attackable_flag`.
-    pub attackable: bool,
-    /// `+0xc60`, `desolid_flag`: a foundation no builder has started.
-    pub desolid: bool,
+    /// Its unit AI, container, targeting, attackable and `desolid_flag` reads.
+    pub flags: AttackTargetFlags,
     /// Its place.
     pub position: Position,
     /// Its master's radii.
@@ -383,7 +392,7 @@ pub fn tower_can_attack(
     {
         return Ok(false);
     }
-    if (t.kind == MasterKind::BUILDING && t.desolid)
+    if (t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID))
         || roles
             .of_master(t.master)
             .contains(MasterRoles::TOWER_SPARED)
@@ -469,7 +478,7 @@ pub fn soldier_can_attack(
     {
         return Ok(false);
     }
-    if !t.targeting {
+    if !t.flags.contains(AttackTargetFlags::TARGETING) {
         return Ok(false);
     }
     if me.player_kind.is_computer() {
@@ -489,7 +498,7 @@ pub fn soldier_can_attack(
     {
         return Ok(false);
     }
-    if t.kind == MasterKind::BUILDING && t.desolid {
+    if t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID) {
         return Ok(false);
     }
     if s.stance == UnitStance::NoAttack {

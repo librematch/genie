@@ -17,21 +17,32 @@ use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
 use crate::production::spawn::PlaceMap;
 
+bitflags::bitflags! {
+    /// What BUILD's placement test runs ([`BuildSite`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct SiteChecks: u8 {
+        /// A human player (`p6`: the explored test).
+        const HUMAN = 1;
+        /// `p13` 1: `FUN_141123f80`'s and `FUN_141264db0`'s own scans run, the latter passing over
+        /// the units (type 70); BUILD's runs neither.
+        const SCANS = 1 << 1;
+        /// The world's zone mode (`+0x820`, `FUN_1415e8e10`).
+        const ZONES = 1 << 2;
+    }
+}
+
 /// What BUILD's placement test reads of the building master and the game.
 #[derive(Clone, Copy, Debug)]
 pub struct BuildSite<'a> {
     /// The player who places it.
     pub player: PlayerId,
-    /// A human player (`p6`: the explored test).
-    pub human: bool,
+    /// What the test runs.
+    pub checks: SiteChecks,
     /// The master's radii the test measures by (`p9`): its clearance radii (`+0x5fc`, `+0x600`)
     /// for BUILD, its size radii (`+0x5d8`, `+0x5dc`) for the Build's test of its foundation.
     pub radius: Footprint,
     /// The master's height radius (`+0x5e0`) is above 0, which the static scans need.
     pub tall: bool,
-    /// `p13` 1: `FUN_141123f80`'s and `FUN_141264db0`'s own scans run, the latter passing over the
-    /// units (type 70); BUILD's runs neither.
-    pub scans: bool,
     /// The master's class.
     pub class: ClassId,
     /// The master's `obstruction_type` is neither 0 nor 12 (`FUN_1411205c0`).
@@ -42,8 +53,6 @@ pub struct BuildSite<'a> {
     pub hill_mode: HillMode,
     /// The placement terrains (`+0x5f2`..`+0x5f8`, [`placement_terrains`]).
     pub placement: PlacementTerrains,
-    /// The world's zone mode (`+0x820`, `FUN_1415e8e10`).
-    pub zones: bool,
     /// The objects the scan passes over (`p12` and, for a building, its annexes, `FUN_14123d090`):
     /// none for BUILD, a reseeding gatherer's old target ([`crate::world::World::reseed`]).
     pub own: &'a [ObjectId],

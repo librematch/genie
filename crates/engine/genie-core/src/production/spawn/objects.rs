@@ -25,6 +25,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
 use crate::production::spawn::ZoneTest;
@@ -350,7 +351,7 @@ impl World {
                 master: made.life,
             },
             place: Static::at(at),
-            attackable: true,
+            flags: UnitFlags::ATTACKABLE,
             pasture: None,
             my_pasture: None,
             sprite: sprite.filter(|_| facing == Facing::Drawn),

@@ -19,6 +19,7 @@ use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::Notify;
 use crate::unit_ai::UnitAi;
+use crate::world::AllySharing;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
@@ -245,7 +246,11 @@ impl Step<'_> {
         unit_give_load(
             (
                 &self.w.spatial.relations,
-                self.w.players.player(self.player)?.sharing,
+                self.w
+                    .players
+                    .player(self.player)?
+                    .ally_sharing
+                    .contains(AllySharing::RESOURCES),
             ),
             self.player,
             &mut adds,

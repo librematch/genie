@@ -41,6 +41,7 @@ use crate::objects::masters::cost_entries;
 use crate::objects::masters::{Master, player_master};
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::objects::{DamagedTimer, Frame, Regeneration, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::Amount;
@@ -328,13 +329,10 @@ impl World {
                 ..Lifecycle::default()
             },
             place: Static::at(position),
-            attackable: true,
-            untargetable: false,
-            under_attack: false,
+            flags: UnitFlags::ATTACKABLE,
             last_human_order: WorldTime::ZERO,
             pasture: None,
             my_pasture: None,
-            undeletable: false,
             group: GroupLink::default(),
             garrison: Vec::new(),
             damaged_lately: DamagedTimer::OUT,
@@ -342,7 +340,6 @@ impl World {
             stopped: false,
             sprite,
             idle_variant: 0,
-            roo_called: false,
         };
         let layer = Building {
             construction: Some(Construction {

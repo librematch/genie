@@ -17,6 +17,7 @@ use crate::unit_ai::Attackers;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -329,7 +330,7 @@ impl UnitAi {
         }
         side.effect_now(Effect::RestorePatrol, self, ai)?;
         if at.group.is_none() {
-            let (order, other) = if at.attack_moving {
+            let (order, other) = if at.flags.contains(SurroundingFlags::ATTACK_MOVING) {
                 (OrderKind::AttackMove, OrderKind::Patrol)
             } else {
                 (OrderKind::Patrol, OrderKind::AttackMove)

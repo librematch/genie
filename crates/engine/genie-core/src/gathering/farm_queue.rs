@@ -30,6 +30,7 @@ use crate::production::CostCount;
 use crate::production::PopulationTest;
 use crate::production::{cost_test, pay, refund_master};
 use crate::unit_ai::unit_ai_kind;
+use crate::world::AutoQueues;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -357,14 +358,14 @@ impl World {
         class: ClassId,
     ) -> Result<Option<(MasterId, bool, Queue)>, GenieError> {
         let owner = self.players.player(p)?;
-        let choice = if (!owner.auto_farm_queue && !owner.farm_queue.any())
+        let choice = if (!owner.auto_queues.contains(AutoQueues::FARMS) && !owner.farm_queue.any())
             || !self
                 .model
                 .roles
                 .of_class(class)
                 .contains(ClassRoles::VILLAGER)
         {
-            if !owner.auto_fishtrap_queue && !owner.fish_trap_queue.any() {
+            if !owner.auto_queues.contains(AutoQueues::FISH_TRAPS) && !owner.fish_trap_queue.any() {
                 return Ok(None);
             }
             if !self
@@ -377,14 +378,18 @@ impl World {
             }
             (
                 self.model.slots.master.fish_trap,
-                owner.auto_fishtrap_queue,
+                owner.auto_queues.contains(AutoQueues::FISH_TRAPS),
                 Queue::FishTraps,
             )
         } else {
             let Some(master) = self.reseed_master(p)? else {
                 return Ok(None);
             };
-            (master, owner.auto_farm_queue, Queue::Farms)
+            (
+                master,
+                owner.auto_queues.contains(AutoQueues::FARMS),
+                Queue::Farms,
+            )
         };
         Ok(Some(choice))
     }

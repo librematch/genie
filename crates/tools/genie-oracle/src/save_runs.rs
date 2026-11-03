@@ -22,6 +22,7 @@ use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::technology::TechState;
 use genie_core::unit_ai::{Hunted, UnitAiKind};
+use genie_core::world::Departures;
 use genie_core::world::GameState;
 use genie_core::world::Tick;
 use genie_core::world::{Player, World};
@@ -77,11 +78,18 @@ fn player_differences(
         stock_differences(player, &after.game, p, report);
     }
     if let Some(&(status, resigned)) = after.game.statuses.get(p)
-        && (status, resigned) != (player.game_status, player.resigned)
+        && (status, resigned)
+            != (
+                player.game_status,
+                player.departures.contains(Departures::RESIGNED),
+            )
     {
         let d = format!(
             "game status slice {:?} game {:?} (status, resigned)",
-            (player.game_status.get(), player.resigned),
+            (
+                player.game_status.get(),
+                player.departures.contains(Departures::RESIGNED)
+            ),
             (status.get(), resigned)
         );
         report.differences.push((id, d));

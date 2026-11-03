@@ -18,6 +18,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, Zones};
@@ -139,7 +140,7 @@ pub(crate) fn closest_resource_of(
             workers: u.workers,
             position,
             pasture: u.pasture,
-            untargetable: u.untargetable,
+            untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
             attribute: u.life.attribute_kind,
             amount: u.life.amount,
             auto_gather: m.auto_gather.is_on(),

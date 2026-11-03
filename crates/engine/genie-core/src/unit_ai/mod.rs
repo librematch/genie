@@ -64,8 +64,8 @@ pub use self::alert_mode::AlertMode;
 use self::attack_pick::point_gap_squared;
 pub(crate) use self::attack_pick::spares_friends;
 pub use self::attack_pick::{
-    AttackAsk, AttackChecks, Attacker, Memory, Pick, Search, Seeker, Target, can_attack,
-    soldier_can_attack, tower_can_attack,
+    AttackAsk, AttackChecks, AttackTargetFlags, Attacker, Memory, Pick, Search, Seeker, Target,
+    can_attack, soldier_can_attack, tower_can_attack,
 };
 pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
@@ -120,8 +120,8 @@ pub use self::side::{
 };
 pub use self::stop_order::StopOrder;
 pub use self::surroundings::{
-    AiMove, Duel, Found, GroupState, Home, OrderForce, Pace, Seen, Surroundings, TopTarget,
-    UnitSeen, flood_search, no_search,
+    AiMove, Duel, Found, GroupState, Home, OrderForce, Pace, Seen, SurroundingFlags, Surroundings,
+    TopTarget, UnitSeen, flood_search, no_search,
 };
 use self::surroundings::{LiveTop, group_lets_idle};
 pub use self::target_kind::OrderTargetKind;

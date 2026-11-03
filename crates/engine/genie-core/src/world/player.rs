@@ -44,6 +44,27 @@ pub struct Formations {
     pub column_to_line_distance: WholeDistance,
 }
 
+bitflags::bitflags! {
+    /// The settings of a player's AI that are on or off ([`AiSettings`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AiSwitches: u8 {
+        /// `may_attack_walls` (`+0x611`, setting 6).
+        const MAY_ATTACK_WALLS = 1;
+        /// `livestock_only_to_tc` (`+0x612`, setting 7).
+        const LIVESTOCK_ONLY_TO_TC = 1 << 1;
+        /// `disable_build_help` (`+0x613`, setting 8).
+        const DISABLE_BUILD_HELP = 1 << 2;
+        /// `disableTowerPriority` (`+0x620`, setting 0xe).
+        const DISABLE_TOWER_PRIORITY = 1 << 3;
+        /// `tradeAttackEvasion` (`+0x621`, setting 0xb).
+        const TRADE_ATTACK_EVASION = 1 << 4;
+        /// `mVillagerAttackReset` (`+0x622`, setting 0x10).
+        const VILLAGER_ATTACK_RESET = 1 << 5;
+        /// `mAllowSerjeantBuilding` (`+0x660`, setting 0x12).
+        const ALLOW_SERJEANT_BUILDING = 1 << 6;
+    }
+}
+
 /// The settings of a player's AI the GAME command's sub-command 0xb sets one by one
 /// (`FUN_140e7c330`'s inner switch), each saved (`WorldPlayerBase::save`, `FUN_14166b820`) and
 /// read by its unit AIs. The two chances it sets too are [`Player::dodge_chance`] and
@@ -57,32 +78,56 @@ pub struct AiSettings {
     pub easier_reaction_percentage: Percent,
     /// `task_ungrouped_soldiers` (`+0x610`, setting 5).
     pub task_ungrouped_soldiers: u8,
-    /// `may_attack_walls` (`+0x611`, setting 6).
-    pub may_attack_walls: bool,
-    /// `livestock_only_to_tc` (`+0x612`, setting 7).
-    pub livestock_only_to_tc: bool,
-    /// `disable_build_help` (`+0x613`, setting 8).
-    pub disable_build_help: bool,
+    /// Settings 6, 7, 8, 0xb, 0xe, 0x10 and 0x12.
+    pub switches: AiSwitches,
     /// `local_targeting_mode` (`+0x614`, setting 9).
     pub local_targeting_mode: TargetingMode,
     /// `targeting_factor_scalar` (`+0x618`, setting 10).
     pub targeting_factor_scalar: Percent,
     /// `preferredTradeDistance` (`+0x61c`, setting 0xd).
     pub preferred_trade_distance: Distance,
-    /// `disableTowerPriority` (`+0x620`, setting 0xe).
-    pub disable_tower_priority: bool,
-    /// `tradeAttackEvasion` (`+0x621`, setting 0xb).
-    pub trade_attack_evasion: bool,
-    /// `mVillagerAttackReset` (`+0x622`, setting 0x10).
-    pub villager_attack_reset: bool,
     /// `boarLureDestination` (`+0x623`, setting 0xc).
     pub boar_lure_destination: LureDestination,
     /// `mAttackMoveMaxDistance` (`+0x624`, setting 0xf).
     pub attack_move_max_distance: WholeDistance,
     /// `mDisableVillagerGarrison` (`+0x650`, setting 0x11).
     pub disable_villager_garrison: VillagerGarrison,
-    /// `mAllowSerjeantBuilding` (`+0x660`, setting 0x12).
-    pub allow_serjeant_building: bool,
+}
+
+bitflags::bitflags! {
+    /// The automatic queues a player turned on ([`Player`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AutoQueues: u8 {
+        /// `autoFarmQueue` (`+0x1424`, saved), which GAME 0x10 flips: a farmer whose farm ran out
+        /// buys another one without the mill's queue (`FUN_141618260`).
+        const FARMS = 1;
+        /// `autoFishTrapQueue` (`+0x1425`, saved), which GAME 0x13 flips (`FUN_141618270`).
+        const FISH_TRAPS = 1 << 1;
+    }
+}
+
+bitflags::bitflags! {
+    /// How a player left the game ([`Player`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Departures: u8 {
+        /// `+0x8b` (saved with `+0x8c` as its bit 1): the player resigned (slot 3, RESIGN).
+        const RESIGNED = 1;
+        /// `+0x8c`: its resignation was a drop from the game.
+        const DROPPED = 1 << 1;
+    }
+}
+
+bitflags::bitflags! {
+    /// What a player shares with its allies ([`Player`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct AllySharing: u8 {
+        /// `allied_LOS_Enable` (`+0x2cc`, saved): the player shares its mutual allies' sight
+        /// ([`crate::vision`]).
+        const VISION = 1;
+        /// `mSharingIsCaring` (`+0x1426`, `FUN_141626780`, saved): the player's gathered resources
+        /// go to its allies too.
+        const RESOURCES = 1 << 1;
+    }
 }
 
 /// One player's objects in live-list order.
@@ -106,11 +151,8 @@ pub struct Player {
     /// The sleeping objects, in their list's order: they are not updated; a unit's work on one
     /// wakes it.
     pub sleeping: ObjectList,
-    /// `autoFarmQueue` (`+0x1424`, saved), which GAME 0x10 flips: a farmer whose farm ran out
-    /// buys another one without the mill's queue (`FUN_141618260`).
-    pub auto_farm_queue: bool,
-    /// `autoFishTrapQueue` (`+0x1425`, saved), which GAME 0x13 flips (`FUN_141618270`).
-    pub auto_fishtrap_queue: bool,
+    /// `autoFarmQueue` and `autoFishTrapQueue` (`+0x1424`, `+0x1425`, saved).
+    pub auto_queues: AutoQueues,
     /// `farm_queue_count` (`+0x141c`, saved): the farms and pastures the mill's queue paid for
     /// (GAME 0xd and 0x15 buy, 0xe and 0x16 take back, [`crate::gathering::farm_queue`]).
     pub farm_queue: QueueCount,
@@ -140,10 +182,8 @@ pub struct Player {
     pub stopped: bool,
     /// `game_status` (`+0x89`, saved): playing, won or lost ([`crate::players::game_status`]).
     pub game_status: GameStatus,
-    /// `+0x8b` (saved with `+0x8c` as its bit 1): the player resigned (slot 3, RESIGN).
-    pub resigned: bool,
-    /// `+0x8c`: its resignation was a drop from the game.
-    pub dropped: bool,
+    /// `+0x8b` and `+0x8c` (saved as one byte, `+0x8c` its bit 1).
+    pub departures: Departures,
     /// `allied_victory` (`+0x2d0`, saved, a byte GAME 5 sets): its allies' victory counts as its
     /// own while it is not 0; the teams count it only at 1 ([`crate::players::diplomacy`]).
     pub allied_victory: u8,
@@ -163,15 +203,11 @@ pub struct Player {
     /// unit backs up from its target after a shot on a draw at least this
     /// ([`crate::unit_ai::Surroundings::keep_distance_chance`]).
     pub keep_distance_chance: Chance,
-    /// `allied_LOS_Enable` (`+0x2cc`, saved): the player shares its mutual allies' sight
-    /// ([`crate::vision`]).
-    pub allied_vision: bool,
+    /// `allied_LOS_Enable` (`+0x2cc`) and `mSharingIsCaring` (`+0x1426`), saved.
+    pub ally_sharing: AllySharing,
     /// The players whose town centres the player's reveal (attribute 209) flared
     /// (`mTCFlared[i]`, saved; [`crate::vision`]).
     pub tc_flared: Vec<bool>,
-    /// `mSharingIsCaring` (`+0x1426`, `FUN_141626780`, saved): the player's gathered resources go
-    /// to its allies too.
-    pub sharing: bool,
     /// `commodity_volumn_delta` (`+0x140c`, saved): the lot a market trade moves (100).
     pub commodity_volume: LotVolume,
     /// The objects whose ghosts the player's list follows (`+0x78`, [`crate::vision::ghost`]): not

@@ -67,6 +67,7 @@ use crate::objects::masters::TaskId;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
+use crate::objects::unit::UnitFlags;
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::ControlKey;
 use crate::orders::MasterSwap;
@@ -114,6 +115,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::parts::Object;
 use crate::world::parts::ObjectParts;
+use crate::world::settings::OptionFlags;
 use crate::world::tests::{forage_world, hunt_world};
 use crate::world::{FrameSeed, Gate, Player};
 use std::sync::Arc;
@@ -1282,13 +1284,13 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
             .unwrap(),
         Some(object_ids([11, -1, -1, -1]))
     );
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     assert_eq!(
         t.command_check(PlayerId::new(1), &object_ids([11, 30, 99]))
             .unwrap(),
         Some(object_ids([11, 30, -1]))
     );
-    t.settings.cheats_enabled = false;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, false);
     assert_eq!(
         t.command_check(PlayerId::new(1), &object_ids([30, 99]))
             .unwrap(),
@@ -1358,9 +1360,9 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
     // allied one way only: out, unless the setting lets any through
     t.players[2].relations = relation_row([3, 3, 0]);
     assert_eq!(check(&t, 3, 12), Some(object_ids([11, -1, -1])));
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     assert_eq!(check(&t, 0, 12), Some(object_ids([11, 30, -1])));
-    t.settings.cheats_enabled = false;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, false);
     assert_eq!(
         t.unload_check(
             PlayerId::new(1),
@@ -1503,7 +1505,7 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
 #[test]
 fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
     let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     t.players.push(Player::default());
     t.reindex();
     t.player_time.push(Millis::ZERO);
@@ -1718,7 +1720,7 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
     t.world_time = WorldTime::from_millis(500);
     t.gate(player_id(2), object_id(50)).unwrap();
     assert_eq!(building(&t), (true, WorldTime::from_millis(401)));
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     t.gate(player_id(2), object_id(50)).unwrap();
     assert_eq!(building(&t), (false, WorldTime::from_millis(401)));
     t.gate(player_id(1), object_id(11)).unwrap();
@@ -2352,7 +2354,7 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
         (stance(&t, 1), stance(&t, 2)),
         (UnitStance::StandGround, UnitStance::Aggressive)
     );
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::Defensive)
         .unwrap();
     assert_eq!(stance(&t, 2), UnitStance::Aggressive);
@@ -5766,7 +5768,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
     t.players[2].objects = vec![Unit {
         id: object_id(60),
         place: Static::at(Position::new(40.0, 40.0, 0.0)),
-        attackable: true,
+        flags: UnitFlags::ATTACKABLE,
         life: Lifecycle {
             master_id: ids::HOUSE,
             state: ObjectState::Alive,

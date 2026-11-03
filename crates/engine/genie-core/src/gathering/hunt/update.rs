@@ -2,6 +2,7 @@
 //! livestock (state 12).
 
 use crate::GenieError;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, Fight, set_walker_anim};
 use crate::combat::victims::{file_kill, write_back};
@@ -121,7 +122,7 @@ impl HuntAction {
                     && roles
                         .of_class(f.victim.class)
                         .contains(ClassRoles::PREDATOR)
-                    && !r.attack.queue_empty =>
+                    && !r.attack.flags.contains(AttackerFlags::QUEUE_EMPTY) =>
             {
                 Err(GenieError::unsupported(
                     "a hunt that ends with its Attack on a predator (set_state 1)",

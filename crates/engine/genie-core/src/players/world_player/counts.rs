@@ -19,6 +19,7 @@ use crate::technology::ResearchState;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::settings::OptionFlags;
 
 impl World {
     /// `FUN_141658970`: player `p`'s first built town centre (state 2) among the ids its tracker
@@ -147,7 +148,7 @@ impl World {
         let Some(player) = self.players.get(p.index()) else {
             return 0;
         };
-        let full = self.settings.full_tech_tree;
+        let full = self.settings.flags.contains(OptionFlags::FULL_TECH_TREE);
         let fallback = full_tree_civ(self.mode_680);
         let civ = if full { fallback } else { player.civ };
         let state = |t: TreeTech| t.index().and_then(|t| player.techs.get(t)).map(|t| t.state);

@@ -10,6 +10,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::{GroupState, Surroundings, UnitAi, UnitSide, group_lets_idle};
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -95,12 +96,14 @@ impl UnitAi {
     }
 
     /// The idle part's patrol branch (`0x140c67f0b`): a patrol order (`0x2c7`, `0x2dd`), or a
-    /// group that patrols ([`GroupState::patrol`]) off the hero power's order (`0x326`).
+    /// group that patrols ([`GroupState::PATROL`]) off the hero power's order (`0x326`).
     pub(super) fn patrols(&self, group: Option<GroupState>) -> bool {
         matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) || group.is_some_and(|g| g.patrol && self.current_order != Some(OrderKind::HeroPower))
+        ) || group.is_some_and(|g| {
+            g.contains(GroupState::PATROL) && self.current_order != Some(OrderKind::HeroPower)
+        })
     }
 
     /// The idle part past slot 72's test of a unit of class 3 or 52 on the make action (`0x26b`,
@@ -119,7 +122,7 @@ impl UnitAi {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if self.current_target.is_some()
             && at.kind == MasterKind::BUILDING
-            && !at.ranged
+            && !at.flags.contains(SurroundingFlags::RANGED)
             && at.firepower <= Firepower::new(unit_ai_tuning.single_volley)
         {
             self.remove_target();
@@ -159,7 +162,7 @@ impl UnitAi {
             ));
         }
         if self.current_action == Some(AiAction::GroupAside) {
-            if group.is_none_or(|g| !g.moving) {
+            if group.is_none_or(|g| !g.contains(GroupState::MOVING)) {
                 self.last_action = Some(AiAction::GroupAside);
                 self.current_action = None;
             }

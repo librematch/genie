@@ -23,6 +23,7 @@ use crate::movement::Speed;
 use crate::objects::ObjectState;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
+use crate::objects::unit::UnitFlags;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::UnitRelation;
 use crate::unit_ai::AiAction;
@@ -208,7 +209,7 @@ impl World {
                     .mover_of(u.id)
                     .map_or(Speed::ZERO, |m| m.stats.speed),
                 range: weapon_range(master),
-                under_attack: u.under_attack,
+                under_attack: u.flags.contains(UnitFlags::UNDER_ATTACK),
                 attacking: ai.current_action == Some(AiAction::Attack),
             };
             self.member_objects(id, &mut objects)?;

@@ -41,6 +41,33 @@ mod update;
 const NO_DYING_SPRITE: GenieError =
     GenieError::unsupported("a dying sprite the data file does not have");
 
+bitflags::bitflags! {
+    /// An object's flag bytes `+0x685` to `+0x68a` ([`Unit`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct UnitFlags: u8 {
+        /// `+0x68a`, `unit_attackable_flag`.
+        const ATTACKABLE = 1;
+        /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes
+        /// the object only through a pasture (`ClosestResourceObject`).
+        const UNTARGETABLE = 1 << 1;
+        /// `+0x685`, `underAttackValue`: its unit AI keeps attackers (`FUN_14119d2d0`).
+        const UNDER_ATTACK = 1 << 2;
+        /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
+        const UNDELETABLE = 1 << 3;
+        /// `mROOAlreadyCalled` (`+0x686`, saved): its obstruction record went (its death's
+        /// `FUN_14121cc40`, a footprint clearing's `FUN_141189670`, a construction start's clearing
+        /// `FUN_1411cd0d0`, a stack unit's completion); later ones leave it alone.
+        const ROO_CALLED = 1 << 4;
+    }
+}
+
+impl Diff for UnitFlags {
+    /// By equality: the flags are one value.
+    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
+        d.equal(self, other);
+    }
+}
+
 /// What the slice tracks of one object.
 #[derive(Clone, Debug, Default, PartialEq, Diff)]
 pub struct Unit {
@@ -56,19 +83,12 @@ pub struct Unit {
     /// the object's layers had, `body`.
     #[diff(path = "body")]
     pub place: Static,
-    /// `+0x68a`, `unit_attackable_flag`.
-    pub attackable: bool,
-    /// `+0x689`, `mUnitTargetingFlag`, is 0 (a new object's is 1): a gatherer's search takes the
-    /// object only through a pasture (`ClosestResourceObject`).
-    pub untargetable: bool,
-    /// `+0x685`, `underAttackValue`: its unit AI keeps attackers (`FUN_14119d2d0`).
-    pub under_attack: bool,
+    /// Its flag bytes `+0x685` to `+0x68a`.
+    pub flags: UnitFlags,
     /// `+0x790`, `parent_pasture_id`: the pasture it is in.
     pub pasture: Option<PastureId>,
     /// `+0x794`, `my_pasture_id`: the pasture it tends.
     pub my_pasture: Option<PastureId>,
-    /// `mDeletionEnabled` (`+0x687`, 1 from its constructor) is 0: no delete takes it.
-    pub undeletable: bool,
     /// Its unit group, if any ([`crate::groups::GroupLink`]).
     pub group: GroupLink,
     /// The objects inside it (`+0x2f8`), in the order they came in (`FUN_141164af0`); one that
@@ -100,10 +120,6 @@ pub struct Unit {
     /// The slice could not model one of its updates: it freezes (its place is known only within
     /// its speed since) while the rest of its player's objects go on.
     pub stopped: bool,
-    /// `mROOAlreadyCalled` (`+0x686`, saved): its obstruction record went (its death's
-    /// `FUN_14121cc40`, a footprint clearing's `FUN_141189670`, a construction start's clearing
-    /// `FUN_1411cd0d0`, a stack unit's completion); later ones leave it alone.
-    pub roo_called: bool,
 }
 
 impl Unit {

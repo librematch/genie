@@ -49,6 +49,7 @@ use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionKind;
 use genie_core::objects::unit::Unit;
+use genie_core::objects::unit::UnitFlags;
 use genie_core::orders::town_bell::{BellShelter, TownBell};
 use genie_core::ownership::CaptureKind;
 use genie_core::players::Amount;
@@ -353,12 +354,17 @@ fn row(
     let unit = Unit {
         id,
         life,
-        attackable: s.unit_attackable_flag != 0,
-        untargetable: s.unit_targeting_flag == 0,
-        under_attack: s.under_attack_value != 0,
+        flags: {
+            let mut flags = UnitFlags::empty();
+            flags.set(UnitFlags::ATTACKABLE, s.unit_attackable_flag != 0);
+            flags.set(UnitFlags::UNTARGETABLE, s.unit_targeting_flag == 0);
+            flags.set(UnitFlags::UNDER_ATTACK, s.under_attack_value != 0);
+            flags.set(UnitFlags::UNDELETABLE, s.deletion_enabled == 0);
+            flags.set(UnitFlags::ROO_CALLED, s.roo_already_called != 0);
+            flags
+        },
         pasture: PastureId::of_field(s.parent_pasture_id),
         my_pasture: PastureId::of_field(s.my_pasture_id),
-        undeletable: s.deletion_enabled == 0,
         group: group_link(s),
         workers: WorkerCount::of_data(s.worker_num),
         last_human_order: WorldTime::from_millis(s.last_human_order_time),
@@ -366,7 +372,6 @@ fn row(
         place: Static::at(Position::new(s.tx, s.ty, s.tz)),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
         sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
-        roo_called: s.roo_already_called != 0,
         ..Unit::default()
     };
     let mut actions = Action::default();

@@ -1,8 +1,10 @@
 use super::*;
 use crate::combat::AttackTargetId;
+use crate::combat::MissileCount;
 use crate::combat::abilities::Look;
 use crate::combat::attack::Armament;
 use crate::combat::attack::AtOnce;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::damage::Allied;
 use crate::combat::damage::HitKind;
 use crate::combat::missile::StrikeResult;
@@ -619,20 +621,17 @@ pub(crate) fn reads() -> AttackReads {
     AttackReads {
         move_defaults: MoveDefaults::default(),
         standing: Some(STANDING),
-        volleys: false,
+        flags: AttackerFlags::ARMED | AttackerFlags::CAN_MOVE | AttackerFlags::QUEUE_EMPTY,
         reload: Seconds::new(2.0),
         hit_chance: HitChance::of_data(100),
-        armed: true,
         swing_sprites: SwingSprites::default(),
         player_kind: PlayerKind::Human,
         world_time: WorldTime::ZERO,
-        can_move: true,
         stance: UnitStance::Aggressive,
         state_position: Point::ORIGIN,
-        queue_empty: true,
         ai_order: AiOrder::Idle,
         ai_kind: None,
-        volley_under_way: false,
+        next_volley: MissileCount::ZERO,
     }
 }
 
@@ -1248,7 +1247,7 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
             speed,
             victim,
         );
-        rig.r.can_move = can_move;
+        rig.r.flags.set(AttackerFlags::CAN_MOVE, can_move);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
         let r = rig
             .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
@@ -1275,7 +1274,8 @@ fn ready_to_attack_out_of_reach_follows_or_fails() {
 fn an_attack_on_target_out_of_sight_fails() {
     let run = |a: &mut Attack, class, ai_kind, queue_empty| {
         let mut rig = Rig::on_the_path(Victim::default()).holding(77, PlayerId::new(1));
-        (rig.f.own.class, rig.r.ai_kind, rig.r.queue_empty) = (class, ai_kind, queue_empty);
+        (rig.f.own.class, rig.r.ai_kind) = (class, ai_kind);
+        rig.r.flags.set(AttackerFlags::QUEUE_EMPTY, queue_empty);
         let ai = rig.ai_mut().unwrap();
         ai.current_target = Some(object_id(77));
         ai.home = Some(Home::default());
@@ -2375,7 +2375,7 @@ fn gate_reach_is_to_its_nearest_part() {
     for (id, _) in parts {
         rig.t.link_test_annex(object_id(id), object_id(7));
     }
-    rig.r.can_move = false;
+    rig.r.flags.set(AttackerFlags::CAN_MOVE, false);
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     let r = rig
         .ground(|u, g, f, r| a.ready_to_attack(u, g, f, r, AtOnce::Tested))
@@ -2407,7 +2407,7 @@ fn the_ready_start_swings_at_once_when_its_timer_ran_out() {
             victim,
         );
         rig.combat_mut().attack_timer = Seconds::new(timer);
-        rig.r.can_move = false;
+        rig.r.flags.set(AttackerFlags::CAN_MOVE, false);
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(attack_sprite);
         a.state = AttackState::New;
@@ -2457,7 +2457,7 @@ fn swing_with_second_sprite_draws_which_one_it_shows() {
             victim,
         );
         *rig.t.streams.get(Stream::Object) = object;
-        rig.r.can_move = false;
+        rig.r.flags.set(AttackerFlags::CAN_MOVE, false);
         rig.r.swing_sprites = sprites;
         let mut a = soldier_attack(7, Distance::new(1.0), 0.0, at);
         a.arms.sprite = Some(sprite(301));
@@ -3486,9 +3486,12 @@ fn an_attack_ends_early_on_an_ally_hidden_target_or_disarmed() {
             vec![(NotifyKind::ACTION_INVALIDATED, [600, 7, 0])]
         )
     );
-    let ((code, _), _) = run(|rig| (rig.f.victim.inside, rig.r.queue_empty) = (true, false));
+    let ((code, _), _) = run(|rig| {
+        rig.f.victim.inside = true;
+        rig.r.flags.remove(AttackerFlags::QUEUE_EMPTY);
+    });
     assert_eq!(code, Some(UpdateCode::Code4));
-    let ((code, posted), a) = run(|rig| rig.r.armed = false);
+    let ((code, posted), a) = run(|rig| rig.r.flags.set(AttackerFlags::ARMED, false));
     assert_eq!(
         (code, a.state, posted),
         (
@@ -3694,7 +3697,9 @@ fn an_attack_on_dead_target_posts_by_its_unit_ai() {
         lost(order, |rig| rig.r.player_kind = PlayerKind::Computer).1,
         posted_1fb
     );
-    let queued = lost(order, |rig| rig.r.queue_empty = false);
+    let queued = lost(order, |rig| {
+        rig.r.flags.set(AttackerFlags::QUEUE_EMPTY, false);
+    });
     assert_eq!(
         (queued.0, queued.1, queued.2),
         (Ok(UpdateCode::Code5), vec![], true)

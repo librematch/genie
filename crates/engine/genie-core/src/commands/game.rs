@@ -14,7 +14,10 @@ use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::Stance;
+use crate::world::AiSwitches;
+use crate::world::AutoQueues;
 use crate::world::World;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{LureDestination, Percent, TargetingMode, VillagerGarrison};
@@ -58,11 +61,11 @@ impl GameCommand {
 }
 
 impl World {
-    /// `do_command`'s gate of GAME (`0x140e77b00` case 0x67; the packet's length, at least 0x14,
-    /// is the decoder's): with the issuing player in the world, a sub-command other than 1, 4
-    /// and 0xf for another player runs only with the game's cheats
-    /// ([`crate::world::settings::Settings::cheats_enabled`]); without the issuing player it does not
-    /// run. The world's `+0xb12` (the disable-verification cheat), which would let either
+    /// `do_command`'s gate of GAME (`0x140e77b00` case 0x67; the packet's length, at least 0x14, is
+    /// the decoder's): with the issuing player in the world, a sub-command other than 1, 4 and 0xf
+    /// for another player runs only with the game's cheats
+    /// ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`]); without the issuing player it
+    /// does not run. The world's `+0xb12` (the disable-verification cheat), which would let either
     /// through, is not held.
     pub(crate) fn game_allowed(&self, g: &GameCommand) -> bool {
         if self.players.get(g.issuer.index()).is_none() {
@@ -72,7 +75,7 @@ impl World {
             g.sub,
             GameSub::Speed | GameSub::QuickBuild | GameSub::Open0xf
         ) || g.player == i16::from(g.issuer.get())
-            || self.settings.cheats_enabled
+            || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
     }
 
     /// GAME (0x67): `do_command`'s gate ([`World::game_allowed`]), then `FUN_140e7c330`'s switch
@@ -126,7 +129,7 @@ impl World {
                     self.set_diplomacy(p, q, stance)?;
                 }
             }
-            GameSub::QuickBuild if self.settings.cheats_enabled => {
+            GameSub::QuickBuild if self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) => {
                 self.instant_work = i32::from(g.player);
                 if self.instant_work != 0 {
                     return Err(CHEAT);
@@ -138,7 +141,9 @@ impl World {
                     self.resolve_teams();
                 }
             }
-            GameSub::Cheat if self.settings.cheats_enabled => return Err(CHEAT),
+            GameSub::Cheat if self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) => {
+                return Err(CHEAT);
+            }
             GameSub::ProductionQueue => {
                 if let Some(p) = target {
                     self.players.player_mut(p)?.production_queue_on = g.a as u8;
@@ -229,7 +234,10 @@ impl World {
             }
             GameSub::AutoFarmQueue => {
                 let owner = self.players.player_mut(p)?;
-                owner.auto_farm_queue = !owner.auto_farm_queue;
+                owner.auto_queues.set(
+                    AutoQueues::FARMS,
+                    !owner.auto_queues.contains(AutoQueues::FARMS),
+                );
             }
             GameSub::FishTrapQueue => {
                 let _ = self.queue_fish_traps(p, count)?;
@@ -239,7 +247,10 @@ impl World {
             }
             GameSub::AutoFishTrapQueue => {
                 let owner = self.players.player_mut(p)?;
-                owner.auto_fishtrap_queue = !owner.auto_fishtrap_queue;
+                owner.auto_queues.set(
+                    AutoQueues::FISH_TRAPS,
+                    !owner.auto_queues.contains(AutoQueues::FISH_TRAPS),
+                );
             }
             _ => {}
         }
@@ -274,19 +285,25 @@ impl World {
             3 => s.easiest_reaction_percentage = Percent::new(i32::from(byte)),
             4 => s.easier_reaction_percentage = Percent::new(i32::from(byte)),
             5 => s.task_ungrouped_soldiers = byte,
-            6 => s.may_attack_walls = value == 1,
-            7 => s.livestock_only_to_tc = value == 1,
-            8 => s.disable_build_help = byte == 1,
+            6 => s.switches.set(AiSwitches::MAY_ATTACK_WALLS, value == 1),
+            7 => s.switches.set(AiSwitches::LIVESTOCK_ONLY_TO_TC, value == 1),
+            8 => s.switches.set(AiSwitches::DISABLE_BUILD_HELP, byte == 1),
             9 => s.local_targeting_mode = TargetingMode::of_data(i32::from(byte)),
             10 => s.targeting_factor_scalar = Percent::new(i32::from(byte)),
-            0xb => s.trade_attack_evasion = value != 1,
+            0xb => s.switches.set(AiSwitches::TRADE_ATTACK_EVASION, value != 1),
             0xc => s.boar_lure_destination = LureDestination::of_data(byte),
             0xd => s.preferred_trade_distance = Distance::new(value as f32),
-            0xe => s.disable_tower_priority = value != 0,
+            0xe => s
+                .switches
+                .set(AiSwitches::DISABLE_TOWER_PRIORITY, value != 0),
             0xf => s.attack_move_max_distance = WholeDistance::of_data(value as i32),
-            0x10 => s.villager_attack_reset = value != 0,
+            0x10 => s
+                .switches
+                .set(AiSwitches::VILLAGER_ATTACK_RESET, value != 0),
             0x11 => s.disable_villager_garrison = VillagerGarrison::of_data(value as i32),
-            0x12 => s.allow_serjeant_building = value != 0,
+            0x12 => s
+                .switches
+                .set(AiSwitches::ALLOW_SERJEANT_BUILDING, value != 0),
             _ => {}
         }
         Ok(())
@@ -459,7 +476,7 @@ mod tests {
             (QueueCount::of_data(1), Amount::new(840.0))
         );
         // player 9 is outside the world: nothing
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         t.game(&game(1, GameSub::FarmQueue, 9, 2, 0)).unwrap();
         assert_eq!(
             (t.players[1].farm_queue, wood(&t)),
@@ -478,7 +495,7 @@ mod tests {
         assert!(t.game_allowed(&game(1, GameSub::QuickBuild, 2, 0, 0)));
         assert!(t.game_allowed(&game(1, GameSub::Open0xf, 2, 0, 0)));
         assert!(!t.game_allowed(&game(9, GameSub::Posture, 9, 0, 0)));
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         assert!(t.game_allowed(&game(1, GameSub::Posture, 2, 0, 0)));
         // refused: nothing changes
         let mut t = world();
@@ -495,11 +512,14 @@ mod tests {
             .unwrap();
         t.game(&game(1, GameSub::Posture, 1, 0, 0)).unwrap();
         let p = &t.players[1];
-        assert!(p.auto_farm_queue && p.auto_fishtrap_queue);
+        assert!(
+            p.auto_queues.contains(AutoQueues::FARMS)
+                && p.auto_queues.contains(AutoQueues::FISH_TRAPS)
+        );
         assert_eq!(p.posture, Posture::Defensive);
         t.game(&game(1, GameSub::Posture, 1, 0, 0)).unwrap();
         assert_eq!(t.players[1].posture, Posture::Aggressive);
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         let before = t.players.clone();
         t.game(&game(1, GameSub::Posture, 7, 0, 0)).unwrap();
         t.game(&game(1, GameSub::Posture, -1, 0, 0)).unwrap();
@@ -516,7 +536,7 @@ mod tests {
         t.game(&game(1, GameSub::QuickBuild, 1, 0, 0)).unwrap();
         assert_eq!(t.players, before);
         assert_eq!(t.instant_work, 0);
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         assert_eq!(t.game(&game(1, GameSub::Cheat, 1, 4, 0)), Err(CHEAT));
         assert_eq!(t.game(&game(1, GameSub::QuickBuild, 2, 0, 0)), Err(CHEAT));
         assert_eq!(t.instant_work, 2);
@@ -544,7 +564,7 @@ mod tests {
     fn an_ai_setting_goes_to_computer_player_only() {
         let mut t = world();
         t.players[2].kind = PlayerKind::Computer;
-        t.settings.cheats_enabled = true;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
         t.game(&game(1, GameSub::AiSetting, 1, 1, 30)).unwrap();
         assert_eq!(t.players[1].dodge_chance, Chance::NONE);
         let set = |t: &mut World, setting: i16, value: u32| {
@@ -570,10 +590,58 @@ mod tests {
         );
         let s = p.ai_settings;
         assert_eq!(s.easiest_reaction_percentage, Percent::new(5));
-        assert!(!s.may_attack_walls && s.livestock_only_to_tc && s.disable_build_help);
-        assert!(!s.trade_attack_evasion && s.disable_tower_priority);
+        assert!(
+            !s.switches.contains(AiSwitches::MAY_ATTACK_WALLS)
+                && s.switches.contains(AiSwitches::LIVESTOCK_ONLY_TO_TC)
+                && s.switches.contains(AiSwitches::DISABLE_BUILD_HELP)
+        );
+        assert!(
+            !s.switches.contains(AiSwitches::TRADE_ATTACK_EVASION)
+                && s.switches.contains(AiSwitches::DISABLE_TOWER_PRIORITY)
+        );
         assert_eq!(s.preferred_trade_distance, Distance::new(4_294_967_296.0));
         assert_eq!(s.attack_move_max_distance, WholeDistance::of_data(-16));
         assert!(t.allow_gaia_capture[2]);
+    }
+
+    /// The settings the test above leaves: the bytes 4, 5, 9, 10 and 0xc take the value's low
+    /// byte, the flags 0x10 and 0x12 `value != 0`, 0x11 the value as it is.
+    #[test]
+    fn the_other_ai_settings_take_their_values() {
+        let mut t = world();
+        t.players[2].kind = PlayerKind::Computer;
+        let set = |t: &mut World, setting: i16, value: u32| {
+            t.set_ai_setting(player_id(2), setting, value).unwrap();
+        };
+        set(&mut t, 4, 0x1_07);
+        set(&mut t, 5, 0x2_03);
+        set(&mut t, 9, 0x1_02);
+        set(&mut t, 10, 0x1_50);
+        set(&mut t, 0xc, 0x1_04);
+        set(&mut t, 0x10, 3);
+        set(&mut t, 0x11, 0xffff_fffe);
+        set(&mut t, 0x12, 1);
+        let s = t.players[2].ai_settings;
+        assert_eq!(
+            (s.easier_reaction_percentage, s.task_ungrouped_soldiers),
+            (Percent::new(7), 3)
+        );
+        assert_eq!(
+            (s.local_targeting_mode, s.targeting_factor_scalar),
+            (TargetingMode::of_data(2), Percent::new(0x50))
+        );
+        assert_eq!(s.boar_lure_destination, LureDestination::of_data(4));
+        assert_eq!(s.disable_villager_garrison, VillagerGarrison::of_data(-2));
+        assert!(
+            s.switches.contains(AiSwitches::VILLAGER_ATTACK_RESET)
+                && s.switches.contains(AiSwitches::ALLOW_SERJEANT_BUILDING)
+        );
+        set(&mut t, 0x10, 0);
+        assert!(
+            !t.players[2]
+                .ai_settings
+                .switches
+                .contains(AiSwitches::VILLAGER_ATTACK_RESET)
+        );
     }
 }

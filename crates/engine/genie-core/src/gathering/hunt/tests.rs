@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::BeginLayer;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
@@ -1574,7 +1575,8 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         *h.state.attack_mut().unwrap() = Some(a);
         let mut rig = Rig::on_the_path(victim).holding(10028, PlayerId::new(1));
         let mut r = hunt_reads();
-        (r.attack.queue_empty, r.predator_hunts_end) = (queue_empty, ends);
+        r.attack.flags.set(AttackerFlags::QUEUE_EMPTY, queue_empty);
+        r.predator_hunts_end = ends;
         let got = rig.run(100, |c, u, actions, f, _| {
             h.update(
                 c,

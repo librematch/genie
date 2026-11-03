@@ -31,6 +31,32 @@ impl FarmMode {
     }
 }
 
+bitflags::bitflags! {
+    /// The game options that are on or off ([`Settings`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct OptionFlags: u8 {
+        /// `mFullTechTreeEnabled` (`+0x63`): a civilisation's own technologies of a mode other than
+        /// 1 are disabled like another civilisation's
+        /// (`genie_core::world::World::update_dependents`).
+        const FULL_TECH_TREE = 1;
+        /// `mVillagerForceDrop` (`+0x1070`), which [`Settings::carry_rule`] reads.
+        const VILLAGER_FORCE_DROP = 1 << 1;
+        /// `mCheatsEnabled` (`+0x1074`, `FUN_1412ffe00`): players may order each other's units, and
+        /// GAME's cheat sub-commands run. The lobby sets it before the game starts; nothing in the
+        /// game changes it, so a playback takes it from the header as the other options.
+        const CHEATS_ENABLED = 1 << 2;
+        /// `mTeamsLocked` (`+0x64`): the world's teams stay as the game began
+        /// (`genie_core::world::World::resolve_teams`).
+        const TEAMS_LOCKED = 1 << 3;
+        /// `mTurboEnabled` (`+0x67`).
+        const TURBO = 1 << 4;
+        /// `mSharedExploration` (`+0x68`).
+        const SHARED_EXPLORATION = 1 << 5;
+        /// `mAntiquityMode` (`+0x6a`).
+        const ANTIQUITY = 1 << 6;
+    }
+}
+
 /// What the simulation reads of the game options.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Settings {
@@ -44,9 +70,9 @@ pub struct Settings {
     /// `mSubGameModeFlag` (`+0x94`): the rules a mode adds to another (bit 1 sudden death, bit 2
     /// regicide), read as an int (`FUN_141324b60` on `+0x18` reads `+0x18 + 0x7c`).
     pub sub_game_mode_flag: SubModeFlags,
-    /// `mFullTechTreeEnabled` (`+0x63`): a civilisation's own technologies of a mode other than
-    /// 1 are disabled like another civilisation's (`genie_core::world::World::update_dependents`).
-    pub full_tech_tree: bool,
+    /// `mFullTechTreeEnabled`, `mVillagerForceDrop`, `mCheatsEnabled`, `mTeamsLocked`,
+    /// `mTurboEnabled`, `mSharedExploration` and `mAntiquityMode`.
+    pub flags: OptionFlags,
     /// `mWalkableFarms` (`+0x69`): how farmers work a farm.
     pub farm_mode: FarmMode,
     /// `mSelectedContentMode` (`+0x98`). The option is a tagged value read through
@@ -54,29 +80,14 @@ pub struct Settings {
     /// else 0); the load reads the value alone and the kind stays 0, as the object's
     /// constructor and `FUN_14130f2b0` leave it.
     pub selected_content_mode: ContentMode,
-    /// `mVillagerForceDrop` (`+0x1070`), which [`Settings::carry_rule`] reads.
-    pub villager_force_drop: bool,
-    /// `mCheatsEnabled` (`+0x1074`, `FUN_1412ffe00`): players may order each other's units, and
-    /// GAME's cheat sub-commands run. The lobby sets it before the game starts; nothing in the
-    /// game changes it, so a playback takes it from the header as the other options.
-    pub cheats_enabled: bool,
     /// `mTreatyLength`: the treaty's minutes, 0 for none. The world's treaty monitor (`+0x820`,
     /// `FUN_141461190`) fills its players' zones only while a treaty holds (`FUN_141461c00`);
     /// the slice holds no treaty.
     pub treaty_length: TreatyLength,
-    /// `mTeamsLocked` (`+0x64`): the world's teams stay as the game began
-    /// (`genie_core::world::World::resolve_teams`).
-    pub teams_locked: bool,
     /// `mStartingAge` (`+0x3c`): 0 the mode's default, 2 to 6 the ages.
     pub starting_age: Age,
     /// `mResourceLevel` (`+0x54`).
     pub resource_level: ResourceLevel,
-    /// `mTurboEnabled` (`+0x67`).
-    pub turbo: bool,
-    /// `mSharedExploration` (`+0x68`).
-    pub shared_exploration: bool,
-    /// `mAntiquityMode` (`+0x6a`).
-    pub antiquity: bool,
 }
 
 /// A technology's mode (its `+0x28`) that tests the root's `+0x560` entry (`FUN_140c87f20`),
@@ -109,7 +120,7 @@ impl Settings {
         let positive = match mode.unsigned_abs() {
             n @ 2..=18 => self.rule_mode(n)?,
             n @ 19..=25 => self.resource_level.get() == i32::from(n) - 19,
-            26 => self.antiquity,
+            26 => self.flags.contains(OptionFlags::ANTIQUITY),
             32 if mode < 0 => return Ok(true),
             n @ 27..=34 => self.age_mode(n)?,
             _ => return Ok(true),
@@ -136,13 +147,13 @@ impl Settings {
             9 => m == 10,
             10 => m == 12,
             11 => m == 1,
-            12 => self.turbo,
+            12 => self.flags.contains(OptionFlags::TURBO),
             13 => matches!(m, 4 | 3 | 5 | 15),
             14 => flags.contains(SubModeFlags::REGICIDE),
             15 => return Err(ROOT_MODE),
             16 => m == 16,
             17 => self.farm_mode == FarmMode::Fixed,
-            18 => self.shared_exploration,
+            18 => self.flags.contains(OptionFlags::SHARED_EXPLORATION),
             _ => return Err(mode_outside("a rule mode outside 2 to 18", n)),
         })
     }
@@ -171,7 +182,7 @@ impl Settings {
     /// resource it carries.
     #[must_use]
     pub fn carry_rule(&self) -> bool {
-        self.villager_force_drop
+        self.flags.contains(OptionFlags::VILLAGER_FORCE_DROP)
             && self.game_mode != GameMode::KingOfTheHill
             && !self.game_mode.standard()
     }
@@ -240,7 +251,11 @@ mod tests {
     fn the_carry_rule_needs_the_force_drop_in_scenario_mode_but_king_of_the_hill() {
         let with = |game_mode: i32, villager_force_drop| Settings {
             game_mode: GameMode::of_data(game_mode),
-            villager_force_drop,
+            flags: if villager_force_drop {
+                OptionFlags::VILLAGER_FORCE_DROP
+            } else {
+                OptionFlags::empty()
+            },
             ..Settings::default()
         };
         for mode in [3, 4, 14, 15] {
@@ -362,7 +377,7 @@ mod tests {
             (
                 12,
                 Settings {
-                    turbo: true,
+                    flags: OptionFlags::TURBO,
                     ..mode(9)
                 },
             ),
@@ -375,7 +390,7 @@ mod tests {
             (
                 18,
                 Settings {
-                    shared_exploration: true,
+                    flags: OptionFlags::SHARED_EXPLORATION,
                     ..mode(9)
                 },
             ),
@@ -437,7 +452,7 @@ mod tests {
             );
         }
         let antiquity = Settings {
-            antiquity: true,
+            flags: OptionFlags::ANTIQUITY,
             ..mode(9)
         };
         assert_eq!(antiquity.tech_mode_allows(TechMode::of_data(26)), Ok(true));
@@ -496,7 +511,7 @@ mod tests {
             sub_game_mode_flag: SubModeFlags::from_bits_retain(1),
             resource_level: ResourceLevel::of_data(3),
             farm_mode: FarmMode::Walkable,
-            antiquity: true,
+            flags: OptionFlags::ANTIQUITY,
             ..Settings::default()
         };
         assert_eq!(

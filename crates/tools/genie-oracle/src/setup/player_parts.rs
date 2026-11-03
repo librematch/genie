@@ -25,6 +25,7 @@ use genie_core::technology::ResearchCap;
 use genie_core::technology::ResearchCount;
 use genie_core::technology::{Location, ResearchState, TechState};
 use genie_core::world::AiSettings;
+use genie_core::world::AiSwitches;
 use genie_core::world::Seconds;
 use genie_core::world::WholeSeconds;
 use genie_core::world::WorldTime;
@@ -34,24 +35,43 @@ use genie_save::generated::world::{History as WorldHistory, TribeMainDecisionAi,
 
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
 /// sub-command 0xb sets.
-pub(super) const fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
+pub(super) fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
     AiSettings {
         easiest_reaction_percentage: Percent::new(b.easiest_reaction_percentage),
         easier_reaction_percentage: Percent::new(b.easier_reaction_percentage),
         task_ungrouped_soldiers: b.task_ungrouped_soldiers,
-        may_attack_walls: b.may_attack_walls != 0,
-        livestock_only_to_tc: b.livestock_only_to_tc != 0,
-        disable_build_help: b.disable_build_help != 0,
+        switches: {
+            let mut flags = AiSwitches::empty();
+            flags.set(AiSwitches::MAY_ATTACK_WALLS, b.may_attack_walls != 0);
+            flags.set(
+                AiSwitches::LIVESTOCK_ONLY_TO_TC,
+                b.livestock_only_to_tc != 0,
+            );
+            flags.set(AiSwitches::DISABLE_BUILD_HELP, b.disable_build_help != 0);
+            flags.set(
+                AiSwitches::DISABLE_TOWER_PRIORITY,
+                b.disable_tower_priority != 0,
+            );
+            flags.set(
+                AiSwitches::TRADE_ATTACK_EVASION,
+                b.trade_attack_evasion != 0,
+            );
+            flags.set(
+                AiSwitches::VILLAGER_ATTACK_RESET,
+                b.villager_attack_reset != 0,
+            );
+            flags.set(
+                AiSwitches::ALLOW_SERJEANT_BUILDING,
+                b.allow_serjeant_building != 0,
+            );
+            flags
+        },
         local_targeting_mode: TargetingMode::of_data(b.local_targeting_mode),
         targeting_factor_scalar: Percent::new(b.targeting_factor_scalar),
         preferred_trade_distance: Distance::new(b.preferred_trade_distance),
-        disable_tower_priority: b.disable_tower_priority != 0,
-        trade_attack_evasion: b.trade_attack_evasion != 0,
-        villager_attack_reset: b.villager_attack_reset != 0,
         boar_lure_destination: LureDestination::of_data(b.boar_lure_destination),
         attack_move_max_distance: WholeDistance::of_data(b.attack_move_max_distance),
         disable_villager_garrison: VillagerGarrison::of_data(b.disable_villager_garrison),
-        allow_serjeant_building: b.allow_serjeant_building != 0,
     }
 }
 

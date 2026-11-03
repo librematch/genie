@@ -58,6 +58,8 @@ use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::AttackChecks;
+use crate::unit_ai::AttackTargetFlags;
+use crate::unit_ai::GroupState;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
@@ -66,6 +68,7 @@ use crate::unit_ai::OrderTest;
 use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TakenAs;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::attack_orders::OrderNow;
@@ -3692,7 +3695,7 @@ fn computer_unit_weighs_its_target_against_its_attacker() {
         vec![]
     );
     let shy = Surroundings {
-        disable_tower_priority: true,
+        flags: SurroundingFlags::DISABLE_TOWER_PRIORITY,
         ..soldier_at()
     };
     assert_eq!(
@@ -4145,7 +4148,7 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
     dead.state = ObjectState::Dying;
     let at = Surroundings {
         id: object_id(9729),
-        under_attack: true,
+        flags: SurroundingFlags::UNDER_ATTACK,
         units: vec![walked_off, dead],
         roles: roles(),
         slots: slots(),
@@ -4209,7 +4212,7 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
     let mut r = rng();
     let at = Surroundings {
         position: Position::new(29.5, 89.5, 0.0),
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         player: PlayerId::new(2),
         class: Some(class::VILLAGER),
         roles: roles(),
@@ -5742,7 +5745,11 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
         u.home.as_mut().unwrap().furious = furious;
         let mut r = rng();
         let place = Surroundings {
-            mode_1,
+            flags: if mode_1 {
+                SurroundingFlags::MODE_1
+            } else {
+                SurroundingFlags::empty()
+            },
             ..at(Position::new(23.5, 105.5, 0.0))
         };
         assert_eq!(
@@ -6052,7 +6059,7 @@ fn an_animal_whose_wander_ended_drops_its_move_action_and_turns_idle() {
         ..deer()
     };
     let walking = Surroundings {
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         ..place
     };
     let _ = u
@@ -6105,10 +6112,14 @@ fn scout() -> UnitAi {
 fn scout_at(interruptible: bool, busy: bool) -> Surroundings {
     Surroundings {
         position: Position::new(93.5, 58.25, 0.0),
-        busy,
+        flags: {
+            let mut flags = SurroundingFlags::empty();
+            flags.set(SurroundingFlags::BUSY, busy);
+            flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
+            flags
+        },
         player: PlayerId::new(1),
         class: Some(class::CLASS_12),
-        interruptible,
         roles: roles(),
         slots: slots(),
         unit_ai_tuning: tuning().unit_ai,
@@ -6619,8 +6630,7 @@ fn making_building_runs_process_idle_only_without_target() {
     let at = Surroundings {
         class: Some(class::BUILDING),
         kind: MasterKind::BUILDING,
-        ranged: true,
-        busy: true,
+        flags: SurroundingFlags::RANGED | SurroundingFlags::BUSY,
         roles: roles(),
         slots: slots(),
         unit_ai_tuning: tuning().unit_ai,
@@ -6654,7 +6664,7 @@ fn making_building_runs_process_idle_only_without_target() {
     assert_eq!(u.idle_timer, Millis::ZERO);
     // a building without a missile and a single volley forgets its target, then searches
     let single = Surroundings {
-        ranged: false,
+        flags: SurroundingFlags::empty(),
         firepower: Firepower::new(1.0),
         ..at
     };
@@ -6689,7 +6699,7 @@ fn making_building_runs_process_idle_only_without_target() {
 #[test]
 fn unit_ai_with_target_runs_its_update_on_any_order() {
     let at = Surroundings {
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         player: PlayerId::new(1),
         state: ObjectState::Alive,
         target: Some(Seen {
@@ -6807,7 +6817,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     assert_eq!(u.idle_timer, Millis::new(3000));
     // inside another, a unit drops its target before the lookup
     let inside = Surroundings {
-        garrisoned: true,
+        flags: SurroundingFlags::GARRISONED,
         ..standing
     };
     let mut u = builder_done();
@@ -6953,7 +6963,7 @@ fn follower(deer: Position, visible: bool) -> (UnitAi, Surroundings) {
         position: Position::new(110.0, 40.0, 0.0),
         size: Footprint::new(0.2, 0.2),
         state: ObjectState::Alive,
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         class: Some(class::CLASS_12),
         target: Some(Seen {
             state: ObjectState::Alive,
@@ -7229,11 +7239,8 @@ const BOAR: Target = Target {
     master: MasterId::named(48),
     combat_level: CombatLevel::NONE,
     capture: CaptureKind::None,
-    has_ai: true,
-    inside: false,
-    targeting: true,
-    attackable: true,
-    desolid: false,
+    flags: AttackTargetFlags::HAS_AI
+        .union(AttackTargetFlags::TARGETING.union(AttackTargetFlags::ATTACKABLE)),
     position: Position::new(30.0, 98.0, 0.0),
     radius: Footprint::new(0.5, 0.5),
 };
@@ -7461,7 +7468,7 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
     };
     assert_eq!(reach(&no_attack, 119.0), Ok(false));
     let untargeted = Target {
-        targeting: false,
+        flags: AttackTargetFlags::empty(),
         ..villager(119.0)
     };
     assert_eq!(
@@ -7584,7 +7591,7 @@ fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
     let mut u = idle(UnitAiKind::SOLDIER);
     let plain = no_surroundings();
     let carter = Surroundings {
-        task_0x99: true,
+        flags: SurroundingFlags::TASK_0X99,
         roles: roles(),
         slots: slots(),
         unit_ai_tuning: tuning().unit_ai,
@@ -7623,7 +7630,7 @@ fn tower_attacks_started_building_but_not_desolid_foundation() {
         Ok(true)
     );
     let foundation = Target {
-        desolid: true,
+        flags: AttackTargetFlags::DESOLID,
         ..house
     };
     assert_eq!(
@@ -7633,7 +7640,7 @@ fn tower_attacks_started_building_but_not_desolid_foundation() {
     let unit = Target {
         owner: PlayerId::new(1),
         class: class::CLASS_6,
-        desolid: true,
+        flags: AttackTargetFlags::DESOLID,
         ..BOAR
     };
     assert_eq!(
@@ -8025,12 +8032,12 @@ fn no_attack_soldier_searches_then_walks_back_to_its_state_position() {
 #[test]
 fn grouped_unit_full_update_reads_its_group() {
     let group = |idle, moving, member_moving| {
-        Some(GroupState {
-            commanded: true,
-            idle,
-            patrol: false,
-            moving,
-            member_moving,
+        Some({
+            let mut flags = GroupState::COMMANDED;
+            flags.set(GroupState::IDLE, idle);
+            flags.set(GroupState::MOVING, moving);
+            flags.set(GroupState::MEMBER_MOVING, member_moving);
+            flags
         })
     };
     let ship = || UnitAi {
@@ -8072,7 +8079,7 @@ fn grouped_unit_full_update_reads_its_group() {
     // a group without a command: the state position stays
     let mut u = ship();
     let mut g = group(true, false, false);
-    g.as_mut().unwrap().commanded = false;
+    g.as_mut().unwrap().set(GroupState::COMMANDED, false);
     let _ = run(&mut u, &at(g)).unwrap();
     assert_eq!(u.state_position, Point::ORIGIN);
     // the order queue waits for a group that is not idle
@@ -8100,7 +8107,7 @@ fn grouped_unit_full_update_reads_its_group() {
     // and runs processIdle (the ship's caps its last human order time)
     let mut u = idle(UnitAiKind::TRANSPORT);
     let mut g = group(false, true, false);
-    g.as_mut().unwrap().patrol = true;
+    g.as_mut().unwrap().set(GroupState::PATROL, true);
     assert_eq!(
         run(&mut u, &at(g)),
         Ok(vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)])
@@ -8108,7 +8115,7 @@ fn grouped_unit_full_update_reads_its_group() {
     assert_eq!(u.secondary_timer, Millis::new(750));
     // a target of a unit in a patrolling group: FUN_140c41690 answers 0 for a human player
     let mut g = group(true, false, false);
-    g.as_mut().unwrap().patrol = true;
+    g.as_mut().unwrap().set(GroupState::PATROL, true);
     let seen = Seen {
         state: ObjectState::Alive,
         kind: MasterKind::COMBAT,
@@ -9850,7 +9857,7 @@ fn patroller(secondary: u32) -> (UnitAi, Surroundings) {
         size: Footprint::new(0.2, 0.2),
         los: Distance::new(4.0),
         weapon_range: Distance::new(1.0),
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         roles: roles(),
         slots: slots(),
         unit_ai_tuning: tuning().unit_ai,
@@ -10064,7 +10071,7 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
     assert_eq!((&u.patrol_path, u.patrol_waypoint.get()), (&None, 0));
     let (mut u, mut at) = patroller(0);
     u.current_order = None;
-    at.task_0x69 = true;
+    at.flags.set(SurroundingFlags::TASK_0X69, true);
     assert!(idle(&mut u, &at, &mut side(-1), PlayerKind::Human).is_err());
 }
 
@@ -10115,7 +10122,7 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
     u.current_order = None;
     u.current_action = None;
     u.patrol_path = Some(PatrolPath::default());
-    at.busy = false;
+    at.flags.set(SurroundingFlags::BUSY, false);
     let mut side = SoldierSide {
         found: -1,
         attacks: Vec::new(),
@@ -10144,7 +10151,7 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
         (Some(OrderKind::Patrol), Millis::new(750))
     );
     u.current_order = None;
-    at.attack_moving = true;
+    at.flags.set(SurroundingFlags::ATTACK_MOVING, true);
     assert_eq!(
         u.soldier_idle(
             &at,
@@ -10574,7 +10581,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
     assert_eq!(fx, Vec::<Effect>::new());
     // busy with its top action in state 2 it runs too; in another state it stays
     let (mut u, mut at) = attacked_transport();
-    at.busy = true;
+    at.flags.set(SurroundingFlags::BUSY, true);
     at.action_state = Some(ActionState::new(4));
     let mut fx = Vec::new();
     assert_eq!(
@@ -10705,9 +10712,10 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
     let tower = |idle_group: bool| {
         let (mut u, mut at) = attacked_transport();
         u.ai_kind = SIEGE_TOWER_AI;
-        at.group = Some(GroupState {
-            idle: idle_group,
-            ..GroupState::default()
+        at.group = Some(if idle_group {
+            GroupState::IDLE
+        } else {
+            GroupState::empty()
         });
         (u, at)
     };
@@ -12215,10 +12223,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
         ..at.clone()
     };
     let patrolling = Surroundings {
-        group: Some(GroupState {
-            patrol: true,
-            ..GroupState::default()
-        }),
+        group: Some(GroupState::PATROL),
         ..at.clone()
     };
     for (mut u, at) in [
@@ -12405,7 +12410,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
         ..idle(UnitAiKind::CIVILIAN)
     };
     let at = Surroundings {
-        busy: true,
+        flags: SurroundingFlags::BUSY,
         player: PlayerId::new(3),
         class: Some(class::VILLAGER),
         state: ObjectState::Alive,
@@ -12652,10 +12657,7 @@ fn an_order_not_ready_stays_and_patrol_or_unnamed_orders_take_nothing() {
 /// so does a unit of a group that patrols, but not on the hero power's order (`0x326`).
 #[test]
 fn patrolling_group_unit_on_the_hero_power_does_not_patrol() {
-    let group = GroupState {
-        patrol: true,
-        ..GroupState::default()
-    };
+    let group = GroupState::PATROL;
     let mut u = idle(UnitAiKind::SOLDIER);
     assert!(u.patrols(Some(group)) && !u.patrols(None));
     u.current_order = Some(OrderKind::HeroPower);
@@ -13967,10 +13969,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         ..idle(SOLDIER_AI)
     };
     let grouped = Surroundings {
-        group: Some(GroupState {
-            commanded: true,
-            ..GroupState::default()
-        }),
+        group: Some(GroupState::COMMANDED),
         ..here.clone()
     };
     let (r, fx, _) = handled(&mut u, done, &grouped, PlayerKind::Human);

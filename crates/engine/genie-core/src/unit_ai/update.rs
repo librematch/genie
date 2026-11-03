@@ -21,6 +21,7 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTest;
 use crate::unit_ai::Pace;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::{
     AfterOrder, AiMove, BREAK, CIVILIAN_CARED, DEAD, Effect, GO_ON, Gatherable, GroupState,
     LIVE_TARGET_ACTIONS, Memory, NO_POINT, Notify, Pick, ResourceSearch, Retarget, Search,
@@ -82,7 +83,9 @@ impl UnitAi {
         self.keep_attackers(at, side);
         // a unit with an order, or in a group with a command (`+0x3a8`), keeps its place as its
         // state position (0x140c674c9)
-        if self.current_order.is_some() || at.group.is_some_and(|g| g.commanded) {
+        if self.current_order.is_some()
+            || at.group.is_some_and(|g| g.contains(GroupState::COMMANDED))
+        {
             self.state_position = at.position.ground();
         }
         self.secondary_timer = self.secondary_timer.saturating_sub(dt);
@@ -107,8 +110,8 @@ impl UnitAi {
             && (!busy || (!self.orders.is_empty() && side.interruptible_now()?))
             && result != 0xd
             && self.can_order(at, OrderTest::Any)
-            && at.group.is_none_or(|g| g.idle)
-            && !at.garrisoned
+            && at.group.is_none_or(|g| g.contains(GroupState::IDLE))
+            && !at.flags.contains(SurroundingFlags::GARRISONED)
         {
             self.run_orders(at, side, player_kind, ai)?;
         }
@@ -311,7 +314,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
-        if self.current_target.is_some() && at.garrisoned {
+        if self.current_target.is_some() && at.flags.contains(SurroundingFlags::GARRISONED) {
             self.current_target = None;
         }
         if self.current_target.is_none() {
@@ -358,7 +361,7 @@ impl UnitAi {
                     && (matches!(
                         self.current_order,
                         Some(OrderKind::Patrol | OrderKind::AttackMove)
-                    ) || at.group.is_some_and(|g| g.patrol))
+                    ) || at.group.is_some_and(|g| g.contains(GroupState::PATROL)))
                 {
                     return Err(GenieError::unsupported(
                         "the patrol range of a unit AI's target",

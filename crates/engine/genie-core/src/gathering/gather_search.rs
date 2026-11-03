@@ -61,7 +61,7 @@ pub struct Candidate {
     pub position: Position,
     /// `+0x790`, `parent_pasture_id`.
     pub pasture: Option<PastureId>,
-    /// `+0x689` is 0 ([`crate::objects::unit::Unit::untargetable`]).
+    /// `+0x689` is 0 ([`crate::objects::unit::UnitFlags::UNTARGETABLE`]).
     pub untargetable: bool,
     /// `+0x308`, `attribute_type_held`, none for −1.
     pub attribute: Option<AttributeId>,

@@ -52,7 +52,9 @@ use crate::players::attribute::AttributeId;
 pub use crate::players::history::HISTORY_PERIOD;
 use crate::technology::TechId;
 pub(crate) use crate::world::player::NO_ATTRIBUTE;
-pub use crate::world::player::{AiSettings, Formations, Player};
+pub use crate::world::player::{
+    AiSettings, AiSwitches, AllySharing, AutoQueues, Departures, Formations, Player,
+};
 use genie_diff::Diff;
 pub use genie_model::layer;
 use genie_model::layer::MasterSlots;

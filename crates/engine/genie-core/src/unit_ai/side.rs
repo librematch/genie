@@ -72,25 +72,25 @@ pub trait UnitSide {
 
     /// The unit's slot 0x430 as it stands now (`FUN_14106d0e0`; its slot 0x818, `FUN_14106d100`,
     /// is 0): its action list holds an action, the stops and commands its AI made in the update
-    /// included ([`Surroundings::busy`] at the update's start).
+    /// included ([`SurroundingFlags::BUSY`] at the update's start).
     ///
     /// # Errors
     ///
     /// A side without its unit.
     ///
-    /// [`Surroundings::busy`]: crate::unit_ai::Surroundings::busy
+    /// [`SurroundingFlags::BUSY`]: crate::unit_ai::SurroundingFlags::BUSY
     fn busy_now(&mut self) -> Result<bool, GenieError> {
         Err(WITHOUT_UNIT)
     }
 
     /// The unit's slot 0x2d0 as it stands now: its top action may be interrupted
-    /// ([`Surroundings::interruptible`] at the update's start).
+    /// ([`SurroundingFlags::INTERRUPTIBLE`] at the update's start).
     ///
     /// # Errors
     ///
     /// A side without its unit, and an action whose slot 0x2d0 the slice does not model.
     ///
-    /// [`Surroundings::interruptible`]: crate::unit_ai::Surroundings::interruptible
+    /// [`SurroundingFlags::INTERRUPTIBLE`]: crate::unit_ai::SurroundingFlags::INTERRUPTIBLE
     fn interruptible_now(&mut self) -> Result<bool, GenieError> {
         Err(WITHOUT_UNIT)
     }

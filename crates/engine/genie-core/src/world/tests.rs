@@ -169,6 +169,7 @@ use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Presence;
+use crate::objects::unit::UnitFlags;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
 use crate::objects::unit::{Unit, loses_actions};
 use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount};
@@ -276,12 +277,14 @@ use crate::vision::registry::UnitUpdate;
 use crate::vision::registry::{Record, Registry};
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::vision::visibility::{Visibility as VisionVisibility, VisibleMap};
+use crate::world::AutoQueues;
 use crate::world::checkpoint::TopAction;
 use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::parts::{Object, Part, PartTable, no_own_masters};
 use crate::world::player::Player;
 use crate::world::settings::FarmMode;
+use crate::world::settings::OptionFlags;
 use ids::FISH_TRAP;
 use std::iter::{once, repeat_n};
 use std::sync::Arc;
@@ -1138,7 +1141,7 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
                 u.pasture,
                 u.life.amount,
                 u.life.attribute_kind,
-                u.untargetable
+                u.flags.contains(UnitFlags::UNTARGETABLE)
             ),
             (
                 Some(PastureId::new(object_id(50))),
@@ -2296,7 +2299,7 @@ fn queued_build_queues_its_order_for_another_player_villager() {
         Arc::new(builder_masters()),
     ];
     placeable(&mut t);
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     // the command phase alone (the units' updates would run the orders)
     t.run(&Command::Build(BuildCommand {
         player: player_id(1),
@@ -10236,7 +10239,7 @@ fn queue_at_another_player_building_queues_and_pays_for_its_owner() {
         t.reindex();
         t.player_time.push(Millis::ZERO);
         t.model.masters.push(t.model.masters[0].clone());
-        t.settings.cheats_enabled = cheats;
+        t.settings.flags.set(OptionFlags::CHEATS_ENABLED, cheats);
         t
     };
     let mut t = two(true);
@@ -10401,7 +10404,7 @@ fn research_check_refuses_another_player_buildings() {
         Some(object_ids([-1, -1]))
     );
     // while players may order each other's
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     t.players[1].kind = PlayerKind::Human;
     assert_eq!(
         t.research_check(&at(player_id(1), Some(object_id(9)), 1, vec![]))
@@ -15879,7 +15882,7 @@ fn cheat_code_does_nothing_without_the_game_cheats() {
     });
     t.run(&cheat);
     assert_eq!(t.players, before);
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     t.run(&cheat);
     assert!(t.players[1].stopped);
 }
@@ -17548,7 +17551,7 @@ fn reseed_world() -> World {
 #[test]
 fn farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
     let mut t = reseed_world();
-    t.players[1].auto_farm_queue = true;
+    t.players[1].auto_queues.set(AutoQueues::FARMS, true);
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
         .unwrap();
     let p = &t.players[1];
@@ -17582,7 +17585,7 @@ fn farmer_whose_farm_ran_out_reseeds_it_with_the_automatic_queue() {
 fn reseed_takes_queued_farm() {
     for (auto, wood) in [(false, 100.0), (true, 59.0)] {
         let mut t = reseed_world();
-        t.players[1].auto_farm_queue = auto;
+        t.players[1].auto_queues.set(AutoQueues::FARMS, auto);
         t.players[1].attributes[1] = Amount::new(wood);
         t.players[1].farm_queue = QueueCount::of_data(2);
         t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
@@ -17614,7 +17617,7 @@ fn without_farm_to_make_the_farmer_idles() {
         Some(GatherState::Idle)
     );
     let mut t = reseed_world();
-    t.players[1].auto_farm_queue = true;
+    t.players[1].auto_queues.set(AutoQueues::FARMS, true);
     t.players[1].attributes[1] = Amount::new(59.0);
     t.players[1].kind = PlayerKind::Computer;
     t.reseed_after_walk(PlayerId::new(1), ListIndex::new(0), WalkEnd::Arrived)
@@ -17724,7 +17727,7 @@ fn fishing_ship_reseeds_fish_trap() {
     );
     let mut t = reseed_world();
     ship(&mut t);
-    t.players[1].auto_fishtrap_queue = true;
+    t.players[1].auto_queues.set(AutoQueues::FISH_TRAPS, true);
     assert_eq!(t.reseed(PlayerId::new(1), ListIndex::new(0)), Ok(true));
     let p = &t.players[1];
     assert_eq!(
@@ -22754,7 +22757,7 @@ fn the_command_phase_runs_each_player_command_by_its_handler() {
     // with the game's cheats a cheat code is not modelled: it stops the player it is for, or
     // its issuer for a player outside the game
     let mut cheats = t;
-    cheats.settings.cheats_enabled = true;
+    cheats.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     let cheat = |player| GameCommand {
         issuer: player_id(1),
         sub: GameSub::Cheat,

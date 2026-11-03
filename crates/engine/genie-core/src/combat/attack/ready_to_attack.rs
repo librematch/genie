@@ -2,7 +2,9 @@
 //! and the facing at its end.
 
 use crate::GenieError;
+use crate::combat::MissileCount;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::{
     Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, TARGET_GONE, face_target,
     move_reads,
@@ -132,7 +134,10 @@ impl Attack {
         let (target, t) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
         if target_unseen(g.map, f, &t)? {
-            if r.stance == UnitStance::Aggressive && Speed::ZERO < speed && r.can_move {
+            if r.stance == UnitStance::Aggressive
+                && Speed::ZERO < speed
+                && r.flags.contains(AttackerFlags::CAN_MOVE)
+            {
                 self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics, move_to_tuning)?;
                 return Ok(Readiness::Waiting);
             }
@@ -152,7 +157,11 @@ impl Attack {
         };
         let mobile = MasterKind::MOVING <= f.own.kind && Speed::ZERO < speed;
         if at_once == AtOnce::Tested
-            && self.ready_at_once(t.position, near, mobile || r.volley_under_way)
+            && self.ready_at_once(
+                t.position,
+                near,
+                mobile || r.next_volley != MissileCount::ZERO,
+            )
         {
             return self.face(
                 (at, g.motion.mover_mut()),
@@ -166,7 +175,7 @@ impl Attack {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::TOO_CLOSE, [-1; 3])?;
             }
-            if speed != Speed::ZERO && r.can_move {
+            if speed != Speed::ZERO && r.flags.contains(AttackerFlags::CAN_MOVE) {
                 return Ok(Readiness::Waiting);
             }
             return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
@@ -188,7 +197,7 @@ impl Attack {
             if (r.stance == UnitStance::Defensive
                 && self.off_leash(t.position, r.state_position, attack_tuning))
                 || speed == Speed::ZERO
-                || !r.can_move
+                || !r.flags.contains(AttackerFlags::CAN_MOVE)
             {
                 return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
             }

@@ -33,6 +33,7 @@ use crate::objects::masters::player_master;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::players::tracker::key;
 use crate::vision::SightCentre;
 use crate::vision::SightLayer;
@@ -257,7 +258,7 @@ impl Unit {
                 master: made.life,
             },
             place: Static::at(position),
-            attackable: true,
+            flags: UnitFlags::ATTACKABLE,
             pasture: None,
             my_pasture: None,
             ..Self::default()

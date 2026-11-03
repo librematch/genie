@@ -14,6 +14,7 @@ use crate::players::QueryRelation;
 use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::flight::BadPoint;
 use crate::unit_ai::{
@@ -58,7 +59,7 @@ impl UnitAi {
         let Some(home) = self.home else {
             return (false, None);
         };
-        if home.furious || at.mode_1 {
+        if home.furious || at.flags.contains(SurroundingFlags::MODE_1) {
             return (false, None);
         }
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
@@ -162,7 +163,7 @@ impl UnitAi {
         self.cap_human_order(side, ai)?;
         if roles.of_some_class(at.class).contains(ClassRoles::KING) {
             let led = !roles.of_master(at.master).contains(MasterRoles::KING_UNLED)
-                && !at.garrisoned
+                && !at.flags.contains(SurroundingFlags::GARRISONED)
                 && self.current_order.is_none()
                 && player_kind.is_computer();
             if led {
@@ -202,7 +203,7 @@ impl UnitAi {
                 return Ok(true);
             }
         }
-        if at.mode_1 {
+        if at.flags.contains(SurroundingFlags::MODE_1) {
             return Err(GenieError::unsupported(
                 "a hunted animal's idle check in mode 1 (its herd)",
             ));
@@ -310,12 +311,12 @@ impl UnitAi {
             },
             memory: Memory::default(),
         };
-        let mut reach = if at.mode_1 {
+        let mut reach = if at.flags.contains(SurroundingFlags::MODE_1) {
             at.los
         } else {
             at.los * unit_ai_tuning.lion_sight_share
         };
-        if at.scenario {
+        if at.flags.contains(SurroundingFlags::SCENARIO) {
             return Err(GenieError::unsupported(
                 "a lion's reach in the scenario modes",
             ));
@@ -327,7 +328,7 @@ impl UnitAi {
         if found.id.is_none_or(|id| id.get() < 0) {
             found = side.closest(&search(None))?;
             self.alert(found, at.dt_seconds);
-            if !at.mode_1 {
+            if !at.flags.contains(SurroundingFlags::MODE_1) {
                 reach = at.los / unit_ai_tuning.lion_sight_divisor;
             }
         }

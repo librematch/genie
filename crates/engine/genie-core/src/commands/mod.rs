@@ -9,6 +9,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::World;
+use crate::world::settings::OptionFlags;
 use genie_diff::Diff;
 
 pub mod all_back_to_work;
@@ -279,7 +280,7 @@ const COMPUTER_UNITS: usize = 500;
 impl World {
     /// The command check's units (`FUN_140e553f0`, `FUN_140e55250`): each unit the world holds
     /// (`FUN_1415417a0`, live or sleeping) that is the player's own, or any while players may
-    /// order each other's units ([`crate::world::settings::Settings::cheats_enabled`]); none
+    /// order each other's units ([`crate::world::settings::OptionFlags::CHEATS_ENABLED`]); none
     /// (the game's −1) for the others.
     pub(crate) fn checked_units(
         &self,
@@ -289,7 +290,12 @@ impl World {
         units
             .iter()
             .map(|&id| match self.place(id) {
-                Some(p) if p.player() == player || self.settings.cheats_enabled => id,
+                Some(p)
+                    if p.player() == player
+                        || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) =>
+                {
+                    id
+                }
                 _ => None,
             })
             .collect()

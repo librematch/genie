@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::update::let_go;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Engagement, Fight, HALF, NO_RANGE, NONE, set_walker_anim,
@@ -155,7 +156,7 @@ impl Attack {
         let waits = match r.ai_order {
             AiOrder::Absent => true,
             AiOrder::Idle => false,
-            AiOrder::Order(_) => r.queue_empty,
+            AiOrder::Order(_) => r.flags.contains(AttackerFlags::QUEUE_EMPTY),
         };
         if human && waits {
             let speed =
@@ -190,7 +191,7 @@ impl Attack {
                 NotifyKind::ACTION_COMPLETED,
                 [600, 0, 0],
             )?;
-        } else if r.ai_order.has_ai() && r.queue_empty {
+        } else if r.ai_order.has_ai() && r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_INVALIDATED,
@@ -256,7 +257,7 @@ impl Attack {
         {
             home.go_home = true;
         }
-        if r.queue_empty {
+        if r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
             unit.post_own(
                 &mut c.w.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,

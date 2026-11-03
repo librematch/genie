@@ -7,6 +7,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::ByRelation;
 use crate::players::PlayerId;
@@ -21,6 +22,7 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::OrderRecord;
+use crate::unit_ai::best_target::ThingFlags;
 use crate::unit_ai::best_target::choice::{add_extra, kept_by_owner_and_class, may_attack};
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -286,12 +288,10 @@ fn enemy(id: i32, class: ClassId, distance: Distance, hp: HitPoints) -> (Thing, 
         Thing {
             owner: PlayerId::new(2),
             state: ObjectState::Alive,
-            has_ai: true,
+            flags: ThingFlags::HAS_AI | ThingFlags::TARGETABLE | ThingFlags::ATTACKABLE,
             master: master_id(4),
             class,
             kind: MasterKind::COMBAT,
-            targetable: true,
-            attackable: true,
             distance,
             speed: Speed::new(1.0),
             ..Thing::default()
@@ -451,13 +451,13 @@ fn failed_paths_become_retarget_entries() {
 fn the_lists_pass_over_what_the_unit_may_not_attack() {
     let mut field = Field::default();
     let mut no_ai = enemy(30, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    no_ai.0.has_ai = false;
+    no_ai.0.flags.set(ThingFlags::HAS_AI, false);
     let mut inside = enemy(31, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    inside.0.inside = true;
+    inside.0.flags.set(ThingFlags::INSIDE, true);
     let mut dead = enemy(32, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
     dead.0.state = ObjectState::Dying;
     let mut ally = enemy(33, class::CLASS_0, Distance::new(3.0), HitPoints::new(40.0));
-    ally.0.allied = true;
+    ally.0.flags.set(ThingFlags::ALLIED, true);
     for (id, t) in [(30, no_ai), (31, inside), (32, dead), (33, ally)] {
         let _ = field.things.insert(object_id(id), t);
     }
@@ -823,7 +823,7 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     );
     for t in [
         Thing {
-            has_ai: false,
+            flags: ThingFlags::empty(),
             ..thing
         },
         Thing {
@@ -831,11 +831,11 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
             ..thing
         },
         Thing {
-            allied: true,
+            flags: ThingFlags::ALLIED,
             ..thing
         },
         Thing {
-            inside: true,
+            flags: ThingFlags::INSIDE,
             ..thing
         },
     ] {
@@ -879,7 +879,7 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         ..gaia
     };
     let taken = Thing {
-        capture: true,
+        capture: CaptureKind::BySight,
         ..gaia
     };
     assert!(kept_by_owner_and_class(&computer, &any, &gaia, &roles()));

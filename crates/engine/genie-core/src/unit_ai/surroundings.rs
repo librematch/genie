@@ -135,6 +135,54 @@ pub struct Home {
     pub go_home: bool,
 }
 
+bitflags::bitflags! {
+    /// What an idle check reads of its unit and the game as yes or no ([`Surroundings`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct SurroundingFlags: u16 {
+        /// The game's setting at `+0x680` (`FUN_140ec0cd0`) is 1: boars stay put.
+        const MODE_1 = 1;
+        /// The unit's action list has an action (object slot 0x430, `FUN_14106d0e0`; its slot
+        /// 0x818, `FUN_14106d100`, is 0).
+        const BUSY = 1 << 1;
+        /// The unit's slot 0x2d0 with 0 (`FUN_14106d170`): its top action may be interrupted, or it
+        /// has none.
+        const INTERRUPTIBLE = 1 << 2;
+        /// The master has a task of action type 0x99 (`FUN_1415c60b0`; the mule cart's): such a
+        /// unit with an action or a target takes no queued order (`FUN_140c4eea0`).
+        const TASK_0X99 = 1 << 3;
+        /// An object of type 70 or more inside another (`+0x2f0`): it runs no queued order.
+        const GARRISONED = 1 << 4;
+        /// Its master has a missile (`+0x83c` 0 or more, `FUN_1410bfca0`).
+        const RANGED = 1 << 5;
+        /// The game mode (the save's `mGameMode`, options `+0x34`) is one of `FUN_141302540`'s:
+        /// Scenario (3), Campaign (4), King of the Hill (5), Co-op Campaign (15).
+        const SCENARIO = 1 << 6;
+        /// The master has a task of action type 0x69 (`FUN_1415c60b0`; the healers'), whose idle
+        /// soldier looks for an ally to heal (`FUN_140c16f00`).
+        const TASK_0X69 = 1 << 7;
+        /// The unit's `+0x685`, `underAttackValue`.
+        const UNDER_ATTACK = 1 << 8;
+        /// The unit's slot 0x538 with 9 (`FUN_14106d0c0`): its action list holds an Attack (type
+        /// 9); read with [`Surroundings::action_state`], which tells whether the slice holds the
+        /// list.
+        const ATTACK_LISTED = 1 << 9;
+        /// The unit's `+0x7fb`, `mAttackMoving`.
+        const ATTACK_MOVING = 1 << 10;
+        /// Its owner's `disableTowerPriority` (`player+0x620`, GAME 0xb's setting 0xe): a computer
+        /// player's unit but a siege weapon, unpacked trebuchet or warship ignores a tower's damage
+        /// ([`UnitAi::damaged`]).
+        ///
+        /// [`UnitAi::damaged`]: crate::unit_ai::UnitAi::damaged
+        const DISABLE_TOWER_PRIORITY = 1 << 11;
+        /// An object inside it (`+0x2f8`) belongs to another owner that is a computer player: a
+        /// building's or tower's damage alert (0x201) reaches that owner's AI too (its slot 0x2e8,
+        /// then slot 0x3c8, [`alert_owner`]).
+        ///
+        /// [`alert_owner`]: crate::unit_ai::alert_owner
+        const GUEST_COMPUTER = 1 << 12;
+    }
+}
+
 /// What an idle check reads of its unit and the game, and the build's roles and slots it reads
 /// them by.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -150,11 +198,8 @@ pub struct Surroundings {
     pub map: GridSize,
     /// The world's dt in seconds (`world+0x164`).
     pub dt_seconds: Seconds,
-    /// The game's setting at `+0x680` (`FUN_140ec0cd0`) is 1: boars stay put.
-    pub mode_1: bool,
-    /// The unit's action list has an action (object slot 0x430, `FUN_14106d0e0`; its slot 0x818,
-    /// `FUN_14106d100`, is 0).
-    pub busy: bool,
+    /// Its yes-or-no reads.
+    pub flags: SurroundingFlags,
     /// The owner's id (`player+0x718`); Gaia is 0.
     pub player: PlayerId,
     /// The unit's master's class (decoded).
@@ -172,37 +217,19 @@ pub struct Surroundings {
     pub search_radius: Distance,
     /// Slot 0x230 (`FUN_14108d960`): its master's weapon range (`+0x828`).
     pub weapon_range: Distance,
-    /// The unit's slot 0x2d0 with 0 (`FUN_14106d170`): its top action may be interrupted, or it
-    /// has none.
-    pub interruptible: bool,
-    /// The master has a task of action type 0x99 (`FUN_1415c60b0`; the mule cart's): such a
-    /// unit with an action or a target takes no queued order (`FUN_140c4eea0`).
-    pub task_0x99: bool,
-    /// An object of type 70 or more inside another (`+0x2f0`): it runs no queued order.
-    pub garrisoned: bool,
     /// The unit's state (`+0x640`), type (`+0xf`), `+0x924` and master id.
     pub state: ObjectState,
     /// The unit's type (`+0xf`).
     pub kind: MasterKind,
-    /// Its master has a missile (`+0x83c` 0 or more, `FUN_1410bfca0`).
-    pub ranged: bool,
     /// Its missiles per volley (`+0xa00`, `FUN_1412136d0`), 0 for a unit without volleys.
     pub firepower: Firepower,
     /// The unit's `+0x924`.
     pub capture: CaptureKind,
     /// The unit's master.
     pub master: MasterId,
-    /// The game mode (the save's `mGameMode`, options `+0x34`) is one of `FUN_141302540`'s:
-    /// Scenario (3), Campaign (4), King of the Hill (5), Co-op Campaign (15).
-    pub scenario: bool,
-    /// The master has a task of action type 0x69 (`FUN_1415c60b0`; the healers'), whose idle
-    /// soldier looks for an ally to heal (`FUN_140c16f00`).
-    pub task_0x69: bool,
     /// The unit AI's current target as the world's object table holds it (`FUN_1415417a0`),
     /// `None` when it does not exist or the unit AI has none.
     pub target: Option<Seen>,
-    /// The unit's `+0x685`, `underAttackValue`.
-    pub under_attack: bool,
     /// The unit's id (`+8`), which its attackers' unit AIs must target to stay attackers.
     pub id: ObjectId,
     /// The unit's slot 0x1f8 (`FUN_14106a6c0`): its animation speed (`+0x7b8`); None while the
@@ -211,10 +238,6 @@ pub struct Surroundings {
     /// The unit's slot 0x2b0 (`RGE_Action_Object::actionState`): its top action's state, 0
     /// without one; None for an action the slice does not hold.
     pub action_state: Option<ActionState>,
-    /// The unit's slot 0x538 with 9 (`FUN_14106d0c0`): its action list holds an Attack (type
-    /// 9); read with [`Surroundings::action_state`], which tells whether the slice holds the
-    /// list.
-    pub attack_listed: bool,
     /// The objects the unit AI names besides its target, as the world's object table holds them:
     /// its attackers ([`UnitAi::attackers`]) and the callers of its queued damage notifies. One
     /// the table does not hold is absent.
@@ -229,8 +252,6 @@ pub struct Surroundings {
     pub top_target: Option<TopTarget>,
     /// Slot 0x240 (`FUN_1410863c0`): its master's least range (`+0x850`).
     pub min_range: Distance,
-    /// The unit's `+0x7fb`, `mAttackMoving`.
-    pub attack_moving: bool,
     /// Where the unit last moved to (slot 0x520: `+0x824`), as the game's vector (x, height,
     /// y); an object without movement state, its place.
     pub moved_at: BVector,
@@ -240,18 +261,6 @@ pub struct Surroundings {
     /// Its owner's `chance_for_archers_to_maintain_distance` (`player+0xe11`, saved): a computer
     /// player's siege unit backs up after a shot on a draw at least this.
     pub keep_distance_chance: Chance,
-    /// Its owner's `disableTowerPriority` (`player+0x620`, GAME 0xb's setting 0xe): a computer
-    /// player's unit but a siege weapon, unpacked trebuchet or warship ignores a tower's damage
-    /// ([`UnitAi::damaged`]).
-    ///
-    /// [`UnitAi::damaged`]: crate::unit_ai::UnitAi::damaged
-    pub disable_tower_priority: bool,
-    /// An object inside it (`+0x2f8`) belongs to another owner that is a computer player: a
-    /// building's or tower's damage alert (0x201) reaches that owner's AI too (its slot 0x2e8,
-    /// then slot 0x3c8, [`alert_owner`]).
-    ///
-    /// [`alert_owner`]: crate::unit_ai::alert_owner
-    pub guest_computer: bool,
     /// The build's roles, through which the unit AI reads the classes and masters it meets
     /// (FD-046-D45).
     pub roles: Roles,
@@ -290,23 +299,25 @@ pub(super) struct LiveTop {
 /// The idle part's group test (`0x140c67e8f`): no group, or one that is idle (`FUN_141017ad0`) of
 /// a unit that does not move (slot 0x5c8).
 pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
-    group.is_none_or(|g| g.idle && !g.member_moving)
+    group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
 }
 
-/// What the full update (`0x140c66b10`) reads of a unit's group.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct GroupState {
-    /// Its current command (`+0x3a8`) is not -1.
-    pub commanded: bool,
-    /// `IsIdle` (`FUN_141017ad0`, [`crate::groups::UnitGroup::is_idle`]).
-    pub idle: bool,
-    /// It patrols: its top path's [`crate::movement::PathFlags::LOOPS`] (`FUN_141017c40`) or its
-    /// [`crate::groups::GroupFlags::PATROL`] (`FUN_141017c30`).
-    pub patrol: bool,
-    /// Its motion moves (`FUN_141046600`).
-    pub moving: bool,
-    /// The unit itself moves (its slot 0x5c8), which the idle part reads with the group.
-    pub member_moving: bool,
+bitflags::bitflags! {
+    /// What the full update (`0x140c66b10`) reads of a unit's group.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct GroupState: u8 {
+        /// Its current command (`+0x3a8`) is not -1.
+        const COMMANDED = 1;
+        /// `IsIdle` (`FUN_141017ad0`, [`crate::groups::UnitGroup::is_idle`]).
+        const IDLE = 1 << 1;
+        /// It patrols: its top path's [`crate::movement::PathFlags::LOOPS`] (`FUN_141017c40`) or
+        /// its [`crate::groups::GroupFlags::PATROL`] (`FUN_141017c30`).
+        const PATROL = 1 << 2;
+        /// Its motion moves (`FUN_141046600`).
+        const MOVING = 1 << 3;
+        /// The unit itself moves (its slot 0x5c8), which the idle part reads with the group.
+        const MEMBER_MOVING = 1 << 4;
+    }
 }
 
 impl Surroundings {

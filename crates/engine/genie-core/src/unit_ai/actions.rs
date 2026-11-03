@@ -12,6 +12,7 @@ use crate::orders::Dispatch;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::GroupState;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -19,6 +20,7 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
     AiMove, ENDED_ACTIONS, Effect, GO_ON, Notify, PRODUCED, QueuedOrder, Surroundings, UnitAi,
@@ -187,7 +189,7 @@ impl UnitAi {
         let p1 = n.p[0];
         let order = self.current_order;
         let action = self.current_action;
-        if order.is_some() || at.group.is_some_and(|g| g.commanded) {
+        if order.is_some() || at.group.is_some_and(|g| g.contains(GroupState::COMMANDED)) {
             self.state_position = at.position.ground();
         }
         let attack = AiAction::Attack.value();
@@ -438,10 +440,12 @@ impl UnitAi {
     /// the full update and `FUN_140c68980` pass as 0 and only the slot 4 of `FUN_140c2bd20` as 1)
     /// a unit that passes the test takes orders only with that task.
     pub(super) const fn can_order(&self, at: &Surroundings, test: OrderTest) -> bool {
-        if at.task_0x99 && (at.target.is_some() || self.current_action.is_some()) {
+        if at.flags.contains(SurroundingFlags::TASK_0X99)
+            && (at.target.is_some() || self.current_action.is_some())
+        {
             return false;
         }
-        matches!(test, OrderTest::Any) || at.task_0x99
+        matches!(test, OrderTest::Any) || at.flags.contains(SurroundingFlags::TASK_0X99)
     }
 
     /// The unit AI between its owner's turns (`FUN_140c68980`, from `RGE_Combat_Object::update`
@@ -463,7 +467,9 @@ impl UnitAi {
         if !self.notifies.is_empty() || self.orders.is_empty() {
             return Ok(());
         }
-        if (self.current_action.is_some() || at.busy) && !at.interruptible {
+        if (self.current_action.is_some() || at.flags.contains(SurroundingFlags::BUSY))
+            && !at.flags.contains(SurroundingFlags::INTERRUPTIBLE)
+        {
             return Ok(());
         }
         if self.can_order(at, OrderTest::Any) {

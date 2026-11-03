@@ -22,6 +22,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::player_master;
 use crate::objects::masters::{DamageAmount, DamageClass, Master, MasterTables};
 use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
 use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::pathing::tile_path::Path;
@@ -29,8 +30,10 @@ use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relations;
+use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::TargetRules;
+use crate::unit_ai::best_target::ThingFlags;
 use crate::unit_ai::best_target::{AttackCategory, Candidate, Searcher, Thing, order_weights};
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::Foreign;
@@ -39,6 +42,7 @@ use crate::unit_ai::{
     Target, attack_sight, attacks_neutral as unit_ai_attacks_neutral,
     can_attack as unit_ai_can_attack, can_convert, spares_friends as unit_ai_spares_friends,
 };
+use crate::world::AiSwitches;
 use crate::world::Mode680;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
@@ -405,16 +409,28 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             combat_level: m.combat_level,
             capture,
-            has_ai: self.parts.unit_ai.contains(t.id),
-            inside: t.life.inside.is_some(),
-            targeting: !t.untargetable,
-            attackable: t.attackable,
-            desolid: self
-                .parts
-                .building_of(t.id)
-                .construction
-                .as_ref()
-                .is_some_and(|c| c.desolid),
+            flags: {
+                let mut flags = AttackTargetFlags::empty();
+                flags.set(AttackTargetFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
+                flags.set(AttackTargetFlags::INSIDE, t.life.inside.is_some());
+                flags.set(
+                    AttackTargetFlags::TARGETING,
+                    !t.flags.contains(UnitFlags::UNTARGETABLE),
+                );
+                flags.set(
+                    AttackTargetFlags::ATTACKABLE,
+                    t.flags.contains(UnitFlags::ATTACKABLE),
+                );
+                flags.set(
+                    AttackTargetFlags::DESOLID,
+                    self.parts
+                        .building_of(t.id)
+                        .construction
+                        .as_ref()
+                        .is_some_and(|c| c.desolid),
+                );
+                flags
+            },
             position: placed.position,
             radius: placed.radius,
         };
@@ -449,7 +465,10 @@ impl AttackPicker for WorldPicker<'_> {
             kind: a.kind,
             attack_priority: a.attack_priority,
             player_kind: a.player_kind,
-            walls_allowed: self.ai_settings.may_attack_walls,
+            walls_allowed: self
+                .ai_settings
+                .switches
+                .contains(AiSwitches::MAY_ATTACK_WALLS),
             can_move: seeker.can_move(),
             sight: attack_sight(a)?,
             range: a.range_against()?,
@@ -482,16 +501,29 @@ impl AttackPicker for WorldPicker<'_> {
         let a = self.attacker;
         Ok(Some(Thing {
             owner,
-            allied: allied(self.relations, self.player, owner, AllyTest::WithRelation4),
+            flags: {
+                let mut flags = ThingFlags::empty();
+                flags.set(
+                    ThingFlags::ALLIED,
+                    allied(self.relations, self.player, owner, AllyTest::WithRelation4),
+                );
+                flags.set(ThingFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
+                flags.set(ThingFlags::INSIDE, t.life.inside.is_some());
+                flags.set(
+                    ThingFlags::TARGETABLE,
+                    !t.flags.contains(UnitFlags::UNTARGETABLE),
+                );
+                flags.set(
+                    ThingFlags::ATTACKABLE,
+                    t.flags.contains(UnitFlags::ATTACKABLE),
+                );
+                flags
+            },
             state: t.life.state,
-            has_ai: self.parts.unit_ai.contains(t.id),
-            inside: t.life.inside.is_some(),
             master: t.life.master_id,
             class: m.class,
             kind: m.kind,
-            capture: capture.any(),
-            targetable: !t.untargetable,
-            attackable: t.attackable,
+            capture,
             held: t.life.amount,
             distance: footprint_gap(a.position, a.radius, placed.position, placed.radius),
             speed: self

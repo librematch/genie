@@ -3,6 +3,7 @@
 use crate::players::CivId;
 use crate::players::world_player::{TreeMaster, TreeTech};
 use crate::world::Age;
+use crate::world::settings::OptionFlags;
 use crate::world::settings::Settings;
 use serde::Deserialize;
 use serde::Serialize;
@@ -127,7 +128,7 @@ impl TechTree {
                 }
                 return Found::Unit(unit);
             }
-            if civ == q.fallback || !q.settings.full_tech_tree {
+            if civ == q.fallback || !q.settings.flags.contains(OptionFlags::FULL_TECH_TREE) {
                 return Found::NoBuilding;
             }
             civ = q.fallback;
@@ -162,7 +163,10 @@ impl TechTree {
         match self.find(q) {
             Found::NoCiv | Found::OutOfAges => 0,
             Found::Unit(Some(u)) => f(u),
-            Found::Unit(None) if q.civ != q.fallback && q.settings.full_tech_tree => {
+            Found::Unit(None)
+                if q.civ != q.fallback
+                    && q.settings.flags.contains(OptionFlags::FULL_TECH_TREE) =>
+            {
                 let again = TreeQuery {
                     civ: q.fallback,
                     ..*q

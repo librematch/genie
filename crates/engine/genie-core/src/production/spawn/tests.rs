@@ -40,6 +40,8 @@ use crate::orders::town_bell::BellShelter;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerKind;
+use crate::production::spawn::NearFlags;
+use crate::production::spawn::SiteChecks;
 use crate::production::spawn::ZoneTest;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
@@ -261,22 +263,17 @@ fn sheep(state: ObjectState) -> Near {
         id: object_id(9520),
         position: Position::new(106.68481, 47.14652, 0.0),
         radius: Footprint::new(0.35, 0.35),
-        tall: true,
+        flags: NearFlags::TALL | NearFlags::MOVING,
         kind: MasterKind::COMBAT,
         class: class::LIVESTOCK,
         master: master_id(705),
         buildable_on: BuildableOn::NO,
         obstruction_kind: ObstructionKind::CIRCLE,
-        auto_gather: false,
         state,
-        desolid: false,
         player: PlayerId::new(0),
-        moving: true,
         fog_visibility: FogVisibility::INVISIBLE,
         fog_mask: None,
-        holds: false,
         hp: HitPoints::new(7.0),
-        forest_tile: false,
         outline: Radii::ZERO,
     }
 }
@@ -351,7 +348,7 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
         class: class::BUILDING,
         master: ids::HOUSE,
         obstruction_kind: ObstructionKind::KIND_2,
-        moving: false,
+        flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::Alive,
         fog_mask: Some(VisionBits::from_bits_retain((1 << 1) | (1 << 33))),
@@ -359,16 +356,14 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
     };
     let site = BuildSite {
         player: PlayerId::new(1),
-        human: true,
+        checks: SiteChecks::HUMAN,
         radius: Footprint::new(1.0, 1.0),
         tall: false,
-        scans: false,
         class: class::BUILDING,
         obstructs: true,
         restriction: &Restriction::new(vec![1.0]),
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
-        zones: false,
         own: &[],
     };
     let test = |o: Near, masks: [u64; 2]| {
@@ -1186,16 +1181,18 @@ impl PlaceMap for Dark {
 const fn house_site(restriction: &Restriction, human: bool) -> BuildSite<'_> {
     BuildSite {
         player: PlayerId::new(1),
-        human,
+        checks: if human {
+            SiteChecks::HUMAN
+        } else {
+            SiteChecks::empty()
+        },
         radius: Footprint::new(1.0, 1.0),
         tall: false,
-        scans: false,
         class: class::BUILDING,
         obstructs: true,
         restriction,
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
-        zones: false,
         own: &[],
     }
 }
@@ -1244,7 +1241,7 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
         Ok(None)
     );
     let zoned = BuildSite {
-        zones: true,
+        checks: SiteChecks::ZONES,
         ..open
     };
     assert_eq!(
@@ -1353,7 +1350,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
     let house = Near {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        moving: false,
+        flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::Alive,
         ..sheep(ObjectState::Alive)
@@ -1381,7 +1378,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         }
     ));
     let walking = Near {
-        moving: true,
+        flags: NearFlags::MOVING,
         ..unit
     };
     assert!(!ignores(&site, walking));
@@ -1408,7 +1405,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         }
     ));
     let foundation = Near {
-        desolid: true,
+        flags: NearFlags::DESOLID,
         ..house
     };
     assert!(ignores(&site, foundation));
@@ -1432,7 +1429,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     let walker = Near {
         kind: MasterKind::COMBAT,
         class: class::CLASS_6,
-        moving: true,
+        flags: NearFlags::MOVING,
         player: PlayerId::new(1),
         state: ObjectState::Alive,
         ..sheep(ObjectState::Unfinished)
@@ -1448,7 +1445,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         ..walker
     }));
     assert!(!passes(Near {
-        moving: false,
+        flags: NearFlags::empty(),
         ..walker
     }));
     assert!(!passes(Near {
@@ -1456,7 +1453,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         ..walker
     }));
     let still = Near {
-        moving: false,
+        flags: NearFlags::empty(),
         ..walker
     };
     assert!(passes(Near {
@@ -1471,7 +1468,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
     };
     assert!(passes(stump));
     assert!(!passes(Near {
-        forest_tile: true,
+        flags: NearFlags::FOREST_TILE,
         ..stump
     }));
     assert!(!passes(Near {
@@ -1498,7 +1495,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         class: class::BUILDING,
         master: ids::HOUSE,
         obstruction_kind: ObstructionKind::KIND_2,
-        moving: false,
+        flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::Alive,
         ..sheep(ObjectState::Alive)
@@ -1515,7 +1512,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         Near {
             kind: MasterKind::COMBAT,
             player: PlayerId::new(1),
-            moving: true,
+            flags: NearFlags::MOVING,
             ..house
         },
         Near {
@@ -1529,7 +1526,7 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
             ..house
         },
         Near {
-            desolid: true,
+            flags: NearFlags::DESOLID,
             ..house
         },
         Near {
@@ -1575,7 +1572,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         radius: Footprint::new(1.0, 1.0),
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        moving: false,
+        flags: NearFlags::empty(),
         player: PlayerId::new(2),
         state: ObjectState::DyingSprite,
         obstruction_kind: ObstructionKind::KIND_2,
@@ -1597,7 +1594,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     assert_eq!(test(&build, house), 0);
     let scans = BuildSite {
         tall: true,
-        scans: true,
+        checks: SiteChecks::SCANS,
         ..build
     };
     assert_eq!(test(&scans, house), 6);
@@ -1615,7 +1612,7 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
         test(
             &scans,
             Near {
-                desolid: true,
+                flags: NearFlags::DESOLID,
                 ..house
             }
         ),

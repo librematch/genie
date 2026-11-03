@@ -50,6 +50,7 @@ use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::LosSight;
+use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::AttributeRoles;
@@ -338,7 +339,10 @@ impl Unit {
                 // the building takes the load: the owner's attributes gain it at once
                 let mut adds = Vec::new();
                 give_load(
-                    (&c.w.spatial.relations, owner.sharing),
+                    (
+                        &c.w.spatial.relations,
+                        owner.ally_sharing.contains(AllySharing::RESOURCES),
+                    ),
                     c.player,
                     &mut adds,
                     resource,

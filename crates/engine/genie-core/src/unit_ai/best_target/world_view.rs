@@ -9,6 +9,7 @@ use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::ownership::CaptureKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -87,31 +88,40 @@ pub struct Ask {
     pub work_state: bool,
 }
 
+bitflags::bitflags! {
+    /// What `bestUnitToAttack` reads of an object as yes or no ([`Thing`]).
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct ThingFlags: u8 {
+        /// The unit's owner counts its owner an ally (`FUN_141663d90` with the ally flag).
+        const ALLIED = 1;
+        /// It has a unit AI (`+0x6b0`).
+        const HAS_AI = 1 << 1;
+        /// It is inside another (`+0x2f0`).
+        const INSIDE = 1 << 2;
+        /// Its targeting flag (`+0x689`, `FUN_141188bb0`).
+        const TARGETABLE = 1 << 3;
+        /// Its attackable flag (`+0x68a`, `FUN_141188b10`).
+        const ATTACKABLE = 1 << 4;
+    }
+}
+
 /// What `bestUnitToAttack` reads of an object of the world (`FUN_1415417a0`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Thing {
     /// Its owner's id.
     pub owner: PlayerId,
-    /// The unit's owner counts its owner an ally (`FUN_141663d90` with the ally flag).
-    pub allied: bool,
+    /// Its alliance, unit AI, container, targeting and attackable reads.
+    pub flags: ThingFlags,
     /// `+0x640`.
     pub state: ObjectState,
-    /// It has a unit AI (`+0x6b0`).
-    pub has_ai: bool,
-    /// It is inside another (`+0x2f0`).
-    pub inside: bool,
     /// Its master's id, class and type.
     pub master: MasterId,
     /// Its master's class.
     pub class: ClassId,
     /// Its master's type.
     pub kind: MasterKind,
-    /// Its `+0x924` (`FUN_14107cc90`): others take it over by seeing it.
-    pub capture: bool,
-    /// Its targeting flag (`+0x689`, `FUN_141188bb0`).
-    pub targetable: bool,
-    /// Its attackable flag (`+0x68a`, `FUN_141188b10`).
-    pub attackable: bool,
+    /// Its `+0x924` (`FUN_14107cc90`): how others take it over.
+    pub capture: CaptureKind,
     /// What it holds (`+0x310`).
     pub held: Amount,
     /// The footprints' gap to the unit (`FUN_14118f680`).

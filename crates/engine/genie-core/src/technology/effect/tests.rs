@@ -86,11 +86,13 @@ use crate::vision::VisionBits;
 use crate::vision::VisionMasks;
 use crate::vision::visibility::LosSight;
 use crate::vision::visibility::{Seer, Visibility, VisibleMap};
+use crate::world::AllySharing;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::WorldTime;
+use crate::world::settings::OptionFlags;
 use crate::world::{FrameSeed, GameMode};
 use std::sync::Arc;
 
@@ -1402,7 +1404,7 @@ fn the_resource_commands_side_effects() {
     t.spatial.vision = ByPlayer::new(vec![VisionMasks::default(); 3]);
     t.do_effect(PlayerId::new(1), &[attribute(1, 50, 1, -1, 1.0)], None)
         .unwrap();
-    assert!(t.players[1].allied_vision);
+    assert!(t.players[1].ally_sharing.contains(AllySharing::VISION));
     assert_eq!(t.players[1].attributes[50], Amount::new(1.0));
     assert!(
         t.spatial
@@ -2051,7 +2053,9 @@ fn the_full_tech_tree_disables_civ_own_technologies_but_those_of_mode_1() {
             vec![Millis::ZERO],
             vec![player],
         );
-        t.settings.full_tech_tree = full_tech_tree;
+        t.settings
+            .flags
+            .set(OptionFlags::FULL_TECH_TREE, full_tech_tree);
         t.model.techs = Arc::new(vec![
             def(-1, 0, 0),
             def(0, 5, 0),

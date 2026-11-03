@@ -124,6 +124,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
+use crate::world::settings::OptionFlags;
 use crate::world::tests::in_update;
 use std::sync::Arc;
 
@@ -3828,7 +3829,7 @@ fn seek_shelter_sends_the_players_villagers_and_checked_units_to_its_buildings()
     // with +0x1074 the ally's villager is the player's to send; its own player's town
     // centres are not asked, only the commanding player's
     let mut t = let_out_world();
-    t.settings.cheats_enabled = true;
+    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
     walker(
         &mut t,
         PlayerId::new(2),

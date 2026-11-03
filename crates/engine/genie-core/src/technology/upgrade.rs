@@ -37,6 +37,7 @@ use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::visibility::LosSight;
+use crate::world::AllySharing;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -269,7 +270,13 @@ impl World {
             let amount = u.life.amount;
             let mut adds = Vec::new();
             give_load(
-                (&self.spatial.relations, self.players.player(p)?.sharing),
+                (
+                    &self.spatial.relations,
+                    self.players
+                        .player(p)?
+                        .ally_sharing
+                        .contains(AllySharing::RESOURCES),
+                ),
                 p,
                 &mut adds,
                 kind,

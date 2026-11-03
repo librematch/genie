@@ -76,6 +76,7 @@ use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
+use crate::world::Departures;
 use crate::world::Millis;
 use crate::world::Player;
 use crate::world::Seconds;
@@ -234,7 +235,7 @@ fn defeat_names_the_player_with_the_most_of_its_own_attribute() {
             data3: 0.0,
         }]
     );
-    t.players[2].resigned = true;
+    t.players[2].departures.set(Departures::RESIGNED, true);
     t.players[2].history.entries = vec![HistoryEntry {
         civilian: Population::of_data(1),
         military: Population::ZERO,
@@ -1111,7 +1112,11 @@ fn resignation_cancels_the_queues_and_the_last_side_wins() {
     t.resign(player_id(1), Departure::Resigned).unwrap();
     let p = &t.players[1];
     assert_eq!(
-        (p.game_status, p.resigned, p.dropped),
+        (
+            p.game_status,
+            p.departures.contains(Departures::RESIGNED),
+            p.departures.contains(Departures::DROPPED)
+        ),
         (GameStatus::Lost, true, false)
     );
     assert_eq!(p.attributes[0], Amount::new(46.0));
@@ -1161,7 +1166,13 @@ fn early_in_the_game_resignation_leaves_the_objects_alone() {
     let mut t = game();
     t.world_time = WorldTime::from_millis(60_000);
     t.resign(player_id(1), Departure::Dropped).unwrap();
-    assert_eq!((t.players[1].resigned, t.players[1].dropped), (true, true));
+    assert_eq!(
+        (
+            t.players[1].departures.contains(Departures::RESIGNED),
+            t.players[1].departures.contains(Departures::DROPPED)
+        ),
+        (true, true)
+    );
     assert_eq!(t.players[1].attributes[0], Amount::ZERO);
 }
 

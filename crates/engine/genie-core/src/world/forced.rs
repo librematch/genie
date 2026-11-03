@@ -20,6 +20,7 @@ use crate::technology::TechState;
 use crate::unit_ai::UnitAi;
 use crate::vision::VisionBits;
 use crate::vision::visibility::VisibleMap;
+use crate::world::Departures;
 use crate::world::World;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
@@ -199,7 +200,7 @@ impl World {
         }
         if let Some(&(status, resigned)) = game.statuses.get(p.index()) {
             player.game_status = status;
-            player.resigned = resigned;
+            player.departures.set(Departures::RESIGNED, resigned);
         }
         // each update's first unmodelled part is its own: a freeze's would hide a later stop
         player.unsupported = None;
@@ -530,7 +531,10 @@ mod tests {
         let player = &t.players[1];
         assert_eq!(player.resources(), before);
         assert_eq!(
-            (player.game_status, player.resigned),
+            (
+                player.game_status,
+                player.departures.contains(Departures::RESIGNED)
+            ),
             (GameStatus::Lost, true)
         );
         assert!(player.unsupported.is_none());

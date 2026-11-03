@@ -20,6 +20,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::players::Amount;
 use crate::players::PlayerId;
+use crate::unit_ai::AttackTargetFlags;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiKind;
@@ -401,7 +402,9 @@ pub fn siege_can_attack(
     if me.player == PlayerId::GAIA && !takes_by_sight {
         return Ok(false);
     }
-    if (t.kind == MasterKind::BUILDING && t.desolid) || me.state < ObjectState::Alive {
+    if (t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID))
+        || me.state < ObjectState::Alive
+    {
         return Ok(false);
     }
     if !me.player_kind.is_computer()

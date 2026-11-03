@@ -16,6 +16,7 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AttackChecks;
+use crate::unit_ai::GroupState;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -23,6 +24,7 @@ use crate::unit_ai::OrderPriority;
 use crate::unit_ai::Pace;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
@@ -104,7 +106,7 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         // `IsIdle` (FUN_141017ad0) of the unit's group, read at the handler's start
-        let held_by_group = at.group.is_some_and(|g| !g.idle);
+        let held_by_group = at.group.is_some_and(|g| !g.contains(GroupState::IDLE));
         if !known
             && !player_kind.is_computer()
             && self.current_target != Some(attacker_id)
@@ -190,7 +192,9 @@ impl UnitAi {
             classes,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !player_kind.is_computer() {
+                lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
+                    && !player_kind.is_computer()
+                {
                     2
                 } else {
                     0
@@ -272,7 +276,7 @@ impl UnitAi {
                 && !roles.of_some_class(at.class).intersects(
                     ClassRoles::SIEGE | ClassRoles::UNPACKED_TREBUCHET | ClassRoles::WARSHIP,
                 )
-                && at.disable_tower_priority)
+                && at.flags.contains(SurroundingFlags::DISABLE_TOWER_PRIORITY))
         {
             return Ok(GO_ON);
         }

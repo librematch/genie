@@ -17,6 +17,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::vision::visibility::BuildingSight;
+use crate::world::AllySharing;
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
@@ -187,7 +188,7 @@ impl World {
         let Some(give) = store(amount, out, &mut player.generated) else {
             return Ok(());
         };
-        let sharing = player.sharing;
+        let sharing = player.ally_sharing.contains(AllySharing::RESOURCES);
         let mut adds = Vec::new();
         give_load(
             (&self.spatial.relations, sharing),

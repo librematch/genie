@@ -3,6 +3,7 @@
 use crate::combat::Charge;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::walks::QUIET_CODE;
 use crate::combat::attack::{
     AfterHit, Attack, AttackReads, DRAW_SCALE, EPSILON, Fight, HALF, Hit, Readiness, after_hit,
@@ -245,7 +246,7 @@ impl Attack {
         );
         // slot 0x858 (FUN_14120c0a0): the volley, but for a unit without a missile, volley
         // missile or charge projectile, whose hit is FUN_141081020's melee one
-        if ranged || r.volleys {
+        if ranged || r.flags.contains(AttackerFlags::VOLLEYS) {
             unit.volley(
                 c,
                 Aimed::at(self.target.map(AttackTargetId::id), &f.victim),

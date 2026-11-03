@@ -20,6 +20,7 @@ use crate::objects::SpriteFlags;
 use crate::objects::WorkerCount;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
+use crate::objects::unit::UnitFlags;
 use crate::players::PlayerId;
 use crate::technology::Attributes;
 use crate::world::World;
@@ -87,12 +88,12 @@ impl World {
     /// pasture's height ([`World::make_new_object`], no footprint): the point goes, the pasture
     /// lists it ([`crate::objects::layers::Building::livestock`]), its state is 2 (slot 0xa0 with
     /// 2: it is already), no unit targets it (`+0x689` 0,
-    /// [`crate::objects::unit::Unit::untargetable`]), it is the pasture's (`+0x790`) and holds its
-    /// food (`+0x310`); its current sprite with a random first facet draws a facet below its facets
-    /// less one (0x1fd2, IDIV). Each attempt counts, a master the owner has not got too. Not held:
-    /// its selection flag (`+0x68b` 0, slot 0x6b0) and the drawn facet (`+0xe`, `FUN_14119d490`:
-    /// the moving set-sprite derives it from the angle again, `FUN_141158620` -> `FUN_14114d6c0`,
-    /// its dying sprite's included).
+    /// [`crate::objects::unit::UnitFlags::UNTARGETABLE`]), it is the pasture's (`+0x790`) and holds
+    /// its food (`+0x310`); its current sprite with a random first facet draws a facet below its
+    /// facets less one (0x1fd2, IDIV). Each attempt counts, a master the owner has not got too. Not
+    /// held: its selection flag (`+0x68b` 0, slot 0x6b0) and the drawn facet (`+0xe`,
+    /// `FUN_14119d490`: the moving set-sprite derives it from the angle again, `FUN_141158620` ->
+    /// `FUN_14114d6c0`, its dying sprite's included).
     ///
     /// # Errors
     ///
@@ -145,7 +146,7 @@ impl World {
                 let (_, u) = self
                     .object_mut(new)
                     .ok_or(GenieError::unreachable("the livestock just made"))?;
-                u.untargetable = true;
+                u.flags.set(UnitFlags::UNTARGETABLE, true);
                 u.pasture = Some(id);
                 u.life.amount = food;
                 let graphic = u.sprite.map(|s| s.graphic);

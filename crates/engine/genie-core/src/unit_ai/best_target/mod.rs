@@ -14,7 +14,7 @@ pub use self::statistics::{
     Bounded, Bounds, Candidate, Entry, STATISTICS, Statistics, order_weights,
 };
 pub use self::values::{EntryCount, KillTime, OrderWeight, TargetScore};
-pub use self::world_view::{Ask, Battlefield, Searcher, Thing};
+pub use self::world_view::{Ask, Battlefield, Searcher, Thing, ThingFlags};
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::world::layer::ClassRoles;

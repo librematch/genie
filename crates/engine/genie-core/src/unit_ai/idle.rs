@@ -15,6 +15,7 @@ use crate::unit_ai::AlertMode;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
@@ -87,7 +88,7 @@ impl UnitAi {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
-        if !player_kind.is_computer() || at.garrisoned {
+        if !player_kind.is_computer() || at.flags.contains(SurroundingFlags::GARRISONED) {
             return Ok(false);
         }
         let (classes, radius): (&[ClassId], f32) = if self.ai_kind == FISHING_AI {
@@ -169,7 +170,9 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && MasterKind::COMBAT <= at.kind && !at.capture.any();
+        let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
+            && MasterKind::COMBAT <= at.kind
+            && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
@@ -289,7 +292,11 @@ impl UnitAi {
             classes: &SIEGE_CARED,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario { 2 } else { 0 },
+                lowest: if at.flags.contains(SurroundingFlags::SCENARIO) {
+                    2
+                } else {
+                    0
+                },
                 seeker: self.seeker(at),
                 ask: AttackAsk::IDLE,
             },
@@ -351,7 +358,9 @@ impl UnitAi {
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
         self.cap_human_order(side, ai)?;
-        let searches = !at.scenario && MasterKind::COMBAT <= at.kind && !at.capture.any();
+        let searches = !at.flags.contains(SurroundingFlags::SCENARIO)
+            && MasterKind::COMBAT <= at.kind
+            && !at.capture.any();
         if at.player == PlayerId::GAIA && !searches {
             return Ok(false);
         }
@@ -410,7 +419,11 @@ impl UnitAi {
             classes: &SOLDIER_CARED,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario { 2 } else { 0 },
+                lowest: if at.flags.contains(SurroundingFlags::SCENARIO) {
+                    2
+                } else {
+                    0
+                },
                 seeker: self.seeker(at),
                 ask: AttackAsk::IDLE,
             },
@@ -487,7 +500,7 @@ impl UnitAi {
         if self.restore_patrol(at, ai, side)? {
             return Ok(true);
         }
-        if at.task_0x69 {
+        if at.flags.contains(SurroundingFlags::TASK_0X69) {
             return Err(GenieError::unsupported(
                 "a healer's search for an ally to heal",
             ));
@@ -542,7 +555,7 @@ impl UnitAi {
         ) {
             let _ = self.walk_back(at, side, rng)?;
         }
-        if at.task_0x69 {
+        if at.flags.contains(SurroundingFlags::TASK_0X69) {
             return Err(GenieError::unsupported(
                 "a healer's search for an ally to heal",
             ));
@@ -585,7 +598,9 @@ impl UnitAi {
             classes: &TOWER_CARED,
             size: at.size,
             pick: Pick::Attack {
-                lowest: if at.scenario && !player_kind.is_computer() {
+                lowest: if at.flags.contains(SurroundingFlags::SCENARIO)
+                    && !player_kind.is_computer()
+                {
                     2
                 } else {
                     0

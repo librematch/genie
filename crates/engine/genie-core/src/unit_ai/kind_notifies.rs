@@ -15,6 +15,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
+use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::{
     BREAK, DEAD, Effect, GO_ON, LION_ATTACKED_TIMEOUT, Notify, Surroundings, UnitAi, UnitSide,
@@ -440,7 +441,7 @@ impl UnitAi {
                 Ok(DEAD)
             }
             NotifyKind::DAMAGED => {
-                if at.guest_computer {
+                if at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
                     alert_owner(PlayerKind::Computer)?;
                 }
                 self.damaged(n, time, at, player_kind, ai_rng, side)

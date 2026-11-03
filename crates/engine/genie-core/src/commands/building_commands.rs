@@ -29,6 +29,7 @@ use crate::world::GameMode;
 use crate::world::index::Place;
 use crate::world::parts::Part;
 use crate::world::player::Player;
+use crate::world::settings::OptionFlags;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::world::{BLOCKS_RESEARCH, World};
@@ -274,7 +275,7 @@ impl World {
         }
         let own = self
             .object(r.building)
-            .map(|(p, _)| p == player || self.settings.cheats_enabled);
+            .map(|(p, _)| p == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED));
         match own {
             Some(false) => return Ok(None),
             None if listed == 1 => return Ok(None),

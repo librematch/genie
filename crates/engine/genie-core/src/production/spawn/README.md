@@ -26,6 +26,7 @@ test: the map's edge, the terrain, the explored tiles and the objects in the way
 | [`gather_walk.rs`](gather_walk.rs) | A new unit's walk to its building's gather point (`FUN_140ace9c0`). |
 | [`make_action.rs`](make_action.rs) | A building's production list and its make action (`TRIBE_Action_Make_Obj`). |
 | [`mod.rs`](mod.rs) | A trained unit's spawn: where the make action (`TRIBE_Action_Make_Obj`, `FUN_140ad0240`) puts the unit its building made. |
+| [`near.rs`](near.rs) | An object near a candidate (`Near`), as the placement test and the blocker test read it. |
 | [`new_unit.rs`](new_unit.rs) | A made unit's spawn, the command queue it takes, its unit AI and the combat unit's constructor. |
 | [`objects.rs`](objects.rs) | A spot beside a building, the remains a death leaves, a plain object, the flares and a building a death makes. |
 | [`placement_code.rs`](placement_code.rs) | What a building's placement test answers. |
