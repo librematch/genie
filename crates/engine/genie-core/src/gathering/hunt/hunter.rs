@@ -18,6 +18,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterTables;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
+use crate::objects::unit::Presence;
 use crate::objects::unit::object_master;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::Amount;
@@ -73,7 +74,7 @@ impl Unit {
             }
         }
         if let Some(site) = actions.list.hunt().map(|h| h.carry_to) {
-            let held = c.w.spatial.get(site).is_some();
+            let held = Presence::of_found(c.w.spatial.get(site));
             let (kept, let_go) = second_target_checked(
                 site,
                 held,

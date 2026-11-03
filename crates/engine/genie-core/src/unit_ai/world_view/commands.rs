@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::construction::repair::{REPAIR, repairers};
+use crate::garrison::EnterSlot;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
@@ -18,7 +19,6 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
-use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::pathing::zones::{UNKNOWN_RESTRICTION, ZoneId, ZoneMap};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -214,7 +214,7 @@ impl UnitView<'_, '_> {
         let Some((_, target_unit)) = find(target) else {
             return Ok(false);
         };
-        let under_artifact = self.actions.top_action_kind() == Some(ARTIFACT_KIND);
+        let slot = EnterSlot::under(self.actions.top_action_kind());
         let masters = self
             .c
             .w
@@ -287,7 +287,7 @@ impl UnitView<'_, '_> {
             target,
             task,
             switch: switch.map(|m| m.id),
-            under_artifact,
+            slot,
         };
         if let Some(n) = self
             .c

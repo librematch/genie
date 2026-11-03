@@ -41,6 +41,7 @@ use crate::unit_ai::UnitAiKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::{Attacker, TopTarget};
+use crate::world::GameMode;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
@@ -123,7 +124,7 @@ impl Unit {
         ai_kind: UnitAiKind,
         master: Option<&Master>,
         (player, player_kind): (PlayerId, PlayerKind),
-        scenario: bool,
+        mode: GameMode,
         (capture, firepower, speed): (CaptureKind, Firepower, Speed),
     ) -> Attacker {
         Attacker {
@@ -149,7 +150,7 @@ impl Unit {
             position: self.position(),
             radius: master.map_or(Footprint::ZERO, |m| m.radius),
             speed,
-            scenario,
+            scenario: mode.scenario(),
             firepower,
             capture,
         }

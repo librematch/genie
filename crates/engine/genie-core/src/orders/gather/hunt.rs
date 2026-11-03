@@ -29,7 +29,7 @@ impl World {
             target,
             task,
             point,
-            clears,
+            notifies,
             notify,
         } = order;
         let mut quarry = self.quarry(player, target)?;
@@ -42,7 +42,7 @@ impl World {
                 Some(AiAction::Hunt),
                 Some((target, quarry.class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;

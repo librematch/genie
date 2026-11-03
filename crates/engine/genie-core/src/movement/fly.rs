@@ -11,6 +11,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::{cos, sin};
 use crate::math::rng::{Stream, Well512};
+use crate::movement::MoveState;
 use crate::movement::move_to::{ListUpdate, update_sub_actions};
 use crate::movement::move_to::{MoveToAction, graphic_of};
 use crate::movement::{Me, Mover};
@@ -379,7 +380,7 @@ impl Unit {
     fn lift_to_fly_height(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let (x, y) = (self.position().x(), self.position().y());
         let at = Position::new(x, y, c.w.model.tuning.fly.height);
-        let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);
+        let moving = MoveState::of_mover(c.w.parts.mover_of(self.id));
         self.new_position(
             at,
             moving,

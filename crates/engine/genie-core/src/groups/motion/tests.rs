@@ -1,6 +1,7 @@
 use super::*;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
+use crate::groups::PathBudget;
 use crate::groups::motion::FlagChange;
 use crate::groups::motion::YawLimit;
 use crate::map::Distance;
@@ -487,7 +488,7 @@ impl Fixture {
             plan: &mut plan,
             dt: Seconds::new(0.1),
         };
-        path_step(m, group, lead, &mut world, false).unwrap()
+        path_step(m, group, lead, &mut world, PathBudget::Untested).unwrap()
     }
 }
 
@@ -598,7 +599,7 @@ impl Fixture {
         &mut self,
         m: &mut Motion,
         lead: &Lead,
-        budget: bool,
+        budget: PathBudget,
         target: Option<&Placed>,
         target_gap2: DistanceSquared,
     ) -> Option<Pass> {
@@ -678,7 +679,13 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     let mut m = requesting(0, 30.0);
     m.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(matches!(
-        fx.request(&mut m, &lead(), true, None, DistanceSquared::new(f32::MAX)),
+        fx.request(
+            &mut m,
+            &lead(),
+            PathBudget::Tested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        ),
         Some(Pass::Done(false))
     ));
     assert_eq!(
@@ -692,7 +699,7 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
     let p = fx.request(
         &mut m,
         &grouped(0),
-        false,
+        PathBudget::Untested,
         None,
         DistanceSquared::new(f32::MAX),
     );
@@ -710,7 +717,13 @@ fn request_over_the_budget_waits_and_the_last_plan_spent_gives_up() {
             solid: false,
             ..lead
         };
-        let _ = fx.request(&mut m, &lead, false, None, DistanceSquared::new(f32::MAX));
+        let _ = fx.request(
+            &mut m,
+            &lead,
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX),
+        );
         assert_eq!(m.paths.last().map(|l| l.continue_counter.get()), Some(1));
     }
 }
@@ -724,7 +737,13 @@ fn top_level_without_planner_plans_the_straight_way() {
     let mut m = requesting(2, 30.0);
     m.paths[0].continue_counter = PlanTries::of_data(4);
     assert!(matches!(
-        fx.request(&mut m, &lead(), false, None, DistanceSquared::new(f32::MAX)),
+        fx.request(
+            &mut m,
+            &lead(),
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        ),
         Some(Pass::Next)
     ));
     assert_eq!(m.paths.len(), 2);
@@ -765,13 +784,25 @@ fn near_waypoint_without_way_is_reached_or_arrived_at() {
     };
     let mut m = requesting(0, 6.0);
     assert!(matches!(
-        fx.request(&mut m, &lead, false, None, DistanceSquared::new(f32::MAX)),
+        fx.request(
+            &mut m,
+            &lead,
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        ),
         Some(Pass::Reached)
     ));
     m.paths[0].created = WorldTime::from_millis(100);
     m.velocity = BVector::new(0.0, 0.0, 1.0);
     assert!(matches!(
-        fx.request(&mut m, &lead, false, None, DistanceSquared::new(f32::MAX)),
+        fx.request(
+            &mut m,
+            &lead,
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        ),
         Some(Pass::Done(true))
     ));
     assert_eq!(
@@ -785,7 +816,7 @@ fn near_waypoint_without_way_is_reached_or_arrived_at() {
         fx.request(
             &mut m,
             &lead,
-            false,
+            PathBudget::Untested,
             Some(&placed),
             DistanceSquared::new(tuning().group.near)
         ),
@@ -797,7 +828,7 @@ fn near_waypoint_without_way_is_reached_or_arrived_at() {
         fx.request(
             &mut m,
             &lead,
-            false,
+            PathBudget::Untested,
             Some(&placed),
             DistanceSquared::new(0.2)
         ),
@@ -816,7 +847,7 @@ fn near_target_takes_the_straight_way() {
         fx.request(
             &mut m,
             &lead(),
-            false,
+            PathBudget::Untested,
             Some(&placed),
             DistanceSquared::new(0.5)
         )
@@ -852,8 +883,14 @@ fn near_waypoint_takes_the_short_pather_path() {
     let mut lead = lead();
     lead.walker.radius = Distance::new(0.6);
     assert!(
-        fx.request(&mut m, &lead, false, None, DistanceSquared::new(f32::MAX))
-            .is_none()
+        fx.request(
+            &mut m,
+            &lead,
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        )
+        .is_none()
     );
     let new = &m.paths[0];
     assert_eq!(
@@ -872,8 +909,14 @@ fn far_waypoint_takes_the_long_pather_path() {
     let mut fx = open_fixture();
     let mut m = requesting(0, 30.0);
     assert!(
-        fx.request(&mut m, &lead(), false, None, DistanceSquared::new(f32::MAX))
-            .is_none()
+        fx.request(
+            &mut m,
+            &lead(),
+            PathBudget::Untested,
+            None,
+            DistanceSquared::new(f32::MAX)
+        )
+        .is_none()
     );
     let new = &m.paths[0];
     assert_eq!(
@@ -1083,7 +1126,14 @@ impl Fixture {
             plan: &mut plan,
             dt: Seconds::new(0.1),
         };
-        step::pass(m, &GroupView::default(), lead, &mut world, false).unwrap()
+        step::pass(
+            m,
+            &GroupView::default(),
+            lead,
+            &mut world,
+            PathBudget::Untested,
+        )
+        .unwrap()
     }
 }
 
@@ -1306,7 +1356,7 @@ fn the_members_centre_pulls_group_whose_members_all_act() {
             dt: Seconds::new(0.1),
         };
         assert!(matches!(
-            step::pass(&mut m, &group, &lead(), &mut world, false).unwrap(),
+            step::pass(&mut m, &group, &lead(), &mut world, PathBudget::Untested).unwrap(),
             Pass::Done(true)
         ));
         m.new_position[0]

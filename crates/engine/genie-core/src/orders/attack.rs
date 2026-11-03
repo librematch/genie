@@ -19,6 +19,7 @@ use crate::objects::masters::FogVisibility;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
 use crate::players::PlayerId;
+use crate::unit_ai::Notifies;
 use crate::world::WorldTime;
 use crate::world::slots::PlayerSlots;
 
@@ -114,7 +115,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         if task.work_range != Distance::ZERO {
             return Err(GenieError::unsupported(
@@ -123,7 +124,7 @@ impl World {
         }
         let aim = self.attack_aim(target)?;
         let world_time = self.world_time;
-        self.attack_notifies(player, idx, (target, &aim), point, clears)?;
+        self.attack_notifies(player, idx, (target, &aim), point, notifies)?;
         self.clear_actions(player, idx)?;
         let master = self
             .players
@@ -254,14 +255,14 @@ impl World {
     /// aimed object at its place (`FUN_140c64b50`, `FUN_140c64c10`); the target taken (slot
     /// 0x178); the last retarget time the world's; the work notify (`FUN_14106e4e0` kind 9:
     /// order 700, action 600, the target with its class and the work's `point`, its notifies
-    /// cleared with `clears`) and the order history.
+    /// cleared with `notifies`) and the order history.
     pub(super) fn attack_notifies(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         (target, aim): (ObjectId, &Aim),
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
@@ -278,7 +279,7 @@ impl World {
                 Some(AiAction::Attack),
                 Some((target, aim.class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(

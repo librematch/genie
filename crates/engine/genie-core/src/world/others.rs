@@ -20,6 +20,7 @@ use crate::players::PlayerId;
 use crate::players::tracker::{Tracker, key};
 use crate::unit_ai::world_view::Foreign;
 use crate::world::World;
+use crate::world::index::ListKind;
 use crate::world::index::{ObjectIndex, Place};
 use crate::world::layer::Roles;
 use crate::world::player::Player;
@@ -115,11 +116,11 @@ impl<'a> OthersRef<'a> {
             after,
             left,
         } = self.foreign;
-        let (q, sleeping) = (place.player(), place.sleeping());
+        let (q, list) = (place.player(), place.list());
         let list = match q.index().cmp(&before.len()) {
-            Ordering::Less => side(before.get(q.index())?, sleeping),
-            Ordering::Greater => side(after.get(q.index() - before.len() - 1)?, sleeping),
-            Ordering::Equal if sleeping => return None,
+            Ordering::Less => side(before.get(q.index())?, list),
+            Ordering::Greater => side(after.get(q.index() - before.len() - 1)?, list),
+            Ordering::Equal if list == ListKind::Sleeping => return None,
             Ordering::Equal => left.map_or(self.own, |(_, l)| l),
         };
         Some((q, list))
@@ -220,12 +221,11 @@ impl<'a> OthersRef<'a> {
     }
 }
 
-/// Player `player`'s sleeping list, or else its live one.
-const fn side(player: &Player, sleeping: bool) -> &ObjectList {
-    if sleeping {
-        &player.sleeping
-    } else {
-        &player.objects
+/// Player `player`'s list of `kind`.
+const fn side(player: &Player, kind: ListKind) -> &ObjectList {
+    match kind {
+        ListKind::Sleeping => &player.sleeping,
+        ListKind::Live => &player.objects,
     }
 }
 

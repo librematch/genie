@@ -165,11 +165,13 @@ use crate::objects::object_list::ObjectList;
 use crate::objects::release::{Releaser, released};
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
+use crate::objects::unit::Presence;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
 use crate::objects::unit::{Unit, loses_actions};
 use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount};
 use crate::orders::ControlKey;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
 use crate::ownership::CaptureKind;
@@ -1449,7 +1451,7 @@ fn villager_ordered_on_pasture_works_its_livestock() {
         point: Position::new(20.0, 20.0, 0.0),
         carry_test: true,
         filter: None,
-        notified: false,
+        source: OrderSource::Queued,
     };
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
@@ -1501,7 +1503,7 @@ fn unit_past_state_2_ignores_work_order() {
         point: Position::new(20.0, 20.0, 0.0),
         carry_test: true,
         filter: None,
-        notified: false,
+        source: OrderSource::Queued,
     };
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
@@ -1521,7 +1523,7 @@ fn villager_ordered_on_pasture_without_livestock_tends_on() {
         point: Position::new(20.0, 20.0, 0.0),
         carry_test: true,
         filter: None,
-        notified: false,
+        source: OrderSource::Queued,
     };
     let mut t = tended_pasture(Position::new(18.0, 18.0, 0.0), 2.0);
     let v = t.players[1].objects.last_place().unwrap();
@@ -2759,7 +2761,7 @@ fn work_command_on_damaged_building_starts_repair() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -2836,7 +2838,7 @@ fn work_command_on_another_building_moves_the_repair_there() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(
         PlayerId::new(1),
@@ -2910,7 +2912,7 @@ fn work_command_on_foundation_starts_build_as_its_builder() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -3028,7 +3030,7 @@ fn builder_with_master_of_its_own_walks_with_its_own_master_sprite() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     let walking = Graphic {
         id: SpriteId::named(7),
@@ -3096,7 +3098,7 @@ fn work_command_on_the_build_own_foundation_keeps_the_work_or_walks_again() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -3204,7 +3206,7 @@ fn work_command_on_another_foundation_moves_the_build_there() {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(
         PlayerId::new(1),
@@ -3549,7 +3551,7 @@ fn work_command_on_bush_starts_gather_and_another_moves_it() {
         point: Position::new(32.5, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(
         PlayerId::new(1),
@@ -3725,7 +3727,7 @@ fn loaded_forager_sent_to_its_town_centre_carries_its_load_there() {
         point: Position::new(20.0, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     let loaded = || {
         let mut t = forage_world();
@@ -3787,7 +3789,7 @@ fn work_command_without_task_moves_the_unit_there() {
         point: Position::new(20.0, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     let mut t = forage_world();
     t.order_work(
@@ -3879,7 +3881,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             ListIndex::new(0),
             object_id(601),
             point,
-            false
+            OrderSource::Queued
         ),
         Ok(true)
     );
@@ -3921,7 +3923,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            false
+            OrderSource::Queued
         ),
         Ok(true)
     );
@@ -3953,7 +3955,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            false
+            OrderSource::Queued
         ),
         Ok(true)
     );
@@ -4852,7 +4854,7 @@ fn the_units_on_new_foundation_are_sent_off_it() {
             point: Position::new(30.0, 88.0, 0.0),
             carry_test: false,
             filter: None,
-            notified: true,
+            source: OrderSource::Direct,
         },
     )
     .unwrap();
@@ -5239,7 +5241,7 @@ fn work_command_on_another_deer_moves_the_hunt_there() {
         point: Position::new(36.5, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -5294,7 +5296,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
             ListIndex::new(0),
             object_id(501),
             point,
-            false
+            OrderSource::Queued
         ),
         Ok(true)
     );
@@ -5324,7 +5326,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
             ListIndex::new(0),
             object_id(700),
             Position::new(20.0, 89.5, 0.0),
-            false
+            OrderSource::Queued
         ),
         Ok(true)
     );
@@ -6494,7 +6496,7 @@ fn side_own_release_tells_the_unit_ai_as_the_side_returns() {
                 UnitAiKind::SOLDIER,
                 None,
                 (PlayerId::new(1), PlayerKind::Human),
-                false,
+                GameMode::RandomMap,
                 (
                     CaptureKind::None,
                     Firepower::ZERO,
@@ -6553,7 +6555,7 @@ fn step_own_notify_waits_for_the_unit_ai_side_to_return() {
                 UnitAiKind::SOLDIER,
                 None,
                 (PlayerId::new(1), PlayerKind::Human),
-                false,
+                GameMode::RandomMap,
                 (
                     CaptureKind::None,
                     Firepower::ZERO,
@@ -6605,7 +6607,7 @@ fn the_ai_stream_is_the_unit_ai_while_its_side_runs() {
                     UnitAiKind::SOLDIER,
                     None,
                     (PlayerId::new(1), PlayerKind::Human),
-                    false,
+                    GameMode::RandomMap,
                     (
                         CaptureKind::None,
                         Firepower::ZERO,
@@ -6646,7 +6648,7 @@ fn unit_ai_stop_lets_its_target_go_within_the_update() {
         point: Position::new(32.5, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -6879,7 +6881,7 @@ fn villager_side<R>(
                 UnitAiKind::BOAR,
                 None,
                 (PlayerId::new(1), PlayerKind::Human),
-                false,
+                GameMode::RandomMap,
                 (
                     CaptureKind::None,
                     Firepower::ZERO,
@@ -12911,7 +12913,7 @@ fn second_target_past_state_6_is_let_go_and_one_gone_dropped() {
     assert_eq!(
         second_target_checked(
             Some(DropSiteId::new(object_id(9149))),
-            true,
+            Presence::Held,
             Some(ObjectState::Removed)
         ),
         (None, Some(DropSiteId::new(object_id(9149))))
@@ -12919,7 +12921,7 @@ fn second_target_past_state_6_is_let_go_and_one_gone_dropped() {
     assert_eq!(
         second_target_checked(
             Some(DropSiteId::new(object_id(9149))),
-            true,
+            Presence::Held,
             Some(ObjectState::Undead)
         ),
         (Some(DropSiteId::new(object_id(9149))), None)
@@ -12927,16 +12929,19 @@ fn second_target_past_state_6_is_let_go_and_one_gone_dropped() {
     assert_eq!(
         second_target_checked(
             Some(DropSiteId::new(object_id(9149))),
-            true,
+            Presence::Held,
             Some(ObjectState::Alive)
         ),
         (Some(DropSiteId::new(object_id(9149))), None)
     );
     assert_eq!(
-        second_target_checked(Some(DropSiteId::new(object_id(9149))), false, None),
+        second_target_checked(Some(DropSiteId::new(object_id(9149))), Presence::Gone, None),
         (None, None)
     );
-    assert_eq!(second_target_checked(None, false, None), (None, None));
+    assert_eq!(
+        second_target_checked(None, Presence::Gone, None),
+        (None, None)
+    );
 }
 
 /// A foundation's attacking units (`+0xce0`): slot 0x178 of a building (`FUN_1411dba70`) below
@@ -17866,17 +17871,20 @@ fn committing_build_or_wall_to_busy_builder_readies_its_queue() {
 fn resource_search_starts_from_its_point_unless_it_is_none_or_has_site() {
     let unit = Position::new(5.0, 6.0, 0.5);
     assert_eq!(
-        search_origin(Point::new(12.5, 30.5), false, unit),
+        search_origin(Point::new(12.5, 30.5), None::<ObjectId>, unit),
         Position::new(12.5, 30.5, 0.5)
     );
-    assert_eq!(search_origin(NO_POINT, false, unit), unit);
-    assert_eq!(search_origin(Point::new(12.5, 30.5), true, unit), unit);
+    assert_eq!(search_origin(NO_POINT, None::<ObjectId>, unit), unit);
     assert_eq!(
-        search_origin(Point::new(-1.0, 3.0), false, unit),
+        search_origin(Point::new(12.5, 30.5), Some(object_id(1)), unit),
+        unit
+    );
+    assert_eq!(
+        search_origin(Point::new(-1.0, 3.0), None::<ObjectId>, unit),
         Position::new(-1.0, 3.0, 0.5)
     );
     assert!(
-        search_origin(Point::new(f32::NAN, -1.0), false, unit)
+        search_origin(Point::new(f32::NAN, -1.0), None::<ObjectId>, unit)
             .x()
             .is_nan()
     );
@@ -21157,7 +21165,7 @@ fn repair_for(t: &mut World, n: usize) -> Vec<Option<RepairState>> {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -21561,7 +21569,7 @@ fn repaired_by(n: usize) -> [(f32, f32); 2] {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     for &i in &repairers {
         t.order_work(PlayerId::new(1), i, &work).unwrap();

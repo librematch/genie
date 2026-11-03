@@ -44,6 +44,15 @@ use std::sync::Arc;
 #[cfg(test)]
 use std::sync::LazyLock;
 
+/// Which of a player's object lists: the live one or the sleeping one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ListKind {
+    /// The live list (`+0x30`).
+    Live,
+    /// The sleeping list.
+    Sleeping,
+}
+
 /// Where an object is: its player and its index in the live or the sleeping list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Place {
@@ -52,12 +61,19 @@ pub(crate) enum Place {
 }
 
 impl Place {
-    /// Slot `i` of player `p`'s sleeping list, or else its live one.
-    pub(crate) const fn of(p: PlayerId, sleeping: bool, i: ListIndex) -> Self {
-        if sleeping {
-            Self::Sleeping(p, i)
-        } else {
-            Self::Live(p, i)
+    /// Slot `i` of player `p`'s list of `kind`.
+    pub(crate) const fn of(p: PlayerId, kind: ListKind, i: ListIndex) -> Self {
+        match kind {
+            ListKind::Sleeping => Self::Sleeping(p, i),
+            ListKind::Live => Self::Live(p, i),
+        }
+    }
+
+    /// The list the slot is in.
+    pub(crate) const fn list(self) -> ListKind {
+        match self {
+            Self::Live(..) => ListKind::Live,
+            Self::Sleeping(..) => ListKind::Sleeping,
         }
     }
 
@@ -82,7 +98,7 @@ impl Place {
 
     /// Slot `i` of the same list.
     const fn at(self, i: ListIndex) -> Self {
-        Self::of(self.player(), self.sleeping(), i)
+        Self::of(self.player(), self.list(), i)
     }
 }
 
@@ -153,7 +169,7 @@ impl ObjectIndex {
         }
         let place = self.filed(id)?;
         let player = players.get(place.player().index())?;
-        list(player, place.sleeping())
+        list(player, place.list())
             .get(place.slot())
             .is_some_and(|u| u.id == id)
             .then_some(place)
@@ -615,12 +631,11 @@ fn scan(players: &[Player], id: ObjectId) -> Option<Place> {
         })
 }
 
-/// A player's list, by the place's kind.
-const fn list(player: &Player, sleeping: bool) -> &ObjectList {
-    if sleeping {
-        &player.sleeping
-    } else {
-        &player.objects
+/// A player's list of `kind`.
+const fn list(player: &Player, kind: ListKind) -> &ObjectList {
+    match kind {
+        ListKind::Sleeping => &player.sleeping,
+        ListKind::Live => &player.objects,
     }
 }
 

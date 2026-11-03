@@ -74,16 +74,27 @@ pub(super) fn ground(a: BVector, b: BVector) -> Distance {
     Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y()))
 }
 
+/// Whether a walk's goal is in the short pather's reach ([`Mover::near_goal`]).
+///
+/// [`Mover::near_goal`]: crate::movement::Mover::near_goal
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum GoalReach {
+    /// In reach.
+    Near,
+    /// Out of it.
+    Far,
+}
+
 /// The short pather's range for a request (`0x141150f00`): the level's range less 0.1 when its
 /// goal is in reach ([`Mover::near_goal`]), at least 0; else 0.
 ///
 /// [`Mover::near_goal`]: crate::movement::Mover::near_goal
 pub(super) fn short_range(
-    near: bool,
+    near: GoalReach,
     range: Distance,
     movement_tuning: &MovementTuning,
 ) -> Distance {
-    if !near {
+    if near == GoalReach::Far {
         return Distance::ZERO;
     }
     let r = range - Distance::new(movement_tuning.range_floor);

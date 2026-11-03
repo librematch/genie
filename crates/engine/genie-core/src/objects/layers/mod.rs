@@ -11,6 +11,7 @@
 use crate::GenieError;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
+use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::pathing::Pathing;
 use genie_diff::Diff;
@@ -57,13 +58,13 @@ impl Static {
     /// `RGE_Static_Object::new_position` (`0x1411a58b0`) at `at`, which its callers hold on the
     /// map: the object takes the place, the world's index moves it between the tiles' lists and
     /// refiles its record, its sight follows ([`Spatial::set_position`]), and its mesh shape
-    /// follows (`FUN_14118c540` -> `FUN_141056460`, [`Pathing::moved`]; a `moving` object's
+    /// follows (`FUN_14118c540` -> `FUN_141056460`, [`Pathing::moved`]; a moving object's
     /// shape goes) where the caller holds the mesh.
     pub(crate) fn new_position(
         &mut self,
         id: ObjectId,
         at: Position,
-        moving: bool,
+        moving: MoveState,
         (world, pathing): (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
@@ -97,7 +98,7 @@ impl Static {
         self.position = at;
         placed.position = at;
         world.insert(id, placed);
-        pathing.moved(id, &placed, false);
+        pathing.moved(id, &placed, MoveState::Standing);
         placed
     }
 
@@ -164,7 +165,7 @@ mod tests {
             .new_position(
                 object_id(7),
                 Position::new(2.5, 1.25, 0.0),
-                true,
+                MoveState::Moving,
                 (&mut world, None),
                 &roles(),
                 tuning().visibility,

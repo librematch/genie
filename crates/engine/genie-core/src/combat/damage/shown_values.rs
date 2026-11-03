@@ -155,13 +155,22 @@ pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>, roles: &Roles) -
             || target.is_some_and(|t| charge_hit(a, t, roles) || range_charge_hit(a, t, roles)))
 }
 
-/// The best amount of `weapons` above 0 (the first of a tie), of a melee, pierce or class-31
-/// weapon with `fighting`.
-pub(super) fn best_attack(weapons: &[ClassAmount], fighting: bool) -> DamageAmount {
+/// Which weapons the shown attack's best ([`best_attack`]) reads: the fighting classes' (melee,
+/// pierce, class 31) or any.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Weapons {
+    /// Melee, pierce and class 31.
+    Fighting,
+    /// Any class.
+    Any,
+}
+
+/// The best amount of `weapons` above 0 (the first of a tie), of the classes `of`.
+pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount {
     weapons
         .iter()
         .filter(|w| {
-            !fighting
+            of == Weapons::Any
                 || matches!(
                     w.class,
                     DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
@@ -192,11 +201,11 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
         && a.charge_kind.ranged()
         && let Some(weapons) = s.projectile
     {
-        return best_attack(weapons, true);
+        return best_attack(weapons, Weapons::Fighting);
     }
-    let mut attack = best_attack(&v.weapons, true);
+    let mut attack = best_attack(&v.weapons, Weapons::Fighting);
     if attack == DamageAmount::ZERO {
-        attack = best_attack(&v.weapons, false);
+        attack = best_attack(&v.weapons, Weapons::Any);
     }
     let powerup = if v.tribe() {
         a.attack_powerup.get()

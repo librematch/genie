@@ -502,7 +502,7 @@ impl UnitAi {
             side.seek_unexplored(self, ai_rng)?
         };
         if let Some(t) = found {
-            let _ = self.explore_at(t, true, side, ai_rng, unit_ai_tuning)?;
+            let _ = self.explore_at(t, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
             self.last_action = self.current_action;
             self.current_action = action;
             return Ok(BREAK);
@@ -527,7 +527,7 @@ impl UnitAi {
                     return Ok(BREAK);
                 };
                 if self.current_action == Some(AiAction::AutoScout) {
-                    let _ = self.explore_at(t, true, side, ai_rng, unit_ai_tuning)?;
+                    let _ = self.explore_at(t, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
                 }
                 self.current_action = action;
                 Ok(BREAK)

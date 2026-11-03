@@ -18,6 +18,7 @@ use crate::movement::Planning;
 use crate::movement::move_to::MoveToReads;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
@@ -30,6 +31,7 @@ use crate::orders::object_gone;
 use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::EnterOrder;
@@ -38,6 +40,27 @@ use crate::world::Player;
 use crate::world::World;
 use crate::world::index::{ObjectsRef, Place};
 use crate::world::slots::PlayerSlots;
+
+/// Where a unit's new Enter goes: its own action list, or under the Artifact on top as its
+/// sub-action (`FUN_1410847e0`; the top action read before the task search).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum EnterSlot {
+    /// The unit's own action.
+    Own,
+    /// The Artifact's sub-action.
+    UnderArtifact,
+}
+
+impl EnterSlot {
+    /// The slot under the top action `top`.
+    pub(crate) fn under(top: Option<ActionKind>) -> Self {
+        if top == Some(ARTIFACT_KIND) {
+            Self::UnderArtifact
+        } else {
+            Self::Own
+        }
+    }
+}
 
 impl World {
     /// The work command's Enter (its action type 3, [`World::new_enter`]), the unit AI hearing of
@@ -50,7 +73,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let (action, target, class) = self.new_enter(player, idx, target, task)?;
         if let Some(ai) = self
@@ -63,7 +86,7 @@ impl World {
                 Some(AiAction::Enter),
                 Some((target.id(), class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Enter), Some(AiAction::Enter)))?;
@@ -105,8 +128,8 @@ impl World {
         else {
             return Ok(false);
         };
-        let under_artifact = top == Some(ARTIFACT_KIND);
-        let failed = self.enter_with(player, idx, target, &task, under_artifact)?;
+        let slot = EnterSlot::under(top);
+        let failed = self.enter_with(player, idx, target, &task, slot)?;
         self.post_own_failure(player, idx, failed)?;
         Ok(true)
     }
@@ -144,7 +167,7 @@ impl World {
         if let Some(master) = order.switch {
             self.change_master(player, idx, master)?;
         }
-        self.enter_with(player, idx, order.target, &order.task, order.under_artifact)
+        self.enter_with(player, idx, order.target, &order.task, order.slot)
     }
 
     /// The enter command's Enter on `task` (`FUN_140a855d0`, [`World::new_enter`]): under an
@@ -162,10 +185,10 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         task: &Task,
-        under_artifact: bool,
+        slot: EnterSlot,
     ) -> Result<Option<Notify>, GenieError> {
         let (action, target, _) = self.new_enter(player, idx, target, task)?;
-        self.install_enter_as(player, idx, target, action, task, under_artifact)
+        self.install_enter_as(player, idx, target, action, task, slot)
     }
 
     /// The Enter's constructor (`FUN_140a855d0`) on `target` with `task`: its target, an annex
@@ -217,7 +240,7 @@ impl World {
         action: EnterAction,
         task: &Task,
     ) -> Result<Option<Notify>, GenieError> {
-        self.install_enter_as(player, idx, target, action, task, false)
+        self.install_enter_as(player, idx, target, action, task, EnterSlot::Own)
     }
 
     /// [`World::install_enter`], or with `sub` the Enter as the sub-action of the Artifact on top
@@ -235,16 +258,16 @@ impl World {
         target: ContainerId,
         mut action: EnterAction,
         task: &Task,
-        sub: bool,
+        slot: EnterSlot,
     ) -> Result<Option<Notify>, GenieError> {
         let id = self.players.live(player, idx)?.id;
-        if sub {
+        if slot == EnterSlot::UnderArtifact {
             self.enter_under_artifact(player, idx, id, action)?;
         } else {
             self.clear_actions(player, idx)?;
         }
         if self.players.live(player, idx)?.life.inside.is_some() {
-            return self.enter_from_inside(player, idx, action, sub).map(Some);
+            return self.enter_from_inside(player, idx, action, slot).map(Some);
         }
         let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
         if !self.has_room(tp, t, Some(id))? {
@@ -263,7 +286,7 @@ impl World {
                     .list
                     .set_enter(Some(action));
                 let entered = self.enter_now(player, idx, target);
-                if sub {
+                if slot == EnterSlot::UnderArtifact {
                     let actions = self.parts.actions.of_mut(id)?;
                     let e = actions.list.take_enter();
                     if let (Some(e), Some(art)) = (e, actions.list.artifact_mut()) {
@@ -273,7 +296,7 @@ impl World {
                 entered.map(|()| None)
             }
             Walking::Walk(to) => {
-                self.parts.actions.of_mut(id)?.place_enter(action, sub);
+                self.parts.actions.of_mut(id)?.place_enter(action, slot);
                 to.map_or(Ok(()), |to| self.move_transport(Some(target), to))
                     .map(|()| None)
             }
@@ -324,12 +347,15 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         mut action: EnterAction,
-        sub: bool,
+        slot: EnterSlot,
     ) -> Result<Notify, GenieError> {
         action.state = EnterState::Failed;
         let masters = OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player));
         let unit = self.players.live_mut(player, idx)?;
-        self.parts.actions.of_mut(unit.id)?.place_enter(action, sub);
+        self.parts
+            .actions
+            .of_mut(unit.id)?
+            .place_enter(action, slot);
         unit.shows_standing_sprite(
             self.parts.motion.layer_mut(unit.id),
             masters,

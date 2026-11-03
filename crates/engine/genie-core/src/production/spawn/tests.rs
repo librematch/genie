@@ -35,10 +35,12 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::orders::OrderSource;
 use crate::orders::town_bell::BellShelter;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerKind;
+use crate::production::spawn::ZoneTest;
 use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::test_ids::player_id;
@@ -456,7 +458,7 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
             &villager,
             &map,
             Point::new(x, y),
-            false,
+            ZoneTest::Skipped,
             &roles(),
             &tuning().spawn,
         )
@@ -492,7 +494,7 @@ fn the_first_object_of_tile_list_reports_the_block() {
             &villager,
             &Flat(list),
             Point::new(106.5, 47.5),
-            false,
+            ZoneTest::Skipped,
             &roles(),
             &tuning().spawn,
         )
@@ -898,7 +900,7 @@ fn queued_move() -> QueuedOrder {
 #[test]
 fn gather_point_without_target_walks_the_new_unit_there() {
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
-    let walked = |notified| {
+    let walked = |source| {
         let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
         t.parts.set_town_bell_flag(u.id, BellShelter::Sheltered);
@@ -912,13 +914,13 @@ fn gather_point_without_target_walks_the_new_unit_there() {
             PlayerId::new(1),
             ListIndex::new(0),
             Position::new(40.0, 80.0, 0.0),
-            notified,
+            source,
         )
         .unwrap();
         t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
             .unwrap()
     };
-    let u = walked(true);
+    let u = walked(OrderSource::Direct);
     assert_eq!(u.parts.mover().unwrap().waiting, 1);
     assert!(!u.parts.town_bell.flag.is_sheltered());
     let ai = u.parts.unit_ai.as_ref().unwrap();
@@ -941,7 +943,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
             wait: MoveWait::default(),
         })
     );
-    let unloaded = walked(false);
+    let unloaded = walked(OrderSource::Queued);
     assert_eq!(
         unloaded.parts.unit_ai.as_ref().unwrap().orders,
         [queued_move()]
@@ -966,7 +968,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
         PlayerId::new(1),
         ListIndex::new(0),
         Position::new(40.0, 80.0, 0.0),
-        true,
+        OrderSource::Direct,
     )
     .unwrap();
     let u = &t.players[1].objects[ListIndex::new(0)];
@@ -979,7 +981,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
         PlayerId::new(1),
         ListIndex::new(0),
         Position::new(40.0, 80.0, 0.0),
-        true,
+        OrderSource::Direct,
     )
     .unwrap();
     let reason = |t: &mut World| {
@@ -987,7 +989,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
             PlayerId::new(1),
             ListIndex::new(0),
             Position::new(41.0, 80.0, 0.0),
-            true,
+            OrderSource::Direct,
         )
         .unwrap_err()
         .reason()

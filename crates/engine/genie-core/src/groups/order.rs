@@ -6,6 +6,7 @@ use crate::groups::GroupCommand;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::StopScope;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::{ATTACK_COMMANDS, MOVE_COMMAND, MoveTo};
 use crate::groups::task::TargetTask;
@@ -107,7 +108,7 @@ impl World {
             }
         }
         if moved {
-            self.stop_all_units(group, false)?;
+            self.stop_all_units(group, StopScope::Busy)?;
         }
         let g = self.groups.held_mut(group)?;
         g.flags &= !GroupFlags::JOINED;

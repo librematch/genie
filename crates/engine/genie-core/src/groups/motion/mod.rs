@@ -25,6 +25,16 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::slots::CheckedIndex;
 
+/// Whether `BMotion`'s path step tests the player's path budget before a plan (its `param_2`;
+/// only a computer player's counts).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PathBudget {
+    /// The budget is tested.
+    Tested,
+    /// It is not.
+    Untested,
+}
+
 mod levels;
 mod request;
 mod step;

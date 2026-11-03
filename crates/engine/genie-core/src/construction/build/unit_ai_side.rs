@@ -8,6 +8,7 @@ use crate::construction::FoundationId;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Tile;
+use crate::map::spatial::SpotPick;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
@@ -261,7 +262,7 @@ impl UnitView<'_, '_> {
                     (unit.id, mover.stats.radius.x()),
                     mover.stats.restriction_mask,
                     (placed.position, radius),
-                    false,
+                    SpotPick::Nearest,
                     by_id,
                 )?
             }

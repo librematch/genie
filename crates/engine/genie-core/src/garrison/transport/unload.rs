@@ -23,6 +23,7 @@ use crate::pathing::zones::Relabel;
 use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
+use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{NOT_MOVING, Placing, Tested, WorldMap, placement};
 use crate::unit_ai::alert_owner;
 use crate::world::index::ObjectsRef;
@@ -456,7 +457,7 @@ impl World {
                     &placing,
                     &map,
                     spot,
-                    false,
+                    ZoneTest::Skipped,
                     &self.model.roles,
                     &self.model.tuning.spawn,
                 )? == Tested::Free

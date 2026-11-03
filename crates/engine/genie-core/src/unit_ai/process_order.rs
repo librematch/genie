@@ -128,7 +128,7 @@ impl UnitAi {
             | OrderKind::Unload
             | OrderKind::UnloadOverWall => self.object_move_order(o, world, side, ai)?,
             OrderKind::Explore => {
-                self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?
+                self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?
             }
             OrderKind::Stop => {
                 self.remove_target();
@@ -158,7 +158,8 @@ impl UnitAi {
                 true
             }
             OrderKind::Scout => {
-                let explored = self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?;
+                let explored =
+                    self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?;
                 self.set_action(Some(AiAction::Scout));
                 explored
             }
@@ -167,7 +168,8 @@ impl UnitAi {
                 return self.order_on_target(o, class, at, side, ai);
             }
             OrderKind::AutoScout => {
-                let explored = self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?;
+                let explored =
+                    self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?;
                 self.set_action(Some(AiAction::AutoScout));
                 explored
             }

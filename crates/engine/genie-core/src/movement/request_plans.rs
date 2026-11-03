@@ -7,6 +7,7 @@ use crate::movement::LevelFlags;
 use crate::movement::Levels;
 use crate::movement::PathState;
 use crate::movement::WaypointIndex;
+use crate::movement::path_points::GoalReach;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use std::ops::ControlFlow;
@@ -162,7 +163,11 @@ impl Mover {
         {
             return Ok(false);
         }
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)?;
+        let near = if self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)? {
+            GoalReach::Near
+        } else {
+            GoalReach::Far
+        };
         let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
         if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.failed = true;
@@ -236,7 +241,7 @@ impl Mover {
         (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
-        near: bool,
+        near: GoalReach,
         np: &mut NewPath,
     ) -> Result<ShortFound, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
@@ -272,13 +277,17 @@ impl Mover {
         by_id: ObjectsRef<'_>,
     ) -> Result<ControlFlow<AfterRequest, bool>, GenieError> {
         let movement_tuning = &by_id.tuning().movement;
-        let near = self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)?;
+        let near = if self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)? {
+            GoalReach::Near
+        } else {
+            GoalReach::Far
+        };
         if np.found && 3 <= np.path.points.len() {
             return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
         if SHORT_PATHER
             && !np.failed
-            && (w.distance <= Distance::new(movement_tuning.short_reach) || near)
+            && (w.distance <= Distance::new(movement_tuning.short_reach) || near == GoalReach::Near)
             && let Some(step) = self.short_try(me, (world, by_id), plan, w, near, np)?
         {
             return Ok(ControlFlow::Break(step));
@@ -310,7 +319,7 @@ impl Mover {
         (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
         w: &Way<'_>,
-        near: bool,
+        near: GoalReach,
         np: &mut NewPath,
     ) -> Result<Option<AfterRequest>, GenieError> {
         let movement_tuning = &by_id.tuning().movement;

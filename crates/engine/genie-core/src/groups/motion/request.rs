@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::Motion;
+use crate::groups::PathBudget;
 use crate::groups::motion::{
     EPSILON, LAST_TRIES, Lead, LeadGroup, PATROL_PAUSE, Pass, STUCK_PAUSE, StepWorld, ground, hold,
     point, reset_level,
@@ -68,7 +69,7 @@ pub(super) fn request(
     motion: &mut Motion,
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
-    budget: bool,
+    budget: PathBudget,
     target: Option<&Placed>,
     target_gap2: DistanceSquared,
 ) -> Result<Option<Pass>, GenieError> {
@@ -143,9 +144,9 @@ fn take_turn(
     motion: &mut Motion,
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
-    budget: bool,
+    budget: PathBudget,
 ) -> Result<Option<Pass>, GenieError> {
-    if budget
+    if budget == PathBudget::Tested
         && !world
             .plan
             .pathing

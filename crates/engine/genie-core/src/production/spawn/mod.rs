@@ -22,7 +22,7 @@ mod world_map;
 
 pub use self::placement_code::PlacementCode;
 pub(crate) use self::placement_test::NOT_MOVING;
-pub use self::placement_test::{Near, PlaceMap, Placing, build_placement, placement};
+pub use self::placement_test::{Near, PlaceMap, Placing, ZoneTest, build_placement, placement};
 use self::search::corner_tiles;
 pub use self::search::spawn_point;
 #[cfg(test)]

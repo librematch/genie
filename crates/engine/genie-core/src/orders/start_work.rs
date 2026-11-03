@@ -35,6 +35,7 @@ use crate::objects::masters::GatherGroup;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -169,7 +170,7 @@ impl World {
                     point,
                     carry_test: false,
                     filter: None,
-                    notified: true,
+                    source: OrderSource::Direct,
                 };
                 self.order_work(p, i, &work)?;
             }

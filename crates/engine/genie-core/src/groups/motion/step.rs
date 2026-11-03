@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::groups::Motion;
+use crate::groups::PathBudget;
 use crate::groups::motion::FlagChange;
 use crate::groups::motion::{
     EPSILON, GroupView, Lead, LeadGroup, PASSES, point, request, reset_level, set_flag, steer,
@@ -70,12 +71,16 @@ pub(crate) fn path_step(
     group: &GroupView,
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
-    budget: bool,
+    budget: PathBudget,
 ) -> Result<bool, GenieError> {
     if motion.paths.is_empty() {
         return Ok(false);
     }
-    let budget = budget && group.player_kind.is_computer();
+    let budget = if budget == PathBudget::Tested && group.player_kind.is_computer() {
+        PathBudget::Tested
+    } else {
+        PathBudget::Untested
+    };
     let dt = world.dt;
     let level = motion.paths.checked_mut(0)?;
     if Seconds::ZERO < level.pause_time {
@@ -106,7 +111,7 @@ pub(super) fn pass(
     group: &GroupView,
     lead: &Lead,
     world: &mut StepWorld<'_, '_>,
-    budget: bool,
+    budget: PathBudget,
 ) -> Result<Pass, GenieError> {
     let group_tuning = &world.by_id.tuning().group;
     let spatial = &mut *world.spatial;

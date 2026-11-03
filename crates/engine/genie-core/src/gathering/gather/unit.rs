@@ -31,6 +31,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
+use crate::objects::unit::Presence;
 use crate::objects::unit::{Unit, second_target_checked};
 use crate::players::AllyTest;
 use crate::players::Amount;
@@ -113,7 +114,7 @@ impl Unit {
             }
         }
         let site = actions.list.gather().ok_or(NO_GATHER)?.carry_to;
-        let held = c.w.spatial.get(site).is_some();
+        let held = Presence::of_found(c.w.spatial.get(site));
         let (kept, let_go) = second_target_checked(
             site,
             held,

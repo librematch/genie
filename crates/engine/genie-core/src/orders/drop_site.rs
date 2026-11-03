@@ -22,6 +22,7 @@ use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::Dispatch;
 use crate::orders::MasterSwap;
+use crate::orders::OrderSource;
 use crate::orders::object_gone;
 use crate::orders::{NO_POINT, Work, nearest_table_site};
 use crate::players::Amount;
@@ -90,7 +91,7 @@ impl World {
             point: Position::from([NO_POINT; 3]),
             carry_test: false,
             filter: Some(filter),
-            notified: false,
+            source: OrderSource::Queued,
         };
         self.order_work(p, idx, &work)?;
         if way_back {
@@ -307,7 +308,7 @@ impl World {
             point,
             carry_test: true,
             filter: None,
-            notified: false,
+            source: OrderSource::Queued,
         };
         self.order_work(p, idx, &work)?;
         let Some((target, master, owner, place)) = back else {

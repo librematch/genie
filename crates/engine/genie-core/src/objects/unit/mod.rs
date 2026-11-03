@@ -1,6 +1,7 @@
 //! What the slice tracks of one object ([`Unit`]) and its update, action by action.
 
 use crate::map::Position;
+use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::BlastDefense;
@@ -153,7 +154,7 @@ impl Unit {
     pub(crate) fn new_position(
         &mut self,
         at: Position,
-        moving: bool,
+        moving: MoveState,
         places: (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
@@ -170,21 +171,41 @@ impl Unit {
     }
 }
 
+/// Whether the world's table (`FUN_1415417a0`) holds an object.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Presence {
+    /// It holds it.
+    Held,
+    /// It does not.
+    Gone,
+}
+
+impl Presence {
+    /// The presence of what a lookup found.
+    #[must_use]
+    pub const fn of_found<T>(found: Option<&T>) -> Self {
+        if found.is_some() {
+            Self::Held
+        } else {
+            Self::Gone
+        }
+    }
+}
+
 /// The second target's checks at the start of a Gather's or a Hunt's update (`0x140a8e1d0`,
-/// `0x140ac7a00`) on `site`, which the world's table holds (`held`,
-/// `FUN_1415417a0`) in `state`: one the table lacks goes (`FUN_140a7a190` with none, with nothing
-/// to let go); one past state 6 is let go (slot 0x180) and goes. The game checks the second
-/// target's absence before the first target's state; the two touch different objects. Returns
-/// the second target after them and the object let go.
+/// `0x140ac7a00`) on `site`, which the world's table holds ([`Presence`]) in `state`: one the table
+/// lacks goes (`FUN_140a7a190` with none, with nothing to let go); one past state 6 is let go (slot
+/// 0x180) and goes. The game checks the second target's absence before the first target's state;
+/// the two touch different objects. Returns the second target after them and the object let go.
 pub(crate) fn second_target_checked(
     site: Option<DropSiteId>,
-    held: bool,
+    held: Presence,
     state: Option<ObjectState>,
 ) -> (Option<DropSiteId>, Option<DropSiteId>) {
     let Some(site) = site else {
         return (None, None);
     };
-    if !held {
+    if held == Presence::Gone {
         return (None, None);
     }
     match state {

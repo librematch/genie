@@ -182,7 +182,7 @@ impl UnitView<'_, '_> {
             ai.ai_kind,
             Some(m),
             (owner, player_kind),
-            self.attacker.scenario,
+            self.c.w.settings.game_mode,
             (
                 capture,
                 self.c.w.parts.combat_of(u.id).firepower,

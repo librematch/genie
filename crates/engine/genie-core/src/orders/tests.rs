@@ -70,6 +70,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::ControlKey;
 use crate::orders::MasterSwap;
+use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
@@ -97,6 +98,7 @@ use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiKind;
@@ -645,7 +647,7 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
         object_id(50),
         &task,
         Position::new(10.4, 10.0, 0.0),
-        true,
+        Notifies::Cleared,
     )
     .unwrap();
     let unit = &t.players[1].objects[ListIndex::new(0)];
@@ -692,7 +694,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
         object_id(50),
         &task,
         at,
-        true,
+        Notifies::Cleared,
     )
     .unwrap();
     t.world_time = WorldTime::from_millis(3500);
@@ -703,7 +705,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             Some(object_id(50)),
             Some(ENTER),
             at,
-            true
+            Notifies::Cleared
         ),
         Ok(false)
     );
@@ -714,7 +716,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             Some(object_id(51)),
             None,
             at,
-            true
+            Notifies::Cleared
         ),
         Ok(false)
     );
@@ -732,7 +734,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             Some(object_id(50)),
             Some(ATTACK),
             at,
-            true
+            Notifies::Cleared
         ),
         Ok(true)
     );
@@ -804,7 +806,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         ListIndex::new(0),
         (object_id(61), &aim),
         Position::new(21.0, 21.0, 0.0),
-        true,
+        Notifies::Cleared,
     )
     .unwrap();
     let ai = t
@@ -853,7 +855,7 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         ListIndex::new(0),
         (object_id(61), &aim),
         Position::new(21.0, 21.0, 0.0),
-        true,
+        Notifies::Cleared,
     )
     .unwrap();
     assert_eq!(
@@ -884,7 +886,7 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
             object_id(50),
             &task,
             Position::new(10.4, 10.0, 0.0),
-            true,
+            Notifies::Cleared,
         )
         .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
@@ -2145,7 +2147,7 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
         PlayerId::new(1),
         ListIndex::new(0),
         Position::new(30.0, 30.0, 0.0),
-        false,
+        OrderSource::Queued,
     )
     .unwrap();
     let unit = &t.players[1].objects[ListIndex::new(0)];
@@ -3815,7 +3817,7 @@ fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
         point: Position::new(11.0, 10.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -5094,7 +5096,7 @@ fn foraging() -> World {
         point: Position::new(32.5, 89.5, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
@@ -5366,7 +5368,7 @@ fn an_attack_task_start_ends_where_the_start_does() {
             object_id(50),
             &task,
             Position::new(at, 10.0, 0.0),
-            true,
+            Notifies::Cleared,
         )
         .unwrap();
         let unit = &t.players[1].objects[ListIndex::new(0)];
@@ -5453,7 +5455,11 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
         .retarget_gather_work(
             PlayerId::new(1),
             ListIndex::new(0),
-            (object_id(601), Position::new(36.5, 89.5, 0.0), true),
+            (
+                object_id(601),
+                Position::new(36.5, 89.5, 0.0),
+                Notifies::Cleared,
+            ),
         )
         .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -5479,7 +5485,11 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
     t.retarget_hunt_work(
         PlayerId::new(1),
         ListIndex::new(0),
-        (object_id(501), Position::new(36.5, 89.5, 0.0), true),
+        (
+            object_id(501),
+            Position::new(36.5, 89.5, 0.0),
+            Notifies::Cleared,
+        ),
     )
     .unwrap();
     let v = &t.players[1].objects[ListIndex::new(0)];
@@ -5535,7 +5545,11 @@ fn work_command_retarget_to_its_player_master_84_fails() {
     let r = t.retarget_gather_work(
         PlayerId::new(1),
         ListIndex::new(0),
-        (object_id(800), Position::new(33.5, 89.5, 0.0), true),
+        (
+            object_id(800),
+            Position::new(33.5, 89.5, 0.0),
+            Notifies::Cleared,
+        ),
     );
     assert_eq!(
         r.err().map(|e| e.reason()),
@@ -5547,7 +5561,11 @@ fn work_command_retarget_to_its_player_master_84_fails() {
     let r = t.retarget_hunt_work(
         PlayerId::new(1),
         ListIndex::new(0),
-        (object_id(800), Position::new(33.5, 89.5, 0.0), true),
+        (
+            object_id(800),
+            Position::new(33.5, 89.5, 0.0),
+            Notifies::Cleared,
+        ),
     );
     assert_eq!(
         r.err().map(|e| e.reason()),
@@ -5570,7 +5588,11 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         .tasks
         .first()
         .unwrap();
-    let at = (Some(object_id(601)), Position::new(36.5, 89.5, 0.0), true);
+    let at = (
+        Some(object_id(601)),
+        Position::new(36.5, 89.5, 0.0),
+        Notifies::Cleared,
+    );
     assert_eq!(
         t.retake_task(PlayerId::new(1), ListIndex::new(0), at, &task, true),
         Ok(false)
@@ -5665,7 +5687,7 @@ fn work_command_factory_starts_the_task_action() {
         ListIndex::new(0),
         (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
         &task,
-        (true, true),
+        (Notifies::Cleared, OrderSource::Direct),
     )
     .unwrap();
     assert_eq!(
@@ -5689,7 +5711,7 @@ fn work_command_factory_starts_the_task_action() {
             ListIndex::new(0),
             (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
             &unknown,
-            (true, true)
+            (Notifies::Cleared, OrderSource::Direct)
         )
         .err()
         .map(|e| e.reason()),

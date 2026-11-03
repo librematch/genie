@@ -26,11 +26,13 @@ use crate::objects::masters::player_master;
 use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::task_finder::world::{TaskWorld, point_terrain, task_search, task_target_with};
@@ -125,7 +127,7 @@ impl World {
                 point: Position::new(position.x(), position.y(), 0.0),
                 carry_test: false,
                 filter: None,
-                notified: true,
+                source: OrderSource::Direct,
             };
             self.order_work(q, idx, &work)?;
         } else if let Some(m) = self.parts.mover_mut(self.players.live(q, idx)?.id) {
@@ -351,7 +353,7 @@ impl World {
                 Some(AiAction::Build),
                 Some((foundation.id(), site_class)),
                 Position::new(position.x(), position.y(), 0.0),
-                true,
+                Notifies::Cleared,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;

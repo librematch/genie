@@ -11,6 +11,7 @@ use crate::map::Position;
 use crate::map::Rect;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::spatial::SpotPick;
 use crate::map::spatial::TileSight;
 use crate::map::spatial::{BLOCKED, Spatial};
 use crate::movement::footprint_gap_squared;
@@ -584,6 +585,6 @@ impl Spatial {
         site: (Position, Footprint),
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
-        self.spot_off(from, me, mask, site, false, by_id)
+        self.spot_off(from, me, mask, site, SpotPick::Nearest, by_id)
     }
 }

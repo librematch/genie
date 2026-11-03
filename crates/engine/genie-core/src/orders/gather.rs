@@ -27,6 +27,7 @@ use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
@@ -51,8 +52,8 @@ pub(super) struct HuntOrder {
     pub(super) task: HuntTask,
     /// The command's point.
     pub(super) point: Position,
-    /// The install clears the action list.
-    pub(super) clears: bool,
+    /// Whether the work command's notify clears the unit AI's notifies.
+    pub(super) notifies: Notifies,
     /// The work command's unit AI notify runs.
     pub(super) notify: bool,
 }
@@ -378,7 +379,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         task: &Task,
-        notify: Option<(Position, bool)>,
+        notify: Option<(Position, Notifies)>,
     ) -> Result<(), GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
@@ -486,13 +487,13 @@ impl World {
 
     /// [`World::start_gather`]'s notify of the gatherer's unit AI, where it has one (slot 0x828):
     /// the gather order and action, the target `target` with its class, the work's point and
-    /// its clearing (`point`, `clears`); the AI remembers the order.
+    /// its clearing (`point`, `notifies`); the AI remembers the order.
     fn notify_gather(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: (ObjectId, ClassId),
-        (point, clears): (Position, bool),
+        (point, notifies): (Position, Notifies),
     ) -> Result<(), GenieError> {
         let id = self.players.live(player, idx)?.id;
         let Some(ai) = self.parts.unit_ai.get_mut(id) else {
@@ -503,7 +504,7 @@ impl World {
             Some(AiAction::Gather),
             Some(target),
             point,
-            clears,
+            notifies,
             self.streams.get(Stream::Ai),
         )?;
         self.remember_order(

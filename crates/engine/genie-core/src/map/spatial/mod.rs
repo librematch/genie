@@ -40,7 +40,7 @@ use genie_diff::Diff;
 use std::collections::BTreeMap;
 
 mod footprint;
-pub use self::footprint::Movers;
+pub use self::footprint::{Movers, SpotPick};
 mod grid;
 mod objects;
 mod pather;
@@ -49,7 +49,7 @@ mod search;
 mod sight;
 mod tile_sight;
 
-pub use self::grid::WalkQuery;
+pub use self::grid::{TileRecords, WalkQuery};
 
 pub use self::pather::{Hit, SmoothingWalls, tile_record_id};
 use self::pather::{WalkTest, record_meets_segment};

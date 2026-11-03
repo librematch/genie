@@ -8,6 +8,7 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
+use crate::groups::PathBudget;
 use crate::groups::SlotState;
 use crate::groups::UnitGroup;
 use crate::groups::formation::SlotOrder;
@@ -98,7 +99,11 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         g.unit_kinds.retain(|s| !s.units.is_empty());
-        let budget = !g.flags.contains(GroupFlags::TURN);
+        let budget = if g.flags.contains(GroupFlags::TURN) {
+            PathBudget::Untested
+        } else {
+            PathBudget::Tested
+        };
         let forward = g.motion.position[1];
         self.motion_update(group, budget)?;
         self.after_motion(group, far, forward)
@@ -157,7 +162,7 @@ impl World {
         if lead.is_none() {
             return Ok(());
         }
-        self.motion_update(group, false)?;
+        self.motion_update(group, PathBudget::Untested)?;
         if !self
             .groups
             .held(group)?
@@ -311,7 +316,7 @@ impl World {
             self.groups.held_mut(group)?.flags &= !GroupFlags::RELAYOUT_AT_TURN;
         }
         self.groups.held_mut(group)?.motion.drop_to_high_level()?;
-        self.motion_update(group, true)?;
+        self.motion_update(group, PathBudget::Tested)?;
         if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
             let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
             self.groups.held_mut(group)?.current_formation = Some(f);

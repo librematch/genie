@@ -282,6 +282,28 @@ pub enum Motion {
     Arrived,
 }
 
+/// Whether an object moves (object slot 185, [`Mover::is_moving`]): the mesh holds the shape
+/// only of one that stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveState {
+    /// Its velocity is longer than 0.
+    Moving,
+    /// It stands, or it does not move at all.
+    Standing,
+}
+
+impl MoveState {
+    /// The state of an object with `mover` (none for one that does not move).
+    #[must_use]
+    pub fn of_mover(mover: Option<&Mover>) -> Self {
+        if mover.is_some_and(Mover::is_moving) {
+            Self::Moving
+        } else {
+            Self::Standing
+        }
+    }
+}
+
 /// The gap below which the game takes a distance as zero (`DAT_142eb0c60`).
 const EPSILON: f32 = MOVEMENT_EPSILON;
 /// The world's up axis (`DAT_143cc2f30`), the yaw's axis.

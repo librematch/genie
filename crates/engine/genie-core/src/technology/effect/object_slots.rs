@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::combat::Charge;
 use crate::combat::Firepower;
+use crate::combat::missile::Missile;
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::at_most_or_unordered;
@@ -398,7 +399,7 @@ pub(super) fn within_table(masters: &Masters, unit: MasterId) -> bool {
 pub(super) fn has_actions(
     actions: &Action,
     production: Option<&Production>,
-    missile: bool,
+    missile: Option<&Missile>,
 ) -> bool {
     actions.list.artifact().is_some()
         || actions.list.build().is_some()
@@ -410,7 +411,7 @@ pub(super) fn has_actions(
         || actions.list.explore().is_some()
         || actions.list.enter().is_some()
         || actions.list.transport().is_some()
-        || missile
+        || missile.is_some()
         || actions.list.make().is_some()
         || production.is_some_and(|q| q.action.is_some())
 }

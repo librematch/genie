@@ -60,8 +60,8 @@ pub fn spawn_point(
     spawn_tuning: &SpawnTuning,
 ) -> Result<Point, GenieError> {
     let frame = Frame::new(site, unit, spawn_tuning);
-    for pass in 1..=2 {
-        for segment in frame.segments(pass == 2, spawn_tuning) {
+    for pass in [SearchPass::First, SearchPass::Second] {
+        for segment in frame.segments(pass, spawn_tuning) {
             // a segment's spots are all made before its first is tried
             let spots: Vec<Spot> = segment.iter().flat_map(|r| frame.spots(r)).collect();
             for spot in &spots {
@@ -127,6 +127,16 @@ struct Frame {
     no_y: bool,
 }
 
+/// A pass of the spawn search's frame: the first (each side toward the gather point), or the
+/// second (every open side).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SearchPass {
+    /// The first pass.
+    First,
+    /// The second pass.
+    Second,
+}
+
 impl Frame {
     /// The frame beside `site` for a unit of radii `unit`.
     fn new(site: &Site, unit: Footprint, spawn_tuning: &SpawnTuning) -> Self {
@@ -162,7 +172,7 @@ impl Frame {
     /// ([`Frame::right_side`]), the bottom side's two ([`Frame::bottom_side`]); then, on the
     /// second pass with the top right and bottom left corners walled, one segment of the bottom
     /// side from the right (9) and the right side from the bottom (10).
-    fn segments(&self, second: bool, spawn_tuning: &SpawnTuning) -> Vec<Vec<Run>> {
+    fn segments(&self, pass: SearchPass, spawn_tuning: &SpawnTuning) -> Vec<Vec<Run>> {
         let [left_top, right_top, right_bottom, left_bottom] = self.walls;
         let (x, y, gx, gy) = (
             self.centre.x(),
@@ -173,16 +183,17 @@ impl Frame {
         let (dx, dy) = (self.away.x(), self.away.y());
         let mut out = Vec::new();
         if !left_top {
-            self.top_left(second, &mut out, spawn_tuning);
+            self.top_left(pass, &mut out, spawn_tuning);
         }
-        if !right_top && (self.no_x || second || (x < gx && dy < dx)) {
-            self.right_side(second, &mut out);
+        if !right_top && (self.no_x || pass == SearchPass::Second || (x < gx && dy < dx)) {
+            self.right_side(pass, &mut out);
         }
-        let bottom_closed = left_bottom || (!self.no_y && !second && (y <= gy || dy < dx));
+        let bottom_closed =
+            left_bottom || (!self.no_y && pass == SearchPass::First && (y <= gy || dy < dx));
         if !bottom_closed {
-            self.bottom_side(second, &mut out);
+            self.bottom_side(pass, &mut out);
         }
-        if !right_bottom && right_top && left_bottom && second {
+        if !right_bottom && right_top && left_bottom && pass == SearchPass::Second {
             let (sx, sy) = (self.step.x(), self.step.y());
             let (bx, by) = (self.half.x(), self.half.y());
             let (right, bottom) = (self.right, self.bottom);
@@ -208,7 +219,7 @@ impl Frame {
     /// part, (3) the top side's right part (without a wall at the top right), (4) the left
     /// side's lower part (without one at the bottom left), each toward the gather point or on
     /// the second pass.
-    fn top_left(&self, second: bool, out: &mut Vec<Vec<Run>>, spawn_tuning: &SpawnTuning) {
+    fn top_left(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>, spawn_tuning: &SpawnTuning) {
         let [_, right_top, _, left_bottom] = self.walls;
         let (x, y, gx, gy) = (
             self.centre.x(),
@@ -221,11 +232,11 @@ impl Frame {
         let (bx, by) = (self.half.x(), self.half.y());
         let (left, top) = (self.left, self.top);
         let (no_x, no_y) = (self.no_x, self.no_y);
-        if no_y || second || ((y < gy && dx <= dy) && (no_x || gx < x)) {
+        if no_y || pass == SearchPass::Second || ((y < gy && dx <= dy) && (no_x || gx < x)) {
             let end = bx * spawn_tuning.side_share + bx + left;
             out.push(vec![run(Side::Up, (left, sx, end), Course::Rising, top)]);
         }
-        if no_x || second || ((gx < x && dy < dx) && (no_y || y < gy)) {
+        if no_x || pass == SearchPass::Second || ((gx < x && dy < dx) && (no_y || y < gy)) {
             let end = top - (by * spawn_tuning.side_share + by);
             out.push(vec![run(
                 Side::Left,
@@ -234,14 +245,14 @@ impl Frame {
                 left,
             )]);
         }
-        if !right_top && (no_y || second || (y < gy && dx <= dy)) {
+        if !right_top && (no_y || pass == SearchPass::Second || (y < gy && dx <= dy)) {
             let (start, end) = (
                 bx * spawn_tuning.side_share + bx + left,
                 bx + bx + left + sx + sx,
             );
             out.push(vec![run(Side::Up, (start, sx, end), Course::Rising, top)]);
         }
-        if !left_bottom && (no_x || second || (gx < x && dy < dx)) {
+        if !left_bottom && (no_x || pass == SearchPass::Second || (gx < x && dy < dx)) {
             let (start, end) = (
                 top - (by * spawn_tuning.side_share + by),
                 top - (by + by + sy + sy),
@@ -257,11 +268,11 @@ impl Frame {
 
     /// The right side down: (5) its top half (toward a gather point above, or on the second
     /// pass), (6) its lower half without a wall at the bottom right.
-    fn right_side(&self, second: bool, out: &mut Vec<Vec<Run>>) {
+    fn right_side(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>) {
         let y = self.centre.y();
         let (sy, by) = (self.step.y(), self.half.y());
         let (right, top) = (self.right, self.top);
-        if self.no_y || second || y < self.gather.y() {
+        if self.no_y || pass == SearchPass::Second || y < self.gather.y() {
             out.push(vec![run(
                 Side::Right,
                 (top, -sy, top - by),
@@ -282,11 +293,11 @@ impl Frame {
 
     /// The bottom side: (7) its left half (toward a gather point on the left, or on the second
     /// pass), (8) its right half without a wall at the bottom right.
-    fn bottom_side(&self, second: bool, out: &mut Vec<Vec<Run>>) {
+    fn bottom_side(&self, pass: SearchPass, out: &mut Vec<Vec<Run>>) {
         let x = self.centre.x();
         let (sx, bx) = (self.step.x(), self.half.x());
         let (left, bottom) = (self.left, self.bottom);
-        if self.no_x || second || self.gather.x() < x {
+        if self.no_x || pass == SearchPass::Second || self.gather.x() < x {
             out.push(vec![run(
                 Side::Down,
                 (left, sx, left + bx),

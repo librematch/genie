@@ -75,6 +75,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::{BackToWork, TownBell};
@@ -103,6 +104,7 @@ use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTargetKind;
 use crate::unit_ai::UnitAiKind;
@@ -2053,8 +2055,15 @@ fn gather_point_on_its_own_building_takes_the_new_unit_in() {
         target: Some(object_id(100)),
         target_master: Some(TC),
     };
-    t.gather(PlayerId::new(1), idx, g, object_id(100), true, true)
-        .unwrap();
+    t.gather(
+        PlayerId::new(1),
+        idx,
+        g,
+        object_id(100),
+        OrderSource::Direct,
+        true,
+    )
+    .unwrap();
     let v = &t.players[1].objects[idx];
     assert_eq!(
         (
@@ -2121,7 +2130,7 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
         object_id(100),
         &garrison,
         Position::new(10.0, 10.0, 0.0),
-        false,
+        Notifies::Kept,
     )
     .unwrap();
     let v = &t.players[1].objects[idx];
@@ -2181,7 +2190,7 @@ fn enters_the_centre(setup: impl FnOnce(&mut World)) -> (Result<(), GenieError>,
         object_id(100),
         &garrison,
         Position::new(10.0, 10.0, 0.0),
-        false,
+        Notifies::Kept,
     );
     (r, t)
 }
@@ -3301,7 +3310,7 @@ fn work_at(target: i32, point: Position) -> Work {
         point,
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     }
 }
 

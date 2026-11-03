@@ -23,6 +23,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::object_gone;
 use crate::orders::{GARRISON, Work};
 use crate::players::PlayerId;
@@ -453,7 +454,7 @@ impl World {
                 point,
                 carry_test: false,
                 filter: Some(GARRISON),
-                notified: true,
+                source: OrderSource::Direct,
             };
             self.order_work(p, idx, &work)?;
         }

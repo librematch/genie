@@ -9,6 +9,7 @@ use crate::map::Position;
 use crate::map::spatial::{Obstruction, Placed};
 use crate::math::Angle;
 use crate::math::rng::Stream;
+use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -21,6 +22,7 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::unit::Unit;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::production::QueuedUnits;
@@ -138,7 +140,7 @@ impl World {
             self.hand_queue(p, new, &queue, position.z())?;
         } else if let Some(gather) = gather.filter(|g| g.state == GatherPointState::Point) {
             // only a state of 1 sends it (`FUN_140ace9c0`'s `+0xc30 != 1` return)
-            self.gather(p, new, gather, building_id, true, true)?;
+            self.gather(p, new, gather, building_id, OrderSource::Direct, true)?;
         }
         // FUN_140ace760: the new unit's tasks that spawn more (action type 0x9c)
         let now = self.players.live(p, new)?.life.master_id;
@@ -386,7 +388,7 @@ impl World {
             ),
         };
         self.spatial.insert(id, placed);
-        self.pathing.moved(id, &placed, false);
+        self.pathing.moved(id, &placed, MoveState::Standing);
         self.pathing.tiles_changed(self.spatial.take_changes());
         if let Some(v) = self.spatial.sight.as_mut() {
             v.add_seer(

@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::{
     Interact, LISTED, MoveOrder, Place, Split, Work, grid_point, ignore_unit, offset_point,
@@ -158,7 +159,7 @@ impl World {
                 point: at,
                 carry_test: order.carry_test,
                 filter: order.filter,
-                notified: true,
+                source: OrderSource::Direct,
             };
             return self.order_work(player, idx, &work);
         }
@@ -215,12 +216,12 @@ impl World {
             point: point.with_height(0.0),
             carry_test: false,
             filter: None,
-            notified: true,
+            source: OrderSource::Direct,
         };
         self.order_work(player, idx, &work)
     }
 
-    /// Slot 0x128 (`FUN_141211b80`) of object `id` with `work`: `+0xa14` takes `work.notified`
+    /// Slot 0x128 (`FUN_141211b80`) of object `id` with `work`: `+0xa14` takes `work.source`
     /// while the command runs, and with it set the unit AI's order queue empties
     /// (`FUN_140c5e010`); `FUN_14106c590` passes the order on to slot 0x7e8 unless the target
     /// is the unit itself (its `+0x888` count is not held). Nothing for an object the world
@@ -233,7 +234,7 @@ impl World {
         let Some(Place::Live(player, idx)) = self.place(id) else {
             return Ok(());
         };
-        if work.notified
+        if work.source == OrderSource::Direct
             && let Some(ai) = self.parts.unit_ai.get_mut(id)
         {
             ai.orders.clear();
@@ -268,7 +269,7 @@ impl World {
                 point,
                 carry_test: false,
                 filter: None,
-                notified: false,
+                source: OrderSource::Queued,
             };
             self.order_work(player, idx, &work)?;
         }

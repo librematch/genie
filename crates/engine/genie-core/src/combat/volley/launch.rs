@@ -15,6 +15,7 @@ use crate::map::{Offset, Position};
 use crate::math::Angle;
 use crate::math::fmath::BVector;
 use crate::math::rng::Stream;
+use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::{Acceleration, SubstituteCount, WaitDelays};
@@ -164,7 +165,7 @@ impl Unit {
             ),
         };
         c.w.spatial.insert(id, placed);
-        c.w.pathing.moved(id, &placed, false);
+        c.w.pathing.moved(id, &placed, MoveState::Standing);
         if let Some(v) = c.w.spatial.sight.as_mut() {
             v.add_seer(
                 id,

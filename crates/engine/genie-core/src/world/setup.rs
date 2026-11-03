@@ -5,7 +5,7 @@ use crate::GenieError;
 use crate::groups::UnitGroups;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
-use crate::movement::Mover;
+use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::RelicCount;
@@ -140,7 +140,7 @@ impl World {
                 let Some(placed) = self.spatial.get(u.id) else {
                     continue;
                 };
-                let moving = self.parts.mover_of(u.id).is_some_and(Mover::is_moving);
+                let moving = MoveState::of_mover(self.parts.mover_of(u.id));
                 let desolid = self
                     .parts
                     .building_of(u.id)
@@ -150,7 +150,7 @@ impl World {
                 if placed.tall
                     && kind.recorded()
                     && m.obstruction_class != ObstructionClass::NONE
-                    && !moving
+                    && moving == MoveState::Standing
                     && !desolid
                 {
                     self.pathing.place_shape(u.id, placed);

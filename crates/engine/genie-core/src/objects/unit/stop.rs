@@ -14,6 +14,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::release::Releaser;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::Unread;
@@ -271,7 +272,7 @@ impl Unit {
                     point,
                     carry_test: true,
                     filter: None,
-                    notified: false,
+                    source: OrderSource::Queued,
                 };
                 c.lend_at((&mut *self, &mut *actions), |w, p, i| {
                     w.order_work(p, i, &work)

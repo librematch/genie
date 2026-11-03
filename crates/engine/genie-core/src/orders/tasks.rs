@@ -23,6 +23,7 @@ use crate::orders::gather::HuntOrder;
 use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::world_view::RepairOrder;
 use crate::world::World;
@@ -74,7 +75,7 @@ impl World {
                 kind4: task.attribute_kind4,
             },
             point,
-            clears: false,
+            notifies: Notifies::Kept,
             notify: false,
         })
     }
@@ -133,7 +134,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
@@ -172,7 +173,7 @@ impl World {
                 Some(AiAction::Build),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;
@@ -246,7 +247,7 @@ impl World {
         target: ObjectId,
         task: &Task,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         // the task finder found the task on the target, which the world holds
         let (repair, class) = self.new_repair(player, idx, target, task)?;
@@ -257,7 +258,7 @@ impl World {
                 Some(AiAction::Repair),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(
@@ -322,7 +323,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let class = self.repair_retarget(player, idx, target)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -332,7 +333,7 @@ impl World {
                 Some(AiAction::Repair),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(
@@ -450,7 +451,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let class = self.build_take(player, idx, target)?;
         let unit = self.players.live_mut(player, idx)?;
@@ -460,7 +461,7 @@ impl World {
                 Some(AiAction::Build),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Build), Some(AiAction::Build)))?;

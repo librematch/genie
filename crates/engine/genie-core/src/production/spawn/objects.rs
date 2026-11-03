@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::{Obstruction, Placed};
 use crate::math::Angle;
 use crate::math::rng::Stream;
+use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -26,6 +27,7 @@ use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::objects::{Facet, FacetCount};
 use crate::players::PlayerId;
+use crate::production::spawn::ZoneTest;
 use crate::production::spawn::{
     Facing, NOT_MOVING, Placing, Site, WorldMap, corner_tiles, placement, spawn_point,
 };
@@ -112,7 +114,7 @@ impl World {
                     &placing,
                     &map,
                     spot,
-                    false,
+                    ZoneTest::Skipped,
                     &self.model.roles,
                     &self.model.tuning.spawn,
                 )
@@ -308,7 +310,7 @@ impl World {
             ),
         };
         self.spatial.insert(id, placed);
-        self.pathing.moved(id, &placed, false);
+        self.pathing.moved(id, &placed, MoveState::Standing);
         self.pathing.tiles_changed(self.spatial.take_changes());
         self.seer_comes(id, (p, master), made, at)?;
         if let Some(e) = self.take_sight_unsupported() {

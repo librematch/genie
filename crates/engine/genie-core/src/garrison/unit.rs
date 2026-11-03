@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::combat::Firepower;
 use crate::garrison::ContainerId;
+use crate::garrison::EnterSlot;
 use crate::garrison::EnterState;
 use crate::garrison::{
     EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate, enter_view, share,
@@ -611,9 +612,14 @@ impl Unit {
 }
 
 impl Action {
-    /// The unit's new Enter: its own action, or with `sub` the sub-action of its Artifact on top.
-    pub(crate) fn place_enter(&mut self, action: EnterAction, sub: bool) {
-        match self.list.artifact_mut().filter(|_| sub) {
+    /// The unit's new Enter in its `slot`: its own action, or the sub-action of its Artifact on
+    /// top.
+    pub(crate) fn place_enter(&mut self, action: EnterAction, slot: EnterSlot) {
+        match self
+            .list
+            .artifact_mut()
+            .filter(|_| slot == EnterSlot::UnderArtifact)
+        {
             Some(art) => {
                 art.sub = Some(ArtifactSub::Enter { enter: action });
             }

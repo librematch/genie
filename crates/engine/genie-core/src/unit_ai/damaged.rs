@@ -23,6 +23,7 @@ use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderPriority;
 use crate::unit_ai::OrderTargetKind;
@@ -118,7 +119,7 @@ impl UnitAi {
         // `FUN_140c64b60` with 0: the last order kept) at priority 100
         if self.current_order.is_some() && Some(caller) != self.current_target {
             self.requeue_current(at, side, player_kind, ai_rng)?;
-            self.set_order_with(Some(OrderKind::Attack), false, ai_rng);
+            self.set_order_with(Some(OrderKind::Attack), OrderHistory::Skipped, ai_rng);
             self.order_priority = OrderPriority::COMMAND;
         }
         // slot 0xb8 forced, the civilian's

@@ -21,6 +21,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::SpecialAttack;
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -79,7 +80,11 @@ impl World {
                 point: at,
                 carry_test: true,
                 filter: order.filter,
-                notified: order.disable_retargeting,
+                source: if order.disable_retargeting {
+                    OrderSource::Direct
+                } else {
+                    OrderSource::Queued
+                },
             },
         )?;
         let state = match self.object(id) {

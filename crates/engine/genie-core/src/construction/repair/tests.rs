@@ -25,6 +25,7 @@ use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, Graphics};
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -414,7 +415,7 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
         point: Position::new(30.0, 88.0, 0.0),
         carry_test: false,
         filter: None,
-        notified: true,
+        source: OrderSource::Direct,
     };
     t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();

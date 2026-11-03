@@ -16,6 +16,7 @@ use crate::objects::WorkerCount;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::players::PlayerId;
 use crate::unit_ai::NO_POINT;
@@ -226,7 +227,7 @@ impl World {
             point,
             carry_test: false,
             filter: None,
-            notified: true,
+            source: OrderSource::Direct,
         };
         self.order_work(p, idx, &work)
     }

@@ -28,6 +28,17 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::mem::take;
 
+/// Which frozen objects have a say in [`Spatial::check_known`]'s check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum KnownScope<'a> {
+    /// Every one.
+    All,
+    /// Only those with an obstruction record (the motion step's and the short pather's).
+    Records,
+    /// Only those of the classes (the registry's lists).
+    Classes(&'a [ClassId]),
+}
+
 impl Spatial {
     /// A map without terrain: every tile's class is 0.
     #[must_use]
@@ -275,33 +286,34 @@ impl Spatial {
     /// within what it may have moved, or a unit a stopped player's building may have made since,
     /// at the fastest speed of the players' units, each plus the farthest reach.
     pub fn check_known(&self, rect: Rect) -> Result<(), GenieError> {
-        self.check_known_of(rect, false, None)
+        self.check_known_of(rect, KnownScope::All)
     }
 
     /// [`Spatial::check_known`] for a query over obstruction records and the mesh (the motion
     /// step's and the short pather's): a frozen object without a record (a bird) has no say.
     pub fn check_known_records(&self, rect: Rect) -> Result<(), GenieError> {
-        self.check_known_of(rect, true, None)
+        self.check_known_of(rect, KnownScope::Records)
     }
 
     /// [`Spatial::check_known`] for a query over the registry's lists of `classes`: a frozen
     /// object of another class has no say.
     pub fn check_known_classes(&self, rect: Rect, classes: &[ClassId]) -> Result<(), GenieError> {
-        self.check_known_of(rect, false, Some(classes))
+        self.check_known_of(rect, KnownScope::Classes(classes))
     }
 
     pub(super) fn check_known_of(
         &self,
         rect: Rect,
-        records: bool,
-        classes: Option<&[ClassId]>,
+        scope: KnownScope<'_>,
     ) -> Result<(), GenieError> {
         // only a frozen object has an unknown place, and each is in `frozen_for`
         let near = self.frozen().find(|&(id, p)| {
-            if records && p.obstruction.is_none() {
+            if scope == KnownScope::Records && p.obstruction.is_none() {
                 return false;
             }
-            if classes.is_some_and(|c| !c.contains(&p.class)) {
+            if let KnownScope::Classes(c) = scope
+                && !c.contains(&p.class)
+            {
                 return false;
             }
             p.unknown.is_some_and(|u| {

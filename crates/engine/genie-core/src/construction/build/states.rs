@@ -12,6 +12,7 @@ use crate::movement::move_to::MoveToAction;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::players::attribute::AttributeId;
@@ -261,7 +262,7 @@ impl BuildAction {
             point,
             carry_test: false,
             filter: None,
-            notified: true,
+            source: OrderSource::Direct,
         };
         self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work))
     }

@@ -20,6 +20,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::ReadyOrders;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
@@ -545,12 +546,12 @@ impl World {
         idx: ListIndex,
         point: Position,
     ) -> Result<(), GenieError> {
-        self.move_point_order_with(player, idx, point, true)
+        self.move_point_order_with(player, idx, point, OrderSource::Direct)
     }
 
     /// Slot 0x138 (`FUN_141216f10`) without a target, the no-task end of a work command on a
     /// point: a villager drops its town-bell flag (not held otherwise), the unit AI's order queue
-    /// empties (`FUN_140c5e010`) while the unit's `+0xa14` (`a14`) is set, then the move to the
+    /// empties (`FUN_140c5e010`) while the unit's `+0xa14` (`source`) is set, then the move to the
     /// point ([`World::move_to_point`], `FUN_14106d340`). `+0xa14` is 1 but inside slot 0x128
     /// (`FUN_141211b80`), which holds it at its argument while its work command runs.
     pub(crate) fn move_point_order_with(
@@ -558,7 +559,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-        a14: bool,
+        source: OrderSource,
     ) -> Result<(), GenieError> {
         let villager = self
             .model
@@ -574,7 +575,9 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
-        if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
+        if source == OrderSource::Direct
+            && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
+        {
             ai.orders.clear();
         }
         let _ = self.move_to_point(player, idx, point)?;

@@ -56,7 +56,9 @@ use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderTest;
 use crate::unit_ai::QueueEnd;
@@ -4263,7 +4265,7 @@ fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
         Some(AiAction::Hunt),
         Some((object_id(9365), class::TREE)),
         Position::new(24.5, 97.5, 0.0),
-        true,
+        Notifies::Cleared,
         &mut r,
     )
     .unwrap();
@@ -4282,7 +4284,7 @@ fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
         Some(AiAction::Hunt),
         Some((object_id(9365), class::TREE)),
         Position::new(24.5, 97.5, 0.0),
-        true,
+        Notifies::Cleared,
         &mut r,
     )
     .unwrap();
@@ -9173,7 +9175,7 @@ fn the_order_setter_caps_by_signed_compare_and_may_keep_the_last_order() {
         secondary_timer: Millis::new(0x8000_0000),
         ..idle(UnitAiKind::SOLDIER)
     };
-    u.set_order_with(Some(OrderKind::Attack), false, &mut rng());
+    u.set_order_with(Some(OrderKind::Attack), OrderHistory::Skipped, &mut rng());
     assert_eq!(
         (u.current_order, u.last_order),
         (Some(OrderKind::Attack), Some(OrderKind::Wait))

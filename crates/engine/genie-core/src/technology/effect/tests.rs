@@ -2,6 +2,7 @@ use super::*;
 use crate::combat::Charge;
 use crate::combat::Firepower;
 use crate::combat::attack::Arms;
+use crate::combat::missile::Missile;
 use crate::construction::MainBuildingId;
 use crate::construction::build::Construction;
 use crate::construction::{Annexes, BuilderCount};
@@ -12,6 +13,7 @@ use crate::gathering::make::MakeState;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Offset;
 use crate::map::Position;
 use crate::map::Snow;
 use crate::map::spatial::{Obstruction, Placed, Spatial};
@@ -124,10 +126,17 @@ fn charge_keeps_its_share_of_changed_maximum() {
 #[test]
 fn an_object_has_actions_while_it_holds_one() {
     let a = Action::default();
-    assert!(!has_actions(&a, None, false));
-    assert!(has_actions(&a, None, true));
+    let missile = Missile {
+        max_range: Distance::ZERO,
+        fired_from: None,
+        charge: false,
+        flying: true,
+        step: Offset::ZERO,
+    };
+    assert!(!has_actions(&a, None, None));
+    assert!(has_actions(&a, None, Some(&missile)));
     let mut production = Production::default();
-    assert!(!has_actions(&a, Some(&production), false));
+    assert!(!has_actions(&a, Some(&production), None));
     production.action = Some(Making::Research(MakeTech {
         state: MakeTechState::Researching,
         paid: false,
@@ -135,7 +144,7 @@ fn an_object_has_actions_while_it_holds_one() {
         master: -1,
         progress: Seconds::ZERO,
     }));
-    assert!(has_actions(&a, Some(&production), false));
+    assert!(has_actions(&a, Some(&production), None));
 }
 
 /// An Attack's slot 0x50 (`FUN_140a7f800`): its sprites take the master's unless they are

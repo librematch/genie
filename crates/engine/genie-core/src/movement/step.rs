@@ -15,6 +15,7 @@ use crate::math::fmath::BVector;
 use crate::math::fmath::{add, at_most_or_unordered, scale};
 use crate::movement::LevelFlags;
 use crate::movement::Levels;
+use crate::movement::MoveState;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::movement::StepPlans;
@@ -258,7 +259,14 @@ impl Mover {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
-        place.new_position(id, at, self.is_moving(), places, roles, visibility_tuning)
+        place.new_position(
+            id,
+            at,
+            MoveState::of_mover(Some(self)),
+            places,
+            roles,
+            visibility_tuning,
+        )
     }
 
     /// The position setter (slot 11 -> `FUN_141161950` -> `0x1411a58b0`): a unit that can move

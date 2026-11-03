@@ -6,7 +6,7 @@ use crate::combat::volley::same_members;
 use crate::groups::UnitGroups;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
-use crate::movement::Mover;
+use crate::movement::MoveState;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -310,7 +310,7 @@ impl World {
         self.follow_state(p, &forced, before)?;
         self.spatial.unfreeze(id);
         if let Some(placed) = self.spatial.get(id).copied() {
-            let moving = self.parts.mover_of(forced.id).is_some_and(Mover::is_moving);
+            let moving = MoveState::of_mover(self.parts.mover_of(forced.id));
             self.pathing.moved(id, &placed, moving);
         }
         forced.stopped = false;

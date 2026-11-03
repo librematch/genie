@@ -563,6 +563,15 @@ pub(super) fn first(found: &[Found]) -> Option<Near> {
     found.first().map(|&(_, o)| o)
 }
 
+/// Whether a placement runs the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ZoneTest {
+    /// The zone mode is on.
+    Tested,
+    /// It is off.
+    Skipped,
+}
+
 /// The master's slot 0x50 (`0x141264db0`) with the spawn's arguments: `FUN_141123f80`'s test
 /// (the map's edge, then per tile of the box the terrain restriction and the explored tiles,
 /// then the objects overlapping), then its own scan of the objects overlapping, which reports
@@ -573,7 +582,7 @@ pub fn placement(
     me: &Placing<'_>,
     map: &dyn PlaceMap,
     p: Point,
-    zones: bool,
+    zones: ZoneTest,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> Result<Tested, GenieError> {
@@ -620,7 +629,7 @@ pub fn placement(
         if !passable || !seen {
             false
         } else if 0.0 < rx || 0.0 < ry {
-            if zones {
+            if zones == ZoneTest::Tested {
                 return Err(GenieError::unsupported("a placement test in a zone mode"));
             }
             let counts = |o: &Near| {

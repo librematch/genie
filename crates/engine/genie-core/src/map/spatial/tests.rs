@@ -4,6 +4,7 @@ use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::spatial::Movers;
+use crate::map::spatial::TileRecords;
 use crate::map::{Rect, Segment};
 use crate::movement::Speed;
 use crate::objects::HitPoints;
@@ -690,7 +691,7 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
             Point::new(2.0, 5.5),
             Point::new(8.0, 5.5),
             Distance::new(0.2),
-            false,
+            TileRecords::Passed,
             &[RecordId::from(object_id(7))],
         )
         .unwrap();

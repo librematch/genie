@@ -32,6 +32,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::ControlKey;
+use crate::orders::OrderSource;
 use crate::orders::town_bell::BellShelter;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_KIND;
@@ -258,8 +259,13 @@ impl World {
         }
         let (p, idx) = self.follower_start(loose, i)?;
         let (x, y) = (followed.place.x(), followed.place.y());
-        let taken =
-            self.move_to_object_with(p, idx, followed.id, Position::new(x, y, 0.0), true)?;
+        let taken = self.move_to_object_with(
+            p,
+            idx,
+            followed.id,
+            Position::new(x, y, 0.0),
+            OrderSource::Direct,
+        )?;
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
             if !taken {
@@ -309,9 +315,9 @@ impl World {
         );
         match followed.class {
             Some(_) => {
-                let _ = self.move_to_object_with(p, idx, followed.id, at, true)?;
+                let _ = self.move_to_object_with(p, idx, followed.id, at, OrderSource::Direct)?;
             }
-            None => self.move_point_order_with(p, idx, at, true)?,
+            None => self.move_point_order_with(p, idx, at, OrderSource::Direct)?,
         }
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
@@ -334,12 +340,12 @@ impl World {
         target: ObjectId,
         point: Position,
     ) -> Result<(), GenieError> {
-        self.move_to_object_with(player, idx, target, point, true)
+        self.move_to_object_with(player, idx, target, point, OrderSource::Direct)
             .map(|_| ())
     }
 
     /// Slot 0x138 to `target` (`FUN_141216f10`): a villager is no longer under the town bell
-    /// (`+0x9dc`); with `+0xa14` (`a14`: 1 but inside slot 0x128's work command with 0) its unit
+    /// (`+0x9dc`); with `+0xa14` (`source`: 1 but inside slot 0x128's work command with 0) its unit
     /// AI's order queue empties (`FUN_140c5e010`); then `FUN_14106d340`: unless the unit is its own
     /// target, its unit AI's notifies go with the world time (`FUN_140c5dc10`) and, but after a
     /// kill it stops on (`FUN_140c41c10`), its current action's slot 0x40 may take the target and
@@ -358,7 +364,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-        a14: bool,
+        source: OrderSource,
     ) -> Result<bool, GenieError> {
         let world_time = self.world_time;
         let class = self
@@ -375,7 +381,9 @@ impl World {
         if villager {
             self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
-        if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
+        if source == OrderSource::Direct
+            && let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
+        {
             ai.orders.clear();
         }
         if target == unit.id {

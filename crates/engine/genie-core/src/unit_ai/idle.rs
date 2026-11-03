@@ -12,6 +12,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::OrderForce;
+use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::TargetRules;
 use crate::unit_ai::UnitAiKind;
@@ -222,7 +223,7 @@ impl UnitAi {
         }
         if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)? {
             if self.current_order != Some(OrderKind::Defend) {
-                self.set_order_with(None, false, ai);
+                self.set_order_with(None, OrderHistory::Skipped, ai);
             }
             return Ok(true);
         }
@@ -443,7 +444,7 @@ impl UnitAi {
         }
         if self.attack_slot(target, TargetRules::Own, at, side, ai)? {
             if self.retarget_disabled == 0 && self.current_order != Some(OrderKind::Defend) {
-                self.set_order_with(None, false, ai);
+                self.set_order_with(None, OrderHistory::Skipped, ai);
             }
             return Ok(true);
         }

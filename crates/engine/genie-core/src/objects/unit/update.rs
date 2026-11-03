@@ -3,6 +3,7 @@
 use crate::GenieError;
 use crate::combat::attack::run_down_attack_timers;
 use crate::math::rng::Stream;
+use crate::movement::MoveState;
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectState;
 use crate::objects::SpriteFlags;
@@ -328,7 +329,7 @@ impl Unit {
         if MasterKind::ACTION <= m.kind
             && let Some(p) = c.w.spatial.get(self.id).copied()
         {
-            let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);
+            let moving = MoveState::of_mover(c.w.parts.mover_of(self.id));
             c.w.pathing.refresh(self.id, &p, moving, m.outline);
         }
         Ok(())

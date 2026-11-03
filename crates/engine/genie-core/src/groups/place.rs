@@ -75,16 +75,27 @@ impl Spiral {
     }
 }
 
+/// Which of a group's motion's places an orientation (`FUN_141049e10`) sets: the new position
+/// only (`param_4` 0) or the position too (1).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Orient {
+    /// The new position and the position.
+    Both,
+    /// The new position only.
+    NewOnly,
+}
+
 impl Motion {
     /// `FUN_141049e10`: the motion faces `forward` with `up`, both normalized, and their cross
     /// product `up × forward` (normalized) as its right; the new position takes all three, and with
-    /// `both` (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. False, with nothing
-    /// changed, when the dot product of the two lies outside `GroupTuning::square_min` to `GroupTuning::square_max`.
+    /// [`Orient::Both`] (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. False, with
+    /// nothing changed, when the dot product of the two lies outside `GroupTuning::square_min` to
+    /// `GroupTuning::square_max`.
     pub fn set_orientation(
         &mut self,
         forward: BVector,
         up: BVector,
-        both: bool,
+        places: Orient,
         group_tuning: &GroupTuning,
     ) -> bool {
         let d = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
@@ -96,7 +107,7 @@ impl Motion {
         self.new_position[1] = forward;
         self.new_position[2] = up;
         self.new_position[3] = right;
-        if both {
+        if places == Orient::Both {
             self.position[1] = forward;
             self.position[2] = up;
             self.position[3] = right;
@@ -239,7 +250,7 @@ impl World {
         let _ = g.motion.set_orientation(
             forward,
             BVector::new(0.0, 1.0, 0.0),
-            true,
+            Orient::Both,
             &self.model.tuning.group,
         );
         Ok(())
@@ -476,7 +487,7 @@ mod tests {
         assert!(m.set_orientation(
             BVector::new(2.0, 0.0, 0.0),
             BVector::new(0.0, 1.0, 0.0),
-            true,
+            Orient::Both,
             &tuning().group
         ));
         assert_eq!(m.position[1], BVector::new(1.0, 0.0, 0.0));
@@ -487,7 +498,7 @@ mod tests {
         assert!(!m.set_orientation(
             BVector::new(1.0, 0.1, 0.0),
             BVector::new(0.0, 1.0, 0.0),
-            true,
+            Orient::Both,
             &tuning().group
         ));
     }

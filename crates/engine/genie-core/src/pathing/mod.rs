@@ -19,6 +19,7 @@ use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::map::spatial::{BLOCKED, Obstruction, Placed, Tiles};
+use crate::movement::MoveState;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
 use crate::pathing::mesh::{Mesh, ONE};
@@ -319,7 +320,7 @@ impl Pathing {
     /// while it is not moving (object slot 185, `0x1411583d0`), added or replaced
     /// (`FUN_140fdb8d0`, `FUN_140fdc730`), and none while it moves (`FUN_140fdc250`). Without the
     /// game's mesh nothing is kept.
-    pub fn moved(&mut self, id: ObjectId, p: &Placed, moving: bool) {
+    pub fn moved(&mut self, id: ObjectId, p: &Placed, moving: MoveState) {
         let Some(mesh) = self.mesh.as_mut() else {
             return;
         };
@@ -327,7 +328,7 @@ impl Pathing {
         if !has_shape {
             return;
         }
-        if moving {
+        if moving == MoveState::Moving {
             if let Some(s) = self.shapes.remove(id) {
                 mesh.remove(s);
             }
@@ -362,14 +363,14 @@ impl Pathing {
     /// ([`refreshed_rect`]), added or replaced (an odd box always replaces: its shape is removed
     /// and added again); none while it moves. The record's moving flag (byte 3, 0x10) is not
     /// held: the walk reads the gait. Without the game's mesh nothing is kept.
-    pub fn refresh(&mut self, id: ObjectId, p: &Placed, moving: bool, outline: Footprint) {
+    pub fn refresh(&mut self, id: ObjectId, p: &Placed, moving: MoveState, outline: Footprint) {
         let Some(mesh) = self.mesh.as_mut() else {
             return;
         };
         if p.obstruction.is_none() {
             return;
         }
-        if moving {
+        if moving == MoveState::Moving {
             if let Some(s) = self.shapes.remove(id) {
                 mesh.remove(s);
             }
@@ -679,7 +680,12 @@ mod tests {
         let mut p = Pathing::default();
         p.set_mesh(Mesh::new(120), []);
         let hunter = villager(106.53662, 46.65576);
-        p.refresh(object_id(10029), &hunter, false, Footprint::ZERO);
+        p.refresh(
+            object_id(10029),
+            &hunter,
+            MoveState::Standing,
+            Footprint::ZERO,
+        );
         let s = p.shape(object_id(10029)).unwrap();
         let r = refreshed_rect(hunter.position, hunter.radius);
         assert_eq!(
@@ -696,11 +702,21 @@ mod tests {
             )
         );
         // moving, it has none; without a record, none either
-        p.refresh(object_id(10029), &hunter, true, Footprint::ZERO);
+        p.refresh(
+            object_id(10029),
+            &hunter,
+            MoveState::Moving,
+            Footprint::ZERO,
+        );
         assert_eq!(p.shape(object_id(10029)), None);
         let mut bare = hunter;
         bare.obstruction = None;
-        p.refresh(object_id(10029), &bare, false, Footprint::ZERO);
+        p.refresh(
+            object_id(10029),
+            &bare,
+            MoveState::Standing,
+            Footprint::ZERO,
+        );
         assert_eq!(p.shape(object_id(10029)), None);
     }
 
@@ -708,7 +724,7 @@ mod tests {
     fn unit_has_shape_while_it_stands_and_none_while_it_moves() {
         let mut p = Pathing::default();
         p.set_mesh(Mesh::new(120), []);
-        p.moved(object_id(9175), &villager(30.0, 89.0), false);
+        p.moved(object_id(9175), &villager(30.0, 89.0), MoveState::Standing);
         let s = p.shape(object_id(9175)).unwrap();
         assert_eq!(p.mesh().unwrap().shapes[s.index()], {
             let r = shape_rect(&villager(30.0, 89.0));
@@ -719,12 +735,12 @@ mod tests {
                 (r.y1() + 1) & !1,
             )
         });
-        p.moved(object_id(9175), &villager(30.1, 89.0), true);
+        p.moved(object_id(9175), &villager(30.1, 89.0), MoveState::Moving);
         assert_eq!(p.shape(object_id(9175)), None);
         // a foundation without its record has none
         let mut site = villager(30.0, 88.0);
         site.obstruction = None;
-        p.moved(object_id(10028), &site, false);
+        p.moved(object_id(10028), &site, MoveState::Standing);
         assert_eq!(p.shape(object_id(10028)), None);
     }
 }

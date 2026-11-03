@@ -34,6 +34,27 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
 
+/// Whether the order setter ([`UnitAi::set_order_with`]) keeps the order before as the last
+/// (1) or leaves the last as it is (0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OrderHistory {
+    /// The order before becomes the last.
+    Recorded,
+    /// The last stays.
+    Skipped,
+}
+
+/// Whether a work command's notify of the unit AI ([`UnitAi::notify_work`]) clears its notifies
+/// (`FUN_140c64e50`): a unit of a type below 70 always, another only with a direct order
+/// ([`crate::orders::OrderSource::notifies`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Notifies {
+    /// They are cleared with time 0.
+    Cleared,
+    /// They stay.
+    Kept,
+}
+
 impl UnitAi {
     /// The unit AI of `ai_type` a new object gets, as `FUN_141215560`'s constructors make it
     /// (the factory `FUN_141215a90` picks among them; the types 3, 6 and 7 only a load makes);
@@ -379,19 +400,20 @@ impl UnitAi {
         };
     }
 
-    /// The order setter with its history ([`UnitAi::set_order_with`] with 1).
+    /// The order setter with its history ([`UnitAi::set_order_with`], [`OrderHistory::Recorded`]).
     pub(crate) fn set_order(&mut self, order: Option<OrderKind>, ai: &mut Well512) {
-        self.set_order_with(order, true, ai);
+        self.set_order_with(order, OrderHistory::Recorded, ai);
     }
 
     /// The order setter (`FUN_140c64b60`): leaving a patrol order (711, 733) redraws an adjusted
     /// idle timeout of exactly 750 (slot 0x1a8) and caps the secondary timer at 750, the
-    /// compare signed (`0x2ee < (int)+0x16c`); with `history` (its third argument) the order
-    /// before becomes the last (`+0x64`), else the last stays; then the order.
+    /// compare signed (`0x2ee < (int)+0x16c`); with [`OrderHistory::Recorded`] (its third
+    /// argument 1) the order before becomes the last (`+0x64`), else the last stays; then the
+    /// order.
     pub(crate) fn set_order_with(
         &mut self,
         order: Option<OrderKind>,
-        history: bool,
+        history: OrderHistory,
         ai: &mut Well512,
     ) {
         let leaving = |o| self.current_order == Some(o) && order != Some(o);
@@ -403,7 +425,7 @@ impl UnitAi {
                 self.secondary_timer = Millis::new(750);
             }
         }
-        if history {
+        if history == OrderHistory::Recorded {
             self.last_order = self.current_order;
         }
         self.current_order = order;
@@ -468,24 +490,24 @@ impl UnitAi {
     /// The work command's notify of its new action (`FUN_14106e4e0`, object slot 0x828): the unit
     /// AI takes the order and action values of the action's type, and the target with its class
     /// (None for a point) and the order's point (`FUN_140c64b60`, `FUN_140c64b50`,
-    /// `FUN_140c64be0`); then, when `clears`, `FUN_140c64e50` clears the notifies with time 0
-    /// (`FUN_140c5dc10`; for a unit of type 70 or more only with its `+0xa14`, which is 1 but
-    /// inside slot 0x128's work command, where INTERACT passes 1 and the queued order on a target
-    /// 0). The order history (`FUN_140c42080`) is not held.
+    /// `FUN_140c64be0`); then, with [`Notifies::Cleared`], `FUN_140c64e50` clears the notifies with
+    /// time 0 (`FUN_140c5dc10`; for a unit of type 70 or more only with its `+0xa14`, which is 1
+    /// but inside slot 0x128's work command, where INTERACT passes 1 and the queued order on a
+    /// target 0). The order history (`FUN_140c42080`) is not held.
     pub fn notify_work(
         &mut self,
         order: Option<OrderKind>,
         action: Option<AiAction>,
         target: Option<(ObjectId, ClassId)>,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
         self.set_order(order, ai);
         self.set_action(action);
         let (id, class) = target.map_or((None, None), |(id, class)| (Some(id), class.or_none()));
         self.set_target(id, class, point);
-        if clears {
+        if notifies == Notifies::Cleared {
             self.clear_notifies(Millis::ZERO)?;
         }
         Ok(())

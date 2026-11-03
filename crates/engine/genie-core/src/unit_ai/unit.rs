@@ -343,7 +343,7 @@ impl Unit {
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode.scenario(),
+            c.w.settings.game_mode,
             (
                 at.capture,
                 c.w.parts.combat_of(self.id).firepower,
@@ -389,7 +389,7 @@ impl Unit {
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode.scenario(),
+            c.w.settings.game_mode,
             (
                 self.capture_kind(c),
                 c.w.parts.combat_of(self.id).firepower,
@@ -506,7 +506,7 @@ impl Unit {
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode.scenario(),
+            c.w.settings.game_mode,
             (
                 at.capture,
                 c.w.parts.combat_of(self.id).firepower,

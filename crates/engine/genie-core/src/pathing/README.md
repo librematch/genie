@@ -55,6 +55,6 @@ members' steering (`groups/steer/`) ask the same planners.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../construction/), [`map`](../map/), [`math`](../math/), [`objects`](../objects/), [`players`](../players/), [`testing`](../testing/), [`world`](../world/).
+- Uses: [`construction`](../construction/), [`map`](../map/), [`math`](../math/), [`movement`](../movement/), [`objects`](../objects/), [`players`](../players/), [`testing`](../testing/), [`world`](../world/).
 - Used by: [`construction`](../construction/), [`garrison`](../garrison/), [`gathering`](../gathering/), [`groups`](../groups/), [`map`](../map/), [`movement`](../movement/), [`objects`](../objects/), [`orders`](../orders/), [`unit_ai`](../unit_ai/), [`world`](../world/).
 <!-- /uses -->

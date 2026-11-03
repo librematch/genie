@@ -194,7 +194,7 @@ impl World {
             || !has_actions(
                 self.parts.actions_of(u.id),
                 self.parts.production.get(u.id),
-                self.parts.missile.contains(u.id),
+                self.parts.missile.get(u.id),
             )
         {
             let sprite = match (attribute, u.idle_variant) {

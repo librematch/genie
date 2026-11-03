@@ -12,6 +12,7 @@ use crate::objects::layers::Action;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::pathing::tile_path::GridLevel;
 use crate::players::PlayerId;
@@ -173,7 +174,7 @@ impl Unit {
             point,
             carry_test: false,
             filter: None,
-            notified: true,
+            source: OrderSource::Direct,
         }))
     }
 }

@@ -161,6 +161,17 @@ pub fn same_costs(
     a.iter().zip(b).all(|(x, y)| x.0 == y.0 && x.1 == y.1)
 }
 
+/// The kind of entry a production queue closes ([`Queue::close`]): a unit's, whose train time
+/// moves down with the later entries, or a research's (`FUN_1411d61e0`'s research branch), whose
+/// does not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QueueEntry {
+    /// A unit's entry.
+    Train,
+    /// A research's entry.
+    Research,
+}
+
 impl Queue {
     /// The entries (the first `+0xbf2` slots).
     #[must_use]
@@ -205,13 +216,13 @@ impl Queue {
 
     /// An emptied entry `i` goes (its caller lowered `+0xbf2` first in the game; here this
     /// does): each later entry moves down a slot, its master, count, technology, costs and
-    /// button, and its train time when `time` (`FUN_1411d61e0`'s research branch does not move
-    /// it); the serials stay, and the slot of the old last entry keeps what it held.
+    /// button, and its train time for a [`QueueEntry::Train`] (`FUN_1411d61e0`'s research branch
+    /// does not move it); the serials stay, and the slot of the old last entry keeps what it held.
     ///
     /// # Errors
     ///
     /// A slot the buffer does not hold (the count past the buffer).
-    pub fn close(&mut self, i: usize, time: bool) -> Result<(), GenieError> {
+    pub fn close(&mut self, i: usize, entry: QueueEntry) -> Result<(), GenieError> {
         self.count = self.count.shrunk();
         let mut j = i;
         while (j as i32) < i32::from(self.count.get()) {
@@ -222,7 +233,7 @@ impl Queue {
             slot.tech = next.tech;
             slot.costs = next.costs;
             slot.button = next.button;
-            if time {
+            if entry == QueueEntry::Train {
                 slot.train_time = next.train_time;
             }
             j += 1;
@@ -294,7 +305,7 @@ impl Queue {
         self.total = self.total.minus(QueuedUnits::ONE);
         self.changes = self.changes.bumped();
         if emptied {
-            self.close(0, true)?;
+            self.close(0, QueueEntry::Train)?;
         }
         Ok(())
     }
@@ -588,7 +599,7 @@ mod tests {
             unit(master_id(5), 1, 30.0),
         ]);
         q.slots[2].train_time = WholeSeconds::of_data(40);
-        q.close(0, true).unwrap();
+        q.close(0, QueueEntry::Train).unwrap();
         assert_eq!(q.count.get(), 2);
         assert_eq!(
             q.slots[..3]
@@ -607,7 +618,7 @@ mod tests {
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
         q.slots[0].train_time = WholeSeconds::of_data(7);
-        q.close(0, false).unwrap();
+        q.close(0, QueueEntry::Research).unwrap();
         assert_eq!(
             (q.slots[0].master, q.slots[0].train_time),
             (Some(ids::VILLAGER_MALE), WholeSeconds::of_data(7))

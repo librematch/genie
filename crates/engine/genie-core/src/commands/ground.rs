@@ -7,6 +7,8 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::TerrainId;
+use crate::map::spatial::SpotPick;
+use crate::movement::MoveState;
 use crate::movement::PathState;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -169,7 +171,7 @@ impl World {
             (first.id, mover.stats.radius.x()),
             mover.stats.restriction_mask,
             (site_at, radius),
-            true,
+            SpotPick::Farthest,
             by_id,
         )?;
         let Some(spot) = spot else {
@@ -387,7 +389,7 @@ impl World {
         };
         self.spatial.insert(id, placed);
         if placed.obstruction.is_some() {
-            self.pathing.moved(id, &placed, false);
+            self.pathing.moved(id, &placed, MoveState::Standing);
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
         if let Some(v) = self.spatial.sight.as_mut() {

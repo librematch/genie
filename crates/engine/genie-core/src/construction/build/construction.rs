@@ -11,6 +11,7 @@ use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
 use crate::map::terrain::Foundation;
 use crate::math::fmath::at_most_or_unordered;
+use crate::movement::MoveState;
 use crate::movement::Mover;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
@@ -258,7 +259,7 @@ impl Construction {
         }
         pathing.tiles_changed(world.take_changes());
         if let Some(p) = world.get(id) {
-            pathing.moved(id, p, false);
+            pathing.moved(id, p, MoveState::Standing);
         }
         if let Some(m) = mover {
             m.last_move = now.after(Millis::new(1));

@@ -61,6 +61,7 @@ pub use self::unit_kind::UnitKind;
 
 mod attack;
 mod command;
+pub use self::command::StopScope;
 mod create;
 pub use self::create::LeavingWalk;
 
@@ -72,8 +73,10 @@ pub mod formation;
 mod layout;
 mod lock;
 mod motion;
+pub use self::motion::PathBudget;
 mod order;
 mod place;
+pub use self::place::Orient;
 mod stats;
 pub use self::stats::FarMembers;
 mod steer;

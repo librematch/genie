@@ -113,6 +113,16 @@ impl UnitGroup {
     }
 }
 
+/// Which members `stopAllUnits` ([`World::stop_all_units`]) stops: those with an action (slot
+/// 0x530 not -1), or every one (its flag).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StopScope {
+    /// The members with an action.
+    Busy,
+    /// Every member.
+    All,
+}
+
 impl World {
     /// `allHordeUnits` (`FUN_141008e50`): no member the world holds is of a master above type 69
     /// with a formation category (`+0x8bc`).
@@ -278,7 +288,7 @@ impl World {
         else {
             return Ok(false);
         };
-        self.stop_all_units(group, false)?;
+        self.stop_all_units(group, StopScope::Busy)?;
         let ids: Vec<ObjectId> = self
             .groups
             .held(group)?
@@ -543,7 +553,7 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn stop_all_units(&mut self, group: GroupId, all: bool) -> Result<(), GenieError> {
+    pub fn stop_all_units(&mut self, group: GroupId, scope: StopScope) -> Result<(), GenieError> {
         let ids: Vec<ObjectId> = self
             .groups
             .held(group)?
@@ -552,15 +562,15 @@ impl World {
             .map(|m| m.id)
             .collect();
         for (k, id) in ids.into_iter().enumerate() {
-            self.stop_listed_unit(group, (k, id), all)?;
+            self.stop_listed_unit(group, (k, id), scope)?;
         }
         Ok(())
     }
 
     /// Whether [`World::stop_all_units`] stops the member at `place`: one with an action takes
-    /// the stop, one without only under `all` (slot 0x530: the top action's type, -1 without
-    /// one).
-    fn stop_applies(&self, place: Place, all: bool) -> Result<bool, GenieError> {
+    /// the stop, one without only with [`StopScope::All`] (slot 0x530: the top action's type, -1
+    /// without one).
+    fn stop_applies(&self, place: Place, scope: StopScope) -> Result<bool, GenieError> {
         let u = match place {
             Place::Live(p, i) => self.players.live(p, i)?,
             Place::Sleeping(p, i) => self.players.asleep(p, i)?,
@@ -570,7 +580,7 @@ impl World {
                 "stopAllUnits of a member with an action the slice does not model",
             ));
         }
-        Ok(all || self.parts.actions_of(u.id).top_action_kind().is_some())
+        Ok(scope == StopScope::All || self.parts.actions_of(u.id).top_action_kind().is_some())
     }
 
     /// [`World::stop_all_units`]' stop of the member `id` at index `k` of group `group`.
@@ -578,13 +588,13 @@ impl World {
         &mut self,
         group: GroupId,
         (k, id): (usize, ObjectId),
-        all: bool,
+        scope: StopScope,
     ) -> Result<(), GenieError> {
         // FUN_1415417a0: a sleeping member too
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        if !self.stop_applies(place, all)? {
+        if !self.stop_applies(place, scope)? {
             return Ok(());
         }
         let Place::Live(p, idx) = place else {

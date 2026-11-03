@@ -2,6 +2,7 @@
 //! [`Step`], [`Foreign`], [`OwnerView`], the pickers).
 
 use crate::GenieError;
+use crate::garrison::EnterSlot;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Well512;
 use crate::objects::ObjectId;
@@ -93,7 +94,7 @@ pub(crate) struct EnterOrder {
     pub(crate) target: ObjectId,
     pub(crate) task: Task,
     pub(crate) switch: Option<MasterId>,
-    pub(crate) under_artifact: bool,
+    pub(crate) slot: EnterSlot,
 }
 
 /// The players but the owner of the unit that updates, read-only: the players before it and

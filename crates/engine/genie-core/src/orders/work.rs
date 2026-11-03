@@ -29,12 +29,14 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::work_master;
+use crate::orders::OrderSource;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{ATTACK_TASK, Work};
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::world::TaskWorld;
 use crate::unit_ai::task_finder::world::point_terrain;
@@ -88,7 +90,7 @@ impl World {
         target: Option<ObjectId>,
         filter: Option<ActionKind>,
         point: Position,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<bool, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
@@ -104,7 +106,7 @@ impl World {
         if !a.keeps(target)? {
             return Ok(false);
         }
-        self.tell_of_attack(player, idx, (target, point), clears)?;
+        self.tell_of_attack(player, idx, (target, point), notifies)?;
         Ok(true)
     }
 
@@ -118,7 +120,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold",
@@ -134,7 +136,7 @@ impl World {
                 Some(AiAction::Attack),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(
@@ -199,15 +201,20 @@ impl World {
             point,
             carry_test,
             filter,
-            notified,
+            source,
         } = *order;
         let unit = &self.players.live(player, idx)?;
         if target == Some(unit.id) {
             return Ok(());
         }
         // FUN_140c64e50: a unit of a type below 70 always clears its AI's notifies
-        let clears =
-            notified || unit.master(self.master_tables(), player)?.kind < MasterKind::COMBAT;
+        let notifies = if source == OrderSource::Direct
+            || unit.master(self.master_tables(), player)?.kind < MasterKind::COMBAT
+        {
+            Notifies::Cleared
+        } else {
+            Notifies::Kept
+        };
         let found = self.work_task(player, idx, (target, point), filter)?;
         let Some((with, task)) = found else {
             if filter.is_some() {
@@ -216,10 +223,10 @@ impl World {
             // LAB_1410706a8 without a task: the top Attack on the target keeps it; else a unit
             // whose master moves (slot 0xe8, its speed `+0x740`) is told of a move (slot 0x828)
             // and moves there (slot 0x138), which is not modelled; one that does not, nothing
-            if self.keep_attack(player, idx, target, filter, point, clears)? {
+            if self.keep_attack(player, idx, target, filter, point, notifies)? {
                 return Ok(());
             }
-            return self.work_move(player, idx, target, point, (clears, notified));
+            return self.work_move(player, idx, target, point, (notifies, source));
         };
         // a new master's task is another than the one the unit's action holds
         let same_master = with == self.players.live(player, idx)?.life.master_id;
@@ -234,11 +241,11 @@ impl World {
             .parts
             .actions_of(self.players.live(player, idx)?.id)
             .top_action_kind();
-        let kept = self.retake_task(player, idx, (target, point, clears), &task, same_master)?;
+        let kept = self.retake_task(player, idx, (target, point, notifies), &task, same_master)?;
         if carry_test {
             self.carried_resource_test(player, idx, &task)?;
         }
-        if self.keep_attack(player, idx, target, filter, point, clears)? {
+        if self.keep_attack(player, idx, target, filter, point, notifies)? {
             return Ok(());
         }
         // the top action of type 0x7e would hear the target through its slot 0x48: the slice
@@ -249,7 +256,7 @@ impl World {
         if kept {
             return Ok(());
         }
-        self.start_task(player, idx, (target, point), &task, (clears, notified))
+        self.start_task(player, idx, (target, point), &task, (notifies, source))
     }
 
     /// The work command's master and task for the unit at (`player`, `idx`) on `target` (none
@@ -322,7 +329,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (target, point, clears): (Option<ObjectId>, Position, bool),
+        (target, point, notifies): (Option<ObjectId>, Position, Notifies),
         task: &Task,
         same_master: bool,
     ) -> Result<bool, GenieError> {
@@ -330,7 +337,11 @@ impl World {
         let top = self.parts.actions_of(unit.id).top_action_kind();
         Ok(match self.parts.actions_of(unit.id).list.hunt().copied() {
             Some(h) if task.action_kind == HUNT && h.task.id == task.id => {
-                self.retarget_hunt_work(player, idx, (target.ok_or(TERRAIN_TASK)?, point, clears))?;
+                self.retarget_hunt_work(
+                    player,
+                    idx,
+                    (target.ok_or(TERRAIN_TASK)?, point, notifies),
+                )?;
                 true
             }
             _ if top == Some(task.action_kind) && task.action_kind == ActionKind::BUILD => {
@@ -339,11 +350,11 @@ impl World {
                         "a work command on the Build task of the unit's former master",
                     ));
                 }
-                self.retake_build(player, idx, target.ok_or(TERRAIN_TASK)?, point, clears)?;
+                self.retake_build(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
                 true
             }
             _ if top == Some(task.action_kind) && task.action_kind == REPAIR => {
-                self.retake_repair(player, idx, target.ok_or(TERRAIN_TASK)?, point, clears)?;
+                self.retake_repair(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
                 true
             }
             _ if top == Some(GATHER)
@@ -358,11 +369,11 @@ impl World {
                 self.retarget_gather_work(
                     player,
                     idx,
-                    (target.ok_or(TERRAIN_TASK)?, point, clears),
+                    (target.ok_or(TERRAIN_TASK)?, point, notifies),
                 )?
             }
             _ if top == Some(TRANSPORT) && task.action_kind == TRANSPORT => {
-                self.retake_transport((player, idx), (target, point), task, clears)?
+                self.retake_transport((player, idx), (target, point), task, notifies)?
             }
             // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
             // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
@@ -389,7 +400,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (target, point, clears): (ObjectId, Position, bool),
+        (target, point, notifies): (ObjectId, Position, Notifies),
     ) -> Result<(), GenieError> {
         let t = self.task_target(target, 0)?;
         if self
@@ -412,7 +423,7 @@ impl World {
                 Some(AiAction::Hunt),
                 Some((target, class)),
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
@@ -427,7 +438,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        (target, point, clears): (ObjectId, Position, bool),
+        (target, point, notifies): (ObjectId, Position, Notifies),
     ) -> Result<bool, GenieError> {
         let t = self.task_target(target, 0)?;
         if self
@@ -451,7 +462,7 @@ impl World {
                     Some(AiAction::Gather),
                     Some((target, class)),
                     point,
-                    clears,
+                    notifies,
                     self.streams.get(Stream::Ai),
                 )?;
                 self.remember_order(
@@ -473,15 +484,15 @@ impl World {
         idx: ListIndex,
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
-        (clears, notified): (bool, bool),
+        (notifies, source): (Notifies, OrderSource),
     ) -> Result<(), GenieError> {
         match task.action_kind {
             // the factory makes no action of a mule cart's task: the move without one
-            CART_TASK => self.work_move(player, idx, target, point, (clears, notified)),
-            TRANSPORT => self.start_transport((player, idx), (target, point), task, clears),
+            CART_TASK => self.work_move(player, idx, target, point, (notifies, source)),
+            TRANSPORT => self.start_transport((player, idx), (target, point), task, notifies),
             ENTER | ATTACK_TASK | HUNT | ActionKind::BUILD | REPAIR | GATHER => {
                 let target = target.ok_or(TERRAIN_TASK)?;
-                self.start_object_task(player, idx, (target, point), task, clears)
+                self.start_object_task(player, idx, (target, point), task, notifies)
             }
             _ => Err(UNMODELLED_FACTORY),
         }
@@ -495,11 +506,11 @@ impl World {
         idx: ListIndex,
         (target, point): (ObjectId, Position),
         task: &Task,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         match task.action_kind {
-            ENTER => self.start_enter(player, idx, target, task, point, clears),
-            ATTACK_TASK => self.start_attack(player, idx, target, task, point, clears),
+            ENTER => self.start_enter(player, idx, target, task, point, notifies),
+            ATTACK_TASK => self.start_attack(player, idx, target, task, point, notifies),
             HUNT => self.start_hunt(HuntOrder {
                 player,
                 index: idx,
@@ -514,28 +525,29 @@ impl World {
                     kind4: task.attribute_kind4,
                 },
                 point,
-                clears,
+                notifies,
                 notify: true,
             }),
-            ActionKind::BUILD => self.start_build(player, idx, target, task, point, clears),
-            REPAIR => self.start_repair(player, idx, target, task, point, clears),
-            GATHER => self.start_gather(player, idx, target, task, Some((point, clears))),
+            ActionKind::BUILD => self.start_build(player, idx, target, task, point, notifies),
+            REPAIR => self.start_repair(player, idx, target, task, point, notifies),
+            GATHER => self.start_gather(player, idx, target, task, Some((point, notifies))),
             _ => Err(UNMODELLED_FACTORY),
         }
     }
 
     /// The work command without an action (`FUN_14106ff70`: no task, or one the action list's
     /// factory makes no action of, the mule cart's 0x99): a unit whose master moves (slot 0xe8,
-    /// its speed `+0x740`) is told of a move (slot 0x828, its notifies cleared with `clears`) and,
-    /// in state 2 or of class 51, moves to the target or the point (slot 0x138 with the unit's
-    /// `+0xa14`, the work's `notified`); one that does not move does nothing.
+    /// its speed `+0x740`) is told of a move (slot 0x828, its notifies cleared with
+    /// [`Notifies::Cleared`]) and, in state 2 or of class 51, moves to the target or the point
+    /// (slot 0x138 with the unit's `+0xa14`, the work's `source`); one that does not move does
+    /// nothing.
     pub(super) fn work_move(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: Option<ObjectId>,
         point: Position,
-        (clears, notified): (bool, bool),
+        (notifies, source): (Notifies, OrderSource),
     ) -> Result<(), GenieError> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
@@ -567,7 +579,7 @@ impl World {
                 action,
                 named,
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(player, idx, (order, action))?;
@@ -580,9 +592,9 @@ impl World {
                 .contains(ClassRoles::PACKED_TREBUCHET)
         {
             match target {
-                None => self.move_point_order_with(player, idx, point, notified)?,
+                None => self.move_point_order_with(player, idx, point, source)?,
                 Some(target) => {
-                    let _ = self.move_to_object_with(player, idx, target, point, notified)?;
+                    let _ = self.move_to_object_with(player, idx, target, point, source)?;
                 }
             }
         }

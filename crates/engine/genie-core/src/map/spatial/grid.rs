@@ -40,6 +40,15 @@ pub struct WalkQuery<'a> {
     pub objects: ObjectsRef<'a>,
 }
 
+/// Whether a line query ([`Spatial::line_hits`]) meets the temporary tile records too.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TileRecords {
+    /// With them.
+    Met,
+    /// Without them.
+    Passed,
+}
+
 impl Spatial {
     /// Each obstruction record: the object's id, the record's kind and box.
     pub fn records(&self) -> impl Iterator<Item = (ObjectId, ObstructionKind, Rect)> + '_ {
@@ -360,7 +369,7 @@ impl Spatial {
         if let Some(mask) = mask {
             self.put_tile_records(from, to, grow, mask);
         }
-        let hits = self.line_hits(from, to, grow, true, ignore);
+        let hits = self.line_hits(from, to, grow, TileRecords::Met, ignore);
         self.set_manager_buffer(None);
         if mask.is_some() {
             self.clear_tile_records();
@@ -387,7 +396,7 @@ impl Spatial {
         from: Point,
         to: Point,
         grow: Distance,
-        tiles: bool,
+        tiles: TileRecords,
         ignore: &[RecordId],
     ) -> Result<Vec<RecordId>, GenieError> {
         const MOST_HITS: usize = 25;
@@ -406,7 +415,7 @@ impl Spatial {
         let meets = |kind: ObstructionKind, bx: Rect| {
             rect.overlaps(bx.grown(grow)) && record_meets_segment(kind, bx, grow, walk)
         };
-        if tiles {
+        if tiles == TileRecords::Met {
             let level = self.grid.level(0);
             let shift = self.grid.shift(level);
             for &(y, x) in &self.tile_records {

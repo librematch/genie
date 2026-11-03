@@ -14,6 +14,7 @@ use crate::objects::ObjectState;
 use crate::objects::Voice;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::town_bell::BellShelter;
 use crate::players::PlayerId;
@@ -33,7 +34,7 @@ const FORCED_ENTRY_BELOW: InsideCount = InsideCount::new(10);
 impl World {
     /// `FUN_140ace9c0` with a gather point without a target, and an unloaded unit's move
     /// (`FUN_1411e7220`): the unit waits to move (slot 0x2a0 with 1) and takes slot 0x128
-    /// (`FUN_141211b80`) with no target at the point (z 0; its `+0xa14` `notified`: 1 for a new
+    /// (`FUN_141211b80`) with no target at the point (z 0; its `+0xa14` `source`: 1 for a new
     /// unit, whose unit AI's order queue empties, `FUN_140c5e010`; 0 for an unloaded one); slot
     /// 0x7e8 (`FUN_141227190`) runs the work command (`FUN_14106ff70`), which finds no task: a
     /// unit with speed in state 2 notifies its unit AI with the `MoveTo`'s order and action, no
@@ -49,7 +50,7 @@ impl World {
         p: PlayerId,
         new: ListIndex,
         point: Position,
-        notified: bool,
+        source: OrderSource,
     ) -> Result<(), GenieError> {
         let world_time = self.world_time;
         let sprite = self.point_move_sprite(p, new)?;
@@ -87,7 +88,7 @@ impl World {
             ));
         }
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            if notified {
+            if source == OrderSource::Direct {
                 ai.orders.clear();
             }
             ai.notify_work(
@@ -95,10 +96,10 @@ impl World {
                 Some(AiAction::Move),
                 None,
                 point,
-                notified,
+                source.notifies(),
                 self.streams.get(Stream::Ai),
             )?;
-            if notified {
+            if source == OrderSource::Direct {
                 ai.orders.clear();
             }
             ai.clear_notifies(world_time.since_start())?;
@@ -200,7 +201,7 @@ impl World {
     /// ([`World::lost_gather_target`]). The unit waits to move (slot 0x2a0 with 1); on a building
     /// its own task list's garrison finder (filter 3, [`World::garrison_task_found`]) decides: a
     /// task found is worked at once (slot 0x7e8 with filter 3, outside slot 0x128: `+0xa14` 1);
-    /// else, and for any other target, slot 0x128 works it (`notified`, any task). An unloaded
+    /// else, and for any other target, slot 0x128 works it (`source`, any task). An unloaded
     /// unit's caller goes to slot 0x128 at once (`finder` clear). A gather point on its own
     /// building takes the unit in at once ([`World::enter_forced`]) while the building holds
     /// fewer than 10 or fewer than its capacity.
@@ -210,13 +211,13 @@ impl World {
         new: ListIndex,
         g: GatherPoint,
         building: ObjectId,
-        notified: bool,
+        source: OrderSource,
         finder: bool,
     ) -> Result<(), GenieError> {
         // the walk's place is the point on the ground (height 0)
         let at = g.point.with_z(0.0);
         if g.target.is_none() {
-            return self.gather_move(p, new, at, notified);
+            return self.gather_move(p, new, at, source);
         }
         // its own building takes it at once (slot 0x1a0 forced) while it holds fewer than 10 or
         // fewer than its master's capacity (its slot 0x498 against `+0x5d4`); else the building
@@ -234,7 +235,7 @@ impl World {
             Some(t) => t,
             None => match self.lost_gather_target(p, new, g)? {
                 Some(id) => id,
-                None => return self.gather_move(p, new, at, notified),
+                None => return self.gather_move(p, new, at, source),
             },
         };
         let (owner, t) = self.object(target).ok_or(GenieError::unreachable(
@@ -250,7 +251,11 @@ impl World {
             point: at,
             carry_test: false,
             filter: if garrison { Some(ENTER) } else { None },
-            notified: garrison || notified,
+            source: if garrison {
+                OrderSource::Direct
+            } else {
+                source
+            },
         };
         self.order_work(p, new, &work)
     }

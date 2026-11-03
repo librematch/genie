@@ -18,6 +18,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlayersMasters;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
@@ -307,7 +308,7 @@ impl World {
                 point: point.with_height(0.0),
                 carry_test: false,
                 filter: None,
-                notified: false,
+                source: OrderSource::Queued,
             };
             self.order_work(up, ui, &work)?;
             return Ok(true);
@@ -321,7 +322,7 @@ impl World {
                         ai.remove_target();
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
-                    self.gather(up, ui, g, bid, false, false)?;
+                    self.gather(up, ui, g, bid, OrderSource::Queued, false)?;
                     return Ok(true);
                 }
                 g.point.ground()
@@ -351,7 +352,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(up, ui)?.id) {
             ai.remove_target();
         }
-        self.gather_move(up, ui, to.with_height(0.0), false)?;
+        self.gather_move(up, ui, to.with_height(0.0), OrderSource::Queued)?;
         Ok(true)
     }
 

@@ -7,7 +7,7 @@ use crate::map::Distance;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Stream;
 use crate::math::rng::Well512;
-use crate::movement::Mover;
+use crate::movement::MoveState;
 use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ListIndex;
@@ -452,7 +452,7 @@ pub(crate) fn switch_master(
             ));
         }
         unit.life.master_id = new;
-        let moving = motion.mover().is_some_and(Mover::is_moving);
+        let moving = MoveState::of_mover(motion.mover());
         if let Some(m) = motion.mover_mut() {
             m.stats = next.move_stats.ok_or(GenieError::unsupported(
                 "a moving unit's new master does not move",

@@ -24,6 +24,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
 use crate::players::AllyTest;
@@ -553,7 +554,7 @@ impl World {
                     point: Position::new(x, y, 0.0),
                     carry_test: true,
                     filter: None,
-                    notified: false,
+                    source: OrderSource::Queued,
                 },
             )?,
         }

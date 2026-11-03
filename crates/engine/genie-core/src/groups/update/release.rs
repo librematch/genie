@@ -11,6 +11,7 @@ use crate::groups::SpecificMove;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::send::Travel;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::orders::OrderSource;
 use crate::orders::Work;
 use crate::world::World;
 use crate::world::index::Place;
@@ -92,7 +93,11 @@ impl World {
                 point: at,
                 carry_test: true,
                 filter: certain,
-                notified: retarget != 0,
+                source: if retarget == 0 {
+                    OrderSource::Queued
+                } else {
+                    OrderSource::Direct
+                },
             },
         )?;
         if self.groups.held(group)?.special_units.contains(&id) {

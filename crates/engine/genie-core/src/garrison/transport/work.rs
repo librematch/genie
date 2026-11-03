@@ -11,6 +11,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
 use crate::world::layer::ClassRoles;
@@ -32,9 +33,9 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
-        self.notify_transport((p, i), (target, point), clears)?;
+        self.notify_transport((p, i), (target, point), notifies)?;
         self.clear_actions(p, i)?;
         let mut t = TransportAction::on_task(Some(task.id), point);
         let move_to_tuning = self.model.tuning.move_to;
@@ -65,7 +66,7 @@ impl World {
         (p, i): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<bool, GenieError> {
         let unit = self.players.live(p, i)?;
         let on_task = self.parts.actions_of(unit.id).top_action_kind() == Some(TRANSPORT)
@@ -111,7 +112,7 @@ impl World {
             .list
             .set_transport(Some(t));
         self.transport_changed(p, i, changed)?;
-        self.notify_transport((p, i), (target, point), clears)?;
+        self.notify_transport((p, i), (target, point), notifies)?;
         Ok(true)
     }
 
@@ -152,7 +153,7 @@ impl World {
         &mut self,
         (p, i): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
-        clears: bool,
+        notifies: Notifies,
     ) -> Result<(), GenieError> {
         let named = match target.and_then(|id| Some((id, self.object(id)?))) {
             Some((target, (tp, t))) => Some((target, t.master(self.master_tables(), tp)?.class)),
@@ -165,7 +166,7 @@ impl World {
                 Some(AiAction::Transport),
                 named,
                 point,
-                clears,
+                notifies,
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(

@@ -31,14 +31,24 @@ pub enum Movers {
     LeftOut,
 }
 
+/// Which tile beside a footprint the spot search ([`Spatial::spot_off`]) takes: the nearest
+/// (`param_7` 0) or the farthest (1), an empty one first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SpotPick {
+    /// The nearest.
+    Nearest,
+    /// The farthest.
+    Farthest,
+}
+
 impl Spatial {
     /// `FUN_1411566b0`: the tile beside a footprint at `at` of radii `radius` a unit at `from`
     /// with terrain mask `mask` goes to: a flood over passable tiles from the footprint's own
     /// (`(int)(x - rx)` to `(int)(x + rx - 0.001)`, columns first), at most `(int)(rx + ry) + 1`
     /// tiles from its centre; of the tiles found outside the footprint, the first empty one, else
     /// by the 3D distance of its centre (at the unit's height) from the unit the closest, or with
-    /// `farthest` (`param_7` 1) the farthest, later ones replacing it in the flood's order once
-    /// they beat it (an empty tile found, only empty ones). Returns its centre.
+    /// [`SpotPick::Farthest`] (`param_7` 1) the farthest, later ones replacing it in the flood's
+    /// order once they beat it (an empty tile found, only empty ones). Returns its centre.
     ///
     /// # Errors
     ///
@@ -49,7 +59,7 @@ impl Spatial {
         (me, radius_x): (ObjectId, f32),
         mask: TerrainMask,
         (at, radius): (Position, Footprint),
-        farthest: bool,
+        pick: SpotPick,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
         /// A tile's centre (`DAT_142e7f384`).
@@ -92,7 +102,11 @@ impl Spatial {
             }
             i += 1;
         }
-        let mut best = if farthest { 0.0 } else { NO_SPOT };
+        let mut best = if pick == SpotPick::Farthest {
+            0.0
+        } else {
+            NO_SPOT
+        };
         let mut spot = None;
         let mut empty = false;
         for &t in &list {
@@ -116,7 +130,7 @@ impl Spatial {
                 from.y() - centre.y(),
             );
             let distance = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
-            let beats = if farthest {
+            let beats = if pick == SpotPick::Farthest {
                 best < distance
             } else {
                 distance < best

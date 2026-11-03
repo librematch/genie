@@ -479,19 +479,19 @@ impl UnitAi {
         Ok(true)
     }
 
-    /// Slot 0x100 (`FUN_140c4d910`), with `again` (its argument 4) or without an action value:
+    /// Slot 0x100 (`FUN_140c4d910`), forced (its argument 4) or without an action value:
     /// the unit's explore to `tile`'s corner (slot 0x398, [`Effect::Explore`], which takes it); the AI
     /// then holds the explore's action value and the point without a target (`FUN_140c64c10`
     /// with −1, which leaves the target class), at height `UnitAiTuning::explore_z`.
     pub(super) fn explore_at(
         &mut self,
         tile: Tile,
-        again: bool,
+        force: OrderForce,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
-        if !again && self.current_action.is_some() {
+        if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(false);
         }
         let point = tile.corner();

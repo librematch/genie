@@ -46,9 +46,9 @@ pub(crate) struct ResourceWorld<'a, 'b> {
 /// Where `ClosestResourceObject` (`FUN_140c49760`) searches from, the unit at `unit`: without a
 /// site from `point` (at the unit's height), unless both its parts are exactly −1
 /// (`DAT_14330ec20`, `UCOMISS`/`JP`/`JNZ`: a part that is not a number differs); with a site
-/// (`has_site`, which replaces the point) and for (−1, −1) from the unit's place.
-pub(crate) fn search_origin(point: Point, has_site: bool, unit: Position) -> Position {
-    if !has_site && (point.x() != -1.0 || point.y() != -1.0) {
+/// (`site`, which replaces the point) and for (−1, −1) from the unit's place.
+pub(crate) fn search_origin<T>(point: Point, site: Option<T>, unit: Position) -> Position {
+    if site.is_none() && (point.x() != -1.0 || point.y() != -1.0) {
         point.with_height(unit.z())
     } else {
         unit
@@ -161,7 +161,7 @@ pub(crate) fn closest_resource_of(
             })
             .collect()
     };
-    let position = search_origin(point, site.is_some(), unit.position());
+    let position = search_origin(point, site, unit.position());
     let seeker = gather_search::Seeker {
         player,
         position,
