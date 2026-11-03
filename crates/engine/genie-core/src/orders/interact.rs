@@ -314,7 +314,7 @@ impl World {
                 self.groups.count_command();
                 return Ok(());
             }
-            &[id] if !order.control => {
+            &[id] if !order.control.is_held() => {
                 self.groups.count_command();
                 // a gone unit (the check's none) leaves no group and takes no move
                 let Some(id) = id else {
@@ -368,14 +368,14 @@ impl World {
             args: CommandArgs {
                 queued: order.queued,
                 direct: order.direct,
-                disable_retargeting: order.control,
+                disable_retargeting: order.control.is_held(),
                 filter: None,
             },
             first: FirstTarget {
                 filter: None,
                 disable_retargeting: |retargets| retargets,
             },
-            lock_line: order.control,
+            lock_line: order.control.is_held(),
         };
         self.order_groups(split, &groups)
     }

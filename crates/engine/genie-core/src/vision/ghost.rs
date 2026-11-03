@@ -702,6 +702,7 @@ mod tests {
     use crate::objects::masters::{Master, Masters};
     use crate::objects::unit::Unit;
     use crate::ownership::CaptureKind;
+    use crate::players::game_status::GameStatus;
     #[cfg(test)]
     use crate::players::{ByPlayer, PlayerKind};
     use crate::test_ids::master_id;
@@ -1174,7 +1175,7 @@ mod tests {
                 .masters
                 .push(Arc::new(masters(RecycleMode::RECYCLED)));
         }
-        let own = |p| own_masks(p, false);
+        let own = |p| own_masks(p, GameStatus::Playing);
         let with = |p, bits: u64| {
             let mut masks = own(p);
             masks.visible |= VisionBits::from_bits_retain(bits);

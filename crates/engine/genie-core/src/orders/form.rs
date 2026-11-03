@@ -6,6 +6,7 @@ use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::common_group;
 use crate::objects::ObjectId;
+use crate::orders::ControlKey;
 use crate::orders::Split;
 use crate::orders::{LISTED, set_differentiator_groups};
 use crate::players::PlayerId;
@@ -49,7 +50,7 @@ impl World {
         for &id in units.iter().flatten() {
             self.stop_marcher(id)?;
         }
-        let mut split = self.split(&units, &|_| true, false)?;
+        let mut split = self.split(&units, &|_| true, ControlKey::Up)?;
         let mut listed: Vec<GroupId> = Vec::new();
         for (number, group_units) in split.groups.clone().iter().enumerate() {
             if group_units.is_empty() {

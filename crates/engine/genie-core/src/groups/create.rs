@@ -176,12 +176,21 @@ impl UnitGroup {
     }
 }
 
+/// What a unit that leaves its group (`removeUnit`'s `param_4`) does with its walk.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeavingWalk {
+    /// It stands (0).
+    Stands,
+    /// Its walk goes on (1).
+    KeepsMoving,
+}
+
 impl World {
     /// `removeUnit` (`FUN_14102c160`) of unit `id` from group `group`, `target` (`param_3`) the
     /// object its sub-formation is reckoned against (`FUN_141011300`'s rams rule, which no code
-    /// enables) and `keep_moving` (`param_4`): false for a unit not a member. A member the world
-    /// holds whose group link names the group stands (slot 0x560, [`crate::movement::Mover::
-    /// stand`], unless `keep_moving`) and its link clears (`+0x6d0` -1). The members' ids and
+    /// enables) and `walk` (`param_4`): false for a unit not a member. A member the world holds
+    /// whose group link names the group stands (slot 0x560, [`crate::movement::Mover::stand`],
+    /// unless it [`LeavingWalk::KeepsMoving`]) and its link clears (`+0x6d0` -1). The members' ids and
     /// own moves close up; `mSecondsSinceAttacking` keeps its places (the last member's value
     /// goes to the spare ones). It leaves its sub-formation's statistic (`FUN_14102c480`); a
     /// lead that leaves gives way to the member nearest the target (`FUN_141016870`,
@@ -198,7 +207,7 @@ impl World {
         group: GroupId,
         id: ObjectId,
         target: Option<ObjectId>,
-        keep_moving: bool,
+        walk: LeavingWalk,
     ) -> Result<bool, GenieError> {
         let _ = target;
         let Some(g) = self.groups.get(group) else {
@@ -214,7 +223,9 @@ impl World {
                 Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
             };
             if u.group.id == Some(group_id) {
-                if !keep_moving && let Some(m) = self.parts.mover_mut(u.id) {
+                if walk == LeavingWalk::Stands
+                    && let Some(m) = self.parts.mover_mut(u.id)
+                {
                     m.stand()?;
                 }
                 u.group.id = None;
@@ -371,7 +382,7 @@ impl World {
             && self.groups.get(old).is_some()
         {
             // the unit leaves its old group first (removeUnit with -1, moving stopped)
-            let _ = self.remove_unit(old, id, None, false)?;
+            let _ = self.remove_unit(old, id, None, LeavingWalk::Stands)?;
         }
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
         let ai_rng = self.streams.get(Stream::Ai);
@@ -437,6 +448,7 @@ mod tests {
     use crate::groups::FormationCategory;
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
+    use crate::groups::LeavingWalk;
     use crate::groups::MotionFlags;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitKindStatistic};
     use crate::map::Distance;
@@ -682,7 +694,7 @@ mod tests {
     fn removed_member_leaves_its_slot_statistic_and_lead() {
         let mut t = three();
         assert!(
-            t.remove_unit(group_id(1), object_id(11), None, false)
+            t.remove_unit(group_id(1), object_id(11), None, LeavingWalk::Stands)
                 .unwrap()
         );
         let g = t.groups.get(group_id(1)).unwrap();
@@ -722,11 +734,11 @@ mod tests {
         assert_eq!(m.paths[0].state, PathState::Idle);
         // not a member, or a group the world does not hold
         assert!(
-            !t.remove_unit(group_id(1), object_id(11), None, false)
+            !t.remove_unit(group_id(1), object_id(11), None, LeavingWalk::Stands)
                 .unwrap()
         );
         assert!(
-            !t.remove_unit(group_id(2), object_id(10), None, false)
+            !t.remove_unit(group_id(2), object_id(10), None, LeavingWalk::Stands)
                 .unwrap()
         );
     }
@@ -854,7 +866,7 @@ mod tests {
     fn unit_kept_moving_walks_on_and_gone_one_leaves_its_statistic() {
         let mut t = three();
         assert!(
-            t.remove_unit(group_id(1), object_id(11), None, true)
+            t.remove_unit(group_id(1), object_id(11), None, LeavingWalk::KeepsMoving)
                 .unwrap()
         );
         assert_eq!(
@@ -868,7 +880,7 @@ mod tests {
         let mut t = three();
         let _ = t.remove_live(PlayerId::new(1), ListIndex::new(2)).unwrap();
         assert!(
-            t.remove_unit(group_id(1), object_id(12), None, false)
+            t.remove_unit(group_id(1), object_id(12), None, LeavingWalk::Stands)
                 .unwrap()
         );
         let g = t.groups.get(group_id(1)).unwrap();

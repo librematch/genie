@@ -37,7 +37,7 @@ pub use self::by_player::ByPlayer;
 pub use self::chance::Chance;
 pub use self::civ_id::CivId;
 pub use self::escrow_share::EscrowShare;
-pub use self::market_values::{LotVolume, NetTrades, Price, PriceSwing};
+pub use self::market_values::{LotVolume, MarketTrade, NetTrades, Price, PriceSwing};
 pub use self::player_id::PlayerId;
 pub use self::player_kind::PlayerKind;
 pub use self::player_set::PlayerSet;

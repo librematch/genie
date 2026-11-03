@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
@@ -191,7 +192,7 @@ impl World {
                     if state == SlotState::InPlace {
                         // a slot without a unit names no member: the removal finds none
                         if let Some(unit) = unit {
-                            let _ = self.remove_unit(group, unit, target, false)?;
+                            let _ = self.remove_unit(group, unit, target, LeavingWalk::Stands)?;
                         }
                     } else {
                         kept += 1;

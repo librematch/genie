@@ -74,13 +74,22 @@ impl NetTrades {
 
     /// One more purchase, or one more sale (wrapping as the game's int).
     #[must_use]
-    pub const fn traded(self, buy: bool) -> Self {
-        Self(if buy {
-            self.0.wrapping_add(1)
-        } else {
-            self.0.wrapping_sub(1)
+    pub const fn traded(self, trade: MarketTrade) -> Self {
+        Self(match trade {
+            MarketTrade::Buy => self.0.wrapping_add(1),
+            MarketTrade::Sell => self.0.wrapping_sub(1),
         })
     }
+}
+
+/// A trade at the market: a purchase (`TRIBE_COMMAND_BUY_COMMODITY`, the price rises) or a sale
+/// (`TRIBE_COMMAND_SELL_COMMODITY`, it falls).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MarketTrade {
+    /// A purchase (`FUN_1415cd6a0`).
+    Buy,
+    /// A sale (`FUN_1415caf80`).
+    Sell,
 }
 
 impl genie_diff::Diff for Price {
@@ -146,6 +155,7 @@ impl genie_diff::Diff for LotVolume {
 
 #[cfg(test)]
 mod tests {
+    use crate::players::MarketTrade;
     use crate::players::{LotVolume, NetTrades, Price, PriceSwing};
 
     /// A step raises or lowers a price by one `f32` operation; the net trades count both ways.
@@ -155,9 +165,14 @@ mod tests {
         assert_eq!(p.raised(0.02).get().to_bits(), (1.3_f32 + 0.02).to_bits());
         assert_eq!(p.lowered(0.02).get().to_bits(), (1.3_f32 - 0.02).to_bits());
         assert!(Price::new(0.2) < p);
-        assert_eq!(NetTrades::ZERO.traded(true).traded(false), NetTrades::ZERO);
         assert_eq!(
-            NetTrades::new(i32::MIN).traded(false),
+            NetTrades::ZERO
+                .traded(MarketTrade::Buy)
+                .traded(MarketTrade::Sell),
+            NetTrades::ZERO
+        );
+        assert_eq!(
+            NetTrades::new(i32::MIN).traded(MarketTrade::Sell),
             NetTrades::new(i32::MAX)
         );
         assert_eq!(PriceSwing::default(), PriceSwing::ZERO);

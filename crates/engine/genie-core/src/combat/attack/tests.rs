@@ -1,4 +1,5 @@
 use super::*;
+use crate::combat::AttackTargetId;
 use crate::combat::abilities::Look;
 use crate::combat::damage::Allied;
 use crate::combat::missile::StrikeResult;
@@ -88,49 +89,51 @@ use std::sync::Arc;
 /// at or past the interrupt frame readyToAttack runs, the swing going on.
 #[test]
 fn swing_after_its_hit_follows_its_interrupt_and_firing_frames() {
-    use AfterHit::{Continue, Done, Ready};
+    use AfterHit::{Continue, Done, Ready, Recheck};
+    let missile = Some(master_id(99));
+    let target = Some(AttackTargetId::new(object_id(7)));
     let f = Frame::of_data;
     // ranged, timer run out (NaN counts too)
     assert_eq!(
-        after_hit(true, Seconds::ZERO, false, f(5), f(3), f(9)),
+        after_hit(missile, Seconds::ZERO, None, f(5), f(3), f(9)),
         Done
     );
     assert_eq!(
-        after_hit(true, Seconds::ZERO, true, f(5), f(3), f(6)),
+        after_hit(missile, Seconds::ZERO, target, f(5), f(3), f(6)),
         Ready
     );
     assert_eq!(
-        after_hit(true, Seconds::new(f32::NAN), true, f(5), f(3), f(6)),
+        after_hit(missile, Seconds::new(f32::NAN), target, f(5), f(3), f(6)),
         Ready
     );
     assert_eq!(
-        after_hit(true, Seconds::new(-1.0), true, f(-1), f(3), f(4)),
+        after_hit(missile, Seconds::new(-1.0), target, f(-1), f(3), f(4)),
         Ready
     );
     assert_eq!(
-        after_hit(true, Seconds::ZERO, true, f(-1), f(3), f(3)),
-        Continue { check: false }
+        after_hit(missile, Seconds::ZERO, target, f(-1), f(3), f(3)),
+        Continue
     );
     assert_eq!(
-        after_hit(true, Seconds::ZERO, true, f(5), f(3), f(5)),
-        Continue { check: true }
+        after_hit(missile, Seconds::ZERO, target, f(5), f(3), f(5)),
+        Recheck
     );
     // ranged with time left, or melee: only the interrupt test
     assert_eq!(
-        after_hit(true, Seconds::new(0.5), false, f(5), f(3), f(9)),
-        Continue { check: true }
+        after_hit(missile, Seconds::new(0.5), None, f(5), f(3), f(9)),
+        Recheck
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, false, f(5), f(3), f(4)),
-        Continue { check: false }
+        after_hit(None, Seconds::ZERO, None, f(5), f(3), f(4)),
+        Continue
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, true, f(5), f(3), f(5)),
-        Continue { check: true }
+        after_hit(None, Seconds::ZERO, target, f(5), f(3), f(5)),
+        Recheck
     );
     assert_eq!(
-        after_hit(false, Seconds::ZERO, true, f(-1), f(3), f(9)),
-        Continue { check: false }
+        after_hit(None, Seconds::ZERO, target, f(-1), f(3), f(9)),
+        Continue
     );
 }
 

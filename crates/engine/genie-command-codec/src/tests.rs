@@ -23,7 +23,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::MasterId;
-use genie_core::orders::{Interact, MoveOrder};
+use genie_core::orders::{ControlKey, Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
@@ -223,7 +223,7 @@ fn move_follow_and_guard_keep_their_orders() {
                 queued: true,
                 direct: false,
                 human: true,
-                control: false,
+                control: ControlKey::Up,
             }),
         })
     );

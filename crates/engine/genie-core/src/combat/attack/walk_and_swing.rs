@@ -307,13 +307,12 @@ impl Attack {
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
         let sprite_tuning = c.w.model.tuning.sprite;
-        let ranged = self.arms.missile.is_some();
         let timer = c.w.parts.combat_of(unit.id).attack_timer;
         let mut g = c.w.attack_ground(unit.id);
         match after_hit(
-            ranged,
+            self.arms.missile,
             timer,
-            self.target.is_some(),
+            self.target,
             self.arms.interrupt_frame,
             self.arms.fire_frame,
             sprite.frame,
@@ -324,12 +323,12 @@ impl Attack {
             }
             // readyToAttack with its third argument 0: a target out of reach is followed
             // (`set_state` 4); a ready unit only faces it; the swing goes on either way
-            AfterHit::Continue { check: true } => {
+            AfterHit::Recheck => {
                 if let Readiness::Away(gap) = self.ready_to_attack(unit, &mut g, f, r, false)? {
                     self.follow(unit, &mut g, r, f, gap)?;
                 }
             }
-            AfterHit::Continue { check: false } => {}
+            AfterHit::Continue => {}
         }
         // the loop test reads the unit's sprite as it is now (`+0x140`): readyToAttack may have
         // shown the standing one

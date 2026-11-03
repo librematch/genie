@@ -68,6 +68,7 @@ use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
+use crate::orders::ControlKey;
 use crate::orders::split::splits_together;
 use crate::ownership::artifact::Artifact;
 use crate::pathing::Pathing;
@@ -1197,20 +1198,24 @@ fn the_splitter_groups_soldiers_near_each_other_and_leaves_villagers_loose() {
     ];
     let mut t = soldiers(&units, &[]);
     let split = t
-        .split(&object_ids([14, 13, 12, 11, 10]), &|_| true, false)
+        .split(&object_ids([14, 13, 12, 11, 10]), &|_| true, ControlKey::Up)
         .unwrap();
     // 12 has two to join it (11 and 13), 11 and 13 one each
     assert_eq!(split.groups, [object_id_list([12, 11, 13])]);
     assert_eq!(split.loose, object_id_list([10, 14]));
     let split = t
-        .split(&object_ids([14, 13, 12, 11, 10]), &|_| true, true)
+        .split(
+            &object_ids([14, 13, 12, 11, 10]),
+            &|_| true,
+            ControlKey::Held,
+        )
         .unwrap();
     assert_eq!(split.loose, object_id_list([10]));
     assert_eq!(split.groups.len(), 4);
     // without auto formations every unit moves loose
     t.players[1].formations.auto = false;
     let split = t
-        .split(&object_ids([14, 13, 12, 11, 10]), &|_| true, false)
+        .split(&object_ids([14, 13, 12, 11, 10]), &|_| true, ControlKey::Up)
         .unwrap();
     assert_eq!(split.loose, object_id_list([10, 11, 12, 13, 14]));
     assert_eq!(split.groups, Vec::<Vec<ObjectId>>::new());
@@ -1228,11 +1233,13 @@ fn the_splitter_keeps_the_order_members_of_an_existing_group_together() {
     let mut t = soldiers(&units, &[11, 12]);
     t.players[1].formations.auto = false;
     let split = t
-        .split(&object_ids([13, 12, 11]), &|_| true, false)
+        .split(&object_ids([13, 12, 11]), &|_| true, ControlKey::Up)
         .unwrap();
     assert_eq!(split.groups, [object_id_list([11, 12])]);
     assert_eq!(split.loose, object_id_list([13]));
-    let split = t.split(&object_ids([12, 13]), &|_| true, false).unwrap();
+    let split = t
+        .split(&object_ids([12, 13]), &|_| true, ControlKey::Up)
+        .unwrap();
     assert_eq!(split.loose, object_id_list([12, 13]));
 }
 
@@ -1503,7 +1510,7 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
         queued: true,
         direct: false,
         human: false,
-        control: false,
+        control: ControlKey::Up,
     };
     t.move_order(PlayerId::new(2), &object_ids([11]), &order)
         .unwrap();
@@ -1547,7 +1554,7 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
         queued: false,
         direct: false,
         human: false,
-        control: false,
+        control: ControlKey::Up,
     };
     let mut t = soldiers(&units, &[11]);
     t.move_order(PlayerId::new(1), &object_ids([11]), &order)
@@ -3832,12 +3839,12 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
         .collect();
     let mut t = soldiers(&units, &[]);
     let ids = object_ids((100..161).rev());
-    let split = t.split(&ids, &|_| true, false).unwrap();
+    let split = t.split(&ids, &|_| true, ControlKey::Up).unwrap();
     assert_eq!(split.groups, [object_id_list(100..160)]);
     assert_eq!(split.loose, object_id_list([160]));
     // the gone 999 is the first run's first entry
     let gone: Vec<_> = ids.iter().copied().chain(object_ids([999])).collect();
-    let split = t.split(&gone, &|_| true, false).unwrap();
+    let split = t.split(&gone, &|_| true, ControlKey::Up).unwrap();
     assert_eq!(
         split.groups,
         [object_id_list(100..159), object_id_list([159, 160])]
@@ -3845,11 +3852,11 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
     assert_eq!(split.loose, Vec::<ObjectId>::new());
     // 159 twice: the first run's last entry has no next one to repeat it
     let twice = object_ids((100..160).chain([159]));
-    let split = t.split(&twice, &|_| true, false).unwrap();
+    let split = t.split(&twice, &|_| true, ControlKey::Up).unwrap();
     assert_eq!(split.groups, [object_id_list(100..160)]);
     assert_eq!(split.loose, object_id_list([159]));
     // with Ctrl held the first run fills the 60 groups, the second's group is dropped
-    let split = t.split(&ids, &|_| true, true).unwrap();
+    let split = t.split(&ids, &|_| true, ControlKey::Held).unwrap();
     assert_eq!(split.groups.len(), 60);
     assert_eq!(split.groups[59], [object_id(159)]);
     assert_eq!(split.loose, Vec::<ObjectId>::new());
@@ -4882,7 +4889,7 @@ fn move_of_soldiers_in_no_group_forms_new_groups() {
         queued: false,
         direct: false,
         human: false,
-        control: false,
+        control: ControlKey::Up,
     };
     let world = || searchable(patrollers(&units, &[]));
     let mut t = world();
@@ -4895,7 +4902,7 @@ fn move_of_soldiers_in_no_group_forms_new_groups() {
     assert_eq!(t.groups.commands, Differentiator::of_data(1));
     let mut t = world();
     let ctrl = MoveOrder {
-        control: true,
+        control: ControlKey::Held,
         ..order
     };
     t.move_order(PlayerId::new(1), &object_ids([11, 12, 13]), &ctrl)
@@ -4927,7 +4934,7 @@ fn move_of_whole_group_keeps_it() {
         queued: false,
         direct: false,
         human: false,
-        control: false,
+        control: ControlKey::Up,
     };
     let kept = || {
         let mut t = soldiers(&units, &[11, 12]);

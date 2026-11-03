@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::groups::Motion;
+use crate::groups::motion::FlagChange;
 use crate::groups::motion::{
     EPSILON, GroupView, Lead, LeadGroup, PASSES, point, request, reset_level, set_flag, steer,
 };
@@ -89,7 +90,7 @@ pub(crate) fn path_step(
     loop {
         match pass(motion, group, lead, world, budget)? {
             Pass::Done(r) => return Ok(r),
-            Pass::Reached => set_flag(&mut motion.paths, LevelFlags::REACHED, true),
+            Pass::Reached => set_flag(&mut motion.paths, LevelFlags::REACHED, FlagChange::Set),
             Pass::Next => {}
         }
         passes += 1;
@@ -194,9 +195,13 @@ pub(super) fn reached(
             motion.new_position[0] = p;
             motion.position[0] = p;
         }
-        set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, false);
+        set_flag(
+            &mut motion.paths,
+            LevelFlags::AT_WAYPOINT,
+            FlagChange::Clear,
+        );
     }
-    set_flag(&mut motion.paths, LevelFlags::REACHED, false);
+    set_flag(&mut motion.paths, LevelFlags::REACHED, FlagChange::Clear);
     let at = motion.position[0];
     let level = motion.paths.checked_mut(0)?;
     level.waypoint = level.waypoint.next();
@@ -223,7 +228,7 @@ pub(super) fn reached(
     };
     if target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
         beyond = 0.0;
-        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, false);
+        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, FlagChange::Clear);
     }
     let level = motion.paths.checked_mut(0)?;
     if level.waypoint.within(level.points.len()) {

@@ -123,9 +123,42 @@ pub struct MoveOrder {
     pub direct: bool,
     /// `+0x15`: the last human order time is set.
     pub human: bool,
-    /// `+0x12` (`cade_api`'s `controlHeld`): the splitter makes each unit it may group a group of
-    /// its own ([`World::split`]).
-    pub control: bool,
+    /// `+0x12` (`cade_api`'s `controlHeld`): held, the splitter makes each unit it may group a
+    /// group of its own ([`World::split`]).
+    pub control: ControlKey,
+}
+
+/// MOVE's Ctrl key (`+0x12`, `cade_api`'s `controlHeld`): held or not.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ControlKey {
+    /// Not held (0).
+    #[default]
+    Up,
+    /// Held (any other byte; the codec writes 1).
+    Held,
+}
+
+impl ControlKey {
+    /// The key of the command's byte `value`: held when it is not 0.
+    #[must_use]
+    pub const fn of_byte(value: u8) -> Self {
+        if value == 0 { Self::Up } else { Self::Held }
+    }
+
+    /// The byte the codec writes: 1 held, 0 not.
+    #[must_use]
+    pub const fn byte(self) -> u8 {
+        match self {
+            Self::Up => 0,
+            Self::Held => 1,
+        }
+    }
+
+    /// Whether it is held.
+    #[must_use]
+    pub const fn is_held(self) -> bool {
+        matches!(self, Self::Held)
+    }
 }
 
 /// What a unit's slot 0x7e8 (`FUN_141227190`) is given through slot 0x128: the target, the point

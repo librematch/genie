@@ -16,6 +16,7 @@ use crate::GenieError;
 use crate::players::Amount;
 use crate::players::ByPlayer;
 use crate::players::PlayerId;
+use crate::players::game_status::GameStatus;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
@@ -50,15 +51,15 @@ const REVEAL_CENTRES: usize = 209;
 /// The attributes that add a scenario's masks of visible and explored players, not modelled.
 const SHARED_MASKS: [usize; 2] = [285, 286];
 
-/// The masks of player `p` before any sharing: its own bits and the bits no tile has, with the
-/// ended ones for a player who won or lost.
+/// The masks of player `p` of `status` before any sharing: its own bits and the bits no tile
+/// has, with the ended ones for a player who won or lost.
 #[must_use]
-pub fn own_masks(p: PlayerId, ended: bool) -> VisionMasks {
+pub fn own_masks(p: PlayerId, status: GameStatus) -> VisionMasks {
     let mut masks = VisionMasks {
         visible: VisionBits::visible(p) | VisionBits::NO_TILE,
         explored: VisionBits::explored(p) | VisionBits::NO_TILE_EXPLORED,
     };
-    if ended {
+    if status.ended() {
         masks.visible |= VisionBits::ENDED;
         masks.explored |= VisionBits::ENDED_EXPLORED;
     }
@@ -75,7 +76,7 @@ impl World {
         let n = self.players.len();
         let mut masks: ByPlayer<VisionMasks> = PlayerId::each(self.players.len())
             .zip(&self.players)
-            .map(|(p, player)| own_masks(p, player.game_status.ended()))
+            .map(|(p, player)| own_masks(p, player.game_status))
             .collect();
         let mut flares = Vec::new();
         for (p, me) in PlayerId::each(self.players.len())
@@ -219,7 +220,7 @@ mod tests {
         t.rebuild_vision().unwrap();
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(0)),
-            Some(&own_masks(PlayerId::new(0), false))
+            Some(&own_masks(PlayerId::new(0), GameStatus::Playing))
         );
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(1)),
@@ -241,11 +242,11 @@ mod tests {
         t.rebuild_vision().unwrap();
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(1)),
-            Some(&own_masks(PlayerId::new(1), false))
+            Some(&own_masks(PlayerId::new(1), GameStatus::Playing))
         );
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(2)),
-            Some(&own_masks(PlayerId::new(2), false))
+            Some(&own_masks(PlayerId::new(2), GameStatus::Playing))
         );
         assert_eq!(
             t.spatial.vision.get(PlayerId::new(4)),
@@ -267,11 +268,11 @@ mod tests {
     #[test]
     fn player_alone_sees_with_its_own_bits() {
         assert_eq!(
-            own_masks(PlayerId::new(2), false),
+            own_masks(PlayerId::new(2), GameStatus::Playing),
             masks(0x2000_0004, 0x2000_0004_0000_0000)
         );
         assert_eq!(
-            own_masks(PlayerId::new(1), true),
+            own_masks(PlayerId::new(1), GameStatus::Won),
             masks(0x6000_0002, 0x6000_0002_0000_0000)
         );
     }

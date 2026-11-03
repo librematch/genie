@@ -62,6 +62,7 @@ pub use self::unit_kind::UnitKind;
 mod attack;
 mod command;
 mod create;
+pub use self::create::LeavingWalk;
 
 use crate::math::fmath::{sqrt, sub};
 pub use command::MoveTo as CommandMoveTo;

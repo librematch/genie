@@ -232,7 +232,7 @@ impl Spatial {
         self.vision
             .get(player)
             .copied()
-            .unwrap_or_else(|| own_masks(player, false))
+            .unwrap_or_else(|| own_masks(player, GameStatus::Playing))
     }
 
     /// The map revealed to player `player` (`FUN_141639860` -> `FUN_1412847b0` with

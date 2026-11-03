@@ -249,7 +249,7 @@ fn order(c: &OrderCommand) -> Result<Packet, GenieError> {
             x: o.point.x(),
             y: o.point.y(),
             num: units.count,
-            field_0x12: u8::from(o.control),
+            field_0x12: o.control.byte(),
             field_0x13: u8::from(o.queued),
             field_0x14: u8::from(o.direct),
             field_0x15: u8::from(o.human),

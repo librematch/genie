@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
 use crate::groups::WorldObject;
 use crate::groups::command::MOVE_COMMAND;
@@ -157,7 +158,7 @@ impl World {
                         || Some(p) != owner
                 }
             };
-            if leaves && self.remove_unit(group, id, None, false)? {
+            if leaves && self.remove_unit(group, id, None, LeavingWalk::Stands)? {
                 if self.object(id).is_some()
                     && let Some(mover) = self.parts.mover_mut(id)
                 {

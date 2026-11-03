@@ -164,6 +164,7 @@ use crate::objects::sprite::Graphic;
 use crate::objects::unit::{Outcome, TAKEN_OUT};
 use crate::objects::unit::{Unit, loses_actions};
 use crate::objects::{DamagedTimer, FacetCount, Frame, Regeneration, WorkerCount};
+use crate::orders::ControlKey;
 use crate::orders::Dispatch;
 use crate::orders::town_bell::BackToWork;
 use crate::orders::{Interact, MoveOrder, Sweep, Work};
@@ -22618,7 +22619,7 @@ fn the_command_phase_runs_an_order_after_its_check() {
         queued: false,
         direct: false,
         human: true,
-        control: false,
+        control: ControlKey::Up,
     };
     let order = |units: Vec<Option<ObjectId>>, order| {
         Command::Order(OrderCommand {
@@ -22677,7 +22678,7 @@ fn an_order_of_the_last_commanded_units_reads_what_the_last_run_order_left() {
         queued: false,
         direct: false,
         human: true,
-        control: false,
+        control: ControlKey::Up,
     };
     let order = |units| {
         Command::Order(OrderCommand {

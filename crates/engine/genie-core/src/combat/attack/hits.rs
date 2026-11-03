@@ -2,6 +2,7 @@
 //! (`FUN_141084230`) and the blast so far.
 
 use crate::GenieError;
+use crate::combat::AttackTargetId;
 use crate::combat::Charge;
 use crate::combat::attack::DRAW_SCALE;
 use crate::combat::damage::HitLayer;
@@ -21,6 +22,7 @@ use crate::objects::ObjectId;
 use crate::objects::Relics;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::HitChance;
+use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
@@ -48,28 +50,28 @@ pub(super) enum AfterHit {
     Done,
     /// A ranged unit past its interrupt frame, else its firing frame: `set_state(6)` at once.
     Ready,
-    /// The swing goes on; at or past its interrupt frame readyToAttack (`FUN_140a7f9d0` with 0)
-    /// runs first.
-    Continue {
-        /// readyToAttack runs.
-        check: bool,
-    },
+    /// At or past its interrupt frame: readyToAttack (`FUN_140a7f9d0` with 0) runs, then the
+    /// swing goes on.
+    Recheck,
+    /// The swing goes on.
+    Continue,
 }
 
-/// [`AfterHit`] of a unit with a missile or not (`ranged`, `+0x98`), its attack timer (`+0x91c`,
-/// slot 0x100: `COMISS` with 0 then `SETBE`, so NaN counts as run out), a target (`+0x20`), its
+/// [`AfterHit`] of a unit with its missile or none (`+0x98`: a ranged unit), its attack timer
+/// (`+0x91c`, slot 0x100: `COMISS` with 0 then `SETBE`, so NaN counts as run out), its target or
+/// none (`+0x20`), its
 /// interrupt frame (`+0x9c`, −1 for none), its firing frame (`+0x9a`) and the sprite's frame
 /// (the sprite list's slot 8: the node's `+0x24`), compared as signed shorts.
 pub(super) fn after_hit(
-    ranged: bool,
+    missile: Option<MasterId>,
     timer: Seconds,
-    target: bool,
+    target: Option<AttackTargetId>,
     interrupt: Frame,
     fire: Frame,
     frame: Frame,
 ) -> AfterHit {
-    if ranged && at_most_or_unordered(timer.get(), 0.0) {
-        if !target {
+    if missile.is_some() && at_most_or_unordered(timer.get(), 0.0) {
+        if target.is_none() {
             return AfterHit::Done;
         }
         let limit = if interrupt == Frame::NONE {
@@ -81,8 +83,10 @@ pub(super) fn after_hit(
             return AfterHit::Ready;
         }
     }
-    AfterHit::Continue {
-        check: interrupt != Frame::NONE && interrupt <= frame,
+    if interrupt != Frame::NONE && interrupt <= frame {
+        AfterHit::Recheck
+    } else {
+        AfterHit::Continue
     }
 }
 

@@ -9,6 +9,7 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
+use crate::orders::ControlKey;
 use crate::orders::SplitPath;
 use crate::orders::{Interact, Split, Splittable, centroid};
 use crate::pathing::tile_path::Found;
@@ -41,7 +42,7 @@ impl World {
             _ => {}
         }
         let loose = self
-            .split(units, &|_| true, false)
+            .split(units, &|_| true, ControlKey::Up)
             .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
         self.groups.count_command();
         let loose = loose?;
@@ -85,7 +86,7 @@ impl World {
         units: &[Option<ObjectId>],
         kept: &dyn Fn(ObjectId) -> bool,
     ) -> Result<Vec<ObjectId>, GenieError> {
-        let split = self.split(units, kept, false)?;
+        let split = self.split(units, kept, ControlKey::Up)?;
         if !split.groups.is_empty() {
             return Err(GenieError::unsupported(
                 "a unit group the order splitter forms",
@@ -120,7 +121,7 @@ impl World {
         &mut self,
         units: &[Option<ObjectId>],
         kept: &dyn Fn(ObjectId) -> bool,
-        control: bool,
+        control: ControlKey,
     ) -> Result<Split, GenieError> {
         // FUN_140fd9ae0 splits only when the list's first unit exists (its owner): else no unit
         // takes the order
@@ -153,7 +154,7 @@ impl World {
         &mut self,
         owner: PlayerId,
         run: &[Option<ObjectId>],
-        control: bool,
+        control: ControlKey,
         split: &mut Split,
     ) -> Result<(), GenieError> {
         let left = self.splittables(run)?;
@@ -224,7 +225,7 @@ impl World {
             }
             let chosen = left.remove(best.0);
             let mut group = vec![chosen.id];
-            if !control {
+            if !control.is_held() {
                 let mut i = 0;
                 while i < left.len() {
                     if splits_together(

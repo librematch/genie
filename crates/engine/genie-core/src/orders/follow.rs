@@ -10,6 +10,7 @@ use crate::garrison::transport::TRANSPORT;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::gathering::make::MAKE;
+use crate::groups::LeavingWalk;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Position;
@@ -30,6 +31,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
+use crate::orders::ControlKey;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
@@ -79,7 +81,7 @@ impl World {
             60
         };
         let ids = ids.split_at(ids.len().min(cap)).0;
-        let split = self.split(ids, &|_| true, false)?;
+        let split = self.split(ids, &|_| true, ControlKey::Up)?;
         if !split.groups.is_empty() {
             return Err(GenieError::unsupported(
                 "a FOLLOW whose units the splitter groups (FUN_141007320, FUN_140fd9f40)",
@@ -187,7 +189,7 @@ impl World {
         target: Option<ObjectId>,
     ) -> Result<(), GenieError> {
         if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
-            let _ = self.remove_unit(link, id, target, false)?;
+            let _ = self.remove_unit(link, id, target, LeavingWalk::Stands)?;
         }
         Ok(())
     }

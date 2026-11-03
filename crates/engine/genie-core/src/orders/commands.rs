@@ -2,6 +2,7 @@
 
 use crate::GenieError;
 use crate::commands::UnloadPick;
+use crate::groups::LeavingWalk;
 use crate::groups::common_group;
 use crate::map::Distance;
 use crate::map::Point;
@@ -272,7 +273,7 @@ impl World {
         }
         for &id in &units {
             if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
-                let _ = self.remove_unit(link, id, None, false)?;
+                let _ = self.remove_unit(link, id, None, LeavingWalk::Stands)?;
             }
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
                 ai.orders.clear();

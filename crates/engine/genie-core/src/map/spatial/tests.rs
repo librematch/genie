@@ -12,6 +12,7 @@ use crate::objects::masters::MasterKind;
 use crate::ownership::CaptureKind;
 use crate::players::ByPlayer;
 use crate::players::Relation;
+use crate::players::game_status::GameStatus;
 use crate::players::relation_row;
 use crate::players::relations;
 use crate::test_ids::class_id;
@@ -1422,7 +1423,7 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
     // (OBJECT_MASK holds neither ENDED nor ENDED_EXPLORED)
     assert_eq!(
         s.vision.get(PlayerId::new(1)),
-        Some(&own_masks(PlayerId::new(1), true))
+        Some(&own_masks(PlayerId::new(1), GameStatus::Won))
     );
     assert_eq!(
         s.tile_sight(PlayerId::new(1), Tile::new(0, 0)),
@@ -1434,19 +1435,19 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
 fn revealed_map_gives_the_player_the_ended_bits() {
     let mut s = Spatial {
         vision: ByPlayer::new(vec![
-            own_masks(PlayerId::new(0), false),
-            own_masks(PlayerId::new(1), false),
+            own_masks(PlayerId::new(0), GameStatus::Playing),
+            own_masks(PlayerId::new(1), GameStatus::Playing),
         ]),
         ..Spatial::default()
     };
     s.reveal_to(PlayerId::new(1));
     assert_eq!(
         s.vision.get(PlayerId::new(1)),
-        Some(&own_masks(PlayerId::new(1), true))
+        Some(&own_masks(PlayerId::new(1), GameStatus::Won))
     );
     assert_eq!(
         s.vision.get(PlayerId::new(0)),
-        Some(&own_masks(PlayerId::new(0), false))
+        Some(&own_masks(PlayerId::new(0), GameStatus::Playing))
     );
 }
 
@@ -1463,8 +1464,8 @@ fn sighted(words: Vec<VisionBits>) -> Spatial {
             Vec::new(),
         )),
         vision: ByPlayer::new(vec![
-            own_masks(PlayerId::new(0), false),
-            own_masks(PlayerId::new(1), false),
+            own_masks(PlayerId::new(0), GameStatus::Playing),
+            own_masks(PlayerId::new(1), GameStatus::Playing),
         ]),
         ..Spatial::default()
     }

@@ -4,6 +4,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupId;
+use crate::groups::LeavingWalk;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SpecificMove;
@@ -76,7 +77,7 @@ impl World {
         let part = self.gate_part(id, target)?;
         if self.groups.held(group)?.command_queue.is_empty() && !self.target_pending(group)? {
             let (id, part) = (id, Some(part));
-            let _ = self.remove_unit(group, id, part, false)?;
+            let _ = self.remove_unit(group, id, part, LeavingWalk::Stands)?;
         }
         self.stand_unit(id)?;
         self.clear_own_move(group, id)?;

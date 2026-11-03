@@ -30,8 +30,8 @@ mod request;
 mod step;
 mod walk;
 
+use self::levels::{FlagChange, ground, point, reset_level, set_flag};
 pub(in crate::groups) use self::levels::{Passing, hold, passes_waypoint};
-use self::levels::{ground, point, reset_level, set_flag};
 use self::request::request;
 use self::step::Pass;
 pub(crate) use self::step::{StepWorld, path_step};

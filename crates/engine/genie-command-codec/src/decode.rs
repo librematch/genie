@@ -26,7 +26,7 @@ use genie_core::map::Tile;
 use genie_core::objects::Frame;
 use genie_core::objects::ObjectId;
 use genie_core::objects::masters::{ActionKind, MasterId};
-use genie_core::orders::{Interact, MoveOrder};
+use genie_core::orders::{ControlKey, Interact, MoveOrder};
 use genie_core::players::Amount;
 use genie_core::players::PlayerId;
 use genie_core::players::TributeFee;
@@ -150,7 +150,7 @@ fn orders(packet: &Packet) -> Result<Option<Command>, GenieError> {
                 queued: c.field_0x13 != 0,
                 direct: c.field_0x14 != 0,
                 human: c.field_0x15 == 1,
-                control: c.field_0x12 != 0,
+                control: ControlKey::of_byte(c.field_0x12),
             };
             (c.commp_id, listed(c.num, &c.ids), Order::Move(order))
         }

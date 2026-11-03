@@ -1,6 +1,7 @@
 use super::*;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
+use crate::groups::motion::FlagChange;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::GridSize;
@@ -196,9 +197,9 @@ fn levels_flag_and_its_parents_bit_2() {
         level(1, &[], 0, PathState::Idle),
         level(2, &[], 0, PathState::Idle),
     ];
-    set_flag(&mut paths, LevelFlags::REACHED, true);
+    set_flag(&mut paths, LevelFlags::REACHED, FlagChange::Set);
     assert_eq!(paths[0].flags, LevelFlags::REACHED);
-    set_flag(&mut paths, LevelFlags::MET_TARGET, false);
+    set_flag(&mut paths, LevelFlags::MET_TARGET, FlagChange::Clear);
     assert_eq!(
         (paths[0].flags, paths[1].flags, paths[2].flags),
         (
@@ -207,7 +208,7 @@ fn levels_flag_and_its_parents_bit_2() {
             LevelFlags::MET_TARGET
         )
     );
-    set_flag(&mut paths, LevelFlags::REACHED, false);
+    set_flag(&mut paths, LevelFlags::REACHED, FlagChange::Clear);
     assert_eq!(paths[0].flags, LevelFlags::NONE);
     assert_eq!(paths[1].flags, LevelFlags::MET_TARGET);
 }

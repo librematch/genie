@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::Motion;
+use crate::groups::motion::FlagChange;
 use crate::groups::motion::{
     EPSILON, GroupView, Lead, Pass, Passing, StepWorld, ground, hold, passes_waypoint, path_step,
     point, reset_level, set_flag,
@@ -50,7 +51,7 @@ pub(super) fn steer(
     let waypoint = point(level, level.waypoint);
     let at = motion.position[0];
     if ground(at, waypoint).get() < EPSILON {
-        set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
+        set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, FlagChange::Set);
         return Ok(Pass::Reached);
     }
     // FUN_141046080: the direction on the ground
@@ -62,12 +63,12 @@ pub(super) fn steer(
     let next = add(at, scale(step, direction));
     match passes_waypoint(waypoint, at, next, group_tuning) {
         Passing::Passes => {
-            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
+            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, FlagChange::Set);
             return Ok(Pass::Reached);
         }
         Passing::Reaches => {
-            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
-            set_flag(&mut motion.paths, LevelFlags::REACHED, true);
+            set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, FlagChange::Set);
+            set_flag(&mut motion.paths, LevelFlags::REACHED, FlagChange::Set);
         }
         Passing::Short => {}
     }
@@ -119,8 +120,8 @@ fn way_blocked(
     }
     let (on_target, newer) = weigh_hits(motion, spatial, &hits, by_id)?;
     if hits.len() == 1 && on_target {
-        set_flag(&mut motion.paths, LevelFlags::REACHED, true);
-        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, true);
+        set_flag(&mut motion.paths, LevelFlags::REACHED, FlagChange::Set);
+        set_flag(&mut motion.paths, LevelFlags::MET_TARGET, FlagChange::Set);
         return Ok(Some(Pass::Next));
     }
     if 0 < newer {

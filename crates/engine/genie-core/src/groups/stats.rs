@@ -8,6 +8,7 @@ use crate::groups::FormationKind;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
 use crate::groups::attack::moved_place;
 use crate::groups::create::FormationUnit;
@@ -201,7 +202,7 @@ impl World {
             };
             self.member_objects(id, &mut objects)?;
             if far && self.far_from_slot(group, &view, largest)? {
-                if self.remove_unit(group, id, None, false)? {
+                if self.remove_unit(group, id, None, LeavingWalk::Stands)? {
                     if self.object(id).is_some()
                         && let Some(m) = self.parts.mover_mut(id)
                     {

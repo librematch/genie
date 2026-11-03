@@ -8,6 +8,7 @@ use crate::garrison::{
     EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate, enter_view, share,
 };
 use crate::gathering::gather::unit::give_load;
+use crate::groups::LeavingWalk;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
@@ -434,7 +435,8 @@ impl Unit {
         if let Some(group) = self.group.id {
             if c.w.groups.get(group).is_some() {
                 c.lend((&mut *self, &mut *actions), |w| {
-                    w.remove_unit(group, id, Some(target.id()), false).map(drop)
+                    w.remove_unit(group, id, Some(target.id()), LeavingWalk::Stands)
+                        .map(drop)
                 })?;
             }
             if let Some(m) = c.w.parts.mover_mut(self.id) {

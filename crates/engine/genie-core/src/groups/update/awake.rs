@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
 use crate::groups::SlotState;
 use crate::groups::UnitGroup;
@@ -121,7 +122,7 @@ impl World {
             && !g.flags.contains(GroupFlags::PATROL)
         {
             while let Some(&id) = self.groups.held(group)?.objects.first() {
-                if !self.remove_unit(group, id, None, false)? {
+                if !self.remove_unit(group, id, None, LeavingWalk::Stands)? {
                     let _ = self.groups.held_mut(group)?.objects.remove(0);
                 }
             }

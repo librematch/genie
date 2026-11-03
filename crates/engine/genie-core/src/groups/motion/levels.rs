@@ -14,13 +14,22 @@ use crate::world::Seconds;
 use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
-/// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `flag` set or cleared;
-/// [`LevelFlags::MET_TARGET`] (bit 2) is then set on every parent too.
-pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, on: bool) {
+/// What `FUN_140f9b4d0` does to the walked level's flag: its `on` argument.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum FlagChange {
+    /// The flag goes on (1).
+    Set,
+    /// The flag goes off (0).
+    Clear,
+}
+
+/// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `flag` set or cleared
+/// (`change`); [`LevelFlags::MET_TARGET`] (bit 2) is then set on every parent too.
+pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, change: FlagChange) {
     let Some((level, parents)) = paths.split_first_mut() else {
         return;
     };
-    level.flags.set(flag, on);
+    level.flags.set(flag, change == FlagChange::Set);
     if flag == LevelFlags::MET_TARGET {
         for p in parents {
             p.flags |= LevelFlags::MET_TARGET;
