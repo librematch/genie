@@ -5,9 +5,10 @@ use crate::GenieError;
 use crate::map::Axis;
 use crate::math::fmath::at_most_or_unordered;
 use crate::pathing::hull_path::{
-    EPSILON, FAR, FULL_TURN, HALF, HALF_TURN, HIGH_T, Hull, LOW_T, MOST, NO_ANGLE, NUDGE, ONE,
-    Point, QUADRANT, TURN, UNTURN,
+    EPSILON, FULL_TURN, HALF, HALF_TURN, HIGH_T, Hull, LOW_T, MOST, NO_ANGLE, NUDGE, ONE, Point,
+    QUADRANT, TURN, UNTURN,
 };
+use crate::world::layer::generated::HullPathTuning;
 use crate::world::slots::CheckedIndex;
 
 impl Hull {
@@ -41,10 +42,11 @@ impl Hull {
         at_start: bool,
         a: Point,
         b: Point,
+        hull_path_tuning: &HullPathTuning,
     ) -> Option<(Point, usize)> {
         let n = self.points.len();
         let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
-        let mut best = FAR;
+        let mut best = hull_path_tuning.far;
         let mut found: Option<(Point, usize)> = None;
         for k in 1..=n {
             let p0 = *self.points.get(k - 1)?;
@@ -82,7 +84,12 @@ impl Hull {
     /// box lies inside the hull, 2 when some of its corners do (with which do not, by corner: low
     /// left, low right, high right, high left), 1 when a hull point lies in the box or a box side
     /// meets the hull, else 0.
-    pub(super) fn shape_overlap(&self, min: Point, max: Point) -> (u8, [bool; 4]) {
+    pub(super) fn shape_overlap(
+        &self,
+        min: Point,
+        max: Point,
+        hull_path_tuning: &HullPathTuning,
+    ) -> (u8, [bool; 4]) {
         let ((x0, y0), (x1, y1)) = ((min.x(), min.y()), (max.x(), max.y()));
         let mut outside = [true; 4];
         if !(x0 <= self.max.x() && y0 <= self.max.y() && self.min.x() <= x1 && self.min.y() <= y1) {
@@ -117,7 +124,7 @@ impl Hull {
         ];
         let meets = sides
             .iter()
-            .any(|&(a, b)| self.intersection(true, a, b).is_some());
+            .any(|&(a, b)| self.intersection(true, a, b, hull_path_tuning).is_some());
         (u8::from(meets), outside)
     }
 

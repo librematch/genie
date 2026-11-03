@@ -69,9 +69,13 @@ impl World {
     ) -> Result<(), GenieError> {
         let (world_time, period) = (self.world_time, self.history_period);
         let player = self.players.player_mut(p)?;
-        player
-            .history
-            .update(&player.attributes, world_time, period, self.model.slots)?;
+        player.history.update(
+            &player.attributes,
+            world_time,
+            period,
+            self.model.slots,
+            &self.model.tuning.history,
+        )?;
         let explored = if self.settings.explored_all() {
             Some(PERCENT)
         } else {

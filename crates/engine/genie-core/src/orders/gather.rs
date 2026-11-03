@@ -105,7 +105,11 @@ impl World {
         let rate = StopRate {
             work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.work_rate,
             capacity: Amount::of_master(me.capacity),
-            productivity: productivity_of(productivity, &owner.attributes),
+            productivity: productivity_of(
+                productivity,
+                &owner.attributes,
+                &self.model.tuning.gather,
+            ),
         };
         // the sprites its MoveTos' constructors take for none (FUN_140aa0d30, FUN_140aa0df0)
         let walks = unit.move_walks(
@@ -141,6 +145,7 @@ impl World {
             mover,
             rng,
             &self.model.roles,
+            &self.model.tuning,
         )?;
         let new = gather.targets();
         // a farm another farmer works: taken (slot 0x68) and let go again (set_state 11)
@@ -219,7 +224,14 @@ impl World {
             ));
         };
         let old = gather.targets();
-        gather.take_move(moved_to, point, player, mover, &walks)?;
+        gather.take_move(
+            moved_to,
+            point,
+            player,
+            mover,
+            &walks,
+            &self.model.tuning.move_to,
+        )?;
         let new = gather.targets();
         self.exchange_gather_targets(old, new, by)?;
         Ok(true)
@@ -306,6 +318,7 @@ impl World {
                 gap,
             },
             mover,
+            &self.model.tuning.move_to,
         )? {
             return Ok(false);
         }
@@ -400,6 +413,7 @@ impl World {
             productivity: productivity_of(
                 task.productivity,
                 &self.players.player(player)?.attributes,
+                &self.model.tuning.gather,
             ),
         };
         let mut gather = GatherAction::new(
@@ -445,6 +459,7 @@ impl World {
             mover,
             rng,
             &self.model.roles,
+            &self.model.tuning,
         )?;
         Held {
             kind: unit.life.attribute_type,

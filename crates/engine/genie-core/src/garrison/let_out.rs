@@ -23,6 +23,7 @@ use crate::orders::set_stance;
 use crate::players::PlayerId;
 use crate::unit_ai::StopOrder;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::visibility::LosSight;
 use crate::world::World;
@@ -193,6 +194,7 @@ impl World {
                 bid,
                 LosSight::tile_circle(building_at, building_radius, INSIDE_SIGHT),
                 &self.model.roles,
+                self.model.tuning.visibility,
             )?;
         }
         // slot 0x58: on the map at the spot (new_position: its tile's list, its sight)
@@ -230,7 +232,10 @@ impl World {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
         }
         if let Some(e) = self.take_sight_unsupported() {
@@ -268,6 +273,7 @@ impl World {
             own,
             self.parts.combat_of(b.id).reload_powerup,
             &self.model.roles,
+            &self.model.tuning.garrison,
         );
         Ok(Some(share(
             made,
@@ -383,7 +389,14 @@ impl World {
             .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
         self.pathing.tiles_changed(self.spatial.take_changes());
         if let Some(v) = self.spatial.sight.as_mut() {
-            v.moved(id, from, at, placed.radius, &self.model.roles)?;
+            v.moved(
+                id,
+                from,
+                at,
+                placed.radius,
+                &self.model.roles,
+                self.model.tuning.visibility,
+            )?;
             v.registry_moved(id, placed.class, from, at);
         }
         let unit = self.players.live_mut(up, ui)?;

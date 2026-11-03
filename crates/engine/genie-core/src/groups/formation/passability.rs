@@ -19,24 +19,12 @@ use crate::map::TerrainMask;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{BVector, scale, sub};
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, rotation};
-use crate::math::image::group::{FARTHEST, SLOT_NUDGE_X, SLOT_NUDGE_Z};
-use crate::math::image::group::{
-    PASS_FAR as GROUP_PASS_FAR, PASS_HALF as GROUP_PASS_HALF,
-    PASS_HALF_MARGIN as GROUP_PASS_HALF_MARGIN, PASS_MARGIN as GROUP_PASS_MARGIN,
-    PASS_ONE as GROUP_PASS_ONE, PASS_SHARE as GROUP_PASS_SHARE,
-};
+use crate::math::image::group::FARTHEST;
+use crate::math::image::group::{PASS_HALF as GROUP_PASS_HALF, PASS_ONE as GROUP_PASS_ONE};
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::GroupTuning;
 
-/// The passability's box starts at this (`DAT_142eea788`) on its low sides, 0 on its high ones.
-pub(super) const PASS_FAR: f32 = GROUP_PASS_FAR;
-/// The passability's grid holds the box plus this (`DAT_142eb0f50`) and one more cell
-/// ([`PASS_ONE`]) a side.
-pub(super) const PASS_MARGIN: f32 = GROUP_PASS_MARGIN;
-/// The grid starts this far below the box (`DAT_142ed6f20`).
-pub(super) const PASS_HALF_MARGIN: f32 = GROUP_PASS_HALF_MARGIN;
-/// Below this share of the slots' array reachable (`DAT_142eae8d0`), only the nearest slot is.
-pub(super) const PASS_SHARE: f32 = GROUP_PASS_SHARE;
 /// The grid's extra cell, and the spacing below which slots are nudged (`DAT_14330eb8c`).
 pub(super) const PASS_ONE: f32 = GROUP_PASS_ONE;
 /// A slot lies in its cell's middle (`DAT_142e7f384`).
@@ -45,15 +33,6 @@ pub(super) const PASS_HALF: f32 = GROUP_PASS_HALF;
 pub(super) const PASS_CELLS: i32 = 100;
 /// The grid's bytes (`local_2948`, cleared by the literal `0x2710` at `0x14103bf36`).
 pub(super) const GRID_BYTES: usize = 10000;
-/// The nudges of a slot by its cell's count (the tables `DAT_142f49470` and `DAT_142f49dd0`
-/// with the literals 0 and 0.25 after them, `0x14103cd8c` and `0x14103cda4`), x and y.
-pub(super) const SLOT_NUDGE: [GroundOffset; 5] = GroundOffset::table([
-    [SLOT_NUDGE_X[0], SLOT_NUDGE_Z[0]],
-    [SLOT_NUDGE_X[1], SLOT_NUDGE_Z[1]],
-    [SLOT_NUDGE_X[2], SLOT_NUDGE_Z[2]],
-    [SLOT_NUDGE_X[3], SLOT_NUDGE_Z[3]],
-    [0.0, 0.25],
-]);
 
 impl World {
     /// `FormationTransform` (`FUN_14103a1f0`) of `formation` for group `g`, `column_to_line`
@@ -144,6 +123,7 @@ impl World {
                             k as i32,
                             TransformType::BY_LINES,
                             world,
+                            &self.model.tuning.group,
                         );
                     }
                     if width < 0x100 {
@@ -159,7 +139,15 @@ impl World {
                 };
                 let mut i = 0;
                 loop {
-                    let _ = transform_slot(formation, &rotation, point, i, kind, world);
+                    let _ = transform_slot(
+                        formation,
+                        &rotation,
+                        point,
+                        i,
+                        kind,
+                        world,
+                        &self.model.tuning.group,
+                    );
                     i += 1;
                     formation.number_transformed_slots += 1;
                     if capacity <= formation.number_transformed_slots {
@@ -224,8 +212,56 @@ impl World {
             if below_or_unordered(un.spacing.get(), PASS_ONE) {
                 s.transform_position = s
                     .transform_position
-                    .with_x(x as f32 + PASS_HALF + SLOT_NUDGE.checked(nudge)?.x())
-                    .with_y(y as f32 + PASS_HALF + SLOT_NUDGE.checked(nudge)?.y());
+                    .with_x(
+                        x as f32
+                            + PASS_HALF
+                            + GroundOffset::table([
+                                [
+                                    self.model.tuning.group.slot_nudge_x[0],
+                                    self.model.tuning.group.slot_nudge_z[0],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[1],
+                                    self.model.tuning.group.slot_nudge_z[1],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[2],
+                                    self.model.tuning.group.slot_nudge_z[2],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[3],
+                                    self.model.tuning.group.slot_nudge_z[3],
+                                ],
+                                [0.0, 0.25],
+                            ])
+                            .checked(nudge)?
+                            .x(),
+                    )
+                    .with_y(
+                        y as f32
+                            + PASS_HALF
+                            + GroundOffset::table([
+                                [
+                                    self.model.tuning.group.slot_nudge_x[0],
+                                    self.model.tuning.group.slot_nudge_z[0],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[1],
+                                    self.model.tuning.group.slot_nudge_z[1],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[2],
+                                    self.model.tuning.group.slot_nudge_z[2],
+                                ],
+                                [
+                                    self.model.tuning.group.slot_nudge_x[3],
+                                    self.model.tuning.group.slot_nudge_z[3],
+                                ],
+                                [0.0, 0.25],
+                            ])
+                            .checked(nudge)?
+                            .y(),
+                    );
             } else {
                 s.transform_position = s
                     .transform_position
@@ -248,8 +284,8 @@ impl World {
     /// temporary records of the tiles its mask lacks (`FUN_141052b90`), the members are ignored
     /// (`FUN_1410562e0`), and each active slot is reachable when the line from the group's place
     /// to it meets nothing standing ([`crate::map::spatial::Spatial::still_line_hit`]). With fewer
-    /// than [`PASS_SHARE`] of the slots' array reachable, all are unreachable but the nearest,
-    /// which takes the group's place. On a grid of the box plus [`PASS_HALF_MARGIN`] each way
+    /// than `GroupTuning::pass_share` of the slots' array reachable, all are unreachable but the nearest,
+    /// which takes the group's place. On a grid of the box plus `GroupTuning::pass_half_margin` each way
     /// (at most [`PASS_CELLS`] cells a side) the reachable slots' cells count their slots (bits 1 to 5, bit
     /// 0 set) and point toward the nearest slot (bits 6 and 7: +y, +x, -y, -x). Each
     /// unreachable slot's unit then searches breadth first from its own place's cell, through
@@ -258,7 +294,7 @@ impl World {
     /// (one slot, pointing to it). A cell found that is not the nearest slot's steps once more
     /// the way its cell points, when that cell holds at most five and the line from the unit
     /// there is clear. The slot then lies in the middle of its cell, below a spacing of
-    /// [`PASS_ONE`] nudged by its count ([`SLOT_NUDGE_X`], [`SLOT_NUDGE_Z`]). The temporary
+    /// [`PASS_ONE`] nudged by its count (`GroupTuning::slot_nudge_x`, `GroupTuning::slot_nudge_z`). The temporary
     /// records and the ignore list go after.
     ///
     /// # Errors
@@ -299,7 +335,12 @@ impl World {
             return Ok(());
         };
         // the active slot nearest the group's place, and the box around the tester and them
-        let (bounds, nearest) = passability_box(&formation.slots, tester.moved_vector(), position);
+        let (bounds, nearest) = passability_box(
+            &formation.slots,
+            tester.moved_vector(),
+            position,
+            &self.model.tuning.group,
+        );
         let k = nearest.ok_or(NO_NEAREST_SLOT)?;
         if !stands(formation.slots.checked(k)?.transform_position) {
             if !stands(position) {
@@ -324,7 +365,9 @@ impl World {
         self.spatial.set_manager_ignore(&[]);
         let (mut reachable, mut unreachable) =
             self.slot_reach(formation, position, grow, &members)?;
-        if (reachable.len() as f32) / (formation.slot_capacity() as f32) < PASS_SHARE {
+        if (reachable.len() as f32) / (formation.slot_capacity() as f32)
+            < self.model.tuning.group.pass_share
+        {
             unreachable.append(&mut reachable);
             reachable.push(k);
             let s = formation.slots.checked_mut(k)?;
@@ -334,15 +377,15 @@ impl World {
                 .with_y(position.y());
         }
         // CVTTSS2SI at 0x14103bedd, 0x14103bef9, 0x14103bf1c and 0x14103bf2e
-        let w = cvttss2si((max_x - min_x) + PASS_MARGIN + PASS_ONE);
-        let h = cvttss2si((max_z - min_z) + PASS_MARGIN + PASS_ONE);
+        let w = cvttss2si((max_x - min_x) + self.model.tuning.group.pass_margin + PASS_ONE);
+        let h = cvttss2si((max_z - min_z) + self.model.tuning.group.pass_margin + PASS_ONE);
         if PASS_CELLS < w || PASS_CELLS < h {
             // the records go (FUN_1410561f0 at 0x14103cf9f)
             self.spatial.clear_tile_records();
             return Ok(());
         }
-        let ox = cvttss2si(min_x - PASS_HALF_MARGIN);
-        let oz = cvttss2si(min_z - PASS_HALF_MARGIN);
+        let ox = cvttss2si(min_x - self.model.tuning.group.pass_half_margin);
+        let oz = cvttss2si(min_z - self.model.tuning.group.pass_half_margin);
         let mut grid = PassGrid {
             cells: vec![0u8; GRID_BYTES],
             size: GridSize::new(w, h),
@@ -545,7 +588,7 @@ pub(super) fn slot_tile(at: BVector) -> Tile {
 }
 
 /// The passability's box and nearest slot (0x14103b650..0x14103b758): from the box
-/// ([`PASS_FAR`], [`PASS_FAR`]) to (0, 0), each active slot of `slots` widens it first by the
+/// (`GroupTuning::pass_far`, `GroupTuning::pass_far`) to (0, 0), each active slot of `slots` widens it first by the
 /// tester's place `at` (slot 0x520) and then by its own, as `MINSS new, old` and `MAXSS new, old`
 /// take them (the old bound kept for a NaN either side); the nearest is the first active slot
 /// whose squared distance to the group's place `position` (summed x, height, y) lies below the
@@ -555,9 +598,11 @@ pub(super) fn passability_box(
     slots: &[Slot],
     at: BVector,
     position: BVector,
+    group_tuning: &GroupTuning,
 ) -> (Rect, Option<usize>) {
     use crate::math::fmath::{maxss, minss};
-    let (mut min_x, mut min_z, mut max_x, mut max_z) = (PASS_FAR, PASS_FAR, 0.0f32, 0.0f32);
+    let (mut min_x, mut min_z, mut max_x, mut max_z) =
+        (group_tuning.pass_far, group_tuning.pass_far, 0.0f32, 0.0f32);
     let mut best = FARTHEST;
     let mut nearest = None;
     for (j, t) in slots.iter().enumerate() {

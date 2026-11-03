@@ -58,14 +58,12 @@ use crate::map::TerrainMask;
 #[cfg(test)]
 use crate::map::spatial::{Placed, tile_record_id};
 use crate::math::image::hull_path::{
-    DIRECTIONS as HULL_PATH_DIRECTIONS, ENTRANCE_STEP as HULL_PATH_ENTRANCE_STEP,
-    EPSILON as HULL_PATH_EPSILON, EXIT_STEP as HULL_PATH_EXIT_STEP, FAR as HULL_PATH_FAR,
+    DIRECTIONS as HULL_PATH_DIRECTIONS, EPSILON as HULL_PATH_EPSILON,
     FULL_TURN as HULL_PATH_FULL_TURN, HALF as HULL_PATH_HALF, HALF_TURN as HULL_PATH_HALF_TURN,
     HIGH_T as HULL_PATH_HIGH_T, LOW_T as HULL_PATH_LOW_T, MOST as HULL_PATH_MOST,
-    NEAR_TARGET as HULL_PATH_NEAR_TARGET, NO_ANGLE as HULL_PATH_NO_ANGLE, NUDGE as HULL_PATH_NUDGE,
-    ONE as HULL_PATH_ONE, QUADRANT as HULL_PATH_QUADRANT, SAME_END as HULL_PATH_SAME_END,
-    SIDES as HULL_PATH_SIDES, SQRT_2 as HULL_PATH_SQRT_2, TURN as HULL_PATH_TURN,
-    UNTURN as HULL_PATH_UNTURN,
+    NO_ANGLE as HULL_PATH_NO_ANGLE, NUDGE as HULL_PATH_NUDGE, ONE as HULL_PATH_ONE,
+    QUADRANT as HULL_PATH_QUADRANT, SIDES as HULL_PATH_SIDES, SQRT_2 as HULL_PATH_SQRT_2,
+    TURN as HULL_PATH_TURN, UNTURN as HULL_PATH_UNTURN,
 };
 use crate::world::index::ObjectsRef;
 use std::ops::Index;
@@ -95,20 +93,10 @@ const ONE: f32 = HULL_PATH_ONE;
 /// `DAT_142ed55d4`, `DAT_142f4328c`: the parameters within which two segments meet.
 const LOW_T: f32 = HULL_PATH_LOW_T;
 const HIGH_T: f32 = HULL_PATH_HIGH_T;
-/// `DAT_142f43298`: the intersection search's first distance.
-const FAR: f32 = HULL_PATH_FAR;
 /// `DAT_14330ebf4`: the largest float, the first distance of the ray searches.
 const MOST: f32 = HULL_PATH_MOST;
-/// `DAT_142eb99cc`: two exit or entrance paths ending this close end at the same point.
-const SAME_END: f32 = HULL_PATH_SAME_END;
-/// `DAT_142ef9004`, `DAT_142eb880c`: the step along a box's side, of its length, of the walk out of
-/// a hull and of the walk into one.
-const EXIT_STEP: f32 = HULL_PATH_EXIT_STEP;
-const ENTRANCE_STEP: f32 = HULL_PATH_ENTRANCE_STEP;
 /// `DAT_142f43290`: the square root of 2, a detour point's distance from a square's middle.
 const SQRT_2: f32 = HULL_PATH_SQRT_2;
-/// `DAT_142eb0f48`: within 2 tiles (squared) of a moving target the quick path stops short of it.
-const NEAR_TARGET: f32 = HULL_PATH_NEAR_TARGET;
 /// The gift wrap's pseudo-angle (`MergePointsIntoHull`): none yet (`DAT_14330ec20`), the quadrants
 /// added left of the y axis and below the x axis (`DAT_142e8c150` 2, `DAT_142eb0f48` 4), the degrees
 /// of one (`DAT_142f43294`) and a turn (`DAT_142f02860`, `DAT_142f4329c`).

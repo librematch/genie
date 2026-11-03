@@ -73,6 +73,7 @@ pub(crate) fn closest_resource_of(
     roles: &Roles,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     use crate::gathering::gather_search::{self, Candidate, ResourceWorld};
+    let gather_search_tuning = &by_id.tuning().gather_search;
 
     let site = match site.filter(|&s| c.spatial.get(s).is_some()) {
         None => None,
@@ -196,6 +197,7 @@ pub(crate) fn closest_resource_of(
                 )
             },
         },
+        gather_search_tuning,
     )
 }
 

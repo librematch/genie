@@ -10,10 +10,8 @@ use crate::commands::TradeLots;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::image::market::{
-    FLIP as MARKET_FLIP, FOOD_START as MARKET_FOOD_START, LEAST_COST as MARKET_LEAST_COST,
-    ORE_START as MARKET_ORE_START, PERCENT as MARKET_PERCENT, ROUND as MARKET_ROUND,
-    STONE_START as MARKET_STONE_START, SWING as MARKET_SWING,
-    UNKNOWN_PRICE as MARKET_UNKNOWN_PRICE, WOOD_START as MARKET_WOOD_START,
+    FLIP as MARKET_FLIP, PERCENT as MARKET_PERCENT, ROUND as MARKET_ROUND,
+    UNKNOWN_PRICE as MARKET_UNKNOWN_PRICE,
 };
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -23,23 +21,15 @@ use crate::players::{NetTrades, Price, PriceSwing};
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MarketTuning;
 use crate::world::slots::PlayerSlots;
 
-/// A commodity's price after its net trades came back to 0 (`DAT_142f03164`, `DAT_14330eb8c`,
-/// `DAT_142f0703c`).
-const FOOD_START: Price = Price::new(MARKET_FOOD_START);
-const WOOD_START: Price = Price::new(MARKET_WOOD_START);
-const STONE_START: Price = Price::new(MARKET_STONE_START);
-const ORE_START: Price = Price::new(MARKET_ORE_START);
-/// A trade's growth of the swing (`DAT_142e8c150`), the hundredths of its step
-/// (`DAT_14330ebcc`) and the sign flip of a negative growth (`DAT_14330ec20`).
-const SWING: f32 = MARKET_SWING;
+/// The hundredths of a trade's step (`DAT_14330ebcc`) and the sign flip of a negative growth
+/// (`DAT_14330ec20`).
 const PERCENT: f32 = MARKET_PERCENT;
 const FLIP: f32 = MARKET_FLIP;
 /// The price of an attribute no commodity is (`FUN_1415cd3c0`, `DAT_14330ec20`).
 const UNKNOWN_PRICE: Price = Price::new(MARKET_UNKNOWN_PRICE);
-/// A purchase costs at least this (`DAT_142f66f34`).
-const LEAST_COST: f32 = MARKET_LEAST_COST;
 /// A sale's gold rounds half up (`DAT_142e7f384`).
 const ROUND: f32 = MARKET_ROUND;
 
@@ -79,17 +69,18 @@ impl Market {
         &mut self,
         commodity: AttributeId,
         roles: &Roles,
+        market_tuning: &MarketTuning,
     ) -> Option<(&mut Commodity, Price)> {
         {
             let held = roles.of_attribute(commodity);
             if held.contains(AttributeRoles::FOOD) {
-                Some((&mut self.food, FOOD_START))
+                Some((&mut self.food, Price::new(market_tuning.food_start)))
             } else if held.contains(AttributeRoles::WOOD) {
-                Some((&mut self.wood, WOOD_START))
+                Some((&mut self.wood, Price::new(market_tuning.wood_start)))
             } else if held.contains(AttributeRoles::STONE) {
-                Some((&mut self.stone, STONE_START))
+                Some((&mut self.stone, Price::new(market_tuning.stone_start)))
             } else if held.contains(AttributeRoles::ORE) {
-                Some((&mut self.ore, ORE_START))
+                Some((&mut self.ore, Price::new(market_tuning.ore_start)))
             } else {
                 None
             }
@@ -121,9 +112,15 @@ impl Market {
     /// positive: `COMISS`, `JBE`, a NaN stays; truncated by `CVTTSS2SI`) in hundredths raises the
     /// price to at most the maximum, or lowers it to at least the minimum (`COMISS`, `JBE`: a NaN
     /// price stays). The game's event 0x80 on a changed price is the interface's.
-    pub fn trade(&mut self, commodity: AttributeId, buy: bool, roles: &Roles) {
+    pub fn trade(
+        &mut self,
+        commodity: AttributeId,
+        buy: bool,
+        roles: &Roles,
+        market_tuning: &MarketTuning,
+    ) {
         let (min, max) = (self.min_price, self.max_price);
-        let Some((c, start)) = self.commodity(commodity, roles) else {
+        let Some((c, start)) = self.commodity(commodity, roles, market_tuning) else {
             return;
         };
         c.trades = c.trades.traded(buy);
@@ -132,7 +129,7 @@ impl Market {
             c.price = start;
             return;
         }
-        let next = c.swing.get() + SWING;
+        let next = c.swing.get() + market_tuning.swing;
         let mut growth = next - c.swing.get();
         if 0.0 > growth {
             growth *= FLIP;
@@ -197,7 +194,12 @@ impl World {
             if at_most_or_unordered(price, 0.0) {
                 return Ok(());
             }
-            self.market.trade(commodity, false, &self.model.roles);
+            self.market.trade(
+                commodity,
+                false,
+                &self.model.roles,
+                &self.model.tuning.market,
+            );
             let worth = volume.as_f32() * price;
             let fee = self.fee(p) * worth;
             let gold = cvttss2si(worth - fee + ROUND) as f32;
@@ -244,7 +246,10 @@ impl World {
             }
             let lot = volume.as_f32();
             let worth = lot * price;
-            let cost = maxss(LEAST_COST, self.fee(p) * worth + worth);
+            let cost = maxss(
+                self.model.tuning.market.least_cost,
+                self.fee(p) * worth + worth,
+            );
             if below_or_unordered(gold.get(), cost) {
                 return Ok(());
             }
@@ -256,7 +261,12 @@ impl World {
                 ResourceStat::NONE,
                 true,
             )?;
-            self.market.trade(commodity, true, &self.model.roles);
+            self.market.trade(
+                commodity,
+                true,
+                &self.model.roles,
+                &self.model.tuning.market,
+            );
             self.add_resource(p, commodity, Amount::new(lot), ResourceStat::NONE, true)?;
         }
         Ok(())
@@ -273,6 +283,7 @@ mod tests {
     use crate::test_ids::{amounts, attributes};
     use crate::testing::attribute;
     use crate::testing::roles;
+    use crate::testing::tuning;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -301,7 +312,7 @@ mod tests {
     #[test]
     fn trade_moves_the_price_step_and_back_at_no_net_trades_it_resets() {
         let mut m = market();
-        m.trade(attribute::WOOD, true, &roles());
+        m.trade(attribute::WOOD, true, &roles(), &tuning().market);
         assert_eq!(
             m.wood,
             Commodity {
@@ -310,17 +321,17 @@ mod tests {
                 swing: PriceSwing::new(2.0),
             }
         );
-        m.trade(attribute::WOOD, true, &roles());
+        m.trade(attribute::WOOD, true, &roles(), &tuning().market);
         assert_eq!(
             (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02), 2, 4.0)
         );
-        m.trade(attribute::WOOD, false, &roles());
+        m.trade(attribute::WOOD, false, &roles(), &tuning().market);
         assert_eq!(
             (m.wood.price.get(), m.wood.trades.get(), m.wood.swing.get()),
             (0.02 + (1.0 + 0.02) - 0.02, 1, 6.0)
         );
-        m.trade(attribute::WOOD, false, &roles());
+        m.trade(attribute::WOOD, false, &roles(), &tuning().market);
         assert_eq!(
             m.wood,
             Commodity {
@@ -331,18 +342,18 @@ mod tests {
         );
         // the stone's start, the bounds, another attribute
         m.stone.price = Price::new(9.98);
-        m.trade(attribute::STONE, true, &roles());
-        m.trade(attribute::STONE, true, &roles());
+        m.trade(attribute::STONE, true, &roles(), &tuning().market);
+        m.trade(attribute::STONE, true, &roles(), &tuning().market);
         assert_eq!(m.stone.price.get(), 9.99);
-        m.trade(attribute::STONE, false, &roles());
-        m.trade(attribute::STONE, false, &roles());
+        m.trade(attribute::STONE, false, &roles(), &tuning().market);
+        m.trade(attribute::STONE, false, &roles(), &tuning().market);
         assert_eq!(m.stone.price.get(), 1.3);
         m.food.price = Price::new(0.21);
-        m.trade(attribute::FOOD, false, &roles());
-        m.trade(attribute::FOOD, false, &roles());
+        m.trade(attribute::FOOD, false, &roles(), &tuning().market);
+        m.trade(attribute::FOOD, false, &roles(), &tuning().market);
         assert_eq!(m.food.price.get(), 0.2);
         let before = m;
-        m.trade(attribute::HEADROOM, true, &roles());
+        m.trade(attribute::HEADROOM, true, &roles(), &tuning().market);
         assert_eq!(
             (m, m.price(attribute::HEADROOM, &roles()).get()),
             (before, -1.0)
@@ -350,7 +361,7 @@ mod tests {
         // a swing so large that 2 more does not change it: no step
         m.ore.swing = PriceSwing::new(1.0e8);
         m.ore.trades = NetTrades::new(5);
-        m.trade(attribute::ORE, true, &roles());
+        m.trade(attribute::ORE, true, &roles(), &tuning().market);
         assert_eq!((m.ore.price.get(), m.ore.swing.get()), (1.0, 1.0e8));
     }
 

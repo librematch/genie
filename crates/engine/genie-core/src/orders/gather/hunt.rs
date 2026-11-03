@@ -1,6 +1,7 @@
 //! A work command's Hunt: its start from the factory and the Hunt action's own start.
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::gathering::hunt::{HuntAction, HuntStart, HuntTask, Quarry};
 use crate::math::rng::Stream;
 use crate::movement::Speed;
@@ -94,8 +95,12 @@ impl World {
             &engagement,
             arms,
             mover,
-            &self.model.roles,
-            &self.model.tuning.attack,
+            BeginLayer {
+                roles: &self.model.roles,
+                attack_tuning: &self.model.tuning.attack,
+                move_to_tuning: &self.model.tuning.move_to,
+            },
+            &self.model.tuning.hunt,
         )?;
         Held {
             kind: unit.life.attribute_type,
@@ -110,6 +115,7 @@ impl World {
                 self.parts.move_stats_mut(unit.id),
                 g,
                 self.streams.get(Stream::Sprite),
+                self.model.tuning.sprite,
             );
             self.parts.set_anim_speed(unit.id, Speed::ZERO);
         }

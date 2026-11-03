@@ -96,6 +96,7 @@ impl World {
             &mut self.pathing,
             restriction,
             ship.position,
+            &self.model.tuning.tile_path,
         )?;
         let unit = self.players.live_mut(p, i)?;
         let changes = if let Some(t) = self
@@ -106,11 +107,31 @@ impl World {
             .transport_mut()
             .filter(|_| existing)
         {
-            vec![t.work(ship.position, true, &ship, &mut shore)?]
+            vec![t.work(
+                ship.position,
+                true,
+                &ship,
+                &mut shore,
+                &self.model.tuning.transport,
+                &self.model.tuning.move_to,
+            )?]
         } else {
             let mut t = TransportAction::new(ship.position);
-            let started = t.start(true, &ship, &mut shore)?;
-            let worked = t.work(to, true, &ship, &mut shore)?;
+            let started = t.start(
+                true,
+                &ship,
+                &mut shore,
+                &self.model.tuning.transport,
+                &self.model.tuning.move_to,
+            )?;
+            let worked = t.work(
+                to,
+                true,
+                &ship,
+                &mut shore,
+                &self.model.tuning.transport,
+                &self.model.tuning.move_to,
+            )?;
             self.parts
                 .actions
                 .of_mut(unit.id)?
@@ -143,15 +164,12 @@ impl World {
             self.parts.motion.layer_mut(id),
             point,
             (&self.spatial, &mut self.zones, &mut self.pathing),
+            &self.model,
             (
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
-                (
-                    &self.model.graphics,
-                    self.parts.combat.of(id).abilities.look.as_ref(),
-                ),
+                self.parts.combat.of(id).abilities.look.as_ref(),
                 rng,
             ),
-            &self.model.roles,
         )
     }
 
@@ -177,6 +195,7 @@ impl World {
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
                 &self.model.graphics,
                 rng,
+                self.model.tuning.sprite,
             )?;
         }
         Ok(())
@@ -218,6 +237,7 @@ impl World {
                 &mut self.pathing,
                 restriction,
                 unit.position(),
+                &self.model.tuning.tile_path,
             )?;
             Some(shore.zone(t.point.tile())?)
         };
@@ -242,13 +262,20 @@ impl World {
         if count == 0 {
             let terrain = self.spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
             let rng = self.streams.get(Stream::Action);
-            let (point, sails) = retry_point(Point::new(x, y), ship.map, terrain, rng);
+            let (point, sails) = retry_point(
+                Point::new(x, y),
+                ship.map,
+                terrain,
+                rng,
+                &self.model.tuning.transport,
+            );
             let mut shore = MapShore::new(
                 &self.spatial,
                 &mut self.zones,
                 &mut self.pathing,
                 restriction,
                 ship.position,
+                &self.model.tuning.tile_path,
             )?;
             let t = transport_mut(&self.players, &mut self.parts, p, i)?;
             let (x, y) = (point.x(), point.y());
@@ -258,6 +285,8 @@ impl World {
                     TransportState::SailToUnload { move_to: None },
                     &ship,
                     &mut shore,
+                    &self.model.tuning.transport,
+                    &self.model.tuning.move_to,
                 )?);
                 t.retarget = true;
             } else {
@@ -272,9 +301,15 @@ impl World {
             &mut self.pathing,
             restriction,
             ship.position,
+            &self.model.tuning.tile_path,
         )?;
         let t = transport_mut(&self.players, &mut self.parts, p, i)?;
-        changes.push(t.unloaded(&ship, &mut shore)?);
+        changes.push(t.unloaded(
+            &ship,
+            &mut shore,
+            &self.model.tuning.transport,
+            &self.model.tuning.move_to,
+        )?);
         for c in changes {
             self.transport_changed(p, i, c)?;
         }
@@ -391,7 +426,7 @@ impl World {
         let mut draws = DropDraws::new(around, made.radius, self.spatial.map, last, &mut rng);
         let mut found = None;
         // the place's tests, each only after the one before passed
-        while let Some(spot) = draws.next_on_map()? {
+        while let Some(spot) = draws.next_on_map(&self.model.tuning.transport)? {
             let (x, y) = (spot.x(), spot.y());
             if !in_zone(spot, zone, zone_map)? {
                 continue;
@@ -415,7 +450,14 @@ impl World {
                     placement: made.placement,
                 };
                 let map = WorldMap { turns: &*self };
-                placement(&placing, &map, spot, false, &self.model.roles)? == Tested::Free
+                placement(
+                    &placing,
+                    &map,
+                    spot,
+                    false,
+                    &self.model.roles,
+                    &self.model.tuning.spawn,
+                )? == Tested::Free
             };
             if free
                 && self.spatial.point_clear(

@@ -8,8 +8,8 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    AttackField, CLOSEST_RANGE, ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach,
-    RecordId, SEARCH_REUSE_SQUARED, Spatial, players_seen, record_meets_segment, tile_record_id,
+    AttackField, ClosestChecks, FarmLook, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial,
+    players_seen, record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::math::conversions::cvttss2si;
@@ -32,6 +32,9 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
+use crate::world::layer::generated::RegistryTuning;
+use crate::world::layer::generated::SpatialTuning;
+use crate::world::layer::generated::VisibilityTuning;
 use std::fmt::{Debug, Error, Formatter};
 
 impl Spatial {
@@ -111,6 +114,7 @@ impl Spatial {
         id: ObjectId,
         position: Position,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         if let Some(p) = self.objects.get_mut(id) {
             let from = p.position;
@@ -130,7 +134,7 @@ impl Spatial {
                 return Ok(());
             };
             if let Some(v) = self.sight.as_mut() {
-                v.moved(id, from, position, p.radius, roles)?;
+                v.moved(id, from, position, p.radius, roles, visibility_tuning)?;
                 v.registry_moved(id, p.class, from, position);
             }
         }
@@ -178,6 +182,8 @@ impl Spatial {
         query: SearchQuery<'_>,
         roles: &Roles,
         best_target_tuning: &BestTargetTuning,
+        spatial_tuning: &SpatialTuning,
+        registry_tuning: RegistryTuning,
     ) -> Result<Found, GenieError> {
         let SearchQuery {
             searcher: me,
@@ -192,7 +198,7 @@ impl Spatial {
         let _ = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
         ))?;
-        let fresh = self.search_query(player, search)?;
+        let fresh = self.search_query(player, search, spatial_tuning, registry_tuning)?;
         let _ = self.last_found()?;
         self.pick_found(
             (me, player),
@@ -206,6 +212,7 @@ impl Spatial {
                 farm,
                 roles,
                 best_target_tuning,
+                spatial_tuning,
             },
         )
     }
@@ -250,6 +257,8 @@ impl Spatial {
         &mut self,
         player: PlayerId,
         search: &Search<'_>,
+        spatial_tuning: &SpatialTuning,
+        registry_tuning: RegistryTuning,
     ) -> Result<bool, GenieError> {
         let v = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
@@ -261,7 +270,7 @@ impl Spatial {
         let (x, y) = (search.at.x(), search.at.y());
         let mut fresh = false;
         let (dx, dy) = (x - self.search_cache.at.x(), y - self.search_cache.at.y());
-        if SEARCH_REUSE_SQUARED < dy * dy + dx * dx || !self.search_cache.holds {
+        if spatial_tuning.search_reuse_squared < dy * dy + dx * dx || !self.search_cache.holds {
             self.search_cache.hold(search.at);
             let radius = search.radius.get().min(1000.0);
             let (rx, ry) = (search.size.x(), search.size.y());
@@ -273,16 +282,19 @@ impl Spatial {
             );
             self.check_known_classes(rect, search.classes)?;
             self.check_sight(player, rect)?;
-            if let Some(lists) = r.visible_units(VisibleQuery {
-                player,
-                position: search.at,
-                radius: search.radius,
-                mode: 0,
-                classes: search.classes,
-                relations: &relations,
-                size: search.size,
-                wanted: 0xff,
-            })? {
+            if let Some(lists) = r.visible_units(
+                VisibleQuery {
+                    player,
+                    position: search.at,
+                    radius: search.radius,
+                    mode: 0,
+                    classes: search.classes,
+                    relations: &relations,
+                    size: search.size,
+                    wanted: 0xff,
+                },
+                registry_tuning,
+            )? {
                 self.search_cache.remember(lists);
                 fresh = true;
             }
@@ -393,7 +405,7 @@ impl Spatial {
     /// `ClosestObject` (`FUN_140c488b0`) for object `me` over what its search `found`, its
     /// reachability check on (argument 8, every caller's): each record by relation and order:
     /// itself, an object that is gone and one dying (state 7 and up) are passed, so is one the
-    /// [`Filter`] leaves out; then one the unit reaches within `CLOSEST_RANGE` (slot 0x3d0,
+    /// [`Filter`] leaves out; then one the unit reaches within `SpatialTuning::closest_range` (slot 0x3d0,
     /// `reach`) and nearer than the nearest so far (by the search's distance; a tie goes to the
     /// lower id) is the nearest. Livestock (class 58) counts when the searcher's player owns it or
     /// it is not in state 2, and not while its top action is the Artifact with a point
@@ -410,7 +422,7 @@ impl Spatial {
         reach: &mut Reach<'_>,
         checks: ClosestChecks<'_>,
     ) -> Result<(Option<ObjectId>, f32), GenieError> {
-        let roles = checks.roles;
+        let (roles, spatial_tuning) = (checks.roles, checks.spatial_tuning);
         let at = self.objects.get(me);
         let searcher = Searcher {
             class_10: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::PREDATOR)),
@@ -444,7 +456,9 @@ impl Spatial {
                 if !closest_kept(record.id, (seer, p), filter, (player, searcher), checks)? {
                     continue;
                 }
-                if filter.reach && !reach(self, record.id, CLOSEST_RANGE)? {
+                if filter.reach
+                    && !reach(self, record.id, Distance::new(spatial_tuning.closest_range))?
+                {
                     continue;
                 }
                 best = nearer(best, &record);

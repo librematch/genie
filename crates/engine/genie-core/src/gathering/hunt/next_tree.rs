@@ -2,6 +2,7 @@
 //! (trees): the closest tree from the hunt's drop site, which the hunt then takes.
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::{NO_HUNT, Quarry};
@@ -157,8 +158,12 @@ impl Unit {
             &engagement,
             arms,
             mover,
-            roles,
-            &c.w.model.tuning.attack,
+            BeginLayer {
+                roles,
+                attack_tuning: &c.w.model.tuning.attack,
+                move_to_tuning: &c.w.model.tuning.move_to,
+            },
+            &c.w.model.tuning.hunt,
         )? {
             if arrived {
                 show_arrived(
@@ -166,6 +171,7 @@ impl Unit {
                     &mut self.sprite,
                     c.w.parts.motion_mut(self.id),
                     c.w.streams.get(Stream::Sprite),
+                    c.w.model.tuning.sprite,
                 )?;
             }
             // slot 0x68 (FUN_140a7a230): the old target goes, the new one is taken

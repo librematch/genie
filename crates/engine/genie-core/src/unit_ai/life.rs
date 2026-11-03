@@ -21,8 +21,8 @@ use crate::unit_ai::{
     ARTIFACT_AI, ARTIFACT_IDLE_TIMEOUT, AiMove, BOAR_AI, COMPUTER_SOLDIER_IDLE_TIMEOUT,
     DESIRED_DISTANCE, Effect, Found, HUMAN_ORDER_CAP, HUNTED_IDLE_TIMEOUT, Home, Hunted,
     IDLE_TIMEOUT, LION_IDLE_TIMEOUT, Memory, NewObject, ORDER_HISTORY, OrderRecord,
-    PATROL_TURN_REACH, PRIEST_IDLE_TIMEOUT, SIEGE_IDLE_TIMEOUT, SOLDIER_AI, SOLDIER_IDLE_TIMEOUT,
-    Surroundings, TOWER_AI, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen, UnitSide, adjusted_idle_timeout,
+    PRIEST_IDLE_TIMEOUT, SIEGE_IDLE_TIMEOUT, SOLDIER_AI, SOLDIER_IDLE_TIMEOUT, Surroundings,
+    TOWER_AI, TOWER_IDLE_TIMEOUT, UnitAi, UnitSeen, UnitSide, adjusted_idle_timeout,
     notify_capacity, siege_stance, soldier_stance,
 };
 use crate::world::Millis;
@@ -30,6 +30,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
 
 impl UnitAi {
@@ -328,7 +329,12 @@ impl UnitAi {
     /// from the unit (`COMISS`, `SETBE`: a NaN distance is). The attack move is on order 733, off
     /// on any other, as it was while a saved patrol is still held.
     #[must_use]
-    pub fn path_ask(ai: Option<&mut Self>, at: Point, point: Point) -> PathAsk {
+    pub fn path_ask(
+        ai: Option<&mut Self>,
+        at: Point,
+        point: Point,
+        unit_ai_tuning: &UnitAiTuning,
+    ) -> PathAsk {
         let Some(ai) = ai else {
             return PathAsk {
                 ends_in_range: false,
@@ -352,7 +358,7 @@ impl UnitAi {
             } else {
                 let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
                 let d = sqrt(dy * dy + dx * dx);
-                ask.back_and_forth = at_most_or_unordered(PATROL_TURN_REACH, d);
+                ask.back_and_forth = at_most_or_unordered(unit_ai_tuning.patrol_turn_reach, d);
             }
         }
         ask.attack_move = ai

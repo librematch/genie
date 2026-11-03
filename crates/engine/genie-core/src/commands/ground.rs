@@ -27,7 +27,6 @@ use crate::map::spatial::Obstruction;
 use crate::map::spatial::Placed;
 use crate::map::terrain::Foundation;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-use crate::math::image::unit_ai::RADIUS_SCALE as UNIT_AI_RADIUS_SCALE;
 use crate::objects::lifecycle::death_parts::clear_look_of;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::{Master, player_master};
@@ -55,15 +54,13 @@ impl World {
         foundation: FoundationId,
         units: &[ObjectId],
     ) -> Result<(), GenieError> {
-        /// The notify's radii are hundredths (`DAT_14330ebcc`).
-        const RADIUS_SCALE: f32 = UNIT_AI_RADIUS_SCALE;
         let (site_owner, site) = self.object(foundation).ok_or(GenieError::unsupported(
             "a footprint's foundation the slice does not hold",
         ))?;
         let radius = site.master(self.master_tables(), site_owner)?.radius;
         let p = [
-            (radius.x() * RADIUS_SCALE) as i32,
-            (radius.y() * RADIUS_SCALE) as i32,
+            (radius.x() * self.model.tuning.unit_ai.radius_scale) as i32,
+            (radius.y() * self.model.tuning.unit_ai.radius_scale) as i32,
             foundation.id().get(),
         ];
         let mut together = Vec::new();
@@ -247,7 +244,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f, &self.model.roles)
+            .cover(&f, &self.model.roles, self.model.tuning.terrain)
     }
 
     /// The footprint clearing (`FUN_1415c3620` with `param_7` 0) of a new building of `master`
@@ -278,12 +275,18 @@ impl World {
             trees,
         };
         let mut looks: BTreeMap<ObjectId, ClearLook> = BTreeMap::new();
-        for id in clearing_objects(&self.spatial, at) {
+        for id in clearing_objects(&self.spatial, at, &self.model.tuning.build) {
             if let Some(look) = self.clear_look(id)? {
                 let _ = looks.insert(id, look);
             }
         }
-        let cleared = footprint_clearing(&self.spatial, &site, &looks, &self.model.roles)?;
+        let cleared = footprint_clearing(
+            &self.spatial,
+            &site,
+            &looks,
+            &self.model.roles,
+            &self.model.tuning.build,
+        )?;
         for cl in cleared {
             self.clear_object(cl, false)?;
             if !trees {
@@ -386,9 +389,9 @@ impl World {
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
         if let Some(v) = self.spatial.sight.as_mut() {
-            let umv = v.link_building(position, made.radius)?;
+            let umv = v.link_building(position, made.radius, self.model.tuning.visibility)?;
             if desolid {
-                v.unlink_building(position, made.radius)?;
+                v.unlink_building(position, made.radius, self.model.tuning.visibility)?;
             }
             v.add_seer(
                 id,

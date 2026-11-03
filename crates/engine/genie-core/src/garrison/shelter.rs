@@ -7,14 +7,11 @@ use crate::garrison::ContainerId;
 use crate::garrison::GarrisonScope;
 use crate::garrison::InsideCount;
 use crate::garrison::ShelterReach;
-use crate::garrison::{
-    COMPUTER_IDS, FAR, HUMAN_IDS, NEARBY, TOWN_BELL_REACH, class_has_flags, has_garrison_task,
-};
+use crate::garrison::{COMPUTER_IDS, FAR, HUMAN_IDS, class_has_flags, has_garrison_task};
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::fmath::below_or_unordered;
-use crate::math::image::garrison::LEAST_HP_SHARE as GARRISON_LEAST_HP_SHARE;
 use crate::math::msvc::{sort, unordered_map_order};
 use crate::movement::footprint_gap_squared;
 use crate::objects::ObjectId;
@@ -64,9 +61,6 @@ pub(crate) struct Shelters {
     /// The counts ([`World::garrisoned`], slot 0x498).
     pub counts: Vec<InsideCount>,
 }
-/// A building takes units in only above this share of its master's hit points (`FUN_14120eb10`,
-/// in doubles).
-pub(super) const LEAST_HP_SHARE: f64 = GARRISON_LEAST_HP_SHARE;
 
 impl World {
     /// `UNIT_ORDER`'s garrison (action 5) on `target`, which the world holds (`FUN_140e7f200`; the
@@ -77,7 +71,7 @@ impl World {
     /// ([`World::garrisoned`]). With [`GarrisonScope::Nearby`], each object of the target's owner's tracker under the
     /// master the target's line stands for (`FUN_140fdd6c0`, `FUN_140fdd6f0`, [`UnitLines::base`];
     /// `FUN_14104f960`, [`crate::players::tracker::Tracker::list`]), in the tracker's order, within
-    /// [`NEARBY`] of the target (`FUN_14118f8c0`, the squared footprint gap; `COMISS`/`JC`: a NaN
+    /// `GarrisonTuning::nearby` of the target (`FUN_14118f8c0`, the squared footprint gap; `COMISS`/`JC`: a NaN
     /// is out): one of a type below 80 is a transport, one not a gate (class 39) and no annex
     /// (`+0xbb8`) a building, and each one in reach pushes its count, the gates and annexes
     /// left out too. Then [`World::shelter`] (`param_6` 0, [`ShelterReach::Far`]) by `dispatch`
@@ -242,7 +236,7 @@ impl World {
             let (other_at, other_radius) = self.ground(id)?;
             // COMISS NEARBY, gap; JC: a gap above it, or a NaN, is out
             let gap = footprint_gap_squared(other_at, other_radius, at, radius);
-            if below_or_unordered(NEARBY, gap.get()) {
+            if below_or_unordered(self.model.tuning.garrison.nearby, gap.get()) {
                 continue;
             }
             let om = o.master(self.master_tables(), op)?;
@@ -277,7 +271,7 @@ impl World {
     /// ([`World::takes_in`]), and with each transport of a unit whose master's class has a flag
     /// of 0x10002 ([`class_has_flags`]) when the commanding player's master of the unit's master
     /// id has a task of action 3 on the transport's class ([`has_garrison_task`]), within the reach
-    /// (`reach`, `param_6`: [`TOWN_BELL_REACH`] or [`FAR`]; `COMISS`/`JBE`: a NaN is out); a
+    /// (`reach`, `param_6`: `GarrisonTuning::town_bell_reach` or [`FAR`]; `COMISS`/`JBE`: a NaN is out); a
     /// pair names its shelter by its index, a transport's after the buildings. The pairs sorted
     /// by their squared footprint gap (`FUN_1415f0830`, MSVC's `std::sort`) give each unit, in
     /// that order, the first shelter whose count is below its master's capacity, then any unit
@@ -295,7 +289,7 @@ impl World {
         dispatch: Dispatch,
     ) -> Result<(), GenieError> {
         let reach = match reach {
-            ShelterReach::TownBell => TOWN_BELL_REACH,
+            ShelterReach::TownBell => self.model.tuning.garrison.town_bell_reach,
             ShelterReach::Far => FAR,
         };
         let all: Vec<ContainerId> = shelters

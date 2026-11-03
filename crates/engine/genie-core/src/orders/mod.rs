@@ -75,11 +75,7 @@ use crate::groups::UnitGroup;
 use crate::map::RestrictionId;
 use crate::math::fmath::below_or_unordered;
 use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
-use crate::math::image::order::{
-    DAMAGE_WHOLE as ORDER_DAMAGE_WHOLE, GUARD_RANGE as ORDER_GUARD_RANGE,
-    TABLE_DROP_FAR as ORDER_TABLE_DROP_FAR, WAYPOINT_APART as ORDER_WAYPOINT_APART,
-    WAYPOINT_APART_LOW as ORDER_WAYPOINT_APART_LOW,
-};
+use crate::math::image::order::DAMAGE_WHOLE as ORDER_DAMAGE_WHOLE;
 use crate::math::rng::Well512;
 use crate::movement::Mover;
 use crate::objects::layers::{Building, Combat};
@@ -90,6 +86,7 @@ use crate::unit_ai::{QueuedOrder, UnitAi, UnitSide, UnitStance};
 use crate::world::OBJECT_MASTER;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::OrderTuning;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
 
@@ -180,8 +177,6 @@ fn packs(
 const HERD_MOST: usize = 16;
 /// The groups one command lists (`DAT_143f152b8`, below `0x3c`).
 const LISTED: usize = 60;
-/// The range of GUARD's defend order (`DAT_142eb3634`, [`World::guard`]).
-const GUARD_RANGE: f32 = ORDER_GUARD_RANGE;
 /// The task filter of garrisoning (3).
 pub(crate) const GARRISON: ActionKind = ActionKind::named(3);
 /// A task's action type of attacking (7), whose factory makes an Attack (type 9).
@@ -247,10 +242,6 @@ struct Followed {
 type SplitPath<'a> =
     dyn FnMut(&Splittable, &Splittable) -> Result<Option<(Found, Distance)>, GenieError> + 'a;
 
-/// The drop-site table's search starts beyond this squared distance (`FUN_141658e20`,
-/// `DAT_142f89ac4`).
-const TABLE_DROP_FAR: f32 = ORDER_TABLE_DROP_FAR;
-
 /// The action's point on neither axis (`DAT_14330ec20`).
 const NO_POINT: f32 = GARRISON_NO_POINT;
 
@@ -262,10 +253,6 @@ pub(crate) const NO_HUNT_TASK: GenieError =
     GenieError::unsupported("a hunt command without a task");
 
 const TROPHIES: RangeInclusive<i16> = 1650..=1653;
-/// A patrol's waypoint counts when it is this far from the last one on x or y
-/// (`FUN_14161b970`, `DAT_14330eb8c`), or this far the other way (`DAT_14330ec20`).
-const WAYPOINT_APART: f32 = ORDER_WAYPOINT_APART;
-const WAYPOINT_APART_LOW: f32 = ORDER_WAYPOINT_APART_LOW;
 
 /// An object that a caller found or was given, which the world does not hold.
 pub(crate) fn object_gone(id: impl ObjectKey) -> GenieError {
@@ -469,18 +456,18 @@ const ATTACK_MOVE_QUEUED: GenieError =
     GenieError::unsupported("an attack move through a unit AI's queue (slot 0x30)");
 
 /// The waypoints a walker from `from` passes on its way (`FUN_14161b970`'s two filters): each
-/// one at least [`WAYPOINT_APART`] from the last one kept on x or on y, either way
+/// one at least `OrderTuning::waypoint_apart` from the last one kept on x or on y, either way
 /// (`COMISS`/`JNC` on each of the four: a NaN difference is not), the first measured from
 /// `from`.
-fn waypoints_from(from: Point, waypoints: &[Point]) -> Vec<Point> {
+fn waypoints_from(from: Point, waypoints: &[Point], order_tuning: &OrderTuning) -> Vec<Point> {
     let mut last = from;
     let mut kept = Vec::with_capacity(waypoints.len());
     for &w in waypoints {
         let (dx, dy) = (w.x() - last.x(), w.y() - last.y());
-        if WAYPOINT_APART <= dx
-            || dx <= WAYPOINT_APART_LOW
-            || WAYPOINT_APART <= dy
-            || dy <= WAYPOINT_APART_LOW
+        if order_tuning.waypoint_apart <= dx
+            || dx <= order_tuning.waypoint_apart_low
+            || order_tuning.waypoint_apart <= dy
+            || dy <= order_tuning.waypoint_apart_low
         {
             kept.push(w);
             last = w;
@@ -614,14 +601,15 @@ fn damage_share(
 /// ([`crate::unit_ai::task_finder::table_drop_buildings`]), the objects of each master's done list in the
 /// tracker in turn (`FUN_14104f600`, the master itself the key) that `look` holds (their state
 /// and place) in state 2, the nearest by the squared distance of the centres (the first of
-/// equals; none from [`TABLE_DROP_FAR`] on).
+/// equals; none from `OrderTuning::table_drop_far` on).
 pub(crate) fn nearest_table_site(
     (table, civ, tracker): (&[DropSite], CivId, &Tracker),
     (at, held, class): (Point, Option<AttributeId>, ClassId),
     look: impl Fn(ObjectId) -> Option<(ObjectState, Position)>,
+    order_tuning: &OrderTuning,
 ) -> Option<DropSiteId> {
     let buildings = table_drop_buildings(table, held, Some(class), civ);
-    let mut best = (None, TABLE_DROP_FAR);
+    let mut best = (None, order_tuning.table_drop_far);
     for m in buildings {
         // a queued unit's place (â1) names no object
         for &id in tracker.list(ListKey::master(m)).iter().flatten() {

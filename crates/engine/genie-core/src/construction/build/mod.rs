@@ -54,8 +54,8 @@ mod walks;
 pub(crate) mod world_side;
 
 pub use self::build_state::BuildState;
-pub(crate) use self::clearing::{CLEARING_REACH, clearing_objects, footprint_clearing};
 pub use self::clearing::{ClearLook, Cleared, ClearingSite};
+pub(crate) use self::clearing::{clearing_objects, footprint_clearing};
 
 pub use self::drop_off::DropSearch;
 #[cfg(test)]
@@ -67,10 +67,6 @@ use crate::gathering::hunt::DropOff;
 use crate::map::Snow;
 #[cfg(test)]
 use crate::map::spatial::Spatial;
-use crate::math::image::build::{
-    DROP_REACH as BUILD_DROP_REACH, EXTRA_BUILDER as BUILD_EXTRA_BUILDER, REACH as BUILD_REACH,
-    WONDER_RATE as BUILD_WONDER_RATE,
-};
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
 use crate::objects::masters::{Masters, WorkValue};
@@ -85,9 +81,8 @@ use crate::world::NO_ATTRIBUTE;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 
-/// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
-const REACH: f32 = BUILD_REACH;
 /// A foundation of another player than the builder's, which the slice does not hand the Build.
 const FOREIGN_SITE: GenieError = GenieError::unsupported("a foundation of another player");
 /// The Build's foundation the world no longer holds where its place is read.
@@ -314,12 +309,13 @@ pub(crate) fn show_built(
     frame: Frame,
     graphics: &Graphics,
     sprite_rng: &mut Well512,
+    sprite_tuning: SpriteTuning,
 ) {
     let standing = master
         .standing_sprite
         .and_then(|s| graphics.get(s).copied());
     if let Some(g) = standing {
-        new_sprite(sprite, stats, g, sprite_rng);
+        new_sprite(sprite, stats, g, sprite_rng, sprite_tuning);
         if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
             s.set_frame(frame);
         }
@@ -331,6 +327,7 @@ mod built_sprite_tests {
     use super::*;
     use crate::objects::SpeedMultiplier;
     use crate::objects::SpriteFlags;
+    use crate::testing::tuning;
 
     #[cfg(test)]
     use crate::objects::FacetCount;
@@ -368,6 +365,7 @@ mod built_sprite_tests {
         let mut sprite = Some(ActiveSprite::start(
             g(SpriteId::named(10), SpriteFlags::ANIMATED),
             &mut rng,
+            tuning().sprite,
         ));
         show_built(
             &mut sprite,
@@ -376,6 +374,7 @@ mod built_sprite_tests {
             Frame::of_data(2),
             &graphics,
             &mut rng,
+            tuning().sprite,
         );
         let s = sprite.unwrap();
         assert_eq!(
@@ -394,6 +393,7 @@ mod built_sprite_tests {
             Frame::of_data(3),
             &statics,
             &mut rng,
+            tuning().sprite,
         );
         assert_eq!(
             none.map(|s| (s.graphic.id, s.frame)),
@@ -435,16 +435,11 @@ pub(crate) struct BuildReads {
     pub(crate) by: Releaser,
 }
 
-/// A second builder works at a third of the rate of the first (`DAT_142ed66b0`).
-const EXTRA_BUILDER: f32 = BUILD_EXTRA_BUILDER;
 /// The progress a started foundation holds before its first work (`0x2edbe6ff`, about 1e-10).
 const STARTED: u32 = 0x2edb_e6ff;
-const WONDER_RATE: f32 = BUILD_WONDER_RATE;
 
 /// The drop-off's wait after a drop site out of reach (`0xc0400000`).
 const DROP_WAIT: Seconds = Seconds::new(-3.0);
-/// The drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-const DROP_REACH: f32 = BUILD_DROP_REACH;
 /// The orders whose targets gone the unit AI drops after a drop-off (`FUN_140c5de60`: the bits
 /// of `0x400011` over `order - 0x2c5`).
 pub(crate) const DROPPED_ORDERS: [OrderKind; 3] =

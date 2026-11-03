@@ -229,6 +229,7 @@ impl Unit {
             }),
             roles: c.w.model.roles.clone(),
             slots: c.w.model.slots,
+            unit_ai_tuning: c.w.model.tuning.unit_ai,
         })
     }
 

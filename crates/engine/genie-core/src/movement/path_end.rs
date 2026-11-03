@@ -76,6 +76,8 @@ impl Mover {
         ask: ReachAsk,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let long_path_tuning = &by_id.tuning().long_path;
+        let tile_path_tuning = &by_id.tuning().tile_path;
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let ReachAsk {
@@ -121,7 +123,8 @@ impl Mover {
                 closed: Vec::new(),
                 full: false,
             };
-            let found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
+            let found =
+                planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
             if !found.reaches() {
                 return Ok(false);
             }
@@ -155,7 +158,13 @@ impl Mover {
                 return Ok(false);
             }
             let gap = footprint_gap(at, ground, t.position, t.radius);
-            Some(LongTarget::new(t.position, t.radius, gap, gap2))
+            Some(LongTarget::new(
+                t.position,
+                t.radius,
+                gap,
+                gap2,
+                *long_path_tuning,
+            ))
         } else {
             let gap = |d: f32, r: f32| {
                 let g = d.abs() - r;
@@ -209,7 +218,7 @@ impl Mover {
         };
         let player = world.get(me.id).map(|p| p.player);
         let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
-        reaches(world.tiles(), world.map, &req, &gates)
+        reaches(world.tiles(), world.map, &req, &gates, *long_path_tuning)
     }
 
     /// The test before a non-quiet `MoveTo`'s path end follows its moved target (`0x140aa2a70` in

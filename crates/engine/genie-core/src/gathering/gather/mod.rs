@@ -21,6 +21,8 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
+use crate::math::rng::Well512;
+use crate::movement::MoveStats;
 use crate::movement::move_to::MoveDefaults;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -28,10 +30,14 @@ use crate::objects::WorkRate;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
+use crate::objects::sprite::ActiveSprite;
+use crate::objects::sprite::Graphic;
+use crate::objects::sprite::new_sprite;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::world::Seconds;
+use crate::world::layer::generated::SpriteTuning;
 use genie_diff::Diff;
 
 mod gather_state;
@@ -56,14 +62,32 @@ use crate::combat::damage::Victim;
 use crate::gathering::hunt::Dropped;
 use crate::gathering::{DropSiteId, GatherTargetId};
 use crate::math::image::gather::{
-    DEFAULT_PRODUCTIVITY as GATHER_DEFAULT_PRODUCTIVITY, DROP_REACH as GATHER_DROP_REACH,
     LAST_BIT as GATHER_LAST_BIT, NO_GATHER_POINT as GATHER_NO_GATHER_POINT,
-    REMAINDER as GATHER_REMAINDER, STOP_CENTRE as GATHER_STOP_CENTRE, WAIT_GAP as GATHER_WAIT_GAP,
-    WAIT_SHIFT as GATHER_WAIT_SHIFT, WAIT_WORKERS as GATHER_WAIT_WORKERS,
+    REMAINDER as GATHER_REMAINDER,
 };
 use crate::movement::move_to::WalkTo;
 use crate::objects::WorkerCount;
 use crate::unit_ai::UnitStance;
+
+/// What a gatherer's stand reads and writes (`FUN_140a8b6b0`'s sprite, shown with
+/// [`new_sprite`]): the standing sprite (none keeps the one shown), the unit's sprite, the Sprite
+/// stream that draws a new sprite's first frame and the sprite group's tuning values.
+pub(crate) struct Stand<'a> {
+    pub(crate) graphic: Option<Graphic>,
+    pub(crate) sprite: &'a mut Option<ActiveSprite>,
+    pub(crate) rng: &'a mut Well512,
+    pub(crate) sprite_tuning: &'a SpriteTuning,
+}
+
+impl Stand<'_> {
+    /// The unit stands: [`new_sprite`] with the standing sprite, if any, its top speed `stats`
+    /// read with it.
+    fn show(self, stats: Option<&mut MoveStats>) {
+        if let Some(g) = self.graphic {
+            new_sprite(self.sprite, stats, g, self.rng, *self.sprite_tuning);
+        }
+    }
+}
 
 /// The Gather action's type, which word 9 adds.
 pub const GATHER: ActionKind = ActionKind::named(5);
@@ -80,22 +104,9 @@ const NO_GATHER_POINT: f32 = GATHER_NO_GATHER_POINT;
 const REMAINDER: Amount = Amount::new(GATHER_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
 const LAST_BIT: f32 = GATHER_LAST_BIT;
-/// A drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-const DROP_REACH: f32 = GATHER_DROP_REACH;
-/// A random wait's shift (`DAT_142e7f384`).
-const WAIT_SHIFT: f32 = GATHER_WAIT_SHIFT;
-/// A failed walk to a target with at most this many workers waits (`0x140a8e1d0` case 3,
-/// `DAT_142eb1c98`), as one to a target at least `WAIT_GAP` away (the squared footprint gap,
-/// `DAT_142ec9ec0`); else the gatherer searches.
-const WAIT_WORKERS: f32 = GATHER_WAIT_WORKERS;
-const WAIT_GAP: f32 = GATHER_WAIT_GAP;
 
 /// A farm's stops under the game's farm setting (the constructor's `mNumberStops`).
 const FARM_STOPS: FarmStops = FarmStops::of_data(4);
-/// A stop's point lies this far into its tile (`DAT_142e7f384`).
-const STOP_CENTRE: f32 = GATHER_STOP_CENTRE;
-/// The productivity of a task without a productivity attribute (`DAT_14330eb8c`).
-const DEFAULT_PRODUCTIVITY: Amount = Amount::new(GATHER_DEFAULT_PRODUCTIVITY);
 /// The draws a stop's point takes at most (`set_state(4)`'s loop).
 const STOP_DRAWS: u32 = 10;
 /// The player's attribute that sells a farm's food at once (`player+0x100` at `+0x300`).

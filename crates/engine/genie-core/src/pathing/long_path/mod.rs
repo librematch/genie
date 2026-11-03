@@ -51,11 +51,11 @@ use crate::construction::gates::lets_pass;
 use crate::map::TerrainMask;
 use crate::math::fmath::sqrt;
 use crate::math::image::long_path::{
-    EDGE_GAP as LONG_PATH_EDGE_GAP, EPSILON as LONG_PATH_EPSILON, REACHED as LONG_PATH_REACHED,
-    TILE_CENTRE as LONG_PATH_TILE_CENTRE,
+    EPSILON as LONG_PATH_EPSILON, TILE_CENTRE as LONG_PATH_TILE_CENTRE,
 };
 use crate::players::PlayerSet;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::generated::LongPathTuning;
 
 /// The search expands at most this many tiles (`FUN_140f9eb70`: `20000 < n` breaks).
 const MOST_EXPANSIONS: i32 = 20000;
@@ -69,15 +69,8 @@ const HUMAN_PERCENT: i32 = 7500;
 /// (`FUN_140f9eb70` after `FUN_141659cf0`).
 const COMPUTER_FACTOR: i32 = 25;
 
-/// The goal counts as reached within this many tiles, and a range above it ends the search
-/// before it starts when the goal lies within the range (`DAT_14330eb8c`).
-const REACHED: f32 = LONG_PATH_REACHED;
-
 /// The margin of the reached test within the range (`DAT_142eb0c60`).
 const EPSILON: f32 = LONG_PATH_EPSILON;
-
-/// A target's footprint ends this short of its far edges (`DAT_142eb99cc`).
-const EDGE_GAP: f32 = LONG_PATH_EDGE_GAP;
 
 /// A path point lies at its tile's centre: the tile plus this on both axes (`DAT_142e7f384`).
 const TILE_CENTRE: f32 = LONG_PATH_TILE_CENTRE;
@@ -143,7 +136,7 @@ pub struct LongTarget {
     /// Its tile.
     pub tile: Tile,
     /// The tiles of its footprint (the centre less the radius, the centre plus the radius less
-    /// `EDGE_GAP`, whole).
+    /// `LongPathTuning::edge_gap`, whole).
     pub rect: TileRect,
     /// The unit's footprint gap to it, squared (`FUN_14118f8c0`) and not (`FUN_14118f680`).
     pub gap_squared: DistanceSquared,
@@ -159,6 +152,7 @@ impl LongTarget {
         radius: Footprint,
         gap: Distance,
         gap_squared: DistanceSquared,
+        long_path_tuning: LongPathTuning,
     ) -> Self {
         let (x, y) = (position.x(), position.y());
         Self {
@@ -166,8 +160,8 @@ impl LongTarget {
             rect: TileRect::new(
                 (x - radius.x()) as i32,
                 (y - radius.y()) as i32,
-                ((x + radius.x()) - EDGE_GAP) as i32,
-                ((y + radius.y()) - EDGE_GAP) as i32,
+                ((x + radius.x()) - long_path_tuning.edge_gap) as i32,
+                ((y + radius.y()) - long_path_tuning.edge_gap) as i32,
             ),
             gap_squared,
             gap,
@@ -227,8 +221,9 @@ pub fn reaches(
     map: GridSize,
     req: &LongRequest,
     gates: GateAsk<'_>,
+    long_path_tuning: LongPathTuning,
 ) -> Result<bool, GenieError> {
-    Ok(match search(tiles, map, req, gates)? {
+    Ok(match search(tiles, map, req, gates, long_path_tuning)? {
         Searched::Refused => false,
         Searched::InRange => true,
         Searched::Ran { reached, .. } => reached,
@@ -248,8 +243,9 @@ pub fn path(
     map: GridSize,
     (req, gates): (&LongRequest, GateAsk<'_>),
     z: f32,
+    long_path_tuning: LongPathTuning,
 ) -> Result<(bool, Path), GenieError> {
-    Ok(match search(tiles, map, req, gates)? {
+    Ok(match search(tiles, map, req, gates, long_path_tuning)? {
         Searched::Refused => (false, Path::default()),
         Searched::InRange => (true, Path::default()),
         Searched::Ran {
@@ -297,9 +293,14 @@ fn trace(
 
 /// [`search`]'s answers before the search: an end off the pather's width (`+0x8`, the far edge
 /// included) is refused; a target within range, or without a target a goal within a range
-/// above [`REACHED`] (`gap2` the ends' squared gap), is in range; a unit that does not move is
+/// above `LongPathTuning::reached` (`gap2` the ends' squared gap), is in range; a unit that does not move is
 /// refused. None: the search runs.
-fn search_refused(map: GridSize, req: &LongRequest, gap2: i32) -> Option<Searched> {
+fn search_refused(
+    map: GridSize,
+    req: &LongRequest,
+    gap2: i32,
+    long_path_tuning: LongPathTuning,
+) -> Option<Searched> {
     let (w, _) = (map.width(), map.height());
     let held = |v: i32| 0 <= v && v <= w;
     let (x0, y0) = (req.from.x(), req.from.y());
@@ -313,7 +314,7 @@ fn search_refused(map: GridSize, req: &LongRequest, gap2: i32) -> Option<Searche
     {
         return Some(Searched::InRange);
     }
-    if REACHED < req.range.get()
+    if long_path_tuning.reached < req.range.get()
         && req.target.is_none()
         && (gap2 as f32) < req.range.squared().get()
     {
@@ -323,13 +324,13 @@ fn search_refused(map: GridSize, req: &LongRequest, gap2: i32) -> Option<Searche
 }
 
 /// [`search`]'s goal test of the popped tile `d` tiles from the goal: a target's gap within the
-/// range ([`EPSILON`]) or the tile within [`REACHED`]; without a target, a search to within
-/// range by `d` against the range, else `d` within [`REACHED`].
-fn search_reached(req: &LongRequest, d: f32) -> bool {
+/// range ([`EPSILON`]) or the tile within `LongPathTuning::reached`; without a target, a search to within
+/// range by `d` against the range, else `d` within `LongPathTuning::reached`.
+fn search_reached(req: &LongRequest, d: f32, long_path_tuning: LongPathTuning) -> bool {
     match req.target {
-        Some(t) => t.gap - req.range < Distance::new(EPSILON) || d < REACHED,
+        Some(t) => t.gap - req.range < Distance::new(EPSILON) || d < long_path_tuning.reached,
         None if req.within_range => d - req.range.get() < EPSILON,
-        None => d < REACHED,
+        None => d < long_path_tuning.reached,
     }
 }
 
@@ -512,13 +513,14 @@ fn search(
     map: GridSize,
     req: &LongRequest,
     gates: GateAsk<'_>,
+    long_path_tuning: LongPathTuning,
 ) -> Result<Searched, GenieError> {
     let (w, h) = (map.width(), map.height());
     let (x0, y0) = (req.from.x(), req.from.y());
     let (x1, y1) = (req.to.x(), req.to.y());
     let (dx, dy) = (x1 - x0, y1 - y0);
     let gap2 = dy.wrapping_mul(dy).wrapping_add(dx.wrapping_mul(dx));
-    if let Some(early) = search_refused(map, req, gap2) {
+    if let Some(early) = search_refused(map, req, gap2, long_path_tuning) {
         return Ok(early);
     }
     // the goal: the target's tile and footprint, else the goal tile
@@ -561,7 +563,7 @@ fn search(
         let (cx, cy) = (c.x(), c.y());
         let (gx, gy) = (x1 - cx, y1 - cy);
         let d = sqrt(gx.wrapping_mul(gx).wrapping_add(gy.wrapping_mul(gy)) as f32);
-        if rect.holds(c) || search_reached(req, d) {
+        if rect.holds(c) || search_reached(req, d, long_path_tuning) {
             return Ok(Searched::Ran {
                 reached: true,
                 end: c,
@@ -608,6 +610,7 @@ fn search(
 mod tests {
     use super::*;
     use crate::map::TerrainMask;
+    use crate::testing::tuning;
     #[cfg(test)]
     use std::cell::RefCell;
 
@@ -665,8 +668,14 @@ mod tests {
             ".....#....",
             "..........",
         ]);
-        let (reached, walk) =
-            path(&t, map, (&request([1, 2], [8, 2]), &|_| Ok(false)), 0.25).unwrap();
+        let (reached, walk) = path(
+            &t,
+            map,
+            (&request([1, 2], [8, 2]), &|_| Ok(false)),
+            0.25,
+            tuning().long_path,
+        )
+        .unwrap();
         assert!(reached);
         let first = walk.points[0];
         let last = *walk.points.last().unwrap();
@@ -692,8 +701,14 @@ mod tests {
             ".....#....",
             ".....#....",
         ]);
-        let (reached, walk) =
-            path(&t, map, (&request([1, 2], [8, 2]), &|_| Ok(false)), 0.0).unwrap();
+        let (reached, walk) = path(
+            &t,
+            map,
+            (&request([1, 2], [8, 2]), &|_| Ok(false)),
+            0.0,
+            tuning().long_path,
+        )
+        .unwrap();
         assert!(!reached);
         assert_eq!(walk.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
         assert_eq!(walk.points.last(), Some(&BVector::new(4.5, 0.0, 2.5)));
@@ -701,7 +716,7 @@ mod tests {
         let mut req = request([0, 1], [4, 1]);
         req.range = Distance::new(4.5);
         assert_eq!(
-            path(&t, map, (&req, &|_| Ok(false)), 0.0).unwrap(),
+            path(&t, map, (&req, &|_| Ok(false)), 0.0, tuning().long_path).unwrap(),
             (true, Path::default())
         );
     }
@@ -752,7 +767,13 @@ mod tests {
             "..........",
         ]);
         assert_eq!(
-            reaches(&t, map, &request([1, 2], [8, 2]), &|_| Ok(false)),
+            reaches(
+                &t,
+                map,
+                &request([1, 2], [8, 2]),
+                &|_| Ok(false),
+                tuning().long_path
+            ),
             Ok(true)
         );
         let (t, map) = tiles(&[
@@ -763,7 +784,13 @@ mod tests {
             ".....#....",
         ]);
         assert_eq!(
-            reaches(&t, map, &request([1, 2], [8, 2]), &|_| Ok(false)),
+            reaches(
+                &t,
+                map,
+                &request([1, 2], [8, 2]),
+                &|_| Ok(false),
+                tuning().long_path
+            ),
             Ok(false)
         );
     }
@@ -790,17 +817,29 @@ mod tests {
             }
         };
         assert_eq!(
-            reaches(&t, map, &request([1, 2], [8, 2]), &ask(true)),
+            reaches(
+                &t,
+                map,
+                &request([1, 2], [8, 2]),
+                &ask(true),
+                tuning().long_path
+            ),
             Ok(false)
         );
         assert_eq!(asked.borrow().len(), 0);
         let mut req = request([1, 2], [8, 2]);
         req.allies |= PlayerSet::of(PlayerId::new(4));
-        assert_eq!(reaches(&t, map, &req, &ask(false)), Ok(false));
+        assert_eq!(
+            reaches(&t, map, &req, &ask(false), tuning().long_path),
+            Ok(false)
+        );
         assert!(asked.borrow().iter().all(|&g| g == Tile::new(5, 2)));
-        assert_eq!(reaches(&t, map, &req, &ask(true)), Ok(true));
+        assert_eq!(
+            reaches(&t, map, &req, &ask(true), tuning().long_path),
+            Ok(true)
+        );
         let fails = |_| Err(GenieError::unreachable("the gate's master"));
-        assert!(reaches(&t, map, &req, &fails).is_err());
+        assert!(reaches(&t, map, &req, &fails, tuning().long_path).is_err());
     }
 
     #[test]
@@ -814,7 +853,13 @@ mod tests {
             "...T.....",
         ]);
         assert_eq!(
-            reaches(&t, map, &request([0, 0], [8, 4]), &|_| Ok(false)),
+            reaches(
+                &t,
+                map,
+                &request([0, 0], [8, 4]),
+                &|_| Ok(false),
+                tuning().long_path
+            ),
             Ok(false)
         );
     }
@@ -824,8 +869,14 @@ mod tests {
         let (t, map) = tiles(&["..#..", "..#..", "..#.."]);
         let mut req = request([0, 1], [4, 1]);
         req.moves = false;
-        assert_eq!(reaches(&t, map, &req, &|_| Ok(false)), Ok(false));
+        assert_eq!(
+            reaches(&t, map, &req, &|_| Ok(false), tuning().long_path),
+            Ok(false)
+        );
         req.range = Distance::new(4.5);
-        assert_eq!(reaches(&t, map, &req, &|_| Ok(false)), Ok(true));
+        assert_eq!(
+            reaches(&t, map, &req, &|_| Ok(false), tuning().long_path),
+            Ok(true)
+        );
     }
 }

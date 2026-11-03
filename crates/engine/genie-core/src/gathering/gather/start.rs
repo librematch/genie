@@ -6,9 +6,9 @@ use crate::gathering::DropSiteId;
 use crate::gathering::FarmStops;
 use crate::gathering::StopIndex;
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::Stand;
 use crate::gathering::gather::{
-    DEFAULT_PRODUCTIVITY, FARM_STOPS, GatherAction, GatherReads, Resource, STOP_CENTRE, STOP_DRAWS,
-    Walks,
+    FARM_STOPS, GatherAction, GatherReads, Resource, STOP_DRAWS, Walks,
 };
 use crate::gathering::hunt::HuntTask;
 use crate::gathering::{GatherTargetId, both_food};
@@ -24,9 +24,6 @@ use crate::objects::WorkRate;
 use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::WorkValue;
-use crate::objects::sprite::ActiveSprite;
-use crate::objects::sprite::Graphic;
-use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -36,6 +33,9 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::GatherTuning;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::Tuning;
 use crate::world::step::Step;
 
 /// What a gather's start takes besides its mover and stream ([`GatherAction::start`]'s
@@ -118,9 +118,13 @@ pub struct MoveTarget {
 /// The productivity the time per stop reads (the constructor's and the update's): the player's
 /// attribute the task's `attribute_type2` names, as it is, or 1.0 for none (`DAT_14330eb8c`).
 #[must_use]
-pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[Amount]) -> Amount {
+pub fn productivity_of(
+    attribute_type2: Option<AttributeId>,
+    attributes: &[Amount],
+    gather_tuning: &GatherTuning,
+) -> Amount {
     let Some(attribute) = attribute_type2 else {
-        return DEFAULT_PRODUCTIVITY;
+        return Amount::new(gather_tuning.default_productivity);
     };
     attributes
         .get(attribute.index())
@@ -133,7 +137,13 @@ pub fn productivity_of(attribute_type2: Option<AttributeId>, attributes: &[Amoun
 /// modulo twice each radius, its centre 0.5 in), drawn again while it is the last stop's, at
 /// most ten times.
 #[must_use]
-pub fn stop_point(position: Position, radius: Footprint, last: Point, rng: &mut Well512) -> Point {
+pub fn stop_point(
+    position: Position,
+    radius: Footprint,
+    last: Point,
+    rng: &mut Well512,
+    gather_tuning: &GatherTuning,
+) -> Point {
     let (mut ix, mut iy) = (
         (radius.x() + radius.x()) as i32,
         (radius.y() + radius.y()) as i32,
@@ -148,8 +158,8 @@ pub fn stop_point(position: Position, radius: Footprint, last: Point, rng: &mut 
     let (mut x, mut y) = (last.x(), last.y());
     let mut draws = 0;
     while x == last.x() && y == last.y() && draws < STOP_DRAWS {
-        x = ((rng.rand15() as i32) % ix + left) as f32 + STOP_CENTRE;
-        y = ((rng.rand15() as i32) % iy + bottom) as f32 + STOP_CENTRE;
+        x = ((rng.rand15() as i32) % ix + left) as f32 + gather_tuning.stop_centre;
+        y = ((rng.rand15() as i32) % iy + bottom) as f32 + gather_tuning.stop_centre;
         draws += 1;
     }
     Point::new(x, y)
@@ -228,7 +238,9 @@ impl GatherAction {
         mover: &mut Mover,
         rng: &mut Well512,
         roles: &Roles,
+        tuning: &Tuning,
     ) -> Result<(), GenieError> {
+        let move_to_tuning = &tuning.move_to;
         let GatherStart {
             target,
             player,
@@ -270,7 +282,7 @@ impl GatherAction {
             } else {
                 target.radius.x()
             };
-            self.set_walk_back(Distance::new(radius), mover, &walks)?;
+            self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
             self.target = None;
             return Ok(());
         }
@@ -278,9 +290,9 @@ impl GatherAction {
             self.target = None;
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
-            return self.set_drop(target.position, target.gap, mover, &walks);
+            return self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning);
         }
-        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks)
+        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)
     }
 
     /// Slot 0x48 (`0x140a903a0`) on the work command's new `target` (one the world holds that is
@@ -308,7 +320,9 @@ impl GatherAction {
         mover: &mut Mover,
         rng: &mut Well512,
         roles: &Roles,
+        tuning: &Tuning,
     ) -> Result<bool, GenieError> {
+        let move_to_tuning = &tuning.move_to;
         let GatherRetarget {
             target,
             player,
@@ -337,7 +351,7 @@ impl GatherAction {
             self.target = None;
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
-            self.set_drop(target.position, target.gap, mover, &walks)?;
+            self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
             return Ok(true);
         }
         // slot 0x68 takes the target: its workers count it once it is new
@@ -372,13 +386,13 @@ impl GatherAction {
             } else {
                 target.radius.x()
             };
-            self.set_walk_back(Distance::new(radius), mover, &walks)?;
+            self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
             self.target = None;
             self.carry_to = None;
             return Ok(true);
         }
         self.carry_to = None;
-        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks)?;
+        self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)?;
         Ok(true)
     }
 
@@ -401,7 +415,9 @@ impl GatherAction {
         mover: &mut Mover,
         rng: &mut Well512,
         walks: &Walks<'_>,
+        tuning: &Tuning,
     ) -> Result<(), GenieError> {
+        let (gather_tuning, move_to_tuning) = (&tuning.gather, &tuning.move_to);
         let position = to.at;
         self.tear_down(Some(mover))?;
         self.state = GatherState::Walk { move_to: None };
@@ -414,14 +430,21 @@ impl GatherAction {
         self.point = position;
         let walk = if self.stops.several() {
             let (x, y) = {
-                let p = stop_point(position, radius, self.last_stop, rng);
+                let p = stop_point(position, radius, self.last_stop, rng, gather_tuning);
                 (p.x(), p.y())
             };
             self.last_stop = Point::new(x, y);
             let to = Position::new(x, y, position.z());
-            self.move_to_point(to, self.task.range, TargetMoved::AsksAgain, mover, walks)?
+            self.move_to_point(
+                to,
+                self.task.range,
+                TargetMoved::AsksAgain,
+                mover,
+                walks,
+                move_to_tuning,
+            )?
         } else {
-            self.move_to_object(to, mover, walks)?
+            self.move_to_object(to, mover, walks, move_to_tuning)?
         };
         self.state = GatherState::Walk { move_to: walk };
         Ok(())
@@ -441,6 +464,7 @@ impl GatherAction {
         gap: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = GatherState::Drop { move_to: None };
@@ -456,7 +480,7 @@ impl GatherAction {
             gap,
             state: None,
         };
-        let move_to = self.move_to_object(to, mover, walks)?;
+        let move_to = self.move_to_object(to, mover, walks, move_to_tuning)?;
         self.state = GatherState::Drop { move_to };
         Ok(())
     }
@@ -479,6 +503,7 @@ impl GatherAction {
         player: PlayerId,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         let held = walks.held.amount;
         match target.filter(|t| t.player == player && t.drop_site && Amount::ZERO < held) {
@@ -492,12 +517,12 @@ impl GatherAction {
                 self.target = None;
                 self.point = Position::from([-1.0; 3]);
                 self.carry_to = Some(DropSiteId::new(t.id));
-                self.set_drop(t.position, t.gap, mover, walks)
+                self.set_drop(t.position, t.gap, mover, walks, move_to_tuning)
             }
             None => {
                 self.point = point;
                 self.target = None;
-                self.set_moved(mover, walks)
+                self.set_moved(mover, walks, move_to_tuning)
             }
         }
     }
@@ -509,7 +534,12 @@ impl GatherAction {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn set_moved(&mut self, mover: &mut Mover, walks: &Walks<'_>) -> Result<(), GenieError> {
+    pub fn set_moved(
+        &mut self,
+        mover: &mut Mover,
+        walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
+    ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = GatherState::Moved { move_to: None };
         self.timer = Seconds::ZERO;
@@ -519,7 +549,14 @@ impl GatherAction {
             ));
         }
         let range = self.task.range;
-        let move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        let move_to = self.move_to_point(
+            self.point,
+            range,
+            TargetMoved::Follows,
+            mover,
+            walks,
+            move_to_tuning,
+        )?;
         self.state = GatherState::Moved { move_to };
         Ok(())
     }
@@ -548,17 +585,13 @@ impl GatherAction {
     pub(crate) fn halt(
         &mut self,
         mover: Option<&mut Mover>,
-        stand: Option<Graphic>,
-        sprite: &mut Option<ActiveSprite>,
-        rng: &mut Well512,
+        stand: Stand<'_>,
     ) -> Result<[Option<ObjectId>; 2], GenieError> {
         let mut mover = mover;
         self.tear_down(mover.as_deref_mut())?;
         self.state = GatherState::Idle;
         self.timer = Seconds::ZERO;
-        if let Some(s) = stand {
-            new_sprite(sprite, mover.map(|m| &mut m.stats), s, rng);
-        }
+        stand.show(mover.map(|m| &mut m.stats));
         let released = self.targets();
         self.target = None;
         self.carry_to = None;

@@ -568,7 +568,13 @@ impl World {
             "a unit without its sprite's graphic",
         ))?;
         let rng = self.streams.get(Stream::Sprite);
-        new_sprite(&mut u.sprite, motion.move_stats_mut(), g, rng);
+        new_sprite(
+            &mut u.sprite,
+            motion.move_stats_mut(),
+            g,
+            rng,
+            self.model.tuning.sprite,
+        );
         Ok(true)
     }
 

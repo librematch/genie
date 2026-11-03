@@ -83,6 +83,7 @@ use crate::math::rng::Well512;
 use crate::movement::LinkedPathType;
 use crate::objects::layers::Action;
 use crate::pathing::Pathing;
+use crate::testing::tuning;
 use crate::world::FrameSeed;
 use crate::world::index::{ObjectsRef, TestObjects};
 use std::f32::consts::FRAC_PI_2;
@@ -282,7 +283,12 @@ fn looping_path_goes_round_or_back_and_forth() {
 fn step_falls_short_of_reaches_or_passes_its_waypoint() {
     let w = BVector::new(10.0, 0.0, 0.0);
     assert_eq!(
-        passes_waypoint(w, BVector::ZERO, BVector::new(5.0, 0.0, 0.0)),
+        passes_waypoint(
+            w,
+            BVector::ZERO,
+            BVector::new(5.0, 0.0, 0.0),
+            &tuning().group
+        ),
         Passing::Short
     );
     // a step that ends on the waypoint is not past it
@@ -290,7 +296,8 @@ fn step_falls_short_of_reaches_or_passes_its_waypoint() {
         passes_waypoint(
             w,
             BVector::new(9.95, 0.0, 0.0),
-            BVector::new(10.0, 0.0, 0.0)
+            BVector::new(10.0, 0.0, 0.0),
+            &tuning().group
         ),
         Passing::Short
     );
@@ -299,25 +306,46 @@ fn step_falls_short_of_reaches_or_passes_its_waypoint() {
         passes_waypoint(
             w,
             BVector::new(9.95, 0.0, 0.0),
-            BVector::new(10.02, 0.0, 0.0)
+            BVector::new(10.02, 0.0, 0.0),
+            &tuning().group
         ),
         Passing::Passes
     );
     assert_eq!(
-        passes_waypoint(w, BVector::new(9.0, 0.0, 0.0), BVector::new(10.0, 0.0, 0.0)),
+        passes_waypoint(
+            w,
+            BVector::new(9.0, 0.0, 0.0),
+            BVector::new(10.0, 0.0, 0.0),
+            &tuning().group
+        ),
         Passing::Short
     );
     // past it, but no farther beyond than it was before: on it
     assert_eq!(
-        passes_waypoint(w, BVector::new(9.0, 0.0, 0.0), BVector::new(10.5, 0.0, 0.0)),
+        passes_waypoint(
+            w,
+            BVector::new(9.0, 0.0, 0.0),
+            BVector::new(10.5, 0.0, 0.0),
+            &tuning().group
+        ),
         Passing::Reaches
     );
     assert_eq!(
-        passes_waypoint(w, BVector::new(9.0, 0.0, 0.0), BVector::new(11.0, 0.0, 0.0)),
+        passes_waypoint(
+            w,
+            BVector::new(9.0, 0.0, 0.0),
+            BVector::new(11.0, 0.0, 0.0),
+            &tuning().group
+        ),
         Passing::Reaches
     );
     assert_eq!(
-        passes_waypoint(w, BVector::new(9.0, 0.0, 0.0), BVector::new(12.0, 0.0, 0.0)),
+        passes_waypoint(
+            w,
+            BVector::new(9.0, 0.0, 0.0),
+            BVector::new(12.0, 0.0, 0.0),
+            &tuning().group
+        ),
         Passing::Passes
     );
     // a NaN step is short (COMISS step, to the waypoint; JBE at 0x14104621d), where an
@@ -326,7 +354,8 @@ fn step_falls_short_of_reaches_or_passes_its_waypoint() {
         passes_waypoint(
             w,
             BVector::new(9.0, 0.0, 0.0),
-            BVector::new(f32::NAN, 0.0, 0.0)
+            BVector::new(f32::NAN, 0.0, 0.0),
+            &tuning().group
         ),
         Passing::Short
     );
@@ -336,12 +365,20 @@ fn step_falls_short_of_reaches_or_passes_its_waypoint() {
 #[test]
 fn querys_ends_stay_inside_the_map() {
     assert_eq!(
-        hold(BVector::new(-1.0, 5.0, 3.0), GridSize::new(10, 20)),
+        hold(
+            BVector::new(-1.0, 5.0, 3.0),
+            GridSize::new(10, 20),
+            &tuning().group
+        ),
         Point::new(0.0, 3.0)
     );
     assert_eq!(
-        hold(BVector::new(10.0, 0.0, 25.0), GridSize::new(10, 20)),
-        Point::new(10.0 - NEAR, 20.0 - NEAR)
+        hold(
+            BVector::new(10.0, 0.0, 25.0),
+            GridSize::new(10, 20),
+            &tuning().group
+        ),
+        Point::new(10.0 - tuning().group.near, 20.0 - tuning().group.near)
     );
 }
 
@@ -711,7 +748,7 @@ fn top_level_without_planner_plans_the_straight_way() {
 /// A near waypoint the short pather finds no way to: a group without a target counts it
 /// reached, and at the last waypoint of a level made in this tick the walk ends there (the
 /// level resets in state 6, the group stands); a group within reach of its target arrived
-/// (state 4), the reach [`NEAR`] for a level without a range.
+/// (state 4), the reach `GroupTuning::near` for a level without a range.
 #[test]
 fn near_waypoint_without_way_is_reached_or_arrived_at() {
     let mut fx = Fixture::new();
@@ -743,7 +780,7 @@ fn near_waypoint_without_way_is_reached_or_arrived_at() {
             &lead,
             false,
             Some(&placed),
-            DistanceSquared::new(NEAR)
+            DistanceSquared::new(tuning().group.near)
         ),
         Some(Pass::Next)
     ));
@@ -941,7 +978,7 @@ fn reached_waypoint_moves_the_level_on() {
     let mut m = Motion::new();
     m.paths = vec![level(1, &three, 1, PathState::Walking)];
     m.paths[0].flags = LevelFlags::REACHED | LevelFlags::AT_WAYPOINT;
-    reached(&mut m, None).unwrap();
+    reached(&mut m, None, &tuning().group).unwrap();
     assert_eq!(
         (m.position[0], m.new_position[0]),
         (BVector::new(5.0, 0.0, 9.0), BVector::new(5.0, 0.0, 9.0))
@@ -956,14 +993,14 @@ fn reached_waypoint_moves_the_level_on() {
         (LevelFlags::NONE, 2, PathState::WantsPath)
     );
     m.paths = vec![level(0, &three, 1, PathState::Walking)];
-    reached(&mut m, None).unwrap();
+    reached(&mut m, None, &tuning().group).unwrap();
     assert_eq!(
         (m.paths[0].waypoint.get(), m.paths[0].state),
         (2, PathState::Walking)
     );
     m.paths = vec![level(1, &three, 2, PathState::Walking)];
     m.paths[0].path_flags = PathFlags::LOOPS;
-    reached(&mut m, None).unwrap();
+    reached(&mut m, None, &tuning().group).unwrap();
     assert_eq!(
         (m.paths[0].waypoint.get(), m.paths[0].state),
         (0, PathState::WantsPath)
@@ -971,8 +1008,8 @@ fn reached_waypoint_moves_the_level_on() {
 }
 
 /// Past the last waypoint of a path that does not loop: a group farther than the range plus
-/// [`NEAR`] from the waypoint it left steps back to it and asks again (state 2) when that is
-/// level 0's, or at least [`CLOSE`]; else it arrived (state 4). With a target the gap to its
+/// `GroupTuning::near` from the waypoint it left steps back to it and asks again (state 2) when that is
+/// level 0's, or at least `GroupTuning::close`; else it arrived (state 4). With a target the gap to its
 /// footprint counts; a level that reached its target with bit 2 arrived, the bit cleared.
 #[test]
 fn past_its_last_waypoint_level_steps_back_or_arrived() {
@@ -983,7 +1020,7 @@ fn past_its_last_waypoint_level_steps_back_or_arrived() {
         m.position[0] = BVector::new(at.x(), 0.0, at.y());
         m.paths = vec![level(n, &two, 1, PathState::Walking)];
         m.paths[0].flags = LevelFlags::from_bits_retain(flags);
-        reached(&mut m, target).unwrap();
+        reached(&mut m, target, &tuning().group).unwrap();
         (
             m.paths[0].waypoint.get(),
             m.paths[0].state,
@@ -1274,7 +1311,7 @@ fn the_members_centre_pulls_group_whose_members_all_act() {
             Some((Some(object_id(20)), BVector::new(15.0, 3.0, 5.0))),
         ],
     );
-    let pulled = |c: f32, own: f32| PULL_SHARE * c + PULL_KEEP * own;
+    let pulled = |c: f32, own: f32| tuning().group.pull_share * c + tuning().group.pull_keep * own;
     assert_eq!(
         far,
         BVector::new(pulled(15.0, 5.0), pulled(0.0, 0.0), pulled(5.0, 5.0))

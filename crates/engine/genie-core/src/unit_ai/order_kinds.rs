@@ -16,16 +16,18 @@ use crate::objects::masters::GatherGroup;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
-    AiMove, CIVILIAN, EXPLORE_Z, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
+    AiMove, CIVILIAN, Effect, FISHING_AI, Gatherable, QueuedOrder, ResourceSearch, Seen,
     Surroundings, UnitAi, UnitCommand, UnitSide, civilian_kind,
 };
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::UnitAiTuning;
 
 impl UnitAi {
     /// Slot 0x170 (`FUN_140c4ccc0`), the defend of object `target` within `range`, `force`d or
@@ -314,6 +316,7 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         if !force && self.current_action.is_some() {
             return Ok(false);
         }
@@ -325,7 +328,7 @@ impl UnitAi {
         self.target_at(
             Some(target),
             class,
-            Position::new(tile.x() as f32, tile.y() as f32, EXPLORE_Z),
+            Position::new(tile.x() as f32, tile.y() as f32, unit_ai_tuning.explore_z),
         );
         Ok(true)
     }
@@ -340,6 +343,7 @@ impl UnitAi {
         force: bool,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
         if !force && self.current_action.is_some() {
             return Ok(false);
@@ -347,7 +351,7 @@ impl UnitAi {
         let point = Point::new(tile.x() as f32, tile.y() as f32);
         side.effect_now(Effect::Explore(point), self, rng)?;
         self.set_action(Some(AiAction::ExploreAndDestroy));
-        self.target_at(None, None, point.with_height(EXPLORE_Z));
+        self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
         Ok(true)
     }
 
@@ -475,13 +479,14 @@ impl UnitAi {
     /// Slot 0x100 (`FUN_140c4d910`), with `again` (its argument 4) or without an action value:
     /// the unit's explore to `tile`'s corner (slot 0x398, [`Effect::Explore`], which takes it); the AI
     /// then holds the explore's action value and the point without a target (`FUN_140c64c10`
-    /// with −1, which leaves the target class), at height [`EXPLORE_Z`].
+    /// with −1, which leaves the target class), at height `UnitAiTuning::explore_z`.
     pub(super) fn explore_at(
         &mut self,
         tile: Tile,
         again: bool,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
         if !again && self.current_action.is_some() {
             return Ok(false);
@@ -489,7 +494,7 @@ impl UnitAi {
         let point = tile.corner();
         side.effect_now(Effect::Explore(point), self, rng)?;
         self.last_action = self.current_action.replace(AiAction::Explore);
-        self.target_at(None, None, point.with_height(EXPLORE_Z));
+        self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
         Ok(true)
     }
 
@@ -508,7 +513,7 @@ impl UnitAi {
         place: (Point, Option<ClassId>),
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-        roles: &Roles,
+        layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {
         if ObjectState::Alive < unit_state {
             return Ok(());
@@ -518,7 +523,7 @@ impl UnitAi {
             keep_from: None,
             place: Some(place),
         };
-        self.order_now(now, None, ai, side, roles)
+        self.order_now(now, None, ai, side, layer)
     }
 
     /// Slot 0x28 (`FUN_140c55c90`) with Immediate set and inFront clear, from outside the unit
@@ -536,6 +541,7 @@ impl UnitAi {
         (at, side, player_type): (&Surroundings, &mut dyn UnitSide, PlayerType),
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         if ObjectState::Alive < at.state {
             return Ok(());
@@ -546,6 +552,16 @@ impl UnitAi {
             keep_from: None,
             place: Some(place),
         };
-        self.order_now(now, Some((at, player_type)), ai, side, roles)
+        self.order_now(
+            now,
+            Some((at, player_type)),
+            ai,
+            side,
+            AiLayer {
+                roles,
+                slots: at.slots,
+                unit_ai_tuning,
+            },
+        )
     }
 }

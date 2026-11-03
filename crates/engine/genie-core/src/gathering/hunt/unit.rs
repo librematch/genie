@@ -1,6 +1,7 @@
 //! A hunter's search and its walk after a drop.
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement};
 use crate::combat::victims::victim;
 use crate::gathering::closest_resource::herded;
@@ -119,6 +120,7 @@ impl Unit {
                 c.w.parts.move_stats_mut(self.id),
                 s,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             );
         }
         Ok(())
@@ -334,8 +336,12 @@ impl Unit {
             &engagement,
             arms,
             mover,
-            roles,
-            &c.w.model.tuning.attack,
+            BeginLayer {
+                roles,
+                attack_tuning: &c.w.model.tuning.attack,
+                move_to_tuning: &c.w.model.tuning.move_to,
+            },
+            &c.w.model.tuning.hunt,
         )? {
             return Err(GenieError::unsupported(
                 "a hunt's Attack whose MoveTo starts arrived after its drop-off",
@@ -518,6 +524,8 @@ impl Unit {
             },
             roles,
             &c.w.model.tuning.best_target,
+            &c.w.model.tuning.spatial,
+            c.w.model.tuning.registry,
         )?;
         // FUN_140c63e20's alert: enemies found set the alert mode and its time again
         let ai =
@@ -565,6 +573,6 @@ impl Unit {
             ));
         }
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        hunt.search_walk(mover, &walks)
+        hunt.search_walk(mover, &walks, &c.w.model.tuning.move_to)
     }
 }

@@ -45,25 +45,13 @@ pub use self::repair_state::RepairState;
 pub(crate) use self::unit::repair_target;
 use crate::construction::{BuilderCount, RepairTargetId};
 use crate::map::RestrictionId;
-use crate::math::image::repair::{
-    EXTRA_REPAIRER as REPAIR_EXTRA_REPAIRER, LEAST_HP as REPAIR_LEAST_HP,
-    MOVING_REACH as REPAIR_MOVING_REACH, ONE as REPAIR_ONE, REACH as REPAIR_REACH,
-};
+use crate::math::image::repair::ONE as REPAIR_ONE;
 use crate::objects::masters::WorkValue;
 use crate::unit_ai::UnitStance;
 
 /// The Repair action's type, which word 9 adds, and its tasks' action type.
 pub const REPAIR: ActionKind = ActionKind::named(0x6a);
 
-/// The gap within which a repairer reaches its target (`DAT_142eb5690`).
-pub const REACH: f32 = REPAIR_REACH;
-/// What a moving target (`FUN_140fdd080`) or a scenario's game mode adds to the reach
-/// (`DAT_142e8c150`).
-const MOVING_REACH: f32 = REPAIR_MOVING_REACH;
-/// The hit points below which a target in state 2 is not repaired (`DAT_142e7f384`), and the
-/// share each repairer past the first adds to the work (the same constant).
-const LEAST_HP: f32 = REPAIR_LEAST_HP;
-const EXTRA_REPAIRER: f32 = REPAIR_EXTRA_REPAIRER;
 /// The wait of state 10 (`0x3f800000`), and the repairer count's first (`DAT_14330eb8c`).
 const ONE: f32 = REPAIR_ONE;
 

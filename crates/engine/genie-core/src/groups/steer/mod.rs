@@ -11,12 +11,9 @@ mod to_slots;
 use crate::groups::SpecificMove;
 use crate::map::Distance;
 use crate::math::image::group::{
-    ASIDE_TIMER as GROUP_ASIDE_TIMER, CATCH_UP as GROUP_CATCH_UP,
-    CATCH_UP_SPAN as GROUP_CATCH_UP_SPAN, CLEARANCE as GROUP_CLEARANCE, EPSILON as GROUP_EPSILON,
-    LINKED_RADIUS as GROUP_LINKED_RADIUS, ROUND_LENGTH as GROUP_ROUND_LENGTH,
+    EPSILON as GROUP_EPSILON, ROUND_LENGTH as GROUP_ROUND_LENGTH,
     ROUND_RADIUS as GROUP_ROUND_RADIUS, ROUND_REACH as GROUP_ROUND_REACH,
     ROUND_STILL as GROUP_ROUND_STILL, ROUND_TIMER as GROUP_ROUND_TIMER,
-    SLOT_REACH as GROUP_SLOT_REACH,
 };
 use crate::movement::move_to::MOVE_TO as MOVEMENT_MOVE_TO;
 use crate::objects::masters::ActionKind;
@@ -25,25 +22,9 @@ use crate::world::World;
 
 /// A member this near its slot on the ground is in place (`DAT_142eb0c60`, `0x14102629e`).
 const EPSILON: f32 = GROUP_EPSILON;
-/// The members' obstruction tests grow the records by the member's radius times this
-/// (`DAT_142e7f384`).
-const CLEARANCE: Distance = Distance::new(GROUP_CLEARANCE);
 /// A member whose moves to its slot failed more than this many times in a row is moved aside
 /// (`FUN_141025fb0`'s `0xa`).
 const MOST_FAILURES: i32 = 10;
-/// The timer of the move aside after too many failures (`DAT_142eb5690`).
-const ASIDE_TIMER: f32 = GROUP_ASIDE_TIMER;
-/// A member within this many radii of its slot, or this far, walks at its top speed
-/// (`DAT_14330ebb8`, loaded once at `0x1410279d1` for both).
-const SLOT_REACH: f32 = GROUP_SLOT_REACH;
-/// Nearer its slot than [`SLOT_REACH`], a member catches up at its top speed times
-/// [`CATCH_UP`], less the nearer it is within this (`DAT_142eb1c98`).
-const CATCH_UP_SPAN: f32 = GROUP_CATCH_UP_SPAN;
-/// The catching up's share of the top speed (`DAT_142ed66b4`).
-const CATCH_UP: f32 = GROUP_CATCH_UP;
-/// A moving object whose top speed is 0 and whose radius on either axis is above this links its
-/// tiles at a new place (`FUN_14108c320`, `DAT_142e7f384`).
-const LINKED_RADIUS: f32 = GROUP_LINKED_RADIUS;
 /// The action types and states the stop of a member without a slot passes over: a `MoveTo`
 /// in the action list (slot 0x538 with 1), and a top action in state 4, 5 or 11 (slot 0x2b0).
 const MOVE_TO: ActionKind = MOVEMENT_MOVE_TO;

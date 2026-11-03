@@ -147,7 +147,9 @@ fn harmless(master: Master) -> bool {
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,
     };
-    picker.harmless(&spatial, object_id(50), &roles()).unwrap()
+    picker
+        .harmless(&spatial, object_id(50), &roles(), &tuning().unit_ai)
+        .unwrap()
 }
 
 /// Slot 0x78 of the ward's unit AI: of its attackers the world holds, the nearest by the
@@ -279,7 +281,8 @@ fn ward_nearest_attacker_is_its_closest_held_one() {
                 &Spatial::default(),
                 object_id(77),
                 &roles(),
-                &tuning().damage
+                &tuning().damage,
+                &tuning().unit_ai
             )
             .is_err()
     );

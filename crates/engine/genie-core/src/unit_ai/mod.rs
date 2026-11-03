@@ -58,12 +58,12 @@ pub(crate) mod world_view;
 
 pub use self::ai_action::AiAction;
 pub use self::ai_type::UnitAiType;
+use self::attack_pick::point_gap_squared;
 pub(crate) use self::attack_pick::spares_friends;
 pub use self::attack_pick::{
     AttackAsk, Attacker, Memory, Pick, Search, Seeker, Target, can_attack, soldier_can_attack,
     tower_can_attack,
 };
-use self::attack_pick::{DEFEND_GROWTH, point_gap_squared};
 pub use self::attack_picker::{AttackPicker, NoAttack};
 pub(crate) use self::attack_rules::patrol_distance;
 pub use self::attack_rules::{
@@ -71,12 +71,11 @@ pub use self::attack_rules::{
     priest_attacks_neutral, siege_attacks_neutral, siege_can_attack, soldier_attacks_neutral,
     type_attacks_neutral,
 };
-use self::attack_rules::{
-    DEFEND_PATROL_LEASH, STAND_GROUND_PATROL_LEASH, back_up, civilian_may_attack,
-    computer_idle_check, defend_patrol_range, lion_may_attack,
-};
 #[cfg(test)]
 use self::attack_rules::{PATROL_FARTHEST, line_distance};
+use self::attack_rules::{
+    back_up, civilian_may_attack, computer_idle_check, defend_patrol_range, lion_may_attack,
+};
 pub use self::attackers::Attackers;
 #[cfg(test)]
 pub(crate) use self::cared::cared_classes;
@@ -87,26 +86,23 @@ pub use self::cared::{
     TRADE_SHIP_CARED, TRANSPORT_CARED, civilian_kind, civilian_search_radius,
 };
 use self::cared::{
-    BUILDING_AI, EVADE_EDGE, EVADE_REACH, EVASIVE_NEAR, LIVE_TARGET_ACTIONS, RUN_DRAW_SCALE,
-    RUN_EPSILON, RUN_LEASH, RUN_ONE, RUN_REACH, TRANSPORT_AI, adjusted_idle_timeout,
-    attack_search_radius,
+    BUILDING_AI, LIVE_TARGET_ACTIONS, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE, TRANSPORT_AI,
+    adjusted_idle_timeout, attack_search_radius,
 };
 pub(crate) use self::cared::{search_area, search_radius};
 use self::ids::{
     AI_MOVE_RANGE, ARTIFACT_IDLE_TIMEOUT, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET,
-    BOAR_STEP, BOAR_WANDER, COMPUTER_SOLDIER_IDLE_TIMEOUT, DEFEND_SLACK, DESIRED_DISTANCE,
-    ENDED_ACTIONS, EXPLORE_Z, FOLLOW_SLACK_HIGH, FOLLOW_SLACK_LOW, FOUNDATION_REACH, HUNTED_HOME,
-    HUNTED_IDLE_TIMEOUT, HUNTED_SIGHT_GROWTH, HUNTED_STEP, IDLE_TIMEOUT, INVALID_POINT,
-    LION_ATTACKED_TIMEOUT, LION_IDLE_TIMEOUT, LION_SIGHT_DIVISOR, LION_SIGHT_SHARE, NO_ANIM_SPEED,
-    OUTSIDE_ORDER, PRIEST_IDLE_TIMEOUT, RETARGET_RANGE, RETARGET_REACH, Retarget, RetargetSearch,
-    SIEGE_IDLE_TIMEOUT, SOLDIER_IDLE_TIMEOUT, TOWER_IDLE_TIMEOUT, VILLAGER_NOTIFY, WALK_BACK,
-    closest_undiscovered_tile, dodges, held_action_state, order_move, retarget_kind, siege_stance,
-    soldier_stance,
+    BOAR_STEP, BOAR_WANDER, COMPUTER_SOLDIER_IDLE_TIMEOUT, DESIRED_DISTANCE, ENDED_ACTIONS,
+    HUNTED_HOME, HUNTED_IDLE_TIMEOUT, HUNTED_SIGHT_GROWTH, HUNTED_STEP, IDLE_TIMEOUT,
+    INVALID_POINT, LION_ATTACKED_TIMEOUT, LION_IDLE_TIMEOUT, NO_ANIM_SPEED, OUTSIDE_ORDER,
+    PRIEST_IDLE_TIMEOUT, Retarget, RetargetSearch, SIEGE_IDLE_TIMEOUT, SOLDIER_IDLE_TIMEOUT,
+    TOWER_IDLE_TIMEOUT, VILLAGER_NOTIFY, WALK_BACK, closest_undiscovered_tile, dodges,
+    held_action_state, order_move, retarget_kind, siege_stance, soldier_stance,
 };
 pub use self::ids::{HUMAN_ORDER_CAP, NewObject, factory_type, unit_ai_type};
 pub(crate) use self::ids::{alert_owner, helper_answers, searches_on_class};
 pub use self::issuer::Issuer;
-pub use self::notifies::Inbox;
+pub use self::notifies::{AiLayer, Inbox};
 pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
 pub use self::order_outcome::OrderOutcome;
@@ -122,7 +118,7 @@ pub use self::surroundings::{
     AiMove, Duel, Found, GroupState, Home, Seen, Surroundings, TopTarget, UnitSeen, flood_search,
     no_search,
 };
-use self::surroundings::{LiveTop, PATROL_TURN_REACH, SINGLE_VOLLEY, group_lets_idle};
+use self::surroundings::{LiveTop, group_lets_idle};
 pub use self::target_type::OrderTargetType;
 pub use self::unit_stance::UnitStance;
 use crate::groups::FormationKind;
@@ -185,18 +181,9 @@ impl Notify {
 
 /// The damage case's unit too slow to run away (`DAT_142eb0c60`, [`UnitAi::damaged`]).
 const STILL: f32 = UNIT_AI_STILL;
-/// The damage case's kill time of an object the unit cannot harm (`DAT_142efe41c`, 25000).
-const NEVER_KILLED: f32 = UNIT_AI_NEVER_KILLED;
-/// [`NotifyKind::SENT_OFF`]'s radii are hundredths (`DAT_14330ebcc`).
-const RADIUS_SCALE: f32 = UNIT_AI_RADIUS_SCALE;
 
 /// What a notify handler (unit-AI slot 0x238) returns: go on with the next notify.
 const GO_ON: u32 = 2;
-/// The defend stance's leash, squared (`DAT_142ed6f20`).
-const DEFEND_LEASH: f32 = UNIT_AI_DEFEND_LEASH;
-/// What the stand ground stance's leash adds to the unit's range (`DAT_142eb880c`, 0.25, read by
-/// `ADDSS` at `0x140c57c6a`).
-const STAND_GROUND_SLACK: Distance = Distance::new(UNIT_AI_STAND_GROUND_SLACK);
 /// "Notify processing returned stop or new action, breaking."
 const BREAK: u32 = 3;
 /// "I'm dead, purging notifyQueue and returning FALSE."
@@ -229,18 +216,12 @@ const LIVESTOCK_AI: UnitAiType = UnitAiType::LIVESTOCK;
 const TRADE_AI: UnitAiType = UnitAiType::TRADE;
 /// The fishing ship's factory type (`TribeFishingShipUnitAIModule`, class 21).
 const FISHING_AI: UnitAiType = UnitAiType::FISHING;
-/// A computer player's ship evades the object its idle check found by its speed times this
-/// (`FUN_140c21930`, `FUN_140c1eab0`: `DAT_142ec9eb8`).
-const SHIP_EVADE_REACH: f32 = UNIT_AI_SHIP_EVADE_REACH;
 /// The classes of the foundations a fishing ship's builder looks for (`FUN_140c25ca0`, in its
 /// order): buildings, walls, gates, towers and farms.
 const FISHING_BUILDS: [ClassId; 5] = classes([3, 27, 39, 52, 49]);
 /// The fishing ship's builder takes the nearest foundation nearer than this (`FUN_140c25ca0`'s
 /// 9999).
 const FISHING_BUILD_FAR: WholeDistance = WholeDistance::of_data(9999);
-/// The seconds without a sighting after which enemies found are the owner's news
-/// (`DAT_142eb0f4c`).
-const ENEMY_SIGHTING_GAP: Seconds = Seconds::new(UNIT_AI_ENEMY_SIGHTING_GAP);
 
 /// The notify queue's capacity of a unit AI of `ai_type` holding `count` notifies: the
 /// factory's (`FUN_141215560`: 5 for the artifact's and the livestock's, types 14 and 19; 10
@@ -592,12 +573,7 @@ use crate::construction::FoundationId;
 use crate::gathering::DropSiteId;
 use crate::map::WholeDistance;
 use crate::math::fmath::BVector;
-use crate::math::image::unit_ai::{
-    DEFEND_LEASH as UNIT_AI_DEFEND_LEASH, ENEMY_SIGHTING_GAP as UNIT_AI_ENEMY_SIGHTING_GAP,
-    NEVER_KILLED as UNIT_AI_NEVER_KILLED, RADIUS_SCALE as UNIT_AI_RADIUS_SCALE,
-    SHIP_EVADE_REACH as UNIT_AI_SHIP_EVADE_REACH, STAND_GROUND_SLACK as UNIT_AI_STAND_GROUND_SLACK,
-    STILL as UNIT_AI_STILL,
-};
+use crate::math::image::unit_ai::STILL as UNIT_AI_STILL;
 use crate::movement::{PathFlags, WaypointIndex};
 use crate::objects::ObjectState;
 use crate::pathing::tile_path::Path;

@@ -23,7 +23,7 @@ use crate::map::TerrainMask;
 use crate::map::Tile;
 use crate::map::{RestrictionId, Snow};
 use crate::math::conversions::cvttss2si;
-use crate::math::image::terrain::{INSIDE as TERRAIN_INSIDE, TILE as TERRAIN_TILE};
+use crate::math::image::terrain::TILE as TERRAIN_TILE;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::RestrictionField;
@@ -31,6 +31,7 @@ use crate::world::Mode680;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::TerrainTuning;
 use crate::world::slots::CheckedIndex;
 use std::mem::swap;
 
@@ -481,13 +482,19 @@ impl Terrain {
     /// # Panics
     ///
     /// Never: the tiles it covers are held on the map.
-    pub fn cover(&mut self, f: &Foundation, roles: &Roles) -> Result<(), GenieError> {
-        /// `DAT_142eb1e9c`.
-        const INSIDE: f32 = TERRAIN_INSIDE;
+    pub fn cover(
+        &mut self,
+        f: &Foundation,
+        roles: &Roles,
+        terrain_tuning: TerrainTuning,
+    ) -> Result<(), GenieError> {
         let (x, y) = (f.position.x(), f.position.y());
         let (cx, cy) = (f.clearance.x(), f.clearance.y());
         let (mut x0, mut y0) = ((x - cx) as i32, (y - cy) as i32);
-        let (mut x1, mut y1) = (((x + cx) - INSIDE) as i32, ((y + cy) - INSIDE) as i32);
+        let (mut x1, mut y1) = (
+            ((x + cx) - terrain_tuning.inside) as i32,
+            ((y + cy) - terrain_tuning.inside) as i32,
+        );
         if x1 < x0 {
             swap(&mut x0, &mut x1);
         }
@@ -573,6 +580,7 @@ mod tests {
     use crate::testing::ids;
     use crate::testing::ids::TOWN_CENTRE;
     use crate::testing::roles;
+    use crate::testing::tuning;
 
     /// Terrains of ids `k`.
     fn ids(k: &[u8]) -> Vec<TerrainId> {
@@ -801,6 +809,7 @@ mod tests {
                 mode_680: Mode680::ZERO,
             },
             &roles(),
+            tuning().terrain,
         )
         .unwrap();
         assert_eq!(t.kinds, ids(&[6, 6, 6, 6]));
@@ -834,6 +843,7 @@ mod tests {
                 mode_680: Mode680::ZERO,
             },
             &roles(),
+            tuning().terrain,
         )
         .unwrap();
         #[rustfmt::skip]
@@ -863,6 +873,7 @@ mod tests {
                 mode_680: Mode680::ZERO,
             },
             &roles(),
+            tuning().terrain,
         )
         .unwrap();
         assert_eq!(t.kinds, ids(&[27, 2, 27, 47]));
@@ -884,7 +895,7 @@ mod tests {
             terrain_bonus: RestrictionField::NONE,
             mode_680: Mode680::ONE,
         };
-        t.cover(&farm, &roles()).unwrap();
+        t.cover(&farm, &roles(), tuning().terrain).unwrap();
         assert_eq!(
             (t.kinds.clone(), t.layers.clone()),
             (ids(&[29, 29, 29, 47]), vec![None; 4])
@@ -895,6 +906,7 @@ mod tests {
                 ..farm
             },
             &roles(),
+            tuning().terrain,
         )
         .unwrap();
         assert_eq!(t.kinds, ids(&[30, 30, 30, 47]));
@@ -917,14 +929,15 @@ mod tests {
         };
         for master in [master_id(357), master_id(1188)] {
             let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-            t.cover(&site(master), &roles()).unwrap();
+            t.cover(&site(master), &roles(), tuning().terrain).unwrap();
             assert_eq!(
                 (t.kinds.clone(), t.layers.clone()),
                 (ids(&[14, 14, 14, 47]), vec![None; 4])
             );
         }
         let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-        t.cover(&site(ids::HOUSE), &roles()).unwrap();
+        t.cover(&site(ids::HOUSE), &roles(), tuning().terrain)
+            .unwrap();
         assert_eq!(t.kinds, ids(&[0, 3, 29, 47]));
         assert_eq!(t.layers, layers_of(&[14, 14, 14, -1]));
     }

@@ -31,6 +31,7 @@ use crate::production::spawn::{
 };
 use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::World;
@@ -54,11 +55,12 @@ impl World {
         let site_master = building.master(self.master_tables(), p)?;
         let position = building.position();
         let mut walls = [false; 4];
-        for (wall, tiles) in
-            walls
-                .iter_mut()
-                .zip(corner_tiles(position, site_master.radius, made.radius))
-        {
+        for (wall, tiles) in walls.iter_mut().zip(corner_tiles(
+            position,
+            site_master.radius,
+            made.radius,
+            &self.model.tuning.spawn,
+        )) {
             for t in &tiles {
                 let (fx, fy) = (t.x() as f32, t.y() as f32);
                 self.spatial
@@ -99,12 +101,24 @@ impl World {
         };
         let map = WorldMap { turns: self };
         let spatial = &self.spatial;
-        spawn_point(&site, made.radius, &mut |spot| {
-            let (x, y) = (spot.x(), spot.y());
-            let (rx, ry) = (made.radius.x(), made.radius.y());
-            spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
-            placement(&placing, &map, spot, false, &self.model.roles)
-        })
+        spawn_point(
+            &site,
+            made.radius,
+            &mut |spot| {
+                let (x, y) = (spot.x(), spot.y());
+                let (rx, ry) = (made.radius.x(), made.radius.y());
+                spatial.check_known(Rect::new(x - rx, y - ry, x + rx, y + ry))?;
+                placement(
+                    &placing,
+                    &map,
+                    spot,
+                    false,
+                    &self.model.roles,
+                    &self.model.tuning.spawn,
+                )
+            },
+            &self.model.tuning.spawn,
+        )
     }
 
     /// `FUN_1411a4e90`: the remains a dying sprite's end leaves for player `p`: the master's slot
@@ -183,7 +197,10 @@ impl World {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
         }
         Ok(())
@@ -227,7 +244,11 @@ impl World {
             .and_then(|s| self.model.graphics.get(s).copied());
         let mut sprite = None;
         if let Some(g) = standing {
-            sprite = Some(ActiveSprite::start(g, self.streams.get(Stream::Sprite)));
+            sprite = Some(ActiveSprite::start(
+                g,
+                self.streams.get(Stream::Sprite),
+                self.model.tuning.sprite,
+            ));
             if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
                 let _ = self.streams.get(Stream::Object).rand15();
             }
@@ -338,7 +359,15 @@ impl World {
             motion: Motion::of(
                 (MasterKind::ANIMATED <= made.kind).then(Animated::default),
                 moving.map(|stats| {
-                    Mover::new_object(stats, standing.as_ref(), at, self.world_time, angle, facets)
+                    Mover::new_object(
+                        stats,
+                        standing.as_ref(),
+                        at,
+                        self.world_time,
+                        angle,
+                        facets,
+                        &self.model.tuning.spawn,
+                    )
                 }),
             ),
             ..Default::default()

@@ -33,8 +33,8 @@ use crate::objects::release::Releaser;
 use crate::objects::sprite::ActiveSprite;
 use crate::objects::unit::Unit;
 use crate::players::tracker::key;
-use crate::production::spawn::START_RIGHT_Z;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::visibility::{Seer, capture_kind};
 use crate::world::Seconds;
@@ -94,7 +94,8 @@ impl Unit {
             .standing_sprite
             .and_then(|s| c.w.model.graphics.get(s).copied());
         if let Some(g) = standing {
-            let _ = ActiveSprite::start(g, c.w.streams.get(Stream::Sprite));
+            let _ =
+                ActiveSprite::start(g, c.w.streams.get(Stream::Sprite), c.w.model.tuning.sprite);
             if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
                 let _ = c.w.streams.get(Stream::Object).rand15();
             }
@@ -111,7 +112,7 @@ impl Unit {
         let mut mover = Mover {
             animated: Animated::default(),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, START_RIGHT_Z),
+            right: BVector::new(0.0, 0.0, c.w.model.tuning.spawn.start_right_z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
@@ -185,7 +186,10 @@ impl Unit {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning: c.w.model.tuning.visibility,
+                },
             )?;
         }
         let held = static_storage(c.w.players.player_mut(c.player)?, &made.storage)?;

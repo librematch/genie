@@ -6,7 +6,6 @@
 use crate::GenieError;
 use crate::groups::Motion;
 use crate::groups::MotionFlags;
-use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::math::Angle;
@@ -37,12 +36,7 @@ use self::walk::{SHORT_IGNORED, steer};
 use crate::groups::{GroupFlags, WorldObject};
 #[cfg(test)]
 use crate::map::spatial::Spatial;
-use crate::math::image::group::{
-    CLOSE as GROUP_CLOSE, EPSILON as GROUP_EPSILON, NEAR as GROUP_NEAR,
-    PULL_DISTANCE as GROUP_PULL_DISTANCE, PULL_KEEP as GROUP_PULL_KEEP,
-    PULL_SHARE as GROUP_PULL_SHARE, SHORT_LENGTH as GROUP_SHORT_LENGTH,
-    SHORT_REACH as GROUP_SHORT_REACH,
-};
+use crate::math::image::group::EPSILON as GROUP_EPSILON;
 use crate::movement::PlanTries;
 #[cfg(test)]
 use crate::movement::{PathData, Planning};
@@ -50,21 +44,6 @@ use crate::world::layer::MasterRoles;
 
 /// A move or a turn below this counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = GROUP_EPSILON;
-/// How near a point the walk counts as there (`DAT_142eb5690`).
-const NEAR: f32 = GROUP_NEAR;
-/// A waypoint or a target nearer than this takes the straight way when nothing stands on it
-/// (`DAT_14330eb8c`).
-const CLOSE: f32 = GROUP_CLOSE;
-/// A path shorter than this is no path (`DAT_142eb99cc`).
-const SHORT_LENGTH: Distance = Distance::new(GROUP_SHORT_LENGTH);
-/// The short pather serves a waypoint this near (`DAT_142eb0f4c`).
-const SHORT_REACH: f32 = GROUP_SHORT_REACH;
-/// The members' centre pulls the group when it is this far (squared, `DAT_142eb0f48`) ...
-const PULL_DISTANCE: f32 = GROUP_PULL_DISTANCE;
-/// ... by this share (`DAT_142eae8d0`), the group keeping this much of its place
-/// (`DAT_142ecb878`).
-const PULL_SHARE: f32 = GROUP_PULL_SHARE;
-const PULL_KEEP: f32 = GROUP_PULL_KEEP;
 /// The passes of one step (`0x14 < local_7e0` ends it).
 const PASSES: u32 = 20;
 /// A level with fewer plans left than this gives up rather than wait (`FUN_140f95bf0 < 3`).

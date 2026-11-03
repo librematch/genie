@@ -2,7 +2,7 @@
 
 use crate::GenieError;
 use crate::construction::build::BuildState;
-use crate::construction::build::{BuildAction, BuildReads, DROP_REACH, DROP_WAIT, DROPPED_ORDERS};
+use crate::construction::build::{BuildAction, BuildReads, DROP_WAIT, DROPPED_ORDERS};
 use crate::gathering::DropSiteId;
 use crate::gathering::hunt::resource_kind;
 use crate::map::Distance;
@@ -109,6 +109,7 @@ impl BuildAction {
             ),
             (at, builder.life.attribute_type, own.class),
             look,
+            &c.w.model.tuning.order,
         );
         let Some(id) = found else {
             return Ok(DropSearch::Nothing);
@@ -226,7 +227,13 @@ impl BuildAction {
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         let given = sprite.or(self.task.moving);
         self.state = BuildState::Drop {
-            move_to: move_reads.to_object(to, range, given, TargetMoved::AsksAgain)?,
+            move_to: move_reads.to_object(
+                to,
+                range,
+                given,
+                TargetMoved::AsksAgain,
+                &c.w.model.tuning.move_to,
+            )?,
         };
         Ok(())
     }
@@ -237,7 +244,7 @@ impl BuildAction {
     /// ([`BuildAction::step_walk`]): its target let go (code 5), a failed walk (codes 3 and 4)
     /// and a drop site gone or not in state 2 search again. At its end (codes 1 and 2; the
     /// `MoveTo` stays in the list until the next `set_state`) a drop site that does not take the
-    /// load (`FUN_140fdd190`) halts the Build (`set_state(2)`); one beyond [`DROP_REACH`]
+    /// load (`FUN_140fdd190`) halts the Build (`set_state(2)`); one beyond `BuildTuning::drop_reach`
     /// (`FUN_14118f8c0`) makes it wait 3 seconds with the unit's animation stopped
     /// (`FUN_141161850`). Else the load goes to the player (slot 0xf8 with 1 and 1, the resource
     /// of what it carries, `FUN_140fdd4f0`, [`BuildAction::drop_load`]; its sound, slot 0x4c0,
@@ -282,7 +289,7 @@ impl BuildAction {
             self.halt_in(c, builder, reads)?;
             return Ok(HeadCode::Keeps);
         }
-        if DROP_REACH < drop.gap_squared.get() {
+        if c.w.model.tuning.build.drop_reach < drop.gap_squared.get() {
             self.timer = DROP_WAIT;
             c.w.parts.set_anim_speed(builder.id, Speed::ZERO);
             return Ok(HeadCode::Keeps);

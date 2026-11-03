@@ -6,7 +6,7 @@ use crate::combat::attack::face_target;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::{
-    GatherAction, GatherReads, Next, SEARCH_WAIT, StopRate, WAIT_GAP, WAIT_WORKERS, waits_for_farm,
+    GatherAction, GatherReads, Next, SEARCH_WAIT, StopRate, waits_for_farm,
 };
 use crate::gathering::hunt::asked_drop_off;
 use crate::gathering::hunt::walk_sprite;
@@ -211,7 +211,7 @@ impl GatherAction {
         if self.stops.several() {
             let rng = c.w.streams.get(Stream::Action);
             let to = self.walk_to(target, Distance::ZERO);
-            self.set_walk(to, target.radius, mover, rng, &walks)?;
+            self.set_walk(to, target.radius, mover, rng, &walks, &c.w.model.tuning)?;
         } else {
             let radius = if c
                 .w
@@ -224,7 +224,12 @@ impl GatherAction {
             } else {
                 target.radius.x()
             };
-            self.set_walk_back(Distance::new(radius), mover, &walks)?;
+            self.set_walk_back(
+                Distance::new(radius),
+                mover,
+                &walks,
+                &c.w.model.tuning.move_to,
+            )?;
         }
         Ok(Next::Stay)
     }
@@ -301,7 +306,7 @@ impl GatherAction {
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 let rng = c.w.streams.get(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
-                self.set_walk(to, target.radius, mover, rng, &walks)?;
+                self.set_walk(to, target.radius, mover, rng, &walks, &c.w.model.tuning)?;
                 return Ok(Next::Stay);
             }
         }
@@ -336,7 +341,9 @@ impl GatherAction {
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
                 let gap = footprint_gap_squared(at, me, target.position, target.radius);
-                if target.workers.as_f32() <= WAIT_WORKERS || WAIT_GAP <= gap.get() {
+                if target.workers.as_f32() <= c.w.model.tuning.gather.wait_workers
+                    || c.w.model.tuning.gather.wait_gap <= gap.get()
+                {
                     self.random_wait(c, unit);
                     return Ok(Next::Stay);
                 }
@@ -348,7 +355,7 @@ impl GatherAction {
                 self.target = None;
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                self.set_walk_back(Distance::ZERO, mover, &walks)?;
+                self.set_walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to)?;
                 Ok(Next::Stay)
             }
             code => Err(QUIET_CODE.with("code", code)),

@@ -13,9 +13,6 @@ use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
-use crate::math::image::unit_ai::{
-    PATROL_TURN_REACH as UNIT_AI_PATROL_TURN_REACH, SINGLE_VOLLEY as UNIT_AI_SINGLE_VOLLEY,
-};
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
@@ -35,6 +32,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::UnitAiTuning;
 use genie_diff::Diff;
 use std::collections::HashSet;
 
@@ -259,6 +257,8 @@ pub struct Surroundings {
     pub roles: Roles,
     /// The build's slots: the classes and masters the unit AI's code names.
     pub slots: Slots,
+    /// The build's tuning values of the unit AI (FD-046-D49).
+    pub unit_ai_tuning: UnitAiTuning,
 }
 
 /// The target of a unit's top action as its unit AI reads it ([`Surroundings::top_target`]).
@@ -397,14 +397,6 @@ pub struct Seen {
     /// 0xf seen, 0x80 explored, else 0.
     pub sight: TileSight,
 }
-
-/// A patrol's path goes back and forth when its point is at least this far from the unit
-/// (`0x140aa2a70`, `DAT_142eb1c98`).
-pub(super) const PATROL_TURN_REACH: f32 = UNIT_AI_PATROL_TURN_REACH;
-
-/// A building on its make action without a missile and with at most this firepower forgets its
-/// target (`DAT_14330eb8c`).
-pub(super) const SINGLE_VOLLEY: Firepower = Firepower::new(UNIT_AI_SINGLE_VOLLEY);
 
 /// A move the unit AI gives its unit (unit-AI slot 0x130, `FUN_140c55620`, to the unit's slot
 /// 0x340): a `MoveTo` to `point` within `range`.

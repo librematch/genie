@@ -49,6 +49,7 @@ use crate::test_ids::object_id;
 use crate::testing::class::NO_CLASS;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::others::OthersRef;
@@ -105,7 +106,11 @@ fn the_movement_state_takes_the_sprite_facets() {
     let mut mover = walker();
     u.take_sprite_facets(Some(&mut mover));
     assert_eq!(mover.sprite_facets, None);
-    u.sprite = Some(ActiveSprite::start(WALKING, &mut Well512::default()));
+    u.sprite = Some(ActiveSprite::start(
+        WALKING,
+        &mut Well512::default(),
+        tuning().sprite,
+    ));
     u.take_sprite_facets(Some(&mut mover));
     assert_eq!(
         mover.sprite_facets,
@@ -123,7 +128,11 @@ fn an_animated_object_sprite_runs_by_the_update_dt() {
     let animated = |speed: Option<f32>| {
         let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
-        u.sprite = Some(ActiveSprite::start(WALKING, &mut Well512::default()));
+        u.sprite = Some(ActiveSprite::start(
+            WALKING,
+            &mut Well512::default(),
+            tuning().sprite,
+        ));
         // a static object has no animation speed, so no clock
         let (id, before) = (u.id, u.sprite);
         let motion =
@@ -587,7 +596,12 @@ fn every_kind_of_top_action_shows_its_sub_action() {
     let mut attack = own_attack(7, AttackState::Move { move_to: None }, Distance::new(0.5));
     *attack.state.walk_mut().unwrap() = Some(MoveToAction::sub_in(MoveTo::Moving));
     assert_eq!(of(Action::Attack(attack)), walking);
-    let (mut explore, _) = ExploreAction::new(Position::new(1.0, 2.0, 0.0), &bare_walk()).unwrap();
+    let (mut explore, _) = ExploreAction::new(
+        Position::new(1.0, 2.0, 0.0),
+        &bare_walk(),
+        &tuning().move_to,
+    )
+    .unwrap();
     if let Some(m) = explore.state.move_to_mut() {
         m.state = MoveTo::Moving;
     }

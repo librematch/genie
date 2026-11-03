@@ -270,7 +270,10 @@ impl World {
             ),
             &self.model.roles,
         );
-        Ok((with, BuildAction::start(to, task, &move_reads)?))
+        Ok((
+            with,
+            BuildAction::start(to, task, &move_reads, &self.model.tuning.move_to)?,
+        ))
     }
 
     /// The queue path of a builder at `idx` of player `q` (slot 0x30 into slot 0x28): its
@@ -496,6 +499,7 @@ impl World {
                 builder.work_rate + self.parts.combat_of(unit.id).work_rate_powerup,
             ),
             &move_reads,
+            &self.model.tuning.move_to,
         )?;
         if let Some(m) = switch.map(|m| m.id) {
             self.change_master(player, idx, m)?;

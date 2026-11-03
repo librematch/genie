@@ -29,6 +29,7 @@ use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 
 impl Attack {
     /// `set_state(6)` (case 6): with a target or a point (`+0x38` not −1, `UCOMISS`: a NaN one
@@ -45,12 +46,13 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
     ) -> Result<(), GenieError> {
+        let sprite_tuning = g.by_id.tuning().sprite;
         self.enter(AttackState::Ready, g.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
             }
-            return self.finish(unit, g.motion.reborrow(), g.sprite_rng);
+            return self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
         }
         match self.ready_to_attack(unit, g, f, r, false)? {
             Readiness::Ready => self.set_swing(unit, g, f, r),
@@ -70,10 +72,18 @@ impl Attack {
         f: &Fight,
         gap: Distance,
     ) -> Result<(), GenieError> {
+        let move_to_tuning = &g.by_id.tuning().move_to;
+        let sprite_tuning = g.by_id.tuning().sprite;
         self.enter(AttackState::Move { move_to: None }, g.motion.reborrow())?;
         let reads = move_reads((unit, g.motion.mover()), r, g.graphics)?;
-        if self.moving(f.own.source.weapon_range, f.victim.position, gap, &reads)? {
-            self.arrived_sprite(unit, g.motion.reborrow(), g.sprite_rng)?;
+        if self.moving(
+            f.own.source.weapon_range,
+            f.victim.position,
+            gap,
+            &reads,
+            move_to_tuning,
+        )? {
+            self.arrived_sprite(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
         }
         Ok(())
     }
@@ -106,16 +116,18 @@ impl Attack {
         r: &AttackReads,
         skip_ready: bool,
     ) -> Result<Readiness, GenieError> {
+        let move_to_tuning = &g.by_id.tuning().move_to;
+        let sprite_tuning = g.by_id.tuning().sprite;
         let roles = g.by_id.roles();
         let attack_tuning = &g.by_id.tuning().attack;
         let (target, t) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
         if target_unseen(g.map, f, &t)? {
             if r.stance == UnitStance::AGGRESSIVE && Speed::ZERO < speed && r.can_move {
-                self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics)?;
+                self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics, move_to_tuning)?;
                 return Ok(Readiness::Waiting);
             }
-            return self.fail(unit, g.motion.reborrow(), g.sprite_rng);
+            return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
         }
         let at = unit.place.position();
         let ground = g
@@ -146,7 +158,7 @@ impl Attack {
             if speed != Speed::ZERO && r.can_move {
                 return Ok(Readiness::Waiting);
             }
-            return self.fail(unit, g.motion.reborrow(), g.sprite_rng);
+            return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
         }
         // a gate's reach is to the nearest of it and its first two parts (slot 0x680, MINSS)
         let gap = gate_gap(
@@ -167,7 +179,7 @@ impl Attack {
                 || speed == Speed::ZERO
                 || !r.can_move
             {
-                return self.fail(unit, g.motion.reborrow(), g.sprite_rng);
+                return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
             }
             return Ok(Readiness::Away(gap));
         }
@@ -216,8 +228,9 @@ impl Attack {
         unit: &mut Unit,
         motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<Readiness, GenieError> {
-        self.finish_in(AttackState::Failed, unit, motion, sprite_rng)?;
+        self.finish_in(AttackState::Failed, unit, motion, sprite_rng, sprite_tuning)?;
         Ok(Readiness::Waiting)
     }
 

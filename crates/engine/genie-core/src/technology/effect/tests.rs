@@ -69,7 +69,9 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
@@ -909,7 +911,10 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             radius,
             SightShape::Circle,
             SightCentre::Tile,
-            &roles(),
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
         );
         t.spatial.sight = Some(v);
         t.spatial.insert(
@@ -940,7 +945,10 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
             Footprint::new(0.5, 0.5),
             SightShape::Circle,
             SightCentre::Tile,
-            &roles(),
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
         )
         .unwrap();
         let _ = v.sight_on_los(
@@ -951,6 +959,7 @@ fn static_object_line_of_sight_and_second_storage_take_the_change() {
                 SightTiles::new(los),
             ),
             &roles(),
+            tuning().visibility,
         );
         sight(&t)
     };
@@ -1009,7 +1018,11 @@ fn master_new_speed_reaches_its_units_top_speed_by_their_sprites() {
     };
     let walker = || Motion::Moving(tests_walker());
     let mut shows = moving(1);
-    shows.sprite = Some(ActiveSprite::start(fast, &mut Well512::default()));
+    shows.sprite = Some(ActiveSprite::start(
+        fast,
+        &mut Well512::default(),
+        tuning().sprite,
+    ));
     let player = Player {
         objects: vec![shows, moving(2)].into(),
         ..Player::default()
@@ -2169,16 +2182,24 @@ fn standing_sprite_change_shows_on_the_master_idle_units() {
     let mut rng = Well512::default();
     let mut shown = |id, variant| {
         let mut u = unit_of(id, master_id(4), HitPoints::new(30.0));
-        u.sprite = Some(ActiveSprite::start(graphic(SpriteId::named(300)), &mut rng));
+        u.sprite = Some(ActiveSprite::start(
+            graphic(SpriteId::named(300)),
+            &mut rng,
+            tuning().sprite,
+        ));
         u.idle_variant = variant;
         u
     };
     let exploring = shown(3, 0);
     let mut layer = Action::default();
     layer.list.set_explore(Some(
-        ExploreAction::new(Position::new(5.0, 5.0, 0.0), &bare_walk())
-            .unwrap()
-            .0,
+        ExploreAction::new(
+            Position::new(5.0, 5.0, 0.0),
+            &bare_walk(),
+            &tuning().move_to,
+        )
+        .unwrap()
+        .0,
     ));
     let player = Player {
         objects: vec![shown(1, 0), shown(2, 1), exploring].into(),

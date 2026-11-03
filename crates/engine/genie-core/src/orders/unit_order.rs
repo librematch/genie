@@ -87,7 +87,13 @@ impl World {
         let to = WalkTo { at, ..to };
         let unit = self.players.live_mut(player, idx)?;
         let (targets, gone) = match self.parts.actions_mut(unit.id)?.list.artifact_mut() {
-            Some(a) => a.take_object(to, (to_building, to_town_centre), &reads)?,
+            Some(a) => a.take_object(
+                to,
+                (to_building, to_town_centre),
+                &reads,
+                self.model.tuning.artifact,
+                &self.model.tuning.move_to,
+            )?,
             None => Default::default(),
         };
         if let Some(t) = targets.released {

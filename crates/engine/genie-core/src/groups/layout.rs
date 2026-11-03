@@ -14,31 +14,16 @@ use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{self, BVector};
-use crate::math::image::group::{
-    BOX_HALF as GROUP_BOX_HALF, BOX_SIDE_SHARE as GROUP_BOX_SIDE_SHARE,
-    BOX_SIDES as GROUP_BOX_SIDES, EPSILON, HORDE_REACH as GROUP_HORDE_REACH, SPACING_FACTOR,
-    USER_DEFINED_BACK as GROUP_USER_DEFINED_BACK,
-};
+use crate::math::image::group::{BOX_HALF as GROUP_BOX_HALF, EPSILON};
 use crate::objects::ObjectId;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
-/// A horde's and a user defined formation's slots lie at most this far from the group's place
-/// (`DAT_14330ebb8`).
-const HORDE_REACH: f32 = GROUP_HORDE_REACH;
-/// A user defined formation's slots move back by the farthest one ahead plus this
-/// (`DAT_142e7f384`).
-const USER_DEFINED_BACK: f32 = GROUP_USER_DEFINED_BACK;
 /// Half: a phalanx's even line's step, a box's first side and its middles (`DAT_142e7f384`, and
 /// the phalanx's `DAT_142e8c150` as a divisor).
 const BOX_HALF: f32 = GROUP_BOX_HALF;
-/// A phalanx's even line moves back by its step over this (`DAT_142e8c150`).
-const TWO: f32 = SPACING_FACTOR;
-/// A box's perimeter is its side times this (`DAT_142eb0f48`).
-const BOX_SIDES: f32 = GROUP_BOX_SIDES;
-/// A box too small for its units grows to this share of their length (`DAT_142eb880c`).
-const BOX_SIDE_SHARE: f32 = GROUP_BOX_SIDE_SHARE;
 /// Two slots whose offsets on x differ by less than this share a box's line (`DAT_142eb0c60`).
 const LINE_EPSILON: f32 = EPSILON;
 /// The places of the box's positions buffer (`DAT_143f15f00`, `FUN_14102ab30`'s `0x3c`).
@@ -71,14 +56,15 @@ fn length(v: BVector) -> f32 {
 /// positions (transformed, `+0x44`), the world's time, state and depth 0, filled, active, its
 /// sub-formation and no sub-category; the slots in use are the members (an unheld member's slot
 /// keeps what it had, inactive). A user defined formation's offsets on x move back by the
-/// largest of them (0 at least) plus [`USER_DEFINED_BACK`]; then any offset longer than
-/// [`HORDE_REACH`] is scaled down to it.
+/// largest of them (0 at least) plus `GroupTuning::user_defined_back`; then any offset longer than
+/// `GroupTuning::horde_reach` is scaled down to it.
 pub(crate) fn slots_by_place(
     formation: &mut Formation,
     group: &UnitGroup,
     members: &[Option<MemberPlace>],
     user_defined: bool,
     world_time: WorldTime,
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     let n = group.members.len();
     if n == 0 {
@@ -127,15 +113,15 @@ pub(crate) fn slots_by_place(
             // MAXSS at 0x141015208: a NaN offset keeps the farthest so far
             ahead = fmath::maxss(s.offset.x(), ahead);
         }
-        let back = ahead + USER_DEFINED_BACK;
+        let back = ahead + group_tuning.user_defined_back;
         for s in &mut formation.slots {
             s.offset = s.offset.with_x(s.offset.x() - back);
         }
     }
     for s in &mut formation.slots {
         let l = length(s.offset);
-        if HORDE_REACH < l {
-            let k = HORDE_REACH / l;
+        if group_tuning.horde_reach < l {
+            let k = group_tuning.horde_reach / l;
             s.offset = BVector::new(k * s.offset.x(), k * s.offset.height(), k * s.offset.y());
         }
     }
@@ -209,6 +195,7 @@ pub(crate) fn phalanx_slots(
     formation: &mut Formation,
     group: &UnitGroup,
     world_time: WorldTime,
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     let n = group.members.len() as i32;
     if n < 1 {
@@ -247,7 +234,11 @@ pub(crate) fn phalanx_slots(
         let _ = reset_line(l, width, line);
         let mut at = fmath::add(fmath::scale((width / 2) as f32, single), BVector::ZERO);
         if width & 1 == 0 {
-            let half = [single.x() / TWO, single.height() / TWO, single.y() / TWO];
+            let half = [
+                single.x() / group_tuning.spacing_factor,
+                single.height() / group_tuning.spacing_factor,
+                single.y() / group_tuning.spacing_factor,
+            ];
             at = BVector::new(at.x() - half[0], at.height() - half[1], at.y() - half[2]);
         }
         for k in 0..width.max(0) as usize {
@@ -294,18 +285,19 @@ pub fn place_box_perimeter(
     min: &mut BVector,
     max: &mut BVector,
     spacing: Distance,
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     if !(1..=BOX_POSITIONS).contains(&count) {
         return Ok(false);
     }
     let side = max.x() - min.x();
-    let total = side * BOX_SIDES;
+    let total = side * group_tuning.box_sides;
     let n = count as f32;
     let units = n * spacing.get();
     let mut step = total / n;
     if total < units {
         step = units / n;
-        let grow = (units * BOX_SIDE_SHARE - side) * BOX_HALF;
+        let grow = (units * group_tuning.box_side_share - side) * BOX_HALF;
         *min = min.with_x(min.x() - grow).with_y(min.y() - grow);
         *max = max.with_x(max.x() + grow).with_y(max.y() + grow);
     }
@@ -471,6 +463,7 @@ pub(crate) fn box_slots(
     formation: &mut Formation,
     group: &UnitGroup,
     world_time: WorldTime,
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     if group.members.is_empty() {
         return Ok(false);
@@ -518,8 +511,14 @@ pub(crate) fn box_slots(
                 )
             };
             // the game ignores its result: false only for a count refused above
-            let _ =
-                place_box_perimeter(count, &mut positions, &mut min, &mut max, Distance::new(s));
+            let _ = place_box_perimeter(
+                count,
+                &mut positions,
+                &mut min,
+                &mut max,
+                Distance::new(s),
+                group_tuning,
+            );
             (min_x, min_z, max_x, max_z) = (min.x(), min.y(), max.x(), max.y());
         }
         for (j, &p) in positions.iter().enumerate().take(count) {
@@ -569,7 +568,14 @@ impl World {
         g: &UnitGroup,
     ) -> Result<bool, GenieError> {
         let members = self.member_places(g)?;
-        slots_by_place(formation, g, &members, false, self.world_time)
+        slots_by_place(
+            formation,
+            g,
+            &members,
+            false,
+            self.world_time,
+            &self.model.tuning.group,
+        )
     }
 
     /// `createUDF` (`FUN_141014f60`) of `formation` for group `g`, as [`Self::create_horde`]
@@ -584,7 +590,14 @@ impl World {
         g: &UnitGroup,
     ) -> Result<bool, GenieError> {
         let members = self.member_places(g)?;
-        slots_by_place(formation, g, &members, true, self.world_time)
+        slots_by_place(
+            formation,
+            g,
+            &members,
+            true,
+            self.world_time,
+            &self.model.tuning.group,
+        )
     }
 
     /// What `createHorde` and `createUDF` read of each member (`FUN_1415417a0`, slot 0x520,
@@ -619,7 +632,12 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
     ) -> Result<bool, GenieError> {
-        if !phalanx_slots(formation, self.groups.held(group)?, self.world_time)? {
+        if !phalanx_slots(
+            formation,
+            self.groups.held(group)?,
+            self.world_time,
+            &self.model.tuning.group,
+        )? {
             return Ok(false);
         }
         self.lay_units(formation, group, false)?;
@@ -638,7 +656,12 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
     ) -> Result<bool, GenieError> {
-        if !box_slots(formation, self.groups.held(group)?, self.world_time)? {
+        if !box_slots(
+            formation,
+            self.groups.held(group)?,
+            self.world_time,
+            &self.model.tuning.group,
+        )? {
             return Ok(false);
         }
         self.lay_units(formation, group, false)?;
@@ -655,6 +678,7 @@ mod tests {
     use crate::test_ids::group_id;
     use crate::test_ids::object_id;
     use crate::test_ids::object_id_list;
+    use crate::testing::tuning;
 
     fn group(members: usize, spacing: f32, stats: &[(i32, usize)]) -> UnitGroup {
         let mut g = UnitGroup::new(group_id(1));
@@ -696,7 +720,17 @@ mod tests {
             None,
             Some(place(9, 20.0, 10.0, 3)),
         ];
-        assert!(slots_by_place(&mut f, &g, &members, false, WorldTime::from_millis(640)).unwrap());
+        assert!(
+            slots_by_place(
+                &mut f,
+                &g,
+                &members,
+                false,
+                WorldTime::from_millis(640),
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!(
             (
                 f.kind,
@@ -733,7 +767,17 @@ mod tests {
         assert_eq!(f.slots[2].offset, BVector::new(5.0, 0.0, 0.0));
         // no members, no layout
         let mut f = Formation::new();
-        assert!(!slots_by_place(&mut f, &group(0, 1.0, &[]), &[], false, WorldTime::ZERO).unwrap());
+        assert!(
+            !slots_by_place(
+                &mut f,
+                &group(0, 1.0, &[]),
+                &[],
+                false,
+                WorldTime::ZERO,
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!(f, Formation::new());
     }
 
@@ -748,7 +792,17 @@ mod tests {
             None,
             Some(place(9, 20.0, 10.0, 3)),
         ];
-        assert!(slots_by_place(&mut f, &g, &members, true, WorldTime::from_millis(640)).unwrap());
+        assert!(
+            slots_by_place(
+                &mut f,
+                &g,
+                &members,
+                true,
+                WorldTime::from_millis(640),
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!(
             (f.kind, f.transform_type),
             (FormationKind::USER_DEFINED, TransformType::TURNED)
@@ -775,7 +829,17 @@ mod tests {
             Some(place(9, 20.0, 10.0, 3)),
             Some(place(7, f32::NAN, 10.0, 1)),
         ];
-        assert!(slots_by_place(&mut f, &g, &members, true, WorldTime::from_millis(640)).unwrap());
+        assert!(
+            slots_by_place(
+                &mut f,
+                &g,
+                &members,
+                true,
+                WorldTime::from_millis(640),
+                &tuning().group
+            )
+            .unwrap()
+        );
         // the farthest ahead stays finite, so the finite member's offset moves back by it
         assert!(f.slots[0].offset.x().is_finite(), "{:?}", f.slots[0].offset);
     }
@@ -793,7 +857,8 @@ mod tests {
                 &mut out,
                 &mut min,
                 &mut max,
-                Distance::new(f32::INFINITY)
+                Distance::new(f32::INFINITY),
+                &tuning().group
             )
             .unwrap()
         );
@@ -885,7 +950,7 @@ mod tests {
         let mut whole = start.clone();
         assert!(t.create_phalanx(&mut whole, group_id(1)).unwrap());
         let mut parts = start.clone();
-        assert!(phalanx_slots(&mut parts, &g, t.world_time).unwrap());
+        assert!(phalanx_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap());
         t.lay_units(&mut parts, group_id(1), false).unwrap();
         assert_eq!(whole, parts);
         let mut ids: Vec<Option<ObjectId>> = whole.slots.iter().map(|s| s.unit_id).collect();
@@ -907,7 +972,7 @@ mod tests {
         let mut whole = start.clone();
         assert!(t.create_box(&mut whole, group_id(1)).unwrap());
         let mut parts = start;
-        assert!(box_slots(&mut parts, &g, t.world_time).unwrap());
+        assert!(box_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap());
         t.lay_units(&mut parts, group_id(1), false).unwrap();
         assert_eq!(whole, parts);
         assert!(whole.slots.iter().all(|s| s.unit_id.is_some()));
@@ -976,7 +1041,15 @@ mod tests {
     #[test]
     fn box_of_nan_spacing_is_i32_min_wide() {
         let mut f = Formation::new();
-        assert!(box_slots(&mut f, &group(2, f32::NAN, &[(1, 2)]), WorldTime::ZERO).unwrap());
+        assert!(
+            box_slots(
+                &mut f,
+                &group(2, f32::NAN, &[(1, 2)]),
+                WorldTime::ZERO,
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!((f.maximum_width, f.maximum_depth), (i32::MIN, i32::MIN));
     }
 
@@ -984,7 +1057,7 @@ mod tests {
     fn phalanx_grows_by_slot_line() {
         let g = group(4, 2.0, &[(3, 1), (1, 3)]);
         let mut f = Formation::new();
-        assert!(phalanx_slots(&mut f, &g, WorldTime::from_millis(99)).unwrap());
+        assert!(phalanx_slots(&mut f, &g, WorldTime::from_millis(99), &tuning().group).unwrap());
         assert_eq!(
             (
                 f.kind,
@@ -1022,7 +1095,15 @@ mod tests {
         );
         // without statistics the slots take no category
         let mut f = Formation::new();
-        assert!(phalanx_slots(&mut f, &group(2, 2.0, &[]), WorldTime::ZERO).unwrap());
+        assert!(
+            phalanx_slots(
+                &mut f,
+                &group(2, 2.0, &[]),
+                WorldTime::ZERO,
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert!(
             f.slots
                 .iter()
@@ -1038,7 +1119,17 @@ mod tests {
     fn the_box_perimeter_places_its_units_as_the_game_walks_it() {
         let mut out = [BVector::ZERO; BOX_POSITIONS];
         let (mut min, mut max) = (BVector::new(-1.0, 0.0, -1.0), BVector::new(1.0, 0.0, 1.0));
-        assert!(place_box_perimeter(3, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap());
+        assert!(
+            place_box_perimeter(
+                3,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(1.0),
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!(
             out[..3],
             [
@@ -1047,7 +1138,17 @@ mod tests {
                 BVector::new(-1.0, 0.0, 0.0)
             ]
         );
-        assert!(place_box_perimeter(2, &mut out, &mut min, &mut max, Distance::new(10.0)).unwrap());
+        assert!(
+            place_box_perimeter(
+                2,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(10.0),
+                &tuning().group
+            )
+            .unwrap()
+        );
         assert_eq!(
             (min, max),
             (BVector::new(-2.5, 0.0, -2.5), BVector::new(2.5, 0.0, 2.5))
@@ -1057,7 +1158,17 @@ mod tests {
             [BVector::new(2.5, 0.0, 0.0), BVector::new(-2.5, 0.0, 0.0)]
         );
         let (mut min, mut max) = (BVector::new(-2.0, 0.0, -1.0), BVector::new(2.0, 0.0, 1.0));
-        assert!(place_box_perimeter(16, &mut out, &mut min, &mut max, Distance::new(0.5)).unwrap());
+        assert!(
+            place_box_perimeter(
+                16,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(0.5),
+                &tuning().group
+            )
+            .unwrap()
+        );
         let walked: Vec<(f32, f32)> = out[..16].iter().map(|p| (p.x(), p.y())).collect();
         assert_eq!(
             walked,
@@ -1112,15 +1223,41 @@ mod tests {
             let n = places.len();
             let (mut min, mut max) = (BVector::new(lo, 0.0, lo), BVector::new(hi, 0.0, hi));
             assert!(
-                place_box_perimeter(n, &mut out, &mut min, &mut max, Distance::new(0.1)).unwrap()
+                place_box_perimeter(
+                    n,
+                    &mut out,
+                    &mut min,
+                    &mut max,
+                    Distance::new(0.1),
+                    &tuning().group
+                )
+                .unwrap()
             );
             let got: Vec<(f32, f32)> = out[..n].iter().map(|p| (p.x(), p.y())).collect();
             assert_eq!(got, places, "{n}");
         }
         // none, or more than the buffer holds, writes nothing
-        assert!(!place_box_perimeter(0, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap());
         assert!(
-            !place_box_perimeter(61, &mut out, &mut min, &mut max, Distance::new(1.0)).unwrap()
+            !place_box_perimeter(
+                0,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(1.0),
+                &tuning().group
+            )
+            .unwrap()
+        );
+        assert!(
+            !place_box_perimeter(
+                61,
+                &mut out,
+                &mut min,
+                &mut max,
+                Distance::new(1.0),
+                &tuning().group
+            )
+            .unwrap()
         );
     }
 
@@ -1164,7 +1301,7 @@ mod tests {
     fn box_rings_its_categories_from_the_middle_out() {
         let g = group(4, 2.0, &[(1, 3), (5, 1)]);
         let mut f = Formation::new();
-        assert!(box_slots(&mut f, &g, WorldTime::from_millis(5)).unwrap());
+        assert!(box_slots(&mut f, &g, WorldTime::from_millis(5), &tuning().group).unwrap());
         assert_eq!(
             (f.kind, f.transform_type, f.maximum_width, f.maximum_depth),
             (FormationKind::BOX, TransformType::TURNED, 4, 4)
@@ -1188,6 +1325,14 @@ mod tests {
         assert_eq!(f.number_lines, 3);
         // more than the buffer holds of one category
         let g = group(61, 2.0, &[(1, 61)]);
-        assert!(box_slots(&mut Formation::new(), &g, WorldTime::from_millis(5)).is_err());
+        assert!(
+            box_slots(
+                &mut Formation::new(),
+                &g,
+                WorldTime::from_millis(5),
+                &tuning().group
+            )
+            .is_err()
+        );
     }
 }

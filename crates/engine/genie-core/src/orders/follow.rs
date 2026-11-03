@@ -30,10 +30,11 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
-use crate::orders::{Followed, GUARD_RANGE, follow_axis, follow_spread, ignore_unit};
+use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_TYPE;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{OrderPriority, OrderTargetType, QueuedOrder};
@@ -94,7 +95,7 @@ impl World {
                     points.push(at);
                 }
             }
-            if let Some(mean) = follow_spread(&points) {
+            if let Some(mean) = follow_spread(&points, &self.model.tuning.order) {
                 for i in 0..loose.len() {
                     self.follow_offset(&loose, i, followed, mean)?;
                 }
@@ -114,7 +115,7 @@ impl World {
     /// order (`0x2bd`) on `target` at once (slot 0x30 -> slot 0x28 with Immediate set and inFront
     /// clear, [`crate::unit_ai::UnitAi::take_order_now_with`], run outside the unit's update by
     /// [`World::run_unit_ai`]): issued by the unit's owner, on the target with its master as the
-    /// target type and its owner, at the target's place, within [`GUARD_RANGE`], priority 100,
+    /// target type and its owner, at the target's place, within `OrderTuning::guard_range`, priority 100,
     /// ready (slot 0x30's last argument, 1); slot 0x30 shows the order at its x and y.
     pub(crate) fn guard(
         &mut self,
@@ -134,7 +135,7 @@ impl World {
             target: Some(target),
             target_owner: Some(tp),
             point: Position::new(x, y, z),
-            range: Distance::new(GUARD_RANGE),
+            range: Distance::new(self.model.tuning.order.guard_range),
             shown: Point::new(x, y),
             ready: true,
             target_type: Some(OrderTargetType::of_master(tm.id)),
@@ -291,8 +292,16 @@ impl World {
         let (p, idx) = self.follower_start(loose, i)?;
         let map = self.spatial.map;
         let at = Position::new(
-            follow_axis(x - mean.x() + followed.place.x(), map.width()),
-            follow_axis(y - mean.y() + followed.place.y(), map.height()),
+            follow_axis(
+                x - mean.x() + followed.place.x(),
+                map.width(),
+                &self.model.tuning.group,
+            ),
+            follow_axis(
+                y - mean.y() + followed.place.y(),
+                map.height(),
+                &self.model.tuning.group,
+            ),
             0.0,
         );
         match followed.class {
@@ -373,8 +382,14 @@ impl World {
         if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
             let (roles, slots) = (self.model.roles.clone(), self.model.slots);
+            let unit_ai_tuning = self.model.tuning.unit_ai;
             self.run_ai_calls((player, idx), |ai, side, rng| {
-                ai.clear_notifies_at(world_time.since_start(), place, side, rng, &roles, slots)
+                let layer = AiLayer {
+                    roles: &roles,
+                    slots,
+                    unit_ai_tuning: &unit_ai_tuning,
+                };
+                ai.clear_notifies_at(world_time.since_start(), place, side, rng, layer)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
@@ -430,7 +445,7 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let range = object_range(Distance::ZERO, Some(master));
+        let range = object_range(Distance::ZERO, Some(master), &self.model.tuning.order);
         let sprite = object_sprite(master).and_then(|id| self.model.graphics.get(id).copied());
         let unit = self.players.live_mut(player, idx)?;
         let here = unit.position();
@@ -447,7 +462,7 @@ impl World {
             (target, target_state),
             range,
             (sprite, livestock),
-            &self.model.roles,
+            &self.model,
         )?;
         if move_to.shows_standing() {
             unit.shows_standing_sprite(
@@ -455,6 +470,7 @@ impl World {
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                 &self.model.graphics,
                 self.streams.get(Stream::Sprite),
+                self.model.tuning.sprite,
             )?;
         }
         self.parts
@@ -538,6 +554,8 @@ impl World {
                 graphics: &self.model.graphics,
                 look: self.parts.combat.of(id).abilities.look.as_ref(),
                 roles: &self.model.roles,
+                sprite_tuning: self.model.tuning.sprite,
+                move_to_tuning: &self.model.tuning.move_to,
             },
         )? {
             PointMove::Declined => return Ok(false),

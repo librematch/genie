@@ -4,10 +4,8 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::pathing::tile_path::PlanTile;
-use crate::pathing::tile_path::{
-    CellEdges, CellIndex, CellKind, EARLY_LEFT, EARLY_START, GridLevel, NO_COST, Planner,
-    SHORTCUT_COST,
-};
+use crate::pathing::tile_path::{CellEdges, CellIndex, CellKind, GridLevel, NO_COST, Planner};
+use crate::world::layer::generated::TilePathTuning;
 use crate::{math::fmath, math::msvc};
 use std::ops::{Index, IndexMut};
 use std::slice::Iter;
@@ -329,6 +327,7 @@ impl Planner {
         g: Distance,
         parent: NodeIndex,
         dir: CellEdges,
+        tile_path_tuning: &TilePathTuning,
     ) -> Option<NodeIndex> {
         let i = self.index(GridLevel::TILES, at);
         let b0 = self.cells[i].edges;
@@ -336,7 +335,7 @@ impl Planner {
             return None;
         }
         let (g0, entry, shortcut) = match self.measured_from(parent, dir) {
-            (gp, entry, true) => (gp * SHORTCUT_COST, entry, true),
+            (gp, entry, true) => (gp * tile_path_tuning.shortcut_cost, entry, true),
             _ => (g, self.nodes[parent].entry, false),
         };
         let dx = i32::from(entry.x()) - i32::from(at.x());
@@ -390,6 +389,7 @@ impl Planner {
         cell: PlanTile,
         start: PlanTile,
         full: bool,
+        tile_path_tuning: &TilePathTuning,
     ) -> Result<Option<NodeIndex>, GenieError> {
         let start_cell = self.cell(level, cell);
         if !start_cell.kind.contains(CellKind::LONE) && start_cell.edges.is_empty() {
@@ -423,8 +423,8 @@ impl Planner {
             let node = self.nodes[n];
             let h = node.f - node.g;
             if !full
-                && h <= EARLY_LEFT
-                && h0 <= EARLY_START
+                && h <= Distance::new(tile_path_tuning.early_left)
+                && h0 <= Distance::new(tile_path_tuning.early_start)
                 && (h0.get() as i32 * 10) as u32 <= count
             {
                 self.best = Some(n);
@@ -450,6 +450,7 @@ impl Planner {
     pub(super) fn search_tiles(
         &mut self,
         start: PlanTile,
+        tile_path_tuning: &TilePathTuning,
     ) -> Result<Option<NodeIndex>, GenieError> {
         if self.cell(GridLevel::TILES, start).edges.is_empty() {
             return Ok(None);
@@ -481,7 +482,8 @@ impl Planner {
             let node = self.nodes[n];
             for (edge, dx, dy, back) in STEPS {
                 if b.intersects(edge)
-                    && let Some(found) = self.expand0(node.at.stepped(dx, dy), node.g, n, back)
+                    && let Some(found) =
+                        self.expand0(node.at.stepped(dx, dy), node.g, n, back, tile_path_tuning)
                 {
                     return Ok(Some(found));
                 }

@@ -12,98 +12,38 @@ pub mod abilities {
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
 }
 
-/// The values the `artifact` port reads.
-pub mod artifact {
-    /// 0.20000000298023224
-    pub const TOWN_CENTRE_OFFSET: f32 = f32::from_bits(0x3e4c_cccd);
-}
-
 /// The values the `attack` port reads.
 pub mod attack {
-    /// 0.009999999776482582
-    pub const ARRIVED: f32 = f32::from_bits(0x3c23_d70a);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 5.0
-    pub const LEASH_SLACK: f32 = f32::from_bits(0x40a0_0000);
     /// -1.0
     pub const NONE: f32 = f32::from_bits(0xbf80_0000);
-    /// 1000.0
-    pub const RELOAD_MS: f32 = f32::from_bits(0x447a_0000);
-    /// 1.0
-    pub const SEEN_RANGE: f32 = f32::from_bits(0x3f80_0000);
-    /// -0.5
-    pub const SHORT_RANGE_GAP: f32 = f32::from_bits(0xbf00_0000);
-    /// 0.010000000707805157
-    pub const TOUCH: f32 = f32::from_bits(0x3c23_d70b);
 }
 
 /// The values the `best_target` port reads.
 pub mod best_target {
-    /// 75.0
-    pub const DISTANCE_SCORE: f32 = f32::from_bits(0x4296_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 5.0
-    pub const FIVE: f32 = f32::from_bits(0x40a0_0000);
     /// 3.4028234663852886e+38
     pub const NEVER: f32 = f32::from_bits(0x7f7f_ffff);
     /// 1.0
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
-    /// 60000.0
-    pub const ORDER_WINDOW: f32 = f32::from_bits(0x476a_6000);
     /// 0.009999999776482582
     pub const PER_CENT: f32 = f32::from_bits(0x3c23_d70a);
-    /// 10.0
-    pub const SCORE: f32 = f32::from_bits(0x4120_0000);
     /// 100.0
     pub const SIGHT_PER_CENT: f32 = f32::from_bits(0x42c8_0000);
-    /// 10000.0
-    pub const TIER: f32 = f32::from_bits(0x461c_4000);
 }
 
 /// The values the `build` port reads.
 pub mod build {
-    /// 0.009999999776482582
-    pub const ARRIVED: f32 = f32::from_bits(0x3c23_d70a);
-    /// 4.0
-    pub const CLEARING_REACH: f32 = f32::from_bits(0x4080_0000);
-    /// 1.0
-    pub const DROP_REACH: f32 = f32::from_bits(0x3f80_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 0.33000001311302185
-    pub const EXTRA_BUILDER: f32 = f32::from_bits(0x3ea8_f5c3);
-    /// 0.10000000149011612
-    pub const REACH: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 10000.0
-    pub const STACK_WORK: f32 = f32::from_bits(0x461c_4000);
-    /// 1.0
-    pub const STUMP_HP: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.2000000476837158
-    pub const WONDER_RATE: f32 = f32::from_bits(0x3f99_999a);
 }
 
 /// The values the `damage` port reads.
 pub mod damage {
-    /// 0.9900000095367432
-    pub const BLAST_RANGE: f32 = f32::from_bits(0x3f7d_70a4);
-    /// 0.5
-    pub const CONE: f32 = f32::from_bits(0x3f00_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 1.2000000476837158
-    pub const FACING: f32 = f32::from_bits(0x3f99_999a);
-    /// 1.25
-    pub const HIGHER: f32 = f32::from_bits(0x3fa0_0000);
-    /// 0.10000000149011612
-    pub const LEAST_CLASS_HIT: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.75
-    pub const LOWER: f32 = f32::from_bits(0x3f40_0000);
-    /// -0.5
-    pub const MINUS_CONE: f32 = f32::from_bits(0xbf00_0000);
-    /// -1.2000000476837158
-    pub const MINUS_FACING: f32 = f32::from_bits(0xbf99_999a);
     /// -3.1415927410125732
     pub const MINUS_PI: f32 = f32::from_bits(0xc049_0fdb);
     /// -6.2831854820251465
@@ -112,20 +52,8 @@ pub mod damage {
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
     /// 3.1415927410125732
     pub const PI: f32 = f32::from_bits(0x4049_0fdb);
-    /// 1.100000023841858
-    pub const RELIC_BOOST: f32 = f32::from_bits(0x3f8c_cccd);
-    /// 0.20000000298023224
-    pub const RETALIATION_RANGE: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 4.0
-    pub const RETALIATION_SCALE: f32 = f32::from_bits(0x4080_0000);
-    /// 0.6600000262260437
-    pub const SPECIAL: f32 = f32::from_bits(0x3f28_f5c3);
-    /// 1.2000000476837158
-    pub const SPECIFIC_RELIC_BOOST: f32 = f32::from_bits(0x3f99_999a);
     /// 6.2831854820251465
     pub const TWO_PI: f32 = f32::from_bits(0x40c9_0fdb);
-    /// 1.6699999570846558
-    pub const WIDE_CONE: f32 = f32::from_bits(0x3fd5_c28f);
 }
 
 /// The values the `diplomacy` port reads.
@@ -152,8 +80,6 @@ pub mod effect {
 
 /// The values the `explore` port reads.
 pub mod explore {
-    /// 1.0
-    pub const LOS_MARGIN: f32 = f32::from_bits(0x3f80_0000);
     /// -1.0
     pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
 }
@@ -200,8 +126,6 @@ pub mod fly {
     pub const DEGREE: f32 = f32::from_bits(0x3c8e_fa35);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 9.0
-    pub const HEIGHT: f32 = f32::from_bits(0x4110_0000);
 }
 
 /// The values the `game_status` port reads.
@@ -220,142 +144,48 @@ pub mod garrison {
         0x1_0103, 0x1_0103, 0x403, 0x0, 0x0, 0x1_0103, 0x3, 0x1, 0x3, 0x1, 0x3, 0x1_0103, 0x403,
         0x102, 0x102, 0x0, 0x2, 0x0, 0x0,
     ];
-    /// 0.20000000298023224
-    pub const ENTER_HP_SHARE: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 1.0
-    pub const ENTER_NEAR: f32 = f32::from_bits(0x3f80_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
     /// 3.4028234663852886e+38
     pub const FAR: f32 = f32::from_bits(0x7f7f_ffff);
     /// 0.5
     pub const HALF_TILE: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.2
-    pub const LEAST_HP_SHARE: f64 = f64::from_bits(0x3fc9_9999_9999_999a);
-    /// 100.0
-    pub const NEARBY: f32 = f32::from_bits(0x42c8_0000);
     /// -1.0
     pub const NO_POINT: f32 = f32::from_bits(0xbf80_0000);
     /// 1.0
     pub const ONE_MISSILE: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.0
-    pub const RATE_RANGE: f32 = f32::from_bits(0x3f80_0000);
-    /// 625.0
-    pub const TOWN_BELL_REACH: f32 = f32::from_bits(0x441c_4000);
-    /// 1.0
-    pub const UNLOAD_RANGE: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `gather` port reads.
 pub mod gather {
-    /// 1.0
-    pub const DEFAULT_PRODUCTIVITY: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.0
-    pub const DROP_REACH: f32 = f32::from_bits(0x3f80_0000);
     /// 0.0010000000474974513
     pub const LAST_BIT: f32 = f32::from_bits(0x3a83_126f);
     /// -1.0
     pub const NO_GATHER_POINT: f32 = f32::from_bits(0xbf80_0000);
     /// 0.10000000149011612
     pub const REMAINDER: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.5
-    pub const STOP_CENTRE: f32 = f32::from_bits(0x3f00_0000);
-    /// 16.0
-    pub const WAIT_GAP: f32 = f32::from_bits(0x4180_0000);
-    /// 0.5
-    pub const WAIT_SHIFT: f32 = f32::from_bits(0x3f00_0000);
-    /// 3.0
-    pub const WAIT_WORKERS: f32 = f32::from_bits(0x4040_0000);
 }
 
 /// The values the `gather_search` port reads.
 pub mod gather_search {
-    /// 1.399999976158142
-    pub const DIAGONAL: f32 = f32::from_bits(0x3fb3_3333);
-    /// 20.0
-    pub const REACH_CAP: f32 = f32::from_bits(0x41a0_0000);
-    /// 4.0
-    pub const REACH_FLOOR: f32 = f32::from_bits(0x4080_0000);
     /// 0.6100000143051147
     pub const ROUNDING: f32 = f32::from_bits(0x3f1c_28f6);
-    /// 0.75
-    pub const SITE_SHARE: f32 = f32::from_bits(0x3f40_0000);
     /// 0.5
     pub const TILE_CENTRE: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.25
-    pub const UNIT_SHARE: f32 = f32::from_bits(0x3e80_0000);
 }
 
 /// The values the `group` port reads.
 pub mod group {
-    /// 0.10000000149011612
-    pub const ASIDE_TIMER: f32 = f32::from_bits(0x3dcc_cccd);
     /// 0.5
     pub const BOX_HALF: f32 = f32::from_bits(0x3f00_0000);
-    /// 4.0
-    pub const BOX_SIDES: f32 = f32::from_bits(0x4080_0000);
-    /// 0.25
-    pub const BOX_SIDE_SHARE: f32 = f32::from_bits(0x3e80_0000);
-    /// 1.2000000476837158
-    pub const CATCH_UP: f32 = f32::from_bits(0x3f99_999a);
-    /// 3.0
-    pub const CATCH_UP_SPAN: f32 = f32::from_bits(0x4040_0000);
-    /// -2.0
-    pub const CHASING_SLACK: f32 = f32::from_bits(0xc000_0000);
-    /// 0.5
-    pub const CLEARANCE: f32 = f32::from_bits(0x3f00_0000);
-    /// 1.0
-    pub const CLOSE: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.25
-    pub const CONTACT_SLACK: f32 = f32::from_bits(0x3e80_0000);
-    /// 1.0
-    pub const DEFAULT_FORWARD: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.5
-    pub const DEFAULT_RADIUS: f32 = f32::from_bits(0x3f00_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 20.0
-    pub const FAR: f32 = f32::from_bits(0x41a0_0000);
     /// 3.4028234663852886e+38
     pub const FARTHEST: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 40.0
-    pub const FAR_WIDE: f32 = f32::from_bits(0x4220_0000);
-    /// 2.5
-    pub const FLANK_SPACING: f32 = f32::from_bits(0x4020_0000);
-    /// 0.5
-    pub const FRONT_SHARE: f32 = f32::from_bits(0x3f00_0000);
-    /// 5.0
-    pub const HORDE_REACH: f32 = f32::from_bits(0x40a0_0000);
-    /// 0.5
-    pub const LINKED_RADIUS: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.10000000149011612
-    pub const MAP_EDGE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 1.0
-    pub const MEMBER_MIN_HP: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.10000000149011612
-    pub const NEAR: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 10000.0
-    pub const PASS_FAR: f32 = f32::from_bits(0x461c_4000);
     /// 0.5
     pub const PASS_HALF: f32 = f32::from_bits(0x3f00_0000);
-    /// 25.0
-    pub const PASS_HALF_MARGIN: f32 = f32::from_bits(0x41c8_0000);
-    /// 50.0
-    pub const PASS_MARGIN: f32 = f32::from_bits(0x4248_0000);
     /// 1.0
     pub const PASS_ONE: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.20000000298023224
-    pub const PASS_SHARE: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 5.0
-    pub const PATROL_LEG_REACH: f32 = f32::from_bits(0x40a0_0000);
-    /// 4.0
-    pub const PULL_DISTANCE: f32 = f32::from_bits(0x4080_0000);
-    /// 0.800000011920929
-    pub const PULL_KEEP: f32 = f32::from_bits(0x3f4c_cccd);
-    /// 0.20000000298023224
-    pub const PULL_SHARE: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 2.0
-    pub const RANGED_SLACK: f32 = f32::from_bits(0x4000_0000);
     /// 1.5707963705062866
     pub const RIGHT_ANGLE: f32 = f32::from_bits(0x3fc9_0fdb);
     /// 1.0099999904632568
@@ -368,30 +198,6 @@ pub mod group {
     pub const ROUND_STILL: f32 = f32::from_bits(0x3400_0000);
     /// 3.0
     pub const ROUND_TIMER: f32 = f32::from_bits(0x4040_0000);
-    /// 0.009999999776482582
-    pub const SHORT_LENGTH: f32 = f32::from_bits(0x3c23_d70a);
-    /// 10.0
-    pub const SHORT_REACH: f32 = f32::from_bits(0x4120_0000);
-    /// 0.0, 0.25, -0.25, 0.0
-    pub const SLOT_NUDGE_X: [f32; 4] = [
-        f32::from_bits(0x0),
-        f32::from_bits(0x3e80_0000),
-        f32::from_bits(0xbe80_0000),
-        f32::from_bits(0x0),
-    ];
-    /// 0.0, 0.0, 0.0, 0.25
-    pub const SLOT_NUDGE_Z: [f32; 4] = [
-        f32::from_bits(0x0),
-        f32::from_bits(0x0),
-        f32::from_bits(0x0),
-        f32::from_bits(0x3e80_0000),
-    ];
-    /// 5.0
-    pub const SLOT_REACH: f32 = f32::from_bits(0x40a0_0000);
-    /// 1.2000000476837158
-    pub const SLOW_GROUP_FACTOR: f32 = f32::from_bits(0x3f99_999a);
-    /// 2.0
-    pub const SPACING_FACTOR: f32 = f32::from_bits(0x4000_0000);
     /// 0.0, 1.0, 1.0, 0.0
     pub const SPIRAL_FIRST: [[f32; 2]; 2] = [
         [f32::from_bits(0x0), f32::from_bits(0x3f80_0000)],
@@ -402,24 +208,6 @@ pub mod group {
         [f32::from_bits(0x0), f32::from_bits(0xbf80_0000)],
         [f32::from_bits(0xbf80_0000), f32::from_bits(0x0)],
     ];
-    /// 0.05000000074505806
-    pub const SQUARE_MAX: f32 = f32::from_bits(0x3d4c_cccd);
-    /// -0.05000000074505806
-    pub const SQUARE_MIN: f32 = f32::from_bits(0xbd4c_cccd);
-    /// 4.0
-    pub const STAGGER_SHARE: f32 = f32::from_bits(0x4080_0000);
-    /// 0.5
-    pub const USER_DEFINED_BACK: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.5
-    pub const WIDE_RADIUS: f32 = f32::from_bits(0x3f00_0000);
-}
-
-/// The values the `history` port reads.
-pub mod history {
-    /// 0.15
-    pub const BATTLE_RECORD: f64 = f64::from_bits(0x3fc3_3333_3333_3333);
-    /// 0.12
-    pub const BATTLE_START: f64 = f64::from_bits(0x3fbe_b851_eb85_1eb8);
 }
 
 /// The values the `hull_path` port reads.
@@ -443,14 +231,8 @@ pub mod hull_path {
         [f32::from_bits(0xbf6c_835e), f32::from_bits(0x3ec3_ef15)],
         [f32::from_bits(0xbec3_ef15), f32::from_bits(0x3f6c_835e)],
     ];
-    /// 0.25
-    pub const ENTRANCE_STEP: f32 = f32::from_bits(0x3e80_0000);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 0.0625
-    pub const EXIT_STEP: f32 = f32::from_bits(0x3d80_0000);
-    /// 99999997952.0
-    pub const FAR: f32 = f32::from_bits(0x51ba_43b7);
     /// 4.0
     pub const FULL_TURN: f32 = f32::from_bits(0x4080_0000);
     /// 0.5
@@ -463,8 +245,6 @@ pub mod hull_path {
     pub const LOW_T: f32 = f32::from_bits(0xb3d6_bf95);
     /// 3.4028234663852886e+38
     pub const MOST: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 4.0
-    pub const NEAR_TARGET: f32 = f32::from_bits(0x4080_0000);
     /// -1.0
     pub const NO_ANGLE: f32 = f32::from_bits(0xbf80_0000);
     /// 9.999999747378752e-05
@@ -473,8 +253,6 @@ pub mod hull_path {
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
     /// 90.0
     pub const QUADRANT: f32 = f32::from_bits(0x42b4_0000);
-    /// 0.009999999776482582
-    pub const SAME_END: f32 = f32::from_bits(0x3c23_d70a);
     /// 0.0, -1.0, 0.0, 1.0, -1.0, 0.0, 1.0, 0.0
     pub const SIDES: [[f32; 2]; 4] = [
         [f32::from_bits(0x0), f32::from_bits(0xbf80_0000)],
@@ -492,30 +270,16 @@ pub mod hull_path {
 
 /// The values the `hunt` port reads.
 pub mod hunt {
-    /// 1.0
-    pub const DROP_REACH: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.10000000149011612
-    pub const GAP: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 9.0
-    pub const HERD_REACH: f32 = f32::from_bits(0x4110_0000);
     /// 0.0010000000474974513
     pub const LAST_BIT: f32 = f32::from_bits(0x3a83_126f);
-    /// 1.5
-    pub const OWN_LIVESTOCK_RANGE: f32 = f32::from_bits(0x3fc0_0000);
     /// 0.10000000149011612
     pub const REMAINDER: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 5.0
-    pub const TREE_NEAR: f32 = f32::from_bits(0x40a0_0000);
 }
 
 /// The values the `long_path` port reads.
 pub mod long_path {
-    /// 0.009999999776482582
-    pub const EDGE_GAP: f32 = f32::from_bits(0x3c23_d70a);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 1.0
-    pub const REACHED: f32 = f32::from_bits(0x3f80_0000);
     /// 0.5
     pub const TILE_CENTRE: f32 = f32::from_bits(0x3f00_0000);
 }
@@ -524,192 +288,58 @@ pub mod long_path {
 pub mod market {
     /// -1.0
     pub const FLIP: f32 = f32::from_bits(0xbf80_0000);
-    /// 1.149999976158142
-    pub const FOOD_START: f32 = f32::from_bits(0x3f93_3333);
-    /// 21.0
-    pub const LEAST_COST: f32 = f32::from_bits(0x41a8_0000);
-    /// 1.0
-    pub const ORE_START: f32 = f32::from_bits(0x3f80_0000);
     /// 100.0
     pub const PERCENT: f32 = f32::from_bits(0x42c8_0000);
     /// 0.5
     pub const ROUND: f32 = f32::from_bits(0x3f00_0000);
-    /// 1.2999999523162842
-    pub const STONE_START: f32 = f32::from_bits(0x3fa6_6666);
-    /// 2.0
-    pub const SWING: f32 = f32::from_bits(0x4000_0000);
     /// -1.0
     pub const UNKNOWN_PRICE: f32 = f32::from_bits(0xbf80_0000);
-    /// 1.0
-    pub const WOOD_START: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `masters` port reads.
 pub mod masters {
-    /// 1.0
-    pub const HANDICAP_FLOOR: f32 = f32::from_bits(0x3f80_0000);
-    /// 20.0
-    pub const MISSILE_SPEED_CAP: f32 = f32::from_bits(0x41a0_0000);
     /// 100.0
     pub const PERCENT: f32 = f32::from_bits(0x42c8_0000);
     /// 0.5
     pub const ROUND: f32 = f32::from_bits(0x3f00_0000);
     /// 32767.0
     pub const SHORT_CAP: f32 = f32::from_bits(0x46ff_fe00);
-    /// 4.5
-    pub const SPEED_CAP: f32 = f32::from_bits(0x4090_0000);
 }
 
 /// The values the `missile` port reads.
 pub mod missile {
-    /// -2.0
-    pub const BEYOND: f32 = f32::from_bits(0xc000_0000);
     /// 32767.0
     pub const DRAW_SCALE: f32 = f32::from_bits(0x46ff_fe00);
     /// 0.5
     pub const HALF: f32 = f32::from_bits(0x3f00_0000);
-    /// 3.0
-    pub const HEIGHT_SHARE: f32 = f32::from_bits(0x4040_0000);
-    /// 0.10000000149011612
-    pub const LANDING: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.10000000149011612
-    pub const QUERY_EDGE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 2.0
-    pub const REACH_MARGIN: f32 = f32::from_bits(0x4000_0000);
     /// 1.0000000116860974e-07
     pub const VOLLEY_EPSILON: f32 = f32::from_bits(0x33d6_bf95);
     /// 0.5
     pub const VOLLEY_HALF: f32 = f32::from_bits(0x3f00_0000);
-    /// 6.0
-    pub const VOLLEY_REACH_MARGIN: f32 = f32::from_bits(0x40c0_0000);
     /// 32767.0
     pub const VOLLEY_SCALE: f32 = f32::from_bits(0x46ff_fe00);
 }
 
-/// The values the `move_to` port reads.
-pub mod move_to {
-    /// 0.009999999776482582
-    pub const ARRIVED: f32 = f32::from_bits(0x3c23_d70a);
-    /// 0.5
-    pub const OFF_HIGH: f32 = f32::from_bits(0x3f00_0000);
-    /// -0.5
-    pub const OFF_LOW: f32 = f32::from_bits(0xbf00_0000);
-}
-
 /// The values the `movement` port reads.
 pub mod movement {
-    /// 0.10000000149011612
-    pub const ALLY_PAUSE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 1.0
-    pub const CLOSE: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.009999999776482582
-    pub const EDGE_GAP: f32 = f32::from_bits(0x3c23_d70a);
-    /// 0.0010000000474974513
-    pub const EDGE_POSITION_GAP: f32 = f32::from_bits(0x3a83_126f);
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
     /// 3.4028234663852886e+38
     pub const FAR: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 100.0
-    pub const FAST_TURN: f32 = f32::from_bits(0x42c8_0000);
-    /// 0.6000000238418579
-    pub const LONG_PATH_GROW: f32 = f32::from_bits(0x3f19_999a);
-    /// 100.0
-    pub const LOOK_AHEAD: f32 = f32::from_bits(0x42c8_0000);
-    /// 0.5
-    pub const NEW_PATHER_RADIUS: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.5
-    pub const OTHER_PAUSE: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.25
-    pub const PUSHED: f32 = f32::from_bits(0x3e80_0000);
-    /// 0.10000000149011612
-    pub const RANGE_FLOOR: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 1.0
-    pub const REACH_NEAR: f32 = f32::from_bits(0x3f80_0000);
-    /// 10.0
-    pub const REACH_SHORT: f32 = f32::from_bits(0x4120_0000);
-    /// 0.009999999776482582
-    pub const SHORTEST: f32 = f32::from_bits(0x3c23_d70a);
-    /// 16.0
-    pub const SHORT_REACH: f32 = f32::from_bits(0x4180_0000);
-    /// 25.0
-    pub const SPLIT: f32 = f32::from_bits(0x41c8_0000);
-    /// 0.5
-    pub const STRAIGHT_GROW: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.10000000149011612
-    pub const STUCK_PAUSE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 10.0
-    pub const TARGET_SHORT_REACH: f32 = f32::from_bits(0x4120_0000);
     /// 6.2831854820251465
     pub const TWO_PI: f32 = f32::from_bits(0x40c9_0fdb);
-    /// 10.0
-    pub const UNCAPPED_SPEED: f32 = f32::from_bits(0x4120_0000);
-    /// 0.5
-    pub const USER_WAYPOINT_MIDDLE: f32 = f32::from_bits(0x3f00_0000);
-    /// 3.0
-    pub const WIDE_RANGE: f32 = f32::from_bits(0x4040_0000);
 }
 
 /// The values the `order` port reads.
 pub mod order {
-    /// 10000.0
-    pub const BOX_START: f32 = f32::from_bits(0x461c_4000);
-    /// 0.75
-    pub const CART_MOVE_RANGE: f32 = f32::from_bits(0x3f40_0000);
     /// 100.0
     pub const DAMAGE_WHOLE: f32 = f32::from_bits(0x42c8_0000);
-    /// 1.0
-    pub const EDGE: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.5
-    pub const GRID_AREA: f32 = f32::from_bits(0x3fc0_0000);
-    /// 0.5
-    pub const GRID_STEP: f32 = f32::from_bits(0x3f00_0000);
-    /// 2.5
-    pub const GUARD_RANGE: f32 = f32::from_bits(0x4020_0000);
-    /// 20.0
-    pub const SPLIT_PATH_REACH: f32 = f32::from_bits(0x41a0_0000);
-    /// 0.20000000298023224
-    pub const SPLIT_SPEED_GAP: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 8.0
-    pub const SPREAD: f32 = f32::from_bits(0x4100_0000);
-    /// 1000000.0
-    pub const TABLE_DROP_FAR: f32 = f32::from_bits(0x4974_2400);
-    /// 1.0
-    pub const WAYPOINT_APART: f32 = f32::from_bits(0x3f80_0000);
-    /// -1.0
-    pub const WAYPOINT_APART_LOW: f32 = f32::from_bits(0xbf80_0000);
-}
-
-/// The values the `pasture` port reads.
-pub mod pasture {
-    /// 1.0
-    pub const END: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.5
-    pub const INSET: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.30000001192092896
-    pub const STEP: f32 = f32::from_bits(0x3e99_999a);
-}
-
-/// The values the `registry` port reads.
-pub mod registry {
-    /// 7.0
-    pub const MARGIN: f32 = f32::from_bits(0x40e0_0000);
-    /// 44.0
-    pub const MOST_RADIUS: f32 = f32::from_bits(0x4230_0000);
 }
 
 /// The values the `repair` port reads.
 pub mod repair {
-    /// 0.5
-    pub const EXTRA_REPAIRER: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.5
-    pub const LEAST_HP: f32 = f32::from_bits(0x3f00_0000);
-    /// 2.0
-    pub const MOVING_REACH: f32 = f32::from_bits(0x4000_0000);
     /// 1.0
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.10000000149011612
-    pub const REACH: f32 = f32::from_bits(0x3dcc_cccd);
 }
 
 /// The values the `rng` port reads.
@@ -730,240 +360,78 @@ pub mod short_path {
 
 /// The values the `spatial` port reads.
 pub mod spatial {
-    /// 0.10000000149011612
-    pub const CLOSEST_RANGE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.0010000000474974513
-    pub const FOOTPRINT_EDGE: f32 = f32::from_bits(0x3a83_126f);
     /// 3.4028234663852886e+38
     pub const NO_SPOT: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 25.0
-    pub const SEARCH_REUSE_SQUARED: f32 = f32::from_bits(0x41c8_0000);
     /// 0.5
     pub const TILE_CENTRE: f32 = f32::from_bits(0x3f00_0000);
 }
 
 /// The values the `spawn` port reads.
 pub mod spawn {
-    /// 8.0
-    pub const BUILD_SCAN: f32 = f32::from_bits(0x4100_0000);
-    /// 0.10000000149011612
-    pub const GAP: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.0010000000474974513
-    pub const INSIDE: f32 = f32::from_bits(0x3a83_126f);
     /// -1.0
     pub const NONE: f32 = f32::from_bits(0xbf80_0000);
-    /// 0.05000000074505806
-    pub const PASSABLE: f32 = f32::from_bits(0x3d4c_cccd);
-    /// 8.0
-    pub const REACH: f32 = f32::from_bits(0x4100_0000);
-    /// 0.25
-    pub const SIDE_SHARE: f32 = f32::from_bits(0x3e80_0000);
-    /// 0.44999998807907104
-    pub const SMALL: f32 = f32::from_bits(0x3ee6_6666);
-    /// -1.0
-    pub const START_RIGHT_Z: f32 = f32::from_bits(0xbf80_0000);
 }
 
 /// The values the `sprite` port reads.
 pub mod sprite {
     /// 1.0000000116860974e-07
     pub const EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 0.0010000000474974513
-    pub const SHORTEST: f32 = f32::from_bits(0x3a83_126f);
 }
 
 /// The values the `terrain` port reads.
 pub mod terrain {
-    /// 0.0010000000474974513
-    pub const INSIDE: f32 = f32::from_bits(0x3a83_126f);
     /// 1.0
     pub const TILE: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `tile_path` port reads.
 pub mod tile_path {
-    /// 5.0
-    pub const EARLY_LEFT: f32 = f32::from_bits(0x40a0_0000);
-    /// 10.0
-    pub const EARLY_START: f32 = f32::from_bits(0x4120_0000);
-    /// 0.10000000149011612
-    pub const FAR_SIDE: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.009999999776482582
-    pub const GOAL_GAP: f32 = f32::from_bits(0x3c23_d70a);
     /// 1.0
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.100000023841858
-    pub const SHORTCUT_COST: f32 = f32::from_bits(0x3f8c_cccd);
-    /// 100.0
-    pub const SHORTCUT_REACH: f32 = f32::from_bits(0x42c8_0000);
-    /// 7.5
-    pub const SMOOTH_STEP: f32 = f32::from_bits(0x40f0_0000);
-    /// 35.0
-    pub const TILE_SEARCH_LENGTH: f32 = f32::from_bits(0x420c_0000);
 }
 
 /// The values the `transport` port reads.
 pub mod transport {
     /// 32767.0
     pub const DRAW_SCALE: f32 = f32::from_bits(0x46ff_fe00);
-    /// 0.009999999776482582
-    pub const DROP_GAP: f32 = f32::from_bits(0x3c23_d70a);
-    /// 0.30000001192092896
-    pub const MOVE_RANGE: f32 = f32::from_bits(0x3e99_999a);
-    /// 2.0
-    pub const NEAR: f32 = f32::from_bits(0x4000_0000);
     /// -1.0
     pub const NONE: f32 = f32::from_bits(0xbf80_0000);
-    /// 5.0
-    pub const RETRY_SPREAD: f32 = f32::from_bits(0x40a0_0000);
-    /// 2.0
-    pub const SHORE_MARGIN: f32 = f32::from_bits(0x4000_0000);
-    /// 4.0
-    pub const UNLOAD_REACH_SQUARED: f32 = f32::from_bits(0x4080_0000);
-}
-
-/// The values the `treason` port reads.
-pub mod treason {
-    /// 400.0
-    pub const TREASON_COST: f32 = f32::from_bits(0x43c8_0000);
-    /// 200.0
-    pub const TREASON_DISCOUNT_COST: f32 = f32::from_bits(0x4348_0000);
 }
 
 /// The values the `turn` port reads.
 pub mod turn {
-    /// 1.0
-    pub const ARMED_FIREPOWER: f32 = f32::from_bits(0x3f80_0000);
-    /// 99999.0
-    pub const CART_REACH: f32 = f32::from_bits(0x47c3_4f80);
-    /// 1.0
-    pub const DEATH_BLAST_FACTOR: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.0
-    pub const DEATH_BLAST_HP: f32 = f32::from_bits(0x3f80_0000);
     /// -1.0
     pub const DROP_NO_POINT: f32 = f32::from_bits(0xbf80_0000);
-    /// 0.10000000149011612
-    pub const DROP_REACH: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 0.20000000298023224
-    pub const EJECT_SHARE: f32 = f32::from_bits(0x3e4c_cccd);
-    /// 3.0
-    pub const FARM_STAGES: f32 = f32::from_bits(0x4040_0000);
-    /// 100.0
-    pub const FISHING_REACH: f32 = f32::from_bits(0x42c8_0000);
     /// 1.0000000116860974e-07
     pub const GATE_EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 0.4000000059604645
-    pub const GATE_GROW: f32 = f32::from_bits(0x3ecc_cccd);
-    /// 1.0
-    pub const GATE_SHUT_HEIGHT: f32 = f32::from_bits(0x3f80_0000);
     /// -1.0
     pub const HANDOVER_NO_POINT: f32 = f32::from_bits(0xbf80_0000);
-    /// 30.0
-    pub const HERO_REGENERATION: f32 = f32::from_bits(0x41f0_0000);
-    /// 1.0
-    pub const HP_POWERUP_FLOOR: f32 = f32::from_bits(0x3f80_0000);
     /// 3.4028234663852886e+38
     pub const NO_DROP_DISTANCE: f32 = f32::from_bits(0x7f7f_ffff);
     /// 1.0
     pub const ONE_UNIT_AGE: f32 = f32::from_bits(0x3f80_0000);
     /// 1.1920928955078125e-07
     pub const REGENERATION_EPSILON: f32 = f32::from_bits(0x3400_0000);
-    /// 1.0
-    pub const REGENERATION_LEAST_HP: f32 = f32::from_bits(0x3f80_0000);
     /// 60.0
     pub const REGENERATION_MINUTE: f32 = f32::from_bits(0x4270_0000);
-    /// 1.0
-    pub const REGENERATION_POINT: f32 = f32::from_bits(0x3f80_0000);
-    /// 10.0
-    pub const SHORT_DROP_REACH: f32 = f32::from_bits(0x4120_0000);
     /// 1.0000000116860974e-07
     pub const SPEED_EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 400.0
-    pub const TREASON_COST: f32 = f32::from_bits(0x43c8_0000);
-    /// 8.0
-    pub const TREE_SEARCH_WITHIN: f32 = f32::from_bits(0x4100_0000);
 }
 
 /// The values the `unit_ai` port reads.
 pub mod unit_ai {
-    /// 1.0
-    pub const ARMED_FIREPOWER: f32 = f32::from_bits(0x3f80_0000);
     /// 3.4028234663852886e+38
     pub const ATTACKER_FAR: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 0.0625
-    pub const ATTACKER_TIE: f32 = f32::from_bits(0x3d80_0000);
-    /// 5.0
-    pub const DEFEND_GROWTH: f32 = f32::from_bits(0x40a0_0000);
-    /// 25.0
-    pub const DEFEND_LEASH: f32 = f32::from_bits(0x41c8_0000);
-    /// 5.0
-    pub const DEFEND_PATROL_LEASH: f32 = f32::from_bits(0x40a0_0000);
-    /// 1.0
-    pub const DEFEND_SLACK: f32 = f32::from_bits(0x3f80_0000);
-    /// 10.0
-    pub const ENEMY_SIGHTING_GAP: f32 = f32::from_bits(0x4120_0000);
-    /// 1.0
-    pub const EVADE_EDGE: f32 = f32::from_bits(0x3f80_0000);
-    /// 3.0
-    pub const EVADE_REACH: f32 = f32::from_bits(0x4040_0000);
-    /// 5.0
-    pub const EVASIVE_NEAR: f32 = f32::from_bits(0x40a0_0000);
-    /// 1.0
-    pub const EXPLORE_Z: f32 = f32::from_bits(0x3f80_0000);
-    /// 1.0
-    pub const FOLLOW_SLACK_HIGH: f32 = f32::from_bits(0x3f80_0000);
-    /// -1.0
-    pub const FOLLOW_SLACK_LOW: f32 = f32::from_bits(0xbf80_0000);
-    /// 0.10000000149011612
-    pub const FOUNDATION_REACH: f32 = f32::from_bits(0x3dcc_cccd);
-    /// 100.0
-    pub const FULL_FAITH: f32 = f32::from_bits(0x42c8_0000);
-    /// 1.5
-    pub const GAIA_TARGET_REACH: f32 = f32::from_bits(0x3fc0_0000);
-    /// 60.0
-    pub const HARMLESS_HP: f32 = f32::from_bits(0x4270_0000);
-    /// 0.5
-    pub const HARMLESS_RANGE: f32 = f32::from_bits(0x3f00_0000);
-    /// 9.0
-    pub const HELP_REACH: f32 = f32::from_bits(0x4110_0000);
     /// -1.0
     pub const INVALID_POINT: f32 = f32::from_bits(0xbf80_0000);
-    /// 3.0
-    pub const LION_SIGHT_DIVISOR: f32 = f32::from_bits(0x4040_0000);
-    /// 0.5
-    pub const LION_SIGHT_SHARE: f32 = f32::from_bits(0x3f00_0000);
-    /// 25000.0
-    pub const NEVER_KILLED: f32 = f32::from_bits(0x46c3_5000);
     /// 3.4028234663852886e+38
     pub const PATROL_FARTHEST: f32 = f32::from_bits(0x7f7f_ffff);
-    /// 3.0
-    pub const PATROL_TURN_REACH: f32 = f32::from_bits(0x4040_0000);
-    /// 100.0
-    pub const RADIUS_SCALE: f32 = f32::from_bits(0x42c8_0000);
-    /// 3.0
-    pub const RETARGET_RANGE: f32 = f32::from_bits(0x4040_0000);
-    /// 8.0
-    pub const RETARGET_REACH: f32 = f32::from_bits(0x4100_0000);
     /// 32767.0
     pub const RUN_DRAW_SCALE: f32 = f32::from_bits(0x46ff_fe00);
     /// 1.0000000116860974e-07
     pub const RUN_EPSILON: f32 = f32::from_bits(0x33d6_bf95);
-    /// 5.0
-    pub const RUN_LEASH: f32 = f32::from_bits(0x40a0_0000);
     /// 1.0
     pub const RUN_ONE: f32 = f32::from_bits(0x3f80_0000);
-    /// 2.0
-    pub const RUN_REACH: f32 = f32::from_bits(0x4000_0000);
-    /// 7.0
-    pub const SHIP_EVADE_REACH: f32 = f32::from_bits(0x40e0_0000);
-    /// 1.0
-    pub const SINGLE_VOLLEY: f32 = f32::from_bits(0x3f80_0000);
-    /// 0.5
-    pub const STANCE_RANGE_GROWTH: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.5
-    pub const STAND_GROUND_PATROL_LEASH: f32 = f32::from_bits(0x3f00_0000);
-    /// 0.25
-    pub const STAND_GROUND_SLACK: f32 = f32::from_bits(0x3e80_0000);
     /// 1.0000000116860974e-07
     pub const STILL: f32 = f32::from_bits(0x33d6_bf95);
 }
@@ -974,32 +442,16 @@ pub mod upgrade {
     pub const WHOLE: f32 = f32::from_bits(0x42c8_0000);
 }
 
-/// The values the `visibility` port reads.
-pub mod visibility {
-    /// 0.009999999776482582
-    pub const EDGE: f32 = f32::from_bits(0x3c23_d70a);
-}
-
-/// The values the `wait_solidify` port reads.
-pub mod wait_solidify {
-    /// 0.01
-    pub const SOLID_FROM: f64 = f64::from_bits(0x3f84_7ae1_47ae_147b);
-}
-
 /// The values the `wall` port reads.
 pub mod wall {
     /// 0.5
     pub const HALF: f32 = f32::from_bits(0x3f00_0000);
-    /// 9.999999747378752e-06
-    pub const MAP_MARGIN: f32 = f32::from_bits(0x3727_c5ac);
     /// 1.0
     pub const ONE: f32 = f32::from_bits(0x3f80_0000);
 }
 
 /// The values the `world_player` port reads.
 pub mod world_player {
-    /// 200.0
-    pub const LIVESTOCK_SCALE: f32 = f32::from_bits(0x4348_0000);
     /// 60.0
     pub const MINUTE: f32 = f32::from_bits(0x4270_0000);
     /// 100.0

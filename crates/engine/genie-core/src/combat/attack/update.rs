@@ -38,6 +38,8 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::AttackTuning;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
 
@@ -107,6 +109,7 @@ impl Attack {
                     unit,
                     c.w.parts.motion_mut(unit.id),
                     c.w.streams.get(Stream::Sprite),
+                    c.w.model.tuning.sprite,
                 )?;
                 Ok(UpdateCode::DONE)
             }
@@ -124,6 +127,7 @@ impl Attack {
         sprite: &mut Option<ActiveSprite>,
         mut motion: MotionMut<'_>,
         rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<Option<(NotifyKind, [i32; 3])>, GenieError> {
         if self.state.move_to().is_some() {
             return Err(GenieError::unsupported("a building's Attack with a MoveTo"));
@@ -132,7 +136,7 @@ impl Attack {
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(self.voice.is_loud().then_some((
             NotifyKind::ACTION_INVALIDATED,
             [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
@@ -244,6 +248,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::CODE_5)
     }
@@ -305,6 +310,7 @@ impl Attack {
                     f,
                     r,
                     &c.w.model.graphics,
+                    &c.w.model.tuning.move_to,
                 )?;
                 return Ok(Some(UpdateCode::UNDER_WAY));
             }
@@ -334,7 +340,12 @@ impl Attack {
             && self.same_owner;
         let rng = c.w.streams.get(Stream::Sprite);
         if alive && f.own.player != PlayerId::new(0) && !spared && f.victim.allied.by_attacker {
-            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
+            self.finish(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                rng,
+                c.w.model.tuning.sprite,
+            )?;
             if self.voice.is_loud() {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -348,7 +359,12 @@ impl Attack {
         // keeps it in the list; a unit's own Attack (not quiet, +0x60) of a unit whose unit AI's
         // order queue is empty posts 0x1fb with 600 and the target
         if f.victim.inside {
-            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
+            self.finish(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                rng,
+                c.w.model.tuning.sprite,
+            )?;
             if self.voice.is_loud() && r.queue_empty {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -361,7 +377,12 @@ impl Attack {
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
         if !r.armed {
-            self.finish(unit, c.w.parts.motion_mut(unit.id), rng)?;
+            self.finish(
+                unit,
+                c.w.parts.motion_mut(unit.id),
+                rng,
+                c.w.model.tuning.sprite,
+            )?;
             if self.voice.is_loud() {
                 unit.post_own(
                     &mut c.w.parts.unit_ai,
@@ -385,16 +406,19 @@ impl Attack {
         r: &AttackReads,
         alive: bool,
     ) -> Result<UpdateCode, GenieError> {
+        let sprite_tuning = c.w.model.tuning.sprite;
         let mut g = c.w.attack_ground(unit.id);
         match self.ready_to_attack(unit, &mut g, f, r, false)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if !alive => {
-                self.finish(unit, g.motion.reborrow(), g.sprite_rng)?;
+                self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
                 return Ok(UpdateCode::CODE_5);
             }
             Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
             Readiness::Waiting => {}
-            Readiness::Away(gap) => self.follow(unit, &mut g, r, f, gap)?,
+            Readiness::Away(gap) => {
+                self.follow(unit, &mut g, r, f, gap)?;
+            }
         }
         Ok(UpdateCode::UNDER_WAY)
     }
@@ -423,6 +447,7 @@ impl Attack {
                 unit,
                 c.w.parts.motion_mut(unit.id),
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
             unit.post_own(
                 &mut c.w.parts.unit_ai,
@@ -445,6 +470,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::CODE_2)
     }
@@ -459,6 +485,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
         graphics: &Graphics,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.enter(AttackState::GotoSeen { move_to: None }, motion.reborrow())?;
         self.range = f.own.source.weapon_range;
@@ -467,6 +494,7 @@ impl Attack {
             (unit, motion.mover()),
             r,
             graphics,
+            move_to_tuning,
         )
     }
 
@@ -484,8 +512,9 @@ impl Attack {
         unit: (&Unit, Option<&Mover>),
         r: &AttackReads,
         graphics: &Graphics,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
-        self.walk_to_seen(walk, &move_reads(unit, r, graphics)?)
+        self.walk_to_seen(walk, &move_reads(unit, r, graphics)?, move_to_tuning)
     }
 
     /// States 5 and 11 once their `MoveTo` arrived (cases 4 and 10, its update 1 or 2): a target
@@ -522,6 +551,7 @@ impl Attack {
                 (unit, c.w.parts.mover_of(unit.id)),
                 r,
                 &c.w.model.graphics,
+                &c.w.model.tuning.move_to,
             )?;
             return Ok(UpdateCode::UNDER_WAY);
         }
@@ -534,6 +564,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         if self.voice.is_loud() {
             unit.post_own(

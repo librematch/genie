@@ -5,6 +5,7 @@ use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::testing::tuning;
 use std::iter::from_fn;
 
 #[test]
@@ -54,7 +55,7 @@ fn plan_from_off_the_map_reads_no_start_cell() {
     };
     let mut out = Path::default();
     let found = p
-        .plan::<crate::GenieError>(&req, false, &mut out, None)
+        .plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
         .unwrap();
     assert_eq!(found, Found::OffMap);
 }
@@ -73,20 +74,32 @@ fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
     );
     // a goal on the water: the path's end
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(7.5, 4.5))
-            .unwrap(),
+        p.last_open_point(
+            Point::new(2.5, 4.5),
+            Point::new(7.5, 4.5),
+            &tuning().tile_path
+        )
+        .unwrap(),
         Some(Point::new(7.5, 4.5))
     );
     // ashore: the path ends at the node nearest the goal, the last water tile
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(13.5, 4.5))
-            .unwrap(),
+        p.last_open_point(
+            Point::new(2.5, 4.5),
+            Point::new(13.5, 4.5),
+            &tuning().tile_path
+        )
+        .unwrap(),
         Some(Point::new(9.5, 4.5))
     );
     // a goal off the map (result 0): none
     assert_eq!(
-        p.last_open_point(Point::new(2.5, 4.5), Point::new(16.5, 4.5))
-            .unwrap(),
+        p.last_open_point(
+            Point::new(2.5, 4.5),
+            Point::new(16.5, 4.5),
+            &tuning().tile_path
+        )
+        .unwrap(),
         None
     );
 }
@@ -159,12 +172,20 @@ fn the_tile_search_reaches_goal_on_an_open_map() {
         full: true,
     };
     let mut out = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut out).unwrap(), Found::Goal);
+    assert_eq!(
+        p.search_on_tiles(&req, &mut out, &tuning().tile_path)
+            .unwrap(),
+        Found::Goal
+    );
     assert_eq!(out.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
     assert_eq!(out.points.last(), Some(&BVector::new(6.5, 0.0, 5.5)));
     // the search leaves its marks behind: the same search again finds the same path
     let mut again = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut again).unwrap(), Found::Goal);
+    assert_eq!(
+        p.search_on_tiles(&req, &mut again, &tuning().tile_path)
+            .unwrap(),
+        Found::Goal
+    );
     assert_eq!(again.points, out.points);
 }
 
@@ -188,7 +209,11 @@ fn the_tile_search_ends_nearest_the_goal_behind_wall() {
         full: true,
     };
     let mut out = Path::default();
-    assert_eq!(p.search_on_tiles(&req, &mut out).unwrap(), Found::Nearest);
+    assert_eq!(
+        p.search_on_tiles(&req, &mut out, &tuning().tile_path)
+            .unwrap(),
+        Found::Nearest
+    );
     assert_eq!(out.points.first(), Some(&BVector::new(1.5, 0.0, 2.5)));
     assert_eq!(out.points.last(), Some(&BVector::new(2.5, 0.0, 2.5)));
 }
@@ -215,7 +240,7 @@ fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
         };
         let mut out = Path::default();
         assert_eq!(
-            p.plan::<crate::GenieError>(&req, false, &mut out, None)
+            p.plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
                 .unwrap(),
             Found::Goal
         );
@@ -313,11 +338,11 @@ fn stretch_without_points_between_is_left_as_it_is() {
         length: Distance::ZERO,
     };
     let before = path.points.clone();
-    assert_eq!(straighten(&mut path, 0, 1), 0);
-    assert_eq!(straighten(&mut path, 1, 1), 0);
+    assert_eq!(straighten(&mut path, 0, 1, &tuning().tile_path), 0);
+    assert_eq!(straighten(&mut path, 1, 1, &tuning().tile_path), 0);
     assert_eq!(path.points, before);
     // two apart: one point between, the line 30 long takes four points at 7.5 apart: 3 more
-    assert_eq!(straighten(&mut path, 0, 2), -3);
+    assert_eq!(straighten(&mut path, 0, 2, &tuning().tile_path), -3);
 }
 
 /// MarvinBlue/426048731's 9520 in update 758 (the probe's log): the search's twelve tile
@@ -347,7 +372,7 @@ fn the_smoothing_keeps_the_points_before_blocked_walk() {
     };
     // blocked: any walk from the start that ends beyond y = 44.5
     let mut walls = Walls::default();
-    smooth(&mut path, &mut walls).unwrap();
+    smooth(&mut path, &mut walls, &tuning().tile_path).unwrap();
     let ends: Vec<Point> = path.points.iter().map(|p| p.ground()).collect();
     assert_eq!(
         ends,
@@ -363,7 +388,7 @@ fn the_smoothing_keeps_the_points_before_blocked_walk() {
         points: vec![BVector::ZERO, BVector::new(5.0, 0.0, 5.0)],
         length: Distance::ZERO,
     };
-    smooth(&mut short, &mut walls).unwrap();
+    smooth(&mut short, &mut walls, &tuning().tile_path).unwrap();
     assert_eq!((walls.tests, walls.passes), (10, 1));
 }
 

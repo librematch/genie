@@ -9,6 +9,7 @@ use crate::gathering::DropSiteId;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
 use crate::gathering::hunt::{DropOff, Dropped, PointWalk, PointWalker};
+use crate::map::Distance;
 use crate::movement::move_to::MoveTo;
 use crate::movement::{Me, footprint_gap_squared};
 use crate::objects::ObjectState;
@@ -27,6 +28,7 @@ use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::drops_at;
 use crate::unit_ai::task_finder::world::state_of;
 use crate::world::HUNTER_UNMOVING;
+use crate::world::SEARCH_AGAIN;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -34,7 +36,6 @@ use crate::world::lets::release;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
-use crate::world::{SEARCH_AGAIN, TREE_SEARCH_WITHIN};
 
 impl Unit {
     /// The Hunt's update (`0x140ac7a00`) first checks its targets: one gone from the world's
@@ -159,7 +160,13 @@ impl Unit {
             }
             // the hunt took the next tree (slot 0x48): its MoveTo's code 5 ends the update
             _ if tree_lost
-                && self.hunt_tree_search(actions, c, Some(TREE_SEARCH_WITHIN), None, roles)? => {}
+                && self.hunt_tree_search(
+                    actions,
+                    c,
+                    Some(Distance::new(c.w.model.tuning.turn.tree_search_within)),
+                    None,
+                    roles,
+                )? => {}
             Some(_) => self.hunt_strike(actions, c, me, own, tree_lost, roles)?,
             None => {}
         }
@@ -374,7 +381,7 @@ impl Unit {
         )?;
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;
         let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
-        hunt.wait_then_walk(c.dt.seconds(), mover, &walks)
+        hunt.wait_then_walk(c.dt.seconds(), mover, &walks, &c.w.model.tuning.move_to)
     }
 }
 

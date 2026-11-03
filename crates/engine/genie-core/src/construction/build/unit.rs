@@ -17,7 +17,6 @@ use std::collections::BTreeMap;
 
 use crate::GenieError;
 use crate::construction::FoundationId;
-use crate::construction::build::CLEARING_REACH;
 use crate::construction::build::world_side::NOT_HELD;
 use crate::construction::build::{BuildAction, BuildReads, ClearLook, DROPPED_ORDERS};
 use crate::gathering::hunt::DropOff;
@@ -84,7 +83,7 @@ impl Unit {
             })
         {
             let (fx, fy) = (f.position().x(), f.position().y());
-            let reach = CLEARING_REACH + 1.0;
+            let reach = c.w.model.tuning.build.clearing_reach + 1.0;
             for (id, _) in c.w.spatial.objects_within(Rect::new(
                 fx - reach,
                 fy - reach,

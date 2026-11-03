@@ -22,6 +22,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::game_status::GameStatus;
+use crate::vision::SightLayer;
 use crate::vision::own_masks;
 use crate::vision::visibility::MasterChange;
 use crate::vision::visibility::Visibility;
@@ -29,6 +30,7 @@ use crate::vision::{VisionBits, VisionMasks};
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::player::Player;
 impl Spatial {
     /// The Artifact action's owner search (`FUN_140aabc40`) for the animal `me`: the objects on
@@ -198,6 +200,7 @@ impl Spatial {
         los: Distance,
         sees: bool,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let Some(p) = self.objects.get_mut(id) else {
             return Err(GenieError::unsupported(
@@ -207,7 +210,17 @@ impl Spatial {
         p.player = new;
         let (position, radius) = (p.position, p.radius);
         if let Some(v) = self.sight.as_mut() {
-            v.owner_changed(id, position, radius, (new, los.get()), sees, roles)?;
+            v.owner_changed(
+                id,
+                position,
+                radius,
+                (new, los.get()),
+                sees,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
+            )?;
         }
         Ok(())
     }
@@ -414,9 +427,10 @@ impl Spatial {
         id: ObjectId,
         state: ObjectState,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
-            v.state_changed(id, p.position, p.radius, state, roles)?;
+            v.state_changed(id, p.position, p.radius, state, roles, visibility_tuning)?;
         }
         Ok(())
     }
@@ -432,8 +446,12 @@ impl Spatial {
         class: ClassId,
         master: MasterId,
         los: Distance,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<(), GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
             let change = MasterChange {
                 master,
@@ -441,7 +459,7 @@ impl Spatial {
                 old_radius: p.radius,
                 new_radius: radius,
             };
-            v.master_changed(id, p.position, change, roles)?;
+            v.master_changed(id, p.position, change, roles, visibility_tuning)?;
             v.registry_master(
                 id,
                 p.player,

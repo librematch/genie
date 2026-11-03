@@ -331,6 +331,7 @@ impl World {
             masters,
             &self.model.graphics,
             self.streams.get(Stream::Sprite),
+            self.model.tuning.sprite,
         )?;
         Ok(Notify::own(
             unit.id,

@@ -3,7 +3,7 @@
 use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::InsideCount;
-use crate::garrison::{CLASS_FLAGS, ClassFlags, LEAST_HP_SHARE};
+use crate::garrison::{CLASS_FLAGS, ClassFlags};
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
@@ -174,7 +174,7 @@ impl World {
     /// class with a flag of 0x10002 ([`class_has_flags`]) when the unit has a task of action 3 on
     /// its own class ([`has_garrison_task`]); a unit of neither goes on as for a building. Any
     /// other takes a unit of type 70 or more when it is of type 80
-    /// (an annex asks its main building, `+0xbb8`), above [`LEAST_HP_SHARE`] of its master's hit
+    /// (an annex asks its main building, `+0xbb8`), above `GarrisonTuning::least_hp_share` of its master's hit
     /// points, with a capacity (`obj_max`), the unit's master with a garrison task on buildings
     /// and of a kind the building's `garrison_type` takes ([`garrison_type_takes`]). Either then
     /// needs room for one more (slot 0x198 with no unit, [`World::has_room`]) unless `unchecked`
@@ -230,7 +230,7 @@ impl World {
         // CVTPS2PD, CVTDQ2PD, MULSD, then COMISD with JBE: an unordered hit point count takes
         // nothing
         let max_hp = f64::from(HitPoints::of_master(bm.hit_points).get());
-        let above = f64::from(b.life.hp.get()) > max_hp * LEAST_HP_SHARE;
+        let above = f64::from(b.life.hp.get()) > max_hp * self.model.tuning.garrison.least_hp_share;
         if !above || !bm.garrison.holds() {
             return Ok(false);
         }

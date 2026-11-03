@@ -194,7 +194,11 @@ impl Unit {
                 .map_or(UnitStance::AGGRESSIVE, |ai| ai.stance),
             farm_stops: c.w.settings.walkable_farms,
             player_type: c.w.players.player(c.player)?.kind,
-            stop_productivity: productivity_of(task.productivity, attributes),
+            stop_productivity: productivity_of(
+                task.productivity,
+                attributes,
+                &c.w.model.tuning.gather,
+            ),
             food_sold: attributes
                 .get(FARM_FOOD_SOLD)
                 .copied()
@@ -329,7 +333,7 @@ impl Unit {
             state,
         };
         gather
-            .set_walk(to, t.radius, mover, rng, &walks)
+            .set_walk(to, t.radius, mover, rng, &walks, &c.w.model.tuning)
             .map(|()| HeadCode::Keeps)
     }
 

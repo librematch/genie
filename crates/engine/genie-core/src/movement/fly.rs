@@ -30,7 +30,7 @@ use genie_diff::Diff;
 /// The Fly action's type, which word 9 adds.
 pub const FLY: ActionKind = ActionKind::named(10);
 
-use crate::math::image::fly::{DEGREE as FLY_DEGREE, EPSILON as FLY_EPSILON, HEIGHT as FLY_HEIGHT};
+use crate::math::image::fly::{DEGREE as FLY_DEGREE, EPSILON as FLY_EPSILON};
 pub use crate::movement::fly_state::FlyState;
 use crate::objects::Graphics;
 use crate::objects::layers::Action;
@@ -70,15 +70,12 @@ pub struct FlightSprites<'a> {
     pub graphics: &'a Graphics,
 }
 
-/// The height a bird of fly mode 1 flies at once its Fly starts (`FUN_140a84900`).
-pub const HEIGHT: f32 = FLY_HEIGHT;
-
 impl Fly {
     /// The Fly a bird's default task starts (constructor `FUN_140a845c0`, then its first, slot
     /// 0x28 `FUN_140a84900` with 1, as the action list adds it): its home the bird's place
     /// (`position`), then `set_state(3)` draws the flight's time from the Action stream. The
     /// first's other parts are the caller's: a player's bird whose task has `+0x15` set goes to
-    /// state 1 first, and a master of fly mode 1 lifts the bird to [`HEIGHT`] (slot 0x58).
+    /// state 1 first, and a master of fly mode 1 lifts the bird to `FlyTuning::height` (slot 0x58).
     pub fn start(task: Task, position: Position, action: &mut Well512) -> Self {
         let mut fly = Self {
             state: FlyState::New,
@@ -378,13 +375,14 @@ impl Unit {
     /// the move (`+0x824`, `+0x870`).
     fn lift_to_fly_height(&mut self, c: &mut Step<'_>) -> Result<(), GenieError> {
         let (x, y) = (self.position().x(), self.position().y());
-        let at = Position::new(x, y, HEIGHT);
+        let at = Position::new(x, y, c.w.model.tuning.fly.height);
         let moving = c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving);
         self.new_position(
             at,
             moving,
             (&mut c.w.spatial, Some(&mut c.w.pathing)),
             &c.w.model.roles,
+            c.w.model.tuning.visibility,
         )?;
         if let Some(m) = c.w.parts.mover_mut(self.id) {
             m.mark_move(at, c.w.world_time);

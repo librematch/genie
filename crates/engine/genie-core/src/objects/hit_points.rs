@@ -8,10 +8,8 @@ use crate::combat::damage::ArmorPair;
 use crate::combat::damage::{gain_hp as damage_gain_hp, heal_hp};
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::math::image::turn::{
-    HERO_REGENERATION as TURN_HERO_REGENERATION, HP_POWERUP_FLOOR as TURN_HP_POWERUP_FLOOR,
     REGENERATION_EPSILON as TURN_REGENERATION_EPSILON,
-    REGENERATION_LEAST_HP as TURN_REGENERATION_LEAST_HP,
-    REGENERATION_MINUTE as TURN_REGENERATION_MINUTE, REGENERATION_POINT as TURN_REGENERATION_POINT,
+    REGENERATION_MINUTE as TURN_REGENERATION_MINUTE,
 };
 use crate::objects::HitPoints;
 use crate::objects::MasterHitPoints;
@@ -25,20 +23,13 @@ use crate::objects::unit::Unit;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::TurnTuning;
 use genie_diff::Diff;
 
-/// A hero's regeneration (`DAT_142ed06a8`, a minute's hit points).
-pub(crate) const HERO_REGENERATION: Regeneration = Regeneration::new(TURN_HERO_REGENERATION);
 /// The regeneration's minute (`DAT_14330ebc8`).
 pub(crate) const REGENERATION_MINUTE: f32 = TURN_REGENERATION_MINUTE;
 /// The size below which a rate or a period is none (`DAT_142f49458`).
 pub(crate) const REGENERATION_EPSILON: f32 = TURN_REGENERATION_EPSILON;
-/// The hit points below which nothing regenerates (`DAT_14330eb8c`).
-pub(crate) const REGENERATION_LEAST_HP: f32 = TURN_REGENERATION_LEAST_HP;
-/// A whole hit point, the `fmodf` divisor (`XMM11`, `DAT_14330eb8c`).
-pub(crate) const REGENERATION_POINT: f32 = TURN_REGENERATION_POINT;
-/// The hit points a powerup's check leaves at least (`MAXSS` with `DAT_14330eb8c`).
-pub(crate) const HP_POWERUP_FLOOR: f32 = TURN_HP_POWERUP_FLOOR;
 
 /// A combat object's hit point powerup, which takes a loss before its hit points: what losses
 /// took of it (`+0xa38`, `mHitpointsPowerup`) and its most (`+0xa3c`, `mHitpointsMaxPowerup`).
@@ -82,14 +73,18 @@ impl HpPowerup {
 
 /// Slot 0x260 of a combat object (`FUN_1412033a0`), its regeneration rate in hit points a
 /// minute: its stinger (`+0xb3c`, slot 0x750) plus (its powerup (`+0xa34`, slot 0x6f0) plus (a
-/// hero's [`HERO_REGENERATION`] plus its master's `regeneration_rate`, `+0x8b4`)), in the
+/// hero's `TurnTuning::hero_regeneration` plus its master's `regeneration_rate`, `+0x8b4`)), in the
 /// assembly's order. A hero is a master whose `hero_flag` (`+0x8d9`) grants
 /// [`HeroFlags::REGENERATES`].
 #[must_use]
-pub(crate) fn regeneration_rate(master: &Master, combat: &Combat) -> Regeneration {
+pub(crate) fn regeneration_rate(
+    master: &Master,
+    combat: &Combat,
+    turn_tuning: &TurnTuning,
+) -> Regeneration {
     let hero = master.hero_flag.grants(HeroFlags::REGENERATES);
     let bonus = if hero {
-        HERO_REGENERATION
+        Regeneration::new(turn_tuning.hero_regeneration)
     } else {
         Regeneration::ZERO
     };
@@ -171,10 +166,16 @@ impl Unit {
     /// come off (slot 0xb0, [`Unit::lose_hp`]) at most its hit points with its powerups' room
     /// (slot 0xc0). Then an object at its most (slot 0xc0 at least slot 200) has the armor its
     /// charge's hits took back (`+0x9e4` and `+0x9e6`, one dword, zeroed).
-    pub(crate) fn regenerate(&mut self, combat: &mut Combat, master: &Master, dt_seconds: Seconds) {
+    pub(crate) fn regenerate(
+        &mut self,
+        combat: &mut Combat,
+        master: &Master,
+        dt_seconds: Seconds,
+        turn_tuning: &TurnTuning,
+    ) {
         use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-        let rate = regeneration_rate(master, combat).get();
-        if below_or_unordered(self.life.hp.get(), REGENERATION_LEAST_HP)
+        let rate = regeneration_rate(master, combat, turn_tuning).get();
+        if below_or_unordered(self.life.hp.get(), turn_tuning.regeneration_least_hp)
             || self.life.state != ObjectState::Alive
         {
             return;
@@ -189,7 +190,7 @@ impl Unit {
         } else {
             0.0
         };
-        let fraction = points % REGENERATION_POINT;
+        let fraction = points % turn_tuning.regeneration_point;
         let whole = points - fraction;
         combat.regen_timer = Seconds::new(fraction * per);
         if at_most_or_unordered(whole, 0.0) {
@@ -227,14 +228,14 @@ impl Unit {
     /// `TRIBE_Combat_Object::update`'s hit point powerup check (after its abilities): a powerup
     /// (`+0xa38`) above its room (`+0xa3c`; `COMISS`/`JBE`, a NaN is not) comes off the hit points
     /// (`MAXSS` with 1: not below 1, a NaN becomes 1) and the powerup takes the room.
-    pub(crate) fn clamp_hp_powerup(&mut self, combat: &mut Combat) {
+    pub(crate) fn clamp_hp_powerup(&mut self, combat: &mut Combat, turn_tuning: &TurnTuning) {
         let p = combat.hp_powerup;
         if at_most_or_unordered(p.taken.get(), p.max.get()) {
             return;
         }
         self.life.hp = HitPoints::new(maxss(
             self.life.hp.get() - p.room().get().abs(),
-            HP_POWERUP_FLOOR,
+            turn_tuning.hp_powerup_floor,
         ));
         combat.hp_powerup.taken = p.max;
     }

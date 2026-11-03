@@ -9,6 +9,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -22,7 +23,6 @@ use crate::unit_ai::{
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 
 /// The order [`UnitAi::order_now`] runs at once: the order, the unit that keeps the current
@@ -56,8 +56,9 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerType)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-        roles: &Roles,
+        layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {
+        let AiLayer { roles, .. } = layer;
         let OrderNow {
             order,
             keep_from,
@@ -90,7 +91,7 @@ impl UnitAi {
             None => self.clear_notifies(Millis::ZERO)?,
         }
         let front = *self.orders.checked(0)?;
-        if self.process_order(&front, world, place, ai, side, roles)? != OrderOutcome::NotReady {
+        if self.process_order(&front, world, place, ai, side, layer)? != OrderOutcome::NotReady {
             let _ = self.orders.remove(0);
         }
         Ok(())

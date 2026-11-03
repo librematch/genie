@@ -10,6 +10,7 @@ use crate::movement::move_to::{MoveToAction, MoveToReads, SpriteReads, TargetMov
 use crate::objects::Graphics;
 use crate::objects::lifecycle::Held;
 use crate::objects::unit::Unit;
+use crate::world::layer::generated::MoveToTuning;
 
 /// What the Gather's and the Hunt's `MoveTo` constructors read of the unit as `set_state` makes
 /// the `MoveTo` ([`MoveToReads`]), and what the unit carries: the task's walking sprite
@@ -77,11 +78,16 @@ impl GatherAction {
         to: WalkTo,
         mover: &Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let given = self.task.walk_sprite_id(walks.held);
-        walks
-            .live(mover)
-            .to_object(to, self.task.range, given, TargetMoved::AsksAgain)
+        walks.live(mover).to_object(
+            to,
+            self.task.range,
+            given,
+            TargetMoved::AsksAgain,
+            move_to_tuning,
+        )
     }
 
     /// The quiet `MoveTo` to `point` within `range` (`FUN_140aa0d30` with the task's walking
@@ -100,9 +106,12 @@ impl GatherAction {
         on_target_moved: TargetMoved,
         mover: &Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let given = self.task.walk_sprite_id(walks.held);
-        let walk = walks.live(mover).to_point(point, range, given)?;
+        let walk = walks
+            .live(mover)
+            .to_point(point, range, given, move_to_tuning)?;
         Ok(walk.map(|m| MoveToAction {
             on_target_moved,
             ..m

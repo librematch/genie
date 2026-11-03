@@ -13,9 +13,6 @@ use crate::groups::WorldObject;
 use crate::groups::group_list::member_gone;
 use crate::groups::{Member, SpecificMove, UnitGroup, UnitTypeStatistic};
 use crate::map::Distance;
-use crate::math::image::group::{
-    DEFAULT_RADIUS as GROUP_DEFAULT_RADIUS, SPACING_FACTOR as GROUP_SPACING_FACTOR,
-};
 use crate::math::rng::Stream;
 use crate::objects::ObjectId;
 use crate::objects::masters::FormationClass;
@@ -28,14 +25,10 @@ use crate::unit_ai::OrderKind;
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::index::Place;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use std::mem::take;
 
-/// A unit's radius in a formation where its master has no full footprint (`FUN_141025920`,
-/// `DAT_142e7f384`).
-const DEFAULT_RADIUS: f32 = GROUP_DEFAULT_RADIUS;
-/// A radius's share of the spacing (`DAT_142e8c150`): two radii side by side.
-const SPACING_FACTOR: f32 = GROUP_SPACING_FACTOR;
 /// A group holds fewer than this many members (`FUN_1410083c0`'s `0x46`: "No room in this
 /// group").
 const MAX_MEMBERS: usize = 70;
@@ -61,14 +54,14 @@ pub(crate) struct FormationUnit {
 impl FormationUnit {
     /// The unit's radius in a formation (`FUN_141025920`): a master above type 69 with a footprint
     /// and a height (`FUN_141194060` with 1) has its spacing modifier (`+0x8b8`) times its radius
-    /// on x (`+0x5d8`), any other [`DEFAULT_RADIUS`].
-    pub(crate) fn of(master: &Master) -> Self {
+    /// on x (`+0x5d8`), any other `GroupTuning::default_radius`.
+    pub(crate) fn of(master: &Master, group_tuning: &GroupTuning) -> Self {
         let full =
             Distance::ZERO < master.height && 0.0 < master.radius.x() && 0.0 < master.radius.y();
         let radius = if MasterKind::COMBAT <= master.kind && full {
             master.spacing_modifier.get() * master.radius.x()
         } else {
-            DEFAULT_RADIUS
+            group_tuning.default_radius
         };
         Self {
             master: master.id,
@@ -126,6 +119,7 @@ impl UnitGroup {
         unit: FormationUnit,
         masters_of: &dyn Fn(ObjectId) -> Option<MasterId>,
         scratch: &mut Vec<UnitType>,
+        group_tuning: &GroupTuning,
     ) -> Result<(), GenieError> {
         let at = self
             .unit_types
@@ -139,7 +133,7 @@ impl UnitGroup {
                 self.unit_types.len() - 1
             });
         let stat = self.unit_types.checked_mut(at)?;
-        let spacing = unit.radius * SPACING_FACTOR;
+        let spacing = unit.radius * group_tuning.spacing_factor;
         if stat.desired_spacing < spacing {
             stat.desired_spacing = spacing;
         }
@@ -364,7 +358,7 @@ impl World {
         if sub == FormationCategory::ANY {
             return Ok(false);
         }
-        let unit = FormationUnit::of(u.master(self.master_tables(), p)?);
+        let unit = FormationUnit::of(u.master(self.master_tables(), p)?, &self.model.tuning.group);
         let old = u.group.id;
         let g = self.groups.held(group)?;
         if g.has(id) {
@@ -417,8 +411,15 @@ impl World {
             },
             seconds_since_attacking: seconds,
         });
-        g.join_statistic(sub, id, unit, &masters_of, &mut scratch)?;
-        let spacing = unit.radius * SPACING_FACTOR;
+        g.join_statistic(
+            sub,
+            id,
+            unit,
+            &masters_of,
+            &mut scratch,
+            &self.model.tuning.group,
+        )?;
+        let spacing = unit.radius * self.model.tuning.group.spacing_factor;
         if g.desired_spacing < spacing {
             g.desired_spacing = spacing;
         }
@@ -452,6 +453,7 @@ mod tests {
     use crate::objects::unit::Unit;
     use crate::players::PlayerId;
     use crate::testing::ids;
+    use crate::testing::tuning;
     use crate::world::Millis;
     use crate::world::Seconds;
     use crate::world::WorldTime;
@@ -459,8 +461,6 @@ mod tests {
 
     #[cfg(test)]
     use crate::gathering::hunt::tests::walker;
-    #[cfg(test)]
-    use crate::math::image::group::SPACING_FACTOR as GROUP_SPACING_FACTOR;
     #[cfg(test)]
     use crate::movement::PathData;
     #[cfg(test)]
@@ -836,7 +836,7 @@ mod tests {
         t.groups.get_mut(group_id(1)).unwrap().desired_spacing = Distance::ZERO;
         let _ = t.lock_formation(group_id(1), FormationKind::LINE);
         let spacing = t.groups.get(group_id(1)).unwrap().desired_spacing;
-        assert_eq!(spacing, Distance::new(0.2 * GROUP_SPACING_FACTOR));
+        assert_eq!(spacing, Distance::new(0.2 * tuning().group.spacing_factor));
     }
 
     /// Kept moving, the unit's walk stays; a unit the world does not hold leaves the first

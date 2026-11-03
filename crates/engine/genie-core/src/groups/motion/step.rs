@@ -2,8 +2,7 @@
 
 use crate::groups::Motion;
 use crate::groups::motion::{
-    CLOSE, EPSILON, GroupView, Lead, LeadGroup, NEAR, PASSES, point, request, reset_level,
-    set_flag, steer,
+    EPSILON, GroupView, Lead, LeadGroup, PASSES, point, request, reset_level, set_flag, steer,
 };
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -17,6 +16,7 @@ use crate::movement::WaypointLevel;
 use crate::movement::{Planning, footprint_gap, footprint_gap_squared};
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -106,6 +106,7 @@ pub(super) fn pass(
     world: &mut StepWorld<'_, '_>,
     budget: bool,
 ) -> Result<Pass, GenieError> {
+    let group_tuning = &world.by_id.tuning().group;
     let spatial = &mut *world.spatial;
     let level = motion.paths.checked(0)?;
     if !level.has_path {
@@ -129,7 +130,7 @@ pub(super) fn pass(
     });
     let flags = level.flags;
     if flags.contains(LevelFlags::REACHED) {
-        reached(motion, target.as_ref())?;
+        reached(motion, target.as_ref(), group_tuning)?;
     }
     let state = motion.paths.checked(0)?.state;
     if matches!(state, PathState::Arrived | PathState::Unplanned) {
@@ -180,7 +181,11 @@ pub(super) fn pass(
 /// (state 2), else the level arrived (state 4); with waypoints left a level above 0 asks for the
 /// next stretch (state 2). A level that reached its target with bit 2 clears it (and sets it on
 /// its parents). A looping path takes its next waypoint (`FUN_140f98bc0`) and asks again.
-pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<(), GenieError> {
+pub(super) fn reached(
+    motion: &mut Motion,
+    target: Option<&Placed>,
+    group_tuning: &GroupTuning,
+) -> Result<(), GenieError> {
     let level = motion.paths.checked(0)?;
     if level.flags.contains(LevelFlags::AT_WAYPOINT) {
         if level.waypoint.within(level.points.len()) {
@@ -202,7 +207,7 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
     }
     let d = fmath::length(fmath::sub(at, point(level, left)));
     let mut beyond = match target {
-        None => (d - level.range.get()) - NEAR,
+        None => (d - level.range.get()) - group_tuning.near,
         Some(t) => {
             (footprint_gap(
                 t.position,
@@ -212,7 +217,7 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
             )
             .get()
                 - level.range.get())
-                - NEAR
+                - group_tuning.near
         }
     };
     if target.is_some() && level.flags.contains(LevelFlags::MET_TARGET) {
@@ -225,7 +230,9 @@ pub(super) fn reached(motion: &mut Motion, target: Option<&Placed>) -> Result<()
             level.state = PathState::WantsPath;
         }
     } else if EPSILON <= beyond
-        && (target.is_some() || CLOSE <= beyond || level.level == WaypointLevel::WALKED)
+        && (target.is_some()
+            || group_tuning.close <= beyond
+            || level.level == WaypointLevel::WALKED)
         && EPSILON <= d
     {
         level.waypoint = level.waypoint.previous();

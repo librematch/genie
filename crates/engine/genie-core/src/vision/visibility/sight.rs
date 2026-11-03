@@ -12,13 +12,15 @@ use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::MasterId;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
-use crate::vision::visibility::{EDGE, Seer, Visibility, tile_of};
+use crate::vision::visibility::{Seer, Visibility, tile_of};
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::slots::CheckedIndex;
 
 /// An object's own sight, as the base class explores it ([`Visibility::base_sight_on`]'s
@@ -98,8 +100,12 @@ impl Visibility {
         radius: Footprint,
         shape: SightShape,
         centre: SightCentre,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<TileCount, GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
@@ -113,6 +119,7 @@ impl Visibility {
                 centre,
             },
             roles,
+            visibility_tuning,
         )
     }
 
@@ -123,6 +130,7 @@ impl Visibility {
         id: ObjectId,
         sight: LosSight,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<TileCount, GenieError> {
         let LosSight {
             position,
@@ -172,6 +180,7 @@ impl Visibility {
                 centre,
             },
             roles,
+            visibility_tuning,
         )
     }
 
@@ -180,6 +189,7 @@ impl Visibility {
         &mut self,
         on: SightOn,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<TileCount, GenieError> {
         let SightOn {
             id,
@@ -212,8 +222,8 @@ impl Visibility {
                 TileRect::new(
                     (x - rx) as i32,
                     (y - ry) as i32,
-                    ((x + rx) - EDGE) as i32,
-                    ((y + ry) - EDGE) as i32,
+                    ((x + rx) - visibility_tuning.edge) as i32,
+                    ((y + ry) - visibility_tuning.edge) as i32,
                 ),
             )?
         } else {
@@ -234,8 +244,12 @@ impl Visibility {
         radius: Footprint,
         shape: SightShape,
         centre: SightCentre,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<(), GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         let Some(s) = self.seers.get(id).copied() else {
             return Ok(());
         };
@@ -249,6 +263,7 @@ impl Visibility {
                 centre,
             },
             roles,
+            visibility_tuning,
         )?;
         Ok(())
     }
@@ -260,6 +275,7 @@ impl Visibility {
         id: ObjectId,
         sight: LosSight,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let LosSight {
             position,
@@ -304,8 +320,8 @@ impl Visibility {
                 TileRect::new(
                     (x - rx) as i32,
                     (y - ry) as i32,
-                    ((x + rx) - EDGE) as i32,
-                    ((y + ry) - EDGE) as i32,
+                    ((x + rx) - visibility_tuning.edge) as i32,
+                    ((y + ry) - visibility_tuning.edge) as i32,
                 ),
             )?;
         } else {
@@ -323,6 +339,7 @@ impl Visibility {
         to: Position,
         radius: Footprint,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let tile = |p: Position| {
             [
@@ -339,14 +356,27 @@ impl Visibility {
             radius,
             SightShape::Circle,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
         if self
             .seers
             .get(id)
             .is_some_and(|s| s.state == ObjectState::Alive)
         {
-            let _ = self.sight_on(id, to, radius, SightShape::Circle, SightCentre::Tile, roles)?;
+            let _ = self.sight_on(
+                id,
+                to,
+                radius,
+                SightShape::Circle,
+                SightCentre::Tile,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
+            )?;
         }
         Ok(())
     }
@@ -360,6 +390,7 @@ impl Visibility {
         radius: Footprint,
         new: ObjectState,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let Some(old) = self.seers.get(id).map(|s| s.state) else {
             return Ok(());
@@ -376,7 +407,10 @@ impl Visibility {
                 radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
             )?;
             if master_sees {
                 let _ = self.sight_on(
@@ -385,7 +419,10 @@ impl Visibility {
                     radius,
                     SightShape::Footprint,
                     SightCentre::Tile,
-                    roles,
+                    SightLayer {
+                        roles,
+                        visibility_tuning,
+                    },
                 )?;
             }
         }
@@ -396,7 +433,10 @@ impl Visibility {
                 radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
             )?;
         }
         if let Some(s) = self.seers.get_mut(id) {
@@ -413,6 +453,7 @@ impl Visibility {
         position: Position,
         change: MasterChange,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let MasterChange {
             master,
@@ -426,7 +467,10 @@ impl Visibility {
             old_radius,
             SightShape::Circle,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
         if let Some(s) = self.seers.get_mut(id) {
             s.master = master;
@@ -438,7 +482,10 @@ impl Visibility {
             new_radius,
             SightShape::Circle,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
         Ok(())
     }

@@ -3,8 +3,7 @@
 
 use crate::GenieError;
 use crate::garrison::transport::{
-    DEEP_WATER, DRAW_SCALE, DROP_GAP, DROP_TRIES, RETRIES, RETRY_SPREAD, RETRY_STEP, STACK_PLACE,
-    Shore, WATER,
+    DEEP_WATER, DRAW_SCALE, DROP_TRIES, RETRIES, RETRY_STEP, STACK_PLACE, Shore, WATER,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -21,10 +20,12 @@ use crate::math::rng::Well512;
 use crate::pathing::Pathing;
 use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION, ZoneMap, Zones};
+use crate::world::layer::generated::TilePathTuning;
+use crate::world::layer::generated::TransportTuning;
 
 /// `FUN_140aa3ba0`'s new point once no unit went ashore: from the old point (x, y), draws of the
 /// Action stream ("Unload": x, then y), each `r / 0xccc` tiles plus the old coordinate less
-/// [`RETRY_SPREAD`], while the terrain a map read sees at the last draw's tile
+/// `TransportTuning::retry_spread`, while the terrain a map read sees at the last draw's tile
 /// ([`Terrain::read`], kept while the tile is off the `map`) is water (22, 23 or 1), at most
 /// 100; the last draw becomes the point either way. It sails on (true) only when a draw left
 /// the water with more than one draw to spare: the 99th and 100th never count.
@@ -33,6 +34,7 @@ pub(crate) fn retry_point(
     map: GridSize,
     terrain: &Terrain,
     rng: &mut Well512,
+    transport_tuning: &TransportTuning,
 ) -> (Point, bool) {
     let (w, h) = (map.width(), map.height());
     let mut seen = DEEP_WATER;
@@ -44,8 +46,8 @@ pub(crate) fn retry_point(
         if !matches!(seen.get().wrapping_sub(DEEP_WATER.get()), 0 | 1) && seen != WATER {
             break;
         }
-        let x = (rng.rand15() / RETRY_STEP) as f32 + point.x() - RETRY_SPREAD;
-        let y = (rng.rand15() / RETRY_STEP) as f32 + point.y() - RETRY_SPREAD;
+        let x = (rng.rand15() / RETRY_STEP) as f32 + point.x() - transport_tuning.retry_spread;
+        let y = (rng.rand15() / RETRY_STEP) as f32 + point.y() - transport_tuning.retry_spread;
         at = Point::new(x, y);
         let (tx, ty) = (cvttss2si(x), cvttss2si(y));
         if 0 <= tx && 0 <= ty && tx < w && ty < h {
@@ -71,7 +73,7 @@ pub struct Around {
 /// `FUN_141192d10`'s draws (`find_drop_location`) for a unit of master radii `unit_radius` about
 /// `around`: up to 50 draws of the Object stream ("`find_drop_location`"). Each picks a side
 /// (`r * 4 / 0x7fff`: east, west, north or south past the radii, the unit's own and
-/// [`DROP_GAP`]), then a place along it (`r * 2 radius / 32767 - radius`, [`DRAW_SCALE`]); a draw
+/// `TransportTuning::drop_gap`), then a place along it (`r * 2 radius / 32767 - radius`, [`DRAW_SCALE`]); a draw
 /// of `0x7fff` (side 4) keeps the place the last draw left in `last` (the caller's across its
 /// calls; none yet is [`STACK_PLACE`]). The caller tests each place on the map
 /// ([`DropDraws::next_on_map`]): the first in its zone that the unit's master may take and the
@@ -111,12 +113,15 @@ impl<'a> DropDraws<'a> {
     /// # Errors
     ///
     /// [`STACK_PLACE`].
-    pub(crate) fn next_on_map(&mut self) -> Result<Option<Point>, GenieError> {
+    pub(crate) fn next_on_map(
+        &mut self,
+        transport_tuning: &TransportTuning,
+    ) -> Result<Option<Point>, GenieError> {
         let (w, h) = (self.map.width() as f32, self.map.height() as f32);
         while 0 < self.left {
             self.left -= 1;
             let (x, y) = {
-                let p = self.draw()?;
+                let p = self.draw(transport_tuning)?;
                 (p.x(), p.y())
             };
             if 0.0 > x || 0.0 > y || x >= w || y >= h {
@@ -128,11 +133,11 @@ impl<'a> DropDraws<'a> {
     }
 
     /// One draw: its side, then its place along it, which `last` keeps.
-    fn draw(&mut self) -> Result<Point, GenieError> {
+    fn draw(&mut self, transport_tuning: &TransportTuning) -> Result<Point, GenieError> {
         let (cx, cy) = (self.around.center.x(), self.around.center.y());
         let (rx, ry) = (self.around.radius.x(), self.around.radius.y());
-        let off_x = rx + (self.unit_radius.x() + DROP_GAP);
-        let off_y = ry + (self.unit_radius.y() + DROP_GAP);
+        let off_x = rx + (self.unit_radius.x() + transport_tuning.drop_gap);
+        let off_y = ry + (self.unit_radius.y() + transport_tuning.drop_gap);
         let along = |r: u32, radius: Distance, centre: f32| {
             ((r as i32 as f32 * (radius + radius)) / DRAW_SCALE - radius) + Distance::new(centre)
         };
@@ -198,7 +203,8 @@ pub(crate) fn in_zone(
 }
 
 /// The map as a unit's Transport reads it ([`Shore`]): the map's terrain, the zone maps and the
-/// planners, the unit's terrain restriction (its master's `+0x606`; none below 0) and its tile.
+/// planners, the unit's terrain restriction (its master's `+0x606`; none below 0), its tile and
+/// the tile paths' tuning values (the shore point's walk).
 pub(crate) struct MapShore<'a> {
     pub(super) terrain: &'a Terrain,
     pub(super) zones: &'a mut Zones,
@@ -207,6 +213,7 @@ pub(crate) struct MapShore<'a> {
     pub(super) map: GridSize,
     pub(super) restriction: Option<RestrictionId>,
     pub(super) tile: Tile,
+    pub(super) tile_path_tuning: &'a TilePathTuning,
 }
 
 impl<'a> MapShore<'a> {
@@ -221,6 +228,7 @@ impl<'a> MapShore<'a> {
         pathing: &'a mut Pathing,
         restriction: Option<RestrictionId>,
         position: Position,
+        tile_path_tuning: &'a TilePathTuning,
     ) -> Result<Self, GenieError> {
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
         Ok(Self {
@@ -231,6 +239,7 @@ impl<'a> MapShore<'a> {
             map: spatial.map,
             restriction,
             tile: position.tile(),
+            tile_path_tuning,
         })
     }
 
@@ -277,6 +286,6 @@ impl Shore for MapShore<'_> {
         else {
             return Ok(None);
         };
-        planner.last_open_point(from, to)
+        planner.last_open_point(from, to, self.tile_path_tuning)
     }
 }

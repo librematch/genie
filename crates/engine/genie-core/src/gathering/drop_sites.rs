@@ -15,10 +15,7 @@ use crate::objects::masters::MasterKind;
 use crate::pathing::tile_path::Found;
 
 use crate::map::spatial::Spatial;
-use crate::math::image::turn::{
-    DROP_NO_POINT, DROP_REACH as TURN_DROP_REACH, FISHING_REACH as TURN_FISHING_REACH,
-    NO_DROP_DISTANCE as TURN_NO_DROP_DISTANCE, SHORT_DROP_REACH as TURN_SHORT_DROP_REACH,
-};
+use crate::math::image::turn::{DROP_NO_POINT, NO_DROP_DISTANCE as TURN_NO_DROP_DISTANCE};
 use crate::movement::{Me, Mover, Planning, footprint_gap_squared};
 use crate::objects::layers::Action;
 use crate::objects::masters::Master;
@@ -68,8 +65,8 @@ impl Seeker<'_, '_> {
 
     /// What `FUN_1411671e0` measures to the drop site `o` (of `master`, its centre `squared`
     /// away), or none when the planner passes it over: the planner's result decides whether it
-    /// counts ([`counted`]); by path its path's length, within [`SHORT_DROP_REACH`] the shorter
-    /// of that and the short path ([`DROP_REACH`]), kept in `last`; without a planner `last`;
+    /// counts ([`counted`]); by path its path's length, within `TurnTuning::short_drop_reach` the shorter
+    /// of that and the short path (`TurnTuning::drop_reach`), kept in `last`; without a planner `last`;
     /// else `squared`.
     ///
     /// # Errors
@@ -84,30 +81,37 @@ impl Seeker<'_, '_> {
         last: &mut f32,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<f32>, GenieError> {
+        let tile_path_tuning = &by_id.tuning().tile_path;
+        let turn_tuning = &by_id.tuning().turn;
         let roles = by_id.roles();
         let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
         let to = o.position().ground();
         let ground = self.mover.stats.radius.ground();
         let near = || {
             footprint_gap_squared(self.unit.position(), ground, o.position(), master.radius)
-                <= FISHING_REACH
+                <= DistanceSquared::new(turn_tuning.fishing_reach)
         };
-        let planned =
-            self.mover
-                .plan_length(self.unit.position(), self.spatial, self.plan, to, radii)?;
+        let planned = self.mover.plan_length(
+            self.unit.position(),
+            self.spatial,
+            self.plan,
+            to,
+            radii,
+            tile_path_tuning,
+        )?;
         Ok(match planned {
             Some((found, length)) if counted(found, by_path, self.fishing(roles), near) => {
                 if !by_path {
                     return Ok(Some(squared));
                 }
                 *last = length.get();
-                if length.get() <= SHORT_DROP_REACH
+                if length.get() <= turn_tuning.short_drop_reach
                     && let Some(short) = self.mover.short_reach(
                         self.unit.position(),
                         &self.me,
                         self.spatial,
                         o.id,
-                        Distance::new(DROP_REACH),
+                        Distance::new(turn_tuning.drop_reach),
                         by_id,
                     )?
                     && short < length
@@ -143,13 +147,10 @@ impl Seeker<'_, '_> {
             .map(|p| p.position.ground()))
     }
 }
-/// The squared footprint gap within which a fishing ship counts a drop site its path does not
-/// reach (`DAT_14330ebcc`).
-pub(crate) const FISHING_REACH: DistanceSquared = DistanceSquared::new(TURN_FISHING_REACH);
 
 /// Whether the planner's result `found` lets a drop site count in [`drop_site_search`]: a path
 /// to it or into its range (below 2), or for a fishing ship seeking by path one the planner
-/// does not reach (3, the game's `3 <= result`) whose footprint lies `near` ([`FISHING_REACH`]).
+/// does not reach (3, the game's `3 <= result`) whose footprint lies `near` (`TurnTuning::fishing_reach`).
 pub(crate) fn counted(
     found: Found,
     by_path: bool,
@@ -172,7 +173,7 @@ pub(crate) fn counted(
 /// measured (of an earlier object, else the largest float) by path. Without a seeker, by the
 /// squared distance of the centres. A fishing ship (class 21) seeks in every zone, and by path a
 /// drop site the planner does not reach (its result 3 or more) counts by its path's length too
-/// while the footprints' squared gap (`FUN_14118f8c0`) is at most [`FISHING_REACH`]. A villager
+/// while the footprints' squared gap (`FUN_14118f8c0`) is at most `TurnTuning::fishing_reach`. A villager
 /// working a farm measures from the farm ([`Seeker::farm_worked`]), by the squared distance. The
 /// point [`NO_POINT`] on both axes takes the first object of a master in `sites` in state 2; a
 /// point at or below it on either axis has no zone and goes by the squared distance. The first
@@ -253,11 +254,6 @@ pub(crate) fn drop_site_search<'u>(
     Ok(best)
 }
 
-/// A drop site within this path length is measured by the short path too (`FUN_1411671e0`,
-/// `DAT_142eb0f4c`).
-pub(crate) const SHORT_DROP_REACH: f32 = TURN_SHORT_DROP_REACH;
-/// The range the short path measures a drop site within (`DAT_142eb5690`).
-pub(crate) const DROP_REACH: f32 = TURN_DROP_REACH;
 /// The distance a drop-site search starts from (`DAT_14330ebf4`, the largest float).
 pub(crate) const NO_DROP_DISTANCE: f32 = TURN_NO_DROP_DISTANCE;
 
@@ -322,6 +318,7 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::testing::class;
     use crate::testing::ids;
+
     use crate::world::WorldTime;
     #[cfg(test)]
     use crate::world::parts::{Object, no_own_masters};

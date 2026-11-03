@@ -4,9 +4,9 @@
 use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
+use crate::garrison::HALF_TILE;
 use crate::garrison::Walls;
 use crate::garrison::meeting::Meeting;
-use crate::garrison::{ENTER_NEAR, HALF_TILE};
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Position;
@@ -188,6 +188,7 @@ impl EnterAction {
         reads: &MoveToReads<'_>,
         by_id: ObjectsRef<'_>,
     ) -> Result<Walking, GenieError> {
+        let move_to_tuning = &by_id.tuning().move_to;
         self.state = EnterState::Walk { move_to: None };
         if t.in_reach {
             return Ok(Walking::Enter);
@@ -213,6 +214,7 @@ impl EnterAction {
                 self.walk_range(t.building),
                 self.moving,
                 TargetMoved::Ignores,
+                move_to_tuning,
             )?
         } else {
             reads.to_point_of(
@@ -220,6 +222,7 @@ impl EnterAction {
                 (self.point, self.walk_range(false).get()),
                 self.moving,
                 TargetMoved::Ignores,
+                move_to_tuning,
             )?
         };
         self.state = EnterState::Walk { move_to };
@@ -271,6 +274,7 @@ impl EnterAction {
             OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
             &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )
     }
 
@@ -292,10 +296,11 @@ impl EnterAction {
         walls: &mut Walls<'_>,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
+        let garrison_tuning = &by_id.tuning().garrison;
         if range.squared() < gap_squared {
             return Ok(false);
         }
-        if range <= ENTER_NEAR && Speed::ZERO < target_speed {
+        if range <= Distance::new(garrison_tuning.enter_near) && Speed::ZERO < target_speed {
             return Ok(!walls.walled_off(by_id)?);
         }
         Ok(true)

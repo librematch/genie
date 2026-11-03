@@ -461,6 +461,7 @@ impl World {
                 &mut self.spatial,
                 &mut self.pathing,
                 &self.model.roles,
+                self.model.tuning.visibility,
             )?;
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
@@ -505,7 +506,8 @@ impl World {
         if old < ObjectState::DyingSprite && ObjectState::Undead < new {
             forget_resource(&mut self.spatial, Some(master), id, position)?;
         }
-        self.spatial.sight_state(id, new, &self.model.roles)?;
+        self.spatial
+            .sight_state(id, new, &self.model.roles, self.model.tuning.visibility)?;
         if old < ObjectState::Removed && new == ObjectState::Removed {
             self.leave_storage(owner, master, |flag| flag == 32)?;
         }
@@ -561,7 +563,7 @@ impl World {
         }
         self.unwatch(owner, id)?;
         if let (Some(v), Some(at)) = (self.spatial.sight.as_mut(), death.unlink) {
-            v.unlink_building(at, master.radius)?;
+            v.unlink_building(at, master.radius, self.model.tuning.visibility)?;
         }
         self.combat_set_state(owner, id, ObjectState::Dying, master)?;
         if let Some(kind) = death.building.count {

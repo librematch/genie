@@ -105,7 +105,6 @@ pub struct Artifact {
 pub const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
 
 use crate::garrison::EnterAction;
-use crate::math::image::artifact::TOWN_CENTRE_OFFSET as ARTIFACT_TOWN_CENTRE_OFFSET;
 use crate::objects::layers::Action as LayersAction;
 use crate::objects::masters::MasterKind;
 pub use crate::ownership::artifact_state::ArtifactState;
@@ -114,12 +113,10 @@ use crate::unit_ai::NotifyKind;
 use crate::world::Tick;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::ArtifactTuning;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
 use std::mem::take;
-
-/// Livestock's `MoveTo` to a town centre walks to its place less this on both axes
-/// (`FUN_140aa0df0`, `DAT_142eae8d0`).
-const TOWN_CENTRE_OFFSET: f32 = ARTIFACT_TOWN_CENTRE_OFFSET;
 
 impl Artifact {
     /// A new action of a task whose moving sprite is `moving`, about to check for a new owner.
@@ -255,13 +252,15 @@ impl Artifact {
         to: WalkTo,
         (to_building, to_town_centre): (bool, bool),
         reads: &MoveToReads<'_>,
+        artifact_tuning: ArtifactTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(Targets, SubActionsGone), GenieError> {
         let range = if to_building { 1.0 } else { 0.0 };
         // its point (`+0x38`): the target's place, or the point below a town centre
         let held = if to_town_centre {
             WalkTo::unheld(Position::new(
-                to.at.x() - TOWN_CENTRE_OFFSET,
-                to.at.y() - TOWN_CENTRE_OFFSET,
+                to.at.x() - artifact_tuning.town_centre_offset,
+                to.at.y() - artifact_tuning.town_centre_offset,
                 to.at.z(),
             ))
         } else {
@@ -272,6 +271,7 @@ impl Artifact {
             Distance::new(range),
             self.moving,
             TargetMoved::Follows,
+            move_to_tuning,
         )?;
         let alive = to.state.is_none_or(|s| s < ObjectState::Removed);
         let released = self.set_target(None, false).released;
@@ -296,8 +296,9 @@ impl Artifact {
         &mut self,
         point: Position,
         reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<SubActionsGone, GenieError> {
-        let walk = reads.to_point(point, Distance::ZERO, self.moving)?;
+        let walk = reads.to_point(point, Distance::ZERO, self.moving, move_to_tuning)?;
         self.goal = Some(point);
         let gone = self.drop_sub_actions();
         self.sub = walk.map(|m| ArtifactSub::Walk {
@@ -670,6 +671,7 @@ mod tests {
     use crate::test_ids::object_id;
     use crate::testing::class;
     use crate::testing::roles;
+    use crate::testing::tuning;
     #[cfg(test)]
     use crate::world::WorldTime;
     use std::sync::Arc;
@@ -690,7 +692,11 @@ mod tests {
             ..Artifact::new(false, None)
         };
         assert_eq!(
-            a.take_point(Position::new(28.5, 93.5, 0.0), &move_reads(&sprites())),
+            a.take_point(
+                Position::new(28.5, 93.5, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to
+            ),
             Ok(SubActionsGone::default())
         );
         assert_eq!(
@@ -716,7 +722,11 @@ mod tests {
             ..a
         };
         assert_eq!(
-            walking.take_point(Position::new(28.5, 94.5, 0.0), &move_reads(&sprites())),
+            walking.take_point(
+                Position::new(28.5, 94.5, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to
+            ),
             Ok(SubActionsGone {
                 stops: true,
                 released: None
@@ -792,7 +802,8 @@ mod tests {
         assert_eq!(
             a.take_point(
                 Position::new(32.854_168, 120.729_164, 0.0),
-                &move_reads(&sprites())
+                &move_reads(&sprites()),
+                &tuning().move_to
             ),
             Ok(by_enter)
         );
@@ -818,6 +829,8 @@ mod tests {
                 object(9149, Position::new(5.0, 6.0, 0.0), true),
                 (true, false),
                 &move_reads(&sprites()),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert_eq!(
@@ -838,7 +851,11 @@ mod tests {
             ),
         });
         assert_eq!(
-            c.take_point(Position::new(3.0, 4.0, 0.0), &move_reads(&sprites())),
+            c.take_point(
+                Position::new(3.0, 4.0, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to
+            ),
             Ok(SubActionsGone {
                 stops: false,
                 released: Some(object_id(11970))
@@ -990,7 +1007,11 @@ mod tests {
         // a walking animal's MoveTo goes (its teardown stops the unit), and its target is let go
         let mut walking = Artifact::new(false, None);
         let _ = walking
-            .take_point(Position::new(28.5, 94.5, 0.0), &move_reads(&sprites()))
+            .take_point(
+                Position::new(28.5, 94.5, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to,
+            )
             .unwrap();
         walking.target = Some(object_id(9149));
         assert_eq!(
@@ -1085,6 +1106,8 @@ mod tests {
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
                 (true, false),
                 &move_reads(&sprites()),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert_eq!(
@@ -1107,6 +1130,8 @@ mod tests {
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
                 (true, false),
                 &move_reads(&sprites()),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert!(gone.stops);
@@ -1122,6 +1147,8 @@ mod tests {
                 object(300, Position::new(1.0, 2.0, 0.0), false),
                 (false, false),
                 &move_reads(&sprites()),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert_eq!(
@@ -1164,7 +1191,11 @@ mod tests {
     fn walk_the_motion_step_gives_up_at_its_start_fails() {
         let mut a = Artifact::new(false, None);
         let _ = a
-            .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&sprites()))
+            .take_point(
+                Position::new(35.5, 88.5, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to,
+            )
             .unwrap();
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().stats.speed = Speed::ZERO;
@@ -1285,7 +1316,11 @@ mod tests {
         let shown = |a: &Artifact| a.move_to().copied().and_then(|m| m.sprite).map(|g| g.id);
         let mut a = Artifact::new(false, None);
         let _ = a
-            .take_point(Position::new(28.5, 93.5, 0.0), &move_reads(&sprites))
+            .take_point(
+                Position::new(28.5, 93.5, 0.0),
+                &move_reads(&sprites),
+                &tuning().move_to,
+            )
             .unwrap();
         assert_eq!(shown(&a), Some(SpriteId::named(20)));
         let _ = a
@@ -1293,12 +1328,18 @@ mod tests {
                 object(9149, Position::new(1.0, 1.0, 0.0), true),
                 (false, false),
                 &move_reads(&sprites),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert_eq!(shown(&a), Some(SpriteId::named(21)));
         a.moving = Some(SpriteId::named(3));
         let _ = a
-            .take_point(Position::new(28.5, 93.5, 0.0), &move_reads(&sprites))
+            .take_point(
+                Position::new(28.5, 93.5, 0.0),
+                &move_reads(&sprites),
+                &tuning().move_to,
+            )
             .unwrap();
         assert_eq!(shown(&a), Some(SpriteId::named(3)));
         // a sprite the table lacks fails the move before it changes anything
@@ -1309,7 +1350,11 @@ mod tests {
         let mut lacking = before;
         assert!(
             lacking
-                .take_point(Position::new(1.0, 1.0, 0.0), &move_reads(&sprites))
+                .take_point(
+                    Position::new(1.0, 1.0, 0.0),
+                    &move_reads(&sprites),
+                    &tuning().move_to
+                )
                 .is_err()
         );
         assert!(
@@ -1317,7 +1362,9 @@ mod tests {
                 .take_object(
                     object(9149, Position::new(1.0, 1.0, 0.0), true),
                     (false, false),
-                    &move_reads(&sprites)
+                    &move_reads(&sprites),
+                    tuning().artifact,
+                    &tuning().move_to
                 )
                 .is_err()
         );
@@ -1334,6 +1381,8 @@ mod tests {
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
                 (true, true),
                 &move_reads(&sprites()),
+                tuning().artifact,
+                &tuning().move_to,
             )
             .unwrap();
         assert_eq!(
@@ -1362,7 +1411,11 @@ mod tests {
             graphics: &graphics,
         };
         let _ = a
-            .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&with_3))
+            .take_point(
+                Position::new(35.5, 88.5, 0.0),
+                &move_reads(&with_3),
+                &tuning().move_to,
+            )
             .unwrap();
         let mut rig = Rig::on_the_path(Victim::default());
         // the top speed derives from the base and the sprite shown
@@ -1382,7 +1435,11 @@ mod tests {
         assert_eq!(rig.posted(), vec![in_the_way]);
         let mut walking = Artifact::new(false, None);
         let _ = walking
-            .take_point(Position::new(35.5, 88.5, 0.0), &move_reads(&sprites()))
+            .take_point(
+                Position::new(35.5, 88.5, 0.0),
+                &move_reads(&sprites()),
+                &tuning().move_to,
+            )
             .unwrap();
         let start = walking.move_to().copied().unwrap();
         walking.sub = Some(ArtifactSub::Walk {

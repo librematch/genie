@@ -24,6 +24,7 @@ use crate::objects::unit::Unit;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
 
 /// The last object state a `MoveTo` takes as its target (`FUN_140a7a230`: one above is refused,
 /// its id −1).
@@ -163,6 +164,7 @@ impl<'g> MoveToReads<'g> {
         range: Distance,
         given: Option<SpriteId>,
         on_target_moved: TargetMoved,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let (target, gap) = to.held();
         let walk = MoveToAction {
@@ -175,7 +177,7 @@ impl<'g> MoveToReads<'g> {
             on_target_moved,
             wait: MoveWait::NEW,
         };
-        Ok(walk.added(self.state, Distance::new(gap), self.speed))
+        Ok(walk.added(self.state, Distance::new(gap), self.speed, move_to_tuning))
     }
 
     /// A quiet `MoveTo` to `point` within `range` (`FUN_140aa0d30`, `FUN_140a7a170` with 1) that
@@ -192,6 +194,7 @@ impl<'g> MoveToReads<'g> {
         (point, range): (Position, f32),
         given: Option<SpriteId>,
         on_target_moved: TargetMoved,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let (target, gap) = to.held();
         let walk = MoveToAction {
@@ -199,7 +202,7 @@ impl<'g> MoveToReads<'g> {
             on_target_moved,
             ..MoveToAction::sub_to_point(point, Distance::new(range), self.sprites.to_point(given)?)
         };
-        Ok(walk.added(self.state, Distance::new(gap), self.speed))
+        Ok(walk.added(self.state, Distance::new(gap), self.speed, move_to_tuning))
     }
 
     /// `FUN_140aa0df0` without a target: no target, its zeroed point ([`NO_TARGET_POINT`]), far
@@ -212,6 +215,7 @@ impl<'g> MoveToReads<'g> {
         &self,
         range: Distance,
         given: Option<SpriteId>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let walk = MoveToAction {
             state: MoveTo::Start,
@@ -223,7 +227,12 @@ impl<'g> MoveToReads<'g> {
             on_target_moved: TargetMoved::Follows,
             wait: MoveWait::NEW,
         };
-        Ok(walk.added(self.state, Distance::new(NO_TARGET_GAP), self.speed))
+        Ok(walk.added(
+            self.state,
+            Distance::new(NO_TARGET_GAP),
+            self.speed,
+            move_to_tuning,
+        ))
     }
 
     /// A quiet `MoveTo` to `point` within `range` (`FUN_140aa0d30`, then `FUN_140a7a170` with 1)
@@ -238,9 +247,15 @@ impl<'g> MoveToReads<'g> {
         point: Position,
         range: Distance,
         given: Option<SpriteId>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let walk = MoveToAction::sub_to_point(point, range, self.sprites.to_point(given)?);
-        Ok(walk.added(self.state, Distance::new(NO_TARGET_GAP), self.speed))
+        Ok(walk.added(
+            self.state,
+            Distance::new(NO_TARGET_GAP),
+            self.speed,
+            move_to_tuning,
+        ))
     }
 }
 
@@ -276,6 +291,7 @@ mod tests {
     use crate::construction::build::tests::graphics;
     use crate::movement::move_to::MoveDefaults;
     use crate::test_ids::object_id;
+    use crate::testing::tuning;
 
     /// The sub-action `MoveTo`s (`FUN_140aa0df0`, `FUN_140aa0d30`, then `FUN_140a977e0`): one to an
     /// object takes its maker's sprite, else the object default; one to a point the point default;
@@ -306,9 +322,15 @@ mod tests {
             state: Some(ObjectState::Foundation),
         };
         let to = |w: &MoveToReads<'_>, to, given| {
-            w.to_object(to, Distance::new(0.1), given, TargetMoved::Follows)
-                .unwrap()
-                .unwrap()
+            w.to_object(
+                to,
+                Distance::new(0.1),
+                given,
+                TargetMoved::Follows,
+                &tuning().move_to,
+            )
+            .unwrap()
+            .unwrap()
         };
         let m = to(&move_reads, house, None);
         assert_eq!(
@@ -355,7 +377,7 @@ mod tests {
         };
         assert_eq!(to(&stuck, house, None).state, MoveTo::Failed);
         let nothing = move_reads
-            .to_nothing(Distance::new(0.1), None)
+            .to_nothing(Distance::new(0.1), None, &tuning().move_to)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -367,7 +389,12 @@ mod tests {
             (MoveTo::Start, -1, Position::ORIGIN)
         );
         let point = move_reads
-            .to_point(Position::new(4.0, 5.0, 0.0), Distance::ZERO, None)
+            .to_point(
+                Position::new(4.0, 5.0, 0.0),
+                Distance::ZERO,
+                None,
+                &tuning().move_to,
+            )
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -384,11 +411,22 @@ mod tests {
             ..move_reads
         };
         assert_eq!(
-            dying.to_object(house, Distance::new(0.1), None, TargetMoved::Follows),
+            dying.to_object(
+                house,
+                Distance::new(0.1),
+                None,
+                TargetMoved::Follows,
+                &tuning().move_to
+            ),
             Ok(None)
         );
         assert_eq!(
-            dying.to_point(Position::new(4.0, 5.0, 0.0), Distance::ZERO, None),
+            dying.to_point(
+                Position::new(4.0, 5.0, 0.0),
+                Distance::ZERO,
+                None,
+                &tuning().move_to
+            ),
             Ok(None)
         );
         assert!(
@@ -396,7 +434,8 @@ mod tests {
                 .to_point(
                     Position::new(4.0, 5.0, 0.0),
                     Distance::ZERO,
-                    Some(SpriteId::named(99))
+                    Some(SpriteId::named(99)),
+                    &tuning().move_to
                 )
                 .is_err()
         );

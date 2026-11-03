@@ -7,7 +7,6 @@ use crate::gathering::DropSiteId;
 use crate::gathering::closest_resource::{ResourceWorld, closest_resource_of};
 use crate::map::DistanceSquared;
 use crate::map::Position;
-use crate::math::image::turn::CART_REACH as TURN_CART_REACH;
 use crate::math::rng::Stream;
 use crate::movement::{Planning, footprint_gap_squared};
 use crate::objects::ListIndex;
@@ -106,7 +105,6 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> Result<(Option<ObjectId>, Position), GenieError> {
-        const CART_REACH: DistanceSquared = DistanceSquared::new(TURN_CART_REACH);
         let id = self.players.live(p, idx)?.id;
         let current = self
             .parts
@@ -200,7 +198,7 @@ impl World {
         let cart_master = self.players.live(p, idx)?.master(self.master_tables(), p)?;
         let at = self.players.live(p, idx)?.position();
         let mut best: Option<(ObjectId, Position)> = None;
-        let mut best_d = CART_REACH;
+        let mut best_d = DistanceSquared::new(self.model.tuning.turn.cart_reach);
         for f in found {
             let Some(o) = self.spatial.get(f) else {
                 continue;

@@ -10,9 +10,8 @@ use crate::math::fmath::{at_most_or_unordered, maxss, sqrt};
 use crate::objects::ObjectId;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
-    DIRECTIONS, EXIT_STEP, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex,
-    NodeList, ONE, Point, SAME_END, SIDES, SQRT_2, Target, WalkResult, Waypoints, Within,
-    walk_length,
+    DIRECTIONS, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex, NodeList,
+    ONE, Point, SIDES, SQRT_2, Target, WalkResult, Waypoints, Within, walk_length,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -279,11 +278,16 @@ impl HullPather<'_> {
         p: Point,
         goal: Option<Point>,
     ) -> Result<bool, GenieError> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let d = self.radius + self.radius;
         let mut made = false;
         for dir in DIRECTIONS {
             let mut q = Point::new(d.get() * dir.x() + p.x(), d.get() * dir.y() + p.y());
-            if let Some((at, _)) = self.hulls.checked(hull.index())?.intersection(false, p, q) {
+            if let Some((at, _)) =
+                self.hulls
+                    .checked(hull.index())?
+                    .intersection(false, p, q, hull_path_tuning)
+            {
                 q = at;
             }
             if self.hulls.checked(hull.index())?.box_holding(q).is_none() {
@@ -316,7 +320,7 @@ impl HullPather<'_> {
     }
 
     /// Keeps a walk's way out of a hull at `end` as one of `paths` (`count` kept, at most `most`):
-    /// a path ending within [`SAME_END`] of one kept replaces it when it costs no more, else is
+    /// a path ending within `HullPathTuning::same_end` of one kept replaces it when it costs no more, else is
     /// dropped. Returns the path's slot.
     pub(super) fn keep_path(
         &mut self,
@@ -324,6 +328,7 @@ impl HullPather<'_> {
         count: &mut usize,
         end: NodeIndex,
     ) -> Result<Option<usize>, GenieError> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let at = self.nodes.checked(end)?.at;
         let cost = self.nodes.checked(end)?.cost;
         let mut k = 0;
@@ -333,7 +338,9 @@ impl HullPather<'_> {
                 .points
                 .last()
                 .unwrap_or(&Point::new(f32::NAN, f32::NAN));
-            if (at.x() - last.x()).abs() < SAME_END && (at.y() - last.y()).abs() < SAME_END {
+            if (at.x() - last.x()).abs() < hull_path_tuning.same_end
+                && (at.y() - last.y()).abs() < hull_path_tuning.same_end
+            {
                 if paths.checked(k)?.cost < cost {
                     return Ok(None);
                 }
@@ -495,6 +502,7 @@ impl HullPather<'_> {
         from: Point,
         goal: Option<Point>,
     ) -> Result<(Option<usize>, bool), GenieError> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let root = self.add_unrefused(UnrefusedNode {
             list: NodeList::WALKS,
             open: true,
@@ -512,7 +520,14 @@ impl HullPather<'_> {
         let mut made = self.first_steps(hull, root, from, goal)?;
         let bounds = self.hulls.checked(hull.index())?.objects.checked(b)?.bounds;
         let d = self.radius + self.radius;
-        made |= self.side_points(hull, root, bounds, from, EXIT_STEP, Some((from, d.get())))?;
+        made |= self.side_points(
+            hull,
+            root,
+            bounds,
+            from,
+            hull_path_tuning.exit_step,
+            Some((from, d.get())),
+        )?;
         Ok((inside, !made))
     }
 

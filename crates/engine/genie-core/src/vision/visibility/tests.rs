@@ -10,7 +10,9 @@ use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
@@ -262,7 +264,10 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
             Footprint::new(0.2, 0.2),
             SightShape::Circle,
             SightCentre::Tile,
-            &roles(),
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
         )
         .unwrap();
     let tile = |x: i32, y: i32| (y * 120 + x) as usize;
@@ -273,7 +278,10 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         Footprint::new(0.2, 0.2),
         (PlayerId::new(1), 3.0),
         true,
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     )
     .unwrap();
     assert_eq!(v.maps[0].counts[tile(12, 10)], 0);
@@ -287,7 +295,10 @@ fn an_ownership_change_moves_the_sight_of_an_object_that_sees() {
         Footprint::new(0.2, 0.2),
         (PlayerId::new(2), 4.0),
         false,
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     )
     .unwrap();
     assert_eq!(v.maps[1].counts[tile(13, 10)], 1);
@@ -539,7 +550,10 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
             r,
             SightShape::Circle,
             SightCentre::Tile,
-            &roles(),
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
         )
         .unwrap();
     let before = v.maps[1].counts.clone();
@@ -549,6 +563,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(5.9, 5.2, 0.0),
         r,
         &roles(),
+        tuning().visibility,
     )
     .unwrap();
     assert_eq!(v.maps[1].counts, before, "the same tile");
@@ -558,6 +573,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         Position::new(6.1, 5.2, 0.0),
         r,
         &roles(),
+        tuning().visibility,
     )
     .unwrap();
     assert_eq!(v.maps[1].counts[v.index(Tile::new(8, 5))], 1);
@@ -568,6 +584,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         r,
         ObjectState::Dying,
         &roles(),
+        tuning().visibility,
     )
     .unwrap();
     let seen: Vec<_> = (0..120 * 120)
@@ -588,6 +605,7 @@ fn unit_sight_moves_with_its_tile_and_shrinks_to_its_footprint_when_it_dies() {
         r,
         ObjectState::Removed,
         &roles(),
+        tuning().visibility,
     )
     .unwrap();
     assert!(v.maps[1].counts.iter().all(|&c| c <= 0));
@@ -695,8 +713,12 @@ fn the_extent_list_matches_the_saved_entries_of_town_centre_and_house() {
 fn first_sight_of_building_tile_explores_the_building() {
     let mut v = world(PlayerId::new(3));
     assert_eq!(
-        v.link_building(Position::new(29.0, 94.0, 0.0), Footprint::new(2.0, 2.0))
-            .unwrap(),
+        v.link_building(
+            Position::new(29.0, 94.0, 0.0),
+            Footprint::new(2.0, 2.0),
+            tuning().visibility
+        )
+        .unwrap(),
         1
     );
     assert_eq!(v.link(Tile::new(29, 94)).unwrap(), (ANCHOR, 1));
@@ -721,8 +743,12 @@ fn first_sight_of_building_tile_explores_the_building() {
     assert_eq!(v.maps[1].counts[v.index(Tile::new(27, 92))], 1);
     assert_eq!(v.maps[1].counts[v.index(Tile::new(30, 95))], 0);
     assert_eq!(v.maps[1].explored, TileCount::new(16));
-    v.unlink_building(Position::new(29.0, 94.0, 0.0), Footprint::new(2.0, 2.0))
-        .unwrap();
+    v.unlink_building(
+        Position::new(29.0, 94.0, 0.0),
+        Footprint::new(2.0, 2.0),
+        tuning().visibility,
+    )
+    .unwrap();
     assert_eq!(v.link(Tile::new(29, 94)).unwrap(), (0, 0));
 }
 
@@ -745,7 +771,10 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
             r,
             SightShape::Circle,
             SightCentre::Tile,
-            &roles()
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility
+            }
         )
         .unwrap(),
         TileCount::ZERO,
@@ -757,11 +786,14 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         r,
         SightShape::Footprint,
         SightCentre::Tile,
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     )
     .unwrap();
     assert!(v.maps[2].counts.iter().all(|&c| c == -1));
-    v.construction_started(object_id(9), at, r, &roles())
+    v.construction_started(object_id(9), at, r, &roles(), tuning().visibility)
         .unwrap();
     let seen = |v: &Visibility| (0..120 * 120).filter(|&i| 0 < v.maps[2].counts[i]).count();
     assert_eq!(seen(&v), 4);
@@ -777,7 +809,10 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         r,
         SightShape::Footprint,
         SightCentre::Tile,
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     )
     .unwrap();
     let _ = v
@@ -787,7 +822,10 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
             r,
             SightShape::Circle,
             SightCentre::Tile,
-            &roles(),
+            SightLayer {
+                roles: &roles(),
+                visibility_tuning: tuning().visibility,
+            },
         )
         .unwrap();
     // the table of a tile corner: at LOS 2 a 4 by 4 square around the corner

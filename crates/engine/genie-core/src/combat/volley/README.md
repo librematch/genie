@@ -17,5 +17,5 @@ its action.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`production`](../../production/), [`vision`](../../vision/), [`world`](../../world/).
+- Uses: [`map`](../../map/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`vision`](../../vision/), [`world`](../../world/).
 <!-- /uses -->

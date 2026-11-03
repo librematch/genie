@@ -4,8 +4,8 @@
 use crate::GenieError;
 use crate::groups::Motion;
 use crate::groups::motion::{
-    CLOSE, EPSILON, LAST_TRIES, Lead, LeadGroup, NEAR, PATROL_PAUSE, Pass, SHORT_LENGTH,
-    SHORT_REACH, STUCK_PAUSE, StepWorld, ground, hold, point, reset_level,
+    EPSILON, LAST_TRIES, Lead, LeadGroup, PATROL_PAUSE, Pass, STUCK_PAUSE, StepWorld, ground, hold,
+    point, reset_level,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -27,6 +27,7 @@ use crate::pathing::ShortFound;
 use crate::pathing::tile_path::Path;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// What the request plans toward: the walked level's number, range and target, its waypoint,
@@ -56,11 +57,11 @@ struct PathSoFar {
 
 /// The path request of the walked level in state 2 (`0x14104a80b` on): see [`path_step`]. Its
 /// turn first ([`take_turn`]); then the tile pathfinder for a top level ([`tile_plan`]); without
-/// a plan of three points or more, the short pather for a waypoint within [`SHORT_REACH`]
+/// a plan of three points or more, the short pather for a waypoint within `GroupTuning::short_reach`
 /// ([`short_plan`]), and with still no plan the straight way when the waypoint (less the
-/// level's range at a top level's last waypoint) or the target is nearer than [`CLOSE`]
+/// level's range at a top level's last waypoint) or the target is nearer than `GroupTuning::close`
 /// ([`straight_way`]); with none found, or a path of fewer than two points or shorter than
-/// [`SHORT_LENGTH`], the long pather ([`long_plan`]). The path goes to the link ([`link`]).
+/// `GroupTuning::short_length`, the long pather ([`long_plan`]). The path goes to the link ([`link`]).
 ///
 /// [`path_step`]: crate::groups::motion::step::path_step
 pub(super) fn request(
@@ -71,6 +72,7 @@ pub(super) fn request(
     target: Option<&Placed>,
     target_gap2: DistanceSquared,
 ) -> Result<Option<Pass>, GenieError> {
+    let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     if let Some(pass) = take_turn(motion, lead, world, budget)? {
         return Ok(Some(pass));
@@ -100,7 +102,7 @@ pub(super) fn request(
     };
     let mut long = false;
     if !plan.has_plan || plan.path.points.len() < 3 {
-        if leg.way.get() <= SHORT_REACH
+        if leg.way.get() <= group_tuning.short_reach
             && let Some(pass) = short_plan(
                 motion,
                 lead,
@@ -114,13 +116,18 @@ pub(super) fn request(
             return Ok(Some(pass));
         }
         if !plan.has_plan {
-            if beyond.get() < CLOSE || target_gap2 < DistanceSquared::new(CLOSE) {
-                straight_way(lead, world.spatial, &leg, &mut plan)?;
+            if beyond.get() < group_tuning.close
+                || target_gap2 < DistanceSquared::new(group_tuning.close)
+            {
+                straight_way(lead, world.spatial, &leg, &mut plan, group_tuning)?;
             }
             long = !plan.found;
         }
     }
-    if long || plan.path.points.len() < 2 || plan.path.length < SHORT_LENGTH {
+    if long
+        || plan.path.points.len() < 2
+        || plan.path.length < Distance::new(group_tuning.short_length)
+    {
         long_plan(lead, world.spatial, &leg, target, &mut plan, by_id)?;
     }
     let now = world.plan.now;
@@ -235,6 +242,7 @@ fn short_plan(
     short_range: Distance,
     plan: &mut PathSoFar,
 ) -> Result<Option<Pass>, GenieError> {
+    let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     let spatial = &mut *world.spatial;
     plan.planned = false;
@@ -273,7 +281,7 @@ fn short_plan(
     let reach = if target.is_none() || Distance::ZERO < leg.range {
         leg.range
     } else {
-        Distance::new(NEAR)
+        Distance::new(group_tuning.near)
     };
     Ok(Some(in_range(
         motion,
@@ -316,6 +324,7 @@ fn straight_way(
     spatial: &mut Spatial,
     leg: &Leg,
     plan: &mut PathSoFar,
+    group_tuning: &GroupTuning,
 ) -> Result<(), GenieError> {
     let ignore: Vec<RecordId> = lead
         .group
@@ -325,8 +334,8 @@ fn straight_way(
         .map(RecordId::from)
         .collect();
     let hits = spatial.line_query(
-        hold(leg.at, spatial.map),
-        hold(leg.waypoint, spatial.map),
+        hold(leg.at, spatial.map, group_tuning),
+        hold(leg.waypoint, spatial.map, group_tuning),
         lead.walker.radius,
         Some(lead.walker.mask),
         &ignore,

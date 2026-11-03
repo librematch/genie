@@ -36,7 +36,11 @@ impl World {
         self.notify_transport((p, i), (target, point), clears)?;
         self.clear_actions(p, i)?;
         let mut t = TransportAction::on_task(Some(task.id), point);
-        let changed = self.with_shore(p, i, t.task, |ship, shore| t.start(true, ship, shore))?;
+        let move_to_tuning = self.model.tuning.move_to;
+        let transport_tuning = self.model.tuning.transport;
+        let changed = self.with_shore(p, i, t.task, |ship, shore| {
+            t.start(true, ship, shore, &transport_tuning, &move_to_tuning)
+        })?;
         self.parts
             .actions_mut(self.players.live(p, i)?.id)?
             .list
@@ -85,8 +89,17 @@ impl World {
             .ok_or(GenieError::unreachable(
                 "a Transport on top without its action",
             ))?;
+        let move_to_tuning = self.model.tuning.move_to;
+        let transport_tuning = self.model.tuning.transport;
         let changed = self.with_shore(p, i, t.task, |ship, shore| {
-            t.work(point, by_self, ship, shore)
+            t.work(
+                point,
+                by_self,
+                ship,
+                shore,
+                &transport_tuning,
+                &move_to_tuning,
+            )
         })?;
         self.parts
             .actions_mut(self.players.live(p, i)?.id)?
@@ -196,6 +209,7 @@ impl World {
             &mut self.pathing,
             restriction,
             ship.position,
+            &self.model.tuning.tile_path,
         )?;
         f(&ship, &mut shore)
     }

@@ -74,7 +74,12 @@ fn the_record_cells_answer_as_the_full_scan_does() {
         match next() % 7 {
             0 | 1 => s.insert(object_id(id), placed(position, r, kind)),
             2 | 3 => s
-                .set_position(object_id(id), position.with_height(0.0), &roles())
+                .set_position(
+                    object_id(id),
+                    position.with_height(0.0),
+                    &roles(),
+                    tuning().visibility,
+                )
                 .unwrap(),
             4 => {
                 let here = s
@@ -342,6 +347,8 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                 },
                 &roles(),
                 &tuning().best_target,
+                &tuning().spatial,
+                tuning().registry,
             )
             .unwrap();
         (f.enemies, f.fresh)
@@ -1176,8 +1183,13 @@ fn unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
     s.insert(object_id(9177), villager(1.9, 1.0));
     assert_eq!(s.tiles().objects(Tile::new(1, 1)), Some(1));
     assert_eq!(s.tiles().word(Tile::new(1, 1)), Some(4));
-    s.set_position(object_id(9177), Position::new(2.05, 1.0, 0.0), &roles())
-        .unwrap();
+    s.set_position(
+        object_id(9177),
+        Position::new(2.05, 1.0, 0.0),
+        &roles(),
+        tuning().visibility,
+    )
+    .unwrap();
     assert_eq!(
         (
             s.tiles().objects(Tile::new(1, 1)),
@@ -1203,8 +1215,13 @@ fn tile_list_keeps_the_game_order() {
     );
     assert_eq!(s.tile_place(object_id(9173)), 2);
     // the leaving object's slot goes to the last
-    s.set_position(object_id(9171), Position::new(2.1, 1.0, 0.0), &roles())
-        .unwrap();
+    s.set_position(
+        object_id(9171),
+        Position::new(2.1, 1.0, 0.0),
+        &roles(),
+        tuning().visibility,
+    )
+    .unwrap();
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029)]
@@ -1214,15 +1231,25 @@ fn tile_list_keeps_the_game_order() {
         (0, 0)
     );
     // a move within the tile and a master change keep the slot
-    s.set_position(object_id(9173), Position::new(1.2, 1.0, 0.0), &roles())
-        .unwrap();
+    s.set_position(
+        object_id(9173),
+        Position::new(1.2, 1.0, 0.0),
+        &roles(),
+        tuning().visibility,
+    )
+    .unwrap();
     s.change_master(object_id(9173), villager(1.2, 1.0));
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029)]
     );
-    s.set_position(object_id(9171), Position::new(1.0, 1.0, 0.0), &roles())
-        .unwrap();
+    s.set_position(
+        object_id(9171),
+        Position::new(1.0, 1.0, 0.0),
+        &roles(),
+        tuning().visibility,
+    )
+    .unwrap();
     assert_eq!(
         s.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029), object_id(9171)]
@@ -2284,6 +2311,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         farm: &farm,
         roles: &roles,
         best_target_tuning: &tuning().best_target,
+        spatial_tuning: &tuning().spatial,
     };
     let p = villager(1.0, 1.0);
     let kept = |filter, p: &Placed, state, searcher, checks| {
@@ -2517,6 +2545,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         farm: &look,
         roles: &roles,
         best_target_tuning: &tuning().best_target,
+        spatial_tuning: &tuning().spatial,
     };
     let s = seer_in(ObjectState::Alive);
     assert!(

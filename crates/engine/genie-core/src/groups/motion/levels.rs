@@ -2,7 +2,6 @@
 //! points and ground lengths.
 
 use crate::GenieError;
-use crate::groups::motion::NEAR;
 use crate::map::Distance;
 use crate::map::GridSize;
 use crate::map::Point;
@@ -12,6 +11,7 @@ use crate::movement::LevelFlags;
 use crate::movement::PathData;
 use crate::movement::WaypointIndex;
 use crate::world::Seconds;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// `FUN_140f9b4d0(level, bit, on)` on the walked level: its flag `flag` set or cleared;
@@ -73,7 +73,12 @@ pub(in crate::groups) enum Passing {
 }
 
 /// `FUN_141046130` for a walk from `at` toward `waypoint` that would end at `next`.
-pub(in crate::groups) fn passes_waypoint(waypoint: BVector, at: BVector, next: BVector) -> Passing {
+pub(in crate::groups) fn passes_waypoint(
+    waypoint: BVector,
+    at: BVector,
+    next: BVector,
+    group_tuning: &GroupTuning,
+) -> Passing {
     let mut a = fmath::sub(waypoint, at);
     let mut b = fmath::sub(waypoint, next);
     let c = fmath::sub(next, at);
@@ -84,7 +89,7 @@ pub(in crate::groups) fn passes_waypoint(waypoint: BVector, at: BVector, next: B
     let step = fmath::sqrt(c.x() * c.x() + c.height() * c.height() + c.y() * c.y());
     if fmath::at_most_or_unordered(step, to_waypoint) {
         Passing::Short
-    } else if to_waypoint < beyond || step < NEAR {
+    } else if to_waypoint < beyond || step < group_tuning.near {
         Passing::Passes
     } else {
         Passing::Reaches
@@ -93,12 +98,12 @@ pub(in crate::groups) fn passes_waypoint(waypoint: BVector, at: BVector, next: B
 
 /// `FUN_1411570c0`'s ends held inside the map: below 0 at 0, from the map's size on at the size
 /// less 0.1, per axis.
-pub(in crate::groups) fn hold(p: BVector, map: GridSize) -> Point {
+pub(in crate::groups) fn hold(p: BVector, map: GridSize, group_tuning: &GroupTuning) -> Point {
     let axis = |v: f32, size: i32| {
         if v < 0.0 {
             0.0
         } else if size as f32 <= v {
-            size as f32 - NEAR
+            size as f32 - group_tuning.near
         } else {
             v
         }

@@ -11,9 +11,6 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Point;
-use crate::math::image::registry::{
-    MARGIN as REGISTRY_MARGIN, MOST_RADIUS as REGISTRY_MOST_RADIUS,
-};
 use crate::objects::IdTable;
 use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
@@ -23,17 +20,12 @@ use crate::players::PlayerId;
 use crate::players::UnitRelation;
 use crate::players::UnitRelations;
 use crate::vision::VisionBits;
+use crate::world::layer::generated::RegistryTuning;
 use crate::world::slots::CheckedIndex;
 
 /// The players a mask has room for in `Update_Unit_Info`'s loop: the object's record pointers
 /// (`+0x8b0`) are nine.
 pub const SLOTS: usize = 9;
-
-/// The query's cap on the radius (`DAT_142f64e88`).
-const MOST_RADIUS: f32 = REGISTRY_MOST_RADIUS;
-
-/// The query box's margin (`DAT_142ec9eb8`).
-const MARGIN: f32 = REGISTRY_MARGIN;
 
 /// The records a query keeps per relation (`0x1c00` bytes per output list).
 pub const MOST_FOUND: usize = 256;
@@ -263,6 +255,7 @@ impl Registry {
     pub fn visible_units(
         &self,
         query: VisibleQuery<'_>,
+        registry_tuning: RegistryTuning,
     ) -> Result<Option<ByRelation<Vec<Record>>>, GenieError> {
         let VisibleQuery {
             player,
@@ -280,15 +273,21 @@ impl Registry {
             return Ok(None);
         }
         let radius = radius.get();
-        let radius = if radius <= MOST_RADIUS {
+        let radius = if radius <= registry_tuning.most_radius {
             radius
         } else {
-            MOST_RADIUS
+            registry_tuning.most_radius
         };
         let wide = radius + rx;
         let tall = radius + ry;
-        let (x0, x1) = ((x - wide) - MARGIN, x + wide + MARGIN);
-        let (y0, y1) = ((y - tall) - MARGIN, y + tall + MARGIN);
+        let (x0, x1) = (
+            (x - wide) - registry_tuning.margin,
+            x + wide + registry_tuning.margin,
+        );
+        let (y0, y1) = (
+            (y - tall) - registry_tuning.margin,
+            y + tall + registry_tuning.margin,
+        );
         let round = f32::midpoint(wide - rx, tall - ry);
         let mut found: ByRelation<Vec<Record>> = ByRelation::default();
         for &class in classes {
@@ -349,6 +348,7 @@ mod tests {
     use crate::players::{ByPlayer, relations};
     use crate::test_ids::{class_id, object_id};
     use crate::testing::class;
+    use crate::testing::tuning;
 
     fn registry() -> Registry {
         Registry::new(3, 65)
@@ -445,16 +445,19 @@ mod tests {
         .unwrap();
         let relations = relations([1, 4, 4]);
         let found = r
-            .visible_units(VisibleQuery {
-                player: PlayerId::new(0),
-                position: Point::new(10.0, 10.0),
-                radius: Distance::new(3.0),
-                mode: 0,
-                classes: &[class_id(4), class_id(9)],
-                relations: &relations,
-                size: Footprint::new(0.2, 0.2),
-                wanted: 0xff,
-            })
+            .visible_units(
+                VisibleQuery {
+                    player: PlayerId::new(0),
+                    position: Point::new(10.0, 10.0),
+                    radius: Distance::new(3.0),
+                    mode: 0,
+                    classes: &[class_id(4), class_id(9)],
+                    relations: &relations,
+                    size: Footprint::new(0.2, 0.2),
+                    wanted: 0xff,
+                },
+                tuning().registry,
+            )
             .unwrap()
             .unwrap();
         // 1 is 1.8 off along x, 2 is 3.3 off along y (beyond 3.2), 3 is at the corner and beyond
@@ -481,16 +484,19 @@ mod tests {
                 < 1e-6
         );
         assert_eq!(
-            r.visible_units(VisibleQuery {
-                player: PlayerId::new(0),
-                position: Point::new(10.0, 10.0),
-                radius: Distance::new(3.0),
-                mode: 0,
-                classes: &[],
-                relations: &relations,
-                size: Footprint::new(0.2, 0.2),
-                wanted: 0xff
-            })
+            r.visible_units(
+                VisibleQuery {
+                    player: PlayerId::new(0),
+                    position: Point::new(10.0, 10.0),
+                    radius: Distance::new(3.0),
+                    mode: 0,
+                    classes: &[],
+                    relations: &relations,
+                    size: Footprint::new(0.2, 0.2),
+                    wanted: 0xff
+                },
+                tuning().registry
+            )
             .unwrap(),
             None
         );
@@ -520,20 +526,23 @@ mod tests {
         })
         .unwrap();
         let found = r
-            .visible_units(VisibleQuery {
-                player: PlayerId::new(0),
-                position: Point::new(10.0, 10.0),
-                radius: Distance::new(100.0),
-                mode: 1,
-                classes: &[class_id(4)],
-                relations: &ByPlayer::new(vec![
-                    Some(UnitRelation::OWN),
-                    Some(UnitRelation::ENEMY),
-                    Some(UnitRelation::ENEMY),
-                ]),
-                size: Footprint::new(0.2, 0.2),
-                wanted: 0xff,
-            })
+            .visible_units(
+                VisibleQuery {
+                    player: PlayerId::new(0),
+                    position: Point::new(10.0, 10.0),
+                    radius: Distance::new(100.0),
+                    mode: 1,
+                    classes: &[class_id(4)],
+                    relations: &ByPlayer::new(vec![
+                        Some(UnitRelation::OWN),
+                        Some(UnitRelation::ENEMY),
+                        Some(UnitRelation::ENEMY),
+                    ]),
+                    size: Footprint::new(0.2, 0.2),
+                    wanted: 0xff,
+                },
+                tuning().registry,
+            )
             .unwrap()
             .unwrap();
         // the box reaches 44.2 along x: 1's edge is 43.3 off, 2's 49.8
@@ -560,20 +569,23 @@ mod tests {
         })
         .unwrap();
         let found = r
-            .visible_units(VisibleQuery {
-                player: PlayerId::new(0),
-                position: Point::new(10.0, 10.0),
-                radius: Distance::new(3.0),
-                mode: 0,
-                classes: &[class_id(4)],
-                relations: &ByPlayer::new(vec![
-                    Some(UnitRelation::OWN),
-                    Some(UnitRelation::ENEMY),
-                    Some(UnitRelation::ENEMY),
-                ]),
-                size: Footprint::new(0.2, 0.2),
-                wanted: 0xff,
-            })
+            .visible_units(
+                VisibleQuery {
+                    player: PlayerId::new(0),
+                    position: Point::new(10.0, 10.0),
+                    radius: Distance::new(3.0),
+                    mode: 0,
+                    classes: &[class_id(4)],
+                    relations: &ByPlayer::new(vec![
+                        Some(UnitRelation::OWN),
+                        Some(UnitRelation::ENEMY),
+                        Some(UnitRelation::ENEMY),
+                    ]),
+                    size: Footprint::new(0.2, 0.2),
+                    wanted: 0xff,
+                },
+                tuning().registry,
+            )
             .unwrap()
             .unwrap();
         // the centre is 5 off, beyond 3.2, but the edge is 3 off: the 7-tile margin keeps it in

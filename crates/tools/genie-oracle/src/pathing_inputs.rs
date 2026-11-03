@@ -150,8 +150,8 @@ pub fn planner_from_save(
         .iter()
         .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_type)))
         .collect();
-    let roles = &layer().map_err(Error::Unmodelled)?.roles;
-    let spatial = spatial(&header, terrain, roles).map_err(Error::Unmodelled)?;
+    let layer = layer().map_err(Error::Unmodelled)?;
+    let spatial = spatial(&header, terrain, layer).map_err(Error::Unmodelled)?;
     let tiles = spatial.tiles();
     let blocked = |tile: Tile| tiles.word(tile).is_some_and(|w| w & BLOCKED != 0);
     Ok(Planner::new(

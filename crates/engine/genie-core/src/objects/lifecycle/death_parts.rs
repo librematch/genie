@@ -25,6 +25,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::{BuildingDeath, RESTORED_FOUNDATION};
 
 /// The owner's attributes 237, 238 and 239: a built farm's bonus ([`Completion::farm_bonus`]);
@@ -97,6 +98,7 @@ pub(crate) fn combat_dies(
     spatial: &mut Spatial,
     pathing: &mut Pathing,
     roles: &Roles,
+    visibility_tuning: VisibilityTuning,
 ) -> Result<(), GenieError> {
     if u.pasture.is_some() || u.my_pasture.is_some() {
         return Err(GenieError::unsupported(
@@ -126,7 +128,7 @@ pub(crate) fn combat_dies(
         && u.life.inside.is_none()
         && let Some(v) = spatial.sight.as_mut()
     {
-        v.unlink_building(u.position(), master.radius)?;
+        v.unlink_building(u.position(), master.radius, visibility_tuning)?;
     }
     u.roo_called = true;
     Ok(())

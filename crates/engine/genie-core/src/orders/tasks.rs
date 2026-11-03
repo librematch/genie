@@ -162,7 +162,7 @@ impl World {
             ),
             &self.model.roles,
         );
-        let build = BuildAction::start(to, build_task, &move_reads)?;
+        let build = BuildAction::start(to, build_task, &move_reads, &self.model.tuning.move_to)?;
         self.take(target, self.releaser(player, idx)?)?;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -223,7 +223,13 @@ impl World {
             .walk_to(self, Some(target))?
             .ok_or(REPAIR_TARGET_GONE)?;
         let repair_task = RepairTask::of(task);
-        let repair = RepairAction::start(to, repair_task, master.weapon_range, &move_reads)?;
+        let repair = RepairAction::start(
+            to,
+            repair_task,
+            master.weapon_range,
+            &move_reads,
+            &self.model.tuning.move_to,
+        )?;
         self.take(target, self.releaser(player, idx)?)?;
         Ok((repair, class))
     }
@@ -415,7 +421,12 @@ impl World {
             let counted = same && r.counted;
             r.counted = false;
             r.target = taken;
-            r.walk_again(to, self.parts.motion.mover_mut(unit.id), &move_reads)?;
+            r.walk_again(
+                to,
+                self.parts.motion.mover_mut(unit.id),
+                &move_reads,
+                &self.model.tuning.move_to,
+            )?;
             if counted {
                 self.leave_builders(Some(target))?;
             }
@@ -502,7 +513,9 @@ impl World {
             ),
             &self.model.roles,
         );
-        let walk = old.task.walk(&move_reads, Some(to))?;
+        let walk = old
+            .task
+            .walk(&move_reads, Some(to), &self.model.tuning.move_to)?;
         // the work command gives the Build its new foundation
         let foundation = FoundationId::new(target);
         if old.target != Some(foundation) {

@@ -2,9 +2,10 @@
 
 use crate::GenieError;
 use crate::construction::FoundationId;
+use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::at_most_or_unordered;
-use crate::math::image::unit_ai::{ATTACKER_FAR, ATTACKER_TIE};
+use crate::math::image::unit_ai::ATTACKER_FAR;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::objects::ObjectId;
@@ -18,6 +19,7 @@ use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
@@ -27,8 +29,8 @@ use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::attack_orders::OrderNow;
 use crate::unit_ai::{
-    BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, FOUNDATION_REACH, GO_ON,
-    Memory, NO_ANIM_SPEED, Notify, Pick, QueuedOrder, SIEGE_TOWER_AI, Search, Surroundings, UnitAi,
+    BREAK, DEAD, Effect, FISHING_BUILD_FAR, FISHING_BUILDS, FISHING_CARED, GO_ON, Memory,
+    NO_ANIM_SPEED, Notify, Pick, QueuedOrder, SIEGE_TOWER_AI, Search, Surroundings, UnitAi,
     UnitSeen, UnitSide, alert_owner, civilian_search_radius, closest_undiscovered_tile,
     held_action_state,
 };
@@ -355,7 +357,7 @@ impl UnitAi {
     /// own foundations (relation 3, state 0, reachable) of each class of [`FISHING_BUILDS`] over
     /// its search ([`FISHING_CARED`], its radius grown by its `+0x1e8`, 7); the nearest by the
     /// distance each answers, below [`FISHING_BUILD_FAR`], that the unit reaches within
-    /// `FOUNDATION_REACH` (slot 0x3d0) it builds (slot 0xf0 with 1, [`AiCommand::BuildObject`]) and
+    /// `UnitAiTuning::foundation_reach` (slot 0x3d0) it builds (slot 0xf0 with 1, [`AiCommand::BuildObject`]) and
     /// the processing breaks. Else a human player's ship goes on (2); a computer player's posts
     /// itself its build's completion (slot 0x328: `0x1fa` with `0x25a`) first.
     pub(super) fn fishing_builder_search(
@@ -365,6 +367,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let mut best = (None, FISHING_BUILD_FAR);
         for class in FISHING_BUILDS {
             let found = side.closest(&Search {
@@ -391,7 +394,7 @@ impl UnitAi {
             }
         }
         if let Some(site) = best.0
-            && side.reaches(site, FOUNDATION_REACH)?
+            && side.reaches(site, Distance::new(unit_ai_tuning.foundation_reach))?
         {
             let _ = self.build_object(FoundationId::new(site), true, at, side, rng)?;
             return Ok(BREAK);
@@ -483,6 +486,7 @@ impl UnitAi {
         at: &Surroundings,
         ai_rng: &mut Well512,
     ) -> Option<ObjectId> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let mut best = (ATTACKER_FAR, None);
         // none (−1) is an object the update does not hold
@@ -499,8 +503,8 @@ impl UnitAi {
                 continue;
             }
             let d = u.gap_squared;
-            if best.0 - ATTACKER_TIE <= d.get()
-                && (best.0 + ATTACKER_TIE <= d.get() || ai_rng.rand15() & 1 == 0)
+            if best.0 - unit_ai_tuning.attacker_tie <= d.get()
+                && (best.0 + unit_ai_tuning.attacker_tie <= d.get() || ai_rng.rand15() & 1 == 0)
             {
                 continue;
             }
@@ -543,6 +547,7 @@ impl UnitAi {
         player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let Some(order) = self
             .current_order
@@ -568,6 +573,16 @@ impl UnitAi {
             keep_from: Some(at.id),
             place: Some(place),
         };
-        self.order_now(now, Some((at, player_type)), ai, side, roles)
+        self.order_now(
+            now,
+            Some((at, player_type)),
+            ai,
+            side,
+            AiLayer {
+                roles,
+                slots: at.slots,
+                unit_ai_tuning,
+            },
+        )
     }
 }

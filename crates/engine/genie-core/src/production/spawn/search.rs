@@ -7,7 +7,8 @@ use crate::map::GroundOffset;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::{Tile, TileOffset};
-use crate::production::spawn::{GAP, NONE, SIDE_SHARE, SMALL, Site, Tested};
+use crate::production::spawn::{NONE, Site, Tested};
+use crate::world::layer::generated::SpawnTuning;
 
 /// The ways a spot tries its next point: up, down, left and right.
 const UP: TileOffset = TileOffset::new(0, 1);
@@ -56,10 +57,11 @@ pub fn spawn_point(
     site: &Site,
     unit: Footprint,
     test: &mut dyn FnMut(Point) -> Result<Tested, GenieError>,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<Point, GenieError> {
-    let frame = Frame::new(site, unit);
+    let frame = Frame::new(site, unit, spawn_tuning);
     for pass in 1..=2 {
-        for segment in frame.segments(pass == 2) {
+        for segment in frame.segments(pass == 2, spawn_tuning) {
             // a segment's spots are all made before its first is tried
             let spots: Vec<Spot> = segment.iter().flat_map(|r| frame.spots(r)).collect();
             for spot in &spots {
@@ -107,7 +109,7 @@ struct Run {
 }
 
 /// The frame about the building the search walks: the unit's step (its radii, a small unit's
-/// doubled plus [`GAP`]), the building's half sizes and centre, the frame's sides, the walled
+/// doubled plus `SpawnTuning::gap`), the building's half sizes and centre, the frame's sides, the walled
 /// corners (left top, right top, right bottom, left bottom), and the gather point and its
 /// distances from the centre (the axes the gather point lacks: [`NONE`]).
 struct Frame {
@@ -127,11 +129,11 @@ struct Frame {
 
 impl Frame {
     /// The frame beside `site` for a unit of radii `unit`.
-    fn new(site: &Site, unit: Footprint) -> Self {
+    fn new(site: &Site, unit: Footprint, spawn_tuning: &SpawnTuning) -> Self {
         let (mut sx, mut sy) = (unit.x(), unit.y());
-        if sx < SMALL && sy < SMALL {
-            sx = sx + sx + GAP;
-            sy = sy + sy + GAP;
+        if sx < spawn_tuning.small && sy < spawn_tuning.small {
+            sx = sx + sx + spawn_tuning.gap;
+            sy = sy + sy + spawn_tuning.gap;
         }
         let (bx, by) = (site.radius.x(), site.radius.y());
         let (x, y) = (site.position.x(), site.position.y());
@@ -160,7 +162,7 @@ impl Frame {
     /// ([`Frame::right_side`]), the bottom side's two ([`Frame::bottom_side`]); then, on the
     /// second pass with the top right and bottom left corners walled, one segment of the bottom
     /// side from the right (9) and the right side from the bottom (10).
-    fn segments(&self, second: bool) -> Vec<Vec<Run>> {
+    fn segments(&self, second: bool, spawn_tuning: &SpawnTuning) -> Vec<Vec<Run>> {
         let [left_top, right_top, right_bottom, left_bottom] = self.walls;
         let (x, y, gx, gy) = (
             self.centre.x(),
@@ -171,7 +173,7 @@ impl Frame {
         let (dx, dy) = (self.away.x(), self.away.y());
         let mut out = Vec::new();
         if !left_top {
-            self.top_left(second, &mut out);
+            self.top_left(second, &mut out, spawn_tuning);
         }
         if !right_top && (self.no_x || second || (x < gx && dy < dx)) {
             self.right_side(second, &mut out);
@@ -206,7 +208,7 @@ impl Frame {
     /// part, (3) the top side's right part (without a wall at the top right), (4) the left
     /// side's lower part (without one at the bottom left), each toward the gather point or on
     /// the second pass.
-    fn top_left(&self, second: bool, out: &mut Vec<Vec<Run>>) {
+    fn top_left(&self, second: bool, out: &mut Vec<Vec<Run>>, spawn_tuning: &SpawnTuning) {
         let [_, right_top, _, left_bottom] = self.walls;
         let (x, y, gx, gy) = (
             self.centre.x(),
@@ -220,11 +222,11 @@ impl Frame {
         let (left, top) = (self.left, self.top);
         let (no_x, no_y) = (self.no_x, self.no_y);
         if no_y || second || ((y < gy && dx <= dy) && (no_x || gx < x)) {
-            let end = bx * SIDE_SHARE + bx + left;
+            let end = bx * spawn_tuning.side_share + bx + left;
             out.push(vec![run(Side::Up, (left, sx, end), Course::Rising, top)]);
         }
         if no_x || second || ((gx < x && dy < dx) && (no_y || y < gy)) {
-            let end = top - (by * SIDE_SHARE + by);
+            let end = top - (by * spawn_tuning.side_share + by);
             out.push(vec![run(
                 Side::Left,
                 (top, -sy, end),
@@ -233,11 +235,17 @@ impl Frame {
             )]);
         }
         if !right_top && (no_y || second || (y < gy && dx <= dy)) {
-            let (start, end) = (bx * SIDE_SHARE + bx + left, bx + bx + left + sx + sx);
+            let (start, end) = (
+                bx * spawn_tuning.side_share + bx + left,
+                bx + bx + left + sx + sx,
+            );
             out.push(vec![run(Side::Up, (start, sx, end), Course::Rising, top)]);
         }
         if !left_bottom && (no_x || second || (gx < x && dy < dx)) {
-            let (start, end) = (top - (by * SIDE_SHARE + by), top - (by + by + sy + sy));
+            let (start, end) = (
+                top - (by * spawn_tuning.side_share + by),
+                top - (by + by + sy + sy),
+            );
             out.push(vec![run(
                 Side::Left,
                 (start, -sy, end),
@@ -344,11 +352,12 @@ pub(super) fn corner_tiles(
     position: Position,
     radius: Footprint,
     unit: Footprint,
+    spawn_tuning: &SpawnTuning,
 ) -> [[Tile; 2]; 4] {
     let (mut sx, mut sy) = (unit.x(), unit.y());
-    if sx < SMALL && sy < SMALL {
-        sx = sx + sx + GAP;
-        sy = sy + sy + GAP;
+    if sx < spawn_tuning.small && sy < spawn_tuning.small {
+        sx = sx + sx + spawn_tuning.gap;
+        sy = sy + sy + spawn_tuning.gap;
     }
     let (x, y) = (position.x(), position.y());
     let (bx, by) = (radius.x(), radius.y());

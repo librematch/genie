@@ -10,9 +10,6 @@ use crate::combat::victims::victim_of;
 use crate::map::Distance;
 use crate::map::RestrictionId;
 use crate::map::spatial::Spatial;
-use crate::math::image::unit_ai::{
-    HARMLESS_HP as UNIT_AI_HARMLESS_HP, HARMLESS_RANGE as UNIT_AI_HARMLESS_RANGE,
-};
 use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::movement::{WaypointIndex, footprint_gap};
@@ -45,6 +42,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::DamageTuning;
+use crate::world::layer::generated::UnitAiTuning;
 use crate::world::others::OthersRef;
 use crate::world::parts::Parts;
 use crate::world::player::AiSettings;
@@ -56,11 +54,6 @@ pub(super) fn attacks(m: &Master) -> f32 {
         .filter(|w| DamageAmount::ZERO < w.amount)
         .fold(0.0, |sum, w| sum + w.amount.as_f32())
 }
-
-/// The hit points (`DAT_14330ebc8`) and the range (`DAT_142e7f384`) below which a villager
-/// fights its attacker back ([`WorldPicker::harmless`]).
-pub(super) const HARMLESS_HP: f32 = UNIT_AI_HARMLESS_HP;
-pub(super) const HARMLESS_RANGE: Distance = Distance::new(UNIT_AI_HARMLESS_RANGE);
 
 /// An object the unit AI found or names that the slice does not hold (another player's it does
 /// not keep).
@@ -150,6 +143,7 @@ impl WorldPicker<'_> {
         whom: ObjectId,
         any: bool,
         roles: &Roles,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
         let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
@@ -175,7 +169,13 @@ impl WorldPicker<'_> {
             master: t.life.master_id,
             hero: tm.hero_flag,
         });
-        Ok(can_convert(&converter, target.as_ref(), any, roles))
+        Ok(can_convert(
+            &converter,
+            target.as_ref(),
+            any,
+            roles,
+            unit_ai_tuning,
+        ))
     }
 
     /// What object `from` deals object `to` per hit (`to`'s slot 0x220 with `from`,
@@ -253,10 +253,11 @@ impl WorldPicker<'_> {
         other: ObjectId,
         roles: &Roles,
         damage_tuning: &DamageTuning,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<Duel, GenieError> {
         let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
-            converts: self.converts(other, self.me, true, roles)?,
+            converts: self.converts(other, self.me, true, roles, unit_ai_tuning)?,
             attacks: attacks(om),
             harms: self.damage(spatial, other, self.me, roles, damage_tuning)?,
             harmed: self.damage(spatial, self.me, other, roles, damage_tuning)?,
@@ -267,8 +268,8 @@ impl WorldPicker<'_> {
     /// The villager's test of its attacker `other` (`FUN_140c22bf0` case 500): one of a master
     /// with object flag 0x10 (`+0x654`) that is its own copy (`+0x158` equal to `+0x58`), which
     /// shows an attack below 5 (slot 0x878, [`crate::combat::damage::shown_attack`]; below 4, or with
-    /// its master's hit points below [`HARMLESS_HP`]), a melee armor below 1 (slot 0x868) and a
-    /// range of at most [`HARMLESS_RANGE`] (slot 0x880, `COMISS` with `JNC`: not a NaN), is
+    /// its master's hit points below `UnitAiTuning::harmless_hp`), a melee armor below 1 (slot 0x868) and a
+    /// range of at most `UnitAiTuning::harmless_range` (slot 0x880, `COMISS` with `JNC`: not a NaN), is
     /// fought back as Gaia's attackers are. Its attack's target (an Attack's, `FUN_14107cc30`)
     /// counts when the world holds it.
     pub(crate) fn harmless(
@@ -276,6 +277,7 @@ impl WorldPicker<'_> {
         spatial: &Spatial,
         other: ObjectId,
         roles: &Roles,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<bool, GenieError> {
         let (q, o, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
         if !om.object_flags.contains(ObjectFlags::SCOUT) || om.copy_id != Some(om.id) {
@@ -334,14 +336,15 @@ impl WorldPicker<'_> {
         let attack = shown_attack(&v, &shown, roles);
         let amount = DamageAmount::new;
         if amount(4) < attack
-            || (amount(3) < attack && HARMLESS_HP <= HitPoints::of_master(om.hit_points).get())
+            || (amount(3) < attack
+                && unit_ai_tuning.harmless_hp <= HitPoints::of_master(om.hit_points).get())
         {
             return Ok(false);
         }
         if amount(0) < shown_melee_armor(&v, roles)? {
             return Ok(false);
         }
-        Ok(shown_range(&v, &shown, roles) <= HARMLESS_RANGE)
+        Ok(shown_range(&v, &shown, roles) <= Distance::new(unit_ai_tuning.harmless_range))
     }
 
     /// Slot 0x78 of object `target`'s unit AI (`FUN_140c48610`): of its attackers in their order,
@@ -495,11 +498,12 @@ impl AttackPicker for WorldPicker<'_> {
 
     fn can_attack(&mut self, spatial: &Spatial, id: ObjectId) -> Result<bool, GenieError> {
         let roles = self.by_id.roles();
+        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
         ))?;
         let (target, _) = self.target(spatial, id)?;
-        unit_ai_can_attack(self.attacker, &seeker, &target, roles)
+        unit_ai_can_attack(self.attacker, &seeker, &target, roles, unit_ai_tuning)
     }
 
     fn attacks_neutral(&mut self, class: ClassId) -> Result<bool, GenieError> {
@@ -533,13 +537,14 @@ impl AttackPicker for WorldPicker<'_> {
         category: Option<AttackCategory>,
     ) -> Result<Candidate, GenieError> {
         let damage_tuning = &self.by_id.tuning().damage;
+        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let roles = self.by_id.roles();
         let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
         let damage = self.damage(spatial, self.me, id, roles, damage_tuning)?;
-        let armed = 0.0 < attacks(m) || self.converts(id, self.me, true, roles)?;
+        let armed = 0.0 < attacks(m) || self.converts(id, self.me, true, roles, unit_ai_tuning)?;
         Ok(Candidate {
             id,
             distance,
@@ -555,7 +560,7 @@ impl AttackPicker for WorldPicker<'_> {
             hp: t.life.hp,
             reload: self.parts.combat_of(me.id).reload_stinger
                 + (mm.reload - self.parts.combat_of(me.id).reload_powerup),
-            workable: self.converts(self.me, id, false, roles)?,
+            workable: self.converts(self.me, id, false, roles, unit_ai_tuning)?,
             current: self.seeker.is_some_and(|s| s.target == Some(id)),
         })
     }
@@ -592,8 +597,9 @@ impl AttackPicker for WorldPicker<'_> {
 
     fn engages(&mut self, id: ObjectId) -> Result<bool, GenieError> {
         let roles = self.by_id.roles();
+        let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(0.0 < attacks(m) || self.converts(id, self.me, true, roles)?)
+        Ok(0.0 < attacks(m) || self.converts(id, self.me, true, roles, unit_ai_tuning)?)
     }
 
     /// The quick path (slot 0x3e0) within `range`, with its master's terrain mask and radius on

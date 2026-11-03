@@ -28,6 +28,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::QueueEnd;
 use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::world::parts::{Object, ObjectParts};
 use crate::world::slots::PlayerSlots;
@@ -290,7 +291,11 @@ impl World {
         if standing.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && standing.facets.several() {
             let _ = self.streams.get(Stream::Object).rand15();
         }
-        let sprite = ActiveSprite::start(standing, self.streams.get(Stream::Sprite));
+        let sprite = ActiveSprite::start(
+            standing,
+            self.streams.get(Stream::Sprite),
+            self.model.tuning.sprite,
+        );
         let facets = SpriteFacets {
             count: standing.facets,
             turns: standing.flags.contains(SpriteFlags::TURNS),
@@ -403,7 +408,10 @@ impl World {
                 made.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
         }
         if let Some(e) = self.take_sight_unsupported() {
@@ -498,6 +506,7 @@ impl World {
                 self.world_time,
                 angle,
                 Some(facets),
+                &self.model.tuning.spawn,
             ))),
             ..ObjectParts::default()
         };

@@ -182,8 +182,10 @@ code keep it so:
   object into the free place, as the game's list does. A sort runs MSVC's introsort
   (`math/msvc.rs`), because the order of equal elements depends on the algorithm.
 - **The game data.** The values come from the recording's save and the game's `.dat` file, never
-  from constants in the code. `math/image.rs` holds the constants of the game's image that the
-  routines read. A script generates it.
+  from constants in the code. The exe's facts about specific ids (roles, slots) and its tuning
+  values (ranges, times, factors) are the build layer, `builds/158041.ncl`, which the model
+  holds (`Model::roles`, `slots`, `tuning`). `math/image.rs` holds the image's arithmetic
+  constants that the routines read. A generator writes both from the build's symbol table.
 
 ## Conventions
 

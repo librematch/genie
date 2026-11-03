@@ -13,7 +13,7 @@ use crate::players::PlayerType;
 use crate::players::ResourceStat;
 use crate::players::attribute::AttributeId;
 use crate::players::tracker::ListKey;
-use crate::players::world_player::{EARLY_SCOUTING_MS, LIVESTOCK_SCALE, MINUTE, SECOND, get, set};
+use crate::players::world_player::{EARLY_SCOUTING_MS, MINUTE, SECOND, get, set};
 use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
@@ -62,7 +62,7 @@ impl World {
                 sum += self.parts.building_of(unit.id).livestock_summation.get();
             }
         }
-        let grows = log(sum / LIVESTOCK_SCALE + SECOND);
+        let grows = log(sum / self.model.tuning.world_player.livestock_scale + SECOND);
         let rate = get(
             &self.players.player(p)?.attributes,
             self.model.slots.attribute.mill_food,

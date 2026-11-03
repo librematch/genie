@@ -94,6 +94,7 @@ use crate::test_ids::unit_list;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
@@ -1251,7 +1252,7 @@ fn villager_inside_town_center_adds_one_missile_to_its_volleys() {
         ..Master::default()
     };
     let masters = Masters::new([arrow, tc.clone(), villager.clone()]);
-    let rate = attack_rate(&tc, &masters, Seconds::ZERO, &roles());
+    let rate = attack_rate(&tc, &masters, Seconds::ZERO, &roles(), &tuning().garrison);
     assert_eq!(rate, DamageRate::new(2.5));
     // a garrison firepower at most 0 is its magnitude
     assert_eq!(
@@ -1315,7 +1316,13 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
     };
     let masters = Masters::new([arrow, town_center()]);
     assert_eq!(
-        attack_rate(&town_center(), &masters, Seconds::ZERO, &roles()),
+        attack_rate(
+            &town_center(),
+            &masters,
+            Seconds::ZERO,
+            &roles(),
+            &tuning().garrison
+        ),
         DamageRate::new(3.5)
     );
     for (reload, range) in [(f32::NAN, 6.0), (2.0, f32::NAN), (0.0, 6.0), (2.0, 1.0)] {
@@ -1325,7 +1332,7 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
             ..town_center()
         };
         assert_eq!(
-            attack_rate(&tc, &masters, Seconds::ZERO, &roles())
+            attack_rate(&tc, &masters, Seconds::ZERO, &roles(), &tuning().garrison)
                 .get()
                 .to_bits(),
             0.0f32.to_bits()
@@ -1344,7 +1351,13 @@ fn an_attack_rate_needs_reload_and_range_that_compare_above_their_limits() {
         ..town_center()
     };
     assert_eq!(
-        attack_rate(&infantry, &masters, Seconds::new(0.5), &roles()),
+        attack_rate(
+            &infantry,
+            &masters,
+            Seconds::new(0.5),
+            &roles(),
+            &tuning().garrison
+        ),
         DamageRate::new(8.0 / 1.5)
     );
 }

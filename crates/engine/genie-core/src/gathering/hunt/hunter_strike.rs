@@ -13,6 +13,7 @@ use crate::gathering::drop_sites::nearest_drop_site;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::NO_HUNT;
 use crate::gathering::hunt::{Herd, HuntAction, HuntNext, HuntReads, HuntSprites};
+use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveDefaults, MoveTo};
@@ -30,7 +31,6 @@ use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
 use crate::players::Amount;
 use crate::world::HUNTER_MASTER;
-use crate::world::TREE_NEAR;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
@@ -128,6 +128,7 @@ impl Unit {
                 c.w.parts.unit_ai.get(self.id),
                 (owner.kind, c.w.world_time),
                 roles,
+                &c.w.model.tuning.turn,
             ),
             work_rate: c.w.parts.combat_of(self.id).work_rate_powerup + master.work_rate,
             capacity: Amount::of_master(master.capacity),
@@ -169,7 +170,15 @@ impl Unit {
                 .or_else(|| actions.list.hunt().and_then(|h| h.target_class));
             roles.of_some_class(class).contains(ClassRoles::TREE)
         });
-        if tree && self.hunt_tree_search(actions, c, None, Some(TREE_NEAR), roles)? {
+        if tree
+            && self.hunt_tree_search(
+                actions,
+                c,
+                None,
+                Some(Distance::new(c.w.model.tuning.hunt.tree_near)),
+                roles,
+            )?
+        {
             return Ok(());
         }
         let hunt = actions.list.hunt_mut().ok_or(NO_HUNT)?;

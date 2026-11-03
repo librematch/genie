@@ -1,5 +1,6 @@
 use super::*;
 use crate::GenieError;
+use crate::combat::Firepower;
 use crate::combat::abilities::Abilities;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::{Arms, Attack};
@@ -218,6 +219,7 @@ use crate::testing::static_roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -242,6 +244,7 @@ use crate::unit_ai::{
 };
 use crate::unit_ai::{Effect, Notify, UnitAi};
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
@@ -1051,7 +1054,11 @@ fn completed_pasture_puts_its_livestock_on_its_edges() {
     );
     t.streams.get(Stream::Object).set_seed(1385);
     let mut e = t.streams.get(Stream::Object).clone();
-    let mut points = edge_points(Position::new(20.0, 20.0, 0.0), Distance::new(2.0));
+    let mut points = edge_points(
+        Position::new(20.0, 20.0, 0.0),
+        Distance::new(2.0),
+        &tuning().pasture,
+    );
     let mut tiles = Vec::new();
     let mut expected = Vec::new();
     for _ in 0..3 {
@@ -1148,7 +1155,11 @@ fn pasture_counts_each_attempt_and_shares_its_food() {
     let mut t = pasture_game(Position::new(20.0, 20.0, 0.0), 3.0, &[master_id(1899)]);
     t.streams.get(Stream::Object).set_seed(7);
     let mut e = t.streams.get(Stream::Object).clone();
-    let mut points = edge_points(Position::new(20.0, 20.0, 0.0), Distance::new(2.0));
+    let mut points = edge_points(
+        Position::new(20.0, 20.0, 0.0),
+        Distance::new(2.0),
+        &tuning().pasture,
+    );
     let mut expected = Vec::new();
     for _ in 0..3 {
         let kind = livestock(slots().master)[e.rand15() as usize % 2];
@@ -1916,6 +1927,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_high_draw() {
         master.standing_sprite_2,
         &graphics,
         &mut r,
+        tuning().sprite,
     );
     assert_eq!(u.idle_variant, 1);
     let s = u.sprite.unwrap();
@@ -1935,6 +1947,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_high_draw() {
         master.standing_sprite_2,
         &graphics,
         &mut rng(low),
+        tuning().sprite,
     );
     assert_eq!(
         (u.idle_variant, u.sprite.unwrap().graphic.id),
@@ -1963,6 +1976,7 @@ fn an_idle_object_swaps_its_standing_sprite_on_high_draw() {
             m.standing_sprite_2,
             &graphics,
             &mut r,
+            tuning().sprite,
         );
         assert_eq!(r.draws, rng(high).draws);
     }
@@ -4698,7 +4712,12 @@ fn footprint_world() -> World {
     );
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(30.0, 88.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(30.0, 88.5, 0.0), &roles())
+        .set_position(
+            object_id(9175),
+            Position::new(30.0, 88.5, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
         .unwrap();
     t
 }
@@ -5398,7 +5417,12 @@ fn hunter_drops_its_meat_at_the_town_centre_and_goes_back() {
         (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
         v.place_for_test(Position::new(22.3, 89.5, 0.0));
         t.spatial
-            .set_position(object_id(9175), Position::new(22.3, 89.5, 0.0), &roles())
+            .set_position(
+                object_id(9175),
+                Position::new(22.3, 89.5, 0.0),
+                &roles(),
+                tuning().visibility,
+            )
             .unwrap();
         t.model.drop_sites = Arc::new(vec![DropSite {
             building: ids::TOWN_CENTRE,
@@ -5675,7 +5699,12 @@ fn hunter_strikes_its_live_deer_and_gathers_the_dead_one_until_full() {
         (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(held));
         v.place_for_test(Position::new(31.9, 89.5, 0.0));
         t.spatial
-            .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0), &roles())
+            .set_position(
+                object_id(9175),
+                Position::new(31.9, 89.5, 0.0),
+                &roles(),
+                tuning().visibility,
+            )
             .unwrap();
         t
     };
@@ -5742,7 +5771,12 @@ fn hunter_work_reaches_its_deer_in_the_same_update() {
     (v.life.attribute_type, v.life.amount) = (Some(attribute::MEAT), Amount::new(5.0));
     v.place_for_test(Position::new(31.9, 89.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(31.9, 89.5, 0.0), &roles())
+        .set_position(
+            object_id(9175),
+            Position::new(31.9, 89.5, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
         .unwrap();
     let left = in_update(
         &mut t,
@@ -5941,7 +5975,12 @@ fn hunter_leads_its_far_sheep_to_the_town_centre_and_slaughters_near_one() {
     let mut t = shepherd_world(22.6);
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(23.2, 89.5, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(23.2, 89.5, 0.0), &roles())
+        .set_position(
+            object_id(9175),
+            Position::new(23.2, 89.5, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
         .unwrap();
     assert_eq!(hunt_part_of(&mut t, 50), Ok(()));
     let h = t
@@ -6897,7 +6936,12 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
     // the villager out of reach, so that it walks
     t.players[1].objects[ListIndex::new(0)].place_for_test(Position::new(20.0, 80.0, 0.0));
     t.spatial
-        .set_position(object_id(9175), Position::new(20.0, 80.0, 0.0), &roles())
+        .set_position(
+            object_id(9175),
+            Position::new(20.0, 80.0, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
         .unwrap();
     assert_eq!(
         t.enter_command(PlayerId::new(1), ListIndex::new(0), object_id(4242), true),
@@ -7581,7 +7625,11 @@ fn queued_build_order_builds_and_leaves_patrol_order() {
                 None,
                 rng,
                 side,
-                &roles(),
+                AiLayer {
+                    roles: &roles(),
+                    slots: slots(),
+                    unit_ai_tuning: &tuning().unit_ai,
+                },
             )?;
             assert_eq!(r, OrderOutcome::Taken);
             Ok(())
@@ -7666,7 +7714,12 @@ fn build_command_without_its_foundation_or_task_does_nothing() {
 #[test]
 fn world_routine_unit_ai_calls_run_on_the_unit_at_once() {
     let mut t = sent_off_world(vec![]);
-    let (explore, _) = ExploreAction::new(Position::new(10.0, 10.0, 0.0), &bare_walk()).unwrap();
+    let (explore, _) = ExploreAction::new(
+        Position::new(10.0, 10.0, 0.0),
+        &bare_walk(),
+        &tuning().move_to,
+    )
+    .unwrap();
     t.parts
         .actions
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
@@ -9408,7 +9461,11 @@ fn the_long_pather_asks_the_gate_on_its_anchor() {
         Vec::new(),
     );
     let _ = v
-        .link_building(Position::new(20.0, 20.0, 0.0), Footprint::new(1.5, 0.5))
+        .link_building(
+            Position::new(20.0, 20.0, 0.0),
+            Footprint::new(1.5, 0.5),
+            tuning().visibility,
+        )
         .unwrap();
     let side = Tile::new(19, 20);
     let anchor = v.anchor_of(side).unwrap();
@@ -10712,7 +10769,10 @@ pub(crate) fn hands_world(
         Footprint::new(0.2, 0.2),
         SightShape::Circle,
         SightCentre::Tile,
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     );
     s.sight = Some(v);
     s.insert(
@@ -10774,6 +10834,7 @@ fn hands(
         s,
         now,
         &roles(),
+        tuning().visibility,
     )?;
     Ok(answer
         .map(|m| {
@@ -14893,7 +14954,11 @@ fn an_annex_follows_its_dying_main_building_into_state_4() {
                 place: Static::at(Position::new(124.5, 174.5, 0.0)),
                 pasture: None,
                 my_pasture: None,
-                sprite: Some(ActiveSprite::start(g, &mut Well512::default())),
+                sprite: Some(ActiveSprite::start(
+                    g,
+                    &mut Well512::default(),
+                    tuning().sprite,
+                )),
                 life: Lifecycle {
                     class: Class::Animated,
                     master_id: master,
@@ -15215,13 +15280,23 @@ fn unit_regenerated_to_its_most_has_its_armor_back() {
         )
     };
     let (mut healed, mut healed_combat) = unit(HitPoints::new(53.0));
-    healed.regenerate(&mut healed_combat, &berserk, Seconds::new(3.0));
+    healed.regenerate(
+        &mut healed_combat,
+        &berserk,
+        Seconds::new(3.0),
+        &tuning().turn,
+    );
     assert_eq!(
         (healed.life.hp, healed_combat.armor_removed),
         (HitPoints::new(54.0), ArmorPair::ZERO)
     );
     let (mut hurt, mut hurt_combat) = unit(HitPoints::new(40.0));
-    hurt.regenerate(&mut hurt_combat, &berserk, Seconds::new(3.0));
+    hurt.regenerate(
+        &mut hurt_combat,
+        &berserk,
+        Seconds::new(3.0),
+        &tuning().turn,
+    );
     assert_eq!(
         (hurt.life.hp, hurt_combat.armor_removed),
         (HitPoints::new(41.0), ArmorPair::new(2, 1))
@@ -15260,7 +15335,12 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         regen_timer: Seconds::new(1.5),
         ..Default::default()
     };
-    u.regenerate(&mut unit_combat, &berserk, Seconds::new(2.0));
+    u.regenerate(
+        &mut unit_combat,
+        &berserk,
+        Seconds::new(2.0),
+        &tuning().turn,
+    );
     assert_eq!(
         (u.life.hp, unit_combat.regen_timer),
         (
@@ -15271,7 +15351,12 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     // at the most nothing is added, and the time still runs
     let mut full = unit(HitPoints::new(54.0));
     let mut full_combat = Combat::default();
-    full.regenerate(&mut full_combat, &berserk, Seconds::new(3.0));
+    full.regenerate(
+        &mut full_combat,
+        &berserk,
+        Seconds::new(3.0),
+        &tuning().turn,
+    );
     assert_eq!(
         (full.life.hp, full_combat.regen_timer),
         (HitPoints::new(54.0), Seconds::ZERO)
@@ -15287,7 +15372,7 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..Default::default()
     };
     assert_eq!(
-        regeneration_rate(&hero, &powered_combat),
+        regeneration_rate(&hero, &powered_combat, &tuning().turn),
         Regeneration::new(60.0)
     );
     let not_hero = Master {
@@ -15295,7 +15380,7 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
         ..berserk.clone()
     };
     assert_eq!(
-        regeneration_rate(&not_hero, &powered_combat),
+        regeneration_rate(&not_hero, &powered_combat, &tuning().turn),
         Regeneration::new(30.0)
     );
     // a gate of Aftermath's: -1000 a minute takes 1 hit point per 0.06 s, at most what it has
@@ -15307,16 +15392,16 @@ fn unit_regenerates_whole_hit_points_and_keeps_the_rest_as_time() {
     };
     let mut g = unit(HitPoints::new(1650.0));
     let mut gate_combat = Combat::default();
-    g.regenerate(&mut gate_combat, &gate, Seconds::new(0.104));
+    g.regenerate(&mut gate_combat, &gate, Seconds::new(0.104), &tuning().turn);
     assert_eq!(g.life.hp, HitPoints::new(1649.0));
     let mut low = unit(HitPoints::new(1.0));
     let mut low_combat = Combat::default();
-    low.regenerate(&mut low_combat, &gate, Seconds::new(1.0));
+    low.regenerate(&mut low_combat, &gate, Seconds::new(1.0), &tuning().turn);
     assert_eq!(low.life.hp, HitPoints::ZERO);
     // below 1 hit point or out of state 2: nothing
     let mut dead = unit(HitPoints::new(0.5));
     let mut dead_combat = Combat::default();
-    dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0));
+    dead.regenerate(&mut dead_combat, &gate, Seconds::new(1.0), &tuning().turn);
     assert_eq!(
         (dead.life.hp, dead_combat.regen_timer),
         (HitPoints::new(0.5), Seconds::ZERO)
@@ -15346,7 +15431,7 @@ fn hit_point_powerup_above_its_room_comes_off_the_hit_points() {
         )
     };
     let (mut u, mut unit_combat) = with(100.0, 10.0, 4.0);
-    u.clamp_hp_powerup(&mut unit_combat);
+    u.clamp_hp_powerup(&mut unit_combat, &tuning().turn);
     let at_room = HpPowerup {
         taken: HitPoints::new(4.0),
         max: HitPoints::new(4.0),
@@ -15356,16 +15441,16 @@ fn hit_point_powerup_above_its_room_comes_off_the_hit_points() {
         (HitPoints::new(94.0), at_room)
     );
     let (mut low, mut low_combat) = with(3.0, 10.0, 4.0);
-    low.clamp_hp_powerup(&mut low_combat);
+    low.clamp_hp_powerup(&mut low_combat, &tuning().turn);
     assert_eq!(
         (low.life.hp, low_combat.hp_powerup),
         (HitPoints::new(1.0), at_room)
     );
     let (mut nan, mut nan_combat) = with(f32::NAN, 10.0, 4.0);
-    nan.clamp_hp_powerup(&mut nan_combat);
+    nan.clamp_hp_powerup(&mut nan_combat, &tuning().turn);
     assert_eq!(nan.life.hp, HitPoints::new(1.0));
     let (mut kept, mut kept_combat) = with(100.0, 4.0, 4.0);
-    kept.clamp_hp_powerup(&mut kept_combat);
+    kept.clamp_hp_powerup(&mut kept_combat, &tuning().turn);
     assert_eq!(
         (kept.life.hp, kept_combat.hp_powerup),
         (HitPoints::new(100.0), at_room)
@@ -15612,6 +15697,8 @@ fn ai_move_of(
                 graphics: &graphics,
                 look: None,
                 roles: static_roles(),
+                sprite_tuning: tuning().sprite,
+                move_to_tuning: &tuning().move_to,
             },
             &mut rng,
         ),
@@ -15944,6 +16031,8 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
                 graphics: &none,
                 look: None,
                 roles: static_roles(),
+                sprite_tuning: tuning().sprite,
+                move_to_tuning: &tuning().move_to,
             },
         ),
         Ok(PointMove::Declined)
@@ -15961,6 +16050,8 @@ fn an_ai_move_of_trebuchet_packs_and_the_base_slot_takes_nothing() {
                 graphics: &none,
                 look: None,
                 roles: static_roles(),
+                sprite_tuning: tuning().sprite,
+                move_to_tuning: &tuning().move_to,
             },
         )
         .is_err()
@@ -16028,7 +16119,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
         // the deer's speed 0.737 with its standing sprite's factor 1, its walking one's 1.9
         m.stats.base = Speed::new(0.737);
         m.stats.speed = Speed::new(1.4003);
-        u.sprite = Some(ActiveSprite::start(walking, rng));
+        u.sprite = Some(ActiveSprite::start(walking, rng, tuning().sprite));
         motion.lent().set_anim_speed(Speed::new(1.0));
         actions.list.set_move_to(Some(MoveToAction::to_point(
             Position::new(119.5, 172.5, 0.0),
@@ -16049,6 +16140,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
             &graphics,
             &mut rng,
         ),
+        tuning().sprite,
     )
     .unwrap();
     assert_eq!(
@@ -16072,6 +16164,7 @@ fn an_own_move_to_that_gives_up_fails_standing_unless_villager_waits() {
             &graphics,
             &mut rng,
         ),
+        tuning().sprite,
     )
     .unwrap();
     assert_eq!(
@@ -16263,7 +16356,7 @@ fn scout_attack_on(
             Unit {
                 id: object_id(123),
                 place: Static::at(Position::new(10.0, 10.0, 0.0)),
-                sprite: Some(ActiveSprite::start(standing, &mut rng)),
+                sprite: Some(ActiveSprite::start(standing, &mut rng, tuning().sprite)),
                 life: Lifecycle {
                     master_id: ids::ID_448,
                     inside: inside.map(ContainerId::new),
@@ -16390,7 +16483,7 @@ fn attack_by(who: Master, also: Vec<Master>) -> (Object, Attacked, f32, Tracker)
             Unit {
                 id: object_id(123),
                 place: Static::at(Position::new(10.0, 10.0, 0.0)),
-                sprite: Some(ActiveSprite::start(standing, &mut rng)),
+                sprite: Some(ActiveSprite::start(standing, &mut rng, tuning().sprite)),
                 life: Lifecycle {
                     master_id: attacker_master,
                     inside,
@@ -17593,7 +17686,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, Some(TerrainId::named(7))),
             Seconds::ZERO,
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(29))
     );
@@ -17603,7 +17697,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, Some(TerrainId::named(7))),
             Seconds::new(7.5),
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(30))
     );
@@ -17613,7 +17708,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, Some(TerrainId::named(7))),
             Seconds::new(15.0),
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(31))
     );
@@ -17623,7 +17719,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (true, Some(TerrainId::named(63))),
             Seconds::new(5.0),
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(66))
     );
@@ -17633,7 +17730,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, Some(TerrainId::named(63))),
             Seconds::ZERO,
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(65))
     );
@@ -17643,7 +17741,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, Some(TerrainId::named(117))),
             Seconds::new(15.0),
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(121))
     );
@@ -17653,7 +17752,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, None),
             Seconds::ZERO,
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         Some(TerrainId::named(1))
     );
@@ -17663,7 +17763,8 @@ fn farm_foundation_lays_its_stage_terrain() {
             (false, None),
             Seconds::ZERO,
             WholeSeconds::of_data(15),
-            &roles()
+            &roles(),
+            &tuning().turn
         ),
         None
     );
@@ -17731,7 +17832,7 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
             acceleration: BVector::ZERO,
         });
         t.spatial
-            .set_position(object_id(9175), at, &roles())
+            .set_position(object_id(9175), at, &roles(), tuning().visibility)
             .unwrap();
     };
     place(&mut t, Position::new(30.0, 91.0, 0.0));
@@ -19415,7 +19516,12 @@ fn unit_own_move_to_walks_tells_its_end_and_lets_its_target_go() {
     );
     // the bush moves two tiles off the point the walk goes to
     t.spatial
-        .set_position(object_id(600), Position::new(32.5, 91.5, 0.0), &roles())
+        .set_position(
+            object_id(600),
+            Position::new(32.5, 91.5, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
         .unwrap();
     let (r, _, heard, _) = own_move(&mut t);
     assert_eq!(r, Ok(()));
@@ -19548,8 +19654,12 @@ fn explored(set: impl FnOnce(&mut ExploreAction)) -> Explored {
         0,
     );
     t.build_mesh().unwrap();
-    let (mut explore, _) =
-        ExploreAction::new(Position::new(40.5, 89.5, 0.0), &bare_walk()).unwrap();
+    let (mut explore, _) = ExploreAction::new(
+        Position::new(40.5, 89.5, 0.0),
+        &bare_walk(),
+        &tuning().move_to,
+    )
+    .unwrap();
     set(&mut explore);
     t.parts
         .actions
@@ -19673,7 +19783,7 @@ fn an_explore_walks_to_its_point_then_asks_for_the_next() {
         assert_eq!(heard, asked);
     }
     let (r, e, heard) = explored(|e| {
-        let _ = e.set_state(ExploreState::Wait, None);
+        let _ = e.set_state(ExploreState::Wait, None, &tuning().move_to);
     });
     assert_eq!(
         (r, e.map(|e| e.state), heard),

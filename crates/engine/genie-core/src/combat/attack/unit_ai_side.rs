@@ -134,6 +134,7 @@ impl UnitView<'_, '_> {
             self.c.w.parts.move_stats_mut(unit.id),
             standing,
             self.c.w.streams.get(Stream::Sprite),
+            self.c.w.model.tuning.sprite,
         );
         let cmd = AttackCommand {
             target,
@@ -178,6 +179,7 @@ impl UnitView<'_, '_> {
             &mut unit.sprite,
             self.c.w.parts.motion_mut(unit.id),
             self.c.w.streams.get(Stream::Sprite),
+            self.c.w.model.tuning.sprite,
         )?;
         let target = attack.target;
         self.actions.list.set_attack(Some(attack));
@@ -384,6 +386,7 @@ impl UnitView<'_, '_> {
             Some(ai),
             (self.player_type, self.c.w.world_time),
             roles,
+            &self.c.w.model.tuning.turn,
         );
         Ok(Some(ReadyReads {
             reads,

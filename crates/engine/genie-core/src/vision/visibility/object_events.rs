@@ -12,12 +12,14 @@ use crate::objects::masters::ClassId;
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
 use crate::vision::visibility::Visibility;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::player::Player;
 
 /// An object update past the registry check finds the registry gone.
@@ -220,8 +222,12 @@ impl Visibility {
         radius: Footprint,
         (new, los): (PlayerId, f32),
         sees: bool,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<(), GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         if !self.seers.contains_key(id) {
             return Ok(());
         }
@@ -232,7 +238,10 @@ impl Visibility {
                 radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
             )?;
         }
         if let Some(s) = self.seers.get_mut(id) {
@@ -246,7 +255,10 @@ impl Visibility {
                 radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning,
+                },
             )?;
         }
         Ok(())
@@ -261,6 +273,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
             return Ok(());
@@ -275,7 +288,10 @@ impl Visibility {
             radius,
             SightShape::Footprint,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
         let _ = self.sight_on(
             id,
@@ -283,7 +299,10 @@ impl Visibility {
             radius,
             SightShape::Circle,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
         Ok(())
     }
@@ -296,6 +315,7 @@ impl Visibility {
         position: Position,
         radius: Footprint,
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) {
             b.started = true;
@@ -306,9 +326,12 @@ impl Visibility {
             radius,
             SightShape::Footprint,
             SightCentre::Tile,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning,
+            },
         )?;
-        let _ = self.link_building(position, radius)?;
+        let _ = self.link_building(position, radius, visibility_tuning)?;
         Ok(())
     }
 }

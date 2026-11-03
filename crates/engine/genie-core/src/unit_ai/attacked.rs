@@ -22,14 +22,15 @@ use crate::unit_ai::QueueEnd;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, NEVER_KILLED, Named, Notify, OrderTargetType,
-    Pick, QueuedOrder, RADIUS_SCALE, STILL, Search, Surroundings, UnitAi, UnitSeen, UnitSide,
-    alert_owner, closest_undiscovered_tile,
+    AiMove, AttackAsk, BREAK, DEAD, Effect, GO_ON, Named, Notify, OrderTargetType, Pick,
+    QueuedOrder, STILL, Search, Surroundings, UnitAi, UnitSeen, UnitSide, alert_owner,
+    closest_undiscovered_tile,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::UnitAiTuning;
 
 impl UnitAi {
     /// The base handler's damage case (`FUN_140c589c0`, cases 500 and a missile's warning, 0x20f:
@@ -67,7 +68,7 @@ impl UnitAi {
     ///    (its slot 0x1b8 with 1) but cannot harm it either (its attacks' sum, slot 0x228, or its
     ///    damage to the unit, the unit's slot 0x220, exactly 0) makes it ask for help and attack
     ///    back; and then still, as long as the target cannot convert it, an attacker that would
-    ///    die sooner (its hit points over the unit's damage to it, [`NEVER_KILLED`] for none:
+    ///    die sooner (its hit points over the unit's damage to it, `UnitAiTuning::never_killed` for none:
     ///    `COMISS`, `JA`) or could convert it makes it attack back. It returns 2.
     pub(super) fn damaged(
         &mut self,
@@ -176,6 +177,7 @@ impl UnitAi {
         player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let from = current.map_or(at.position, |t| t.position);
         let (classes, radius) = self.search_area(at, player_type)?;
         let found = side.closest(&Search {
@@ -202,7 +204,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         self.best_this_update = found.id;
         Ok(())
     }
@@ -258,6 +260,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let attacker_id = attacker.id;
         if roles.of_master(target.master).contains(MasterRoles::WONDER)
@@ -290,13 +293,13 @@ impl UnitAi {
         let target_time = if HitPoints::ZERO < t.harmed {
             t.hp / t.harmed
         } else {
-            NEVER_KILLED
+            unit_ai_tuning.never_killed
         };
         let a = side.duel(attacker_id)?;
         let attacker_time = if HitPoints::ZERO < a.harmed {
             a.hp / a.harmed
         } else {
-            NEVER_KILLED
+            unit_ai_tuning.never_killed
         };
         // "my current target will take longer to kill"
         if !t.converts && (attacker_time < target_time || a.converts) {
@@ -377,8 +380,12 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
         roles: &Roles,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<u32, GenieError> {
-        let radius = Footprint::new(n.p[0] as f32 / RADIUS_SCALE, n.p[1] as f32 / RADIUS_SCALE);
+        let radius = Footprint::new(
+            n.p[0] as f32 / unit_ai_tuning.radius_scale,
+            n.p[1] as f32 / unit_ai_tuning.radius_scale,
+        );
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
         let Some(site) = FoundationId::of_field(n.p[2]) else {
             return Ok(GO_ON);
@@ -480,6 +487,7 @@ impl UnitAi {
         ai_rng: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<u32, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let action = self.current_action;
         let auto = action == Some(AiAction::AutoScout);
         // a computer player's unit AI finds no tile (slot 0x90 gives 0 without a draw)
@@ -492,7 +500,7 @@ impl UnitAi {
             side.seek_unexplored(self, ai_rng)?
         };
         if let Some(t) = found {
-            let _ = self.explore_at(t, true, side, ai_rng)?;
+            let _ = self.explore_at(t, true, side, ai_rng, unit_ai_tuning)?;
             self.last_action = self.current_action;
             self.current_action = action;
             return Ok(BREAK);
@@ -517,7 +525,7 @@ impl UnitAi {
                     return Ok(BREAK);
                 };
                 if self.current_action == Some(AiAction::AutoScout) {
-                    let _ = self.explore_at(t, true, side, ai_rng)?;
+                    let _ = self.explore_at(t, true, side, ai_rng, unit_ai_tuning)?;
                 }
                 self.current_action = action;
                 Ok(BREAK)

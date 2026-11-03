@@ -19,6 +19,7 @@ use crate::objects::unit::{NO_DYING_SPRITE, Unit};
 use crate::players::Amount;
 use crate::players::tracker::key;
 use crate::technology::TechId;
+use crate::vision::SightLayer;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -54,7 +55,7 @@ impl Unit {
             .add_attributes(death.adds)?;
         c.w.unwatch(c.player, self.id)?;
         if let (Some(v), Some(at)) = (c.w.spatial.sight.as_mut(), death.unlink) {
-            v.unlink_building(at, master.radius)?;
+            v.unlink_building(at, master.radius, c.w.model.tuning.visibility)?;
         }
         if let Some(kind) = death.building.count {
             c.w.players
@@ -123,6 +124,7 @@ impl Unit {
             &mut c.w.spatial,
             &mut c.w.pathing,
             roles,
+            c.w.model.tuning.visibility,
         )?;
         if before == ObjectState::Alive {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
@@ -173,6 +175,7 @@ impl Unit {
             c.w.parts.move_stats_mut(self.id),
             g,
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         );
         Ok(())
     }
@@ -244,7 +247,10 @@ impl Unit {
             &mut c.w.spatial,
             &mut c.w.pathing,
             c.w.world_time,
-            roles,
+            SightLayer {
+                roles,
+                visibility_tuning: c.w.model.tuning.visibility,
+            },
         )?;
         if started {
             c.w.parts.combat_mut(self.id)?.firepower = master.volley_fire;

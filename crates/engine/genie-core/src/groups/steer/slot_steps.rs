@@ -11,7 +11,6 @@ use crate::groups::SpecificMove;
 use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone, slot_gone};
 use crate::groups::motion::passes_waypoint;
-use crate::groups::steer::{CATCH_UP, CATCH_UP_SPAN, LINKED_RADIUS, SLOT_REACH};
 use crate::map::Distance;
 use crate::math::fmath::{BVector, at_most_or_unordered, below_or_unordered};
 use crate::math::rng::Stream;
@@ -210,12 +209,13 @@ impl World {
         let facets = facets.or_else(|| mover.facets());
         mover.yaw(turn, facets)?;
         let next = mover.projected(direction, dt);
-        let state = SlotState::of_passing(passes_waypoint(to, at, next));
+        let state = SlotState::of_passing(passes_waypoint(to, at, next, &self.model.tuning.group));
         let radius = mover.stats.radius.x();
         let speed = mover.stats.speed;
         self.set_slot_state(group, slot, state)?;
         let within = !below_or_unordered(radius, gap.get());
-        let near = !within && !below_or_unordered(radius * SLOT_REACH, gap.get());
+        let near =
+            !within && !below_or_unordered(radius * self.model.tuning.group.slot_reach, gap.get());
         if state == SlotState::Stopping {
             self.stop_at_slot(group, id)?;
         } else if near {
@@ -252,7 +252,7 @@ impl World {
     }
 
     /// A member far from its slot: the group's flag 0x200, and the member walks at its speed
-    /// within [`SLOT_REACH`], else runs, faster the farther it is (up to [`CATCH_UP`]).
+    /// within `GroupTuning::slot_reach`, else runs, faster the farther it is (up to `GroupTuning::catch_up`).
     fn catch_up_to_slot(
         &mut self,
         group: GroupId,
@@ -260,15 +260,17 @@ impl World {
         (gap, speed): (f32, f32),
     ) -> Result<(), GenieError> {
         self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
-        if at_most_or_unordered(SLOT_REACH, gap) {
+        if at_most_or_unordered(self.model.tuning.group.slot_reach, gap) {
             self.set_member_speed(id, Speed::new(speed));
             let _ = self.show_walking(id)?;
             self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
         } else {
-            let v = if at_most_or_unordered(CATCH_UP_SPAN, gap) {
-                speed * CATCH_UP
+            let v = if at_most_or_unordered(self.model.tuning.group.catch_up_span, gap) {
+                speed * self.model.tuning.group.catch_up
             } else {
-                speed + ((speed * CATCH_UP - speed) * gap) / CATCH_UP_SPAN
+                speed
+                    + ((speed * self.model.tuning.group.catch_up - speed) * gap)
+                        / self.model.tuning.group.catch_up_span
             };
             self.set_member_speed(id, Speed::new(v));
             if !self.show_running(id)? {
@@ -376,15 +378,16 @@ impl World {
             at,
             (&mut self.spatial, Some(&mut self.pathing)),
             &self.model.roles,
+            self.model.tuning.visibility,
         )?;
         if !id.is_recyclable()
             // The types of action objects (`RGE_Action_Object`) and of buildings (`TRIBE_Building_Object`).
             && kind < MasterKind::BUILDING
             && speed == Speed::ZERO
-            && (LINKED_RADIUS < radius.x() || LINKED_RADIUS < radius.y())
+            && (self.model.tuning.group.linked_radius < radius.x() || self.model.tuning.group.linked_radius < radius.y())
             && let Some(v) = self.spatial.sight.as_mut()
         {
-            let _ = v.link_building(at, radius.ground())?;
+            let _ = v.link_building(at, radius.ground(), self.model.tuning.visibility)?;
         }
         Ok(())
     }

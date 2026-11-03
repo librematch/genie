@@ -42,6 +42,7 @@ use crate::test_ids::object_id;
 use crate::test_ids::object_id_list;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::tuning;
 use crate::vision::VisionBits;
 use crate::vision::ghost::Ghost;
 use crate::world::Millis;
@@ -753,6 +754,7 @@ fn the_passability_box_keeps_its_bounds_and_nearest_for_nan_place() {
         &slots,
         BVector::new(5.0, 0.0, 5.0),
         BVector::new(3.0, 0.0, 3.0),
+        &tuning().group,
     );
     assert_eq!(bounds, Rect::new(3.0, 2.0, 5.0, 6.0));
     assert_eq!(nearest, Some(3));
@@ -760,12 +762,21 @@ fn the_passability_box_keeps_its_bounds_and_nearest_for_nan_place() {
         &slots[..2],
         BVector::new(5.0, 0.0, 5.0),
         BVector::new(3.0, 0.0, 3.0),
+        &tuning().group,
     );
     assert_eq!(nearest, Some(0));
     // a NaN tester place keeps the starting bounds for its part too
-    let (bounds, _) = passability_box(&slots[..1], nan, BVector::new(3.0, 0.0, 3.0));
+    let (bounds, _) = passability_box(
+        &slots[..1],
+        nan,
+        BVector::new(3.0, 0.0, 3.0),
+        &tuning().group,
+    );
     assert_eq!(bounds, Rect::new(4.0, 6.0, 4.0, 6.0));
-    assert_eq!(passability_box(&slots[1..2], nan, BVector::ZERO).1, None);
+    assert_eq!(
+        passability_box(&slots[1..2], nan, BVector::ZERO, &tuning().group).1,
+        None
+    );
 }
 
 /// A reachable slot's cell mark: along y for `|dx| <= |dz|` and for a NaN (bit 7 for a `dz`
@@ -884,7 +895,17 @@ fn line_after_column_takes_its_units_in_the_column_order() {
                 .unwrap()
         );
         let mut parts = Formation::new();
-        assert!(column_line_slots(&mut parts, &g, false, (false, false), t.world_time).unwrap());
+        assert!(
+            column_line_slots(
+                &mut parts,
+                &g,
+                false,
+                (false, false),
+                t.world_time,
+                &tuning().group
+            )
+            .unwrap()
+        );
         t.lay_units(&mut parts, group_id(1), previous == FormationKind::COLUMN)
             .unwrap();
         assert_eq!(whole, parts);
@@ -1136,7 +1157,8 @@ fn line_of_two_unit_types_alternates_its_slots() {
             &g,
             false,
             (false, false),
-            WorldTime::from_millis(77)
+            WorldTime::from_millis(77),
+            &tuning().group
         )
         .unwrap()
     );
@@ -1170,18 +1192,48 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             .collect()
     };
     let mut f = Formation::new();
-    assert!(column_line_slots(&mut f, &g, false, (true, false), WorldTime::ZERO).unwrap());
+    assert!(
+        column_line_slots(
+            &mut f,
+            &g,
+            false,
+            (true, false),
+            WorldTime::ZERO,
+            &tuning().group
+        )
+        .unwrap()
+    );
     assert_eq!(f.kind, FormationKind::STAGGERED);
     assert_eq!(offsets(&f, 0), [-3.5, -1.5, 0.5, 2.5, 4.5]);
     assert_eq!(offsets(&f, 1), [-4.5, -2.5, -0.5, 1.5, 3.5]);
     assert_eq!(f.lines[1].distance_back, Distance::new(2.0));
     let mut f = Formation::new();
-    assert!(column_line_slots(&mut f, &g, false, (false, true), WorldTime::ZERO).unwrap());
+    assert!(
+        column_line_slots(
+            &mut f,
+            &g,
+            false,
+            (false, true),
+            WorldTime::ZERO,
+            &tuning().group
+        )
+        .unwrap()
+    );
     assert_eq!(f.kind, FormationKind::FLANKED);
     assert_eq!(offsets(&f, 0), [-4.5, -3.5, 2.5, 3.5, 4.5]);
     assert_eq!(offsets(&f, 1), [-4.0, -3.0, 2.0, 3.0, 4.0]);
     let mut f = Formation::new();
-    assert!(column_line_slots(&mut f, &g, true, (false, false), WorldTime::ZERO).unwrap());
+    assert!(
+        column_line_slots(
+            &mut f,
+            &g,
+            true,
+            (false, false),
+            WorldTime::ZERO,
+            &tuning().group
+        )
+        .unwrap()
+    );
     assert_eq!(
         (f.kind, f.maximum_width, f.maximum_depth),
         (FormationKind::COLUMN, 2, 5)
@@ -1192,7 +1244,8 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             &UnitGroup::default(),
             false,
             (false, false),
-            WorldTime::ZERO
+            WorldTime::ZERO,
+            &tuning().group
         )
         .unwrap()
     );
@@ -1211,7 +1264,17 @@ fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
         ..Member::default()
     }));
     let mut f = Formation::new();
-    assert!(column_line_slots(&mut f, &g, false, (false, false), WorldTime::ZERO).unwrap());
+    assert!(
+        column_line_slots(
+            &mut f,
+            &g,
+            false,
+            (false, false),
+            WorldTime::ZERO,
+            &tuning().group
+        )
+        .unwrap()
+    );
     assert_eq!((f.maximum_width, f.maximum_depth), (5, 3));
     let first: Vec<(f32, i32)> = f.slots[..3]
         .iter()

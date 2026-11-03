@@ -26,6 +26,7 @@ use crate::pathing::Pathing;
 use crate::world::OBJECT_MASTER;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::step::Step;
 
 mod death;
@@ -155,8 +156,10 @@ impl Unit {
         moving: bool,
         places: (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
-        self.place.new_position(self.id, at, moving, places, roles)
+        self.place
+            .new_position(self.id, at, moving, places, roles, visibility_tuning)
     }
 
     /// A test's fixture puts the object at `at` without the world's index, which the test sets

@@ -24,7 +24,7 @@ use crate::construction::repair::REPAIR as CONSTRUCTION_REPAIR;
 use crate::groups::LinePoint;
 use crate::groups::formation::top_path;
 use crate::math::image::facing::QUARTER_PI;
-use crate::math::image::group::{CLOSE as GROUP_CLOSE, FARTHEST as GROUP_FARTHEST, FRONT_SHARE};
+use crate::math::image::group::FARTHEST as GROUP_FARTHEST;
 
 /// The group's current command (`mCurrentCommand`, `+0x3a8`) without one.
 const NO_COMMAND: GroupCommandKind = GroupCommandKind::NONE;
@@ -45,10 +45,6 @@ const FARTHEST: f32 = GROUP_FARTHEST;
 const FOLLOW: GroupCommandKind = GroupCommandKind::FOLLOW;
 /// A turn of the motion above this lays the formation out anew (`DAT_142eb6e44`, π/4).
 const TURN_LIMIT: f32 = QUARTER_PI;
-/// The share of the lead's line of sight a follow keeps within (`DAT_142e7f384`).
-const FOLLOW_SHARE: f32 = FRONT_SHARE;
-/// A follow's target this near the top path's end (squared, `DAT_14330eb8c`) keeps the move.
-const CLOSE: f32 = GROUP_CLOSE;
 /// The differentiator groups' members the update lists for the members' moves, at most this
 /// many (`DAT_143f15860`: `0x8b < n` ends the list).
 const DIFFERENTIATORS: usize = 0x8c;

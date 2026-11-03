@@ -8,11 +8,7 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, maxss, powf, sqrt};
-use crate::math::image::unit_ai::{
-    DEFEND_PATROL_LEASH as UNIT_AI_DEFEND_PATROL_LEASH, FULL_FAITH as UNIT_AI_FULL_FAITH,
-    GAIA_TARGET_REACH as UNIT_AI_GAIA_TARGET_REACH, PATROL_FARTHEST as UNIT_AI_PATROL_FARTHEST,
-    STAND_GROUND_PATROL_LEASH as UNIT_AI_STAND_GROUND_PATROL_LEASH,
-};
+use crate::math::image::unit_ai::PATROL_FARTHEST as UNIT_AI_PATROL_FARTHEST;
 use crate::objects::ObjectState;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
@@ -29,12 +25,13 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    Attacker, BUILDING_AI, CIVILIAN, DEFEND_GROWTH, LION_AI, PREDATOR_AI, PRIEST_AI, SIEGE_AI,
-    SOLDIER_AI, Seeker, TOWER_AI, Target,
+    Attacker, BUILDING_AI, CIVILIAN, LION_AI, PREDATOR_AI, PRIEST_AI, SIEGE_AI, SOLDIER_AI, Seeker,
+    TOWER_AI, Target,
 };
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
 
 /// What a priest's conversion test (`FUN_140c1af00`, the priest's slot 0x1b8) reads of the
@@ -68,9 +65,6 @@ pub struct Convertee {
     pub hero: HeroFlags,
 }
 
-/// The faith a priest's conversion asks unless `any` (`DAT_14330ebcc`).
-pub(super) const FULL_FAITH: Amount = Amount::new(UNIT_AI_FULL_FAITH);
-
 /// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
 /// `t` (None: one the world does not hold), with `any` its faith not asked. Never for class 43, nor
 /// without full faith (100, `COMISS`: a NaN fails) unless `any`; never a Gaia object, nor with the
@@ -80,7 +74,13 @@ pub(super) const FULL_FAITH: Amount = Amount::new(UNIT_AI_FULL_FAITH);
 /// (action type 104): its last for any class and master, or the first for the object's master or
 /// class; one that names an attribute (`+0x26`) the owner holds at most 0 (or not a number) fails.
 #[must_use]
-pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool, roles: &Roles) -> bool {
+pub fn can_convert(
+    p: &Converter<'_>,
+    t: Option<&Convertee>,
+    any: bool,
+    roles: &Roles,
+    unit_ai_tuning: &UnitAiTuning,
+) -> bool {
     if roles
         .of_class(p.class)
         .contains(ClassRoles::MONK_WITH_RELIC)
@@ -88,7 +88,7 @@ pub fn can_convert(p: &Converter<'_>, t: Option<&Convertee>, any: bool, roles: &
         return false;
     }
     // full faith (`COMISS`: a NaN has none)
-    let faithful = FULL_FAITH <= p.faith;
+    let faithful = Amount::new(unit_ai_tuning.full_faith) <= p.faith;
     if !any && !faithful {
         return false;
     }
@@ -300,14 +300,6 @@ pub fn siege_attacks_neutral(
             .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 
-/// A Gaia target lets the siege unit's range grow by this (`DAT_142eb4838`).
-pub(super) const GAIA_TARGET_REACH: Distance = Distance::new(UNIT_AI_GAIA_TARGET_REACH);
-
-/// The defend stance's leash from a saved patrol's path (`DAT_14330ebb8`, 5).
-pub(super) const DEFEND_PATROL_LEASH: Distance = Distance::new(UNIT_AI_DEFEND_PATROL_LEASH);
-/// Stand ground's leash from a saved patrol's path (`DAT_142e7f384`, 0.5).
-pub(super) const STAND_GROUND_PATROL_LEASH: Distance =
-    Distance::new(UNIT_AI_STAND_GROUND_PATROL_LEASH);
 /// `FUN_140f95e10`'s first least distance (`DAT_14330ebf4`, the largest f32).
 pub(super) const PATROL_FARTHEST: f32 = UNIT_AI_PATROL_FARTHEST;
 
@@ -356,7 +348,7 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
 /// The siege unit's attack check (slot 0xa0, `FUN_140c19190`) with `any` (its third argument):
 /// never the classes 1 and 42, nor in `NoAttack`. Its reach is the target's footprint gap to the
 /// unit's state position (`FUN_14118faf0`) less the unit's own diagonal (`sqrtf` of its radii
-/// squared by `powf`), against its range (slot 0x230), grown by [`GAIA_TARGET_REACH`] for a Gaia
+/// squared by `powf`), against its range (slot 0x230), grown by `UnitAiTuning::gaia_target_reach` for a Gaia
 /// target: in `StandGround` (stance 2) but on order `0x2bd` within the range (`COMISS`, `JBE`:
 /// an unordered one passes); in Defend (1) within the range (ungrown) plus 5
 /// (`DAT_14330ebb8`; `JA` rejects); the patrol orders' and a patrol path's ranges (slot 0x470,
@@ -377,12 +369,13 @@ pub fn siege_can_attack(
     t: &Target,
     any: bool,
     roles: &Roles,
+    unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
     if roles
         .of_class(t.class)
         .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
         || s.stance == UnitStance::NO_ATTACK
-        || !siege_in_reach(me, s, t)?
+        || !siege_in_reach(me, s, t, unit_ai_tuning)?
     {
         return Ok(false);
     }
@@ -414,13 +407,18 @@ pub fn siege_can_attack(
 /// # Errors
 ///
 /// A defending unit's patrol range.
-pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool, GenieError> {
+pub(super) fn siege_in_reach(
+    me: &Attacker,
+    s: &Seeker,
+    t: &Target,
+    unit_ai_tuning: &UnitAiTuning,
+) -> Result<bool, GenieError> {
     // `powf` with 2 (`DAT_142e8c150`), y's first
     let diagonal = sqrt(powf(me.radius.y(), 2.0) + powf(me.radius.x(), 2.0));
     let gap = footprint_point_gap(t.position, t.radius, s.state_position) - Distance::new(diagonal);
     let mut range = me.range;
     if t.owner == PlayerId::GAIA {
-        range += GAIA_TARGET_REACH;
+        range += Distance::new(unit_ai_tuning.gaia_target_reach);
     }
     match s.stance {
         UnitStance::STAND_GROUND
@@ -436,7 +434,7 @@ pub(super) fn siege_in_reach(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
             // `JA` rejects: an unordered gap passes
             Ok(at_most_or_unordered(
                 gap.get(),
-                me.range.get() + DEFEND_GROWTH,
+                me.range.get() + unit_ai_tuning.defend_growth,
             ))
         }
         _ => Ok(true),

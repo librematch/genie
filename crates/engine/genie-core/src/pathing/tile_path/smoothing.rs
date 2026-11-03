@@ -1,25 +1,12 @@
 //! The smoothing of a found path (`FUN_140f7dbb0`): its straight stretches wherever the unit
 //! can walk straight.
 
-use crate::map::Distance;
 use crate::map::Point;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath;
 use crate::math::fmath::BVector;
-use crate::math::image::tile_path::{
-    SHORTCUT_REACH as TILE_PATH_SHORTCUT_REACH, SMOOTH_STEP as TILE_PATH_SMOOTH_STEP,
-    TILE_SEARCH_LENGTH as TILE_PATH_TILE_SEARCH_LENGTH,
-};
 use crate::pathing::tile_path::Path;
-
-/// The longest step between the points the smoothing puts on a straight stretch
-/// (`DAT_142f430e8`).
-pub(super) const SMOOTH_STEP: f32 = TILE_PATH_SMOOTH_STEP;
-/// The level-0 search runs only for paths shorter than this (`DAT_142f430ec`).
-pub(super) const TILE_SEARCH_LENGTH: Distance = Distance::new(TILE_PATH_TILE_SEARCH_LENGTH);
-/// The squared distance from the start within which the planner looks for a shorter first
-/// stretch (`DAT_14330ebcc`).
-pub(super) const SHORTCUT_REACH: f32 = TILE_PATH_SHORTCUT_REACH;
+use crate::world::layer::generated::TilePathTuning;
 
 /// The obstruction manager as the smoothing asks it for a unit (`FUN_140f7dbb0`).
 pub trait SegmentTest<E> {
@@ -48,7 +35,12 @@ pub(super) fn point_at(path: &Path, index: i32) -> BVector {
 /// `FUN_140f761b0`: the points between `first` and `last` replaced by evenly spaced points at
 /// most 7.5 apart on the straight line (through the path's own insert, which keeps no two equal
 /// points together); returns how many fewer points lie between them now, 0 with none between.
-pub(super) fn straighten(path: &mut Path, first: i32, last: i32) -> i32 {
+pub(super) fn straighten(
+    path: &mut Path,
+    first: i32,
+    last: i32,
+    tile_path_tuning: &TilePathTuning,
+) -> i32 {
     let between = (last - first) - 1;
     if between < 1 {
         return 0;
@@ -56,7 +48,7 @@ pub(super) fn straighten(path: &mut Path, first: i32, last: i32) -> i32 {
     let a = point_at(path, first);
     let d = fmath::sub(point_at(path, last), a);
     let length = fmath::sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
-    let steps = cvttss2si(length / SMOOTH_STEP);
+    let steps = cvttss2si(length / tile_path_tuning.smooth_step);
     let fewer = between - steps;
     let at = (first + 1) as usize;
     if fewer < 0 {
@@ -93,17 +85,25 @@ pub(super) fn straighten(path: &mut Path, first: i32, last: i32) -> i32 {
 /// # Errors
 ///
 /// What the segment test cannot answer (the pass ends all the same).
-pub fn smooth<E>(path: &mut Path, walls: &mut dyn SegmentTest<E>) -> Result<(), E> {
+pub fn smooth<E>(
+    path: &mut Path,
+    walls: &mut dyn SegmentTest<E>,
+    tile_path_tuning: &TilePathTuning,
+) -> Result<(), E> {
     if path.points.len() <= 2 {
         return Ok(());
     }
-    let smoothed = smooth_pass(path, walls);
+    let smoothed = smooth_pass(path, walls, tile_path_tuning);
     walls.pass_ends();
     smoothed
 }
 
 /// [`smooth`]'s tests and straight stretches over a path of more than two points.
-pub(super) fn smooth_pass<E>(path: &mut Path, walls: &mut dyn SegmentTest<E>) -> Result<(), E> {
+pub(super) fn smooth_pass<E>(
+    path: &mut Path,
+    walls: &mut dyn SegmentTest<E>,
+    tile_path_tuning: &TilePathTuning,
+) -> Result<(), E> {
     let mut first: i32 = 0;
     let mut probe: i32 = 2;
     while (probe as usize) < path.points.len() {
@@ -115,14 +115,14 @@ pub(super) fn smooth_pass<E>(path: &mut Path, walls: &mut dyn SegmentTest<E>) ->
                 first = probe - 1;
                 next = probe + 1;
             } else {
-                let fewer = straighten(path, first, probe - 1);
+                let fewer = straighten(path, first, probe - 1, tile_path_tuning);
                 first = (probe - 1) - fewer;
                 next = first + 2;
             }
         } else {
             next = probe + 1;
             if next as usize == path.points.len() {
-                let _ = straighten(path, first, probe);
+                let _ = straighten(path, first, probe, tile_path_tuning);
             }
         }
         probe = next;

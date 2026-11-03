@@ -1,5 +1,6 @@
 //! The static, animated, moving and action masters' setters.
 
+use crate::layer::generated::MastersTuning;
 use crate::map::Distance;
 use crate::map::RestrictionId;
 use crate::math::fmath::at_most_or_unordered;
@@ -17,7 +18,6 @@ use crate::objects::masters::GarrisonCapacity;
 use crate::objects::masters::HpPercent;
 use crate::objects::masters::InteractionMode;
 use crate::objects::masters::InterfaceKind;
-use crate::objects::masters::MISSILE_SPEED_CAP;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterAttribute;
 use crate::objects::masters::MasterKind;
@@ -28,7 +28,6 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::Occlusion;
 use crate::objects::masters::ROUND;
 use crate::objects::masters::RunPattern;
-use crate::objects::masters::SPEED_CAP;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::add_short;
 use crate::objects::masters::add_sprite;
@@ -411,12 +410,13 @@ impl Master {
     }
 
     /// The speed's cap (`FUN_1410a8b60`, `FUN_1410a8c00`): capped, a speed above it (`COMISS`,
-    /// `JBE`: not a NaN) takes it, 20 for a missile master, else 4.5.
-    pub(super) fn cap_speed(&mut self, capped: bool) {
+    /// `JBE`: not a NaN) takes it, `MastersTuning::missile_speed_cap` for a missile master, else
+    /// `MastersTuning::speed_cap`.
+    pub(super) fn cap_speed(&mut self, capped: bool, masters_tuning: &MastersTuning) {
         let cap = if self.kind == MasterKind::MISSILE {
-            MISSILE_SPEED_CAP
+            masters_tuning.missile_speed_cap
         } else {
-            SPEED_CAP
+            masters_tuning.speed_cap
         };
         if capped && !at_most_or_unordered(self.max_speed.get(), cap) {
             self.max_speed = Speed::new(cap);
@@ -446,7 +446,7 @@ impl Master {
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
             self.max_speed += Speed::new(v);
-            self.cap_speed(world.capped);
+            self.cap_speed(world.capped, world.masters_tuning);
         } else {
             self.add_static(attribute, v, world);
         }
@@ -461,7 +461,7 @@ impl Master {
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
             self.max_speed *= v;
-            self.cap_speed(world.capped);
+            self.cap_speed(world.capped, world.masters_tuning);
         } else {
             self.multiply_static(attribute, v, world);
         }

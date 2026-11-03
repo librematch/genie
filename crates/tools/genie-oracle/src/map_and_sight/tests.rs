@@ -192,7 +192,7 @@ mod spatial {
                 tiles: vec![RgeTile::default(); 4],
             })
             .collect();
-        spatial(&save, &TerrainTable::default(), &layer().unwrap().roles).unwrap()
+        spatial(&save, &TerrainTable::default(), layer().unwrap()).unwrap()
     }
 
     #[test]

@@ -85,6 +85,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -1060,6 +1061,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
             ..standing
         },
         &mut rng,
+        tuning().sprite,
     ));
     t.parts.set_anim_speed(unit.id, Speed::new(1.0));
     t.parts.set_unit_ai(
@@ -2391,6 +2393,8 @@ fn master_change_inside_building_keeps_to_its_record() {
         &next,
         world,
         &roles(),
+        tuning().sprite,
+        tuning().visibility,
     )
     .unwrap();
     assert!(switched.promoted);
@@ -2469,6 +2473,8 @@ fn switched_in_the_open(
         next,
         world,
         &roles(),
+        tuning().sprite,
+        tuning().visibility,
     )?;
     let record = spatial.get(unit.id).copied().unwrap();
     Ok((switched, (unit, combat), record))
@@ -2544,6 +2550,7 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
                 flags: SpriteFlags::ANIMATED,
             },
             &mut sprites,
+            tuning().sprite,
         )),
         ..unit(HitPoints::new(20.0), ObjectState::Alive)
     };
@@ -2774,38 +2781,53 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
 #[test]
 fn follow_box_sets_each_unit_column_against_its_row() {
     assert_eq!(
-        follow_spread(&[Point::new(20.0, 20.0), Point::new(21.0, 20.0)]),
+        follow_spread(
+            &[Point::new(20.0, 20.0), Point::new(21.0, 20.0)],
+            &tuning().order
+        ),
         Some(Point::new(20.5, 20.0))
     );
     assert_eq!(
-        follow_spread(&[Point::new(10.0, 30.0), Point::new(10.5, 30.0)]),
+        follow_spread(
+            &[Point::new(10.0, 30.0), Point::new(10.5, 30.0)],
+            &tuning().order
+        ),
         None
     );
     // the last unit's spread: 8 passes, more does not
     assert_eq!(
-        follow_spread(&[Point::new(10.0, 18.0)]),
+        follow_spread(&[Point::new(10.0, 18.0)], &tuning().order),
         Some(Point::new(10.0, 18.0))
     );
-    assert_eq!(follow_spread(&[Point::new(10.0, 18.5)]), None);
-    // the running spread holds the units before the last
     assert_eq!(
-        follow_spread(&[
-            Point::new(10.0, 10.0),
-            Point::new(30.0, 30.0),
-            Point::new(30.0, 30.0)
-        ]),
+        follow_spread(&[Point::new(10.0, 18.5)], &tuning().order),
         None
     );
-    assert_eq!(follow_spread(&[]), Some(Point::new(0.0, 0.0)));
+    // the running spread holds the units before the last
+    assert_eq!(
+        follow_spread(
+            &[
+                Point::new(10.0, 10.0),
+                Point::new(30.0, 30.0),
+                Point::new(30.0, 30.0)
+            ],
+            &tuning().order
+        ),
+        None
+    );
+    assert_eq!(
+        follow_spread(&[], &tuning().order),
+        Some(Point::new(0.0, 0.0))
+    );
 }
 
 /// A FOLLOW offset stays on the map: below 0 it is 0, past the size less 0.01 that.
 #[test]
 fn follow_offset_stays_on_the_map() {
-    assert_eq!(follow_axis(-0.5, 120), 0.0);
-    assert_eq!(follow_axis(130.0, 120), 119.99);
-    assert_eq!(follow_axis(60.25, 120), 60.25);
-    assert!(follow_axis(f32::NAN, 120).is_nan());
+    assert_eq!(follow_axis(-0.5, 120, &tuning().group), 0.0);
+    assert_eq!(follow_axis(130.0, 120, &tuning().group), 119.99);
+    assert_eq!(follow_axis(60.25, 120, &tuning().group), 60.25);
+    assert!(follow_axis(f32::NAN, 120, &tuning().group).is_nan());
 }
 
 /// Player 1's soldiers 11 and 12 (moving, each with a unit AI) and player 2's 30 at (40, 20),
@@ -2891,7 +2913,12 @@ fn guard_gives_its_units_the_defend_order_at_once() {
         let mut t = followers();
         t.players[2].objects[ListIndex::new(0)].place_for_test(Position::new(x, 20.0, 0.0));
         t.spatial
-            .set_position(object_id(30), Position::new(x, 20.0, 0.0), &roles())
+            .set_position(
+                object_id(30),
+                Position::new(x, 20.0, 0.0),
+                &roles(),
+                tuning().visibility,
+            )
             .unwrap();
         t.guard(PlayerId::new(1), &object_ids([11]), object_id(30))
             .unwrap();
@@ -2909,7 +2936,7 @@ fn guard_gives_its_units_the_defend_order_at_once() {
             (
                 Some(object_id(30)),
                 Some(object_id(30)),
-                Distance::new(GUARD_RANGE)
+                Distance::new(tuning().order.guard_range)
             )
         );
         assert_eq!(ai.target_point, Position::new(x, 20.0, 0.0));
@@ -3801,28 +3828,52 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
 fn units_of_move_take_the_cells_of_grid() {
     let point = Point::new(29.78125, 92.489_586);
     assert_eq!(
-        grid_point(0, 2, point, GridSize::new(120, 120)),
+        grid_point(0, 2, point, GridSize::new(120, 120), &tuning().order),
         Point::new(29.78125, 92.489_586)
     );
     assert_eq!(
-        grid_point(1, 2, point, GridSize::new(120, 120)),
+        grid_point(1, 2, point, GridSize::new(120, 120), &tuning().order),
         Point::new(29.78125, 92.989_586)
     );
     // nine units: three a row around the point; off the map an axis keeps a tile inside
     assert_eq!(
-        grid_point(0, 9, Point::new(10.0, 10.0), GridSize::new(120, 120)),
+        grid_point(
+            0,
+            9,
+            Point::new(10.0, 10.0),
+            GridSize::new(120, 120),
+            &tuning().order
+        ),
         Point::new(9.5, 9.5)
     );
     assert_eq!(
-        grid_point(4, 9, Point::new(10.0, 10.0), GridSize::new(120, 120)),
+        grid_point(
+            4,
+            9,
+            Point::new(10.0, 10.0),
+            GridSize::new(120, 120),
+            &tuning().order
+        ),
         Point::new(10.0, 10.0)
     );
     assert_eq!(
-        grid_point(8, 9, Point::new(119.75, 0.25), GridSize::new(120, 120)),
+        grid_point(
+            8,
+            9,
+            Point::new(119.75, 0.25),
+            GridSize::new(120, 120),
+            &tuning().order
+        ),
         Point::new(119.0, 0.75)
     );
     assert_eq!(
-        grid_point(0, 9, Point::new(0.25, 0.25), GridSize::new(120, 120)),
+        grid_point(
+            0,
+            9,
+            Point::new(0.25, 0.25),
+            GridSize::new(120, 120),
+            &tuning().order
+        ),
         Point::new(1.0, 1.0)
     );
 }
@@ -3835,14 +3886,14 @@ fn units_of_an_order_take_their_offsets_from_their_centroid() {
         Point::new(104.32466, 39.299_885),
         Point::new(103.67509, 39.299_885),
     );
-    let c = centroid(&[a, b]).unwrap();
+    let c = centroid(&[a, b], &tuning().order).unwrap();
     let point = Point::new(108.37596, 43.91338);
     assert_eq!(
-        offset_point(a, c, point, GridSize::new(120, 120)),
+        offset_point(a, c, point, GridSize::new(120, 120), &tuning().order),
         Point::new(108.700_745, 43.91338)
     );
     assert_eq!(
-        offset_point(b, c, point, GridSize::new(120, 120)),
+        offset_point(b, c, point, GridSize::new(120, 120), &tuning().order),
         Point::new(108.05117, 43.91338)
     );
 }
@@ -3852,13 +3903,25 @@ fn units_of_an_order_take_their_offsets_from_their_centroid() {
 /// not.
 #[test]
 fn the_box_of_an_order_moves_only_its_least_value_for_lower_one() {
-    assert!(centroid(&[Point::new(50.0, 50.0), Point::new(30.0, 50.0)]).is_some());
+    assert!(
+        centroid(
+            &[Point::new(50.0, 50.0), Point::new(30.0, 50.0)],
+            &tuning().order
+        )
+        .is_some()
+    );
     assert_eq!(
-        centroid(&[Point::new(30.0, 50.0), Point::new(39.0, 50.0)]),
+        centroid(
+            &[Point::new(30.0, 50.0), Point::new(39.0, 50.0)],
+            &tuning().order
+        ),
         None
     );
     assert_eq!(
-        centroid(&[Point::new(30.0, 50.0), Point::new(38.0, 50.0)]),
+        centroid(
+            &[Point::new(30.0, 50.0), Point::new(38.0, 50.0)],
+            &tuning().order
+        ),
         Some(Point::new(34.0, 50.0))
     );
 }
@@ -3891,41 +3954,140 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     let mut away = BTreeSet::new();
     let scout = unit(9185, true, Position::new(42.047_367, 94.338_486, 0.0));
     let sheep = unit(9529, false, Position::new(45.5, 93.5, 0.0));
-    assert!(!splits_together(&scout, &sheep, f, false, &mut none, &mut away).unwrap());
+    assert!(
+        !splits_together(
+            &scout,
+            &sheep,
+            f,
+            false,
+            &mut none,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     // nearer than 20 tiles the planner's path decides: its goal reached (1) within the
     // influence distance
     let other = unit(9186, true, Position::new(44.0, 94.0, 0.0));
     let mut short = |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(2.5))));
-    assert!(splits_together(&scout, &other, f, false, &mut short, &mut away).unwrap());
+    assert!(
+        splits_together(
+            &scout,
+            &other,
+            f,
+            false,
+            &mut short,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     let mut long = |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(3.5))));
-    assert!(!splits_together(&scout, &other, f, false, &mut long, &mut away).unwrap());
+    assert!(
+        !splits_together(
+            &scout,
+            &other,
+            f,
+            false,
+            &mut long,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     let mut nearest =
         |_: &Splittable, _: &Splittable| Ok(Some((Found::Nearest, Distance::new(2.5))));
-    assert!(!splits_together(&scout, &other, f, false, &mut nearest, &mut away).unwrap());
+    assert!(
+        !splits_together(
+            &scout,
+            &other,
+            f,
+            false,
+            &mut nearest,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     // a path that did not join puts the unit among the far ones; a NaN length joins
     assert_eq!(away, [object_id(9186)].into());
     let mut lost =
         |_: &Splittable, _: &Splittable| Ok(Some((Found::Goal, Distance::new(f32::NAN))));
-    assert!(splits_together(&scout, &other, f, false, &mut lost, &mut away).unwrap());
+    assert!(
+        splits_together(
+            &scout,
+            &other,
+            f,
+            false,
+            &mut lost,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     // a NaN distance takes no path and is within the influence distance
     let nowhere = Splittable {
         moved_at: Point::new(f32::NAN, 94.0),
         ..other
     };
-    assert!(splits_together(&scout, &nowhere, f, false, &mut short, &mut away).unwrap());
+    assert!(
+        splits_together(
+            &scout,
+            &nowhere,
+            f,
+            false,
+            &mut short,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     let far = unit(9187, true, Position::new(80.0, 94.0, 0.0));
-    assert!(!splits_together(&scout, &far, f, false, &mut none, &mut away).unwrap());
+    assert!(
+        !splits_together(
+            &scout,
+            &far,
+            f,
+            false,
+            &mut none,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     let wide = Formations {
         influence: Distance::new(40.0),
         ..f
     };
-    assert!(splits_together(&scout, &far, wide, false, &mut none, &mut away).unwrap());
+    assert!(
+        splits_together(
+            &scout,
+            &far,
+            wide,
+            false,
+            &mut none,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
     // a member must stand in state 2 or more
     let born = Splittable {
         state: ObjectState::Foundation,
         ..far
     };
-    assert!(!splits_together(&scout, &born, wide, true, &mut none, &mut away).unwrap());
+    assert!(
+        !splits_together(
+            &scout,
+            &born,
+            wide,
+            true,
+            &mut none,
+            &mut away,
+            &tuning().order
+        )
+        .unwrap()
+    );
 }
 
 #[test]
@@ -3936,7 +4098,8 @@ fn point_off_the_map_stays_inside_its_edge() {
             Point::new(5.0, 15.0),
             c,
             Point::new(2.0, 118.0),
-            GridSize::new(120, 120)
+            GridSize::new(120, 120),
+            &tuning().order
         ),
         Point::new(1.0, 119.0)
     );
@@ -3966,7 +4129,7 @@ fn patrol_passes_over_waypoint_within_tile_of_the_last() {
         Point::new(12.5, 9.0),
     ];
     assert_eq!(
-        waypoints_from(Point::new(10.0, 10.0), &w),
+        waypoints_from(Point::new(10.0, 10.0), &w, &tuning().order),
         [
             Point::new(11.0, 10.0),
             Point::new(11.5, 9.0),
@@ -3974,7 +4137,7 @@ fn patrol_passes_over_waypoint_within_tile_of_the_last() {
         ]
     );
     assert_eq!(
-        waypoints_from(Point::new(10.0, 10.0), &w[..1]),
+        waypoints_from(Point::new(10.0, 10.0), &w[..1], &tuning().order),
         Vec::<Point>::new()
     );
 }

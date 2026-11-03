@@ -2,13 +2,14 @@
 //! 11 and 15).
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Arms, Attack, Engagement};
 use crate::gathering::DropSiteId;
 use crate::gathering::PastureId;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
 use crate::gathering::hunt::walks::QUIET_CODE;
-use crate::gathering::hunt::{HuntAction, HuntTask, Lead, OWN_LIVESTOCK_RANGE, Quarry};
+use crate::gathering::hunt::{HuntAction, HuntTask, Lead, Quarry};
 use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
 use crate::map::Position;
@@ -28,8 +29,8 @@ use crate::players::PlayerType;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::Roles;
-use crate::world::layer::generated::AttackTuning;
+use crate::world::layer::generated::HuntTuning;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
 /// Who walks to a hunt's point ([`HuntAction::update_point_walk`]).
@@ -134,14 +135,19 @@ impl HuntAction {
     /// (`set_state` 12). `player_type` is the owner's type (`FUN_141659cf0` tests it); `carry_rule` the
     /// game settings' test `FUN_141302150`, with which a hunter drops another resource it carries
     /// (a computer player's does when it carries none).
-    pub fn start(
+    pub(crate) fn start(
         start: HuntStart<'_>,
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
-        roles: &Roles,
-        attack_tuning: &AttackTuning,
+        layer: BeginLayer<'_>,
+        hunt_tuning: &HuntTuning,
     ) -> Result<(Self, bool), GenieError> {
+        let BeginLayer {
+            roles,
+            attack_tuning,
+            move_to_tuning,
+        } = layer;
         let HuntStart {
             task,
             target,
@@ -191,7 +197,7 @@ impl HuntAction {
             hunt.point = Position::from([-1.0; 3]);
             hunt.target_class = None;
             hunt.carry_to = Some(DropSiteId::new(target.id));
-            hunt.set_drop(target.position, attack.gap, mover, &walks)?;
+            hunt.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
             return Ok((hunt, false));
         }
         let chase = HuntChase {
@@ -199,14 +205,25 @@ impl HuntAction {
             player,
             walks: &walks,
         };
-        let arrived = hunt.chase(chase, attack, arms, mover, roles, attack_tuning)?;
+        let arrived = hunt.chase(
+            chase,
+            attack,
+            arms,
+            mover,
+            BeginLayer {
+                roles,
+                attack_tuning,
+                move_to_tuning,
+            },
+            hunt_tuning,
+        )?;
         Ok((hunt, arrived))
     }
 
     /// `set_state(4)` (`0x140ac60e0` case 4): the sub-actions go (an Attack's `MoveTo` stops the
     /// unit), the timer clears and the target's place becomes the point. A dead target, or the hunter's own
     /// player's livestock, is walked to: a quiet `MoveTo` within the task's range, or
-    /// `OWN_LIVESTOCK_RANGE` to the livestock (`FUN_140aa0df0`; its start `0x140aa2100`: a unit
+    /// `HuntTuning::own_livestock_range` to the livestock (`FUN_140aa0df0`; its start `0x140aa2100`: a unit
     /// within 0.01 of the target's footprint is there already). A target not dead yet of another,
     /// unallied player (or of class 49) is attacked first: `set_state(12)` (case 0xc) with an
     /// Attack of the master's ranges. A live allied one fails the hunt (`set_state` 13).
@@ -216,9 +233,14 @@ impl HuntAction {
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
-        roles: &Roles,
-        attack_tuning: &AttackTuning,
+        layer: BeginLayer<'_>,
+        hunt_tuning: &HuntTuning,
     ) -> Result<bool, GenieError> {
+        let BeginLayer {
+            roles,
+            attack_tuning,
+            move_to_tuning,
+        } = layer;
         let HuntChase {
             target,
             player,
@@ -234,7 +256,7 @@ impl HuntAction {
             let range = if ObjectState::Alive < target.state {
                 self.task.range
             } else {
-                Distance::new(OWN_LIVESTOCK_RANGE)
+                Distance::new(hunt_tuning.own_livestock_range)
             };
             let to = WalkTo {
                 id: Some(target.id),
@@ -242,7 +264,7 @@ impl HuntAction {
                 gap: attack.gap,
                 state: Some(target.state),
             };
-            let move_to = self.move_to_object(to, range, mover, walks)?;
+            let move_to = self.move_to_object(to, range, mover, walks, move_to_tuning)?;
             self.state = HuntState::Walk { move_to };
             return Ok(false);
         }
@@ -255,8 +277,18 @@ impl HuntAction {
         }
         self.state = HuntState::Attack { attack: None };
         let reads = walks.live(mover);
-        let (a, arrived) =
-            Attack::start(target.id, attack, arms, mover, &reads, roles, attack_tuning)?;
+        let (a, arrived) = Attack::start(
+            target.id,
+            attack,
+            arms,
+            mover,
+            &reads,
+            BeginLayer {
+                roles,
+                attack_tuning,
+                move_to_tuning,
+            },
+        )?;
         self.state = HuntState::Attack { attack: Some(a) };
         Ok(arrived)
     }
@@ -271,15 +303,20 @@ impl HuntAction {
     /// the new) and the hunt starts over at `set_state(4)`. Its own target changes nothing. Some
     /// when it took the target, true when its Attack's `MoveTo` starts arrived (the caller shows
     /// the idle sprite, [`crate::combat::attack::show_arrived`]).
-    pub fn retarget(
+    pub(crate) fn retarget(
         &mut self,
         retarget: HuntRetarget<'_>,
         attack: &Engagement,
         arms: Arms,
         mover: &mut Mover,
-        roles: &Roles,
-        attack_tuning: &AttackTuning,
+        layer: BeginLayer<'_>,
+        hunt_tuning: &HuntTuning,
     ) -> Result<Option<bool>, GenieError> {
+        let BeginLayer {
+            roles,
+            attack_tuning,
+            move_to_tuning,
+        } = layer;
         let HuntRetarget {
             target,
             player,
@@ -300,7 +337,7 @@ impl HuntAction {
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
             self.target_class = Some(target.class);
-            self.set_drop(target.position, attack.gap, mover, &walks)?;
+            self.set_drop(target.position, attack.gap, mover, &walks, move_to_tuning)?;
             return Ok(Some(false));
         }
         if self.target.map(HuntTargetId::id) == Some(target.id) {
@@ -314,8 +351,19 @@ impl HuntAction {
             player,
             walks: &walks,
         };
-        self.chase(chase, attack, arms, mover, roles, attack_tuning)
-            .map(Some)
+        self.chase(
+            chase,
+            attack,
+            arms,
+            mover,
+            BeginLayer {
+                roles,
+                attack_tuning,
+                move_to_tuning,
+            },
+            hunt_tuning,
+        )
+        .map(Some)
     }
 
     /// Slot 0x40 (`FUN_140ac52c0`): the hunt takes a move's `target` (None for a point) and
@@ -328,7 +376,12 @@ impl HuntAction {
     /// `set_state(8)`. Any other target, or a point: the point is the move's, `+0x68` −1, the
     /// target goes and `set_state(15)`: a quiet `MoveTo` to the point within the task's range
     /// (`FUN_140aa0d30`).
-    pub fn take_move(&mut self, take: HuntMove<'_>, mover: &mut Mover) -> Result<bool, GenieError> {
+    pub fn take_move(
+        &mut self,
+        take: HuntMove<'_>,
+        mover: &mut Mover,
+        move_to_tuning: &MoveToTuning,
+    ) -> Result<bool, GenieError> {
         let HuntMove {
             target,
             point,
@@ -360,13 +413,18 @@ impl HuntAction {
             self.point = Position::from([-1.0; 3]);
             self.target_class = Some(t.class);
             self.carry_to = Some(DropSiteId::new(t.id));
-            self.set_drop(t.position, gap, mover, &walks)?;
+            self.set_drop(t.position, gap, mover, &walks, move_to_tuning)?;
             return Ok(true);
         }
         self.point = point;
         self.target_class = None;
         self.set_target(None);
-        self.set_point_walk(|move_to| HuntState::WalkPoint { move_to }, mover, &walks)?;
+        self.set_point_walk(
+            |move_to| HuntState::WalkPoint { move_to },
+            mover,
+            &walks,
+            move_to_tuning,
+        )?;
         Ok(true)
     }
 
@@ -376,8 +434,18 @@ impl HuntAction {
     /// # Errors
     ///
     /// A unit without speed.
-    pub fn search_walk(&mut self, mover: &mut Mover, walks: &Walks<'_>) -> Result<(), GenieError> {
-        self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, walks)
+    pub fn search_walk(
+        &mut self,
+        mover: &mut Mover,
+        walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
+    ) -> Result<(), GenieError> {
+        self.set_point_walk(
+            |move_to| HuntState::WalkSearch { move_to },
+            mover,
+            walks,
+            move_to_tuning,
+        )
     }
 
     /// `set_state` 11 and 15 (`0x140ac60e0` case 0xb), the walk `walk` makes: the sub-actions go,
@@ -388,11 +456,12 @@ impl HuntAction {
         walk: fn(Option<MoveToAction>) -> HuntState,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = walk(None);
         self.timer = Seconds::ZERO;
-        let move_to = self.move_to_point(mover, walks)?;
+        let move_to = self.move_to_point(mover, walks, move_to_tuning)?;
         self.state = walk(move_to);
         Ok(())
     }
@@ -409,13 +478,19 @@ impl HuntAction {
         dt: Seconds,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.timer += dt;
         if self.timer < Seconds::ZERO {
             return Ok(());
         }
         self.timer = Seconds::ZERO;
-        self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, walks)
+        self.set_point_walk(
+            |move_to| HuntState::WalkSearch { move_to },
+            mover,
+            walks,
+            move_to_tuning,
+        )
     }
 
     /// State 15's and 11's update (`0x140ac7a00` cases 0xe and 0xa) of `unit`'s hunt on the step,

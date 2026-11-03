@@ -206,7 +206,8 @@ fn stop_ends_the_attack_and_the_unit_stands() {
     let mut motion = Motion::Moving(walker());
     motion.lent().set_anim_speed(Speed::new(0.5));
     let (mut sprite, mut rng) = (None, Well512::default());
-    a.halt(motion.lent(), &mut sprite, &mut rng).unwrap();
+    a.halt(motion.lent(), &mut sprite, &mut rng, tuning().sprite)
+        .unwrap();
     // the MoveTo's teardown stops the unit (its speed 0 at once), then set_state(1) sets 1
     assert_eq!(
         (
@@ -222,7 +223,7 @@ fn stop_ends_the_attack_and_the_unit_stands() {
     // a unit without a standing sprite is not modelled
     let mut bare = own_attack(77, AttackState::Ready, Distance::new(1.0));
     assert!(
-        bare.halt(MotionMut::new(None), &mut sprite, &mut rng)
+        bare.halt(MotionMut::new(None), &mut sprite, &mut rng, tuning().sprite)
             .is_err()
     );
 }
@@ -530,7 +531,7 @@ fn sprite_resets_only_for_its_own_graphic() {
         frame: Frame::of_data(6),
         last_frame: Frame::of_data(5),
         looped: true,
-        ..ActiveSprite::start(swing, &mut Well512::default())
+        ..ActiveSprite::start(swing, &mut Well512::default(), tuning().sprite)
     });
     let before = sprite;
     assert!(!reset_sprite(&mut sprite, other));
@@ -1850,7 +1851,7 @@ fn swing_that_fails_its_interrupt_check_stays_failed() {
     rig.unit_mut().sprite = Some(ActiveSprite {
         looped: true,
         frame: Frame::of_data(9),
-        ..ActiveSprite::start(swing, &mut Well512::default())
+        ..ActiveSprite::start(swing, &mut Well512::default(), tuning().sprite)
     });
     let mut a = soldier_attack(7, Distance::new(1.0), 0.0, Position::new(NONE, NONE, NONE));
     (a.state, a.seen, a.arms.interrupt_frame) = (AttackState::Swing, at, Frame::of_data(5));
@@ -1939,7 +1940,9 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
     );
     assert_eq!(a.state, AttackState::Done);
     let (mut sprite, mut rng) = (None, Well512::default());
-    let posted = a.disarmed(&mut sprite, motion.lent(), &mut rng).unwrap();
+    let posted = a
+        .disarmed(&mut sprite, motion.lent(), &mut rng, tuning().sprite)
+        .unwrap();
     assert_eq!(posted, Some((NotifyKind::ACTION_INVALIDATED, [600, -1, 0])));
     assert_eq!(
         (motion.animated().speed, sprite.map(|s| s.graphic.id)),
@@ -1948,7 +1951,8 @@ fn disarmed_building_targetless_attack_ends_with_its_notify() {
     // the Hunt's Attack, a sub-action, posts nothing
     a.voice = Voice::Quiet;
     assert_eq!(
-        a.disarmed(&mut sprite, motion.lent(), &mut rng).unwrap(),
+        a.disarmed(&mut sprite, motion.lent(), &mut rng, tuning().sprite)
+            .unwrap(),
         None
     );
 }
@@ -2635,7 +2639,7 @@ fn at_frame(frame: i16, last: i16) -> ActiveSprite {
         last_frame: Frame::of_data(last),
         changed: true,
         looped: false,
-        ..ActiveSprite::start(STANDING, &mut Well512::default())
+        ..ActiveSprite::start(STANDING, &mut Well512::default(), tuning().sprite)
     }
 }
 
@@ -2695,6 +2699,7 @@ fn ranged_swing_fires_at_its_firing_frame_and_melee_one_counts_down() {
             ..ActiveSprite::start(
                 *t.model.graphics.get(SpriteId::named(301)).unwrap(),
                 &mut Well512::default(),
+                tuning().sprite,
             )
         };
         in_update(
@@ -2796,6 +2801,7 @@ fn swing_unmodelled_parts_fail_and_killing_hit_ends_it() {
         ..ActiveSprite::start(
             *t.model.graphics.get(SpriteId::named(301)).unwrap(),
             &mut Well512::default(),
+            tuning().sprite,
         )
     };
     in_update(
@@ -2956,7 +2962,9 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         a.on_target_moved = mode;
         a.timer = Seconds::new(5.0);
         let reads = walking_reads(&table, MoveDefaults::default(), state, speed);
-        let arrived = a.walk_to_target(at, gap, &reads).unwrap();
+        let arrived = a
+            .walk_to_target(at, gap, &reads, &tuning().move_to)
+            .unwrap();
         (arrived, a.timer, a.state.move_to().copied())
     };
     let (arrived, timer, m) = made(
@@ -3012,7 +3020,10 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     assert_eq!((arrived, m), (false, None));
     let mut none = own_attack(-1, AttackState::Move { move_to: None }, Distance::new(2.0));
     let reads = walking_reads(&table, MoveDefaults::default(), ObjectState::Alive, 1.0);
-    assert!(none.walk_to_target(at, Distance::new(1.0), &reads).is_err());
+    assert!(
+        none.walk_to_target(at, Distance::new(1.0), &reads, &tuning().move_to)
+            .is_err()
+    );
     // without a sprite of its own the constructor's default is taken
     let defaults = MoveDefaults {
         point: Some(STANDING.id),
@@ -3020,7 +3031,9 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     };
     let reads = walking_reads(&table, defaults, ObjectState::Alive, 1.0);
     let mut bare = own_attack(7, AttackState::Move { move_to: None }, Distance::new(2.0));
-    let _ = bare.walk_to_target(at, Distance::new(1.0), &reads).unwrap();
+    let _ = bare
+        .walk_to_target(at, Distance::new(1.0), &reads, &tuning().move_to)
+        .unwrap();
     assert_eq!(
         bare.state.move_to().copied().and_then(|m| m.sprite),
         Some(STANDING)
@@ -3030,8 +3043,12 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         AttackState::GotoSeen { move_to: None },
         Distance::new(2.0),
     );
-    seen.walk_to_seen(|move_to| AttackState::GotoSeen { move_to }, &reads)
-        .unwrap();
+    seen.walk_to_seen(
+        |move_to| AttackState::GotoSeen { move_to },
+        &reads,
+        &tuning().move_to,
+    )
+    .unwrap();
     assert_eq!(
         seen.state.move_to().copied().and_then(|m| m.sprite),
         Some(STANDING)
@@ -3056,7 +3073,7 @@ fn an_attack_move_to_where_it_saw_the_target_walks_within_its_range_or_onto_it()
             } else {
                 |move_to| AttackState::GotoSeen { move_to }
             };
-        a.walk_to_seen(walk, &reads).unwrap();
+        a.walk_to_seen(walk, &reads, &tuning().move_to).unwrap();
         (
             a.timer,
             a.state
@@ -3563,7 +3580,11 @@ fn killing_attack_ends_once_its_swing_looped() {
         )
     );
     let (mut rig, mut a) = on_target(dead, true, (AttackState::Killed, Voice::Loud));
-    rig.unit_mut().sprite = Some(ActiveSprite::start(STANDING, &mut Well512::default()));
+    rig.unit_mut().sprite = Some(ActiveSprite::start(
+        STANDING,
+        &mut Well512::default(),
+        tuning().sprite,
+    ));
     let code = rig.run(20, |c, u, _, _, _| a.killed_step(c, u));
     assert_eq!(
         (

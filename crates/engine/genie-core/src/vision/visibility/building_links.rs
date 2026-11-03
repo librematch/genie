@@ -7,7 +7,8 @@ use crate::map::Tile;
 use crate::map::TileOffset;
 use crate::map::TileRect;
 use crate::vision::SightCentre;
-use crate::vision::visibility::{ANCHOR, EDGE, Extent, LINKED, STEP, Visibility};
+use crate::vision::visibility::{ANCHOR, Extent, LINKED, STEP, Visibility};
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::slots::CheckedIndex;
 
 impl Visibility {
@@ -240,7 +241,11 @@ impl Visibility {
 
     /// A building's footprint as `FUN_1411e6780` links it: from its low edge to its high edge
     /// less 0.01, around the tile of its centre.
-    pub(super) fn footprint(position: Position, radius: Footprint) -> (Tile, TileRect) {
+    pub(super) fn footprint(
+        position: Position,
+        radius: Footprint,
+        visibility_tuning: VisibilityTuning,
+    ) -> (Tile, TileRect) {
         let (x, y) = (position.x(), position.y());
         let (rx, ry) = (radius.x(), radius.y());
         (
@@ -248,8 +253,8 @@ impl Visibility {
             TileRect::new(
                 (x - rx) as i32,
                 (y - ry) as i32,
-                ((x + rx) - EDGE) as i32,
-                ((y + ry) - EDGE) as i32,
+                ((x + rx) - visibility_tuning.edge) as i32,
+                ((y + ry) - visibility_tuning.edge) as i32,
             ),
         )
     }
@@ -260,15 +265,21 @@ impl Visibility {
         &mut self,
         position: Position,
         radius: Footprint,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<i32, GenieError> {
-        let (anchor, rect) = Self::footprint(position, radius);
+        let (anchor, rect) = Self::footprint(position, radius, visibility_tuning);
         self.link_tiles(anchor, rect)
     }
 
     /// A building's UMV entry for its footprint (`FUN_1411e6780`'s `FUN_140f68650`), without
     /// linking its tiles.
-    pub fn building_entry(&mut self, position: Position, radius: Footprint) -> i32 {
-        let (anchor, rect) = Self::footprint(position, radius);
+    pub fn building_entry(
+        &mut self,
+        position: Position,
+        radius: Footprint,
+        visibility_tuning: VisibilityTuning,
+    ) -> i32 {
+        let (anchor, rect) = Self::footprint(position, radius, visibility_tuning);
         self.extent_entry(anchor, rect)
     }
 
@@ -277,8 +288,9 @@ impl Visibility {
         &mut self,
         position: Position,
         radius: Footprint,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
-        let (_, rect) = Self::footprint(position, radius);
+        let (_, rect) = Self::footprint(position, radius, visibility_tuning);
         self.unlink_tiles(rect)
     }
 

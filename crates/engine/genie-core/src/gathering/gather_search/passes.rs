@@ -8,14 +8,12 @@ use crate::gathering::gather_search::SearchSite;
 use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Tile;
-use crate::math::image::gather_search::{
-    DIAGONAL as GATHER_SEARCH_DIAGONAL, ROUNDING as GATHER_SEARCH_ROUNDING,
-    SITE_SHARE as GATHER_SEARCH_SITE_SHARE, UNIT_SHARE as GATHER_SEARCH_UNIT_SHARE,
-};
+use crate::math::image::gather_search::ROUNDING as GATHER_SEARCH_ROUNDING;
 use crate::math::msvc;
 use crate::objects::masters::GatherGroup;
 use crate::players::Amount;
 use crate::vision::SightTiles;
+use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
 
 /// [`closest_resource_at`]'s passes: from a footprint site its footprint's tiles the unit can
@@ -96,9 +94,8 @@ pub(super) fn sort_point_and_side(
     at: Point,
     los: SightTiles,
     site: Option<&SearchSite>,
+    gather_search_tuning: &GatherSearchTuning,
 ) -> ((f32, f32), i32) {
-    const SITE_SHARE: f32 = GATHER_SEARCH_SITE_SHARE;
-    const UNIT_SHARE: f32 = GATHER_SEARCH_UNIT_SHARE;
     let (ux, uy) = (at.x(), at.y());
     let box_side = |los: i32| los.wrapping_add(10).wrapping_mul(3);
     let los = los.get();
@@ -107,8 +104,8 @@ pub(super) fn sort_point_and_side(
         |s| {
             let (sx, sy) = (s.position.x(), s.position.y());
             let at = (
-                sx * SITE_SHARE + ux * UNIT_SHARE,
-                sy * SITE_SHARE + uy * UNIT_SHARE,
+                sx * gather_search_tuning.site_share + ux * gather_search_tuning.unit_share,
+                sy * gather_search_tuning.site_share + uy * gather_search_tuning.unit_share,
             );
             let site_los = SightTiles::of(s.line_of_sight).get();
             let wide = if site_los.wrapping_add(10) <= los.wrapping_add(10) {
@@ -155,15 +152,18 @@ pub(super) fn footprint_seeds(
 }
 
 /// The search's distance of `tile` from a pass's origin: the longer axis plus the shorter one
-/// times 1.4 rounded down, less the shorter one (`DIAGONAL` plus `ROUNDING`, truncated).
-pub(super) fn pass_distance(origin: Tile, tile: Tile) -> i32 {
-    const DIAGONAL: f32 = GATHER_SEARCH_DIAGONAL;
+/// times 1.4 rounded down, less the shorter one (`GatherSearchTuning::diagonal` plus `ROUNDING`, truncated).
+pub(super) fn pass_distance(
+    origin: Tile,
+    tile: Tile,
+    gather_search_tuning: &GatherSearchTuning,
+) -> i32 {
     const ROUNDING: f32 = GATHER_SEARCH_ROUNDING;
     let (dx, dy) = ((origin.x() - tile.x()).abs(), (origin.y() - tile.y()).abs());
     if dy < dx {
-        ((dy as f32 * DIAGONAL + ROUNDING) as i32 - dy) + dx
+        ((dy as f32 * gather_search_tuning.diagonal + ROUNDING) as i32 - dy) + dx
     } else {
-        ((dx as f32 * DIAGONAL + ROUNDING) as i32 - dx) + dy
+        ((dx as f32 * gather_search_tuning.diagonal + ROUNDING) as i32 - dx) + dy
     }
 }
 

@@ -26,5 +26,5 @@ when the heap runs dry; then the path runs to the tile that came nearest the goa
 ## How it connects
 
 <!-- uses -->
-- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`players`](../../players/), [`world`](../../world/).
+- Uses: [`construction`](../../construction/), [`map`](../../map/), [`math`](../../math/), [`players`](../../players/), [`testing`](../../testing/), [`world`](../../world/).
 <!-- /uses -->

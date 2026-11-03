@@ -88,10 +88,12 @@ pub fn old_pather_paths(
         };
         let (mask, radius) = (mover.stats.restriction_mask, mover.stats.radius.x());
         let z = turns.spatial.get(id).map_or(0.0, |p| p.position.z());
-        if let Err(e) = turns
-            .spatial
-            .set_position(id, from.with_height(z), &turns.model.roles)
-        {
+        if let Err(e) = turns.spatial.set_position(
+            id,
+            from.with_height(z),
+            &turns.model.roles,
+            turns.model.tuning.visibility,
+        ) {
             out.push(Err(e));
             continue;
         }

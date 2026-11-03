@@ -20,7 +20,7 @@ pub(crate) use self::graphic::top_speed;
 use crate::combat::abilities::Look;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath;
-use crate::math::image::sprite::{EPSILON as SPRITE_EPSILON, SHORTEST as SPRITE_SHORTEST};
+use crate::math::image::sprite::EPSILON as SPRITE_EPSILON;
 use crate::math::rng::Well512;
 use crate::movement::MoveStats;
 use crate::movement::Speed;
@@ -34,10 +34,9 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 use genie_diff::Diff;
 
-/// The shortest frame interval (`0x3a83126f`, also `DAT_142eb1e9c`).
-const SHORTEST: f32 = SPRITE_SHORTEST;
 /// The gap below which a speed multiplier counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = SPRITE_EPSILON;
 
@@ -56,9 +55,10 @@ pub(crate) fn new_sprite(
     stats: Option<&mut MoveStats>,
     g: Graphic,
     rng: &mut Well512,
+    sprite_tuning: SpriteTuning,
 ) {
     if !sprite.is_some_and(|s| s.graphic.id == g.id) {
-        *sprite = Some(ActiveSprite::start(g, rng));
+        *sprite = Some(ActiveSprite::start(g, rng, sprite_tuning));
     }
     if let Some(stats) = stats {
         stats.show(Some(&g));
@@ -93,7 +93,7 @@ impl ActiveSprite {
     /// A new sprite instance (`FUN_1413b2ef0`): its first frame and interval; a sprite with a
     /// random first frame draws it from the Sprite stream twice (`FUN_1413b3490`, then here). A
     /// static one ([`ActiveSprite::start_static`]) draws it once.
-    pub fn start(graphic: Graphic, sprite_rng: &mut Well512) -> Self {
+    pub fn start(graphic: Graphic, sprite_rng: &mut Well512, sprite_tuning: SpriteTuning) -> Self {
         if !graphic.animated() {
             return Self::start_static(graphic, sprite_rng);
         }
@@ -114,7 +114,7 @@ impl ActiveSprite {
             speed: Speed::ZERO,
         };
         if f64::from(s.interval.get()) < 0.001 {
-            s.interval = Seconds::new(SHORTEST);
+            s.interval = Seconds::new(sprite_tuning.shortest);
         }
         if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             let d = graphic.frame_duration.get();
@@ -201,7 +201,7 @@ impl ActiveSprite {
     }
 
     /// The interval of one frame at `speed` (at least 0.001).
-    fn interval_at(&self, speed: Speed) -> Seconds {
+    fn interval_at(&self, speed: Speed, sprite_tuning: SpriteTuning) -> Seconds {
         let g = &self.graphic;
         let mut i = g.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
@@ -211,14 +211,18 @@ impl ActiveSprite {
         if Speed::ZERO < speed {
             i /= speed.get();
         }
-        Seconds::new(if i < SHORTEST { SHORTEST } else { i })
+        Seconds::new(if i < sprite_tuning.shortest {
+            sprite_tuning.shortest
+        } else {
+            i
+        })
     }
 
     /// One update of `dt` seconds at the object's animation speed (`FUN_1413b5070`, the object's
     /// `+0x7b8`): an animated sprite's time runs, and its whole intervals advance it as many
     /// frames (backwards for such a sprite); past its last frame it loops, after its replay delay,
     /// or stops on it when played once.
-    pub fn update(&mut self, dt: Seconds, speed: Speed) {
+    pub fn update(&mut self, dt: Seconds, speed: Speed, sprite_tuning: SpriteTuning) {
         // a static sprite's update (`FUN_1413b5330`) does nothing
         if !self.graphic.animated() || self.animate == AnimateState::STOPPED {
             return;
@@ -243,7 +247,7 @@ impl ActiveSprite {
         let interval = if self.speed == speed {
             self.interval
         } else {
-            let i = self.interval_at(speed);
+            let i = self.interval_at(speed, sprite_tuning);
             self.interval = i;
             self.speed = speed;
             i
@@ -263,7 +267,7 @@ impl ActiveSprite {
             self.frame = f;
             self.looped = f < Frame::ZERO || last < f;
         }
-        self.interval = self.interval_at(speed);
+        self.interval = self.interval_at(speed, sprite_tuning);
         self.speed = speed;
         let mut stop = self.looped;
         if self.looped {
@@ -432,6 +436,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::testing::class;
     use crate::testing::roles;
+    use crate::testing::tuning;
     use crate::world::WholeSeconds;
 
     /// Build 158041's Lumberjack Female (Attack), graphic 1239: 45 frames of 0.0444 s, animated.
@@ -449,16 +454,16 @@ mod tests {
     fn the_chop_reaches_its_frame_22_after_second_of_20_ms_updates() {
         // MarvinBlue/426048731's 9181 from update 1008 (the tick oracle's trace): frame 0 after
         // the first update (time 0.02), frame 1 after the third (time 0.0155...)
-        let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
-        s.update(Seconds::new(0.02), Speed::new(1.0));
+        let mut s = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
+        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
         assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
-        s.update(Seconds::new(0.02), Speed::new(1.0));
-        s.update(Seconds::new(0.02), Speed::new(1.0));
+        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
+        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
         assert_eq!(s.frame, Frame::of_data(1));
         assert!((s.last - Seconds::new(0.015_555)).get().abs() < 1e-5);
         let mut n = 3;
         while !s.reached(Frame::of_data(22)) {
-            s.update(Seconds::new(0.02), Speed::new(1.0));
+            s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
             n += 1;
         }
         // update 1057, the 49th
@@ -480,9 +485,15 @@ mod tests {
         stats.base = Speed::new(0.8);
         stats.speed = Speed::ZERO;
         let mut rng = Well512::default();
-        let mut sprite = Some(ActiveSprite::start(CHOP, &mut rng));
+        let mut sprite = Some(ActiveSprite::start(CHOP, &mut rng, tuning().sprite));
         let before = rng.clone();
-        new_sprite(&mut sprite, Some(&mut stats), walking, &mut rng);
+        new_sprite(
+            &mut sprite,
+            Some(&mut stats),
+            walking,
+            &mut rng,
+            tuning().sprite,
+        );
         assert_eq!(sprite.map(|s| s.graphic.id), Some(SpriteId::named(1)));
         assert_ne!(rng, before);
         assert_eq!(stats.speed, Speed::new(1.0));
@@ -492,24 +503,42 @@ mod tests {
         }
         stats.speed = Speed::new(0.5);
         let drawn = rng.clone();
-        new_sprite(&mut sprite, Some(&mut stats), walking, &mut rng);
+        new_sprite(
+            &mut sprite,
+            Some(&mut stats),
+            walking,
+            &mut rng,
+            tuning().sprite,
+        );
         assert_eq!(
             (sprite.map(|s| s.frame), &rng, stats.speed),
             (Some(Frame::of_data(3)), &drawn, Speed::new(1.0))
         );
         // a factor of 0 or NaN reads the base alone
-        new_sprite(&mut sprite, Some(&mut stats), CHOP, &mut rng);
+        new_sprite(
+            &mut sprite,
+            Some(&mut stats),
+            CHOP,
+            &mut rng,
+            tuning().sprite,
+        );
         assert_eq!(stats.speed, Speed::new(0.8));
         let nan = Graphic {
             id: SpriteId::named(2),
             speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
         };
-        new_sprite(&mut sprite, Some(&mut stats), nan, &mut rng);
+        new_sprite(
+            &mut sprite,
+            Some(&mut stats),
+            nan,
+            &mut rng,
+            tuning().sprite,
+        );
         assert_eq!(stats.speed, Speed::new(0.8));
         // an object that does not move shows it alone
         let mut still = None;
-        new_sprite(&mut still, None, walking, &mut rng);
+        new_sprite(&mut still, None, walking, &mut rng, tuning().sprite);
         assert_eq!(still.map(|s| s.graphic.id), Some(SpriteId::named(1)));
     }
 
@@ -522,8 +551,8 @@ mod tests {
             speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
         };
-        let mut s = ActiveSprite::start(g, &mut Well512::default());
-        s.update(Seconds::new(1.0), Speed::new(1.0));
+        let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
+        s.update(Seconds::new(1.0), Speed::new(1.0), tuning().sprite);
         assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
     }
 
@@ -531,8 +560,8 @@ mod tests {
     /// 0 frames (0x80000000's low word), where a saturating cast would step back one.
     #[test]
     fn step_count_past_the_i32_range_steps_no_frame() {
-        let mut s = ActiveSprite::start(CHOP, &mut Well512::default());
-        s.update(Seconds::new(3.0e8), Speed::new(1.0));
+        let mut s = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
+        s.update(Seconds::new(3.0e8), Speed::new(1.0), tuning().sprite);
         assert_eq!(
             (s.frame, s.changed, s.looped),
             (Frame::of_data(0), true, false)
@@ -557,11 +586,11 @@ mod tests {
             flags,
         };
         let after = |g: Graphic, frame: Option<i16>, dt: f32| {
-            let mut s = ActiveSprite::start(g, &mut Well512::default());
+            let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
             if let Some(f) = frame {
                 s.frame = Frame::of_data(f);
             }
-            s.update(Seconds::new(dt), Speed::new(1.0));
+            s.update(Seconds::new(dt), Speed::new(1.0), tuning().sprite);
             s
         };
         assert_eq!(
@@ -650,8 +679,8 @@ mod tests {
             replay_delay: Seconds::new(f32::NAN),
             ..CHOP
         };
-        let mut s = ActiveSprite::start(g, &mut Well512::default());
-        s.update(Seconds::new(0.1), Speed::new(1.0));
+        let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
+        s.update(Seconds::new(0.1), Speed::new(1.0), tuning().sprite);
         assert_eq!(s.animate, AnimateState::of_data(1));
     }
 
@@ -668,9 +697,9 @@ mod tests {
             flags: SpriteFlags::NONE,
         };
         let mut rng = Well512::default();
-        let mut s = ActiveSprite::start(still, &mut rng);
+        let mut s = ActiveSprite::start(still, &mut rng, tuning().sprite);
         assert_eq!(rng, Well512::default());
-        s.update(Seconds::new(0.5), Speed::new(1.0));
+        s.update(Seconds::new(0.5), Speed::new(1.0), tuning().sprite);
         assert_eq!(
             (s.frame, s.changed, s.looped),
             (Frame::of_data(0), false, false)
@@ -686,6 +715,7 @@ mod tests {
                 ..still
             },
             &mut rng,
+            tuning().sprite,
         );
         assert_eq!(rng, once);
     }

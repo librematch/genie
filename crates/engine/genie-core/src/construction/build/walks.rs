@@ -11,6 +11,7 @@ use crate::objects::UpdateCode;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
 impl BuildTask {
@@ -25,10 +26,19 @@ impl BuildTask {
         &self,
         move_reads: &MoveToReads<'_>,
         to: Option<WalkTo>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         to.map_or_else(
-            || move_reads.to_nothing(self.range, self.moving),
-            |to| move_reads.to_object(to, self.range, self.moving, TargetMoved::Follows),
+            || move_reads.to_nothing(self.range, self.moving, move_to_tuning),
+            |to| {
+                move_reads.to_object(
+                    to,
+                    self.range,
+                    self.moving,
+                    TargetMoved::Follows,
+                    move_to_tuning,
+                )
+            },
         )
     }
 }
@@ -67,7 +77,10 @@ impl BuildAction {
                     .ok_or(SITE_GONE)?,
             )
         };
-        Ok((to, self.task.walk(&move_reads, to)?))
+        Ok((
+            to,
+            self.task.walk(&move_reads, to, &c.w.model.tuning.move_to)?,
+        ))
     }
 
     /// The sub-action list's update (`FUN_140a992b0`: its first action's, the quiet `MoveTo`'s,

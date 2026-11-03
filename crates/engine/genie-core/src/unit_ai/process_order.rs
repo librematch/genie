@@ -10,6 +10,7 @@ use crate::objects::ObjectKey;
 use crate::objects::masters::ClassId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
@@ -85,8 +86,13 @@ impl UnitAi {
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-        roles: &Roles,
+        layer: AiLayer<'_>,
     ) -> Result<OrderOutcome, GenieError> {
+        let AiLayer {
+            roles,
+            unit_ai_tuning,
+            ..
+        } = layer;
         if !o.ready {
             return Ok(OrderOutcome::NotReady);
         }
@@ -119,7 +125,9 @@ impl UnitAi {
             | OrderKind::Enter
             | OrderKind::Unload
             | OrderKind::UnloadOverWall => self.object_move_order(o, world, side, ai)?,
-            OrderKind::Explore => self.explore_at(o.point.tile(), true, side, ai)?,
+            OrderKind::Explore => {
+                self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?
+            }
             OrderKind::Stop => {
                 self.remove_target();
                 self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
@@ -133,7 +141,7 @@ impl UnitAi {
                 m.is_some()
             }
             OrderKind::ExploreAndDestroy => {
-                self.explore_and_destroy(o.point.tile(), true, side, ai)?
+                self.explore_and_destroy(o.point.tile(), true, side, ai, unit_ai_tuning)?
             }
             OrderKind::Wait => {
                 // case 0x2d8: the wait's action value, leaving a patrol order, then the order
@@ -144,7 +152,7 @@ impl UnitAi {
                 true
             }
             OrderKind::Scout => {
-                let explored = self.explore_at(o.point.tile(), true, side, ai)?;
+                let explored = self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?;
                 self.set_action(Some(AiAction::Scout));
                 explored
             }
@@ -153,7 +161,7 @@ impl UnitAi {
                 return self.order_on_target(o, class, at, side, ai);
             }
             OrderKind::AutoScout => {
-                let explored = self.explore_at(o.point.tile(), true, side, ai)?;
+                let explored = self.explore_at(o.point.tile(), true, side, ai, unit_ai_tuning)?;
                 self.set_action(Some(AiAction::AutoScout));
                 explored
             }

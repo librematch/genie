@@ -64,7 +64,12 @@ impl Unit {
         roles: &Roles,
     ) -> Result<HeadCode, GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        let armed = armed(master, c.w.parts.combat_of(self.id).firepower, roles);
+        let armed = armed(
+            master,
+            c.w.parts.combat_of(self.id).firepower,
+            roles,
+            &c.w.model.tuning.turn,
+        );
         let master_class = master.class;
         let walking = actions.list.attack().is_some_and(|a| {
             matches!(
@@ -83,6 +88,7 @@ impl Unit {
                 &mut self.sprite,
                 c.w.parts.motion_mut(self.id),
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
             if let Some((kind, p)) = posted {
                 self.post_own(&mut c.w.parts.unit_ai, kind, p)?;
@@ -117,6 +123,7 @@ impl Unit {
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),
             roles,
+            &c.w.model.tuning.turn,
         );
         let code = attack.update_gone(c, self, me, &r, master_class, roles);
         if let Some(a) = actions.list.attack_mut() {
@@ -157,6 +164,7 @@ impl Unit {
             c.w.parts.unit_ai.get(self.id),
             (player_type, c.w.world_time),
             roles,
+            &c.w.model.tuning.turn,
         );
         let victim = victim(c, attack.target, roles)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",

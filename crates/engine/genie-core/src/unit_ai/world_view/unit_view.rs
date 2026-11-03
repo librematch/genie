@@ -76,7 +76,14 @@ impl UnitView<'_, '_> {
     ) -> Result<Option<(ClassId, Position)>, GenieError> {
         let picker = self.picker(Some(*seeker))?;
         let (t, _) = picker.target(&self.c.w.spatial, target)?;
-        Ok(can_attack(&self.attacker, seeker, &t, roles)?.then_some((t.class, t.position)))
+        Ok(can_attack(
+            &self.attacker,
+            seeker,
+            &t,
+            roles,
+            &self.c.w.model.tuning.unit_ai,
+        )?
+        .then_some((t.class, t.position)))
     }
 
     /// Whether the unit's view of the world (live objects, owner-first) holds object `id`.
@@ -189,7 +196,13 @@ impl UnitView<'_, '_> {
         };
         let picker = self.picker(None)?;
         let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
-        can_attack(&me, &ai.seeker_with(target_kind), &target, roles)
+        can_attack(
+            &me,
+            &ai.seeker_with(target_kind),
+            &target,
+            roles,
+            &self.c.w.model.tuning.unit_ai,
+        )
     }
 }
 

@@ -6,8 +6,8 @@ use crate::construction::FootprintWaits;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
-    BUILDER_UNMOVING, BuildAction, BuildReads, ClearingSite, EXTRA_BUILDER, FOREIGN_SITE,
-    SITE_GONE, WONDER_RATE, footprint_clearing,
+    BUILDER_UNMOVING, BuildAction, BuildReads, ClearingSite, FOREIGN_SITE, SITE_GONE,
+    footprint_clearing,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -82,7 +82,13 @@ impl BuildAction {
             at: placed.position.ground(),
             trees: true,
         };
-        let cleared = footprint_clearing(&c.w.spatial, &clearing, &reads.looks, roles)?;
+        let cleared = footprint_clearing(
+            &c.w.spatial,
+            &clearing,
+            &reads.looks,
+            roles,
+            &c.w.model.tuning.build,
+        )?;
         for cl in cleared.iter().filter(|cl| cl.record_goes) {
             c.w.pathing.removed(cl.id);
             c.w.spatial.drop_record(cl.id);
@@ -355,16 +361,16 @@ impl BuildAction {
             .roles
             .of_master(site.life.master_id)
             .contains(MasterRoles::WONDER)
-            && WONDER_RATE < factor
+            && c.w.model.tuning.build.wonder_rate < factor
         {
-            factor = WONDER_RATE;
+            factor = c.w.model.tuning.build.wonder_rate;
         }
         if 0.0 < factor {
             rate *= factor;
         }
         let n = Self::builders(c, self.target)?.as_f32();
         if 1.0 < n {
-            rate *= ((n - 1.0) * EXTRA_BUILDER + 1.0) / n;
+            rate *= ((n - 1.0) * c.w.model.tuning.build.extra_builder + 1.0) / n;
         }
         if self.work_on(c, builder, actions, Seconds::new(rate))? {
             return Ok(());
@@ -437,6 +443,7 @@ impl BuildAction {
                 spot.with_height(at.z()),
                 Distance::ZERO,
                 self.task.moving,
+                &c.w.model.tuning.move_to,
             )?,
         };
         Ok(())

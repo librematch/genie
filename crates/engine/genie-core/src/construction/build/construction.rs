@@ -21,6 +21,7 @@ use crate::pathing::Pathing;
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
 use crate::players::history::EventKind;
+use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::Mode680;
 use crate::world::Seconds;
@@ -28,6 +29,7 @@ use crate::world::WorldTime;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use genie_model::model::Model;
 
 /// The completion's storage ([`crate::world::World::complete_building`]): its master's entries of modes 4, 8 and 64 go to its
 /// owner (slot 0xf8, into `attributes`), those of mode 16 to its own `store` (`FUN_1411abad0`: an
@@ -95,7 +97,7 @@ pub(super) fn lay_foundation(
     master: &Master,
     laid: Option<TerrainId>,
     mode_680: Mode680,
-    roles: &Roles,
+    model: &Model,
 ) -> Result<(), GenieError> {
     let terrain = world.terrain.as_mut().ok_or(GenieError::unsupported(
         "a completion without the map's terrain",
@@ -120,7 +122,8 @@ pub(super) fn lay_foundation(
                 terrain_bonus: master.terrain_bonus,
                 mode_680,
             },
-            roles,
+            &model.roles,
+            model.tuning.terrain,
         )?;
     }
     Ok(())
@@ -232,8 +235,12 @@ impl Construction {
         world: &mut Spatial,
         pathing: &mut Pathing,
         now: WorldTime,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<bool, GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         if !c.desolid {
             return Ok(false);
         }
@@ -241,7 +248,7 @@ impl Construction {
         c.desolid = false;
         c.progress = Seconds::new(f32::from_bits(STARTED));
         if let Some(v) = world.sight.as_mut() {
-            v.construction_started(id, placed.position, placed.radius, roles)?;
+            v.construction_started(id, placed.position, placed.radius, roles, visibility_tuning)?;
         }
         // a master of obstruction kind 0 or 12, or of class 0, gets no record (FUN_141056460)
         if c.record.recorded() {

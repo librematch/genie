@@ -33,6 +33,7 @@ use crate::technology::upgrade::damage::{damage_share_of, damage_sprites};
 use crate::unit_ai::UnitAi;
 use crate::unit_ai::unit_ai_type;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::visibility::LosSight;
@@ -294,12 +295,16 @@ impl World {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
             let _ = sight.sight_on_los(
                 id,
                 LosSight::tile_circle(placed.position, placed.radius, SightTiles::of(los)),
                 &self.model.roles,
+                self.model.tuning.visibility,
             )?;
             if let Some(s) = sight.seer_mut(id) {
                 s.los = los;
@@ -390,6 +395,7 @@ impl World {
             before,
             (&graphics, &mut object, &mut sprite),
             &self.model.roles,
+            self.model.tuning.sprite,
         );
         self.model.graphics = graphics;
         *self.streams.get(Stream::Object) = object;
@@ -427,7 +433,13 @@ impl World {
             Place::Live(q, i) => self.players.live_mut(q, i)?,
             Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
         };
-        new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
+        new_sprite(
+            &mut u.sprite,
+            self.parts.move_stats_mut(u.id),
+            g,
+            rng,
+            self.model.tuning.sprite,
+        );
         Ok(())
     }
 
@@ -619,6 +631,7 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::tuning;
     use crate::vision::TileCount;
     use crate::vision::VisionBits;
     #[cfg(test)]
@@ -708,6 +721,7 @@ mod tests {
             HpPercent::of_data(7),
             (&graphics, &mut object, &mut sprite),
             &roles(),
+            tuning().sprite,
         );
         assert_eq!(
             (r, u.life.hp),
@@ -720,6 +734,7 @@ mod tests {
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
             &roles(),
+            tuning().sprite,
         );
         assert_eq!(
             (r, u.life.hp),
@@ -732,6 +747,7 @@ mod tests {
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
             &roles(),
+            tuning().sprite,
         );
         assert_eq!(
             (r, low.life.hp),
@@ -744,6 +760,7 @@ mod tests {
             HpPercent::of_data(0),
             (&graphics, &mut object, &mut sprite),
             &roles(),
+            tuning().sprite,
         );
         assert!(nan.life.hp.get().is_nan());
         // mode 0: nothing drawn
@@ -755,7 +772,8 @@ mod tests {
                 &placed,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite),
-                &roles()
+                &roles(),
+                tuning().sprite
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -771,7 +789,8 @@ mod tests {
                 &scattered,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite),
-                &roles()
+                &roles(),
+                tuning().sprite
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -784,7 +803,8 @@ mod tests {
                 &scattered,
                 HpPercent::of_data(30),
                 (&graphics, &mut object, &mut sprite),
-                &roles()
+                &roles(),
+                tuning().sprite
             ),
             Ok(HpPercent::of_data(40))
         );
@@ -792,7 +812,11 @@ mod tests {
         // mode 2: the entry's sprite, then the standing one when it goes
         let shown = building(70, 100, SPRITE_SHOWN, -1);
         let mut u = Unit {
-            sprite: Some(ActiveSprite::start(graphic(1070), &mut sprite)),
+            sprite: Some(ActiveSprite::start(
+                graphic(1070),
+                &mut sprite,
+                tuning().sprite,
+            )),
             ..object_of(HitPoints::new(40.0))
         };
         assert_eq!(
@@ -801,7 +825,8 @@ mod tests {
                 &shown,
                 HpPercent::of_data(0),
                 (&graphics, &mut object, &mut sprite),
-                &roles()
+                &roles(),
+                tuning().sprite
             ),
             Ok(HpPercent::of_data(60))
         );
@@ -813,7 +838,8 @@ mod tests {
                 &shown,
                 HpPercent::of_data(60),
                 (&graphics, &mut object, &mut sprite),
-                &roles()
+                &roles(),
+                tuning().sprite
             ),
             Ok(HpPercent::of_data(0))
         );
@@ -893,7 +919,11 @@ mod tests {
         };
         let mut house = object(10, ids::HOUSE, ObjectState::Alive, HitPoints::new(275.0));
         let mut sprites = Well512::default();
-        house.sprite = Some(ActiveSprite::start(graphic(1070), &mut sprites));
+        house.sprite = Some(ActiveSprite::start(
+            graphic(1070),
+            &mut sprites,
+            tuning().sprite,
+        ));
         let player = Player {
             objects: vec![
                 house,
@@ -1445,7 +1475,11 @@ mod tests {
         };
         let shown = |at: i16, new: &Master| {
             let mut u = object(10, master_id(4), ObjectState::Alive, HitPoints::new(10.0));
-            u.sprite = Some(ActiveSprite::start(graphic(at), &mut Well512::default()));
+            u.sprite = Some(ActiveSprite::start(
+                graphic(at),
+                &mut Well512::default(),
+                tuning().sprite,
+            ));
             let mut t = one_player(vec![u], vec![old.clone()], &[100, 101, 102, 200, 201]);
             t.upgrade_moving_sprite(
                 Place::Live(PlayerId::new(0), ListIndex::new(0)),
@@ -1661,7 +1695,11 @@ mod tests {
                 ObjectState::DyingSprite,
                 HitPoints::new(20.0),
             );
-            u.sprite = Some(ActiveSprite::start(graphic(at), &mut Well512::default()));
+            u.sprite = Some(ActiveSprite::start(
+                graphic(at),
+                &mut Well512::default(),
+                tuning().sprite,
+            ));
             let graphics = [300, 301, 302, 303, 304, 400, 402, 403];
             let mut t = one_player(vec![u], vec![old.clone()], &graphics);
             t.upgrade_hit_points(Place::Live(PlayerId::new(0), ListIndex::new(0)), (old, new))

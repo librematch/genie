@@ -348,6 +348,7 @@ impl World {
                     )
                 },
             },
+            &self.model.tuning.gather_search,
         )
     }
 }

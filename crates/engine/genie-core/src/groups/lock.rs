@@ -7,7 +7,6 @@ use crate::groups::FormationKind;
 use crate::groups::GroupId;
 use crate::groups::create::FormationUnit;
 use crate::map::Distance;
-use crate::math::image::group::SPACING_FACTOR;
 use crate::objects::ObjectId;
 use crate::unit_ai::UnitStance;
 use crate::world::World;
@@ -96,8 +95,9 @@ impl World {
                 break;
             }
             if let Some((p, u)) = self.object(m.id) {
-                let unit = FormationUnit::of(u.master(self.master_tables(), p)?);
-                let s = unit.radius * SPACING_FACTOR;
+                let unit =
+                    FormationUnit::of(u.master(self.master_tables(), p)?, &self.model.tuning.group);
+                let s = unit.radius * self.model.tuning.group.spacing_factor;
                 if spacing <= s && s != spacing {
                     spacing = s;
                 }

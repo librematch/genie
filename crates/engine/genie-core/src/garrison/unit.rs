@@ -1,11 +1,9 @@
-//! A unit entering a building or a transport, and the transport's sail.
+//! A unit entering a building or a transport, and its update inside.
 
 use crate::GenieError;
 use crate::combat::Firepower;
-use crate::combat::abilities::Look;
 use crate::garrison::ContainerId;
 use crate::garrison::EnterState;
-use crate::garrison::transport::{MapShore, NO_TRANSPORT, Ship, TransportAction, TransportReads};
 use crate::garrison::{
     EnterAction, EnterReads, INSIDE_SIGHT, NO_MASTERS, WalkStart, attack_rate, enter_view, share,
 };
@@ -14,18 +12,14 @@ use crate::map::Distance;
 use crate::map::Footprint;
 use crate::map::Position;
 use crate::map::spatial::Placed;
-use crate::map::spatial::Spatial;
-use crate::math::image::garrison::ENTER_HP_SHARE;
-use crate::math::rng::{Stream, Well512};
+use crate::math::rng::Stream;
 use crate::movement::Me;
 use crate::movement::move_to::MoveDefaults;
-use crate::objects::Graphics;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
 use crate::objects::layers::Action;
-use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::GarrisonKinds;
 use crate::objects::masters::Master;
@@ -34,11 +28,8 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
-use crate::objects::unit::object_master;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::ownership::artifact::ArtifactSub;
-use crate::pathing::Pathing;
-use crate::pathing::zones::Zones;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -48,6 +39,7 @@ use crate::unit_ai::UnitStance;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::{allied, drops_at};
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
@@ -219,94 +211,6 @@ impl Unit {
         Ok(())
     }
 
-    /// The Transport's update ([`crate::garrison::transport::TransportAction::update`] on the
-    /// step, the action copied out of its list and written back after): what it reads of the
-    /// unit's master ([`crate::garrison::transport::TransportReads`]: the sprite its `MoveTo`'s
-    /// start shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
-    pub(crate) fn transport_update(
-        &mut self,
-        actions: &mut Action,
-        c: &mut Step<'_>,
-        me: Me,
-        roles: &Roles,
-    ) -> Result<HeadCode, GenieError> {
-        let mut t = *actions.list.transport().ok_or(NO_TRANSPORT)?;
-        let master = object_master(
-            c.w.parts.own_master.get(self.id),
-            (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
-        )?;
-        let given = TransportAction::given_sprite(t.task, master)?;
-        let reads = TransportReads {
-            radius: master.radius,
-            restriction: master.terrain_restriction,
-            defaults: MoveDefaults::of(
-                master,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
-                roles,
-            ),
-            given,
-            standing: master
-                .standing_sprite
-                .and_then(|s| c.w.model.graphics.get(s))
-                .copied(),
-        };
-        // written back before an error too: the stop's context reads the list
-        let code = t.update(c, self, actions, me, &reads);
-        if let Some(own) = actions.list.transport_mut() {
-            *own = t;
-        }
-        Ok(HeadCode::of(code?))
-    }
-
-    /// The Transport's slot 8 on a move to `point` ([`crate::garrison::transport::TransportAction::move_to`])
-    /// with the map about the unit, then what its state change leaves: the unit stops (its
-    /// `MoveTo`'s teardown) and takes its standing sprite; `motion` is the unit's motion layer.
-    pub(crate) fn transport_sail(
-        &mut self,
-        actions: &mut Action,
-        mut motion: MotionMut<'_>,
-        point: Position,
-        (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
-        (masters, (graphics, look), sprite_rng): (
-            OwnerMasters<'_>,
-            (&Graphics, Option<&Look>),
-            &mut Well512,
-        ),
-        roles: &Roles,
-    ) -> Result<(), GenieError> {
-        let master = self.master_in(masters)?;
-        let task = actions
-            .list
-            .transport()
-            .ok_or(GenieError::unreachable("a sail without its Transport"))?
-            .task;
-        let ship = Ship::of_unit(
-            (self, motion.mover()),
-            master,
-            spatial.map,
-            (graphics, look),
-            task,
-            roles,
-        )?;
-        let restriction = master.terrain_restriction;
-        let mut shore = MapShore::new(spatial, zones, pathing, restriction, self.position())?;
-        let t = actions
-            .list
-            .transport_mut()
-            .ok_or(GenieError::unreachable("a sail without its Transport"))?;
-        let changed = t.move_to(point, &ship, &mut shore)?;
-        if changed.stopped
-            && let Some(m) = motion.mover_mut()
-        {
-            m.stop()?;
-        }
-        if changed.stands {
-            self.show_standing(motion, masters, graphics, sprite_rng)?;
-        }
-        Ok(())
-    }
-
     /// The Enter's `set_state(1)` (`FUN_140a87320` case 1): its sub-actions go (`FUN_140a98620`: a
     /// `MoveTo`'s teardown stops the unit, slot 0x5d0), the unit shows its master's standing
     /// sprite ([`Unit::shows_standing_sprite`]) and, the Enter not being quiet, its unit AI gets
@@ -335,6 +239,7 @@ impl Unit {
             OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
             &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         self.post_own(
             &mut c.w.parts.unit_ai,
@@ -433,7 +338,11 @@ impl Unit {
             }
         }
         if bm.kind == MasterKind::BUILDING
-            && hp <= HitPoints::new(HitPoints::of_master(bm.hit_points).get() * ENTER_HP_SHARE)
+            && hp
+                <= HitPoints::new(
+                    HitPoints::of_master(bm.hit_points).get()
+                        * c.w.model.tuning.garrison.enter_hp_share,
+                )
         {
             return Err(GenieError::unsupported(
                 "an enter into a building at a fifth of its hit points (state 13)",
@@ -503,7 +412,10 @@ impl Unit {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                roles,
+                SightLayer {
+                    roles,
+                    visibility_tuning: c.w.model.tuning.visibility,
+                },
             )?;
         }
         let (bp, building) = c.w.object(target).ok_or(GenieError::unreachable(
@@ -555,7 +467,7 @@ impl Unit {
         let masters = c.w.model.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
             let own = c.w.model.masters.of(bp).unwrap_or(masters);
-            let rate = attack_rate(bm, own, reload, roles);
+            let rate = attack_rate(bm, own, reload, roles, &c.w.model.tuning.garrison);
             share(
                 me,
                 masters,
@@ -610,6 +522,7 @@ impl Unit {
                 target.id(),
                 LosSight::tile_circle(at, radius, INSIDE_SIGHT),
                 &c.w.model.roles,
+                c.w.model.tuning.visibility,
             )?;
         }
         Ok(())

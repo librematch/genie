@@ -11,6 +11,7 @@ use crate::objects::masters::ClassId;
 use crate::orders::Dispatch;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::OrderPriority;
@@ -514,6 +515,7 @@ impl UnitAi {
         player_type: PlayerType,
         ai: &mut Well512,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let mut k = 0;
         while k < self.orders.len() {
@@ -521,7 +523,18 @@ impl UnitAi {
                 return Ok(());
             }
             let order = *self.orders.checked(k)?;
-            let r = self.process_order(&order, Some((at, player_type)), None, ai, side, roles)?;
+            let r = self.process_order(
+                &order,
+                Some((at, player_type)),
+                None,
+                ai,
+                side,
+                AiLayer {
+                    roles,
+                    slots: at.slots,
+                    unit_ai_tuning,
+                },
+            )?;
             if r == OrderOutcome::NotReady {
                 k += 1;
                 continue;

@@ -16,7 +16,7 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::math::fmath;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-use crate::math::image::group::{CHASING_SLACK, CLOSE, CONTACT_SLACK, FARTHEST, RANGED_SLACK};
+use crate::math::image::group::FARTHEST;
 use crate::movement::Mover;
 use crate::objects::ObjectId;
 use crate::players::PlayerId;
@@ -181,9 +181,9 @@ impl World {
     /// or keeps `finished`. With [`GroupFlags::ARRIVED`] the category is released at
     /// once; else it is when one of its units is within its attack range of the target: the
     /// footprint gap less a slack, at most the category's range (negative or unordered: 0). The
-    /// slack is [`CONTACT_SLACK`] for a category without a range, [`RANGED_SLACK`] for one
-    /// with, and [`CHASING_SLACK`] when the target moves (slot 0x5c8) and the category's range
-    /// is above the target's own weapon range (slot 0x230) plus [`RANGED_SLACK`]. A category
+    /// slack is `GroupTuning::contact_slack` for a category without a range, `GroupTuning::ranged_slack` for one
+    /// with, and `GroupTuning::chasing_slack` when the target moves (slot 0x5c8) and the category's range
+    /// is above the target's own weapon range (slot 0x230) plus `GroupTuning::ranged_slack`. A category
     /// without one in range ends `finished` (the returned flag, false). A released category
     /// stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its units at the target.
     ///
@@ -237,8 +237,11 @@ impl World {
             WorldObject::Unit(_, u, _) => self.parts.mover_of(u.id).is_some_and(Mover::is_moving),
             WorldObject::Ghost(..) => false,
         };
-        let outranged =
-            moves && below_or_unordered(weapon_range(master).get() + RANGED_SLACK, listed.get());
+        let outranged = moves
+            && below_or_unordered(
+                weapon_range(master).get() + self.model.tuning.group.ranged_slack,
+                listed.get(),
+            );
         let range = if Distance::ZERO <= listed {
             listed
         } else {
@@ -246,12 +249,12 @@ impl World {
         };
         let slack = if Distance::ZERO < range {
             if outranged {
-                CHASING_SLACK
+                self.model.tuning.group.chasing_slack
             } else {
-                RANGED_SLACK
+                self.model.tuning.group.ranged_slack
             }
         } else {
-            CONTACT_SLACK
+            self.model.tuning.group.contact_slack
         };
         for &id in units {
             let Some(unit) = self.world_object(id) else {
@@ -265,7 +268,7 @@ impl World {
     }
 
     /// The group follows a target that moved (`FUN_14103f4e0`'s object-target tail): a target more
-    /// than [`CLOSE`] from where it stood (`+0x3c8`, the ground length of the difference of the
+    /// than `GroupTuning::close` from where it stood (`+0x3c8`, the ground length of the difference of the
     /// places slot 0x520 gives). One the first member's player cannot see ([`World::sees_object`],
     /// `FUN_141188ea0`) sends the group back to that place, forgetting the target, and the update
     /// ends (`Some(false)`). One it sees is attacked anew ([`World::command_attack`]): a move begun
@@ -294,7 +297,10 @@ impl World {
         let at = t.moved_vector();
         let from = g.current_target.original_position;
         let d = fmath::sub(at, from);
-        if at_most_or_unordered(fmath::sqrt(d.y() * d.y() + d.x() * d.x()), CLOSE) {
+        if at_most_or_unordered(
+            fmath::sqrt(d.y() * d.y() + d.x() * d.x()),
+            self.model.tuning.group.close,
+        ) {
             return Ok(None);
         }
         if !self.sees_object(t, owner)? {

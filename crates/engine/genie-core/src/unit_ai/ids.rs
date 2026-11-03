@@ -3,13 +3,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Position;
-use crate::math::image::unit_ai::{
-    DEFEND_SLACK as UNIT_AI_DEFEND_SLACK, EXPLORE_Z as UNIT_AI_EXPLORE_Z,
-    FOLLOW_SLACK_HIGH as UNIT_AI_FOLLOW_SLACK_HIGH, FOLLOW_SLACK_LOW as UNIT_AI_FOLLOW_SLACK_LOW,
-    FOUNDATION_REACH as UNIT_AI_FOUNDATION_REACH, INVALID_POINT as UNIT_AI_INVALID_POINT,
-    LION_SIGHT_DIVISOR as UNIT_AI_LION_SIGHT_DIVISOR, LION_SIGHT_SHARE as UNIT_AI_LION_SIGHT_SHARE,
-    RETARGET_RANGE as UNIT_AI_RETARGET_RANGE, RETARGET_REACH as UNIT_AI_RETARGET_REACH, RUN_ONE,
-};
+use crate::math::image::unit_ai::{INVALID_POINT as UNIT_AI_INVALID_POINT, RUN_ONE};
 use crate::math::rng::Well512;
 use crate::objects::ActionState;
 use crate::objects::masters::ActionKind;
@@ -103,11 +97,6 @@ pub(super) const BOAR_WANDER: u32 = 7;
 pub(super) const BOAR_STEP: u32 = 6;
 pub(super) const BOAR_OFFSET: i32 = 3;
 pub(super) const AI_MOVE_RANGE: Distance = Distance::new(0.5);
-/// The height of the explore's target point (`FUN_140c4d910`, `DAT_14330eb8c`).
-pub(super) const EXPLORE_Z: f32 = UNIT_AI_EXPLORE_Z;
-/// The villager's reach test of the foundation its search found (slot 0x3d0 in
-/// `FUN_140c22bf0`, `DAT_142eb5690`).
-pub(super) const FOUNDATION_REACH: Distance = Distance::new(UNIT_AI_FOUNDATION_REACH);
 
 /// A villager's notify, or a part of one, the slice does not model.
 pub(super) const VILLAGER_NOTIFY: GenieError =
@@ -119,8 +108,6 @@ pub(super) const NO_ANIM_SPEED: GenieError =
     GenieError::unsupported("a moving villager's damage notify without its animation speed");
 /// The target point's x that marks it unset (`DAT_14330ec20`, −1), which the defend order fills.
 pub(super) const INVALID_POINT: f32 = UNIT_AI_INVALID_POINT;
-/// What the defend order adds to its desired distance before it follows (`DAT_14330eb8c`, 1).
-pub(super) const DEFEND_SLACK: f32 = UNIT_AI_DEFEND_SLACK;
 
 /// An order on an object run without the unit AI's update (its surroundings and side), as
 /// [`UnitAi::take_order_now`] runs one.
@@ -142,11 +129,6 @@ pub(super) const fn order_move(o: &QueuedOrder) -> AiMove {
     }
 }
 
-/// The follow order's target counts as moved when it is more than a tile off the AI's target
-/// point on either axis (`0x140c567c0`: `DAT_14330ec20`, `DAT_14330eb8c`).
-pub(super) const FOLLOW_SLACK_LOW: f32 = UNIT_AI_FOLLOW_SLACK_LOW;
-pub(super) const FOLLOW_SLACK_HIGH: f32 = UNIT_AI_FOLLOW_SLACK_HIGH;
-
 /// The hunted animal's idle check (`FUN_140c1eea0`): away from its origin by more than
 /// `DAT_142eb0f48` (4, squared) it goes home once in 7 checks; otherwise it wanders 1 to 3 tiles
 /// each way (`HUNTED_STEP`), in mode 1 once in 28 and by a tile. Its search reaches its line of
@@ -163,12 +145,6 @@ pub const HUMAN_ORDER_CAP: WorldTime = WorldTime::from_millis(5000);
 pub(super) const LION_IDLE_TIMEOUT: Millis = Millis::new(6000);
 /// The lion's idle timeout once its attack completed (`FUN_140c266f0`).
 pub(super) const LION_ATTACKED_TIMEOUT: Millis = Millis::new(1000);
-/// Outside mode 1 the lion attacks within this share of its line of sight (`FUN_140c1fb70`,
-/// `DAT_142e7f384`).
-pub(super) const LION_SIGHT_SHARE: f32 = UNIT_AI_LION_SIGHT_SHARE;
-/// Finding no villager outside mode 1 it attacks within its line of sight over this
-/// (`FUN_140c1fb70`, `DAT_142eb1c98`).
-pub(super) const LION_SIGHT_DIVISOR: f32 = UNIT_AI_LION_SIGHT_DIVISOR;
 
 /// The walk back's gap and range (`FUN_140c5e7d0`: `DAT_14330eb8c`, 1.0, whose image role in
 /// the unit AI's table is [`RUN_ONE`]'s).
@@ -189,11 +165,6 @@ pub(super) const ENDED_ACTIONS: [AiAction; 9] = [
     AiAction::BoarLuring,
     AiAction::MoveAside,
 ];
-/// A human player's unit on the attack order with a range above this does not retarget
-/// (processMisc).
-pub(super) const RETARGET_RANGE: f32 = UNIT_AI_RETARGET_RANGE;
-/// The retarget's reference distance about a current target (`DAT_142eb9430`).
-pub(super) const RETARGET_REACH: f32 = UNIT_AI_RETARGET_REACH;
 
 /// What the retarget's search reads of its checks ([`UnitAi::retarget_outcome`]): the current
 /// target is a building's, wall's or trebuchet's (or one off the attack order), and the top

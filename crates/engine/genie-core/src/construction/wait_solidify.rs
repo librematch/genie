@@ -31,15 +31,11 @@ use genie_diff::Diff;
 pub const WAIT_SOLIDIFY: ActionKind = ActionKind::named(0x9a);
 
 pub use crate::construction::wait_solidify_state::WaitSolidifyState;
-use crate::math::image::wait_solidify::SOLID_FROM as WAIT_SOLIDIFY_SOLID_FROM;
 use crate::objects::masters::MasterTables;
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
-
-/// `DAT_142eb56a0` (a double): the foundation's build points (`+0xc50`, widened) at most which
-/// it is not solid yet.
-const SOLID_FROM: f64 = WAIT_SOLIDIFY_SOLID_FROM;
+use crate::world::layer::generated::WaitSolidifyTuning;
 
 /// `TRIBE_Action_Wait_Solidify`: its state (`+0x18`), its task (`+0x48`) and the foundation it
 /// waits for (`+0x68`).
@@ -68,11 +64,15 @@ impl WaitSolidify {
 
     /// Its update (slot 0x30, `FUN_140ae8b70`) with the foundation's build points (`+0xc50`),
     /// None when the world does not hold it (`FUN_1415417a0`): true (1, done) unless the world
-    /// holds it with build points at most [`SOLID_FROM`]. `COMISD` with `JA`: build points that
+    /// holds it with build points at most `WaitSolidifyTuning::solid_from`. `COMISD` with `JA`: build points that
     /// are not a number keep it waiting.
     #[must_use]
-    pub fn update(&self, progress: Option<Seconds>) -> bool {
-        progress.is_none_or(|p| f64::from(p.get()) > SOLID_FROM)
+    pub fn update(
+        &self,
+        progress: Option<Seconds>,
+        wait_solidify_tuning: WaitSolidifyTuning,
+    ) -> bool {
+        progress.is_none_or(|p| f64::from(p.get()) > wait_solidify_tuning.solid_from)
     }
 
     /// Its `set_state` (slot 0x80, `FUN_140ae8b60`): the state, nothing else.
@@ -202,6 +202,7 @@ mod tests {
     use crate::objects::masters::ActionKind;
     use crate::test_ids::object_id;
     use crate::test_ids::task_id;
+    use crate::testing::tuning;
 
     fn foundation(id: i32) -> FoundationId {
         FoundationId::new(object_id(id))
@@ -229,14 +230,17 @@ mod tests {
     #[test]
     fn the_wait_ends_once_the_foundation_is_past_hundredth_or_gone() {
         let w = WaitSolidify::new(task(), foundation(8123));
-        assert!(w.update(None), "a foundation the world does not hold");
-        assert!(!w.update(Some(Seconds::ZERO)));
+        assert!(
+            w.update(None, tuning().wait_solidify),
+            "a foundation the world does not hold"
+        );
+        assert!(!w.update(Some(Seconds::ZERO), tuning().wait_solidify));
         // 0.01f32 widens to 0.009999999776…, at most the double 0.01
-        assert!(!w.update(Some(Seconds::new(0.01))));
-        assert!(w.update(Some(Seconds::new(0.010_001))));
-        assert!(w.update(Some(Seconds::new(1.5))));
+        assert!(!w.update(Some(Seconds::new(0.01)), tuning().wait_solidify));
+        assert!(w.update(Some(Seconds::new(0.010_001)), tuning().wait_solidify));
+        assert!(w.update(Some(Seconds::new(1.5)), tuning().wait_solidify));
         // COMISD with JA: unordered is not above
-        assert!(!w.update(Some(Seconds::new(f32::NAN))));
+        assert!(!w.update(Some(Seconds::new(f32::NAN)), tuning().wait_solidify));
     }
 
     #[test]

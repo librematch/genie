@@ -124,6 +124,7 @@ impl World {
             masters,
             self.parts.combat_of(u.id).reload_powerup,
             &self.model.roles,
+            &self.model.tuning.garrison,
         );
         if at_most_or_unordered(rate.get(), 0.0) {
             return Ok(());
@@ -202,10 +203,16 @@ impl World {
                 Place::Sleeping(q, i) => self.players.asleep_mut(q, i)?,
             };
             if u.sprite.is_some() {
-                new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), graphic, rng);
+                new_sprite(
+                    &mut u.sprite,
+                    self.parts.move_stats_mut(u.id),
+                    graphic,
+                    rng,
+                    self.model.tuning.sprite,
+                );
             } else {
                 // a sprite the slice does not hold is taken to be another one
-                let _ = ActiveSprite::start(graphic, rng);
+                let _ = ActiveSprite::start(graphic, rng, self.model.tuning.sprite);
             }
             return Ok(());
         }
@@ -451,6 +458,7 @@ impl World {
                 handicap: None,
                 capped: CAPPED,
                 roles: &self.model.roles,
+                masters_tuning: &self.model.tuning.masters,
             };
             let terrain = self.spatial.terrain.as_ref();
             let Some(m) = self.model.masters.of_mut(p).and_then(|m| m.get_mut(id)) else {

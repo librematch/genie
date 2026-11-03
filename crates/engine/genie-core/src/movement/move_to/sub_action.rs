@@ -7,7 +7,6 @@ use crate::map::Position;
 use crate::math::image::garrison::FAR;
 use crate::movement::PathAsk;
 use crate::movement::Speed;
-use crate::movement::move_to::action::ARRIVED;
 use crate::movement::move_to::{
     Follow, MoveTo, MoveToAction, MoveWait, Shown, TargetMoved, Walk, ask_walk, walk_or_give_up,
 };
@@ -20,6 +19,7 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{AiAction, Inbox};
 use crate::world::Seconds;
+use crate::world::layer::generated::MoveToTuning;
 
 /// A sub-action `MoveTo` that is not quiet letting its target go: its release (slot 0x180) would
 /// be its owner's, and no owner makes one.
@@ -62,15 +62,21 @@ impl MoveToAction {
     /// (`+0x640`) of 3 or later adds none (the game deletes the new `MoveTo`). Else its start
     /// (slot 5 with 1, `0x140aa2100`) sets its state by `gap`, the unit's from the target's
     /// footprint (`FUN_14118f680`; [`NO_TARGET_GAP`] for a `MoveTo` to a point): within
-    /// [`ARRIVED`] it arrived (1; `COMISS`, `JC`: a NaN gap is far), else it starts (3) with
+    /// `MoveToTuning::arrived` it arrived (1; `COMISS`, `JC`: a NaN gap is far), else it starts (3) with
     /// `speed` (slot 0x208) and fails (13) without (`UCOMISS`, `JP`: a NaN speed starts). A quiet
     /// `MoveTo` shows no standing sprite in states 1 and 13 (`0x140aa29e0`).
     #[must_use]
-    pub fn added(self, unit_state: ObjectState, gap: Distance, speed: Speed) -> Option<Self> {
+    pub fn added(
+        self,
+        unit_state: ObjectState,
+        gap: Distance,
+        speed: Speed,
+        move_to_tuning: &MoveToTuning,
+    ) -> Option<Self> {
         if ObjectState::Dying <= unit_state {
             return None;
         }
-        let state = if gap <= Distance::new(ARRIVED) {
+        let state = if gap <= Distance::new(move_to_tuning.arrived) {
             MoveTo::Arrived
         } else if speed == Speed::ZERO {
             MoveTo::Failed

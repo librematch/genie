@@ -10,7 +10,6 @@ use crate::commands::GameSub;
 use crate::gathering::QueueCount;
 use crate::map::Distance;
 use crate::map::WholeDistance;
-use crate::math::image::turn::TREASON_COST as TURN_TREASON_COST;
 use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerId;
@@ -189,7 +188,8 @@ impl World {
                 .players
                 .player_mut(p)?
                 .pending_debit
-                .checked_mut(self.model.slots.attribute.gold.index())? -= TREASON_COST;
+                .checked_mut(self.model.slots.attribute.gold.index())? -=
+                Amount::new(self.model.tuning.turn.treason_cost);
             self.treason(p)?;
         }
         Ok(())
@@ -293,10 +293,6 @@ impl World {
     }
 }
 
-/// What Treason's command takes off the pending debit of gold (`DAT_142eb5bd4`, 400.0, read at
-/// `0x140e7c73d`).
-const TREASON_COST: Amount = Amount::new(TURN_TREASON_COST);
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -314,6 +310,7 @@ mod tests {
     use crate::testing::ids::FARM;
     use crate::testing::ids::FISH_TRAP;
     use crate::testing::ids::PASTURE_1889;
+    use crate::testing::tuning;
     #[cfg(test)]
     use crate::world::FrameSeed;
     use crate::world::Millis;
@@ -395,7 +392,7 @@ mod tests {
         t.game(&game(1, GameSub::TREASON, 1, 0, 0)).unwrap();
         assert_eq!(
             t.players[1].pending_debit[attribute::GOLD.index()],
-            -TREASON_COST
+            -Amount::new(tuning().turn.treason_cost)
         );
     }
 

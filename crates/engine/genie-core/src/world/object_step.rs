@@ -47,6 +47,7 @@ impl World {
                 unit.master(self.master_tables(), p)?,
                 &unit.life,
                 &self.model.roles,
+                &self.model.tuning.turn,
             ) =>
             {
                 self.blasted(&unit, p, None)?

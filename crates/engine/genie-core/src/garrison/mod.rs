@@ -34,12 +34,11 @@ pub use self::damage_rate::DamageRate;
 pub use self::enter_state::EnterState;
 pub use self::firepower::{attack_rate, firepower, share};
 pub use self::inside_count::InsideCount;
-use self::meeting::{ENTER_NEAR, HALF_TILE, UNPLACED};
+use self::meeting::{HALF_TILE, UNPLACED};
 pub use self::meeting::{LandingWalk, MeetAt, MeetingTarget, Walls, meet_at, walled_off};
 pub(crate) use self::meeting::{UNREACHED, enter_view, ship_reaches};
 pub use self::raider_countdown::RaiderCountdown;
 pub use self::scope::{GarrisonScope, ShelterReach};
-use self::shelter::LEAST_HP_SHARE;
 pub(crate) use self::shelter::Shelters;
 use self::takes_in::has_garrison_task;
 pub use self::takes_in::{class_has_flags, garrison_type_takes, is_garrison_task};
@@ -48,10 +47,7 @@ use self::unload::NO_POINT;
 use self::unload::unload_group_takes;
 pub use self::walk_in::{ENTER, EnterAction, EnterTarget, WalkStart, Walking};
 pub(crate) use self::walk_in::{EnterReads, NO_SPEED, SIEGE_UNLOAD};
-use crate::math::image::garrison::{
-    CLASS_FLAGS as GARRISON_CLASS_FLAGS, FAR as GARRISON_FAR, NEARBY as GARRISON_NEARBY,
-    TOWN_BELL_REACH as GARRISON_TOWN_BELL_REACH,
-};
+use crate::math::image::garrison::{CLASS_FLAGS as GARRISON_CLASS_FLAGS, FAR as GARRISON_FAR};
 #[cfg(test)]
 use crate::movement::move_to::MoveTo;
 #[cfg(test)]
@@ -64,12 +60,6 @@ use crate::world::World;
 /// The squared footprint gap past which a garrison order sends no unit (`FUN_141621220` with 0:
 /// no limit).
 const FAR: f32 = GARRISON_FAR;
-/// The squared footprint gap within which a garrison order's target's neighbours shelter units
-/// too (`FUN_14161e370` with `+0x1e`, `DAT_14330ebcc`, 100.0: ten tiles).
-pub(crate) const NEARBY: f32 = GARRISON_NEARBY;
-/// The squared footprint gap within which the town bell reaches (its ring `FUN_14163a650`, its
-/// end `FUN_14163ab80`, and `FUN_141621220` with `param_6` 1: `DAT_142ef3e70`, 625.0, 25 tiles).
-pub(crate) const TOWN_BELL_REACH: f32 = GARRISON_TOWN_BELL_REACH;
 /// The circle a building sees while a unit is inside it (`FUN_141212e10`, `FUN_141213120`:
 /// slots 0x1d0 and 0x1d8 with 5).
 pub(crate) const INSIDE_SIGHT: SightTiles = SightTiles::new(5);

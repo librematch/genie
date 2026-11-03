@@ -57,6 +57,7 @@ mod walks;
 mod work_slots;
 
 pub use self::attack_state::AttackState;
+pub(crate) use self::constructor::BeginLayer;
 pub use self::constructor::{arms, arms_looking, engagement, gaps};
 use self::hits::{AfterHit, after_hit, blast_so_far};
 pub(crate) use self::hits::{Hit, strike};
@@ -85,6 +86,7 @@ use crate::objects::{Frame, Graphics};
 use crate::unit_ai::NotifyKind;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::TurnTuning;
 
 /// The Attack action's type, which word 9 adds.
 pub const ATTACK: ActionKind = ActionKind::named(9);
@@ -317,6 +319,7 @@ impl AttackReads {
         ai: Option<&UnitAi>,
         (player_type, now): (PlayerType, WorldTime),
         roles: &Roles,
+        turn_tuning: &TurnTuning,
     ) -> Self {
         Self {
             standing: master
@@ -326,7 +329,7 @@ impl AttackReads {
             volleys: masters.table.is_some_and(|m| volleys(master, m)),
             reload: combat.reload_stinger + (master.reload - combat.reload_powerup),
             hit_chance: master.hit_chance,
-            armed: armed(master, combat.firepower, roles),
+            armed: armed(master, combat.firepower, roles, turn_tuning),
             swing_sprites: swing_sprites(combat.abilities.look.as_ref(), master, graphics),
             player_type,
             world_time: now,

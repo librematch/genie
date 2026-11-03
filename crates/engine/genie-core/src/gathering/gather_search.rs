@@ -35,6 +35,7 @@ use crate::vision::SightTiles;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::GatherSearchTuning;
 use crate::world::slots::CheckedIndex;
 use std::fmt::{Debug, Error, Formatter};
 use std::mem::take;
@@ -404,8 +405,10 @@ pub fn closest_resource<W>(
     kind: GatherGroup,
     max_workers: WorkerCount,
     reads: ResourceWorld<'_, W>,
+    gather_search_tuning: &GatherSearchTuning,
 ) -> Result<Option<ObjectId>, GenieError> {
-    closest_resource_at(seeker, None, kind, max_workers, reads).map(|(id, _)| id)
+    closest_resource_at(seeker, None, kind, max_workers, reads, gather_search_tuning)
+        .map(|(id, _)| id)
 }
 
 /// [`closest_resource`] from a drop site (`param_3`, None for â1 or a site not found), with what
@@ -433,6 +436,7 @@ pub fn closest_resource_at<W>(
     kind: GatherGroup,
     max_workers: WorkerCount,
     reads: ResourceWorld<'_, W>,
+    gather_search_tuning: &GatherSearchTuning,
 ) -> Result<(Option<ObjectId>, Option<i32>), GenieError> {
     /// The fallback's steps before it has one (`1000000`).
     const NO_STEPS: i32 = 1_000_000;
@@ -457,7 +461,7 @@ pub fn closest_resource_at<W>(
     let los = SightTiles::of(seeker.line_of_sight);
     let unit_tile = Tile::new(ux as i32, uy as i32);
     // the sort's point, and the box's side (fixed for both passes)
-    let (sort_at, side) = sort_point_and_side(Point::new(ux, uy), los, site);
+    let (sort_at, side) = sort_point_and_side(Point::new(ux, uy), los, site, gather_search_tuning);
     let half = side / 2;
     let nearer = |a: Cell, b: Cell| {
         let d = |c: Cell| {
@@ -488,7 +492,7 @@ pub fn closest_resource_at<W>(
             if !explored(world, tile)? {
                 continue;
             }
-            let d = pass_distance(pass.origin, tile);
+            let d = pass_distance(pass.origin, tile, gather_search_tuning);
             if pass.max_steps < d || !map.holds(tile) {
                 continue;
             }
@@ -561,6 +565,7 @@ mod tests {
     use crate::testing::attribute;
     use crate::testing::class;
     use crate::testing::roles;
+    use crate::testing::tuning;
     use crate::unit_ai::task_finder::DropTarget;
 
     fn tree(id: i32, x: f32, y: f32) -> Candidate {
@@ -779,6 +784,7 @@ mod tests {
                     Ok(true)
                 },
             },
+            &tuning().gather_search,
         )
         .unwrap();
         assert_eq!((found, asked), (Some(object_id(2)), vec![object_id(2)]));
@@ -799,6 +805,7 @@ mod tests {
                 objects: &objects,
                 reach: &mut |&mut (), _| Ok(true),
             },
+            &tuning().gather_search,
         )
         .unwrap();
         assert_eq!(found, Some(object_id(1)));
@@ -847,6 +854,7 @@ mod tests {
                     objects: &objects,
                     reach: &mut |&mut (), _| Ok(true),
                 },
+                &tuning().gather_search,
             )
             .unwrap()
         };
@@ -916,6 +924,7 @@ mod tests {
                 objects: &objects,
                 reach: &mut |&mut (), id| Ok(reach.contains(&id)),
             },
+            &tuning().gather_search,
         )
     }
 

@@ -5,12 +5,10 @@ use crate::combat::attack::Fight;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::Walks;
 use crate::gathering::hunt::HuntState;
-use crate::gathering::hunt::{
-    GAP, HERD_FAR, HERD_REACH, HuntAction, HuntNext, HuntReads, LAST_BIT, OWN_LIVESTOCK_RANGE,
-    REMAINDER,
-};
+use crate::gathering::hunt::{HERD_FAR, HuntAction, HuntNext, HuntReads, LAST_BIT, REMAINDER};
 use crate::gathering::{HuntTargetId, both_food};
 use crate::map::Distance;
+use crate::map::DistanceSquared;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
 use crate::math::rng::{Stream, Well512};
@@ -28,13 +26,15 @@ use crate::world::Seconds;
 use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
+use genie_model::model::Model;
 use std::cmp::Ordering;
 
 impl HuntAction {
     /// `set_state(4)` (`0x140ac60e0` case 4) after the target died, or for live livestock of the
     /// hunter's `player`: the sub-actions go, the timer clears, the target's place becomes the
-    /// point, and a quiet `MoveTo` to the target within the task's range (`OWN_LIVESTOCK_RANGE`
+    /// point, and a quiet `MoveTo` to the target within the task's range (`HuntTuning::own_livestock_range`
     /// to own livestock) starts (`FUN_140aa0df0`, its start `0x140aa2100`: a unit within 0.01 of
     /// the target's footprint is there already, state 1; else state 3). Another live target is
     /// not modelled.
@@ -45,8 +45,10 @@ impl HuntAction {
         victim: &Victim,
         player: PlayerId,
         walks: &Walks<'_>,
-        roles: &Roles,
+        model: &Model,
     ) -> Result<(), GenieError> {
+        let (roles, hunt_tuning, move_to_tuning) =
+            (&model.roles, &model.tuning.hunt, &model.tuning.move_to);
         self.tear_down(motion.mover_mut())?;
         self.state = HuntState::Walk { move_to: None };
         self.timer = Seconds::ZERO;
@@ -65,7 +67,7 @@ impl HuntAction {
             .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
         self.point = t.position;
         let range = if victim.state <= ObjectState::Alive {
-            OWN_LIVESTOCK_RANGE
+            hunt_tuning.own_livestock_range
         } else {
             self.task.range.get()
         };
@@ -78,15 +80,16 @@ impl HuntAction {
             gap,
             state: Some(victim.state),
         };
-        let move_to = self.move_to_object(to, Distance::new(range), mover, walks)?;
+        let move_to =
+            self.move_to_object(to, Distance::new(range), mover, walks, move_to_tuning)?;
         self.state = HuntState::Walk { move_to };
         Ok(())
     }
 
     /// `set_state(6)` (case 6): the hunt faces its target. Live livestock of its own player is led
-    /// to its drop site first when it stands more than 3 tiles from it (`HERD_REACH` squared,
+    /// to its drop site first when it stands more than 3 tiles from it (`HuntTuning::herd_reach` squared,
     /// `set_state` 10, not modelled); then live livestock is attacked (`set_state` 12, with an Attack
-    /// of the master's ranges: [`Herd`]). Dead livestock out of the task's range plus `GAP` is
+    /// of the master's ranges: [`Herd`]). Dead livestock out of the task's range plus `HuntTuning::gap` is
     /// walked to again (`set_state` 4, [`HuntAction::set_walk`]). Otherwise the unit takes the hunt's sprite
     /// (`FUN_140ac51d0`: the carrying one for a load of the task's resource of 1 or more, else the
     /// moving one; slot 0x68 takes the standing sprite for none) and its timer is 0. Another
@@ -125,7 +128,9 @@ impl HuntAction {
                 // once, the hunter in the world; either way `moved_sheep` and `set_state(10)`
                 if let (true, Some((site, gap_squared))) = (herd.own, herd.drop_site) {
                     self.drop_site = Some(site);
-                    if HERD_REACH < gap_squared && (self.lead.moved || gap_squared < HERD_FAR) {
+                    if DistanceSquared::new(c.w.model.tuning.hunt.herd_reach) < gap_squared
+                        && (self.lead.moved || gap_squared < HERD_FAR)
+                    {
                         if !self.lead.moved && herd.idle {
                             let (player, sheep) = (c.player, self.target);
                             // the hunt faces its livestock target here
@@ -152,7 +157,7 @@ impl HuntAction {
                     .mover_of(unit.id)
                     .map(|m| m.stats.radius.ground())
                     .ok_or(HUNTER_UNMOVING)?;
-            if self.task.range + Distance::new(GAP)
+            if self.task.range + Distance::new(c.w.model.tuning.hunt.gap)
                 < footprint_gap(unit.place.position(), ground, t.position, t.radius)
             {
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
@@ -163,7 +168,7 @@ impl HuntAction {
                     &f.victim,
                     player,
                     &walks,
-                    roles,
+                    &c.w.model,
                 )?;
                 return Ok(HuntNext::Stay);
             }
@@ -193,6 +198,7 @@ impl HuntAction {
                 c.w.parts.move_stats_mut(unit.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             );
         }
     }
@@ -206,6 +212,7 @@ impl HuntAction {
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
         r: &HuntReads,
+        sprite_tuning: SpriteTuning,
     ) {
         self.state = HuntState::Gather;
         let kind = self.task.resource;
@@ -219,7 +226,13 @@ impl HuntAction {
             unit.life.attribute_type = kind;
         }
         if let Some(g) = r.sprites.working.or(r.sprites.standing) {
-            new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, sprite_rng);
+            new_sprite(
+                &mut unit.sprite,
+                motion.move_stats_mut(),
+                g,
+                sprite_rng,
+                sprite_tuning,
+            );
         }
     }
 

@@ -19,9 +19,7 @@ use crate::map::Point;
 use crate::map::WholeDistance;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
-use crate::math::image::group::{
-    EPSILON as GROUP_EPSILON, PATROL_LEG_REACH as GROUP_PATROL_LEG_REACH,
-};
+use crate::math::image::group::EPSILON as GROUP_EPSILON;
 use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::movement::PathState;
@@ -37,6 +35,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::Place;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 /// A group whose top speed is below this does not move (`commandMoveTo`, `DAT_142eb0c60`); nor is
@@ -44,9 +43,6 @@ use crate::world::slots::{CheckedIndex, PlayerSlots};
 const EPSILON: f32 = GROUP_EPSILON;
 /// The group's command while it moves (`mCurrentCommand` 1).
 pub const MOVE_COMMAND: GroupCommandKind = GroupCommandKind::MOVE;
-/// A patrol's leg goes back and forth when its point is at least this far from the group on
-/// the ground (`commandMoveTo` at 0x141010ddb, `DAT_14330ebb8`).
-const PATROL_LEG_REACH: f32 = GROUP_PATROL_LEG_REACH;
 
 /// The queued commands on a target `checkQueuedOrders` hands to `FUN_14100fc50` when the world
 /// holds the target (its switch's cases 3 and `0x2713`).
@@ -219,7 +215,7 @@ impl World {
     /// path (a new one, flags [`PathFlags::NEW`], made now) runs from the group's place through
     /// its waypoints (which it empties) to the point at the group's desired height, without
     /// [`PathFlags::LOOPS`] and with [`PathFlags::BACK_AND_FORTH`]; a patrol's leg (`leg`) loops
-    /// instead and goes back and forth when the point is at least [`PATROL_LEG_REACH`] from the
+    /// instead and goes back and forth when the point is at least `GroupTuning::patrol_leg_reach` from the
     /// group on the ground (`COMISS`/`JBE` at 0x141010de3: a NaN distance too).
     /// [`GroupFlags::PATROL`] ends set only with `hold`, which also clears the path's
     /// [`PathFlags::LOOPS`] (`keep_flag`'s [`GroupFlags::PATROL`] is cleared again after it, and a
@@ -354,7 +350,8 @@ impl World {
         g.waypoints.clear();
         let at = BVector::new(point.x(), g.desired_height, point.y());
         let _ = path.push(at);
-        let mut path_flags = move_path_flags(g.motion.position[0], at, how.leg);
+        let mut path_flags =
+            move_path_flags(g.motion.position[0], at, how.leg, &self.model.tuning.group);
         // `keep_flag` sets PATROL (0x141010dc1) off a leg, which the hold's test then decides
         // again
         if how.hold {
@@ -608,15 +605,15 @@ impl World {
 }
 
 /// [`World::command_move_to`]'s path flags: a patrol leg sets [`PathFlags::LOOPS`] and, when the
-/// group's place `from` lies at least [`PATROL_LEG_REACH`] from `to` on the ground (`COMISS`/`JBE`:
+/// group's place `from` lies at least `GroupTuning::patrol_leg_reach` from `to` on the ground (`COMISS`/`JBE`:
 /// a NaN too), [`PathFlags::BACK_AND_FORTH`]; any other move clears [`PathFlags::LOOPS`] and sets
 /// [`PathFlags::BACK_AND_FORTH`].
-fn move_path_flags(from: BVector, to: BVector, leg: bool) -> PathFlags {
+fn move_path_flags(from: BVector, to: BVector, leg: bool, group_tuning: &GroupTuning) -> PathFlags {
     if leg {
         let mut d = sub(from, to);
         d = d.with_height(0.0);
         let length = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
-        if at_most_or_unordered(PATROL_LEG_REACH, length) {
+        if at_most_or_unordered(group_tuning.patrol_leg_reach, length) {
             // A new path's flags (`FUN_14152eea0`'s construction).
             // The plans a path level may still try (`FUN_140f9b800`, `FUN_140f98e80`).
             PathFlags::NEW | PathFlags::LOOPS | PathFlags::BACK_AND_FORTH

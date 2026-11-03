@@ -5,9 +5,7 @@ use crate::combat::damage::Victim;
 use crate::gathering::both_food;
 use crate::gathering::gather::GatherState;
 use crate::gathering::gather::update::QUIET_CODE;
-use crate::gathering::gather::{
-    DROP_REACH, GatherAction, GatherReads, LAST_BIT, Next, REMAINDER, WAIT_SHIFT,
-};
+use crate::gathering::gather::{GatherAction, GatherReads, LAST_BIT, Next, REMAINDER};
 use crate::gathering::hunt::Dropped;
 use crate::gathering::hunt::{DropOff, resource_kind};
 use crate::math::rng::Stream;
@@ -75,7 +73,13 @@ impl GatherAction {
     pub(super) fn show(c: &mut Step<'_>, unit: &mut Unit, sprite: Option<Graphic>) {
         if let Some(s) = sprite {
             let rng = c.w.streams.get(Stream::Sprite);
-            new_sprite(&mut unit.sprite, c.w.parts.move_stats_mut(unit.id), s, rng);
+            new_sprite(
+                &mut unit.sprite,
+                c.w.parts.move_stats_mut(unit.id),
+                s,
+                rng,
+                c.w.model.tuning.sprite,
+            );
         }
     }
 
@@ -171,7 +175,7 @@ impl GatherAction {
     /// State 8's update (case 7): the `MoveTo` to the drop site walks ([`GatherAction::update_list`]);
     /// once it ended (its update in state 1 returns 1: the list deletes it and its destructor
     /// stops the unit) the load goes
-    /// to the player at a drop site that takes it (`site`) within `DROP_REACH` (squared): the
+    /// to the player at a drop site that takes it (`site`) within `GatherTuning::drop_reach` (squared): the
     /// resource of what the unit carries ([`crate::gathering::hunt::resource_kind`]), which the caller adds;
     /// the unit carries nothing after (`FUN_14119d310` with â1). Returns the resource and the
     /// amount; the caller lets the drop site go and walks back to the target (`set_state(4)`).
@@ -217,7 +221,7 @@ impl GatherAction {
             self.set_idle(c, unit, r);
             return Ok(Dropped::Idle);
         }
-        if DROP_REACH < site.gap_squared.get() {
+        if c.w.model.tuning.gather.drop_reach < site.gap_squared.get() {
             self.random_wait(c, unit);
             return Ok(Dropped::Going);
         }
@@ -232,7 +236,9 @@ impl GatherAction {
     /// `LAB_140a8ef80`: the timer takes a draw of the Action stream (`GetRandFloat0to1`) less a
     /// half, and the unit's animation stops at once (`FUN_141161850`: its `+0x7b8` 0).
     pub(super) fn random_wait(&mut self, c: &mut Step<'_>, unit: &Unit) {
-        self.timer = Seconds::new(c.w.streams.get(Stream::Action).float01() - WAIT_SHIFT);
+        self.timer = Seconds::new(
+            c.w.streams.get(Stream::Action).float01() - c.w.model.tuning.gather.wait_shift,
+        );
         c.w.parts.set_anim_speed(unit.id, Speed::ZERO);
     }
 }

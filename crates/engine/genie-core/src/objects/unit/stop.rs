@@ -18,8 +18,10 @@ use crate::orders::Work;
 use crate::unit_ai::{AiCommand, Effect};
 use crate::world::Unread;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::torn_down;
 use crate::world::step::Step;
+use genie_model::model::Model;
 
 impl Unit {
     /// stopAction (slot 0x3c0, `FUN_14108c160`): the action list goes ([`Unit::clear_own_actions`])
@@ -42,7 +44,7 @@ impl Unit {
             (&mut releases, &mut leaves),
             by,
             OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-            &c.w.model.graphics,
+            &c.w.model,
             sprite,
         )?;
         torn_down(c, self, (leaves, releases))
@@ -50,15 +52,16 @@ impl Unit {
 
     /// [`Unit::stop_action`] on the parts of the world it changes: the targets its actions let
     /// go and the foundations its Build leaves (`by` the unit, [`Unit::clear_own_actions`]), its
-    /// masters and sprites, and the Sprite stream; `actions` and `motion` are its action and
-    /// motion layers, `unread` why the load could not read it whole ([`Unread`]).
+    /// masters, the model's sprites and tuning values, and the Sprite stream; `actions` and
+    /// `motion` are its action and motion layers, `unread` why the load could not read it whole
+    /// ([`Unread`]).
     pub(crate) fn stop_with(
         &mut self,
         (actions, unread, mut motion): (&mut Action, Option<&Unread>, MotionMut<'_>),
         (releases, builder_leaves): (&mut Vec<(ObjectId, Releaser)>, &mut Vec<ObjectId>),
         by: Releaser,
         masters: OwnerMasters<'_>,
-        graphics: &Graphics,
+        model: &Model,
         sprite: &mut Well512,
     ) -> Result<(), GenieError> {
         self.tear_down_actions(
@@ -69,7 +72,13 @@ impl Unit {
             by,
         )?;
         if self.life.state == ObjectState::Alive {
-            self.show_standing(motion, masters, graphics, sprite)?;
+            self.show_standing(
+                motion,
+                masters,
+                &model.graphics,
+                sprite,
+                model.tuning.sprite,
+            )?;
         }
         Ok(())
     }
@@ -106,6 +115,7 @@ impl Unit {
         masters: OwnerMasters<'_>,
         graphics: &Graphics,
         sprite: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         let standing = self
             .master_in(masters)?
@@ -119,7 +129,13 @@ impl Unit {
             let standing = standing.ok_or(GenieError::unsupported(
                 "a stopped unit without its standing sprite",
             ))?;
-            new_sprite(&mut self.sprite, motion.move_stats_mut(), standing, sprite);
+            new_sprite(
+                &mut self.sprite,
+                motion.move_stats_mut(),
+                standing,
+                sprite,
+                sprite_tuning,
+            );
         }
         Ok(())
     }

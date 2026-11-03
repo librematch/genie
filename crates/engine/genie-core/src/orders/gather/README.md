@@ -16,5 +16,5 @@ hunt order, and the action list starts the Hunt.
 ## How it connects
 
 <!-- uses -->
-- Uses: [`gathering`](../../gathering/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
+- Uses: [`combat`](../../combat/), [`gathering`](../../gathering/), [`math`](../../math/), [`movement`](../../movement/), [`objects`](../../objects/), [`players`](../../players/), [`unit_ai`](../../unit_ai/), [`world`](../../world/).
 <!-- /uses -->

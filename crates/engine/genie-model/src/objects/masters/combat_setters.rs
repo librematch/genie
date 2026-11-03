@@ -107,7 +107,7 @@ impl Master {
             MasterAttribute::ATTACK => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
-                    *e = match handicapped(world.handicap, class) {
+                    *e = match handicapped(world.handicap, class, world.masters_tuning) {
                         Some(f) if *e == DamageAmount::ZERO => {
                             DamageAmount::of_effect(amount.as_f32() * f)
                         }
@@ -204,7 +204,7 @@ impl Master {
             MasterAttribute::ATTACK => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
-                    *e = match handicapped(world.handicap, class) {
+                    *e = match handicapped(world.handicap, class, world.masters_tuning) {
                         Some(f) if *e == DamageAmount::ZERO => {
                             DamageAmount::of_effect(amount.as_f32() * f)
                         }
@@ -301,7 +301,7 @@ impl Master {
             MasterAttribute::ATTACK => {
                 let ClassAmount { class, amount } = class_amount(v);
                 if let Some(e) = Self::class_entry(&mut self.weapons, class) {
-                    let share = match handicapped(world.handicap, class) {
+                    let share = match handicapped(world.handicap, class, world.masters_tuning) {
                         Some(f) if *e == DamageAmount::ZERO => amount.as_f32() * f,
                         _ => amount.as_f32(),
                     };

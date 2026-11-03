@@ -35,6 +35,7 @@ use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
+use crate::world::layer::generated::SpatialTuning;
 use genie_diff::Diff;
 use std::collections::BTreeMap;
 
@@ -59,9 +60,6 @@ pub use self::tile_sight::TileSight;
 use crate::gathering::PastureId;
 use crate::groups::GroupId;
 use crate::map::terrain::Terrain;
-use crate::math::image::spatial::{
-    CLOSEST_RANGE as SPATIAL_CLOSEST_RANGE, SEARCH_REUSE_SQUARED as SPATIAL_SEARCH_REUSE_SQUARED,
-};
 use crate::movement::explore::InfluenceMap;
 #[cfg(test)]
 use crate::objects::unit::TAKEN_OUT;
@@ -72,13 +70,6 @@ use crate::unit_ai::best_target::{AttackCategory, Battlefield, Candidate, Thing}
 use crate::vision::VisionMasks;
 use std::collections::BTreeSet;
 use std::ops::RangeInclusive;
-
-/// The range of `ClosestObject`'s reachability check (`FUN_140c488b0`, `DAT_142eb5690`).
-const CLOSEST_RANGE: Distance = Distance::new(SPATIAL_CLOSEST_RANGE);
-
-/// How near (squared) a unit AI's search comes to the last one's place to skip its query
-/// (`FUN_140c63e20`).
-const SEARCH_REUSE_SQUARED: f32 = SPATIAL_SEARCH_REUSE_SQUARED;
 
 /// The caller's reachability check of a found object (slot 0x3d0 within a range): it paths over
 /// the spatial index the search reads, which the check's queries write, so the search hands it
@@ -616,7 +607,7 @@ pub struct Spatial {
     grid: Grid,
 }
 
-/// The unit AIs' search cache (`FUN_140c63e20`): a search within [`SEARCH_REUSE_SQUARED`] (squared)
+/// The unit AIs' search cache (`FUN_140c63e20`): a search within `SpatialTuning::search_reuse_squared` (squared)
 /// of the last one's place while the cache holds skips its query ("Already searched this update,
 /// skipping second time.") and reads the registry's last answer, whichever unit's search made it;
 /// a search that queries sets the place and holds the cache. Each unit AI's full update
@@ -653,6 +644,7 @@ struct ClosestChecks<'a> {
     farm: &'a FarmLook<'a>,
     roles: &'a Roles,
     best_target_tuning: &'a BestTargetTuning,
+    spatial_tuning: &'a SpatialTuning,
 }
 
 /// What `ClosestObject` reads of a farm it found: its workers (`+0x644`) and the pasture it is in

@@ -60,6 +60,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::ids::PASTURE_1889;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::CIVILIAN;
 use crate::unit_ai::task_finder::{DropSite, DropTarget};
 use crate::unit_ai::{AiAction, OrderKind, QueuedOrder, UnitAi};
@@ -178,6 +179,7 @@ fn site_world(class: ClassId, at: Position, build: BuildAction) -> World {
             sprite: Some(ActiveSprite::start(
                 graphic(WALKING),
                 &mut Well512::default(),
+                tuning().sprite,
             )),
             pasture: None,
             my_pasture: None,
@@ -428,7 +430,7 @@ fn builder_on_an_annex_counts_among_its_main_building_builders() {
     assert_eq!(
         annex_of(&t).map(|k| k.progress),
         Some(Seconds::new(
-            1.0 + rate * (((n - 1.0) * EXTRA_BUILDER + 1.0) / n)
+            1.0 + rate * (((n - 1.0) * tuning().build.extra_builder + 1.0) / n)
         ))
     );
     let mut b = build(&t);
@@ -776,7 +778,7 @@ fn build_waiting_move_to_asks_again_at_its_delay() {
 }
 
 /// The update's case 3 at the `MoveTo`'s end: a villager works wherever it stands
-/// (`set_state(6)`); another builder out of the task's range and [`REACH`] of the footprint
+/// (`set_state(6)`); another builder out of the task's range and `BuildTuning::reach` of the footprint
 /// walks to it again (`set_state(4)`), one within it works; without a sub-action the list's
 /// update returns 1 as well.
 #[test]
@@ -1532,7 +1534,7 @@ fn wood(t: &World) -> (f32, f32, i32) {
 }
 
 /// State 8's update (`0x140ab0370` case 7) at the `MoveTo`'s end: at a drop site in state 2
-/// that takes it within [`DROP_REACH`] the load goes to the player (wood), the drop site goes
+/// that takes it within `BuildTuning::drop_reach` the load goes to the player (wood), the drop site goes
 /// (its slot 0x180) and the builder walks back to its foundation (`set_state(4)`). Farther it
 /// waits 3 seconds with its animation stopped, then searches again; a drop site that does not
 /// take the load halts the Build.

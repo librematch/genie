@@ -18,6 +18,7 @@ use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
 use crate::world::ATTACKER_UNMOVING;
 use crate::world::Seconds;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
 /// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
@@ -80,6 +81,7 @@ impl Attack {
         at: Position,
         gap: Distance,
         reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<bool, GenieError> {
         if self.target.is_none() {
             return Err(ATTACK_WITHOUT_TARGET.with("state", self.state));
@@ -90,7 +92,13 @@ impl Attack {
             gap,
             state: None,
         };
-        let move_to = reads.to_object(to, self.range, self.given_sprite(), self.on_target_moved)?;
+        let move_to = reads.to_object(
+            to,
+            self.range,
+            self.given_sprite(),
+            self.on_target_moved,
+            move_to_tuning,
+        )?;
         self.state = AttackState::Move { move_to };
         self.timer = Seconds::ZERO;
         Ok(move_to.is_some_and(|m| m.arrived()))
@@ -110,13 +118,14 @@ impl Attack {
         &mut self,
         walk: fn(Option<MoveToAction>) -> AttackState,
         reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         let range = if matches!(walk(None), AttackState::GotoPoint { .. }) {
             Distance::ZERO
         } else {
             self.range
         };
-        let to = reads.to_point(self.seen, range, self.given_sprite())?;
+        let to = reads.to_point(self.seen, range, self.given_sprite(), move_to_tuning)?;
         self.state = walk(to.map(|m| MoveToAction {
             on_target_moved: self.on_target_moved,
             ..m

@@ -228,6 +228,7 @@ impl World {
                     self.world_time,
                     angle,
                     None,
+                    &self.model.tuning.spawn,
                 )
             });
         // the constructor (FUN_1411de5f0)
@@ -266,6 +267,7 @@ impl World {
                     mover.as_mut().map(|m| &mut m.stats),
                     g,
                     self.streams.get(Stream::Sprite),
+                    self.model.tuning.sprite,
                 );
             }
         }

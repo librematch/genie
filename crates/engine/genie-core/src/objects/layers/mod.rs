@@ -28,6 +28,7 @@ pub use self::default_task::{DefaultTask, UnreadDefault, Unstartable, default_st
 pub use self::motion::{Animated, Motion, MotionMut};
 use crate::map::spatial::Placed;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 
 /// `RGE_Static_Object`'s place (FD-045-D15): x, y, z (`+0x3c8`, `+0x4c8`, `+0x5a8`, obfuscated in
 /// the game's memory). Every object has it, below its other layers. Only its setter
@@ -65,9 +66,10 @@ impl Static {
         moving: bool,
         (world, pathing): (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
         self.position = at;
-        world.set_position(id, at, roles)?;
+        world.set_position(id, at, roles, visibility_tuning)?;
         if let (Some(pathing), Some(p)) = (pathing, world.get(id)) {
             pathing.moved(id, p, moving);
         }
@@ -129,6 +131,7 @@ mod tests {
     use crate::testing::class;
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::tuning;
 
     /// A small map with object 7 indexed at `at`.
     fn indexed(at: Position) -> Spatial {
@@ -164,6 +167,7 @@ mod tests {
                 true,
                 (&mut world, None),
                 &roles(),
+                tuning().visibility,
             )
             .unwrap();
         assert_eq!(place.position(), Position::new(2.5, 1.25, 0.0));

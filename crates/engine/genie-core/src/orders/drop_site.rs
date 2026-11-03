@@ -186,6 +186,7 @@ impl World {
             (&self.model.drop_sites, player.civ, &player.tracker),
             (at, held, class),
             look,
+            &self.model.tuning.order,
         ))
     }
 

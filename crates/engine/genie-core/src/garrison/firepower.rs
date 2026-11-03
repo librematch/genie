@@ -8,7 +8,6 @@ use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{at_most_or_unordered, maxss};
 use crate::math::image::garrison::{
     EPSILON as GARRISON_EPSILON, ONE_MISSILE as GARRISON_ONE_MISSILE,
-    RATE_RANGE as GARRISON_RATE_RANGE,
 };
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
@@ -18,9 +17,8 @@ use crate::objects::masters::{Master, Masters};
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::GarrisonTuning;
 
-/// A combat master's attack rate needs a weapon range above this (`FUN_14120dc10`).
-pub(super) const RATE_RANGE: f32 = GARRISON_RATE_RANGE;
 /// A unit's firepower counts its volley missiles beyond this many (`FUN_14120e1a0`).
 pub(super) const ONE_MISSILE: f32 = GARRISON_ONE_MISSILE;
 /// A reload at most this long gives no firepower (`FUN_14120e1a0`).
@@ -44,10 +42,11 @@ pub fn attack_rate(
     masters: &Masters,
     reload_powerup: Seconds,
     roles: &Roles,
+    garrison_tuning: &GarrisonTuning,
 ) -> DamageRate {
     // COMISS reload, 0 and COMISS range, 1.0, each with JBE
     if at_most_or_unordered(master.reload.get(), 0.0)
-        || at_most_or_unordered(master.weapon_range.get(), RATE_RANGE)
+        || at_most_or_unordered(master.weapon_range.get(), garrison_tuning.rate_range)
     {
         return DamageRate::ZERO;
     }

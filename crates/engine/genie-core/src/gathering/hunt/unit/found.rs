@@ -1,6 +1,7 @@
 //! A hunter's object found: it becomes the hunt's target, and the sprite of a hunt that fails at once.
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{arms, engagement, show_arrived};
 use crate::gathering::hunt::HuntRetarget;
 use crate::gathering::hunt::HuntState;
@@ -116,8 +117,12 @@ impl Unit {
             &engagement,
             arms,
             mover,
-            roles,
-            &c.w.model.tuning.attack,
+            BeginLayer {
+                roles,
+                attack_tuning: &c.w.model.tuning.attack,
+                move_to_tuning: &c.w.model.tuning.move_to,
+            },
+            &c.w.model.tuning.hunt,
         )? {
             if arrived {
                 show_arrived(
@@ -125,6 +130,7 @@ impl Unit {
                     &mut self.sprite,
                     c.w.parts.motion_mut(self.id),
                     c.w.streams.get(Stream::Sprite),
+                    c.w.model.tuning.sprite,
                 )?;
             }
             take(c, self, found, by, roles)?;
@@ -159,6 +165,7 @@ impl Unit {
                 c.w.parts.move_stats_mut(self.id),
                 standing,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             );
         }
         Ok(())

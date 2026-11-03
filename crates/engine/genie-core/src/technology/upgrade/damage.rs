@@ -19,6 +19,7 @@ use crate::objects::unit::Unit;
 use crate::technology::upgrade::NO_SPRITE;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 
 /// The whole of a damage share (`DAT_14330ebcc`, 100).
 const WHOLE: f32 = UPGRADE_WHOLE;
@@ -66,6 +67,7 @@ pub(crate) fn damage_sprites(
     before: HpPercent,
     (graphics, object, sprite): (&Graphics, &mut Well512, &mut Well512),
     roles: &Roles,
+    sprite_tuning: SpriteTuning,
 ) -> Result<HpPercent, GenieError> {
     let entries = &master.damage_graphics;
     let Some((share, hp)) = share_of(u, master, roles) else {
@@ -105,9 +107,10 @@ pub(crate) fn damage_sprites(
                         motion.move_stats_mut(),
                         graphic(e.sprite)?,
                         sprite,
+                        sprite_tuning,
                     );
                 } else {
-                    let _ = ActiveSprite::start(graphic(e.sprite)?, sprite);
+                    let _ = ActiveSprite::start(graphic(e.sprite)?, sprite, sprite_tuning);
                 }
             }
             _ => {}
@@ -120,9 +123,15 @@ pub(crate) fn damage_sprites(
     {
         let standing = graphic(master.standing_sprite)?;
         if u.sprite.is_some() {
-            new_sprite(&mut u.sprite, motion.move_stats_mut(), standing, sprite);
+            new_sprite(
+                &mut u.sprite,
+                motion.move_stats_mut(),
+                standing,
+                sprite,
+                sprite_tuning,
+            );
         } else {
-            let _ = ActiveSprite::start(standing, sprite);
+            let _ = ActiveSprite::start(standing, sprite, sprite_tuning);
         }
     }
     let _ = SPRITE_PLACED;

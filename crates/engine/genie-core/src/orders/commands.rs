@@ -15,6 +15,7 @@ use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::unit_ai::{Issuer, OrderPriority, UnitStance};
@@ -200,6 +201,8 @@ impl World {
             };
             // the order at once, its calls on the unit at once
             let roles = self.model.roles.clone();
+            let slots = self.model.slots;
+            let unit_ai_tuning = self.model.tuning.unit_ai;
             self.run_ai_calls((p, idx), |ai, side, rng| {
                 ai.take_order_now(
                     state,
@@ -207,7 +210,11 @@ impl World {
                     (position.ground(), Some(class)),
                     rng,
                     side,
-                    &roles,
+                    AiLayer {
+                        roles: &roles,
+                        slots,
+                        unit_ai_tuning: &unit_ai_tuning,
+                    },
                 )
             })?;
         }
@@ -424,7 +431,13 @@ impl World {
         ))?;
         let rng = self.streams.get(Stream::Sprite);
         let u = self.players.live_mut(p, idx)?;
-        new_sprite(&mut u.sprite, self.parts.move_stats_mut(u.id), g, rng);
+        new_sprite(
+            &mut u.sprite,
+            self.parts.move_stats_mut(u.id),
+            g,
+            rng,
+            self.model.tuning.sprite,
+        );
         Ok(())
     }
 }

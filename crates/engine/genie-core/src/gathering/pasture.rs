@@ -10,9 +10,6 @@ use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
-use crate::math::image::pasture::{
-    END as PASTURE_END, INSET as PASTURE_INSET, STEP as PASTURE_STEP,
-};
 use crate::math::msvc::sort;
 use crate::math::rng::Stream;
 use crate::movement::footprint_gap_squared;
@@ -26,6 +23,7 @@ use crate::players::PlayerId;
 use crate::technology::Attributes;
 use crate::world::World;
 use crate::world::layer::MasterSlots;
+use crate::world::layer::generated::PastureTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 
@@ -37,22 +35,15 @@ pub const fn livestock(masters: MasterSlots) -> [MasterId; 2] {
     [masters.pasture_argali, masters.pasture_ibex]
 }
 
-/// The edges lie this far inside the pasture's ground radius (`DAT_142e7f384`).
-const INSET: Distance = Distance::new(PASTURE_INSET);
-/// The step along an edge (`DAT_142e8c148`).
-const STEP: f32 = PASTURE_STEP;
-/// An edge's end (`DAT_14330eb8c`).
-const END: f32 = PASTURE_END;
-
 /// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in
-/// the routine's order: the radius less [`INSET`] gives the corners (xâr, yâr), (x+r, yâr),
+/// the routine's order: the radius less `PastureTuning::inset` gives the corners (xâr, yâr), (x+r, yâr),
 /// (x+r, y+r) and (xâr, y+r); each edge from its first corner to its second, `(b â a) Â· t + a`
-/// in f32 (SUBSS, MULSS, ADDSS) with `t` from 0 by [`STEP`] while at most [`END`]: the bottom
+/// in f32 (SUBSS, MULSS, ADDSS) with `t` from 0 by `PastureTuning::step` while at most `PastureTuning::end`: the bottom
 /// edge from the first corner to the second, the right one from the third to the second, the
 /// top one from the third to the fourth and the left one from the first to the fourth.
 #[must_use]
-pub fn edge_points(at: Position, radius_x: Distance) -> Vec<Point> {
-    let r = radius_x - INSET;
+pub fn edge_points(at: Position, radius_x: Distance, pasture_tuning: &PastureTuning) -> Vec<Point> {
+    let r = radius_x - Distance::new(pasture_tuning.inset);
     let (x, y) = (at.x(), at.y());
     let c = [
         Point::new(x - r.get(), y - r.get()),
@@ -65,12 +56,12 @@ pub fn edge_points(at: Position, radius_x: Distance) -> Vec<Point> {
     for (a, b) in edges {
         let mut t = 0.0f32;
         // COMISS END, t with JNC: on while END is at least t
-        while t <= END {
+        while t <= pasture_tuning.end {
             points.push(Point::new(
                 (b.x() - a.x()) * t + a.x(),
                 (b.y() - a.y()) * t + a.y(),
             ));
-            t += STEP;
+            t += pasture_tuning.step;
         }
     }
     points
@@ -109,7 +100,7 @@ impl World {
             .map(|(_, u)| (u.position(), u.life.master_id))
             .ok_or(GenieError::unreachable("a pasture its completion names"))?;
         let radius_x = self.master(p, master)?.radius.x();
-        let mut points = edge_points(at, Distance::new(radius_x));
+        let mut points = edge_points(at, Distance::new(radius_x), &self.model.tuning.pasture);
         let owner = self.players.player(p)?;
         let count =
             cvttss2si(Attributes::get(owner, self.model.slots.attribute.pasture_livestock)?.get());
@@ -280,13 +271,18 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::tuning;
 
     /// 429381190's pasture 15342 (master 1897, radius 2) at (136, 72): sixteen points, four an
     /// edge; its livestock stood on the left edge's second and third (134.5, 71.4), (134.5,
     /// 72.3) and the bottom edge's fourth (137.2, 70.5).
     #[test]
     fn pasture_edges_take_four_points_each() {
-        let points = edge_points(Position::new(136.0, 72.0, 0.0), Distance::new(2.0));
+        let points = edge_points(
+            Position::new(136.0, 72.0, 0.0),
+            Distance::new(2.0),
+            &tuning().pasture,
+        );
         assert_eq!(points.len(), 16);
         let t = [0.0f32, 0.3, 0.6, 0.3 + 0.3 + 0.3];
         assert_eq!(points[0], Point::new(134.5, 70.5));

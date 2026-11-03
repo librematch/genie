@@ -40,30 +40,15 @@ use self::search::Node;
 use self::search::{NodeIndex, Nodes, OpenList};
 #[cfg(test)]
 use self::smoothing::straighten;
-use self::smoothing::{SHORTCUT_REACH, TILE_SEARCH_LENGTH};
 pub use self::smoothing::{SegmentTest, smooth};
-use crate::math::image::tile_path::{
-    EARLY_LEFT as TILE_PATH_EARLY_LEFT, EARLY_START as TILE_PATH_EARLY_START,
-    FAR_SIDE as TILE_PATH_FAR_SIDE, GOAL_GAP as TILE_PATH_GOAL_GAP, ONE as TILE_PATH_ONE,
-    SHORTCUT_COST as TILE_PATH_SHORTCUT_COST,
-};
+use crate::math::image::tile_path::ONE as TILE_PATH_ONE;
 
 /// The cost the best node starts from in each search (`0x497423f0`).
 const NO_COST: Distance = Distance::new(999_999.0);
-/// The goal's own tile counts when the goal is this near it (`DAT_142eb99cc`).
-const GOAL_GAP: f32 = TILE_PATH_GOAL_GAP;
 /// The planner's half tile (`DAT_142e7f384`) and its −0.5 (`DAT_142eb6e58`).
 const HALF: f32 = 0.5;
 /// A goal's range below 1 grows the marked square by 1 (`DAT_14330eb8c`).
 const ONE: f32 = TILE_PATH_ONE;
-/// The hierarchical search marks 0.1 more on the square's far sides (`DAT_142eb5690`).
-const FAR_SIDE: f32 = TILE_PATH_FAR_SIDE;
-/// A computer player's search stops early near the goal (`DAT_14330ebb8`, `DAT_142eb0f4c`).
-const EARLY_LEFT: Distance = Distance::new(TILE_PATH_EARLY_LEFT);
-const EARLY_START: Distance = Distance::new(TILE_PATH_EARLY_START);
-/// The level-0 search costs a turn's shortcut from the node before at 1.1 times its cost
-/// (`DAT_142e86c14`).
-const SHORTCUT_COST: f32 = TILE_PATH_SHORTCUT_COST;
 
 /// What a search returns (its result byte).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

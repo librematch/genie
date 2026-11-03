@@ -7,10 +7,7 @@ use crate::combat::damage::ArmorPair;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::RepairState;
 use crate::construction::repair::repair_target;
-use crate::construction::repair::{
-    EXTRA_REPAIRER, LEAST_HP, MOVING_REACH, ONE, REACH, RepairAction, RepairReads, RepairTask,
-    Repairee,
-};
+use crate::construction::repair::{ONE, RepairAction, RepairReads, RepairTask, Repairee};
 use crate::construction::{BuilderCount, RepairTargetId};
 use crate::map::Distance;
 use crate::map::Position;
@@ -39,6 +36,8 @@ use crate::unit_ai::NotifyKind;
 use crate::world::Seconds;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::RepairTuning;
 use crate::world::lets::release;
 use crate::world::step::Step;
 use std::mem::replace;
@@ -54,12 +53,13 @@ pub fn work_amount(
     work_value: WorkValue,
     dt: Seconds,
     repairers: Option<BuilderCount>,
+    repair_tuning: &RepairTuning,
 ) -> HitPoints {
     let mut amount = rate * work_value * dt;
     if let Some(n) = repairers {
         let n = n.as_f32();
         if ONE < n {
-            amount *= ((n - ONE) * EXTRA_REPAIRER + ONE) / n;
+            amount *= ((n - ONE) * repair_tuning.extra_repairer + ONE) / n;
         }
     }
     HitPoints::new(amount)
@@ -82,6 +82,7 @@ fn standing(c: &mut Step<'_>, repairer: &mut Unit) -> Result<(), GenieError> {
         OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
         &c.w.model.graphics,
         c.w.streams.get(Stream::Sprite),
+        c.w.model.tuning.sprite,
     )
 }
 
@@ -98,9 +99,10 @@ fn show(
         rng: c.w.streams.get(Stream::Sprite),
         graphics: &c.w.model.graphics,
     };
-    sprites
-        .shown(id.or(standing))?
-        .show(c.w.parts.move_stats_mut(repairer.id));
+    sprites.shown(id.or(standing))?.show(
+        c.w.parts.move_stats_mut(repairer.id),
+        c.w.model.tuning.sprite,
+    );
     Ok(())
 }
 
@@ -119,6 +121,7 @@ impl RepairAction {
         task: RepairTask,
         range: Distance,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Self, GenieError> {
         let mut repair = Self {
             target: to.id.map(RepairTargetId::new),
@@ -131,7 +134,7 @@ impl RepairAction {
             voice: Voice::Loud,
         };
         repair.state = RepairState::Move {
-            move_to: repair.walk(move_reads, Some(to))?,
+            move_to: repair.walk(move_reads, Some(to), move_to_tuning)?,
         };
         Ok(repair)
     }
@@ -147,10 +150,19 @@ impl RepairAction {
         &self,
         move_reads: &MoveToReads<'_>,
         to: Option<WalkTo>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         to.map_or_else(
-            || move_reads.to_nothing(self.range, self.task.moving),
-            |to| move_reads.to_object(to, self.range, self.task.moving, TargetMoved::Follows),
+            || move_reads.to_nothing(self.range, self.task.moving, move_to_tuning),
+            |to| {
+                move_reads.to_object(
+                    to,
+                    self.range,
+                    self.task.moving,
+                    TargetMoved::Follows,
+                    move_to_tuning,
+                )
+            },
         )
     }
 
@@ -164,13 +176,14 @@ impl RepairAction {
         &self,
         point: Position,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
-        move_reads.to_point(point, Distance::ZERO, self.task.moving)
+        move_reads.to_point(point, Distance::ZERO, self.task.moving, move_to_tuning)
     }
 
     /// One update (slot 6, `0x140adaa20`) of `repairer` (`me`) through its step, with what it
     /// reads as it starts (`reads`). A target the world no longer holds ends it (slot 0x68 with
-    /// none, `set_state(1)`); so does one no longer in state 2, one below [`LEAST_HP`] hit
+    /// none, `set_state(1)`); so does one no longer in state 2, one below `RepairTuning::least_hp` hit
     /// points (`COMISS` with `JA`: a NaN is repaired), or one neither its player's own, an
     /// ally's nor Gaia's. Then by its state: 1 is done (its 1: the action list deletes it); 4
     /// walks ([`RepairAction::walking`]); 6 turns the unit toward the target, then works (7); 7
@@ -198,7 +211,7 @@ impl RepairAction {
         }
         if let Some(t) = reads.target
             && (t.state != ObjectState::Alive
-                || LEAST_HP > t.hp.get()
+                || c.w.model.tuning.repair.least_hp > t.hp.get()
                 || (!t.allied && t.owner != PlayerId::GAIA))
         {
             self.drop_target(c, repairer, reads)?;
@@ -267,7 +280,7 @@ impl RepairAction {
         if below_or_unordered(0.0, self.timer.get()) {
             return Ok(());
         }
-        if Self::reaches(repairer, reads) {
+        if Self::reaches(repairer, reads, &c.w.model.tuning.repair) {
             self.set_state(c, repairer, RepairState::Face, reads, roles)?;
         } else {
             self.timer = Seconds::new(ONE);
@@ -306,7 +319,7 @@ impl RepairAction {
     /// State 4 (`0x140adaa20` case 3): the quiet `MoveTo` toward the target walks
     /// ([`RepairAction::step_walk`]); once it is at it, waits or failed (or gone: 1, 2, 3), the
     /// unit within reach of the target ([`RepairAction::reaches`]) faces it (6), one with a
-    /// quick path to it within [`REACH`] (slot 0x3e0, `canQuickPath`) waits (10), any other
+    /// quick path to it within `RepairTuning::reach` (slot 0x3e0, `canQuickPath`) waits (10), any other
     /// fails (13). Its target let go (4, 5) lets the Repair's go (slot 0x68 with none,
     /// [`RepairAction::drop_target`]) and ends the Repair (`set_state(1)`).
     pub(super) fn walking(
@@ -325,7 +338,7 @@ impl RepairAction {
             }
             _ => {}
         }
-        if Self::reaches(repairer, reads) {
+        if Self::reaches(repairer, reads, &c.w.model.tuning.repair) {
             return self.set_state(c, repairer, RepairState::Face, reads, roles);
         }
         let next = if self.can_path(c, repairer, reads)? {
@@ -336,7 +349,7 @@ impl RepairAction {
         self.set_state(c, repairer, next, reads, roles)
     }
 
-    /// Slot 0x3e0 (`canQuickPath`) of the repairer to its target within [`REACH`]: the old
+    /// Slot 0x3e0 (`canQuickPath`) of the repairer to its target within `RepairTuning::reach`: the old
     /// short pather's quick path ([`crate::pathing::hull_path::quick_reach`]) with its master's
     /// x radius and its terrain restriction's mask.
     fn can_path(
@@ -363,7 +376,7 @@ impl RepairAction {
             self.target.map(RepairTargetId::id),
             mask,
             Distance::new(reads.radius.x()),
-            Distance::new(REACH),
+            Distance::new(c.w.model.tuning.repair.reach),
         )
     }
 
@@ -393,20 +406,29 @@ impl RepairAction {
     }
 
     /// The reach test of states 4 and 10: the footprints' gap (`FUN_14118f680`) less
-    /// [`MOVING_REACH`] for a moving target or a scenario's game mode at most [`REACH`]
+    /// `RepairTuning::moving_reach` for a moving target or a scenario's game mode at most `RepairTuning::reach`
     /// (`COMISS REACH, gap` with `JC`/`JNC`: a NaN gap is out of reach).
-    pub(super) fn reaches(repairer: &Unit, reads: &RepairReads) -> bool {
+    pub(super) fn reaches(
+        repairer: &Unit,
+        reads: &RepairReads,
+        repair_tuning: &RepairTuning,
+    ) -> bool {
         let Some(t) = reads.target else {
             return false;
         };
-        let gap = Self::gap(repairer, reads, t);
-        !below_or_unordered(REACH, gap.get())
+        let gap = Self::gap(repairer, reads, t, repair_tuning);
+        !below_or_unordered(repair_tuning.reach, gap.get())
     }
 
     /// The footprints' gap less the moving target's or the scenario's margin.
-    pub(super) fn gap(repairer: &Unit, reads: &RepairReads, t: Repairee) -> Distance {
+    pub(super) fn gap(
+        repairer: &Unit,
+        reads: &RepairReads,
+        t: Repairee,
+        repair_tuning: &RepairTuning,
+    ) -> Distance {
         let margin = if reads.scenario || t.moves {
-            MOVING_REACH
+            repair_tuning.moving_reach
         } else {
             0.0
         };
@@ -434,8 +456,8 @@ impl RepairAction {
         ))?;
         let moved = t.position.x() != self.point.x() || t.position.y() != self.point.y();
         if moved {
-            let gap = Self::gap(repairer, reads, t);
-            if REACH < gap.get() {
+            let gap = Self::gap(repairer, reads, t, &c.w.model.tuning.repair);
+            if c.w.model.tuning.repair.reach < gap.get() {
                 return self.set_state(
                     c,
                     repairer,
@@ -447,7 +469,13 @@ impl RepairAction {
             self.point = t.position;
         }
         let repairers = reads.counted_in.map(|(_, n)| n);
-        let amount = work_amount(reads.rate, self.task.work_value, c.dt.seconds(), repairers);
+        let amount = work_amount(
+            reads.rate,
+            self.task.work_value,
+            c.dt.seconds(),
+            repairers,
+            &c.w.model.tuning.repair,
+        );
         let (answer, kind) = repair_target(c, self.target, amount, roles)?;
         match answer {
             RepairOutcome::Full => {
@@ -545,8 +573,9 @@ impl RepairAction {
         to: WalkTo,
         mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
-        let walk = self.walk(move_reads, Some(to))?;
+        let walk = self.walk(move_reads, Some(to), move_to_tuning)?;
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
         {
@@ -571,8 +600,9 @@ impl RepairAction {
         point: Position,
         mover: Option<&mut Mover>,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(Option<ObjectId>, bool), GenieError> {
-        let walk = self.to_point(point, move_reads)?;
+        let walk = self.to_point(point, move_reads, move_to_tuning)?;
         self.point = point;
         let counted = replace(&mut self.counted, false);
         let old = self.target.take();

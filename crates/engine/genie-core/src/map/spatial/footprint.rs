@@ -18,7 +18,7 @@ use crate::construction::FoundationId;
 use crate::construction::build::ClearLook;
 use crate::map::TerrainMask;
 use crate::map::spatial::{Placed, QUERY_HITS, RecordId, Spatial, tile_record_id};
-use crate::math::image::spatial::{FOOTPRINT_EDGE, NO_SPOT as SPATIAL_NO_SPOT, TILE_CENTRE};
+use crate::math::image::spatial::{NO_SPOT as SPATIAL_NO_SPOT, TILE_CENTRE};
 use crate::world::index::ObjectsRef;
 
 impl Spatial {
@@ -42,12 +42,11 @@ impl Spatial {
         farthest: bool,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<Point>, GenieError> {
-        /// The footprint's last tile stops short of its edge by this (`DAT_142eb1e9c`).
-        const EDGE: f32 = FOOTPRINT_EDGE;
         /// A tile's centre (`DAT_142e7f384`).
         const CENTRE: f32 = TILE_CENTRE;
         /// The closest search's first best (`DAT_14330ebf4`).
         const NO_SPOT: f32 = SPATIAL_NO_SPOT;
+        let spatial_tuning = &by_id.tuning().spatial;
         let (tx, ty) = (at.x(), at.y());
         let (rx, ry) = (radius.x(), radius.y());
         let size = (((ry + rx) as i32) + 2).max(1) * 2;
@@ -57,7 +56,10 @@ impl Spatial {
         self.check_known(Rect::new(fx, fy, fx + size as f32, fy + size as f32))?;
         let (ox, oy) = (half - cx, half - cy);
         let (x0, y0) = ((tx - rx) as i32, (ty - ry) as i32);
-        let (x1, y1) = (((rx + tx) - EDGE) as i32, ((ry + ty) - EDGE) as i32);
+        let (x1, y1) = (
+            ((rx + tx) - spatial_tuning.footprint_edge) as i32,
+            ((ry + ty) - spatial_tuning.footprint_edge) as i32,
+        );
         let footprint = TileRect::new(x0, y0, x1, y1);
         let mut list: Vec<Tile> = (x0..=x1)
             .flat_map(|x| (y0..=y1).map(move |y| Tile::new(x, y)))

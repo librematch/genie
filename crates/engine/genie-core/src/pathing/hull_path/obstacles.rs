@@ -13,6 +13,7 @@ use crate::objects::ObjectId;
 use crate::pathing::hull_path::{HALF, Hull, HullIndex, HullPather, Point, Shape};
 use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::generated::HullPathTuning;
 use crate::world::slots::CheckedIndex;
 
 impl HullPather<'_> {
@@ -26,11 +27,15 @@ impl HullPather<'_> {
         hulls: &mut Vec<Hull>,
         min: Point,
         max: Point,
+        hull_path_tuning: &HullPathTuning,
     ) -> Result<HullIndex, GenieError> {
         let mut index = 0;
         let mut hull: Option<HullIndex> = None;
         while index < hulls.len() {
-            let (overlap, outside) = hulls.checked(index)?.shape_overlap(min, max);
+            let (overlap, outside) =
+                hulls
+                    .checked(index)?
+                    .shape_overlap(min, max, hull_path_tuning);
             let corners = [
                 min,
                 Point::new(max.x(), min.y()),
@@ -97,7 +102,7 @@ impl HullPather<'_> {
                         o.points
                             .get(k)
                             .zip(o.points.get(prev))
-                            .is_some_and(|(a, b)| h.intersection(true, *a, *b).is_some())
+                            .is_some_and(|(a, b)| h.intersection(true, *a, *b, hull_path_tuning).is_some())
                     });
                 if !overlaps {
                     continue;
@@ -140,6 +145,7 @@ impl HullPather<'_> {
         hull: Option<HullIndex>,
         player: Option<PlayerId>,
     ) -> Result<(), GenieError> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let world = &*self.world;
         for &id in world.tiles().list(tile) {
             let Some(p) = world.get(id) else {
@@ -153,7 +159,7 @@ impl HullPather<'_> {
             if left_out && !self.include.contains(&id) {
                 continue;
             }
-            Self::add_box(&mut self.hulls, self.radius, id, p, hull)?;
+            Self::add_box(&mut self.hulls, self.radius, id, p, hull, hull_path_tuning)?;
         }
         Ok(())
     }
@@ -185,6 +191,7 @@ impl HullPather<'_> {
         id: ObjectId,
         p: &Placed,
         hull: Option<HullIndex>,
+        hull_path_tuning: &HullPathTuning,
     ) -> Result<(), GenieError> {
         let (x, y) = (p.position.x(), p.position.y());
         let (rx, ry) = (p.radius.x(), p.radius.y());
@@ -197,7 +204,7 @@ impl HullPather<'_> {
         // `COMISS`/`JA` (0x140f8b772, 0x140f8b7a4): an unordered radius takes the given hull
         let h = match hull {
             Some(h) if at_most_or_unordered(rx, HALF) && at_most_or_unordered(ry, HALF) => h,
-            _ => Self::add_shape_to(hulls, bounds.corner0(), bounds.corner1())?,
+            _ => Self::add_shape_to(hulls, bounds.corner0(), bounds.corner1(), hull_path_tuning)?,
         };
         let objects = &mut hulls.checked_mut(h.index())?.objects;
         let id = RecordId::from(id);
@@ -209,7 +216,8 @@ impl HullPather<'_> {
 
     /// [`HullPather::add_shape_to`] on the pather's hulls.
     pub(super) fn add_shape(&mut self, min: Point, max: Point) -> Result<HullIndex, GenieError> {
-        Self::add_shape_to(&mut self.hulls, min, max)
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
+        Self::add_shape_to(&mut self.hulls, min, max, hull_path_tuning)
     }
 
     /// `MShortPather::processTileObstructions` (`FUN_140f8e1d0`): `tile`'s box when its terrain is not the unit's (unless ignored), into `hull` or its own place, then its objects,

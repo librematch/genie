@@ -43,7 +43,6 @@ impl Unit {
         roles: &Roles,
     ) -> Result<Option<Work>, GenieError> {
         use crate::gathering::gather_search::{self, Candidate};
-        use crate::math::image::gather_search::{REACH_CAP, REACH_FLOOR};
         /// The reach a line of sight below the floor takes (the Build's immediate 4.0).
         const REACH_LOW: f32 = 4.0;
         let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
@@ -68,8 +67,16 @@ impl Unit {
             c.w.players.player(c.player)?.civ,
         );
         let los = site.line_of_sight.get();
-        let held = if REACH_FLOOR <= los { los } else { REACH_LOW };
-        let reach = if held <= REACH_CAP { held } else { REACH_CAP };
+        let held = if c.w.model.tuning.gather_search.reach_floor <= los {
+            los
+        } else {
+            REACH_LOW
+        };
+        let reach = if held <= c.w.model.tuning.gather_search.reach_cap {
+            held
+        } else {
+            c.w.model.tuning.gather_search.reach_cap
+        };
         let builder = gather_search::Builder {
             position: self.position(),
             radius: Distance::new(master.radius.x()),

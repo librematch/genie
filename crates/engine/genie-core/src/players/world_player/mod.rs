@@ -52,8 +52,7 @@ mod update;
 pub use self::tech_tree::{TechTree, TreeBuilding, TreeQuery, TreeUnit, UniqueUnit};
 pub use self::tree_ids::{TreeMaster, TreeTech};
 use crate::math::image::world_player::{
-    LIVESTOCK_SCALE as WORLD_PLAYER_LIVESTOCK_SCALE, MINUTE as WORLD_PLAYER_MINUTE,
-    PERCENT as WORLD_PLAYER_PERCENT, SECOND as WORLD_PLAYER_SECOND,
+    MINUTE as WORLD_PLAYER_MINUTE, PERCENT as WORLD_PLAYER_PERCENT, SECOND as WORLD_PLAYER_SECOND,
 };
 use crate::players::CivId;
 use crate::technology::TechId;
@@ -68,8 +67,6 @@ const SECOND: f32 = WORLD_PLAYER_SECOND;
 const PERCENT: f32 = WORLD_PLAYER_PERCENT;
 /// A minute's seconds (`DAT_14330ebc8`): the trickles and the mills' food are rates a minute.
 const MINUTE: f32 = WORLD_PLAYER_MINUTE;
-/// The livestock food over which a mill's yield grows by one e-fold (`DAT_142eb0f54`).
-const LIVESTOCK_SCALE: f32 = WORLD_PLAYER_LIVESTOCK_SCALE;
 /// Until this world time (ms) the scout map takes only the explored tiles the player sees.
 const EARLY_SCOUTING_MS: WorldTime = WorldTime::from_millis(5000);
 

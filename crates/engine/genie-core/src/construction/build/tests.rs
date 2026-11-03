@@ -34,6 +34,8 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::attribute;
 use crate::testing::class;
+use crate::testing::tuning;
+use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::parts::Object;
@@ -175,7 +177,7 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
         trees,
     };
     let ids = |world: &Spatial, s: ClearingSite| -> Vec<ObjectId> {
-        footprint_clearing(world, &s, &look, &roles())
+        footprint_clearing(world, &s, &look, &roles(), &tuning().build)
             .unwrap()
             .iter()
             .map(|c| c.id)
@@ -237,15 +239,18 @@ fn the_clearing_reads_the_objects_on_its_tiles() {
         );
     }
     assert_eq!(
-        clearing_objects(&world, Point::new(10.5, 10.5)),
+        clearing_objects(&world, Point::new(10.5, 10.5), &tuning().build),
         [object_id(2), object_id(3), object_id(1), object_id(6)]
     );
     // at the map's corner the tiles start at 0 and end at its last
     assert_eq!(
-        clearing_objects(&world, Point::new(17.0, 2.0)),
+        clearing_objects(&world, Point::new(17.0, 2.0), &tuning().build),
         [object_id(1)]
     );
-    assert_eq!(clearing_objects(&world, Point::new(40.0, 40.0)), Vec::new());
+    assert_eq!(
+        clearing_objects(&world, Point::new(40.0, 40.0), &tuning().build),
+        Vec::new()
+    );
 }
 
 /// The record each cleared object loses in the clearing ([`Cleared::record_goes`]): with
@@ -319,7 +324,7 @@ fn cleared_object_loses_its_record_by_its_type_and_the_call() {
             at: Point::new(10.5, 10.5),
             trees,
         };
-        footprint_clearing(&world, &s, &look, &roles())
+        footprint_clearing(&world, &s, &look, &roles(), &tuning().build)
             .unwrap()
             .iter()
             .filter(|c| c.record_goes)
@@ -494,7 +499,7 @@ pub(crate) fn started_on(
         gap,
         state: Some(ObjectState::Foundation),
     };
-    BuildAction::start(to, task, &move_reads).unwrap()
+    BuildAction::start(to, task, &move_reads, &tuning().move_to).unwrap()
 }
 
 /// A Build's start (`0x140aadd80`, `set_state(4)`) takes the task's moving sprite for its
@@ -1183,7 +1188,10 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
         &mut world,
         &mut Pathing::default(),
         WorldTime::from_millis(8280),
-        &roles(),
+        SightLayer {
+            roles: &roles(),
+            visibility_tuning: tuning().visibility,
+        },
     );
     assert_eq!(started, Ok(true));
     assert_eq!(mover.last_move, WorldTime::from_millis(8281));

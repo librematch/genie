@@ -42,6 +42,7 @@ use crate::test_ids::master_id;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::UnitAi;
 use crate::world::FrameSeed;
@@ -432,10 +433,11 @@ fn far_member_turns_and_walks_to_its_slot() {
 fn near_member_catches_up_or_takes_the_group_speed() {
     let speed = 0.8f32;
     let cases = [
-        (4.0, speed * CATCH_UP, RUNNING, 0x200),
+        (4.0, speed * tuning().group.catch_up, RUNNING, 0x200),
         (
             1.5,
-            speed + ((speed * CATCH_UP - speed) * 1.5) / CATCH_UP_SPAN,
+            speed
+                + ((speed * tuning().group.catch_up - speed) * 1.5) / tuning().group.catch_up_span,
             RUNNING,
             0x200,
         ),

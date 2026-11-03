@@ -21,6 +21,7 @@ use crate::players::PlayerId;
 use crate::test_ids::object_id;
 use crate::testing::class;
 use crate::testing::ids;
+use crate::testing::tuning;
 use crate::vision::visibility::Visibility;
 use crate::world::WorldTime;
 use crate::world::index::TestObjects;
@@ -62,16 +63,31 @@ fn walk_meets_the_nearest_side_it_crosses() {
     let h = square();
     // the side from point 2 (low left) to point 3 (high left)
     assert_eq!(
-        h.intersection(false, Point::new(-1.0, 0.5), Point::new(2.0, 0.5)),
+        h.intersection(
+            false,
+            Point::new(-1.0, 0.5),
+            Point::new(2.0, 0.5),
+            &tuning().hull_path
+        ),
         Some((Point::new(0.0, 0.5), 3))
     );
     // the last side ends at point 0: it is side 0
     assert_eq!(
-        h.intersection(false, Point::new(0.5, 2.0), Point::new(0.5, 0.5)),
+        h.intersection(
+            false,
+            Point::new(0.5, 2.0),
+            Point::new(0.5, 0.5),
+            &tuning().hull_path
+        ),
         Some((Point::new(0.5, 1.0), 0))
     );
     assert_eq!(
-        h.intersection(false, Point::new(2.0, 2.0), Point::new(3.0, 2.0)),
+        h.intersection(
+            false,
+            Point::new(2.0, 2.0),
+            Point::new(3.0, 2.0),
+            &tuning().hull_path
+        ),
         None
     );
 }
@@ -100,16 +116,28 @@ fn the_gift_wrap_turns_clockwise_from_the_highest_point() {
 #[test]
 fn box_overlapping_hull_reports_its_corners_outside() {
     let h = square();
-    let (overlap, outside) = h.shape_overlap(Point::new(0.5, 0.5), Point::new(1.5, 1.5));
+    let (overlap, outside) = h.shape_overlap(
+        Point::new(0.5, 0.5),
+        Point::new(1.5, 1.5),
+        &tuning().hull_path,
+    );
     assert_eq!((overlap, outside), (2, [false, true, true, true]));
     assert_eq!(
-        h.shape_overlap(Point::new(0.25, 0.25), Point::new(0.75, 0.75))
-            .0,
+        h.shape_overlap(
+            Point::new(0.25, 0.25),
+            Point::new(0.75, 0.75),
+            &tuning().hull_path
+        )
+        .0,
         3
     );
     assert_eq!(
-        h.shape_overlap(Point::new(2.0, 2.0), Point::new(3.0, 3.0))
-            .0,
+        h.shape_overlap(
+            Point::new(2.0, 2.0),
+            Point::new(3.0, 3.0),
+            &tuning().hull_path
+        )
+        .0,
         0
     );
 }
@@ -1270,7 +1298,11 @@ fn tile_obstructions_and_its_building_go_into_the_hulls() {
         Vec::new(),
     );
     // a building of 2 × 2 tiles, 9..=10 each way, its anchor (10, 10)
-    let _ = v.link_building(Position::new(10.0, 10.0, 0.0), Footprint::new(1.0, 1.0));
+    let _ = v.link_building(
+        Position::new(10.0, 10.0, 0.0),
+        Footprint::new(1.0, 1.0),
+        tuning().visibility,
+    );
     assert_eq!(v.anchor_of(Tile::new(9, 9)), Some(Tile::new(10, 10)));
     w.sight = Some(v);
     w.insert(object_id(20), tall(10.0, 10.0, 1.0, class::PREDATOR)); // the building, on its anchor tile

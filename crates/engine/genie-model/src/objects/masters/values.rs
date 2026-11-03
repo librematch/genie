@@ -2,12 +2,11 @@
 //! the damage sprites' and train locations' entries.
 
 use crate::layer::Roles;
+use crate::layer::generated::MastersTuning;
 use crate::math::conversions::{cvttss2si, cvttss2si_64};
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, maxss};
 use crate::math::image::masters::{
-    HANDICAP_FLOOR as MASTERS_HANDICAP_FLOOR, MISSILE_SPEED_CAP as MASTERS_MISSILE_SPEED_CAP,
     PERCENT as MASTERS_PERCENT, ROUND as MASTERS_ROUND, SHORT_CAP as MASTERS_SHORT_CAP,
-    SPEED_CAP as MASTERS_SPEED_CAP,
 };
 use crate::objects::Graphics;
 use crate::objects::SpriteId;
@@ -24,12 +23,6 @@ use std::fmt::{Debug, Error, Formatter};
 pub(super) const SHORT_CAP: f32 = MASTERS_SHORT_CAP;
 /// 0.5 (`DAT_142e7f384`): a multiply's rounding.
 pub(super) const ROUND: f32 = MASTERS_ROUND;
-/// 4.5 (`DAT_142f52490`): the most speed a capped add or multiply leaves .
-pub(super) const SPEED_CAP: f32 = MASTERS_SPEED_CAP;
-/// 20.0 (`DAT_142e7f38c`): a missile master's .
-pub(super) const MISSILE_SPEED_CAP: f32 = MASTERS_MISSILE_SPEED_CAP;
-/// 1.0 (`DAT_14330eb8c`): a handicap above it raises an attack class at 0 .
-pub(super) const HANDICAP_FLOOR: f32 = MASTERS_HANDICAP_FLOOR;
 /// 100.0 (`DAT_14330ebcc`): a multiply's armor or attack amount is a percentage (an image role to
 /// add: `masters::PERCENT`).
 pub(super) const PERCENT: f32 = MASTERS_PERCENT;
@@ -55,6 +48,9 @@ pub struct AttributeWorld<'a> {
     pub capped: bool,
     /// The build layer's roles: the storages the population attribute sets (FD-046-D48).
     pub roles: &'a Roles,
+    /// The build layer's tuning values of the masters: the speed caps, the handicap's floor
+    /// (FD-046-D49).
+    pub masters_tuning: &'a MastersTuning,
 }
 
 /// The sprite table shows as its absence of a name.
@@ -133,11 +129,15 @@ pub(super) fn class_amount(v: f32) -> ClassAmount {
     }
 }
 
-/// The handicap raises an attack class (`FUN_1410c12b0`): a factor above 1 (`COMISS`, `JBE`: a
-/// NaN does not) for a class above 0x21 (an unsigned compare) or not one of [`UNHANDICAPPED`].
-pub(super) fn handicapped(handicap: Option<f32>, class: DamageClass) -> Option<f32> {
+/// The handicap raises an attack class (`FUN_1410c12b0`): a factor above
+/// `MastersTuning::handicap_floor` (`COMISS`, `JBE`: a NaN does not) for a class above 0x21 (an unsigned compare) or not one of [`UNHANDICAPPED`].
+pub(super) fn handicapped(
+    handicap: Option<f32>,
+    class: DamageClass,
+    masters_tuning: &MastersTuning,
+) -> Option<f32> {
     let f = handicap?;
-    let raised = !at_most_or_unordered(f, HANDICAP_FLOOR)
+    let raised = !at_most_or_unordered(f, masters_tuning.handicap_floor)
         && (0x21 < class.get() as u16 || UNHANDICAPPED >> (class.get() as u16 & 0x3f) & 1 == 0);
     raised.then_some(f)
 }

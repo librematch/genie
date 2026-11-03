@@ -9,7 +9,7 @@ use crate::groups::SlotState;
 use crate::groups::SpecificMove;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone};
 use crate::groups::motion::hold;
-use crate::groups::steer::{ASIDE_TIMER, CLEARANCE, EPSILON, KEEPS_MOVING, MOST_FAILURES, MOVE_TO};
+use crate::groups::steer::{EPSILON, KEEPS_MOVING, MOST_FAILURES, MOVE_TO};
 use crate::map::Distance;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{BVector, below_or_unordered};
@@ -39,7 +39,7 @@ impl World {
     /// Then each member (its count read anew each turn) the world holds: one in a slot of the
     /// formation (by its unit's id, the first) whose own move is active (1) is tested on the line
     /// from where it last moved to (slot 0x520) to the slot's place (`FUN_1411570c0`: the records
-    /// grown by its radius times [`CLEARANCE`], the members ignored, its terrain mask's tiles
+    /// grown by its radius times `GroupTuning::clearance`, the members ignored, its terrain mask's tiles
     /// added): with none in the way it stands (slot 0x560) and its own move ends (the move
     /// zeroed, its path and reason -1); else the move's timer runs down by the update's seconds
     /// (`FUN_1415300e0`), and with the timer and the move's distance both above 0 (`COMISS`
@@ -90,7 +90,13 @@ impl World {
                     .transform_position;
                 let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
                 let from = u.moved_vector(self.parts.mover_of(u.id));
-                let clear = self.line_clear(m.id, from, to, CLEARANCE, &members)?;
+                let clear = self.line_clear(
+                    m.id,
+                    from,
+                    to,
+                    Distance::new(self.model.tuning.group.clearance),
+                    &members,
+                )?;
                 let dt = self.dt_seconds;
                 let g = self.groups.held_mut(group)?;
                 let own = &mut g.members.checked_mut(index)?.specific_move;
@@ -200,8 +206,8 @@ impl World {
         // FUN_1411570c0 sets the manager's ignore list to it (FUN_1410562e0)
         let map = self.spatial.map;
         let hits = self.spatial.line_query(
-            hold(from, map),
-            hold(to, map),
+            hold(from, map, &self.model.tuning.group),
+            hold(to, map, &self.model.tuning.group),
             grow * radius,
             Some(mask),
             &ignore,
@@ -218,7 +224,7 @@ impl World {
     /// - In place (the gap at most 1e-7, `COMISS` with `JC`: not a NaN) and in slot state 3:
     ///   the member's failures (`+0x1c` of its own move) clear, and the end.
     /// - More than 10 failures: the member's own move becomes a move aside
-    ///   ([`World::set_specific_move`], reason 2, its place, [`ASIDE_TIMER`]), it stops (slot
+    ///   ([`World::set_specific_move`], reason 2, its place, `GroupTuning::aside_timer`), it stops (slot
     ///   0x5d0) and the group takes [`GroupFlags::CATCHING_UP`]; the end without the goal.
     /// - A member that is not free ([`World::member_idle`]) stops as one in no slot does, its
     ///   failures clear and a slot in state 1 or 2 takes state 3; the end without the goal. A
@@ -234,7 +240,7 @@ impl World {
     ///   member shows its standing sprite (slot 0x660, [`World::show_standing`]), faces the
     ///   group's forward again when it was put, its failures clear, and the end without the
     ///   goal.
-    /// - Then the line to the slot ([`World::line_clear`] with [`CLEARANCE`], the update's list
+    /// - Then the line to the slot ([`World::line_clear`] with `GroupTuning::clearance`, the update's list
     ///   ignored): one that meets a record is the way round ([`World::way_round`]). A clear line
     ///   steers the unit: the direction to the slot (slot 0x610), the turn from its forward (slot
     ///   0x618 with dt, [`crate::movement::Mover::turn_dt`]) and the yaw (slot 0x5c0), where its
@@ -312,7 +318,7 @@ impl World {
                 group,
                 id,
                 (MovePath::NONE, MoveReason::ASIDE),
-                (at, ASIDE_TIMER, 0.0),
+                (at, self.model.tuning.group.aside_timer, 0.0),
             )?;
             self.stop_member(id)?;
             self.groups.held_mut(group)?.flags |= GroupFlags::CATCHING_UP;
@@ -341,7 +347,13 @@ impl World {
             return Ok(());
         };
         let from = u.moved_vector(self.parts.mover_of(u.id));
-        if !self.line_clear(id, from, to, CLEARANCE, differentiators)? {
+        if !self.line_clear(
+            id,
+            from,
+            to,
+            Distance::new(self.model.tuning.group.clearance),
+            differentiators,
+        )? {
             return self.way_round(group, index, slot, Distance::new(gap), differentiators);
         }
         self.steer_member(group, slot, id, Distance::new(gap))?;

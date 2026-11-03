@@ -36,6 +36,7 @@ use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::layer::generated::TilePathTuning;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath, pathing::short_path};
 
@@ -469,6 +470,7 @@ impl Mover {
         plan: &mut Planning<'_>,
         to: Point,
         radii: Distance,
+        tile_path_tuning: &TilePathTuning,
     ) -> Result<Option<(Found, Distance)>, GenieError> {
         let full = !plan.player_type.is_computer();
         let Some(planner) = plan.pathing.planner(self.stats.restriction, world.tiles()) else {
@@ -483,7 +485,7 @@ impl Mover {
             full,
         };
         let mut path = Path::default();
-        let found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
+        let found = planner.plan::<GenieError>(&req, false, &mut path, None, tile_path_tuning)?;
         path.measure();
         Ok(Some((found, path.length)))
     }

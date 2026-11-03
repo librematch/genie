@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::attack::AttackState;
+use crate::combat::attack::BeginLayer;
 use crate::gathering::DropSiteId;
 use crate::gathering::gather::Walks;
 use crate::map::Footprint;
@@ -48,6 +49,7 @@ use crate::objects::layers::{Animated, Motion, Static};
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
 use crate::test_ids::task_id;
+use crate::testing::model;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::tuning;
@@ -108,9 +110,15 @@ fn hunt_move_to_refuses_target_past_state_6() {
             gap: Distance::ZERO,
             state: Some(state),
         };
-        h.move_to_object(to, Distance::new(1.0), &mover, &walks(Held::default()))
-            .unwrap()
-            .map(|m| (ObjectId::field(m.target), m.point, m.state))
+        h.move_to_object(
+            to,
+            Distance::new(1.0),
+            &mover,
+            &walks(Held::default()),
+            &tuning().move_to,
+        )
+        .unwrap()
+        .map(|m| (ObjectId::field(m.target), m.point, m.state))
     };
     assert_eq!(
         walk(ObjectState::Undead),
@@ -372,8 +380,12 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
         &engagement(),
         ARMS,
         &mut mover,
-        &roles(),
-        &tuning().attack,
+        BeginLayer {
+            roles: &roles(),
+            attack_tuning: &tuning().attack,
+            move_to_tuning: &tuning().move_to,
+        },
+        &tuning().hunt,
     )
     .unwrap();
     assert_eq!(hunt.state.bare(), HuntState::Attack { attack: None });
@@ -418,8 +430,12 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         &engagement(),
         ARMS,
         &mut mover,
-        &roles(),
-        &tuning().attack,
+        BeginLayer {
+            roles: &roles(),
+            attack_tuning: &tuning().attack,
+            move_to_tuning: &tuning().move_to,
+        },
+        &tuning().hunt,
     )
     .unwrap();
     let retarget = |hunt: &mut HuntAction, q: &Quarry, e: &Engagement, m: &mut Mover| {
@@ -433,8 +449,12 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             e,
             ARMS,
             m,
-            &roles(),
-            &tuning().attack,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
         )
         .unwrap()
     };
@@ -492,8 +512,12 @@ fn hunt_new_target_clears_its_lead() {
         &engagement(),
         ARMS,
         &mut mover,
-        &roles(),
-        &tuning().attack,
+        BeginLayer {
+            roles: &roles(),
+            attack_tuning: &tuning().attack,
+            move_to_tuning: &tuning().move_to,
+        },
+        &tuning().hunt,
     )
     .unwrap();
     let led = Lead {
@@ -519,8 +543,12 @@ fn hunt_new_target_clears_its_lead() {
             &engagement(),
             ARMS,
             &mut mover,
-            &roles(),
-            &tuning().attack,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
         )
         .unwrap();
     assert_eq!(hunt.lead, led);
@@ -535,8 +563,12 @@ fn hunt_new_target_clears_its_lead() {
             &engagement(),
             ARMS,
             &mut mover,
-            &roles(),
-            &tuning().attack,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
         )
         .unwrap();
     assert_eq!(
@@ -562,8 +594,12 @@ fn hunter_keeps_another_food_it_carries_and_drops_the_rest_by_the_settings() {
             &engagement(),
             ARMS,
             &mut walker(),
-            &roles(),
-            &tuning().attack,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
         )
         .unwrap();
         held
@@ -692,8 +728,12 @@ fn hunt_on_live_ally_fails() {
         &engagement(),
         ARMS,
         &mut walker(),
-        &roles(),
-        &tuning().attack,
+        BeginLayer {
+            roles: &roles(),
+            attack_tuning: &tuning().attack,
+            move_to_tuning: &tuning().move_to,
+        },
+        &tuning().hunt,
     )
     .expect("a hunt");
     assert_eq!(
@@ -735,8 +775,12 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
             &engagement(),
             ARMS,
             &mut walker(),
-            &roles(),
-            &tuning().attack,
+            BeginLayer {
+                roles: &roles(),
+                attack_tuning: &tuning().attack,
+                move_to_tuning: &tuning().move_to,
+            },
+            &tuning().hunt,
         )
         .unwrap();
         // a quiet MoveTo to the target that asks again when it moves (`+0x61` 1)
@@ -1152,7 +1196,7 @@ fn hunter_walks_pass_on_the_units_in_their_way() {
 
 /// `set_state(4)` (`0x140ac60e0` case 4) toward house 10028 from 9177: a dead target is
 /// walked to within the task's range, the hunter's own live livestock within
-/// `OWN_LIVESTOCK_RANGE`, the point the target's place; a target the hunter touches already
+/// `HuntTuning::own_livestock_range`, the point the target's place; a target the hunter touches already
 /// starts arrived. Another live target is not modelled; a unit without speed fails it at its start.
 #[test]
 fn hunt_walks_to_its_target_place_within_its_range() {
@@ -1170,7 +1214,7 @@ fn hunt_walks_to_its_target_place_within_its_range() {
             victim,
             PlayerId::new(1),
             &walks(Held::default()),
-            &roles(),
+            model(),
         )
     };
     let walk = |h: &HuntAction| {
@@ -1209,7 +1253,7 @@ fn hunt_walks_to_its_target_place_within_its_range() {
     assert_eq!(set_walk(&mut h, &mut rig, &own), Ok(()));
     assert_eq!(
         walk(&h).map(|w| w.1),
-        Some(Distance::new(OWN_LIVESTOCK_RANGE))
+        Some(Distance::new(tuning().hunt.own_livestock_range))
     );
     let mut h = hunting(9177);
     assert_eq!(set_walk(&mut h, &mut rig, &dead), Ok(()));
@@ -1349,7 +1393,10 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
         ),
         (
             HuntState::Walk { move_to: None },
-            Some((MoveTo::Start, Distance::new(OWN_LIVESTOCK_RANGE)))
+            Some((
+                MoveTo::Start,
+                Distance::new(tuning().hunt.own_livestock_range)
+            ))
         )
     );
 }
@@ -1562,7 +1609,7 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         (h.state.bare(), h.state.move_to().copied().map(|m| m.range)),
         (
             HuntState::Walk { move_to: None },
-            Some(Distance::new(OWN_LIVESTOCK_RANGE))
+            Some(Distance::new(tuning().hunt.own_livestock_range))
         )
     );
     let mut h = fresh(-1);
@@ -1626,7 +1673,7 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
 /// animal that stands is sent first, which the world test
 /// `hunter_sheep_walks_before_the_hunter_update_ends` shows), and once led it is led on
 /// however far; a nearer or a farther one is slaughtered (`set_state(12)`). A dead animal out
-/// of the task's range plus `GAP` is walked to (`set_state(4)`); one at hand is faced. A live
+/// of the task's range plus `HuntTuning::gap` is walked to (`set_state(4)`); one at hand is faced. A live
 /// one unprepared is not modelled.
 #[test]
 fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
@@ -2049,6 +2096,7 @@ fn dying_hunter_makes_no_move_to() {
         |move_to| HuntState::WalkSearch { move_to },
         &mut mover,
         &dying,
+        &tuning().move_to,
     )
     .unwrap();
     assert_eq!(
@@ -2059,6 +2107,7 @@ fn dying_hunter_makes_no_move_to() {
         |move_to| HuntState::WalkSearch { move_to },
         &mut mover,
         &walks(Held::default()),
+        &tuning().move_to,
     )
     .unwrap();
     assert_eq!(

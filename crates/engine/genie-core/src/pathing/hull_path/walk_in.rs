@@ -4,8 +4,8 @@ use crate::GenieError;
 use crate::map::Rect;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
-    ENTRANCE_STEP, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS,
-    Point, SIDES, Target, WalkResult, Waypoints, Within,
+    HULL_ITERATIONS, HullIndex, HullPather, NUDGE, NodeIndex, NodeList, PATHS, Point, SIDES,
+    Target, WalkResult, Waypoints, Within,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -113,6 +113,7 @@ impl HullPather<'_> {
         (from, to): (Point, Point),
         target: Option<Target>,
     ) -> Result<(Option<usize>, bool), GenieError> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let root = self.add_unrefused(UnrefusedNode {
             list: NodeList::WALKS,
             open: true,
@@ -146,7 +147,7 @@ impl HullPather<'_> {
                 )
             }
         };
-        made |= self.side_points(hull, root, bounds, to, ENTRANCE_STEP, None)?;
+        made |= self.side_points(hull, root, bounds, to, hull_path_tuning.entrance_step, None)?;
         Ok((inside, !made))
     }
 

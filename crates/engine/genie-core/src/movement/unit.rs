@@ -85,6 +85,7 @@ impl Unit {
                     at,
                     (&mut c.w.spatial, Some(&mut c.w.pathing)),
                     roles,
+                    c.w.model.tuning.visibility,
                 )?;
             }
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)
@@ -192,6 +193,7 @@ impl Unit {
                 &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
             ),
+            c.w.model.tuning.sprite,
         )
     }
 
@@ -243,6 +245,7 @@ impl Unit {
                         c.w.parts.unit_ai.get_mut(self.id),
                         self.place.position().ground(),
                         p,
+                        &c.w.model.tuning.unit_ai,
                     ),
                     _ => PathAsk::default(),
                 };

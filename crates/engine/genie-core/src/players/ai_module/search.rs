@@ -20,7 +20,6 @@ use crate::map::Tile;
 use crate::math::conversions::cvttss2si;
 use crate::math::fmath::{cos, sin};
 use crate::math::image::facing::QUARTER_PI;
-use crate::math::image::group::CATCH_UP_SPAN;
 use crate::math::rng::Well512;
 use crate::movement::explore::Area;
 use crate::objects::ObjectId;
@@ -37,10 +36,6 @@ pub const DEAD_END: u8 = 2;
 
 /// A tile in the map that the path map does not hold (the game reads what follows it).
 const OFF_THE_GRID: GenieError = GenieError::unreachable("a tile the AI's path map does not hold");
-
-/// The spacing of the points of a ring: the unit's line of sight and this (`DAT_142eb1c98`, the
-/// constant the group port's catch-up span also reads).
-pub const RING_SLACK: Distance = Distance::new(CATCH_UP_SPAN);
 
 /// What the search asks of the world beyond [`Area`].
 pub trait SearchArea: Area {

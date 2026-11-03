@@ -28,12 +28,13 @@ use crate::objects::layers::Static;
 use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
 use crate::players::PlayerType;
-use crate::production::spawn::START_RIGHT_Z;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::MovementTuning;
+use crate::world::layer::generated::SpawnTuning;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::{GenieError, math::fmath};
 
 mod ends;
@@ -191,13 +192,14 @@ impl Mover {
         now: WorldTime,
         angle: Angle,
         sprite_facets: Option<SpriteFacets>,
+        spawn_tuning: &SpawnTuning,
     ) -> Self {
         stats.show(shown);
         Self {
             // the animated object's constructor (FUN_141070cf0): animation speed (+0x7b8) 0
             animated: Animated::new(Speed::ZERO),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, START_RIGHT_Z),
+            right: BVector::new(0.0, 0.0, spawn_tuning.start_right_z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
@@ -254,8 +256,9 @@ impl Mover {
         at: Position,
         places: (&mut Spatial, Option<&mut Pathing>),
         roles: &Roles,
+        visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
-        place.new_position(id, at, self.is_moving(), places, roles)
+        place.new_position(id, at, self.is_moving(), places, roles, visibility_tuning)
     }
 
     /// The position setter (slot 11 -> `FUN_141161950` -> `0x1411a58b0`): a unit that can move

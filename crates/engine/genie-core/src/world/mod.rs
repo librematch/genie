@@ -39,7 +39,6 @@ pub(crate) mod unread;
 pub(crate) mod whole;
 
 use crate::GenieError;
-use crate::map::Distance;
 use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::math::rng::Streams;
@@ -85,14 +84,9 @@ pub use self::options::{
 pub use self::play_state::PlayState;
 pub use self::tick::Tick;
 pub use self::unread::Unread;
-use crate::combat::Firepower;
 use crate::groups::UnitGroups;
-use crate::math::image::hunt::TREE_NEAR as HUNT_TREE_NEAR;
 use crate::math::image::turn::{
-    ARMED_FIREPOWER as TURN_ARMED_FIREPOWER, EJECT_SHARE as TURN_EJECT_SHARE,
-    GATE_EPSILON as TURN_GATE_EPSILON, GATE_GROW as TURN_GATE_GROW,
-    GATE_SHUT_HEIGHT as TURN_GATE_SHUT_HEIGHT, SPEED_EPSILON as TURN_SPEED_EPSILON,
-    TREE_SEARCH_WITHIN as TURN_TREE_SEARCH_WITHIN,
+    GATE_EPSILON as TURN_GATE_EPSILON, SPEED_EPSILON as TURN_SPEED_EPSILON,
 };
 use crate::objects::RelicCount;
 use crate::pathing::zones::Zones;
@@ -162,11 +156,6 @@ pub(crate) const ATTACKER_MASTER: GenieError =
 /// A gate's height (its master's `radius_z`) above this shuts it (`DAT_142eb0c60`); a unit
 /// slower than it counts in a gate only when it is a player's.
 pub(crate) const GATE_EPSILON: f32 = TURN_GATE_EPSILON;
-/// A gate's query grows its records and its own box by this (`FUN_1410562d0` with
-/// `DAT_142eb3630`).
-pub(crate) const GATE_GROW: Distance = Distance::new(TURN_GATE_GROW);
-/// The least height of a shut gate its player opens (`FUN_14162f7e0`, `DAT_14330eb8c`).
-pub(crate) const GATE_SHUT_HEIGHT: f32 = TURN_GATE_SHUT_HEIGHT;
 /// The seconds an open gate with nothing in it waits before it shuts (`FUN_1411e7730`'s
 /// immediate `0x3f000000`).
 pub(crate) const GATE_CLOSE_DELAY: Seconds = Seconds::new(0.5);
@@ -199,8 +188,6 @@ pub(crate) struct BuildingDeath {
 /// The attribute naming a building master that changes the terrain around its buildings
 /// (`FUN_1411c39b0`, the player's attribute 255).
 pub(crate) const BUILDING_TERRAIN: usize = 255;
-/// A building at most this share of its hit points lets its garrison out (`DAT_142eae8d0`).
-pub(crate) const EJECT_SHARE: f32 = TURN_EJECT_SHARE;
 
 /// A building's queue holds at most 15 units (`FUN_1411cbc40`).
 pub(crate) const QUEUE_LIMIT: usize = 15;
@@ -209,16 +196,8 @@ pub(crate) const COMPUTER_QUEUE_LIMIT: usize = 2;
 /// The Hunt's search timer: it tells its unit AI again every 10 seconds (`0xc1200000`, in
 /// `0x140ac60e0` and `0x140ac7a00`).
 pub(crate) const SEARCH_AGAIN: Seconds = Seconds::new(-10.0);
-/// `FUN_140ac4670`'s first argument when a hunt's target went on the walk to it, or its `MoveTo`
-/// failed (`DAT_142eb9430`): the hunt searches within this of its point.
-pub(crate) const TREE_SEARCH_WITHIN: Distance = Distance::new(TURN_TREE_SEARCH_WITHIN);
-/// `FUN_140ac4670`'s second argument when a hunt's Attack failed (`DAT_14330ebb8`): the tree
-/// found counts within this of the unit.
-pub(crate) const TREE_NEAR: Distance = Distance::new(HUNT_TREE_NEAR);
 /// A velocity longer than this sets the animation speed (`DAT_142eb0c60`).
 pub(crate) const SPEED_EPSILON: f32 = TURN_SPEED_EPSILON;
-/// A building attacks with a firepower above this (`FUN_14120ea30`).
-pub(crate) const ARMED_FIREPOWER: Firepower = Firepower::new(TURN_ARMED_FIREPOWER);
 
 /// A queued villager's master: male when the 64-bit Action draw times 100 (wrapping) is below 50
 /// modulo 100 (`FUN_1411cbc40`: the build's `villager_male`, 0x53, else its `villager_female`,

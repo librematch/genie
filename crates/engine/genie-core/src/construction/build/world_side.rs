@@ -10,7 +10,6 @@ use crate::construction::build::{Completion, Construction, StackUnit};
 use crate::gathering::PastureId;
 use crate::map::Position;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
-use crate::math::image::build::STACK_WORK as BUILD_STACK_WORK;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::lifecycle::death_parts::{
@@ -27,6 +26,7 @@ use crate::players::PlayerId;
 use crate::production::spawn::Facing;
 use crate::unit_ai::QueuedOrder;
 use crate::unit_ai::unit_ai_type;
+use crate::vision::SightLayer;
 use crate::world::Seconds;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
@@ -135,7 +135,10 @@ impl World {
             &mut self.spatial,
             &mut self.pathing,
             now,
-            &self.model.roles,
+            SightLayer {
+                roles: &self.model.roles,
+                visibility_tuning: self.model.tuning.visibility,
+            },
         )? {
             self.parts.combat_mut(u.id)?.firepower = volley;
             self.watch_started(owner, id)?;
@@ -143,10 +146,6 @@ impl World {
         Ok(())
     }
 }
-
-/// The seconds of work a new object's building gets at once from its owner's slot 0x1c0 with its
-/// flag (`FUN_14162ce00`'s `FUN_1411cc430` with `DAT_142eea788`).
-pub(crate) const STACK_WORK: Seconds = Seconds::new(BUILD_STACK_WORK);
 
 /// The guard of an object the routines here reach through the object itself (their callers
 /// hold it): the slice's lists hold every object the world does.
@@ -443,7 +442,10 @@ impl World {
         if flagged {
             self.clear_footprint(p, master, at.ground(), true)?;
             // the building made on a flagged stack is the foundation its work builds
-            let _ = self.work_building(FoundationId::new(id), STACK_WORK)?;
+            let _ = self.work_building(
+                FoundationId::new(id),
+                Seconds::new(self.model.tuning.build.stack_work),
+            )?;
         }
         if made.auto_gather {
             if self.players.player(p)?.objects.last().map(|u| u.id) != Some(id) {

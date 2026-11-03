@@ -26,6 +26,8 @@ use crate::unit_ai::UnitAi;
 use crate::unit_ai::UnitStance;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
 use crate::world::{ATTACKER_UNMOVING, NO_STANDING_SPRITE};
 
@@ -37,9 +39,16 @@ impl Attack {
         unit: &mut Unit,
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         let g = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
-        new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, sprite_rng);
+        new_sprite(
+            &mut unit.sprite,
+            motion.move_stats_mut(),
+            g,
+            sprite_rng,
+            sprite_tuning,
+        );
         set_walker_anim(motion, Speed::new(0.0));
         Ok(())
     }
@@ -61,12 +70,13 @@ impl Attack {
         e: &Engagement,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<bool, GenieError> {
         if self.state.take_move_to().is_some() {
             mover.stop()?;
         }
         self.state = AttackState::Move { move_to: None };
-        self.moving(e.range, e.target_position, e.gap, reads)
+        self.moving(e.range, e.target_position, e.gap, reads, move_to_tuning)
     }
 
     /// `set_state(4)`'s own part: the range (slot 0x238's), the timer, the `MoveTo` to the target
@@ -82,9 +92,10 @@ impl Attack {
         at: Position,
         gap: Distance,
         reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<bool, GenieError> {
         self.range = range;
-        self.walk_to_target(at, gap, reads)
+        self.walk_to_target(at, gap, reads, move_to_tuning)
     }
 
     /// The teardown of the sub-actions (`FUN_140a73fc0` on the action list): a `MoveTo` stops the
@@ -170,6 +181,7 @@ impl Attack {
                     f,
                     r,
                     &c.w.model.graphics,
+                    &c.w.model.tuning.move_to,
                 )?;
                 return Ok(UpdateCode::CODE_5);
             }
@@ -189,6 +201,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::CODE_5)
     }
@@ -214,6 +227,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         // The predators' class (10), whose unit AI's slot 0x1f0 a failed Attack calls.
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
@@ -259,10 +273,11 @@ impl Attack {
         unit: &mut Unit,
         motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         // The states the slice models: 1 done, 2 the target died, 4 on the way, 6 waiting to swing, 7
         // swinging, 13 failed.
-        self.finish_in(AttackState::Done, unit, motion, sprite_rng)
+        self.finish_in(AttackState::Done, unit, motion, sprite_rng, sprite_tuning)
     }
 
     /// Slot 0x38 (`FUN_140a82ac0`) as the unit's stop calls it: `set_state(1)` (the
@@ -278,6 +293,7 @@ impl Attack {
         mut motion: MotionMut<'_>,
         sprite: &mut Option<ActiveSprite>,
         rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         if self.state.take_move_to().is_some() {
             motion.mover_mut().ok_or(ATTACKER_UNMOVING)?.stop()?;
@@ -287,7 +303,7 @@ impl Attack {
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(())
     }
 
@@ -298,13 +314,20 @@ impl Attack {
         unit: &mut Unit,
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         self.enter(state, motion.reborrow())?;
         set_walker_anim(motion.reborrow(), Speed::new(1.0));
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(&mut unit.sprite, motion.move_stats_mut(), idle, sprite_rng);
+        new_sprite(
+            &mut unit.sprite,
+            motion.move_stats_mut(),
+            idle,
+            sprite_rng,
+            sprite_tuning,
+        );
         Ok(())
     }
 }

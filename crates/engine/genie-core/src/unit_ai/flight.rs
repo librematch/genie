@@ -17,10 +17,9 @@ use crate::unit_ai::NotifyKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    AiMove, BREAK, DEAD, EVADE_EDGE, EVASIVE_NEAR, Effect, FOUNDATION_REACH, GO_ON, Memory, Notify,
-    Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_LEASH, RUN_ONE, RUN_REACH, SIEGE_AI, Search,
-    Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner, closest_undiscovered_tile,
-    search_area,
+    AiMove, BREAK, DEAD, Effect, GO_ON, Memory, Notify, Pick, RUN_DRAW_SCALE, RUN_EPSILON, RUN_ONE,
+    SIEGE_AI, Search, Surroundings, UnitAi, UnitSide, VILLAGER_NOTIFY, alert_owner,
+    closest_undiscovered_tile, search_area,
 };
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
@@ -78,6 +77,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // the siege unit's slot 0x160 (FUN_140c2a8f0): with a top action's target or of class 54
         // it does not run; a computer player's first lets the units inside it go
@@ -133,7 +133,7 @@ impl UnitAi {
                 "a computer's transport ship running away",
             ));
         }
-        let reach = (at.speed * RUN_REACH).get();
+        let reach = (at.speed * unit_ai_tuning.run_reach).get();
         let mut d = sqrt(vy * vy + vx * vx);
         if d < RUN_EPSILON {
             let r = ai.rand15() as i32 as f32;
@@ -147,9 +147,9 @@ impl UnitAi {
         if at.player != PlayerId::GAIA && self.stance == UnitStance::DEFENSIVE {
             let gx = self.state_position.x() - ex;
             let gy = self.state_position.y() - ey;
-            if RUN_LEASH < sqrt(gy * gy + gx * gx) {
-                ex = self.state_position.x() - (vx / d) * RUN_LEASH;
-                ey = self.state_position.y() - (vy / d) * RUN_LEASH;
+            if unit_ai_tuning.run_leash < sqrt(gy * gy + gx * gx) {
+                ex = self.state_position.x() - (vx / d) * unit_ai_tuning.run_leash;
+                ey = self.state_position.y() - (vy / d) * unit_ai_tuning.run_leash;
             }
         }
         self.evasive_move(Position::new(ex, ey, z), (true, true), at, ai, side)
@@ -171,13 +171,14 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         if !uncon && self.current_action.is_some() {
             return Ok(false);
         }
         let near = |p: f32, own: f32| {
             if !p.is_nan() {
                 p
-            } else if at_most_or_unordered(own, EVASIVE_NEAR) {
+            } else if at_most_or_unordered(own, unit_ai_tuning.evasive_near) {
                 // COMISS own, 5.0; JBE
                 own + RUN_ONE
             } else {
@@ -188,7 +189,7 @@ impl UnitAi {
             if v < 0.0 {
                 0.0
             } else if size as f32 <= v {
-                size as f32 - EVADE_EDGE
+                size as f32 - unit_ai_tuning.evade_edge
             } else {
                 v
             }
@@ -292,6 +293,7 @@ impl UnitAi {
         player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         if side.seen_unit(attacker)?.is_none() {
             return Ok(());
         }
@@ -304,7 +306,7 @@ impl UnitAi {
             pick: Pick::Look,
             memory: Memory::default(),
         })?;
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         side.call_for_help(attacker)
     }
 
@@ -356,6 +358,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         match self.current_action {
             Some(AiAction::Hunt) => {
                 return self.hunter_search(n, at, player_type, side, rng);
@@ -368,7 +371,7 @@ impl UnitAi {
             }
             Some(AiAction::Build) => {
                 if let Some(found) = side.foundation_search()?
-                    && side.reaches(found, FOUNDATION_REACH)?
+                    && side.reaches(found, Distance::new(unit_ai_tuning.foundation_reach))?
                 {
                     let _ = self.build_object(FoundationId::new(found), true, at, side, rng)?;
                     return Ok(BREAK);

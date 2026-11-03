@@ -53,6 +53,7 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
 use crate::testing::static_roles;
+use crate::testing::tuning;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::unit_ai_type;
@@ -185,6 +186,7 @@ fn world(capped: bool) -> AttributeWorld<'static> {
         handicap: None,
         capped,
         roles: static_roles(),
+        masters_tuning: &tuning().masters,
     }
 }
 

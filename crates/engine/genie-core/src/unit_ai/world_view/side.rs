@@ -18,7 +18,6 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::map::spatial::{Placed, SearchQuery, Spatial};
-use crate::math::image::unit_ai::HELP_REACH as UNIT_AI_HELP_REACH;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::WaypointIndex;
 use crate::movement::explore::{
@@ -75,6 +74,7 @@ impl UnitSide for UnitView<'_, '_> {
             ),
             (at, self.unit.life.attribute_type, class),
             look,
+            &self.c.w.model.tuning.order,
         ))
     }
 
@@ -129,8 +129,6 @@ impl UnitSide for UnitView<'_, '_> {
         /// The classes that never help: 1 to 3, 18 to 21, 27 and 39.
         const NO_HELP_CLASSES: ClassMask = ClassMask::new(0x0080_083c_000e, 0x28);
 
-        /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
-        const HELP_REACH: DistanceSquared = DistanceSquared::new(UNIT_AI_HELP_REACH);
         let roles = &self.c.w.model.roles.clone();
         let lists = self.c.w.spatial.searched().ok_or(GenieError::unsupported(
             "a search that reads the registry's last answer (before any query)",
@@ -174,7 +172,7 @@ impl UnitSide for UnitView<'_, '_> {
             }
             let gap =
                 footprint_gap_squared(self.unit.position(), my_radius, u.position(), m.radius);
-            if HELP_REACH < gap {
+            if DistanceSquared::new(self.c.w.model.tuning.unit_ai.help_reach) < gap {
                 continue;
             }
             if !self.helper_free(
@@ -199,13 +197,18 @@ impl UnitSide for UnitView<'_, '_> {
             other,
             roles,
             &self.c.w.model.tuning.damage,
+            &self.c.w.model.tuning.unit_ai,
         )
     }
 
     fn harmless(&mut self, attacker: ObjectId) -> Result<bool, GenieError> {
         let roles = &self.c.w.model.roles.clone();
-        self.picker(None)?
-            .harmless(&self.c.w.spatial, attacker, roles)
+        self.picker(None)?.harmless(
+            &self.c.w.spatial,
+            attacker,
+            roles,
+            &self.c.w.model.tuning.unit_ai,
+        )
     }
 
     fn defended_attacker(&mut self, target: ObjectId) -> Result<NearestAttacker, GenieError> {
@@ -430,6 +433,8 @@ impl UnitSide for UnitView<'_, '_> {
             },
             roles,
             &self.c.w.model.tuning.best_target,
+            &self.c.w.model.tuning.spatial,
+            self.c.w.model.tuning.registry,
         )
     }
 

@@ -19,9 +19,7 @@ use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
 use crate::garrison::transport::Around;
-use crate::math::image::garrison::{
-    NO_POINT as GARRISON_NO_POINT, UNLOAD_RANGE as GARRISON_UNLOAD_RANGE,
-};
+use crate::math::image::garrison::NO_POINT as GARRISON_NO_POINT;
 use crate::objects::unit::Unit;
 use crate::orders::set_stance;
 use crate::players::PlayerId;
@@ -36,8 +34,6 @@ use crate::world::layer::Roles;
 
 /// UNLOAD's point without one (`DAT_14330ec20`).
 pub(super) const NO_POINT: f32 = GARRISON_NO_POINT;
-/// UNLOAD's order range (`DAT_14330eb8c`).
-pub(super) const UNLOAD_RANGE: Distance = Distance::new(GARRISON_UNLOAD_RANGE);
 
 impl World {
     /// UNLOAD (`FUN_14161f410`) by player `player` of the objects `ids` its check keeps
@@ -300,7 +296,7 @@ impl World {
     /// clear, [`crate::unit_ai::UnitAi::take_order_now_with`], run outside the unit's update):
     /// issued by the owner, on the unit itself with its master as the target type and the owner
     /// as the target's, at the point (the unit's own place for (−1, −1) unless its master's class
-    /// is 3), height 0, within [`UNLOAD_RANGE`], priority 100, ready (slot 0x30's last argument,
+    /// is 3), height 0, within `GarrisonTuning::unload_range`, priority 100, ready (slot 0x30's last argument,
     /// 1); slot 0x30 shows the order at its x and y.
     pub(super) fn unload_order(
         &mut self,
@@ -335,7 +331,7 @@ impl World {
             target: Some(id),
             target_owner: Some(player),
             point: to.with_height(0.0),
-            range: UNLOAD_RANGE,
+            range: Distance::new(self.model.tuning.garrison.unload_range),
             shown: to,
             ready: true,
             target_type: Some(OrderTargetType::of_master(master.id)),

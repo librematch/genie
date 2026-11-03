@@ -4,13 +4,13 @@
 use crate::GenieError;
 use crate::combat::damage::Victim;
 use crate::gathering::gather::GatherState;
+use crate::gathering::gather::Stand;
 use crate::gathering::gather::update::{QUIET_CODE, UNMOVING};
 use crate::gathering::gather::{
     FARM_WAIT_TIME, GatherAction, GatherReads, NO_GATHER_POINT, Next, SEARCH_WAIT, Walks,
 };
 use crate::map::Distance;
 use crate::map::Position;
-use crate::math::rng::Well512;
 use crate::movement::move_to::{MoveToAction, TargetMoved};
 use crate::movement::{Me, Mover};
 use crate::objects::ObjectId;
@@ -19,15 +19,14 @@ use crate::objects::WorkerCount;
 use crate::objects::lifecycle::Held;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
-use crate::objects::sprite::ActiveSprite;
 use crate::objects::sprite::Graphic;
-use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
 use crate::players::PlayerType;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
 /// Whether a gatherer of `master` whose Gather has the target class `target_class` waits for
@@ -55,8 +54,9 @@ impl GatherAction {
         radius: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
-        self.walk_back(radius, mover, walks)
+        self.walk_back(radius, mover, walks, move_to_tuning)
     }
 
     /// [`GatherAction::set_walk_back`] for the caller (state 8's end without a target: no
@@ -70,12 +70,14 @@ impl GatherAction {
         radius: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.walk_to_point(
             |move_to| GatherState::WalkBack { move_to },
             radius,
             mover,
             walks,
+            move_to_tuning,
         )
     }
 
@@ -91,6 +93,7 @@ impl GatherAction {
         radius: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         let (x, y) = (self.gather_at.x(), self.gather_at.y());
         if x != NO_GATHER_POINT {
@@ -101,6 +104,7 @@ impl GatherAction {
             radius,
             mover,
             walks,
+            move_to_tuning,
         )
     }
 
@@ -113,12 +117,20 @@ impl GatherAction {
         radius: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = walk(None);
         self.timer = Seconds::ZERO;
         let range = radius + self.task.range;
-        let move_to = self.move_to_point(self.point, range, TargetMoved::Follows, mover, walks)?;
+        let move_to = self.move_to_point(
+            self.point,
+            range,
+            TargetMoved::Follows,
+            mover,
+            walks,
+            move_to_tuning,
+        )?;
         self.state = walk(move_to);
         Ok(())
     }
@@ -197,7 +209,12 @@ impl GatherAction {
             {
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                self.set_walk_back(Distance::new(radius), mover, &walks)?;
+                self.set_walk_back(
+                    Distance::new(radius),
+                    mover,
+                    &walks,
+                    &c.w.model.tuning.move_to,
+                )?;
                 self.target = None;
                 return Ok(Next::Stay);
             }
@@ -207,7 +224,12 @@ impl GatherAction {
         }
         let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-        self.begin_reseed_walk(Distance::new(radius), mover, &walks)?;
+        self.begin_reseed_walk(
+            Distance::new(radius),
+            mover,
+            &walks,
+            &c.w.model.tuning.move_to,
+        )?;
         Ok(Next::Stay)
     }
 
@@ -255,16 +277,12 @@ impl GatherAction {
         arrived: bool,
         player_type: PlayerType,
         mover: Option<&mut Mover>,
-        stand: Option<Graphic>,
-        sprite: &mut Option<ActiveSprite>,
-        rng: &mut Well512,
+        stand: Stand<'_>,
     ) -> Result<[Option<ObjectId>; 2], GenieError> {
         let mut mover = mover;
         self.tear_down(mover.as_deref_mut())?;
         self.timer = Seconds::ZERO;
-        if let Some(s) = stand {
-            new_sprite(sprite, mover.map(|m| &mut m.stats), s, rng);
-        }
+        stand.show(mover.map(|m| &mut m.stats));
         if arrived && player_type.is_computer() {
             // State 1: done; its update returns 1 and the action list removes it.
             self.state = GatherState::Done;

@@ -85,8 +85,12 @@ impl World {
         if building.disappears_when_built {
             u.life.hp = HitPoints::ZERO;
         }
-        self.spatial
-            .sight_state(id, ObjectState::Alive, &self.model.roles)?;
+        self.spatial.sight_state(
+            id,
+            ObjectState::Alive,
+            &self.model.roles,
+            self.model.tuning.visibility,
+        )?;
         if let Some(tech) = building.tech {
             self.research_built(p, tech)?;
         }
@@ -143,7 +147,13 @@ impl World {
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
             && let Some(v) = self.spatial.sight.as_mut()
         {
-            v.construction_completed(id, placed.position, placed.radius, &self.model.roles)?;
+            v.construction_completed(
+                id,
+                placed.position,
+                placed.radius,
+                &self.model.roles,
+                self.model.tuning.visibility,
+            )?;
         }
         let place = self.place(id).ok_or(NOT_HELD)?;
         let Self {
@@ -161,6 +171,7 @@ impl World {
             parts.building.of(id).build_frame,
             graphics,
             streams.get(Stream::Sprite),
+            self.model.tuning.sprite,
         );
         Ok(())
     }
@@ -194,7 +205,7 @@ impl World {
         let hp = u.life.hp;
         u.roo_called = true;
         if !main && let Some(v) = self.spatial.sight.as_mut() {
-            v.unlink_building(placed.position, master.radius)?;
+            v.unlink_building(placed.position, master.radius, self.model.tuning.visibility)?;
         }
         let stack = StackUnit {
             master: stack_master(master, building, rice, &self.model.roles, self.model.slots)
@@ -242,15 +253,7 @@ impl World {
             stack_master(master, building, rice, &self.model.roles, self.model.slots),
             &self.model.roles,
         );
-        lay_foundation(
-            c,
-            spatial,
-            placed,
-            master,
-            laid,
-            mode_680,
-            &self.model.roles,
-        )?;
+        lay_foundation(c, spatial, placed, master, laid, mode_680, &self.model)?;
         let mut counts = Vec::new();
         let history = completion_counts(
             master,

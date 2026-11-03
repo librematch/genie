@@ -14,8 +14,22 @@ use crate::unit_ai::{BREAK, DEAD, GO_ON, Notify, PRODUCED, Surroundings, UnitAi,
 use crate::world::Millis;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::UnitAiTuning;
 use crate::world::slots::CheckedIndex;
 use std::mem::take;
+
+/// What a unit AI's call from outside its full update reads of the build layer
+/// ([`UnitAi::clear_notifies_at`], [`UnitAi::take_order_now`]; its orders' run passes it on): the
+/// roles, the slots and the unit AI's tuning values (FD-046-D45, D49).
+#[derive(Clone, Copy, Debug)]
+pub struct AiLayer<'a> {
+    /// The build's roles.
+    pub roles: &'a Roles,
+    /// The build's slots.
+    pub slots: Slots,
+    /// The unit AI's tuning values.
+    pub unit_ai_tuning: &'a UnitAiTuning,
+}
 
 /// A unit's notifies to itself (its slot 0x328, [`UnitAi::post`]), borrowed beside its body: its
 /// unit AI (None for a unit without one), its id and its state.
@@ -127,7 +141,7 @@ impl UnitAi {
     /// `FUN_140c5dc10` from outside the full update for a unit at `place` (its place and its
     /// master's class, which a stop ending an order reads): a completion stops the action (slot
     /// 0xb0 with 1), whose stopAction (slot 0x3c0) is a call on the unit's `side` at once; `rng`
-    /// is the AI stream; `roles` and `slots` are the build's.
+    /// is the AI stream; `layer` is what the stop reads of the build layer.
     ///
     /// # Errors
     ///
@@ -138,14 +152,14 @@ impl UnitAi {
         place: (Point, Option<ClassId>),
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-        roles: &Roles,
-        slots: Slots,
+        layer: AiLayer<'_>,
     ) -> Result<(), GenieError> {
         let at = Surroundings {
             position: place.0.with_height(0.0),
             class: place.1,
-            roles: roles.clone(),
-            slots,
+            roles: layer.roles.clone(),
+            slots: layer.slots,
+            unit_ai_tuning: *layer.unit_ai_tuning,
             ..Surroundings::default()
         };
         self.end_notifies(time, &at, side, rng)

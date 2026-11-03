@@ -10,7 +10,6 @@ use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::sqrt;
-use crate::math::image::explore::LOS_MARGIN as EXPLORE_LOS_MARGIN;
 use crate::math::rng::Stream;
 use crate::movement::explore::Area;
 use crate::movement::{Me, Mover, Planning};
@@ -355,16 +354,12 @@ impl UnitView<'_, '_> {
             player: self.player,
             master: master.id,
             radius: master.radius,
-            reach: master.line_of_sight - LOS_MARGIN,
+            reach: master.line_of_sight - Distance::new(self.c.w.model.tuning.explore.los_margin),
             scouted: false,
         };
         Ok((area, map, master.line_of_sight))
     }
 }
-
-/// The auto scout's search reaches within its line of sight less this (`FUN_140c65490`,
-/// `DAT_14330eb8c`).
-pub(crate) const LOS_MARGIN: Distance = Distance::new(EXPLORE_LOS_MARGIN);
 
 /// `FUN_1416597e0` with 0: the player's first town centre, by the player's index of objects by
 /// master (`player+0x18`, `FUN_14104f560`: those of master 109, then 444, [`town_centres`]), as
@@ -459,6 +454,7 @@ impl Area for ScoutArea<'_> {
 
     fn reaches(&mut self, tile: Tile) -> Result<bool, GenieError> {
         let to = tile.corner();
+        let _tuning = self.by_id.tuning();
         self.mover.reaches(
             (self.at, &self.me),
             (self.spatial, self.by_id),

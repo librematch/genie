@@ -12,6 +12,7 @@ use crate::objects::ActionState;
 use crate::objects::Graphics;
 use crate::objects::UpdateCode;
 use crate::objects::unit::Unit;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
 /// A sub-action list's code that a quiet `MoveTo` does not give: 4 is its target let go when it
@@ -51,11 +52,12 @@ impl HuntAction {
         range: Distance,
         mover: &Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let given = self.task.walk_sprite_id(walks.held);
         walks
             .live(mover)
-            .to_object(to, range, given, TargetMoved::AsksAgain)
+            .to_object(to, range, given, TargetMoved::AsksAgain, move_to_tuning)
     }
 
     /// The quiet `MoveTo` to the hunt's point within the task's range (`FUN_140aa0d30` with the
@@ -70,11 +72,13 @@ impl HuntAction {
         &self,
         mover: &Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Option<MoveToAction>, GenieError> {
         let given = self.task.walk_sprite_id(walks.held);
-        let walk = walks
-            .live(mover)
-            .to_point(self.point, self.task.range, given)?;
+        let walk =
+            walks
+                .live(mover)
+                .to_point(self.point, self.task.range, given, move_to_tuning)?;
         Ok(walk.map(|m| MoveToAction {
             on_target_moved: TargetMoved::AsksAgain,
             ..m

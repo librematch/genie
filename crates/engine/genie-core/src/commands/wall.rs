@@ -24,7 +24,7 @@ use crate::map::GridSize;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Tile;
-use crate::math::image::wall::{HALF as WALL_HALF, MAP_MARGIN as WALL_MAP_MARGIN, ONE as WALL_ONE};
+use crate::math::image::wall::{HALF as WALL_HALF, ONE as WALL_ONE};
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
@@ -34,6 +34,7 @@ use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
+use crate::world::layer::generated::WallTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::cmp::Ordering;
@@ -41,8 +42,6 @@ use std::cmp::Ordering;
 /// The snap's half tile and its step up (`FUN_141123ac0`).
 const HALF: f32 = WALL_HALF;
 const ONE: f32 = WALL_ONE;
-/// How far inside the map's far edges the snap keeps a footprint (`FUN_141123ac0`).
-const MAP_MARGIN: f32 = WALL_MAP_MARGIN;
 
 /// A builder's master type is above this (`FUN_141262270`: `0x27`).
 const BUILDER_TYPE: MasterKind = MasterKind::of_data(0x27);
@@ -145,16 +144,16 @@ pub fn tiles(from: Tile, to: Tile) -> Result<Vec<Tile>, GenieError> {
 
 /// A building master's point for a tile (its slot 0x60, `FUN_141123ac0` with 1): the footprint
 /// of `radius` around `at` moved inside the map of `map` tiles (its far edges less
-/// [`MAP_MARGIN`]), then each coordinate snapped: to the nearest whole one for a whole radius, to
+/// `WallTuning::map_margin`), then each coordinate snapped: to the nearest whole one for a whole radius, to
 /// the tile's centre for another.
 #[must_use]
-pub fn snap(radius: Footprint, map: GridSize, at: Point) -> Point {
+pub fn snap(radius: Footprint, map: GridSize, at: Point, wall_tuning: WallTuning) -> Point {
     let (mut x, mut y) = (at.x(), at.y());
     let (rx, ry) = (radius.x(), radius.y());
     let (low_x, mut high_x) = (x - rx, rx + x);
     let (low_y, mut high_y) = (y - ry, ry + y);
-    let far_x = map.width() as f32 - MAP_MARGIN;
-    let far_y = map.height() as f32 - MAP_MARGIN;
+    let far_x = map.width() as f32 - wall_tuning.map_margin;
+    let far_y = map.height() as f32 - wall_tuning.map_margin;
     if low_x < 0.0 {
         let d = 0.0 - low_x;
         high_x += d;
@@ -296,6 +295,7 @@ impl World {
                     radius,
                     self.spatial.map,
                     Point::new(t.x() as f32, t.y() as f32),
+                    self.model.tuning.wall,
                 );
                 if !self.placement_code(player, master, at, true)?.is_allowed() {
                     continue;
@@ -428,6 +428,7 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::tuning;
 
     /// The tile at `x`, `y`.
     const fn t(x: i32, y: i32) -> Tile {
@@ -491,7 +492,8 @@ mod tests {
             snap(
                 Footprint::new(0.5, 0.5),
                 GridSize::new(120, 120),
-                Point::new(10.0, 20.0)
+                Point::new(10.0, 20.0),
+                tuning().wall
             ),
             Point::new(10.5, 20.5)
         );
@@ -500,7 +502,8 @@ mod tests {
             snap(
                 Footprint::new(1.0, 1.0),
                 GridSize::new(120, 120),
-                Point::new(10.0, 20.0)
+                Point::new(10.0, 20.0),
+                tuning().wall
             ),
             Point::new(10.0, 20.0)
         );
@@ -509,7 +512,8 @@ mod tests {
             snap(
                 Footprint::new(0.5, 0.5),
                 GridSize::new(120, 120),
-                Point::new(0.0, 119.0)
+                Point::new(0.0, 119.0),
+                tuning().wall
             ),
             Point::new(0.5, 119.5)
         );
@@ -517,7 +521,8 @@ mod tests {
             snap(
                 Footprint::new(1.0, 1.0),
                 GridSize::new(120, 120),
-                Point::new(0.0, 119.0)
+                Point::new(0.0, 119.0),
+                tuning().wall
             ),
             Point::new(1.0, 119.0)
         );

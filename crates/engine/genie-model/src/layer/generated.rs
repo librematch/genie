@@ -820,6 +820,8 @@ pub struct Tuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArtifactTuning {
+    /// Livestock's `MoveTo` to a town centre walks to its place less this on both axes (`FUN_140aa0df0`, `DAT_142eae8d0`).
+    ///
     /// `artifact::TOWN_CENTRE_OFFSET`: 0.2 in build 158041.
     pub town_centre_offset: f32,
 }
@@ -828,6 +830,8 @@ pub struct ArtifactTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttackTuning {
+    /// A `MoveTo`'s start counts the unit at its target within this gap (`0x140aa2100`, `DAT_142eb99cc`); the attack's walks read the move-to group's.
+    ///
     /// `attack::ARRIVED`: 0.01 in build 158041.
     pub arrived: f32,
     /// readyToAttack's leash of stance 1 lets a target this much past the range from the unit AI's `state_position` (`DAT_14330ebb8`, read by `ADDSS` at `0x140a80051`).
@@ -856,7 +860,7 @@ pub struct AttackTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BestTargetTuning {
-    /// The scores' scale (`DAT_142eb0f4c`), a distance score's top (`DAT_142efe418`) and the targeting factor's per cent (`DAT_142eb99cc`).
+    /// A distance score's top (`DAT_142efe418`).
     ///
     /// `best_target::DISTANCE_SCORE`: 75 in build 158041.
     pub distance_score: f32,
@@ -868,7 +872,7 @@ pub struct BestTargetTuning {
     ///
     /// `best_target::ORDER_WINDOW`: 60000 in build 158041.
     pub order_window: f32,
-    /// The scores' scale (`DAT_142eb0f4c`), a distance score's top (`DAT_142efe418`) and the targeting factor's per cent (`DAT_142eb99cc`).
+    /// The scores' scale (`DAT_142eb0f4c`).
     ///
     /// `best_target::SCORE`: 10 in build 158041.
     pub score: f32,
@@ -882,20 +886,36 @@ pub struct BestTargetTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuildTuning {
+    /// A `MoveTo`'s start counts the unit at its target within this gap (`0x140aa2100`, `DAT_142eb99cc`); the build's walks read the move-to group's.
+    ///
     /// `build::ARRIVED`: 0.01 in build 158041.
     pub arrived: f32,
+    /// The tiles the footprint clearing scans each way of the building's place (`DAT_142eb0f48`).
+    ///
     /// `build::CLEARING_REACH`: 4 in build 158041.
     pub clearing_reach: f32,
+    /// The drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
+    ///
     /// `build::DROP_REACH`: 1 in build 158041.
     pub drop_reach: f32,
+    /// A second builder works at a third of the rate of the first (`DAT_142ed66b0`).
+    ///
     /// `build::EXTRA_BUILDER`: 0.33 in build 158041.
     pub extra_builder: f32,
+    /// A builder within this of its foundation's footprint has reached it (`DAT_142eb5690`).
+    ///
     /// `build::REACH`: 0.1 in build 158041.
     pub reach: f32,
+    /// The seconds of work a new object's building gets at once from its owner's slot 0x1c0 with its flag (`FUN_14162ce00`'s `FUN_1411cc430` with `DAT_142eea788`).
+    ///
     /// `build::STACK_WORK`: 10000 in build 158041.
     pub stack_work: f32,
+    /// The hit points a tree at most has that the builder's clearing takes (`DAT_14330eb8c`).
+    ///
     /// `build::STUMP_HP`: 1 in build 158041.
     pub stump_hp: f32,
+    /// The progress a started foundation holds before its first work (`0x2edbe6ff`, about 1e-10).
+    ///
     /// `build::WONDER_RATE`: 1.2 in build 158041.
     pub wonder_rate: f32,
 }
@@ -966,6 +986,8 @@ pub struct DamageTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ExploreTuning {
+    /// The auto scout's search reaches within its line of sight less this (`FUN_140c65490`, `DAT_14330eb8c`).
+    ///
     /// `explore::LOS_MARGIN`: 1 in build 158041.
     pub los_margin: f32,
 }
@@ -974,6 +996,8 @@ pub struct ExploreTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FlyTuning {
+    /// The height a bird of fly mode 1 flies at once its Fly starts (`FUN_140a84900`).
+    ///
     /// `fly::HEIGHT`: 9 in build 158041.
     pub height: f32,
 }
@@ -982,18 +1006,32 @@ pub struct FlyTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GarrisonTuning {
+    /// The share of its master's hit points at or below which a building takes no unit that enters it (state 13; `DAT_142eae8d0`).
+    ///
     /// `garrison::ENTER_HP_SHARE`: 0.2 in build 158041.
     pub enter_hp_share: f32,
+    /// How near the point a transport must reach for an Enter (slot 0x3d8's range), and the range up to which an Enter's reach of a target with speed tests the tiles about the two (`FUN_140a85c30`): `DAT_14330eb8c`, 1.0.
+    ///
     /// `garrison::ENTER_NEAR`: 1 in build 158041.
     pub enter_near: f32,
+    /// A building takes units in only above this share of its master's hit points (`FUN_14120eb10`, in doubles).
+    ///
     /// `garrison::LEAST_HP_SHARE`: 0.2 in build 158041.
     pub least_hp_share: f64,
+    /// The squared footprint gap within which a garrison order's target's neighbours shelter units too (`FUN_14161e370` with `+0x1e`, `DAT_14330ebcc`, 100.0: ten tiles).
+    ///
     /// `garrison::NEARBY`: 100 in build 158041.
     pub nearby: f32,
+    /// A combat master's attack rate needs a weapon range above this (`FUN_14120dc10`).
+    ///
     /// `garrison::RATE_RANGE`: 1 in build 158041.
     pub rate_range: f32,
+    /// The squared footprint gap within which the town bell reaches (its ring `FUN_14163a650`, its end `FUN_14163ab80`, and `FUN_141621220` with `param_6` 1: `DAT_142ef3e70`, 625.0, 25 tiles).
+    ///
     /// `garrison::TOWN_BELL_REACH`: 625 in build 158041.
     pub town_bell_reach: f32,
+    /// UNLOAD's order range (`DAT_14330eb8c`).
+    ///
     /// `garrison::UNLOAD_RANGE`: 1 in build 158041.
     pub unload_range: f32,
 }
@@ -1002,16 +1040,28 @@ pub struct GarrisonTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GatherTuning {
+    /// The productivity of a task without a productivity attribute (`DAT_14330eb8c`).
+    ///
     /// `gather::DEFAULT_PRODUCTIVITY`: 1 in build 158041.
     pub default_productivity: f32,
+    /// A drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
+    ///
     /// `gather::DROP_REACH`: 1 in build 158041.
     pub drop_reach: f32,
+    /// A stop's point lies this far into its tile (`DAT_142e7f384`).
+    ///
     /// `gather::STOP_CENTRE`: 0.5 in build 158041.
     pub stop_centre: f32,
+    /// A failed walk to a target at least this far away waits (the squared footprint gap, `0x140a8e1d0` case 3, `DAT_142ec9ec0`); else the gatherer searches.
+    ///
     /// `gather::WAIT_GAP`: 16 in build 158041.
     pub wait_gap: f32,
+    /// A random wait's shift (`DAT_142e7f384`).
+    ///
     /// `gather::WAIT_SHIFT`: 0.5 in build 158041.
     pub wait_shift: f32,
+    /// A failed walk to a target with at most this many workers waits (`0x140a8e1d0` case 3, `DAT_142eb1c98`); else the gatherer searches.
+    ///
     /// `gather::WAIT_WORKERS`: 3 in build 158041.
     pub wait_workers: f32,
 }
@@ -1020,14 +1070,24 @@ pub struct GatherTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GatherSearchTuning {
+    /// A pass's distance counts the shorter axis times this, rounded down, less the shorter one (`DAT_142efe414`).
+    ///
     /// `gather_search::DIAGONAL`: 1.4 in build 158041.
     pub diagonal: f32,
+    /// The most reach a builder's search for more work takes from the building's line of sight (`DAT_142e7f38c`).
+    ///
     /// `gather_search::REACH_CAP`: 20 in build 158041.
     pub reach_cap: f32,
+    /// A building's line of sight below this gives a builder's search for more work its least reach (`DAT_142eb0f48`).
+    ///
     /// `gather_search::REACH_FLOOR`: 4 in build 158041.
     pub reach_floor: f32,
+    /// The search's centre between a drop site and the unit: the site's share (`DAT_142e7f388`).
+    ///
     /// `gather_search::SITE_SHARE`: 0.75 in build 158041.
     pub site_share: f32,
+    /// The search's centre between a drop site and the unit: the unit's share (`DAT_142eb880c`).
+    ///
     /// `gather_search::UNIT_SHARE`: 0.25 in build 158041.
     pub unit_share: f32,
 }
@@ -1036,86 +1096,168 @@ pub struct GatherSearchTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GroupTuning {
+    /// The timer of the move aside after too many failures (`DAT_142eb5690`).
+    ///
     /// `group::ASIDE_TIMER`: 0.1 in build 158041.
     pub aside_timer: f32,
+    /// A box's perimeter is its side times this (`DAT_142eb0f48`).
+    ///
     /// `group::BOX_SIDES`: 4 in build 158041.
     pub box_sides: f32,
+    /// A box too small for its units grows to this share of their length (`DAT_142eb880c`).
+    ///
     /// `group::BOX_SIDE_SHARE`: 0.25 in build 158041.
     pub box_side_share: f32,
+    /// The catching up's share of the top speed (`DAT_142ed66b4`).
+    ///
     /// `group::CATCH_UP`: 1.2 in build 158041.
     pub catch_up: f32,
+    /// The spacing of the points of a ring: the unit's line of sight and this (`DAT_142eb1c98`, the constant the group port's catch-up span also reads).
+    ///
     /// `group::CATCH_UP_SPAN`: 3 in build 158041.
     pub catch_up_span: f32,
+    /// What a group's attack adds to the range against a moving target that outranges it (`DAT_142eb5be8`).
+    ///
     /// `group::CHASING_SLACK`: -2 in build 158041.
     pub chasing_slack: f32,
+    /// The members' obstruction tests grow the records by the member's radius times this (`DAT_142e7f384`).
+    ///
     /// `group::CLEARANCE`: 0.5 in build 158041.
     pub clearance: f32,
+    /// A follow's target this near the top path's end (squared, `DAT_14330eb8c`) keeps the move.
+    ///
     /// `group::CLOSE`: 1 in build 158041.
     pub close: f32,
+    /// What a group's attack takes as its slack at no range (`DAT_142eb880c`).
+    ///
     /// `group::CONTACT_SLACK`: 0.25 in build 158041.
     pub contact_slack: f32,
+    /// A group whose members' forwards cancel out and that holds none faces x (`DAT_14330eb8c`).
+    ///
     /// `group::DEFAULT_FORWARD`: 1 in build 158041.
     pub default_forward: f32,
+    /// A unit's radius in a formation where its master has no full footprint (`FUN_141025920`, `DAT_142e7f384`).
+    ///
     /// `group::DEFAULT_RADIUS`: 0.5 in build 158041.
     pub default_radius: f32,
+    /// A member farther than this from its slot leaves the group (`FUN_14100bcb0`'s far test, `DAT_142e7f38c`).
+    ///
     /// `group::FAR`: 20 in build 158041.
     pub far: f32,
+    /// The far test's distance in a formation of type 7, or once a member of radius `GroupTuning::wide_radius` or more came before (`DAT_142ecbff0`).
+    ///
     /// `group::FAR_WIDE`: 40 in build 158041.
     pub far_wide: f32,
+    /// A flanked line's slots move apart by this less the line's share of the depth (`DAT_142eb3634`).
+    ///
     /// `group::FLANK_SPACING`: 2.5 in build 158041.
     pub flank_spacing: f32,
+    /// The share of the lead's line of sight a follow keeps within (`DAT_142e7f384`).
+    ///
     /// `group::FRONT_SHARE`: 0.5 in build 158041.
     pub front_share: f32,
+    /// A horde's and a user defined formation's slots lie at most this far from the group's place (`DAT_14330ebb8`).
+    ///
     /// `group::HORDE_REACH`: 5 in build 158041.
     pub horde_reach: f32,
+    /// A moving object whose top speed is 0 and whose radius on either axis is above this links its tiles at a new place (`FUN_14108c320`, `DAT_142e7f384`).
+    ///
     /// `group::LINKED_RADIUS`: 0.5 in build 158041.
     pub linked_radius: f32,
+    /// A slot's place kept this far inside the map's far edges (`FUN_14100b760`, `DAT_142eb5690`).
+    ///
     /// `group::MAP_EDGE`: 0.1 in build 158041.
     pub map_edge: f32,
+    /// A group's member below these hit points takes no task (`DAT_14330eb8c`).
+    ///
     /// `group::MEMBER_MIN_HP`: 1 in build 158041.
     pub member_min_hp: f32,
+    /// How near a point the walk counts as there (`DAT_142eb5690`).
+    ///
     /// `group::NEAR`: 0.1 in build 158041.
     pub near: f32,
+    /// The passability's box starts at this (`DAT_142eea788`) on its low sides, 0 on its high ones.
+    ///
     /// `group::PASS_FAR`: 10000 in build 158041.
     pub pass_far: f32,
+    /// The grid starts this far below the box (`DAT_142ed6f20`).
+    ///
     /// `group::PASS_HALF_MARGIN`: 25 in build 158041.
     pub pass_half_margin: f32,
+    /// The passability's grid holds the box plus this (`DAT_142eb0f50`) and one more cell a side.
+    ///
     /// `group::PASS_MARGIN`: 50 in build 158041.
     pub pass_margin: f32,
+    /// Below this share of the slots' array reachable (`DAT_142eae8d0`), only the nearest slot is.
+    ///
     /// `group::PASS_SHARE`: 0.2 in build 158041.
     pub pass_share: f32,
+    /// A patrol's leg goes back and forth when its point is at least this far from the group on the ground (`commandMoveTo` at 0x141010ddb, `DAT_14330ebb8`).
+    ///
     /// `group::PATROL_LEG_REACH`: 5 in build 158041.
     pub patrol_leg_reach: f32,
+    /// The members' centre pulls the group when it is this far (squared, `DAT_142eb0f48`) ...
+    ///
     /// `group::PULL_DISTANCE`: 4 in build 158041.
     pub pull_distance: f32,
+    /// The share of its own place the group keeps when the members' centre pulls it (`DAT_142ecb878`).
+    ///
     /// `group::PULL_KEEP`: 0.8 in build 158041.
     pub pull_keep: f32,
+    /// The members' centre's share of the group's new place when it pulls the group (`DAT_142eae8d0`).
+    ///
     /// `group::PULL_SHARE`: 0.2 in build 158041.
     pub pull_share: f32,
+    /// What a group's attack adds to the range against a target in range, and to a moving target's weapon range for the outrange test (`DAT_142e8c150`).
+    ///
     /// `group::RANGED_SLACK`: 2 in build 158041.
     pub ranged_slack: f32,
+    /// A path shorter than this is no path (`DAT_142eb99cc`).
+    ///
     /// `group::SHORT_LENGTH`: 0.01 in build 158041.
     pub short_length: f32,
+    /// The short pather serves a waypoint this near (`DAT_142eb0f4c`).
+    ///
     /// `group::SHORT_REACH`: 10 in build 158041.
     pub short_reach: f32,
+    /// The x nudges of a slot the passability grid moves where its spacing is below a cell, by its parity (`DAT_142f49470`).
+    ///
     /// `group::SLOT_NUDGE_X`: [0, 0.25, -0.25, 0] in build 158041.
     pub slot_nudge_x: [f32; 4],
+    /// The z nudges of a slot the passability grid moves where its spacing is below a cell, by its parity (`DAT_142f49dd0`).
+    ///
     /// `group::SLOT_NUDGE_Z`: [0, 0, 0, 0.25] in build 158041.
     pub slot_nudge_z: [f32; 4],
+    /// A member within this many radii of its slot, or this far, walks at its top speed (`DAT_14330ebb8`, loaded once at `0x1410279d1` for both).
+    ///
     /// `group::SLOT_REACH`: 5 in build 158041.
     pub slot_reach: f32,
+    /// A group with `GroupFlags::CATCHING_UP` moves at its slowest member's speed divided by this (`FUN_14100bcb0`, `DAT_142ed66b4`).
+    ///
     /// `group::SLOW_GROUP_FACTOR`: 1.2 in build 158041.
     pub slow_group_factor: f32,
+    /// A staggered line's offset is twice the spacing, and an even line moves by half the offset (`DAT_142e8c150`).
+    ///
     /// `group::SPACING_FACTOR`: 2 in build 158041.
     pub spacing_factor: f32,
+    /// ... or above this (`DAT_14330eb78`).
+    ///
     /// `group::SQUARE_MAX`: 0.05 in build 158041.
     pub square_max: f32,
+    /// `FUN_141049e10` refuses a forward whose dot product with the up is below this (`DAT_142f4c1a0`) ...
+    ///
     /// `group::SQUARE_MIN`: -0.05 in build 158041.
     pub square_min: f32,
+    /// A staggered line moves by a quarter of the slot offset (`DAT_142eb0f48`).
+    ///
     /// `group::STAGGER_SHARE`: 4 in build 158041.
     pub stagger_share: f32,
+    /// A user defined formation's slots move back by the farthest one ahead plus this (`DAT_142e7f384`).
+    ///
     /// `group::USER_DEFINED_BACK`: 0.5 in build 158041.
     pub user_defined_back: f32,
+    /// The radius from which the far test takes `GroupTuning::far_wide` (`DAT_142e7f384`).
+    ///
     /// `group::WIDE_RADIUS`: 0.5 in build 158041.
     pub wide_radius: f32,
 }
@@ -1124,8 +1266,12 @@ pub struct GroupTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HistoryTuning {
+    /// A battle's summed share from which it is a recorded event, as a double (`DAT_142f8c5a8`).
+    ///
     /// `history::BATTLE_RECORD`: 0.15 in build 158041.
     pub battle_record: f64,
+    /// A period's own share from which a battle starts or goes on, as a double (`DAT_142f8c5a0`).
+    ///
     /// `history::BATTLE_START`: 0.12 in build 158041.
     pub battle_start: f64,
 }
@@ -1134,14 +1280,24 @@ pub struct HistoryTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HullPathTuning {
+    /// The step along a box's side, of its length, of the walk into a hull (`DAT_142eb880c`).
+    ///
     /// `hull_path::ENTRANCE_STEP`: 0.25 in build 158041.
     pub entrance_step: f32,
+    /// The step along a box's side, of its length, of the walk out of a hull (`DAT_142ef9004`).
+    ///
     /// `hull_path::EXIT_STEP`: 0.0625 in build 158041.
     pub exit_step: f32,
+    /// `DAT_142f43298`: the intersection search's first distance.
+    ///
     /// `hull_path::FAR`: 100000000000 in build 158041.
     pub far: f32,
+    /// `DAT_142eb0f48`: within 2 tiles (squared) of a moving target the quick path stops short of it.
+    ///
     /// `hull_path::NEAR_TARGET`: 4 in build 158041.
     pub near_target: f32,
+    /// `DAT_142eb99cc`: two exit or entrance paths ending this close end at the same point.
+    ///
     /// `hull_path::SAME_END`: 0.01 in build 158041.
     pub same_end: f32,
 }
@@ -1150,14 +1306,24 @@ pub struct HullPathTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HuntTuning {
+    /// A hunt's drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
+    ///
     /// `hunt::DROP_REACH`: 1 in build 158041.
     pub drop_reach: f32,
+    /// A face on dead livestock beyond the task's range plus this walks again (`DAT_142eb5690`).
+    ///
     /// `hunt::GAP`: 0.1 in build 158041.
     pub gap: f32,
+    /// Own livestock farther than this squared from its drop site is led there first (`DAT_142ecccc4`).
+    ///
     /// `hunt::HERD_REACH`: 9 in build 158041.
     pub herd_reach: f32,
+    /// The range of the walk to the hunter's own player's livestock (`DAT_142eb4838`).
+    ///
     /// `hunt::OWN_LIVESTOCK_RANGE`: 1.5 in build 158041.
     pub own_livestock_range: f32,
+    /// `FUN_140ac4670`'s second argument when a hunt's Attack failed (`DAT_14330ebb8`): the tree found counts within this of the unit.
+    ///
     /// `hunt::TREE_NEAR`: 5 in build 158041.
     pub tree_near: f32,
 }
@@ -1166,8 +1332,12 @@ pub struct HuntTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LongPathTuning {
+    /// A target's footprint ends this short of its far edges (`DAT_142eb99cc`).
+    ///
     /// `long_path::EDGE_GAP`: 0.01 in build 158041.
     pub edge_gap: f32,
+    /// The goal counts as reached within this many tiles, and a range above it ends the search before it starts when the goal lies within the range (`DAT_14330eb8c`).
+    ///
     /// `long_path::REACHED`: 1 in build 158041.
     pub reached: f32,
 }
@@ -1176,16 +1346,28 @@ pub struct LongPathTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MarketTuning {
+    /// Food's price after its net trades came back to 0 (`DAT_142f03164`).
+    ///
     /// `market::FOOD_START`: 1.15 in build 158041.
     pub food_start: f32,
+    /// A purchase costs at least this (`DAT_142f66f34`).
+    ///
     /// `market::LEAST_COST`: 21 in build 158041.
     pub least_cost: f32,
+    /// Ore's price after its net trades came back to 0 (`DAT_14330eb8c`).
+    ///
     /// `market::ORE_START`: 1 in build 158041.
     pub ore_start: f32,
+    /// Stone's price after its net trades came back to 0 (`DAT_142f0703c`).
+    ///
     /// `market::STONE_START`: 1.3 in build 158041.
     pub stone_start: f32,
+    /// A trade's growth of the swing (`DAT_142e8c150`).
+    ///
     /// `market::SWING`: 2 in build 158041.
     pub swing: f32,
+    /// Wood's price after its net trades came back to 0 (`DAT_14330eb8c`).
+    ///
     /// `market::WOOD_START`: 1 in build 158041.
     pub wood_start: f32,
 }
@@ -1194,10 +1376,16 @@ pub struct MarketTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MastersTuning {
+    /// A handicap's attack factor above this raises an attack class at 0 (`FUN_1410c12b0`, `DAT_14330eb8c`).
+    ///
     /// `masters::HANDICAP_FLOOR`: 1 in build 158041.
     pub handicap_floor: f32,
+    /// The most speed a capped add or multiply leaves a missile master (`FUN_1410a8b60`, `FUN_1410a8c00`, `DAT_142e7f38c`).
+    ///
     /// `masters::MISSILE_SPEED_CAP`: 20 in build 158041.
     pub missile_speed_cap: f32,
+    /// The most speed a capped add or multiply leaves a master (`FUN_1410a8b60`, `FUN_1410a8c00`, `DAT_142f52490`).
+    ///
     /// `masters::SPEED_CAP`: 4.5 in build 158041.
     pub speed_cap: f32,
 }
@@ -1236,10 +1424,16 @@ pub struct MissileTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MoveToTuning {
+    /// A `MoveTo`'s start counts the unit at its target within this gap (`0x140aa2100`, `DAT_142eb99cc`).
+    ///
     /// `move_to::ARRIVED`: 0.01 in build 158041.
     pub arrived: f32,
+    /// A target leaves the `MoveTo`'s point when its offset from it on either axis is above this (`DAT_142e7f384`).
+    ///
     /// `move_to::OFF_HIGH`: 0.5 in build 158041.
     pub off_high: f32,
+    /// A target leaves the `MoveTo`'s point when its offset from it on either axis is below this (`DAT_142eb6e58`).
+    ///
     /// `move_to::OFF_LOW`: -0.5 in build 158041.
     pub off_low: f32,
 }
@@ -1332,6 +1526,8 @@ pub struct MovementTuning {
     ///
     /// `movement::USER_WAYPOINT_MIDDLE`: 0.5 in build 158041.
     pub user_waypoint_middle: f32,
+    /// What a path end's bonus adds to the walk's range (`DAT_142eb1c98`).
+    ///
     /// `movement::WIDE_RANGE`: 3 in build 158041.
     pub wide_range: f32,
 }
@@ -1340,28 +1536,52 @@ pub struct MovementTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct OrderTuning {
+    /// `DAT_142eea788`.
+    ///
     /// `order::BOX_START`: 10000 in build 158041.
     pub box_start: f32,
+    /// A mule cart's move range to a building (`FUN_1411c5d80`, master type 80; `DAT_142e7f388`).
+    ///
     /// `order::CART_MOVE_RANGE`: 0.75 in build 158041.
     pub cart_move_range: f32,
+    /// `DAT_14330eb8c`.
+    ///
     /// `order::EDGE`: 1 in build 158041.
     pub edge: f32,
+    /// `DAT_142eb4838`.
+    ///
     /// `order::GRID_AREA`: 1.5 in build 158041.
     pub grid_area: f32,
+    /// `DAT_142e7f384`.
+    ///
     /// `order::GRID_STEP`: 0.5 in build 158041.
     pub grid_step: f32,
+    /// The range of GUARD's defend order (`DAT_142eb3634`, `World::guard`).
+    ///
     /// `order::GUARD_RANGE`: 2.5 in build 158041.
     pub guard_range: f32,
+    /// Units nearer than this are measured by a path (`FUN_140fd76d0`, `DAT_142e7f38c`) while `DAT_1439e60e3` (1 at run time) holds.
+    ///
     /// `order::SPLIT_PATH_REACH`: 20 in build 158041.
     pub split_path_reach: f32,
+    /// Units whose speeds differ by more than this do not join where the player breaks formations by speed (`FUN_140fd76d0`, `DAT_143cc2918`).
+    ///
     /// `order::SPLIT_SPEED_GAP`: 0.2 in build 158041.
     pub split_speed_gap: f32,
+    /// `DAT_142eb9430`.
+    ///
     /// `order::SPREAD`: 8 in build 158041.
     pub spread: f32,
+    /// The drop-site table's search starts beyond this squared distance (`FUN_141658e20`, `DAT_142f89ac4`).
+    ///
     /// `order::TABLE_DROP_FAR`: 1000000 in build 158041.
     pub table_drop_far: f32,
+    /// A patrol's waypoint counts when it is at least this far from the last one kept on x or on y (`FUN_14161b970`, `DAT_14330eb8c`).
+    ///
     /// `order::WAYPOINT_APART`: 1 in build 158041.
     pub waypoint_apart: f32,
+    /// A patrol's waypoint counts when its offset from the last one kept on x or on y is at most this (`FUN_14161b970`, `DAT_14330ec20`).
+    ///
     /// `order::WAYPOINT_APART_LOW`: -1 in build 158041.
     pub waypoint_apart_low: f32,
 }
@@ -1370,10 +1590,16 @@ pub struct OrderTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PastureTuning {
+    /// An edge's end (`DAT_14330eb8c`).
+    ///
     /// `pasture::END`: 1 in build 158041.
     pub end: f32,
+    /// The edges lie this far inside the pasture's ground radius (`DAT_142e7f384`).
+    ///
     /// `pasture::INSET`: 0.5 in build 158041.
     pub inset: f32,
+    /// The step along an edge (`DAT_142e8c148`).
+    ///
     /// `pasture::STEP`: 0.3 in build 158041.
     pub step: f32,
 }
@@ -1382,8 +1608,12 @@ pub struct PastureTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RegistryTuning {
+    /// The query box's margin (`DAT_142ec9eb8`).
+    ///
     /// `registry::MARGIN`: 7 in build 158041.
     pub margin: f32,
+    /// The query's cap on the radius (`DAT_142f64e88`).
+    ///
     /// `registry::MOST_RADIUS`: 44 in build 158041.
     pub most_radius: f32,
 }
@@ -1392,12 +1622,20 @@ pub struct RegistryTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RepairTuning {
+    /// The hit points below which a target in state 2 is not repaired (`DAT_142e7f384`), and the share each repairer past the first adds to the work (the same constant).
+    ///
     /// `repair::EXTRA_REPAIRER`: 0.5 in build 158041.
     pub extra_repairer: f32,
+    /// The hit points below which a target in state 2 is not repaired (`DAT_142e7f384`), and the share each repairer past the first adds to the work (the same constant).
+    ///
     /// `repair::LEAST_HP`: 0.5 in build 158041.
     pub least_hp: f32,
+    /// What a moving target (`FUN_140fdd080`) or a scenario's game mode adds to the reach (`DAT_142e8c150`).
+    ///
     /// `repair::MOVING_REACH`: 2 in build 158041.
     pub moving_reach: f32,
+    /// The gap within which a repairer reaches its target (`DAT_142eb5690`).
+    ///
     /// `repair::REACH`: 0.1 in build 158041.
     pub reach: f32,
 }
@@ -1406,10 +1644,16 @@ pub struct RepairTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpatialTuning {
+    /// The range of `ClosestObject`'s reachability check (`FUN_140c488b0`, `DAT_142eb5690`).
+    ///
     /// `spatial::CLOSEST_RANGE`: 0.1 in build 158041.
     pub closest_range: f32,
+    /// The footprint's last tile stops short of its edge by this (`DAT_142eb1e9c`).
+    ///
     /// `spatial::FOOTPRINT_EDGE`: 0.001 in build 158041.
     pub footprint_edge: f32,
+    /// How near (squared) a unit AI's search comes to the last one's place to skip its query (`FUN_140c63e20`).
+    ///
     /// `spatial::SEARCH_REUSE_SQUARED`: 25 in build 158041.
     pub search_reuse_squared: f32,
 }
@@ -1418,20 +1662,36 @@ pub struct SpatialTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpawnTuning {
+    /// How far BUILD's placement scan looks around the point (`FUN_14123aee0`, `DAT_142eb9430`).
+    ///
     /// `spawn::BUILD_SCAN`: 8 in build 158041.
     pub build_scan: f32,
+    /// What a small unit's step adds to twice its radius (`DAT_142eb5690`).
+    ///
     /// `spawn::GAP`: 0.1 in build 158041.
     pub gap: f32,
+    /// How far inside its far edges a box's last tile lies (`DAT_142eb1e9c`).
+    ///
     /// `spawn::INSIDE`: 0.001 in build 158041.
     pub inside: f32,
+    /// A tile whose terrain's restriction value is this or less is not passable (`DAT_14330eb78`).
+    ///
     /// `spawn::PASSABLE`: 0.05 in build 158041.
     pub passable: f32,
+    /// The placement test's objects lie within this many tiles of the point (`DAT_142eb9430`).
+    ///
     /// `spawn::REACH`: 8 in build 158041.
     pub reach: f32,
+    /// The share of a side the first segments cover (`DAT_142eb880c`).
+    ///
     /// `spawn::SIDE_SHARE`: 0.25 in build 158041.
     pub side_share: f32,
+    /// A unit smaller than this on both axes (`DAT_142f5d120`) steps by twice its radius plus `SpawnTuning::gap`.
+    ///
     /// `spawn::SMALL`: 0.45 in build 158041.
     pub small: f32,
+    /// A new moving object's right vector's z (`FUN_1411580a0` reads `DAT_14330ec20`).
+    ///
     /// `spawn::START_RIGHT_Z`: -1 in build 158041.
     pub start_right_z: f32,
 }
@@ -1440,6 +1700,8 @@ pub struct SpawnTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpriteTuning {
+    /// The shortest frame interval (`0x3a83126f`, also `DAT_142eb1e9c`).
+    ///
     /// `sprite::SHORTEST`: 0.001 in build 158041.
     pub shortest: f32,
 }
@@ -1448,6 +1710,8 @@ pub struct SpriteTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TerrainTuning {
+    /// `DAT_142eb1e9c`.
+    ///
     /// `terrain::INSIDE`: 0.001 in build 158041.
     pub inside: f32,
 }
@@ -1456,20 +1720,36 @@ pub struct TerrainTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TilePathTuning {
+    /// A computer player's search stops early once a node's estimate to the goal is at most this (`DAT_14330ebb8`).
+    ///
     /// `tile_path::EARLY_LEFT`: 5 in build 158041.
     pub early_left: f32,
+    /// A computer player's search stops early only when the start's estimate to the goal is at most this (`DAT_142eb0f4c`).
+    ///
     /// `tile_path::EARLY_START`: 10 in build 158041.
     pub early_start: f32,
+    /// The hierarchical search marks 0.1 more on the square's far sides (`DAT_142eb5690`).
+    ///
     /// `tile_path::FAR_SIDE`: 0.1 in build 158041.
     pub far_side: f32,
+    /// The goal's own tile counts when the goal is this near it (`DAT_142eb99cc`).
+    ///
     /// `tile_path::GOAL_GAP`: 0.01 in build 158041.
     pub goal_gap: f32,
+    /// The level-0 search costs a turn's shortcut from the node before at 1.1 times its cost (`DAT_142e86c14`).
+    ///
     /// `tile_path::SHORTCUT_COST`: 1.1 in build 158041.
     pub shortcut_cost: f32,
+    /// The squared distance from the start within which the planner looks for a shorter first stretch (`DAT_14330ebcc`).
+    ///
     /// `tile_path::SHORTCUT_REACH`: 100 in build 158041.
     pub shortcut_reach: f32,
+    /// The longest step between the points the smoothing puts on a straight stretch (`DAT_142f430e8`).
+    ///
     /// `tile_path::SMOOTH_STEP`: 7.5 in build 158041.
     pub smooth_step: f32,
+    /// The level-0 search runs only for paths shorter than this (`DAT_142f430ec`).
+    ///
     /// `tile_path::TILE_SEARCH_LENGTH`: 35 in build 158041.
     pub tile_search_length: f32,
 }
@@ -1478,16 +1758,28 @@ pub struct TilePathTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TransportTuning {
+    /// A drop location's gap past the footprints (`DAT_142eb99cc`).
+    ///
     /// `transport::DROP_GAP`: 0.01 in build 158041.
     pub drop_gap: f32,
+    /// The `MoveTo`'s range to the point (`DAT_142e8c148`).
+    ///
     /// `transport::MOVE_RANGE`: 0.3 in build 158041.
     pub move_range: f32,
+    /// The reach within which a tile of the point's zone lets the unit unload (`DAT_142e8c150`).
+    ///
     /// `transport::NEAR`: 2 in build 158041.
     pub near: f32,
+    /// The new point's spread about the old one (`DAT_14330ebb8`): a draw over the retry step less this.
+    ///
     /// `transport::RETRY_SPREAD`: 5 in build 158041.
     pub retry_spread: f32,
+    /// The shore search's margin about the unit's footprint (`DAT_142e8c150`).
+    ///
     /// `transport::SHORE_MARGIN`: 2 in build 158041.
     pub shore_margin: f32,
+    /// The squared gap from the unit's footprint within which the work unloads at once (`DAT_142eb0f48`).
+    ///
     /// `transport::UNLOAD_REACH_SQUARED`: 4 in build 158041.
     pub unload_reach_squared: f32,
 }
@@ -1496,8 +1788,12 @@ pub struct TransportTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TreasonTuning {
+    /// The gold the treason costs (`DAT_142eb5bd4`, read at `0x141620446`).
+    ///
     /// `treason::TREASON_COST`: 400 in build 158041.
     pub treason_cost: f32,
+    /// The gold the treason costs with attribute 197 above 0 (`DAT_142eb0f54`, read at `0x1416204d5`).
+    ///
     /// `treason::TREASON_DISCOUNT_COST`: 200 in build 158041.
     pub treason_discount_cost: f32,
 }
@@ -1506,38 +1802,72 @@ pub struct TreasonTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TurnTuning {
+    /// A building attacks with a firepower above this (`FUN_14120ea30`).
+    ///
     /// `turn::ARMED_FIREPOWER`: 1 in build 158041.
     pub armed_firepower: f32,
+    /// The squared distance within which a mule cart takes a found object as its next place (`DAT_142ef9008`).
+    ///
     /// `turn::CART_REACH`: 99999 in build 158041.
     pub cart_reach: f32,
+    /// The blast's damage factor (`XMM11`, `DAT_14330eb8c`).
+    ///
     /// `turn::DEATH_BLAST_FACTOR`: 1 in build 158041.
     pub death_blast_factor: f32,
+    /// The hit points below which they blast (`DAT_14330eb8c`; `COMISS`, a NaN does not).
+    ///
     /// `turn::DEATH_BLAST_HP`: 1 in build 158041.
     pub death_blast_hp: f32,
+    /// The range the short path measures a drop site within (`DAT_142eb5690`).
+    ///
     /// `turn::DROP_REACH`: 0.1 in build 158041.
     pub drop_reach: f32,
+    /// A building at most this share of its hit points lets its garrison out (`DAT_142eae8d0`).
+    ///
     /// `turn::EJECT_SHARE`: 0.2 in build 158041.
     pub eject_share: f32,
+    /// The stages over the build time (`DAT_142eb1c98`).
+    ///
     /// `turn::FARM_STAGES`: 3 in build 158041.
     pub farm_stages: f32,
+    /// The squared footprint gap within which a fishing ship counts a drop site its path does not reach (`DAT_14330ebcc`).
+    ///
     /// `turn::FISHING_REACH`: 100 in build 158041.
     pub fishing_reach: f32,
+    /// A gate's query grows its records and its own box by this (`FUN_1410562d0` with `DAT_142eb3630`).
+    ///
     /// `turn::GATE_GROW`: 0.4 in build 158041.
     pub gate_grow: f32,
+    /// The least height of a shut gate its player opens (`FUN_14162f7e0`, `DAT_14330eb8c`).
+    ///
     /// `turn::GATE_SHUT_HEIGHT`: 1 in build 158041.
     pub gate_shut_height: f32,
+    /// A hero's regeneration (`DAT_142ed06a8`, a minute's hit points).
+    ///
     /// `turn::HERO_REGENERATION`: 30 in build 158041.
     pub hero_regeneration: f32,
+    /// The hit points a powerup's check leaves at least (`MAXSS` with `DAT_14330eb8c`).
+    ///
     /// `turn::HP_POWERUP_FLOOR`: 1 in build 158041.
     pub hp_powerup_floor: f32,
+    /// The hit points below which nothing regenerates (`DAT_14330eb8c`).
+    ///
     /// `turn::REGENERATION_LEAST_HP`: 1 in build 158041.
     pub regeneration_least_hp: f32,
+    /// A whole hit point, the `fmodf` divisor (`XMM11`, `DAT_14330eb8c`).
+    ///
     /// `turn::REGENERATION_POINT`: 1 in build 158041.
     pub regeneration_point: f32,
+    /// A drop site within this path length is measured by the short path too (`FUN_1411671e0`, `DAT_142eb0f4c`).
+    ///
     /// `turn::SHORT_DROP_REACH`: 10 in build 158041.
     pub short_drop_reach: f32,
+    /// What Treason's command takes off the pending debit of gold (`DAT_142eb5bd4`, 400.0, read at `0x140e7c73d`).
+    ///
     /// `turn::TREASON_COST`: 400 in build 158041.
     pub treason_cost: f32,
+    /// `FUN_140ac4670`'s first argument when a hunt's target went on the walk to it, or its `MoveTo` failed (`DAT_142eb9430`): the hunt searches within this of its point.
+    ///
     /// `turn::TREE_SEARCH_WITHIN`: 8 in build 158041.
     pub tree_search_within: f32,
 }
@@ -1546,70 +1876,136 @@ pub struct TurnTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnitAiTuning {
+    /// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`, `DAT_14330eb8c`).
+    ///
     /// `unit_ai::ARMED_FIREPOWER`: 1 in build 158041.
     pub armed_firepower: f32,
+    /// Two attackers' squared gaps within this of each other tie, and a draw picks one (`DAT_142ef9004`).
+    ///
     /// `unit_ai::ATTACKER_TIE`: 0.0625 in build 158041.
     pub attacker_tie: f32,
+    /// And the defend stance's by this more (`DAT_14330ebb8`).
+    ///
     /// `unit_ai::DEFEND_GROWTH`: 5 in build 158041.
     pub defend_growth: f32,
+    /// The defend stance's leash, squared (`DAT_142ed6f20`).
+    ///
     /// `unit_ai::DEFEND_LEASH`: 25 in build 158041.
     pub defend_leash: f32,
+    /// The defend stance's leash from a saved patrol's path (`DAT_14330ebb8`, 5).
+    ///
     /// `unit_ai::DEFEND_PATROL_LEASH`: 5 in build 158041.
     pub defend_patrol_leash: f32,
+    /// What the defend order adds to its desired distance before it follows (`DAT_14330eb8c`, 1).
+    ///
     /// `unit_ai::DEFEND_SLACK`: 1 in build 158041.
     pub defend_slack: f32,
+    /// The seconds without a sighting after which enemies found are the owner's news (`DAT_142eb0f4c`).
+    ///
     /// `unit_ai::ENEMY_SIGHTING_GAP`: 10 in build 158041.
     pub enemy_sighting_gap: f32,
+    /// `evasiveMoveTo` (`FUN_140c4d140`): a coordinate at or past the map's size goes this far in (`DAT_14330eb8c`).
+    ///
     /// `unit_ai::EVADE_EDGE`: 1 in build 158041.
     pub evade_edge: f32,
+    /// The hunted animal evades by its speed times this (`FUN_140c1eea0`, `DAT_142eb1c98`).
+    ///
     /// `unit_ai::EVADE_REACH`: 3 in build 158041.
     pub evade_reach: f32,
+    /// `evasiveMoveTo` (`FUN_140c4d140`): a coordinate that is not a number becomes the unit's own plus one, or minus one above this (`DAT_14330ebb8`).
+    ///
     /// `unit_ai::EVASIVE_NEAR`: 5 in build 158041.
     pub evasive_near: f32,
+    /// The height of the explore's target point (`FUN_140c4d910`, `DAT_14330eb8c`).
+    ///
     /// `unit_ai::EXPLORE_Z`: 1 in build 158041.
     pub explore_z: f32,
+    /// The follow order's target counts as moved when its offset from the AI's target point on either axis is above this (`0x140c567c0`, `DAT_14330eb8c`).
+    ///
     /// `unit_ai::FOLLOW_SLACK_HIGH`: 1 in build 158041.
     pub follow_slack_high: f32,
+    /// The follow order's target counts as moved when its offset from the AI's target point on either axis is below this (`0x140c567c0`, `DAT_14330ec20`).
+    ///
     /// `unit_ai::FOLLOW_SLACK_LOW`: -1 in build 158041.
     pub follow_slack_low: f32,
+    /// The villager's reach test of the foundation its search found (slot 0x3d0 in `FUN_140c22bf0`, `DAT_142eb5690`).
+    ///
     /// `unit_ai::FOUNDATION_REACH`: 0.1 in build 158041.
     pub foundation_reach: f32,
+    /// The faith a priest's conversion asks unless `any` (`DAT_14330ebcc`).
+    ///
     /// `unit_ai::FULL_FAITH`: 100 in build 158041.
     pub full_faith: f32,
+    /// A Gaia target lets the siege unit's range grow by this (`DAT_142eb4838`).
+    ///
     /// `unit_ai::GAIA_TARGET_REACH`: 1.5 in build 158041.
     pub gaia_target_reach: f32,
+    /// The hit points below which a villager fights its attacker back (`DAT_14330ebc8`).
+    ///
     /// `unit_ai::HARMLESS_HP`: 60 in build 158041.
     pub harmless_hp: f32,
+    /// The range below which a villager fights its attacker back (`DAT_142e7f384`).
+    ///
     /// `unit_ai::HARMLESS_RANGE`: 0.5 in build 158041.
     pub harmless_range: f32,
+    /// `AskForHelp`'s reach (`DAT_142ecccc4`): the squared footprint gap of 3 tiles.
+    ///
     /// `unit_ai::HELP_REACH`: 9 in build 158041.
     pub help_reach: f32,
+    /// Finding no villager outside mode 1 it attacks within its line of sight over this (`FUN_140c1fb70`, `DAT_142eb1c98`).
+    ///
     /// `unit_ai::LION_SIGHT_DIVISOR`: 3 in build 158041.
     pub lion_sight_divisor: f32,
+    /// Outside mode 1 the lion attacks within this share of its line of sight (`FUN_140c1fb70`, `DAT_142e7f384`).
+    ///
     /// `unit_ai::LION_SIGHT_SHARE`: 0.5 in build 158041.
     pub lion_sight_share: f32,
+    /// The damage case's kill time of an object the unit cannot harm (`DAT_142efe41c`, 25000).
+    ///
     /// `unit_ai::NEVER_KILLED`: 25000 in build 158041.
     pub never_killed: f32,
+    /// A patrol's path goes back and forth when its point is at least this far from the unit (`0x140aa2a70`, `DAT_142eb1c98`).
+    ///
     /// `unit_ai::PATROL_TURN_REACH`: 3 in build 158041.
     pub patrol_turn_reach: f32,
+    /// The notify's radii are hundredths (`DAT_14330ebcc`).
+    ///
     /// `unit_ai::RADIUS_SCALE`: 100 in build 158041.
     pub radius_scale: f32,
+    /// A human player's unit on the attack order with a range above this does not retarget (processMisc).
+    ///
     /// `unit_ai::RETARGET_RANGE`: 3 in build 158041.
     pub retarget_range: f32,
+    /// The retarget's reference distance about a current target (`DAT_142eb9430`).
+    ///
     /// `unit_ai::RETARGET_REACH`: 8 in build 158041.
     pub retarget_reach: f32,
+    /// `runAwayFromAttackers` (`FUN_140c5e900`): a defensive unit runs at most this far from its state position (`DAT_14330ebb8`).
+    ///
     /// `unit_ai::RUN_LEASH`: 5 in build 158041.
     pub run_leash: f32,
+    /// `runAwayFromAttackers` (`FUN_140c5e900`): the run is the unit's speed times this (`DAT_142e8c150`).
+    ///
     /// `unit_ai::RUN_REACH`: 2 in build 158041.
     pub run_reach: f32,
+    /// A computer player's ship evades the object its idle check found by its speed times this (`FUN_140c21930`, `FUN_140c1eab0`: `DAT_142ec9eb8`).
+    ///
     /// `unit_ai::SHIP_EVADE_REACH`: 7 in build 158041.
     pub ship_evade_reach: f32,
+    /// A building on its make action without a missile and with at most this firepower forgets its target (`DAT_14330eb8c`).
+    ///
     /// `unit_ai::SINGLE_VOLLEY`: 1 in build 158041.
     pub single_volley: f32,
+    /// The soldier's range against a target grows by this for its stance checks (`DAT_142e7f384`).
+    ///
     /// `unit_ai::STANCE_RANGE_GROWTH`: 0.5 in build 158041.
     pub stance_range_growth: f32,
+    /// Stand ground's leash from a saved patrol's path (`DAT_142e7f384`, 0.5).
+    ///
     /// `unit_ai::STAND_GROUND_PATROL_LEASH`: 0.5 in build 158041.
     pub stand_ground_patrol_leash: f32,
+    /// What the stand ground stance's leash adds to the unit's range (`DAT_142eb880c`, 0.25, read by `ADDSS` at `0x140c57c6a`).
+    ///
     /// `unit_ai::STAND_GROUND_SLACK`: 0.25 in build 158041.
     pub stand_ground_slack: f32,
 }
@@ -1618,6 +2014,8 @@ pub struct UnitAiTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VisibilityTuning {
+    /// `DAT_142eb99cc`: a footprint's high edge, less this, is its last tile.
+    ///
     /// `visibility::EDGE`: 0.01 in build 158041.
     pub edge: f32,
 }
@@ -1626,6 +2024,8 @@ pub struct VisibilityTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WaitSolidifyTuning {
+    /// `DAT_142eb56a0` (a double): the foundation's build points (`+0xc50`, widened) at most which it is not solid yet.
+    ///
     /// `wait_solidify::SOLID_FROM`: 0.01 in build 158041.
     pub solid_from: f64,
 }
@@ -1634,6 +2034,8 @@ pub struct WaitSolidifyTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WallTuning {
+    /// How far inside the map's far edges the snap keeps a footprint (`FUN_141123ac0`).
+    ///
     /// `wall::MAP_MARGIN`: 0.00001 in build 158041.
     pub map_margin: f32,
 }
@@ -1642,6 +2044,8 @@ pub struct WallTuning {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorldPlayerTuning {
+    /// The livestock food over which a mill's yield grows by one e-fold (`DAT_142eb0f54`).
+    ///
     /// `world_player::LIVESTOCK_SCALE`: 200 in build 158041.
     pub livestock_scale: f32,
 }

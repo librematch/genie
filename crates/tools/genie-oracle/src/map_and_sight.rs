@@ -27,7 +27,7 @@ use genie_core::vision::visibility::{
 };
 use genie_core::world::GameState;
 use genie_core::world::parts::Object;
-use genie_model::layer::Roles;
+use genie_model::layer::BuildLayer;
 use genie_rec::de;
 use genie_save::Header;
 use genie_save::generated::world::VisibleResourceManager;
@@ -158,9 +158,10 @@ impl SavedStep {
 pub(super) fn spatial(
     header: &Header,
     terrain: &TerrainTable,
-    roles: &Roles,
+    layer: &BuildLayer,
 ) -> Result<Spatial, genie_core::GenieError> {
     use genie_core::map::spatial::{Obstruction, Placed, Spatial, Tiles};
+    let roles = &layer.roles;
     let map = &header.world.base_world.map;
     let classes = map
         .rows
@@ -211,12 +212,12 @@ pub(super) fn spatial(
                 |b| b.mupt_linked_object_references_linked_owner_id == -1 && b.desolid_flag == 0,
             );
             let umv = match (links, building.is_some()) {
-                (true, true) => sight.link_building(place, footprint)?,
+                (true, true) => sight.link_building(place, footprint, layer.tuning.visibility)?,
                 (true, false) => {
-                    let _ = sight.link_building(place, footprint)?;
+                    let _ = sight.link_building(place, footprint, layer.tuning.visibility)?;
                     0
                 }
-                (false, true) => sight.building_entry(place, footprint),
+                (false, true) => sight.building_entry(place, footprint, layer.tuning.visibility),
                 (false, false) => 0,
             };
             sight.add_seer(

@@ -7,7 +7,6 @@ use crate::groups::CommandArgs;
 use crate::groups::GroupId;
 use crate::map::Distance;
 use crate::map::Point;
-use crate::math::image::group::MEMBER_MIN_HP;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
@@ -70,7 +69,7 @@ pub(crate) struct TaskQuery {
 impl World {
     /// The task of group `group` on `target` as `BUnitGroup::command` asks for it: slot 0x130
     /// ([`World::member_task`]) of each member the world holds with at least
-    /// [`MEMBER_MIN_HP`] hit points, in order, until one answers a task.
+    /// `GroupTuning::member_min_hp` hit points, in order, until one answers a task.
     ///
     /// # Errors
     ///
@@ -96,7 +95,7 @@ impl World {
             let Some(member) = Some(m.id) else {
                 continue;
             };
-            if u.life.hp < HitPoints::new(MEMBER_MIN_HP) {
+            if u.life.hp < HitPoints::new(self.model.tuning.group.member_min_hp) {
                 continue;
             }
             if let Some(task) = self.member_task(member, &query)? {

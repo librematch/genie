@@ -55,10 +55,7 @@ pub use self::start::{HuntChase, HuntMove, HuntRetarget, HuntStart, PointWalk, P
 #[cfg(test)]
 use crate::combat::damage::Victim;
 use crate::gathering::{DropSiteId, HuntTargetId};
-use crate::math::image::hunt::{
-    GAP as HUNT_GAP, HERD_REACH as HUNT_HERD_REACH, LAST_BIT as HUNT_LAST_BIT,
-    OWN_LIVESTOCK_RANGE as HUNT_OWN_LIVESTOCK_RANGE, REMAINDER as HUNT_REMAINDER,
-};
+use crate::math::image::hunt::{LAST_BIT as HUNT_LAST_BIT, REMAINDER as HUNT_REMAINDER};
 #[cfg(test)]
 use crate::movement::Mover;
 pub use crate::movement::move_to::Shown;
@@ -67,9 +64,6 @@ use crate::objects::masters::WorkValue;
 /// The Hunt action's type, which word 9 adds.
 pub const HUNT: ActionKind = ActionKind::named(110);
 
-/// Own livestock farther than this squared from its drop site is led there first
-/// (`DAT_142ecccc4`).
-const HERD_REACH: DistanceSquared = DistanceSquared::new(HUNT_HERD_REACH);
 /// Own livestock this far squared from its drop site or farther is slaughtered where it stands
 /// (`DAT_142eb0f64`).
 const HERD_FAR: DistanceSquared = DistanceSquared::new(900.0);
@@ -78,15 +72,10 @@ const HERD_FAR: DistanceSquared = DistanceSquared::new(900.0);
 const LEAD_REACH: DistanceSquared = DistanceSquared::new(2.25);
 /// The wait of a herder leading livestock (`set_state(10)`'s timer, `0xbf800000`).
 const LEAD_WAIT: Seconds = Seconds::new(-1.0);
-/// A face on dead livestock beyond the task's range plus this walks again (`DAT_142eb5690`).
-const GAP: f32 = HUNT_GAP;
 /// Below this a target's or a load's remainder counts as nothing (`DAT_142eb5690`).
 const REMAINDER: Amount = Amount::new(HUNT_REMAINDER);
 /// A target's last bit adds its master's first storage amount times this (`DAT_142eb1e9c`).
 const LAST_BIT: f32 = HUNT_LAST_BIT;
-
-/// The range of the walk to the hunter's own player's livestock (`DAT_142eb4838`).
-const OWN_LIVESTOCK_RANGE: f32 = HUNT_OWN_LIVESTOCK_RANGE;
 
 /// The Hunt action of a gatherer (`TRIBE_Action_Hunt`, type 110).
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]

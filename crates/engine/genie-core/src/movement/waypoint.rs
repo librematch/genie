@@ -24,9 +24,9 @@ use crate::objects::ObjectId;
 use crate::objects::layers::Static;
 use crate::objects::sprite::Graphic;
 use crate::pathing::Pathing;
+use crate::vision::SightLayer;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
-use crate::world::layer::Roles;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 
@@ -159,6 +159,7 @@ impl Mover {
         now: WorldTime,
         by_id: ObjectsRef<'_>,
     ) -> Result<(), GenieError> {
+        let visibility_tuning = &by_id.tuning().visibility;
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         let level = self.paths.walked()?;
@@ -166,7 +167,17 @@ impl Mover {
             let p = level.point(level.waypoint);
             let at = self.set_position(p.position(), world.map, movement_tuning);
             let at = self.grounded(at, world.terrain.as_ref());
-            self.moved_to(place, me, Moved { at, now }, world, pathing, roles)?;
+            self.moved_to(
+                place,
+                me,
+                Moved { at, now },
+                world,
+                pathing,
+                SightLayer {
+                    roles,
+                    visibility_tuning: *visibility_tuning,
+                },
+            )?;
         }
         self.paths.walked_mut()?.flags &= !LevelFlags::AT_WAYPOINT;
         Ok(())
@@ -505,10 +516,14 @@ impl Mover {
         Moved { at, now }: Moved,
         world: &mut Spatial,
         pathing: Option<&mut Pathing>,
-        roles: &Roles,
+        sight: SightLayer<'_>,
     ) -> Result<(), GenieError> {
+        let SightLayer {
+            roles,
+            visibility_tuning,
+        } = sight;
         self.mark_move(at, now);
-        self.new_position(place, me.id, at, (world, pathing), roles)?;
+        self.new_position(place, me.id, at, (world, pathing), roles, visibility_tuning)?;
         Ok(())
     }
 

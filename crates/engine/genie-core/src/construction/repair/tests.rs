@@ -36,6 +36,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use crate::unit_ai::{AiAction, NotifyKind};
 use crate::world::tests::{in_update, repairing};
 use crate::world::{Player, World, WorldTime};
@@ -105,7 +106,14 @@ const TARGET: WalkTo = WalkTo {
 
 /// The Repair of the work command on [`TARGET`], within 0, with [`TASK`].
 fn started() -> RepairAction {
-    RepairAction::start(TARGET, TASK, Distance::ZERO, &move_reads(&graphics())).unwrap()
+    RepairAction::start(
+        TARGET,
+        TASK,
+        Distance::ZERO,
+        &move_reads(&graphics()),
+        &tuning().move_to,
+    )
+    .unwrap()
 }
 
 /// A villager's master work rate 1 with a powerup of 0: half a hit point per second per the
@@ -117,7 +125,8 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
             WorkRate::new(1.0),
             WorkValue::new(0.5),
             Seconds::new(0.05),
-            None
+            None,
+            &tuning().repair
         ),
         HitPoints::new(1.0 * 0.5 * 0.05)
     );
@@ -126,7 +135,8 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
             WorkRate::new(1.0),
             WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(BuilderCount::of_data(1))
+            Some(BuilderCount::of_data(1)),
+            &tuning().repair
         ),
         HitPoints::new(1.0 * 0.5 * 0.05)
     );
@@ -136,7 +146,8 @@ fn the_work_counts_half_for_each_repairer_past_the_first() {
             WorkRate::new(1.0),
             WorkValue::new(0.5),
             Seconds::new(0.05),
-            Some(BuilderCount::of_data(3))
+            Some(BuilderCount::of_data(3)),
+            &tuning().repair
         ),
         HitPoints::new(alone * (((3.0 - 1.0) * 0.5 + 1.0) / 3.0))
     );
@@ -400,7 +411,11 @@ fn repair_at(at: Position, set: impl FnOnce(&mut RepairAction)) -> World {
         .unwrap();
     let v = &mut t.players[1].objects[ListIndex::new(0)];
     let standing = *graphics().get(SpriteId::named(5)).unwrap();
-    v.sprite = Some(ActiveSprite::start(standing, &mut Well512::default()));
+    v.sprite = Some(ActiveSprite::start(
+        standing,
+        &mut Well512::default(),
+        tuning().sprite,
+    ));
     set(t
         .parts
         .actions
@@ -489,10 +504,16 @@ fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
         let r = RepairAction { task, ..started() };
         let id = |m: MoveToAction| m.sprite.map(|s| s.id);
         [
-            id(r.walk(&move_reads(&g), Some(TARGET)).unwrap().unwrap()),
-            id(r.to_point(Position::new(1.0, 2.0, 0.0), &move_reads(&g))
+            id(r.walk(&move_reads(&g), Some(TARGET), &tuning().move_to)
                 .unwrap()
                 .unwrap()),
+            id(r.to_point(
+                Position::new(1.0, 2.0, 0.0),
+                &move_reads(&g),
+                &tuning().move_to,
+            )
+            .unwrap()
+            .unwrap()),
         ]
     };
     assert_eq!(
@@ -508,10 +529,17 @@ fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
         task: lacking,
         ..started()
     };
-    assert!(r.walk(&move_reads(&g), Some(TARGET)).is_err());
     assert!(
-        r.to_point(Position::new(1.0, 2.0, 0.0), &move_reads(&g))
+        r.walk(&move_reads(&g), Some(TARGET), &tuning().move_to)
             .is_err()
+    );
+    assert!(
+        r.to_point(
+            Position::new(1.0, 2.0, 0.0),
+            &move_reads(&g),
+            &tuning().move_to
+        )
+        .is_err()
     );
 }
 
@@ -520,7 +548,14 @@ fn repair_move_to_shows_its_task_moving_sprite_else_its_default() {
 #[test]
 fn repair_move_tos_are_quiet() {
     let g = graphics();
-    let r = RepairAction::start(TARGET, TASK, Distance::new(1.5), &move_reads(&g)).unwrap();
+    let r = RepairAction::start(
+        TARGET,
+        TASK,
+        Distance::new(1.5),
+        &move_reads(&g),
+        &tuning().move_to,
+    )
+    .unwrap();
     let to_target = MoveToAction {
         state: MoveTo::Start,
         point: Position::new(11.0, 10.0, 0.0),
@@ -533,7 +568,11 @@ fn repair_move_tos_are_quiet() {
     };
     assert_eq!(r.state.move_to().copied(), Some(to_target));
     assert_eq!(
-        r.to_point(Position::new(1.0, 2.0, 0.0), &move_reads(&g)),
+        r.to_point(
+            Position::new(1.0, 2.0, 0.0),
+            &move_reads(&g),
+            &tuning().move_to
+        ),
         Ok(Some(MoveToAction::sub_to_point(
             Position::new(1.0, 2.0, 0.0),
             Distance::ZERO,
@@ -549,7 +588,7 @@ fn repair_move_tos_are_quiet() {
 fn repair_move_to_starts_as_its_list_adds_it() {
     let g = graphics();
     let state = |to, reads: MoveToReads<'_>| {
-        RepairAction::start(to, TASK, Distance::ZERO, &reads)
+        RepairAction::start(to, TASK, Distance::ZERO, &reads, &tuning().move_to)
             .unwrap()
             .state
             .move_to()
@@ -571,7 +610,10 @@ fn repair_move_to_starts_as_its_list_adds_it() {
         ..move_reads(&g)
     };
     assert_eq!(state(TARGET, dying), None);
-    let none = started().walk(&move_reads(&g), None).unwrap().unwrap();
+    let none = started()
+        .walk(&move_reads(&g), None, &tuning().move_to)
+        .unwrap()
+        .unwrap();
     assert_eq!((none.target, none.point), (None, Position::ORIGIN));
 }
 
@@ -616,7 +658,12 @@ fn repair_walk_to_its_point_shows_its_sprite_as_it_starts() {
             .unwrap();
         let g = graphics();
         let _ = r
-            .take_point(Position::new(35.5, 95.5, 0.0), mover, &move_reads(&g))
+            .take_point(
+                Position::new(35.5, 95.5, 0.0),
+                mover,
+                &move_reads(&g),
+                &tuning().move_to,
+            )
             .unwrap();
         assert_eq!(repaired(&mut t), Ok(HeadCode::Keeps));
         assert_eq!(
@@ -791,7 +838,8 @@ fn repairer_works_until_the_target_is_full_or_the_player_cannot_pay() {
                     WorkRate::new(1.0),
                     WorkValue::new(0.5),
                     Seconds::new(0.05),
-                    Some(BuilderCount::of_data(1))
+                    Some(BuilderCount::of_data(1)),
+                    &tuning().repair
                 )
                 .get(),
             1,
@@ -900,7 +948,8 @@ fn move_sends_the_repairer_to_its_point() {
         r.take_point(
             Position::new(30.0, 5.0, 0.0),
             Some(&mut mover),
-            &move_reads(&g)
+            &move_reads(&g),
+            &tuning().move_to
         ),
         Ok((Some(object_id(20)), true))
     );
@@ -970,21 +1019,27 @@ fn walking_again_starts_new_move_to_the_target() {
         state: RepairState::WalkPoint {
             move_to: Some(MoveToAction {
                 state: MoveTo::Arrived,
-                ..r.to_point(Position::new(3.0, 4.0, 0.0), &move_reads(&g))
-                    .unwrap()
-                    .unwrap()
+                ..r.to_point(
+                    Position::new(3.0, 4.0, 0.0),
+                    &move_reads(&g),
+                    &tuning().move_to,
+                )
+                .unwrap()
+                .unwrap()
             }),
         },
         ..r
     };
     assert_eq!(
-        walking.walk_again(TARGET, Some(&mut mover), &move_reads(&g)),
+        walking.walk_again(TARGET, Some(&mut mover), &move_reads(&g), &tuning().move_to),
         Ok(())
     );
     assert_eq!(
         walking.state,
         RepairState::Move {
-            move_to: r.walk(&move_reads(&g), Some(TARGET)).unwrap()
+            move_to: r
+                .walk(&move_reads(&g), Some(TARGET), &tuning().move_to)
+                .unwrap()
         }
     );
 }

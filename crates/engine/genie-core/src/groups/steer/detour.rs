@@ -476,7 +476,8 @@ impl World {
             closed: Vec::new(),
             full: false,
         };
-        let found = planner.plan::<GenieError>(&req, false, record, None)?;
+        let found =
+            planner.plan::<GenieError>(&req, false, record, None, &self.model.tuning.tile_path)?;
         Ok(Some(found))
     }
 }

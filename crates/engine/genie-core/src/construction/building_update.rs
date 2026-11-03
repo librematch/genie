@@ -13,10 +13,6 @@ use crate::map::Snow;
 use crate::map::TerrainId;
 use crate::map::spatial::Spatial;
 use crate::map::terrain::Foundation;
-use crate::math::image::turn::{
-    DEATH_BLAST_FACTOR as TURN_DEATH_BLAST_FACTOR, DEATH_BLAST_HP as TURN_DEATH_BLAST_HP,
-    FARM_STAGES,
-};
 use crate::math::rng::Well512;
 use crate::movement::MoveAlgorithm;
 use crate::objects::Graphics;
@@ -44,12 +40,12 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
+use crate::world::layer::generated::TurnTuning;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
-use crate::world::{
-    BUILDING_TERRAIN, EJECT_SHARE, GATE_CLOSE_DELAY, GATE_EPSILON, GATE_SHUT_HEIGHT,
-};
+use crate::world::{BUILDING_TERRAIN, GATE_CLOSE_DELAY, GATE_EPSILON};
 use std::mem::take;
 
 /// `TRIBE_Building_Object::update`'s walls' branch (`0x1411c9000`): a master of class 27 (a
@@ -160,7 +156,11 @@ impl Unit {
                 ))?;
         if shut && 0 < allied && !locked {
             gate.close_timer = Seconds::ZERO;
-            return self.toggle_own_gate(actions, c, GATE_SHUT_HEIGHT <= height);
+            return self.toggle_own_gate(
+                actions,
+                c,
+                c.w.model.tuning.turn.gate_shut_height <= height,
+            );
         }
         if height < GATE_EPSILON && total == 0 {
             if gate.close_timer <= Seconds::ZERO {
@@ -236,6 +236,7 @@ impl Unit {
             cons.progress,
             cons.build_time,
             roles,
+            &c.w.model.tuning.turn,
         ) else {
             return Ok(());
         };
@@ -260,7 +261,7 @@ impl Unit {
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f, roles)
+            .cover(&f, roles, c.w.model.tuning.terrain)
     }
 
     /// `TRIBE_Building_Object::update` (`0x1411c9000`) before its combat update: a building in
@@ -334,7 +335,9 @@ impl Unit {
         // (FUN_1411e7220 for each from the last, then their slots 0x1a8 and 0xd0); its master's
         // slot 0x110 only sets a sound flag
         if self.life.hp
-            <= HitPoints::new(HitPoints::of_master(master.hit_points).get() * EJECT_SHARE)
+            <= HitPoints::new(
+                HitPoints::of_master(master.hit_points).get() * c.w.model.tuning.turn.eject_share,
+            )
             && !self.garrison.is_empty()
         {
             return Err(GenieError::unsupported(
@@ -439,6 +442,7 @@ impl Unit {
         second: Option<SpriteId>,
         graphics: &Graphics,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) {
         let Some(second) = second else {
             return;
@@ -467,7 +471,13 @@ impl Unit {
             Some(second)
         };
         if let Some(&g) = next.and_then(|next| graphics.get(next)) {
-            new_sprite(&mut self.sprite, motion.move_stats_mut(), g, sprite_rng);
+            new_sprite(
+                &mut self.sprite,
+                motion.move_stats_mut(),
+                g,
+                sprite_rng,
+                sprite_tuning,
+            );
         }
         if let Some(s) = self.sprite.as_mut() {
             s.reset_frame();
@@ -492,7 +502,7 @@ impl Unit {
         roles: &Roles,
     ) -> Result<(), GenieError> {
         let master = self.master(c.w.master_tables(), c.player)?;
-        if !blasts_at_death(master, &self.life, roles) {
+        if !blasts_at_death(master, &self.life, roles, &c.w.model.tuning.turn) {
             return Ok(());
         }
         let terrain = c.w.spatial.terrain.as_ref();
@@ -519,7 +529,7 @@ impl Unit {
             Some(self.id),
             None,
             &mut targets,
-            DEATH_BLAST_FACTOR,
+            c.w.model.tuning.turn.death_blast_factor,
             HitLayer {
                 roles,
                 slots: c.w.model.slots,
@@ -559,15 +569,16 @@ pub(crate) fn farm_stage_terrain(
     progress: Seconds,
     build_time: WholeSeconds,
     roles: &Roles,
+    turn_tuning: &TurnTuning,
 ) -> Option<TerrainId> {
-    /// The stages over the build time (`DAT_142eb1c98`).
-    const STAGES: f32 = FARM_STAGES;
     /// A farm's first stage terrain (`0x1d`).
     const FIRST_STAGE: u8 = 29;
     /// A rice farm's first stage terrain on mangrove or rice (`0x41`).
     const RICE_STAGE: u8 = 65;
     let stage =
-        (((progress.get() * STAGES) / Seconds::of_master(build_time).get()) as i32 as u8).min(2);
+        (((progress.get() * turn_tuning.farm_stages) / Seconds::of_master(build_time).get()) as i32
+            as u8)
+            .min(2);
     let stage_byte = {
         let held = roles.of_master(master);
         if held.contains(MasterRoles::FARM) {
@@ -586,17 +597,17 @@ pub(crate) fn farm_stage_terrain(
     Some(TerrainId::named(stage_byte))
 }
 
-/// The hit points below which they blast (`DAT_14330eb8c`; `COMISS`, a NaN does not).
-pub(crate) const DEATH_BLAST_HP: f32 = TURN_DEATH_BLAST_HP;
-/// The blast's damage factor (`XMM11`, the same constant).
-pub(crate) const DEATH_BLAST_FACTOR: f32 = TURN_DEATH_BLAST_FACTOR;
-
 /// `TRIBE_Combat_Object::update`'s test for the blast at death: a unit of one of
-/// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below [`DEATH_BLAST_HP`] hit points in state
+/// [`DEATH_BLAST_MASTERS`] or [`DEATH_BLAST_CLASSES`] below `TurnTuning::death_blast_hp` hit points in state
 /// 2. The update runs for the combat objects and buildings (types 70 and 80).
-pub(crate) fn blasts_at_death(master: &Master, life: &Lifecycle, roles: &Roles) -> bool {
+pub(crate) fn blasts_at_death(
+    master: &Master,
+    life: &Lifecycle,
+    roles: &Roles,
+    turn_tuning: &TurnTuning,
+) -> bool {
     MasterKind::COMBAT <= master.kind
-        && life.hp < HitPoints::new(DEATH_BLAST_HP)
+        && life.hp < HitPoints::new(turn_tuning.death_blast_hp)
         && life.state == ObjectState::Alive
         && (roles
             .of_master(master.id)

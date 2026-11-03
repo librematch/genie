@@ -15,15 +15,15 @@ use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAiType;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::{
-    ARTIFACT_AI, AttackAsk, BOAR_AI, CIVILIAN, ENEMY_SIGHTING_GAP, FISHING_AI, FISHING_CARED,
-    Found, Memory, Pick, SHIP_EVADE_REACH, SIEGE_AI, SIEGE_CARED, SIEGE_TOWER_AI, SOLDIER_AI,
-    SOLDIER_CARED, Search, Seeker, Surroundings, TOWER_AI, TOWER_CARED, TRADE_AI, TRADE_CART_CARED,
-    TRADE_SHIP_CARED, UnitAi, UnitSide, attack_search_radius, civilian_search_radius,
-    computer_idle_check, search_radius,
+    ARTIFACT_AI, AttackAsk, BOAR_AI, CIVILIAN, FISHING_AI, FISHING_CARED, Found, Memory, Pick,
+    SIEGE_AI, SIEGE_CARED, SIEGE_TOWER_AI, SOLDIER_AI, SOLDIER_CARED, Search, Seeker, Surroundings,
+    TOWER_AI, TOWER_CARED, TRADE_AI, TRADE_CART_CARED, TRADE_SHIP_CARED, UnitAi, UnitSide,
+    attack_search_radius, civilian_search_radius, computer_idle_check, search_radius,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
+use crate::world::layer::generated::UnitAiTuning;
 
 impl UnitAi {
     /// processIdle, slot 72 (`+0x240`) of each factory type's vtable: the hunted animal's
@@ -69,7 +69,7 @@ impl UnitAi {
     /// inside another looks for the closest object of the classes it cares about
     /// (`ClosestObject` with every relation, state and master, reachable: [`Pick::Closest`]; the
     /// search adds the fishing ship's `+0x1e8`, 7, to its radius) and, finding one the world
-    /// holds, moves away from it by its speed times [`SHIP_EVADE_REACH`] along the line between
+    /// holds, moves away from it by its speed times `UnitAiTuning::ship_evade_reach` along the line between
     /// them (`evasiveMoveTo`, slot 0x150 with both flags, [`UnitAi::evasive_move`]): true (6).
     /// Else false (5).
     pub(super) fn ship_idle(
@@ -79,6 +79,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         self.cap_human_order(side, ai)?;
         if !player_type.is_computer() || at.garrisoned {
@@ -126,7 +127,7 @@ impl UnitAi {
         let Some(u) = side.seen_unit(id)? else {
             return Ok(false);
         };
-        let reach = (at.speed * SHIP_EVADE_REACH).get();
+        let reach = (at.speed * unit_ai_tuning.ship_evade_reach).get();
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let dx = u.position.x() - x;
         let dy = u.position.y() - y;
@@ -245,6 +246,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius: attack_search_radius(at),
@@ -253,7 +255,7 @@ impl UnitAi {
             pick: Pick::Look,
             memory: Memory::default(),
         })?;
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         if !matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
@@ -275,6 +277,7 @@ impl UnitAi {
         player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius: attack_search_radius(at),
@@ -288,7 +291,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         Ok(found.id)
     }
 
@@ -395,6 +398,7 @@ impl UnitAi {
         player_type: PlayerType,
         side: &mut dyn UnitSide,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let found = side.closest(&Search {
             at: at.position.ground(),
             radius: attack_search_radius(at),
@@ -408,7 +412,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         Ok(found.id)
     }
 
@@ -556,6 +560,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         self.cap_human_order(side, rng)?;
         if self.stance == UnitStance::NO_ATTACK {
             let found = side.closest(&Search {
@@ -566,7 +571,7 @@ impl UnitAi {
                 pick: Pick::Look,
                 memory: Memory::default(),
             })?;
-            self.attack_search_alert(found, player_type)?;
+            self.attack_search_alert(found, player_type, unit_ai_tuning)?;
             return Ok(false);
         }
         let found = side.closest(&Search {
@@ -586,7 +591,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         let Some(id) = found.id else {
             return Ok(false);
         };
@@ -630,13 +635,16 @@ impl UnitAi {
         &mut self,
         found: Found,
         player_type: PlayerType,
+        unit_ai_tuning: &UnitAiTuning,
     ) -> Result<(), GenieError> {
         if !found.fresh {
             return Ok(());
         }
         self.alert_mode = found.enemies;
         if found.enemies {
-            if ENEMY_SIGHTING_GAP < self.time_since_enemy && player_type.is_computer() {
+            if Seconds::new(unit_ai_tuning.enemy_sighting_gap) < self.time_since_enemy
+                && player_type.is_computer()
+            {
                 return Err(GenieError::unsupported(
                     "a computer player's notify of enemies sighted (0x210, slot 0x3c8)",
                 ));

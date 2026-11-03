@@ -139,10 +139,11 @@ pub(crate) fn long_path_for(
     target: Option<(ObjectId, &Placed)>,
     by_id: ObjectsRef<'_>,
 ) -> Result<(bool, Path), GenieError> {
+    let long_path_tuning = &by_id.tuning().long_path;
     let long_target = target.map(|(_, t)| {
         let gap2 = footprint_gap_squared(walker.position, walker.radius, t.position, t.radius);
         let gap = footprint_gap(walker.position, walker.radius, t.position, t.radius);
-        LongTarget::new(t.position, t.radius, gap, gap2)
+        LongTarget::new(t.position, t.radius, gap, gap2, *long_path_tuning)
     });
     let listed = lowered_units(walker, world, target.map(|(id, _)| id), by_id);
     let lowered = listed
@@ -173,6 +174,7 @@ pub(crate) fn long_path_for(
         world.map,
         (&req, &gates),
         walker.position.z(),
+        *long_path_tuning,
     )
 }
 
@@ -226,6 +228,7 @@ pub(crate) fn tile_plan_for(
     ask: TileAsk<'_>,
     out: &mut Path,
 ) -> Result<Option<Found>, GenieError> {
+    let tile_path_tuning = &by_id.tuning().tile_path;
     let TileAsk {
         goal: to,
         radii,
@@ -262,7 +265,8 @@ pub(crate) fn tile_plan_for(
     };
     let ignore: Vec<RecordId> = ignore.into_iter().map(RecordId::from).collect();
     let mut walls = SmoothingWalls::new(world, radius, mask, &ignore);
-    let found = planner.plan::<GenieError>(&req, target_box, out, Some(&mut walls))?;
+    let found =
+        planner.plan::<GenieError>(&req, target_box, out, Some(&mut walls), tile_path_tuning)?;
     if walls.ran {
         plan.pathing.smoothing_ran(slots);
         // FUN_140f7dbb0 sets the manager's ignore list to it (FUN_1410562e0)

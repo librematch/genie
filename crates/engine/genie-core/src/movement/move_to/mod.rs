@@ -34,7 +34,6 @@ mod move_wait_state;
 mod sub_action;
 
 use crate::combat::abilities::Look;
-use crate::math::image::move_to::{OFF_HIGH as MOVE_TO_OFF_HIGH, OFF_LOW as MOVE_TO_OFF_LOW};
 pub(crate) use crate::movement::move_to::action::TARGET_LACKING;
 pub use crate::movement::move_to::action::{
     MoveDefaults, MoveStep, MoveToAction, Shows, ai_sprite, holds_object, object_range,
@@ -49,6 +48,7 @@ use crate::objects::Graphics;
 use crate::objects::masters::Master;
 use crate::world::WALKER_UNMOVING;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
 
 /// The `MoveTo` action's type, which word 9 adds when it is a unit's top action.
 pub const MOVE_TO: ActionKind = ActionKind::named(1);
@@ -289,6 +289,7 @@ pub fn ask_walk(
     ask: PathAsk,
     shown: Option<Shown<'_>>,
 ) -> Result<(Option<MoveTo>, Option<Position>), GenieError> {
+    let sprite_tuning = walk.by_id.tuning().sprite;
     let (point, target, radius) = match goal {
         Goal::Target(id) => {
             let t = walk
@@ -314,7 +315,7 @@ pub fn ask_walk(
     }
     mover.request_path_asked(here, point, Distance::new(range), target, now, ask);
     if let Some(mut shown) = shown {
-        shown.show(walk.move_stats_mut());
+        shown.show(walk.move_stats_mut(), sprite_tuning);
     }
     // the MoveTo's point (`+0x38`): the target's place when it asks for the path
     Ok((walk_or_give_up(walk.reborrow())?, Some(point)))
@@ -426,9 +427,9 @@ impl Shown<'_> {
     /// The `MoveTo` turned to state 4: the unit shows its sprite ([`new_sprite`]) and reads its
     /// top speed (`stats`) with it. A `MoveTo` without one (`+0x58` null) is not modelled: slot
     /// 0x68 would show the master's standing sprite (`+0x470`); genie shows nothing.
-    pub fn show(&mut self, stats: Option<&mut MoveStats>) {
+    pub fn show(&mut self, stats: Option<&mut MoveStats>, sprite_tuning: SpriteTuning) {
         if let Some(g) = self.graphic {
-            new_sprite(self.sprite, stats, g, self.rng);
+            new_sprite(self.sprite, stats, g, self.rng, sprite_tuning);
         }
     }
 }
@@ -463,11 +464,6 @@ pub fn walk_or_give_up(walk: Walk<'_>) -> Result<Option<MoveTo>, GenieError> {
         },
     )
 }
-
-/// A target leaves the `MoveTo`'s point when it is more than this off it on either axis
-/// (`DAT_142eb6e58`, `DAT_142e7f384`).
-const OFF_LOW: f32 = MOVE_TO_OFF_LOW;
-const OFF_HIGH: f32 = MOVE_TO_OFF_HIGH;
 
 /// What [`target_moved`] found.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -517,6 +513,7 @@ pub fn target_left(
     point: Position,
     mode: TargetMoved,
 ) -> Result<Follow, GenieError> {
+    let move_to_tuning = &walk.by_id.tuning().move_to;
     if mode == TargetMoved::Ignores {
         return Ok(Follow::Stays);
     }
@@ -526,7 +523,11 @@ pub fn target_left(
         .ok_or(GenieError::unsupported("a MoveTo whose target is gone"))?;
     let at = t.position;
     let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
-    if !(dx < OFF_LOW || OFF_HIGH < dx || dy < OFF_LOW || OFF_HIGH < dy) {
+    if !(dx < move_to_tuning.off_low
+        || move_to_tuning.off_high < dx
+        || dy < move_to_tuning.off_low
+        || move_to_tuning.off_high < dy)
+    {
         return Ok(Follow::Stays);
     }
     if mode == TargetMoved::AsksAgain {
@@ -572,6 +573,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::tuning;
 
     #[cfg(test)]
     use crate::unit_ai::{AiAction, Inbox, NotifyKind, UnitAi};
@@ -927,7 +929,10 @@ mod tests {
     #[test]
     fn an_added_sub_move_to_arrives_starts_or_fails_and_dying_unit_adds_none() {
         let m = MoveToAction::sub_to_point(Position::new(1.0, 2.0, 0.0), Distance::new(0.5), None);
-        let state = |unit_state, gap, speed| m.added(unit_state, gap, speed).map(|a| a.state);
+        let state = |unit_state, gap, speed| {
+            m.added(unit_state, gap, speed, &tuning().move_to)
+                .map(|a| a.state)
+        };
         assert_eq!(
             state(ObjectState::Alive, Distance::new(0.01), Speed::ZERO),
             Some(MoveTo::Arrived)
@@ -980,7 +985,12 @@ mod tests {
             state(ObjectState::Removed, Distance::new(0.5), Speed::new(1.0)),
             None
         );
-        let added = m.added(ObjectState::Alive, Distance::new(0.5), Speed::new(1.0));
+        let added = m.added(
+            ObjectState::Alive,
+            Distance::new(0.5),
+            Speed::new(1.0),
+            &tuning().move_to,
+        );
         assert_eq!(
             added.map(|a| (a.point, a.range, a.voice)),
             Some((m.point, Distance::new(0.5), Voice::Quiet))

@@ -295,7 +295,7 @@ pub(super) fn slice(header: &Header, masters: Option<&MasterTable>) -> Result<Wo
     }
     let none = TerrainTable::default();
     let terrain = masters.map_or(&none, |t| &t.terrain);
-    match layer().and_then(|l| spatial(header, terrain, &l.roles)) {
+    match layer().and_then(|l| spatial(header, terrain, l)) {
         Ok(s) => turns.spatial = s,
         Err(e) => stop_all(&mut turns, &e),
     }
@@ -604,6 +604,7 @@ fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
                     masters,
                     turns.parts.combat_of(b.id).reload_powerup,
                     &turns.model.roles,
+                    &turns.model.tuning.garrison,
                 );
                 Some(garrison_share(
                     me,

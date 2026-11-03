@@ -3,8 +3,9 @@
 use crate::map::Distance;
 use crate::map::Point;
 use crate::pathing::tile_path::{
-    CellEdges, CellIndex, CellKind, FAR_SIDE, GridLevel, HALF, ONE, PlanRect, PlanTile, Planner,
+    CellEdges, CellIndex, CellKind, GridLevel, HALF, ONE, PlanRect, PlanTile, Planner,
 };
+use crate::world::layer::generated::TilePathTuning;
 
 /// A search's request: from a point to a goal with its ranges, as the planner's entry passes
 /// them on (`FUN_140f7c530`'s arguments 3 to 11).
@@ -130,8 +131,8 @@ impl Planner {
 
     /// `FUN_140f7d540`: mark (or clear) the node cells within the goal's ranges; when none is, the
     /// coarsest node cell holding the goal's tile.
-    pub(super) fn mark_goal(&mut self, goal: Goal, set: bool) {
-        self.goal_square(goal, FAR_SIDE);
+    pub(super) fn mark_goal(&mut self, goal: Goal, set: bool, tile_path_tuning: &TilePathTuning) {
+        self.goal_square(goal, tile_path_tuning.far_side);
         self.goal_marked = false;
         let [x0, y0, x1, y1] = self.region.get();
         let mut marked = 0;

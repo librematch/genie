@@ -17,6 +17,7 @@ use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::unit_ai::NotifyKind;
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::world::Seconds;
 use crate::world::WorldTime;
@@ -34,6 +35,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::Part;
 use crate::world::player::Player;
 
@@ -61,6 +63,7 @@ impl World {
             &mut self.spatial,
             self.world_time,
             &self.model.roles,
+            self.model.tuning.visibility,
         );
         let j = self.put_back_own(q, unit)?;
         let Some(own) = changed? else {
@@ -251,7 +254,10 @@ impl World {
                 p.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
         }
         Ok(())
@@ -271,7 +277,10 @@ impl World {
                 p.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
         }
         Ok(())
@@ -356,6 +365,7 @@ impl World {
             &mut self.spatial,
             self.world_time,
             &self.model.roles,
+            self.model.tuning.visibility,
         );
         let idx = self.put_back_own(old, unit)?;
         let own = changed?;
@@ -565,6 +575,7 @@ pub(crate) fn change_hands(
     spatial: &mut Spatial,
     world_time: WorldTime,
     roles: &Roles,
+    visibility_tuning: VisibilityTuning,
 ) -> Result<Option<Box<Master>>, GenieError> {
     spatial.records_owner(u.id, new)?;
     let Some(to) = player_master(masters.players, new, u.life.master_id) else {
@@ -587,7 +598,7 @@ pub(crate) fn change_hands(
     }
     let los = own.line_of_sight;
     let sees = u.life.state == ObjectState::Alive && u.life.inside.is_none();
-    spatial.change_owner(u.id, new, los, sees, roles)?;
+    spatial.change_owner(u.id, new, los, sees, roles, visibility_tuning)?;
     if let Some(a) = actions.list.artifact_mut() {
         a.gaia = new == PlayerId::GAIA;
     }

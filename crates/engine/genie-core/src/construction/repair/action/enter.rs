@@ -95,7 +95,7 @@ impl RepairAction {
             roles,
         )?;
         self.state = RepairState::WalkPoint {
-            move_to: self.to_point(self.point, &move_reads)?,
+            move_to: self.to_point(self.point, &move_reads, &c.w.model.tuning.move_to)?,
         };
         Ok(())
     }
@@ -129,7 +129,7 @@ impl RepairAction {
         )?;
         let to = move_reads.walk_to(c.w, self.target.map(RepairTargetId::id))?;
         self.state = RepairState::Move {
-            move_to: self.walk(&move_reads, to)?,
+            move_to: self.walk(&move_reads, to, &c.w.model.tuning.move_to)?,
         };
         Ok(())
     }

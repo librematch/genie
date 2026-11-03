@@ -31,6 +31,7 @@ use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderRecord;
 use crate::unit_ai::best_target::category;
+use crate::vision::SightLayer;
 use crate::world::Millis;
 use crate::world::Seconds;
 use crate::world::World;
@@ -39,6 +40,8 @@ use crate::world::index::Place;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpriteTuning;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::slots::PlayerSlots;
 
 impl World {
@@ -353,6 +356,8 @@ impl World {
             &next,
             world,
             &self.model.roles,
+            self.model.tuning.sprite,
+            self.model.tuning.visibility,
         )?;
         let owner = self.players.player_mut(player)?;
         for &(kind, amount) in &switched.leaving {
@@ -412,6 +417,8 @@ pub(crate) fn switch_master(
     next: &Master,
     world: SwitchWorld<'_>,
     roles: &Roles,
+    sprite_tuning: SpriteTuning,
+    visibility_tuning: VisibilityTuning,
 ) -> Result<Switched, GenieError> {
     let mut switched = Switched::default();
     let new = next.id;
@@ -484,7 +491,10 @@ pub(crate) fn switch_master(
                     next.class,
                     new,
                     next.line_of_sight,
-                    roles,
+                    SightLayer {
+                        roles,
+                        visibility_tuning,
+                    },
                 )?;
                 world.spatial.change_master(id, placed);
                 world.pathing.moved(id, &placed, moving);
@@ -502,9 +512,15 @@ pub(crate) fn switch_master(
                     "a new master's standing sprite the data file does not have",
                 ))?;
             if unit.sprite.is_some() {
-                new_sprite(&mut unit.sprite, motion.move_stats_mut(), g, world.sprite);
+                new_sprite(
+                    &mut unit.sprite,
+                    motion.move_stats_mut(),
+                    g,
+                    world.sprite,
+                    sprite_tuning,
+                );
             } else {
-                let _ = ActiveSprite::start(g, world.sprite);
+                let _ = ActiveSprite::start(g, world.sprite, sprite_tuning);
             }
         }
         switched.promoted = true;

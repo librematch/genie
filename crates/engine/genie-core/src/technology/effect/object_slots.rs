@@ -25,6 +25,7 @@ use crate::players::tracker::ListKey;
 use crate::production::Production;
 use crate::technology::effect::{Change, OBJECT_GONE};
 use crate::vision::SightCentre;
+use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::visibility::LosSight;
@@ -224,12 +225,16 @@ impl World {
                 placed.radius,
                 SightShape::Circle,
                 SightCentre::Tile,
-                &self.model.roles,
+                SightLayer {
+                    roles: &self.model.roles,
+                    visibility_tuning: self.model.tuning.visibility,
+                },
             )?;
             let _ = sight.sight_on_los(
                 id,
                 LosSight::tile_circle(placed.position, placed.radius, los),
                 &self.model.roles,
+                self.model.tuning.visibility,
             )?;
         }
         Ok(())

@@ -13,9 +13,7 @@ use crate::groups::command::MOVE_COMMAND;
 use crate::groups::command::MoveTo;
 use crate::groups::formation::top_path;
 use crate::groups::group_list::member_gone;
-use crate::groups::update::{
-    ATTACK, CLOSE, FOLLOW, FOLLOW_SHARE, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND, OTHER_COMMANDS,
-};
+use crate::groups::update::{ATTACK, FOLLOW, IDLE_LIMIT, IDLE_SPAN, NO_COMMAND, OTHER_COMMANDS};
 use crate::groups::{SpecificMove, UnitGroup};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
@@ -75,7 +73,7 @@ impl World {
                         let sight = self
                             .master(leader.player(), leader.master_id(self.model.slots))?
                             .line_of_sight;
-                        let range = sight * FOLLOW_SHARE;
+                        let range = sight * self.model.tuning.group.front_share;
                         let d = sub(from, moved);
                         let squared = d.x() * d.x() + 0.0 + d.y() * d.y();
                         if !below_or_unordered(squared, range.squared().get()) {
@@ -221,7 +219,7 @@ impl World {
     }
 
     /// [`World::move_update`] of a group whose motion moves: a following group
-    /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least [`CLOSE`] from its target goes on
+    /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target goes on
     /// following; any other asks for a layout anew. The update does not end.
     fn moving_step(
         &mut self,
@@ -242,7 +240,7 @@ impl World {
                 };
                 let d = sub(end, target.moved_vector());
                 let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
-                if !below_or_unordered(squared, CLOSE) {
+                if !below_or_unordered(squared, self.model.tuning.group.close) {
                     self.groups.held_mut(group)?.current_command = FOLLOW;
                     return Ok(false);
                 }

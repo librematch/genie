@@ -23,12 +23,14 @@ pub(crate) mod explored;
 pub mod ghost;
 pub mod los_tables;
 pub mod registry;
+mod sight_layer;
 mod sight_shape;
 mod sight_tiles;
 mod tile_count;
 pub mod visibility;
 mod vision_bits;
 
+pub use self::sight_layer::SightLayer;
 pub use self::sight_shape::{SightCentre, SightShape};
 pub use self::sight_tiles::SightTiles;
 pub use self::tile_count::TileCount;

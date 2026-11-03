@@ -2334,8 +2334,15 @@ fn tick(m: &mut Mover, at: Position, world: &mut Spatial) -> (Position, Motion) 
         (WorldTime::ZERO, None),
         &tuning().movement,
     );
-    m.new_position(&mut place, object_id(9177), at, (world, None), &roles())
-        .unwrap();
+    m.new_position(
+        &mut place,
+        object_id(9177),
+        at,
+        (world, None),
+        &roles(),
+        tuning().visibility,
+    )
+    .unwrap();
     let motion = m
         .motion(
             &mut place,

@@ -23,6 +23,7 @@ use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
@@ -193,8 +194,14 @@ impl World {
         if self.parts.unit_ai.contains(unit.id) {
             // a completion's stop (slot 0xb0 with 1): the unit's stopAction at once
             let (roles, slots) = (self.model.roles.clone(), self.model.slots);
+            let unit_ai_tuning = self.model.tuning.unit_ai;
             self.run_ai_calls((player, idx), |ai, side, rng| {
-                ai.clear_notifies_at(world_time.since_start(), place, side, rng, &roles, slots)
+                let layer = AiLayer {
+                    roles: &roles,
+                    slots,
+                    unit_ai_tuning: &unit_ai_tuning,
+                };
+                ai.clear_notifies_at(world_time.since_start(), place, side, rng, layer)
             })?;
         }
         let unit = self.players.live_mut(player, idx)?;
@@ -225,6 +232,7 @@ impl World {
                     OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                     &self.model.graphics,
                     self.streams.get(Stream::Sprite),
+                    self.model.tuning.sprite,
                 )?;
             }
             self.parts
@@ -281,6 +289,8 @@ impl World {
                     graphics: &self.model.graphics,
                     look: self.parts.combat.of(id).abilities.look.as_ref(),
                     roles: &self.model.roles,
+                    sprite_tuning: self.model.tuning.sprite,
+                    move_to_tuning: &self.model.tuning.move_to,
                 },
                 self.streams.get(Stream::Sprite),
             ),

@@ -23,6 +23,7 @@ use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::release;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -39,11 +40,12 @@ impl BuildAction {
         to: WalkTo,
         task: BuildTask,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Self, GenieError> {
         Ok(Self {
             target: to.id.map(FoundationId::new),
             state: BuildState::Move {
-                move_to: task.walk(move_reads, Some(to))?,
+                move_to: task.walk(move_reads, Some(to), move_to_tuning)?,
             },
             point: to.at,
             task,

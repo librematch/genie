@@ -6,8 +6,7 @@ use crate::combat::abilities::Look;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
 use crate::garrison::transport::{
-    Changed, MOVE_RANGE, MapShore, NEAR, NO_TRANSPORT, NONE, SHORE_MARGIN, Ship, Shore,
-    TransportAction, TransportReads, UNLOAD_REACH_SQUARED, Updated,
+    Changed, MapShore, NO_TRANSPORT, NONE, Ship, Shore, TransportAction, TransportReads, Updated,
 };
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -37,6 +36,10 @@ use crate::unit_ai::{AiAction, UnitAi};
 use crate::unit_ai::{NotifyKind, alert_owner};
 use crate::world::World;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::SpriteTuning;
+use crate::world::layer::generated::TransportTuning;
+use crate::world::layer::generated::Tuning;
 use crate::world::parts::PartTable;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
@@ -76,6 +79,8 @@ impl TransportAction {
         first: bool,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         let (x, y) = (self.point.x(), self.point.y());
         let sails = first && at_most_or_unordered(0.0, x) && at_most_or_unordered(0.0, y);
@@ -87,6 +92,8 @@ impl TransportAction {
             },
             ship,
             shore,
+            transport_tuning,
+            move_to_tuning,
         )
     }
 
@@ -94,7 +101,7 @@ impl TransportAction {
     /// `MoveTo`'s teardown stops the unit, [`Changed::stopped`]), then the state. State 2 shows
     /// the master's standing sprite ([`Changed::stands`]). States 4 and 11 sail: the point
     /// becomes the shore point on the way from the unit's place ([`Shore::shore_point`]) when
-    /// there is one; then a quiet `MoveTo` to the point within [`MOVE_RANGE`] (`FUN_140aa0d30`
+    /// there is one; then a quiet `MoveTo` to the point within `TransportTuning::move_range` (`FUN_140aa0d30`
     /// with no task: the master's `+0x748` sprite; `FUN_140a7a170` with 1) joins the list
     /// (`FUN_140a977e0`, for a unit in a state below 3) and starts (`0x140aa2100`: a point is
     /// never within its start's gap, so state 3, or 13 for a unit without speed, which a quiet
@@ -108,6 +115,8 @@ impl TransportAction {
         state: TransportState,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         let mut changed = Changed {
             stopped: self.state.take_move_to().is_some(),
@@ -122,9 +131,12 @@ impl TransportAction {
                 {
                     self.point = self.point.with_x(shore_at.x()).with_y(shore_at.y());
                 }
-                let sail = ship
-                    .walk
-                    .to_point(self.point, Distance::new(MOVE_RANGE), ship.given)?;
+                let sail = ship.walk.to_point(
+                    self.point,
+                    Distance::new(transport_tuning.move_range),
+                    ship.given,
+                    move_to_tuning,
+                )?;
                 if let Some(move_to) = self.state.walk_mut() {
                     *move_to = sail;
                 }
@@ -147,10 +159,18 @@ impl TransportAction {
         point: Position,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         self.point = point;
         self.mode = TransportMode::MOVE;
-        self.set_state(TransportState::Sail { move_to: None }, ship, shore)
+        self.set_state(
+            TransportState::Sail { move_to: None },
+            ship,
+            shore,
+            transport_tuning,
+            move_to_tuning,
+        )
     }
 
     /// Slot 7 (`FUN_140aa4620`), the stop: `set_state(2)`.
@@ -158,15 +178,27 @@ impl TransportAction {
     /// # Errors
     ///
     /// A sprite the table lacks.
-    pub fn stop(&mut self, ship: &Ship<'_>, shore: &mut impl Shore) -> Result<Changed, GenieError> {
-        self.set_state(TransportState::Idle, ship, shore)
+    pub fn stop(
+        &mut self,
+        ship: &Ship<'_>,
+        shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
+    ) -> Result<Changed, GenieError> {
+        self.set_state(
+            TransportState::Idle,
+            ship,
+            shore,
+            transport_tuning,
+            move_to_tuning,
+        )
     }
 
     /// Slot 9 (`FUN_140aa4830`), the work order on `point` (x, y and the height), `by_self` when
     /// the object it names is the unit itself (the unload command's); `+0x34` becomes 1. Near
     /// enough to unload there — a tile of the zone of the point's tile (`CVTTSS2SI`,
-    /// [`Shore::zone`]) within [`NEAR`] of the unit ([`Shore::near`], exactly 1), and the point
-    /// within [`UNLOAD_REACH_SQUARED`] of the unit's footprint on the ground (each axis' gap past
+    /// [`Shore::zone`]) within `TransportTuning::near` of the unit ([`Shore::near`], exactly 1), and the point
+    /// within `TransportTuning::unload_reach_squared` of the unit's footprint on the ground (each axis' gap past
     /// the master's radius, `MAXSS` with 0: a NaN gap stays; `COMISS`/`JC`: a NaN is not
     /// within) — it takes the point and unloads (`set_state(6)`). Else a point below 0 on either
     /// axis (`COMISS`/`JC`: a NaN too) changes nothing; any other becomes the point, and the
@@ -181,6 +213,8 @@ impl TransportAction {
         by_self: bool,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         self.mode = TransportMode::WORK;
         let (x, y) = (point.x(), point.y());
@@ -189,8 +223,8 @@ impl TransportAction {
         // MAXSS 0, gap: the gap when it is not below 0, a NaN gap too
         let dx = maxss(0.0, (x - ux).abs() - ship.radius.x());
         let dy = maxss(0.0, (y - uy).abs() - ship.radius.y());
-        let near = shore.near(zone, Distance::new(NEAR))?;
-        let within = !below_or_unordered(UNLOAD_REACH_SQUARED, dy * dy + dx * dx);
+        let near = shore.near(zone, Distance::new(transport_tuning.near))?;
+        let within = !below_or_unordered(transport_tuning.unload_reach_squared, dy * dy + dx * dx);
         let state = if near && within {
             TransportState::Unload
         } else if below_or_unordered(x, 0.0) || below_or_unordered(y, 0.0) {
@@ -201,7 +235,7 @@ impl TransportAction {
             TransportState::Sail { move_to: None }
         };
         self.point = point;
-        self.set_state(state, ship, shore)
+        self.set_state(state, ship, shore, transport_tuning, move_to_tuning)
     }
 
     /// One update (slot 6, `FUN_140aa4640`) of `unit`'s Transport on the step, the action copied
@@ -229,7 +263,9 @@ impl TransportAction {
             pathing,
             streams,
             parts,
-            model: Model { graphics, .. },
+            model: Model {
+                graphics, tuning, ..
+            },
             ..
         } = &mut *c.w;
         let sprites = SpriteReads {
@@ -238,11 +274,25 @@ impl TransportAction {
         };
         let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id)));
         let ship = Ship::of(unit, r.radius, spatial.map, walk, r.given);
-        let mut shore = MapShore::new(spatial, zones, pathing, r.restriction, ship.position)?;
+        let mut shore = MapShore::new(
+            spatial,
+            zones,
+            pathing,
+            r.restriction,
+            ship.position,
+            &tuning.tile_path,
+        )?;
         let look = (r.standing, streams.get(Stream::Sprite));
         let id = unit.id;
         let posts = (&mut *unit, parts.motion.layer_mut(id), &mut parts.unit_ai);
-        match self.state_update(walked, (&ship, &mut shore), posts, look, player_type)? {
+        match self.state_update(
+            walked,
+            (&ship, &mut shore),
+            posts,
+            look,
+            player_type,
+            tuning,
+        )? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
                 self.unload(c, unit, actions)?;
@@ -279,7 +329,7 @@ impl TransportAction {
     /// without one the list answers 1) unloads (4: `set_state(6)`) or idles (11:
     /// `set_state(2)`). State 13 tells the unit's AI it failed (0x1f9 with the Transport's action
     /// value, slot 0x328), idles and returns 3. State 6 unloads:
-    /// - with a point, its zone's tile ([`Shore::zone`]) must lie within [`NEAR`] of the unit
+    /// - with a point, its zone's tile ([`Shore::zone`]) must lie within `TransportTuning::near` of the unit
     ///   ([`Shore::near`]), else the owner hears that it cannot unload there (0x207, its slot
     ///   0x2e8: [`crate::unit_ai::alert_owner`] for a computer player); `+0x68` clears either
     ///   way.
@@ -300,7 +350,10 @@ impl TransportAction {
         (unit, mut motion, ais): (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
         look: (Option<Graphic>, &mut Well512),
         player_type: PlayerType,
+        tuning: &Tuning,
     ) -> Result<Updated, GenieError> {
+        let (transport_tuning, move_to_tuning, sprite_tuning) =
+            (&tuning.transport, &tuning.move_to, tuning.sprite);
         let (changed, code) = match self.state {
             TransportState::Done => return Ok(Updated::Code(UpdateCode::DONE)),
             TransportState::SailToUnload { .. } | TransportState::Sail { .. }
@@ -311,12 +364,21 @@ impl TransportAction {
                 } else {
                     TransportState::Unload
                 };
-                (self.set_state(next, ship, shore)?, UpdateCode::UNDER_WAY)
+                (
+                    self.set_state(next, ship, shore, transport_tuning, move_to_tuning)?,
+                    UpdateCode::UNDER_WAY,
+                )
             }
             // Failed: the update returns 3.
             TransportState::Failed => {
-                let changed = self.set_state(TransportState::Idle, ship, shore)?;
-                stand((unit, motion.reborrow()), changed, look)?;
+                let changed = self.set_state(
+                    TransportState::Idle,
+                    ship,
+                    shore,
+                    transport_tuning,
+                    move_to_tuning,
+                )?;
+                stand((unit, motion.reborrow()), changed, look, sprite_tuning)?;
                 unit.post_own(
                     ais,
                     NotifyKind::ACTION_FAILED,
@@ -332,11 +394,11 @@ impl TransportAction {
                 } else {
                     let zone = shore.zone(self.point.tile())?;
                     self.retarget = false;
-                    reaches = shore.near(zone, Distance::new(NEAR))?;
+                    reaches = shore.near(zone, Distance::new(transport_tuning.near))?;
                 }
                 let mut cannot_unload = !reaches;
                 if reaches && ship.loaded {
-                    if self.next_to_shore(ship, shore)? {
+                    if self.next_to_shore(ship, shore, transport_tuning)? {
                         return Ok(Updated::Unload);
                     }
                     let over_water = x != NONE
@@ -345,8 +407,8 @@ impl TransportAction {
                             .intersects(TerrainFlags::ANY_WATER);
                     cannot_unload = !over_water;
                 }
-                let changed = self.unloaded(ship, shore)?;
-                stand((unit, motion.reborrow()), changed, look)?;
+                let changed = self.unloaded(ship, shore, transport_tuning, move_to_tuning)?;
+                stand((unit, motion.reborrow()), changed, look, sprite_tuning)?;
                 if cannot_unload {
                     alert_owner(player_type)?;
                 }
@@ -354,7 +416,7 @@ impl TransportAction {
             }
             _ => (Changed::default(), UpdateCode::UNDER_WAY),
         };
-        stand((unit, motion.reborrow()), changed, look)?;
+        stand((unit, motion.reborrow()), changed, look, sprite_tuning)?;
         Ok(Updated::Code(code))
     }
 
@@ -368,11 +430,19 @@ impl TransportAction {
         &mut self,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Changed, GenieError> {
         if self.retarget {
             return Ok(Changed::default());
         }
-        self.set_state(TransportState::Idle, ship, shore)
+        self.set_state(
+            TransportState::Idle,
+            ship,
+            shore,
+            transport_tuning,
+            move_to_tuning,
+        )
     }
 
     /// The sprite the `set_state` (`0x140aa42a0`, states 4 and 11) of a Transport on `task` gives
@@ -425,6 +495,7 @@ impl TransportAction {
                 c.w.parts.unit_ai.get_mut(unit.id),
                 unit.place.position().ground(),
                 self.point.ground(),
+                &c.w.model.tuning.unit_ai,
             )
         } else {
             PathAsk::default()
@@ -446,7 +517,7 @@ impl TransportAction {
 
     /// `FUN_140aa3f40` (HD's `next_to_drop_off_terrain`), without a task (`+0x48`; a task whose
     /// `+0x16` is −1 would answer yes): a tile about the unit's footprint grown by
-    /// [`SHORE_MARGIN`] (each edge cut by `CVTTSS2SI`, kept on the map) of the point's zone
+    /// `TransportTuning::shore_margin` (each edge cut by `CVTTSS2SI`, kept on the map) of the point's zone
     /// ([`Shore::zone`]), or without a point (x [`NONE`]) a land tile (the terrain table's bits 3
     /// and 4, `FUN_1413fbee0` and `FUN_1413fc270`); row by row, each from its least x.
     ///
@@ -457,14 +528,15 @@ impl TransportAction {
         &self,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
+        transport_tuning: &TransportTuning,
     ) -> Result<bool, GenieError> {
         let (ux, uy) = (ship.position.x(), ship.position.y());
         let (rx, ry) = (ship.radius.x(), ship.radius.y());
         let (w, h) = (ship.map.width(), ship.map.height());
-        let x0 = cvttss2si((ux - rx) - SHORE_MARGIN).max(0);
-        let y0 = cvttss2si((uy - ry) - SHORE_MARGIN).max(0);
-        let x1 = cvttss2si((ux + rx) + SHORE_MARGIN).min(w - 1);
-        let y1 = cvttss2si((uy + ry) + SHORE_MARGIN).min(h - 1);
+        let x0 = cvttss2si((ux - rx) - transport_tuning.shore_margin).max(0);
+        let y0 = cvttss2si((uy - ry) - transport_tuning.shore_margin).max(0);
+        let x1 = cvttss2si((ux + rx) + transport_tuning.shore_margin).min(w - 1);
+        let y1 = cvttss2si((uy + ry) + transport_tuning.shore_margin).min(h - 1);
         let (x, _y) = (self.point.x(), self.point.y());
         let zone = if x == NONE {
             None
@@ -500,6 +572,7 @@ pub(crate) fn stand(
     (unit, mut motion): (&mut Unit, MotionMut<'_>),
     changed: Changed,
     (standing, rng): (Option<Graphic>, &mut Well512),
+    sprite_tuning: SpriteTuning,
 ) -> Result<(), GenieError> {
     if changed.stopped
         && let Some(m) = motion.mover_mut()
@@ -516,7 +589,13 @@ pub(crate) fn stand(
         let standing = standing.ok_or(GenieError::unsupported(
             "a stopped unit without its standing sprite",
         ))?;
-        new_sprite(&mut unit.sprite, motion.move_stats_mut(), standing, rng);
+        new_sprite(
+            &mut unit.sprite,
+            motion.move_stats_mut(),
+            standing,
+            rng,
+            sprite_tuning,
+        );
     }
     Ok(())
 }

@@ -4,9 +4,6 @@ use crate::GenieError;
 use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::{at_most_or_unordered, sqrt};
-use crate::math::image::order::{
-    SPLIT_PATH_REACH as ORDER_SPLIT_PATH_REACH, SPLIT_SPEED_GAP as ORDER_SPLIT_SPEED_GAP,
-};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -19,6 +16,7 @@ use crate::pathing::tile_path::{Path, Request};
 use crate::players::PlayerId;
 use crate::world::Formations;
 use crate::world::World;
+use crate::world::layer::generated::OrderTuning;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use std::collections::BTreeSet;
@@ -158,65 +156,8 @@ impl World {
         control: bool,
         split: &mut Split,
     ) -> Result<(), GenieError> {
-        let mut left: Vec<Splittable> = Vec::with_capacity(run.len());
-        for (i, &u) in run.iter().enumerate() {
-            let Some(id) = u else {
-                continue;
-            };
-            if run.get(i + 1).copied().flatten() == Some(id) {
-                continue;
-            }
-            let Some((p, u)) = self.object(id) else {
-                continue;
-            };
-            let master = u.master(self.master_tables(), p)?;
-            left.push(Splittable {
-                id,
-                group: u.group.id,
-                kind: master.kind,
-                grouped: master.formation_category.grouped(),
-                turns: master.object_flags.contains(ObjectFlags::SHIP),
-                speed: self
-                    .parts
-                    .mover_of(u.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
-                position: u.position(),
-                moved_at: self
-                    .parts
-                    .mover_of(u.id)
-                    .map_or_else(|| u.position().ground(), |m| m.moved_at.ground()),
-                state: u.life.state,
-                radius: Distance::new(master.radius.x()),
-                restriction: self.parts.mover_of(u.id).map(|m| m.stats.restriction),
-            });
-        }
-        // the units in a group the world holds, with the order's other members of their group
-        let mut taken = vec![false; left.len()];
-        for (i, first) in left.iter().enumerate() {
-            if *taken.checked(i)? {
-                continue;
-            }
-            let Some(group) = first.group.and_then(|id| self.groups.get(id)) else {
-                continue;
-            };
-            *taken.checked_mut(i)? = true;
-            let mut members = vec![first.id];
-            for (j, u) in left.iter().enumerate() {
-                if !*taken.checked(j)? && group.has(u.id) {
-                    members.push(u.id);
-                    *taken.checked_mut(j)? = true;
-                }
-            }
-            match members[..] {
-                [alone] => split.loose.push(alone),
-                _ => split.keep(members),
-            }
-        }
-        let mut left: Vec<Splittable> = left
-            .into_iter()
-            .zip(taken)
-            .filter_map(|(u, taken)| (!taken).then_some(u))
-            .collect();
+        let left = self.splittables(run)?;
+        let mut left = self.keep_world_groups(left, split)?;
         let formations = self.players.player(owner)?.formations;
         if !formations.auto {
             split.loose.extend(left.iter().map(|u| u.id));
@@ -250,7 +191,13 @@ impl World {
                     full: false,
                 };
                 let mut p = Path::default();
-                let found = planner.plan::<GenieError>(&req, false, &mut p, None)?;
+                let found = planner.plan::<GenieError>(
+                    &req,
+                    false,
+                    &mut p,
+                    None,
+                    &self.model.tuning.tile_path,
+                )?;
                 p.measure();
                 Ok(Some((found, p.length)))
             };
@@ -260,8 +207,15 @@ impl World {
             for (i, a) in left.iter().enumerate() {
                 let mut n = 1;
                 for b in left.iter().filter(|b| b.id != a.id) {
-                    let joins =
-                        splits_together(a, b, formations, false, &mut path, &mut split.far)?;
+                    let joins = splits_together(
+                        a,
+                        b,
+                        formations,
+                        false,
+                        &mut path,
+                        &mut split.far,
+                        &self.model.tuning.order,
+                    )?;
                     n += usize::from(joins);
                 }
                 if best.1 < n {
@@ -280,6 +234,7 @@ impl World {
                         true,
                         &mut path,
                         &mut split.far,
+                        &self.model.tuning.order,
                     )? {
                         group.push(left.remove(i).id);
                     } else {
@@ -294,6 +249,81 @@ impl World {
             split.keep(group);
         }
         Ok(())
+    }
+
+    /// What the order splitter (`FUN_140fd76d0`) reads of each unit of a run that the world
+    /// holds: a null entry and one the run's next entry repeats are left out.
+    fn splittables(&self, run: &[Option<ObjectId>]) -> Result<Vec<Splittable>, GenieError> {
+        let mut left: Vec<Splittable> = Vec::with_capacity(run.len());
+        for (i, &u) in run.iter().enumerate() {
+            let Some(id) = u else {
+                continue;
+            };
+            if run.get(i + 1).copied().flatten() == Some(id) {
+                continue;
+            }
+            let Some((p, u)) = self.object(id) else {
+                continue;
+            };
+            let master = u.master(self.master_tables(), p)?;
+            left.push(Splittable {
+                id,
+                group: u.group.id,
+                kind: master.kind,
+                grouped: master.formation_category.grouped(),
+                turns: master.object_flags.contains(ObjectFlags::SHIP),
+                speed: self
+                    .parts
+                    .mover_of(u.id)
+                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                position: u.position(),
+                moved_at: self
+                    .parts
+                    .mover_of(u.id)
+                    .map_or_else(|| u.position().ground(), |m| m.moved_at.ground()),
+                state: u.life.state,
+                radius: Distance::new(master.radius.x()),
+                restriction: self.parts.mover_of(u.id).map(|m| m.stats.restriction),
+            });
+        }
+        Ok(left)
+    }
+
+    /// The units of `left` in a group the world holds go into `split` with the run's other
+    /// members of their group (`FUN_140fd76d0`: one alone is loose); the others are returned.
+    fn keep_world_groups(
+        &self,
+        left: Vec<Splittable>,
+        split: &mut Split,
+    ) -> Result<Vec<Splittable>, GenieError> {
+        // the units in a group the world holds, with the order's other members of their group
+        let mut taken = vec![false; left.len()];
+        for (i, first) in left.iter().enumerate() {
+            if *taken.checked(i)? {
+                continue;
+            }
+            let Some(group) = first.group.and_then(|id| self.groups.get(id)) else {
+                continue;
+            };
+            *taken.checked_mut(i)? = true;
+            let mut members = vec![first.id];
+            for (j, u) in left.iter().enumerate() {
+                if !*taken.checked(j)? && group.has(u.id) {
+                    members.push(u.id);
+                    *taken.checked_mut(j)? = true;
+                }
+            }
+            match members[..] {
+                [alone] => split.loose.push(alone),
+                _ => split.keep(members),
+            }
+        }
+        let left: Vec<Splittable> = left
+            .into_iter()
+            .zip(taken)
+            .filter_map(|(u, taken)| (!taken).then_some(u))
+            .collect();
+        Ok(left)
     }
 
     /// The loose units of a MOVE or an INTERACT of `player` leave their groups (`FUN_14102c160`
@@ -337,26 +367,22 @@ impl World {
                 points.push(u.position().ground());
             }
         }
-        Ok(centroid(&points))
+        Ok(centroid(&points, &self.model.tuning.order))
     }
 }
 
 /// The splitter groups units of a type above this (`0x45`).
 pub(super) const MAX_UNGROUPED: MasterKind = MasterKind::of_data(69);
-/// Units whose speeds differ by more than this do not join where the player breaks formations by
-/// speed (`FUN_140fd76d0`, `DAT_143cc2918`).
-const SPLIT_SPEED_GAP: f32 = ORDER_SPLIT_SPEED_GAP;
-/// Units nearer than this are measured by a path (`FUN_140fd76d0`, `DAT_142e7f38c`) while
+/// Units nearer than `OrderTuning::split_path_reach` are measured by a path while
 /// `DAT_1439e60e3` (1 at run time) holds.
-const SPLIT_PATH_REACH: f32 = ORDER_SPLIT_PATH_REACH;
 const SPLIT_BY_PATH: bool = true;
 
 /// `FUN_140fd76d0`'s test whether `b` joins `a`: both above type 69, both of formation category
-/// 0 or neither, the same object flags' bit 1, speeds within [`SPLIT_SPEED_GAP`] where the player
+/// 0 or neither, the same object flags' bit 1, speeds within `OrderTuning::split_speed_gap` where the player
 /// breaks formations by speed (`COMISS`, `JA`: a NaN gap is within), then (`member`: for the
 /// chosen unit's group, also `b` in a state of 2 or more) within the player's influence distance
 /// on the ground (between where each last moved to, slot 0x520: `FUN_14087e560` with the height
-/// zeroed; `COMISS`, `JA`: a NaN distance is within). Below [`SPLIT_PATH_REACH`] (`COMISS`, `JBE`:
+/// zeroed; `COMISS`, `JA`: a NaN distance is within). Below `OrderTuning::split_path_reach` (`COMISS`, `JBE`:
 /// a NaN distance is not) the game measures a path instead, when the planner of `b`'s
 /// restriction exists: from `b`'s place to `a`'s (`FUN_140f7c530` with `a`'s radius on x as the
 /// radii and `b`'s as the range, no tile search), which joins `b` when it reaches the goal
@@ -369,6 +395,7 @@ pub(super) fn splits_together(
     member: bool,
     path: &mut SplitPath<'_>,
     far: &mut BTreeSet<ObjectId>,
+    order_tuning: &OrderTuning,
 ) -> Result<bool, GenieError> {
     if a.kind <= MAX_UNGROUPED || b.kind <= MAX_UNGROUPED {
         return Ok(false);
@@ -376,7 +403,7 @@ pub(super) fn splits_together(
     if a.grouped != b.grouped || a.turns != b.turns {
         return Ok(false);
     }
-    if f.by_speed && SPLIT_SPEED_GAP < (a.speed - b.speed).get().abs() {
+    if f.by_speed && order_tuning.split_speed_gap < (a.speed - b.speed).get().abs() {
         return Ok(false);
     }
     if member && b.state < ObjectState::Alive {
@@ -388,7 +415,7 @@ pub(super) fn splits_together(
     );
     let d = sqrt(dx * dx + 0.0 + dy * dy);
     if SPLIT_BY_PATH
-        && d < SPLIT_PATH_REACH
+        && d < order_tuning.split_path_reach
         && let Some((found, length)) = path(a, b)?
     {
         let joins = found == Found::Goal && at_most_or_unordered(length.get(), f.influence.get());

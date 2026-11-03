@@ -195,7 +195,11 @@ impl World {
             let commands = self.groups.commands;
             let g = self.groups.held_mut(id)?;
             g.differentiator_id = commands;
-            let kept = waypoints_from(g.motion.position[0].ground(), waypoints);
+            let kept = waypoints_from(
+                g.motion.position[0].ground(),
+                waypoints,
+                &self.model.tuning.order,
+            );
             let Some((&last, before)) = kept.split_last() else {
                 continue;
             };
@@ -297,7 +301,14 @@ impl World {
                     full: false,
                 };
                 let mut path = Path::default();
-                if planner.plan::<GenieError>(&req, false, &mut path, None)? != Found::Goal {
+                if planner.plan::<GenieError>(
+                    &req,
+                    false,
+                    &mut path,
+                    None,
+                    &self.model.tuning.tile_path,
+                )? != Found::Goal
+                {
                     i += 1;
                     continue;
                 }
@@ -372,7 +383,7 @@ impl World {
             }
         }
         let (x, y, z) = (at.x(), at.y(), at.z());
-        let kept = waypoints_from(Point::new(x, y), waypoints);
+        let kept = waypoints_from(Point::new(x, y), waypoints, &self.model.tuning.order);
         let Some((last, before)) = kept.split_last() else {
             return Ok(());
         };

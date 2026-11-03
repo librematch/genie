@@ -17,16 +17,13 @@ use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point};
 use crate::math::fmath::BVector;
 use crate::math::fmath::{self, cross, normalize};
-use crate::math::image::group::{
-    DEFAULT_FORWARD as GROUP_DEFAULT_FORWARD, FARTHEST as GROUP_FARTHEST,
-    FRONT_SHARE as GROUP_FRONT_SHARE, SPIRAL_FIRST, SPIRAL_LAST, SQUARE_MAX as GROUP_SQUARE_MAX,
-    SQUARE_MIN as GROUP_SQUARE_MIN,
-};
+use crate::math::image::group::{FARTHEST as GROUP_FARTHEST, SPIRAL_FIRST, SPIRAL_LAST};
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
 use crate::world::World;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// The spiral's steps (`FUN_141007630`'s table from `DAT_142f49460` and `DAT_142f49480`), x and y:
@@ -39,13 +36,6 @@ const SPIRAL: [GroundOffset; 4] = GroundOffset::table([
 ]);
 /// The points the spiral tries (`FUN_141007630`'s count from 1 below `0x191`).
 const SPIRAL_POINTS: i32 = 400;
-/// `FUN_141049e10` refuses a forward whose dot product with the up is below this
-/// (`DAT_142f4c1a0`) ...
-const SQUARE_MIN: f32 = GROUP_SQUARE_MIN;
-/// ... or above this (`DAT_14330eb78`).
-const SQUARE_MAX: f32 = GROUP_SQUARE_MAX;
-/// A group whose members' forwards cancel out and that holds none faces x (`DAT_14330eb8c`).
-const DEFAULT_FORWARD: f32 = GROUP_DEFAULT_FORWARD;
 
 /// `FUN_141007630`'s spiral: where it is (x, y), its direction in [`SPIRAL`], its leg's length
 /// and its count of steps (from 1).
@@ -87,10 +77,16 @@ impl Motion {
     /// `FUN_141049e10`: the motion faces `forward` with `up`, both normalized, and their cross
     /// product `up × forward` (normalized) as its right; the new position takes all three, and with
     /// `both` (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. False, with nothing
-    /// changed, when the dot product of the two lies outside [`SQUARE_MIN`] to [`SQUARE_MAX`].
-    pub fn set_orientation(&mut self, forward: BVector, up: BVector, both: bool) -> bool {
+    /// changed, when the dot product of the two lies outside `GroupTuning::square_min` to `GroupTuning::square_max`.
+    pub fn set_orientation(
+        &mut self,
+        forward: BVector,
+        up: BVector,
+        both: bool,
+        group_tuning: &GroupTuning,
+    ) -> bool {
         let d = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
-        if d < SQUARE_MIN || SQUARE_MAX < d {
+        if d < group_tuning.square_min || group_tuning.square_max < d {
             return false;
         }
         let right = normalize(cross(up, forward));
@@ -178,6 +174,7 @@ impl World {
             let at = on_map(
                 BVector::new(spiral.at.x(), centroid.height(), spiral.at.y()),
                 self.spatial.map,
+                &self.model.tuning.group,
             );
             if !self.spatial.point_hit(
                 at.ground(),
@@ -204,7 +201,7 @@ impl World {
     /// [`crate::groups::WorldObject::forward`]: 0 for an object that does not move) of the
     /// members the world's table holds, summed in their order and divided by their count, then
     /// normalized; when their squares sum to zero (`UCOMISS`/`JP`: not a NaN) the first held
-    /// member's forward, else ([`DEFAULT_FORWARD`], 0, 0). The motion faces it with up
+    /// member's forward, else (`GroupTuning::default_forward`, 0, 0). The motion faces it with up
     /// (0, 1, 0), position and new position alike ([`Motion::set_orientation`]).
     ///
     /// # Errors
@@ -231,15 +228,18 @@ impl World {
             forwards
                 .first()
                 .copied()
-                .unwrap_or(BVector::new(DEFAULT_FORWARD, 0.0, 0.0))
+                .unwrap_or_else(|| BVector::new(self.model.tuning.group.default_forward, 0.0, 0.0))
         } else {
             let l = fmath::sqrt(squared);
             BVector::new(sum[0] / l, sum[1] / l, sum[2] / l)
         };
         let g = self.groups.held_mut(group)?;
-        let _ = g
-            .motion
-            .set_orientation(forward, BVector::new(0.0, 1.0, 0.0), true);
+        let _ = g.motion.set_orientation(
+            forward,
+            BVector::new(0.0, 1.0, 0.0),
+            true,
+            &self.model.tuning.group,
+        );
         Ok(())
     }
 }
@@ -250,8 +250,8 @@ impl World {
     /// its own, or with [`MotionFlags::NEW`] the members' centre (slot 0x520, summed over the
     /// members the world holds, over the members' count). A flanked group (locked type 8) whose
     /// lead's object ([`World::lead_object`]) moves and could stand there among the members (slot
-    /// 0x270, [`crate::map::spatial::Spatial::point_clear_among`], with [`FRONT_SHARE`] of its radius;
-    /// an object that does not move cannot) stands there. Else the members within the spacing ([`FRONT_SHARE`] of it but for a
+    /// 0x270, [`crate::map::spatial::Spatial::point_clear_among`], with `GroupTuning::front_share` of its radius;
+    /// an object that does not move cannot) stands there. Else the members within the spacing (`GroupTuning::front_share` of it but for a
     /// staggered lock, type 7) of the line along the forward through that place (on the
     /// ground, [`fmath::line_distance`]) are in front: of them the one nearest the point ahead
     /// on the ground (the only one, however far), else the member nearest that point. The
@@ -314,7 +314,7 @@ impl World {
             if self.spatial.point_clear_among(
                 lead.id(),
                 centre.ground(),
-                Distance::new(FRONT_SHARE * master.radius.x()),
+                Distance::new(self.model.tuning.group.front_share * master.radius.x()),
                 mask,
                 &members,
                 by_id,
@@ -328,7 +328,7 @@ impl World {
         let limit = if g.formation_locked_type == Some(FormationKind::STAGGERED) {
             g.desired_spacing
         } else {
-            g.desired_spacing * FRONT_SHARE
+            g.desired_spacing * self.model.tuning.group.front_share
         };
         let through = centre.with_height(0.0);
         let mut in_front: Vec<(ObjectId, BVector)> = Vec::new();
@@ -416,10 +416,6 @@ impl World {
     }
 }
 
-/// `movePositionToFront`'s share of the spacing (`DAT_142e7f384`; the whole spacing for a
-/// staggered lock) and of the lead's radius.
-const FRONT_SHARE: f32 = GROUP_FRONT_SHARE;
-
 /// The first best distance of `movePositionToFront`'s searches (`DAT_14330ebf4`).
 const FARTHEST: f32 = GROUP_FARTHEST;
 
@@ -460,6 +456,7 @@ mod tests {
     use crate::test_ids::master_id;
     use crate::test_ids::object_id;
     use crate::testing::class;
+    use crate::testing::tuning;
     use crate::world::Millis;
     use crate::world::WorldTime;
     #[cfg(test)]
@@ -476,7 +473,8 @@ mod tests {
         assert!(m.set_orientation(
             BVector::new(2.0, 0.0, 0.0),
             BVector::new(0.0, 1.0, 0.0),
-            true
+            true,
+            &tuning().group
         ));
         assert_eq!(m.position[1], BVector::new(1.0, 0.0, 0.0));
         assert_eq!(m.position[3], BVector::new(0.0, 0.0, -1.0));
@@ -486,7 +484,8 @@ mod tests {
         assert!(!m.set_orientation(
             BVector::new(1.0, 0.1, 0.0),
             BVector::new(0.0, 1.0, 0.0),
-            true
+            true,
+            &tuning().group
         ));
     }
 

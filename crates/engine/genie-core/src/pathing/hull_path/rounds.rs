@@ -380,10 +380,11 @@ impl HullPather<'_> {
         at: Point,
         to: Point,
     ) -> Option<(HullIndex, Point, usize)> {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let mut crossing: Option<(HullIndex, Point, usize)> = None;
         let mut crossing_d = MOST;
         for (i, hull) in self.hulls.iter().enumerate() {
-            if let Some((p, edge)) = hull.intersection(vertex < 0, at, to) {
+            if let Some((p, edge)) = hull.intersection(vertex < 0, at, to, hull_path_tuning) {
                 let d = (p.y() - at.y()) * (p.y() - at.y()) + (p.x() - at.x()) * (p.x() - at.x());
                 if d < crossing_d {
                     crossing = Some((HullIndex::new(i), p, edge));

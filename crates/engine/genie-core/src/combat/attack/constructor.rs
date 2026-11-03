@@ -45,14 +45,21 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::AttackTuning;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::step::Step;
 
 /// What an Attack's start reads of the build layer (FD-046-D45, D49): the roles of the unit's
-/// master and the attack's tuning values, one argument of [`Attack::begin`].
+/// master, the attack's tuning values and its `MoveTo`'s, one argument of [`Attack::start`] and
+/// [`Attack::begin`].
 #[derive(Clone, Copy, Debug)]
-pub(super) struct BeginLayer<'a> {
-    roles: &'a Roles,
-    attack_tuning: &'a AttackTuning,
+pub(crate) struct BeginLayer<'a> {
+    /// The build's roles.
+    pub(crate) roles: &'a Roles,
+    /// The attack's tuning values.
+    pub(crate) attack_tuning: &'a AttackTuning,
+    /// The `MoveTo`'s tuning values.
+    pub(crate) move_to_tuning: &'a MoveToTuning,
 }
 
 impl Attack {
@@ -95,15 +102,15 @@ impl Attack {
     /// What the start does not model, and what no hunt's caller takes: a hunter that cannot move
     /// (its Attack's `set_state` 6 or 13 at the start), and readyToAttack's failure before the
     /// start's `set_state(4)` (the unit's `+0x7b8` at 1, as [`Attack::command`] leaves it).
-    pub fn start(
+    pub(crate) fn start(
         target: ObjectId,
         e: &Engagement,
         arms: Arms,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
-        roles: &Roles,
-        attack_tuning: &AttackTuning,
+        layer: BeginLayer<'_>,
     ) -> Result<(Self, bool), GenieError> {
+        let roles = layer.roles;
         let mut a = Self {
             voice: Voice::Quiet,
             on_target_moved: TargetMoved::AsksAgain,
@@ -124,10 +131,7 @@ impl Attack {
             mover,
             &mut posted,
             reads,
-            BeginLayer {
-                roles,
-                attack_tuning,
-            },
+            layer,
         )?;
         if begun.ready {
             return Err(GenieError::unsupported(
@@ -163,6 +167,7 @@ impl Attack {
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
     ) -> Result<(Self, Begun, Vec<Posted>), GenieError> {
+        let move_to_tuning = &by_id.tuning().move_to;
         let attack_tuning = &by_id.tuning().attack;
         let roles = by_id.roles();
         let e = cmd.engagement;
@@ -188,6 +193,7 @@ impl Attack {
             BeginLayer {
                 roles,
                 attack_tuning,
+                move_to_tuning,
             },
         )?;
         Ok((attack, begun, posted))
@@ -238,6 +244,7 @@ impl Attack {
                 &mut unit.sprite,
                 c.w.parts.motion_mut(unit.id),
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
         }
         if begun.ready {
@@ -264,6 +271,7 @@ impl Attack {
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
         }
         Ok((attack, posted))
@@ -307,6 +315,7 @@ impl Attack {
         let BeginLayer {
             roles,
             attack_tuning,
+            move_to_tuning,
         } = layer;
         let movable = e.speed != Speed::ZERO && e.can_move;
         let mut failed_first = false;
@@ -315,7 +324,11 @@ impl Attack {
             if e.stance == UnitStance::AGGRESSIVE && Speed::ZERO < e.speed && e.can_move {
                 self.state = AttackState::GotoSeen { move_to: None };
                 self.range = e.range;
-                self.walk_to_seen(|move_to| AttackState::GotoSeen { move_to }, reads)?;
+                self.walk_to_seen(
+                    |move_to| AttackState::GotoSeen { move_to },
+                    reads,
+                    move_to_tuning,
+                )?;
             } else {
                 failed_first = true;
             }
@@ -334,7 +347,7 @@ impl Attack {
             {
                 failed_first = true;
             } else {
-                let _ = self.set_move(e, mover, reads)?;
+                let _ = self.set_move(e, mover, reads, move_to_tuning)?;
             }
         } else {
             self.point = e.target_position;
@@ -347,7 +360,7 @@ impl Attack {
             ready_end = true;
         }
         if movable {
-            let arrived = self.set_move(e, mover, reads)?;
+            let arrived = self.set_move(e, mover, reads, move_to_tuning)?;
             return Ok(Begun {
                 arrived,
                 ready: false,
@@ -389,6 +402,7 @@ impl Attack {
         sprite: &mut Option<ActiveSprite>,
         mut motion: MotionMut<'_>,
         rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         // State 13 ("Failed"): the target went out of sight.
         self.state = AttackState::Failed;
@@ -396,7 +410,7 @@ impl Attack {
         let idle = self.arms.idle_sprite.ok_or(GenieError::unsupported(
             "an Attack's unit without a standing sprite",
         ))?;
-        new_sprite(sprite, motion.move_stats_mut(), idle, rng);
+        new_sprite(sprite, motion.move_stats_mut(), idle, rng, sprite_tuning);
         Ok(())
     }
 

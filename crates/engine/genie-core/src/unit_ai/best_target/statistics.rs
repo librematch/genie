@@ -28,6 +28,7 @@ pub const STATISTICS: usize = 128;
 pub(super) const NEVER: f32 = BEST_TARGET_NEVER;
 /// Damage at most this does not count (`DAT_142eb0c60`), nor a span below it.
 pub(super) const EPSILON: f32 = BEST_TARGET_EPSILON;
+/// The targeting factor's per cent (`DAT_142eb99cc`).
 pub(super) const PER_CENT: f32 = BEST_TARGET_PER_CENT;
 /// The classes whose objects stand fixed for the rank (`FUN_140c66590`'s mask
 /// `0x12000000000008`: 3, 49, 52).

@@ -113,6 +113,7 @@ impl Unit {
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
         } else {
             // any other top action's slot 0x38 is the base's false for what an animal or an
@@ -229,6 +230,7 @@ impl Unit {
             &mut c.w.spatial,
             c.w.world_time,
             roles,
+            c.w.model.tuning.visibility,
         )?;
         let Some(own) = changed else {
             return Ok(false);

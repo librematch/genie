@@ -11,9 +11,7 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::spatial::Spatial;
 use crate::math::conversions::cvttss2si;
-use crate::math::image::garrison::{
-    ENTER_NEAR as GARRISON_ENTER_NEAR, HALF_TILE as GARRISON_HALF_TILE,
-};
+use crate::math::image::garrison::HALF_TILE as GARRISON_HALF_TILE;
 use crate::movement::MoveStats;
 use crate::movement::Mover;
 use crate::movement::Speed;
@@ -34,10 +32,6 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use std::sync::Arc;
 
-/// How near the point a transport must reach for an Enter (slot 0x3d8's range), and the range up
-/// to which an Enter's reach of a target with speed tests the tiles about the two
-/// (`FUN_140a85c30`): `DAT_14330eb8c`, 1.0.
-pub(super) const ENTER_NEAR: Distance = Distance::new(GARRISON_ENTER_NEAR);
 /// Half a tile (`DAT_142e7f384`, 0.5): what an Enter's meeting point adds to a tile or to a
 /// place before `floorf` (`FUN_140a85f30`), and how far a target leaves its point before the
 /// Enter walks again (`FUN_140a7bd10`).
@@ -554,7 +548,7 @@ impl Meeting<'_> {
 }
 
 /// A transport's slot 0x3d8 (`FUN_14114ffc0`) for an Enter: whether `ship` reaches within
-/// [`ENTER_NEAR`] of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
+/// `GarrisonTuning::enter_near` of the point's tile (the point truncated), [`crate::movement::Mover::reaches`]
 /// from where it last moved to (`actions`, its action layer); one without movement state does
 /// not.
 pub(crate) fn ship_reaches(
@@ -564,6 +558,7 @@ pub(crate) fn ship_reaches(
     to: Position,
     by_id: ObjectsRef<'_>,
 ) -> Result<bool, GenieError> {
+    let garrison_tuning = &by_id.tuning().garrison;
     let Some(m) = mover else {
         return Ok(false);
     };
@@ -574,7 +569,7 @@ pub(crate) fn ship_reaches(
         (world, by_id),
         plan,
         goal,
-        ENTER_NEAR,
+        Distance::new(garrison_tuning.enter_near),
         ship.life.master_id,
     )
 }

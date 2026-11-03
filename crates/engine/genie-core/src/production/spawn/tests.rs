@@ -43,6 +43,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -204,14 +205,19 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
         walls: [false; 4],
     };
     let mut tried = Vec::new();
-    let p = spawn_point(&site, Footprint::new(0.2, 0.2), &mut |c| {
-        tried.push(c);
-        Ok(if c.y() > 46.9 {
-            Tested::Blocked { stays: true }
-        } else {
-            Tested::Free
-        })
-    })
+    let p = spawn_point(
+        &site,
+        Footprint::new(0.2, 0.2),
+        &mut |c| {
+            tried.push(c);
+            Ok(if c.y() > 46.9 {
+                Tested::Blocked { stays: true }
+            } else {
+                Tested::Free
+            })
+        },
+        &tuning().spawn,
+    )
     .unwrap();
     assert_eq!(p, Point::new(106.5, 46.5));
     assert_eq!(
@@ -366,6 +372,7 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
             &Fogged(vec![o], masks),
             Point::new(21.0, 21.0),
             &roles(),
+            &tuning().spawn,
         )
         .unwrap()
         .code()
@@ -441,7 +448,17 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         placement: PlacementTerrains::NONE,
     };
     let map = Flat(vec![sheep(ObjectState::Alive)]);
-    let at = |x, y| placement(&villager, &map, Point::new(x, y), false, &roles()).unwrap();
+    let at = |x, y| {
+        placement(
+            &villager,
+            &map,
+            Point::new(x, y),
+            false,
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+    };
     assert_eq!(at(106.5, 47.5), Tested::Blocked { stays: true });
     assert_eq!(at(106.5, 47.0), Tested::Blocked { stays: true });
     assert_eq!(at(106.5, 46.5), Tested::Free);
@@ -474,6 +491,7 @@ fn the_first_object_of_tile_list_reports_the_block() {
             Point::new(106.5, 47.5),
             false,
             &roles(),
+            &tuning().spawn,
         )
         .unwrap()
     };
@@ -744,10 +762,15 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
 /// later rings.
 fn all_blocked(site: &Site) -> (Vec<Point>, Result<Point, GenieError>) {
     let mut tried = Vec::new();
-    let r = spawn_point(site, Footprint::new(0.5, 0.5), &mut |c| {
-        tried.push(c);
-        Ok(Tested::Blocked { stays: true })
-    });
+    let r = spawn_point(
+        site,
+        Footprint::new(0.5, 0.5),
+        &mut |c| {
+            tried.push(c);
+            Ok(Tested::Blocked { stays: true })
+        },
+        &tuning().spawn,
+    );
     (tried, r)
 }
 
@@ -1182,33 +1205,36 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     let open = house_site(&open_values, true);
     let flat = Flat(Vec::new());
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(50.0, 50.0)).map(|c| c.map(PlacementCode::code)),
+        build_static_test(&open, &flat, Point::new(50.0, 50.0), &tuning().spawn)
+            .map(|c| c.map(PlacementCode::code)),
         Ok(None)
     );
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(0.5, 50.0)).map(|c| c.map(PlacementCode::code)),
+        build_static_test(&open, &flat, Point::new(0.5, 50.0), &tuning().spawn)
+            .map(|c| c.map(PlacementCode::code)),
         Ok(Some(7))
     );
     assert_eq!(
-        build_static_test(&open, &flat, Point::new(119.5, 50.0))
+        build_static_test(&open, &flat, Point::new(119.5, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
         Ok(Some(7))
     );
     let forbidden_values = Restriction::new(vec![0.0]);
     let forbidden = house_site(&forbidden_values, true);
     assert_eq!(
-        build_static_test(&forbidden, &flat, Point::new(50.0, 50.0))
+        build_static_test(&forbidden, &flat, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
         Ok(Some(2))
     );
     assert_eq!(
-        build_static_test(&open, &Dark, Point::new(50.0, 50.0)).map(|c| c.map(PlacementCode::code)),
+        build_static_test(&open, &Dark, Point::new(50.0, 50.0), &tuning().spawn)
+            .map(|c| c.map(PlacementCode::code)),
         Ok(Some(5))
     );
     let computer_values = Restriction::new(vec![1.0]);
     let computer = house_site(&computer_values, false);
     assert_eq!(
-        build_static_test(&computer, &Dark, Point::new(50.0, 50.0))
+        build_static_test(&computer, &Dark, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code)),
         Ok(None)
     );
@@ -1217,7 +1243,7 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
         ..open
     };
     assert_eq!(
-        build_static_test(&zoned, &flat, Point::new(50.0, 50.0))
+        build_static_test(&zoned, &flat, Point::new(50.0, 50.0), &tuning().spawn)
             .map(|c| c.map(PlacementCode::code))
             .unwrap_err()
             .reason(),
@@ -1229,9 +1255,9 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
 #[test]
 fn build_scan_reads_eight_tiles_either_way_within_the_map() {
     use crate::production::spawn::placement_test::build_scan_range;
-    assert_eq!(build_scan_range(50.5, 120), (42, 58));
-    assert_eq!(build_scan_range(2.0, 120), (0, 10));
-    assert_eq!(build_scan_range(115.0, 120), (107, 119));
+    assert_eq!(build_scan_range(50.5, 120, &tuning().spawn), (42, 58));
+    assert_eq!(build_scan_range(2.0, 120, &tuning().spawn), (0, 10));
+    assert_eq!(build_scan_range(115.0, 120, &tuning().spawn), (107, 119));
 }
 
 /// BUILD's sight test: in sight any object but one of fog visibility 3; in the fog one with a
@@ -1553,9 +1579,15 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     let build_values = Restriction::new(vec![1.0]);
     let build = house_site(&build_values, false);
     let test = |site: &BuildSite<'_>, o: Near| {
-        build_placement(site, &Flat(vec![o]), Point::new(21.0, 21.0), &roles())
-            .unwrap()
-            .code()
+        build_placement(
+            site,
+            &Flat(vec![o]),
+            Point::new(21.0, 21.0),
+            &roles(),
+            &tuning().spawn,
+        )
+        .unwrap()
+        .code()
     };
     assert_eq!(test(&build, house), 0);
     let scans = BuildSite {

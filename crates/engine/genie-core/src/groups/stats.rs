@@ -17,10 +17,6 @@ use crate::groups::{UnitGroup, WorldObject};
 use crate::map::Distance;
 use crate::math::fmath::BVector;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered, sqrt, sub};
-use crate::math::image::group::{
-    FAR as GROUP_FAR, FAR_WIDE as GROUP_FAR_WIDE, SLOW_GROUP_FACTOR as GROUP_SLOW_GROUP_FACTOR,
-    WIDE_RADIUS as GROUP_WIDE_RADIUS,
-};
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::objects::ObjectState;
@@ -35,17 +31,6 @@ use crate::world::Unread;
 use crate::world::World;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
-/// A group with [`GroupFlags::CATCHING_UP`] moves at its slowest member's speed divided by this
-/// (`FUN_14100bcb0`, `DAT_142ed66b4`).
-const SLOW_GROUP_FACTOR: f32 = GROUP_SLOW_GROUP_FACTOR;
-/// A member farther than this from its slot leaves the group (`FUN_14100bcb0`'s far test,
-/// `DAT_142e7f38c`).
-const FAR: f32 = GROUP_FAR;
-/// The far test's distance in a formation of type 7, or once a member of radius
-/// [`WIDE_RADIUS`] or more came before (`DAT_142ecbff0`).
-const FAR_WIDE: f32 = GROUP_FAR_WIDE;
-/// The radius from which the far test takes [`FAR_WIDE`] (`DAT_142e7f384`).
-const WIDE_RADIUS: f32 = GROUP_WIDE_RADIUS;
 /// The objects of the members' searches a group keeps at most (`FUN_140c65c60`'s `0x46`).
 const MOST_OBJECTS: usize = 70;
 
@@ -83,7 +68,7 @@ impl World {
     /// their means, the spacing twice the largest radius, the total spacing `(largest + sum) +
     /// (largest + sum)` in that order, the stored positions' desired length the members' count
     /// times the spacing; the motion's top speed is the slowest member's (divided by
-    /// [`SLOW_GROUP_FACTOR`] with [`GroupFlags::CATCHING_UP`]), the seconds not under attack 0 when
+    /// `GroupTuning::slow_group_factor` with [`GroupFlags::CATCHING_UP`]), the seconds not under attack 0 when
     /// a member is under attack, else they grow by the update's time; a member inside another
     /// object stops ([`World::stop_if_inside`]); each sub-formation's spacing is twice its widest
     /// unit's radius and its attack range its units' largest against the group's target
@@ -137,7 +122,7 @@ impl World {
         g.total_spacing = largest + g.total_spacing + largest + g.total_spacing;
         g.stored_positions.desired_length = (largest + largest) * g.members.len() as f32;
         if g.flags.contains(GroupFlags::CATCHING_UP) {
-            slowest /= SLOW_GROUP_FACTOR;
+            slowest /= self.model.tuning.group.slow_group_factor;
         }
         g.motion.maximum_velocity_forward = Speed::new(slowest);
         if under_attack {
@@ -195,7 +180,7 @@ impl World {
                 continue;
             };
             let master = u.master(self.master_tables(), p)?;
-            let unit = FormationUnit::of(master);
+            let unit = FormationUnit::of(master, &self.model.tuning.group);
             let ai = self
                 .parts
                 .unit_ai
@@ -262,11 +247,18 @@ impl World {
                 }
                 let radius = match object {
                     WorldObject::Unit(p, u, _) => {
-                        FormationUnit::of(u.master(self.master_tables(), p)?).radius
+                        FormationUnit::of(
+                            u.master(self.master_tables(), p)?,
+                            &self.model.tuning.group,
+                        )
+                        .radius
                     }
                     WorldObject::Ghost(p, _) => {
-                        FormationUnit::of(self.master(p, object.master_id(self.model.slots))?)
-                            .radius
+                        FormationUnit::of(
+                            self.master(p, object.master_id(self.model.slots))?,
+                            &self.model.tuning.group,
+                        )
+                        .radius
                     }
                 };
                 if k == 0 || widest < radius {
@@ -341,7 +333,12 @@ impl World {
             pick: Pick::Look,
             memory: Memory::default(),
         };
-        let fresh = self.spatial.search_query(p, &search)?;
+        let fresh = self.spatial.search_query(
+            p,
+            &search,
+            &self.model.tuning.spatial,
+            self.model.tuning.registry,
+        )?;
         let lists = self.spatial.searched().ok_or(GenieError::unsupported(
             "a group member's search that reads the registry's last answer (before any query)",
         ))?;
@@ -437,8 +434,8 @@ impl World {
     /// patrol (the top path's [`PathFlags::LOOPS`], `FUN_141046500`), its flags lack
     /// [`GroupFlags::PATROL`], the member's action list holds no Attack (slot 0x538 with 9) and it
     /// has a slot in the formation (the first by its id) farther on the ground from where it last
-    /// moved to (slot 0x520) than [`FAR`], or [`FAR_WIDE`] in a formation of type 7 or once a
-    /// member of radius [`WIDE_RADIUS`] or more came before (`COMISS` with `JC`: a NaN radius is
+    /// moved to (slot 0x520) than `GroupTuning::far`, or `GroupTuning::far_wide` in a formation of type 7 or once a
+    /// member of radius `GroupTuning::wide_radius` or more came before (`COMISS` with `JC`: a NaN radius is
     /// not wide; `COMISS` with `JBE`: a NaN distance is not far).
     ///
     /// # Errors
@@ -474,12 +471,13 @@ impl World {
         };
         let mut d = sub(view.at, slot.transform_position);
         d = d.with_height(0.0);
-        let limit =
-            if f.kind == FormationKind::STAGGERED || !below_or_unordered(largest, WIDE_RADIUS) {
-                FAR_WIDE
-            } else {
-                FAR
-            };
+        let limit = if f.kind == FormationKind::STAGGERED
+            || !below_or_unordered(largest, self.model.tuning.group.wide_radius)
+        {
+            self.model.tuning.group.far_wide
+        } else {
+            self.model.tuning.group.far
+        };
         let gap = sqrt(d.x() * d.x() + 0.0 + d.y() * d.y());
         Ok(!at_most_or_unordered(gap, limit))
     }

@@ -382,8 +382,12 @@ two nested lists, and that slot holds another object after the next swap-remove.
   in id order.
 - Make no layout change that alters the order of the updates or of the random draws.
 - Read game data from the game's files: masters, graphics, tasks and costs come from the save or
-  the `.dat`, never from Rust constants. The only constants in code are the values that the
-  game's own code compares. They come from the generated `math/image.rs`, each with its routine
+  the `.dat`, never from Rust constants. The exe's own facts about ids and its tuning values
+  are the build layer's (`builds/<build>.ncl`, FD-046): a system tests a role
+  (`roles.of_class(class).contains(ClassRoles::GATE)`), reads a slot (`slots.attribute.kills`)
+  and reads its module's tuning group (`attack_tuning.leash_slack`, the parameter named by its
+  module). The only constants in code are the game's arithmetic: identities, sentinels,
+  epsilons and conversions. They come from the generated `math/image.rs`, each with its routine
   in the doc.
 
 ## 9. Game-engine patterns

@@ -125,7 +125,15 @@ impl World {
         }
         let point = centroid.map_or_else(
             || order.point,
-            |c| offset_point(unit.position().ground(), c, order.point, map),
+            |c| {
+                offset_point(
+                    unit.position().ground(),
+                    c,
+                    order.point,
+                    map,
+                    &self.model.tuning.order,
+                )
+            },
         );
         let takes_it = self
             .parts
@@ -340,7 +348,8 @@ impl World {
                 .filter(|&(j, _)| j != i)
                 .map(|(_, &u)| u)
                 .collect();
-            let cell = narrow.then(|| grid_point(i, loose.len(), order.point, map));
+            let cell = narrow
+                .then(|| grid_point(i, loose.len(), order.point, map, &self.model.tuning.order));
             self.move_unit(player, id, &others, cell, order)?;
         }
         Ok(())

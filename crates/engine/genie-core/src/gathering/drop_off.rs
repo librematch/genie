@@ -162,7 +162,7 @@ impl Unit {
                     .mover_mut(self.id)
                     .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
             return gather
-                .walk_back(Distance::ZERO, mover, &walks)
+                .walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to)
                 .map(|()| HeadCode::Keeps);
         }
         if c.w.players.player(c.player)?.kind.is_computer() {
@@ -183,6 +183,7 @@ impl Unit {
                 c.w.parts.move_stats_mut(self.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             );
         }
         if carry_to.is_some() {
@@ -250,6 +251,7 @@ impl Unit {
             productivity: productivity_of(
                 actions.list.gather().and_then(|g| g.task.productivity),
                 &c.w.players.player(c.player)?.attributes,
+                &c.w.model.tuning.gather,
             ),
         };
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), c.w.parts.mover_mut(self.id))
@@ -272,6 +274,7 @@ impl Unit {
             mover,
             rng,
             roles,
+            &c.w.model.tuning,
         )?;
         let new = gather.targets();
         for (old, new) in old.into_iter().zip(new) {
@@ -383,6 +386,7 @@ impl Unit {
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let move_to_tuning = &by_id.tuning().move_to;
         let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -416,7 +420,7 @@ impl Unit {
             ));
         };
         gather.carry_to = site;
-        gather.set_drop(at, gap, mover, &walks)?;
+        gather.set_drop(at, gap, mover, &walks, move_to_tuning)?;
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 
@@ -432,6 +436,7 @@ impl Unit {
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
     ) -> Result<Option<ObjectId>, GenieError> {
+        let move_to_tuning = &by_id.tuning().move_to;
         let roles = by_id.roles();
         if self.life.amount <= Amount::ZERO {
             return Err(GenieError::unsupported(
@@ -470,7 +475,7 @@ impl Unit {
             ));
         };
         hunt.carry_to = site;
-        hunt.set_drop(at, gap, mover, &walks)?;
+        hunt.set_drop(at, gap, mover, &walks, move_to_tuning)?;
         Ok(site.filter(|_| site != carry_to).map(DropSiteId::id))
     }
 

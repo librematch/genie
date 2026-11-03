@@ -11,7 +11,6 @@ use crate::map::Restriction;
 use crate::map::TerrainFlags;
 use crate::map::TerrainId;
 use crate::map::{Tile, TileRect};
-use crate::math::image::spawn::BUILD_SCAN as SPAWN_BUILD_SCAN;
 use crate::objects::HitPoints;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -25,13 +24,12 @@ use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
-use crate::production::spawn::{
-    BuildSite, INSIDE, PASSABLE, REACH, Tested, hill_fails, placement_terrains,
-};
+use crate::production::spawn::{BuildSite, Tested, hill_fails, placement_terrains};
 use crate::vision::{VisionBits, VisionMasks};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::SpawnTuning;
 
 /// An object near a candidate, as the placement test and the blocker test read it.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -192,14 +190,18 @@ pub trait PlaceMap {
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError>;
 }
 
-/// The tiles within `REACH` of a point, clamped to the map (`(int)` of each bound, then the map's
+/// The tiles within `SpawnTuning::reach` of a point, clamped to the map (`(int)` of each bound, then the map's
 /// edges), row by row.
-pub(super) fn reach(map: GridSize, at: Point) -> impl Iterator<Item = Tile> {
+pub(super) fn reach(
+    map: GridSize,
+    at: Point,
+    spawn_tuning: &SpawnTuning,
+) -> impl Iterator<Item = Tile> {
     let (x, y) = (at.x(), at.y());
-    let x0 = ((x - REACH) as i32 as i16).max(0);
-    let x1 = ((x + REACH) as i32 as i16).min((map.width() - 1) as i16);
-    let y0 = ((y - REACH) as i32 as i16).max(0);
-    let y1 = ((y + REACH) as i32 as i16).min((map.height() - 1) as i16);
+    let x0 = ((x - spawn_tuning.reach) as i32 as i16).max(0);
+    let x1 = ((x + spawn_tuning.reach) as i32 as i16).min((map.width() - 1) as i16);
+    let y0 = ((y - spawn_tuning.reach) as i32 as i16).max(0);
+    let y1 = ((y + spawn_tuning.reach) as i32 as i16).min((map.height() - 1) as i16);
     (y0..=y1).flat_map(move |ty| (x0..=x1).map(move |tx| Tile::new(i32::from(tx), i32::from(ty))))
 }
 
@@ -213,9 +215,10 @@ pub(super) fn overlapping(
     p: Point,
     r: Footprint,
     counts: &dyn Fn(&Near) -> Option<bool>,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<Vec<Found>, GenieError> {
     let mut out = Vec::new();
-    for t in reach(map.size(), p) {
+    for t in reach(map.size(), p, spawn_tuning) {
         for o in map.objects(t)? {
             let Some(tall) = counts(&o) else { continue };
             if !(0.0 < o.radius.x() && 0.0 < o.radius.y() && tall) {
@@ -253,17 +256,21 @@ pub fn build_placement(
     map: &dyn PlaceMap,
     p: Point,
     roles: &Roles,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<PlacementCode, GenieError> {
-    if let Some(code) = build_static_test(site, map, p)? {
+    if let Some(code) = build_static_test(site, map, p, spawn_tuning)? {
         return Ok(code);
     }
-    if site.scans && static_scans_find(site, map, p, roles)? {
+    if site.scans && static_scans_find(site, map, p, roles, spawn_tuning)? {
         return Ok(PlacementCode::Blocked);
     }
     // FUN_14123aee0's scan
     let size = map.size();
     let (w, h) = (size.width(), size.height());
-    let ((x0, x1), (y0, y1)) = (build_scan_range(p.x(), w), build_scan_range(p.y(), h));
+    let ((x0, x1), (y0, y1)) = (
+        build_scan_range(p.x(), w, spawn_tuning),
+        build_scan_range(p.y(), h, spawn_tuning),
+    );
     let player = site.player;
     for ty in y0..=y1 {
         for tx in x0..=x1 {
@@ -285,7 +292,7 @@ pub fn build_placement(
 
 /// The static scans of the Build's test (`p11` and `p13` 1, [`BuildSite::scans`]), for a master with
 /// a height ([`BuildSite::tall`]) and radii: `FUN_141123f80`'s, then `FUN_141264db0`'s, each over
-/// the tiles within [`REACH`] (rows, then columns; each tile's objects in its list's order) for an
+/// the tiles within `SpawnTuning::reach` (rows, then columns; each tile's objects in its list's order) for an
 /// object other than the site's own (`p12`), below state 7, not buildable on, no desolid building
 /// (`FUN_141264db0`'s passes classes 51 and 54), with a height (`FUN_141123f80`'s gives a tree's
 /// farm and an obstructing building one, `FUN_141264db0`'s an obstructing building; the
@@ -296,6 +303,7 @@ fn static_scans_find(
     map: &dyn PlaceMap,
     p: Point,
     roles: &Roles,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<bool, GenieError> {
     let (rx, ry) = (site.radius.x(), site.radius.y());
     if !site.tall || !(0.0 < rx || 0.0 < ry) {
@@ -312,7 +320,7 @@ fn static_scans_find(
             || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
-    if !overlapping(map, p, site.radius, &first)?.is_empty() {
+    if !overlapping(map, p, site.radius, &first, spawn_tuning)?.is_empty() {
         return Ok(true);
     }
     let second = |o: &Near| {
@@ -331,7 +339,7 @@ fn static_scans_find(
         let tall = o.tall || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
         listed.then_some(tall)
     };
-    Ok(!overlapping(map, p, site.radius, &second)?.is_empty())
+    Ok(!overlapping(map, p, site.radius, &second, spawn_tuning)?.is_empty())
 }
 
 /// BUILD's static test (`FUN_141123f80` through `FUN_141264db0`) over the clearance box at `p`:
@@ -342,12 +350,16 @@ pub(super) fn build_static_test(
     site: &BuildSite<'_>,
     map: &dyn PlaceMap,
     p: Point,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<Option<PlacementCode>, GenieError> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (site.radius.x(), site.radius.y());
     let size = map.size();
     let (w, h) = (size.width(), size.height());
-    let (far_x, far_y) = ((x + rx) - INSIDE, (y + ry) - INSIDE);
+    let (far_x, far_y) = (
+        (x + rx) - spawn_tuning.inside,
+        (y + ry) - spawn_tuning.inside,
+    );
     if x - rx < 0.0 || w as f32 <= far_x || y - ry < 0.0 || h as f32 <= far_y {
         return Ok(Some(PlacementCode::OffMap));
     }
@@ -374,7 +386,7 @@ pub(super) fn build_static_test(
             let value = site.restriction.value(t).ok_or(GenieError::unsupported(
                 "a terrain its restriction does not list",
             ))?;
-            if value <= PASSABLE {
+            if value <= spawn_tuning.passable {
                 return Ok(Some(PlacementCode::Terrain));
             }
             explored = explored || (site.human && map.explored(site.player, tile));
@@ -395,10 +407,10 @@ pub(super) fn build_static_test(
 }
 
 /// The tiles BUILD's scan reads along one axis about `v` (`FUN_14123aee0`): within
-/// [`BUILD_SCAN`], each end truncated into a short, from 0 to the map's last tile of `size`.
-pub(super) fn build_scan_range(v: f32, size: i32) -> (i32, i32) {
-    let low = (v - BUILD_SCAN) as i32 as i16;
-    let high = (v + BUILD_SCAN) as i32 as i16;
+/// `SpawnTuning::build_scan`, each end truncated into a short, from 0 to the map's last tile of `size`.
+pub(super) fn build_scan_range(v: f32, size: i32, spawn_tuning: &SpawnTuning) -> (i32, i32) {
+    let low = (v - spawn_tuning.build_scan) as i32 as i16;
+    let high = (v + spawn_tuning.build_scan) as i32 as i16;
     (
         i32::from(low.max(0)),
         if i32::from(high) < size {
@@ -539,9 +551,6 @@ pub(super) fn build_passes(
             && !o.forest_tile)
 }
 
-/// How far BUILD's placement scan looks around the point (`FUN_14123aee0`, `DAT_142eb9430`).
-pub(super) const BUILD_SCAN: f32 = SPAWN_BUILD_SCAN;
-
 /// The first object of a scan, which the game reports as the blocker: the tiles row by row, each
 /// tile's objects in its list's order ([`crate::map::spatial::Spatial::objects_on`], the game's: the
 /// load files them in the save's order, as the game's load does).
@@ -561,12 +570,16 @@ pub fn placement(
     p: Point,
     zones: bool,
     roles: &Roles,
+    spawn_tuning: &SpawnTuning,
 ) -> Result<Tested, GenieError> {
     let (x, y) = (p.x(), p.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
     let size = map.size();
     let (w, h) = (size.width(), size.height());
-    let (far_x, far_y) = ((x + rx) - INSIDE, (y + ry) - INSIDE);
+    let (far_x, far_y) = (
+        (x + rx) - spawn_tuning.inside,
+        (y + ry) - spawn_tuning.inside,
+    );
     // FUN_141123f80's own result: 0 free; the objects of its scan report the blocker (6)
     let mut base_blocker = None;
     let off_map = x - rx < 0.0 || w as f32 <= far_x || y - ry < 0.0 || h as f32 <= far_y;
@@ -589,7 +602,7 @@ pub fn placement(
                 let value = me.restriction.value(t).ok_or(GenieError::unsupported(
                     "a terrain its restriction does not list",
                 ))?;
-                if value <= PASSABLE {
+                if value <= spawn_tuning.passable {
                     passable = false;
                     break 'tiles;
                 }
@@ -617,7 +630,7 @@ pub fn placement(
                 listed.then_some(tall && me.tall)
             };
             let found = if me.tall {
-                overlapping(map, p, me.radius, &counts)?
+                overlapping(map, p, me.radius, &counts, spawn_tuning)?
             } else {
                 Vec::new()
             };
@@ -643,7 +656,7 @@ pub fn placement(
         listed.then_some(tall && me.tall)
     };
     let found = if me.tall && (0.0 < rx || 0.0 < ry) {
-        overlapping(map, p, me.radius, &counts)?
+        overlapping(map, p, me.radius, &counts, spawn_tuning)?
     } else {
         Vec::new()
     };

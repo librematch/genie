@@ -7,9 +7,6 @@ use crate::construction::build::CART_TASK;
 use crate::map::Distance;
 use crate::map::Position;
 use crate::map::spatial::Spatial;
-use crate::math::image::artifact::TOWN_CENTRE_OFFSET as ARTIFACT_TOWN_CENTRE_OFFSET;
-use crate::math::image::move_to::ARRIVED as MOVE_TO_ARRIVED;
-use crate::math::image::order::CART_MOVE_RANGE;
 use crate::math::rng::Well512;
 use crate::movement::Speed;
 use crate::movement::move_to::Shown;
@@ -32,7 +29,10 @@ use crate::world::Seconds;
 use crate::world::WALKER_UNMOVING;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::OrderTuning;
 use genie_diff::Diff;
+use genie_model::model::Model;
 
 /// A `MoveTo` (`RGE_Action_Move_To`): a unit's own top action (a wandering animal's, a moved or
 /// following unit's; its `+0x60` and `+0x61` are 0: it is loud), or the sub-action of an
@@ -67,15 +67,9 @@ pub struct MoveToAction {
     pub wait: MoveWait,
 }
 
-/// A `MoveTo`'s start counts the unit at its target within this gap (`0x140aa2100`,
-/// `DAT_142eb99cc`).
-pub(super) const ARRIVED: f32 = MOVE_TO_ARRIVED;
 /// A `MoveTo` to an object the world does not hold.
 pub(crate) const TARGET_LACKING: GenieError =
     GenieError::unsupported("a MoveTo to an object the world lacks");
-/// Livestock's `MoveTo` to a town centre walks to its place less this on both axes
-/// (`FUN_140aa0df0`, `DAT_142eae8d0`).
-const TOWN_CENTRE_OFFSET: f32 = ARTIFACT_TOWN_CENTRE_OFFSET;
 
 /// `FUN_140aa0df0`'s test of a `MoveTo`'s target object of master `master` in `state`:
 /// livestock (`livestock`, the unit's class 58) moving to a town centre (master 109) holds none,
@@ -105,12 +99,16 @@ pub struct MoveStep {
 
 /// The range a `MoveTo` to an object (`FUN_140aa0df0`) takes for `range`: one made with none
 /// (0.0; `UCOMISS`, so −0.0 too and never a NaN) takes the unit's slot 0x268. A building's
-/// (`FUN_1411c5d80`, master type 80) is `image::order::CART_MOVE_RANGE` (0.75) when its slot
+/// (`FUN_1411c5d80`, master type 80) is `order_tuning.cart_move_range` (0.75) when its slot
 /// 0x4f0 holds (`FUN_1411d4980` -> `FUN_1415c60b0`: its master has a task of action type 0x99, a
 /// mule cart's); any other's (`FUN_14106a6d0`) is 0. A `MoveTo` to a point (`FUN_140aa0d30`)
 /// keeps its range.
 #[must_use]
-pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
+pub fn object_range(
+    range: Distance,
+    master: Option<&Master>,
+    order_tuning: &OrderTuning,
+) -> Distance {
     if range != Distance::ZERO {
         return range;
     }
@@ -118,7 +116,7 @@ pub fn object_range(range: Distance, master: Option<&Master>) -> Distance {
         m.kind == MasterKind::BUILDING && m.tasks.iter().any(|t| t.action_kind == CART_TASK)
     });
     if cart {
-        Distance::new(CART_MOVE_RANGE)
+        Distance::new(order_tuning.cart_move_range)
     } else {
         Distance::ZERO
     }
@@ -215,7 +213,7 @@ impl MoveToAction {
     /// A new `MoveTo` of its own to the object `target` within `range` (`FUN_140aa0df0`; its point
     /// `+0x38` the target's place, which a path request renews), with
     /// its `sprite` ([`MoveToAction::sprite`]), as its start (slot 0x808 ->
-    /// `0x140aa2100`) leaves it: a unit more than [`ARRIVED`] from the target's footprint
+    /// `0x140aa2100`) leaves it: a unit more than `MoveToTuning::arrived` from the target's footprint
     /// (`FUN_14118f680`) in state 3 with speed (slot 0x208), 13 without; a unit at the target
     /// already in state 1, which its next update ends. States 1 and 13 (`0x140aa29e0`, not quiet)
     /// show the master's standing sprite ([`Mover::shows_standing`]; the sprite itself and
@@ -228,10 +226,13 @@ impl MoveToAction {
         target: ObjectId,
         range: Distance,
         sprite: Option<Graphic>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<Self, GenieError> {
         let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
         let ground = mover.stats.radius.ground();
-        let state = if footprint_gap(me, ground, t.position, t.radius) <= Distance::new(ARRIVED) {
+        let state = if footprint_gap(me, ground, t.position, t.radius)
+            <= Distance::new(move_to_tuning.arrived)
+        {
             MoveTo::Arrived
         } else if mover.stats.speed == Speed::ZERO {
             MoveTo::Failed
@@ -253,7 +254,7 @@ impl MoveToAction {
     /// A new `MoveTo` of its own (loud, `+0x60` 0) to the object `target` within `range`
     /// (`FUN_140aa0df0`), then its start (slot 0x808 -> `0x140aa2100`). Livestock (`livestock`,
     /// the unit's class 58) moving to a town centre (master 109) holds no target and walks to
-    /// the centre's place less [`TOWN_CENTRE_OFFSET`] on both axes; a target in a `state` of 7
+    /// the centre's place less `ArtifactTuning::town_centre_offset` on both axes; a target in a `state` of 7
     /// or later is not held either (`FUN_140a7a230`: its id stays −1) and the `MoveTo` walks to
     /// its place, as a `MoveTo` to that point starts ([`MoveToAction::to_point`]). Any other
     /// target is held ([`MoveToAction::to_target`]), and the caller takes it (slot
@@ -269,18 +270,20 @@ impl MoveToAction {
         (target, state): (ObjectId, ObjectState),
         range: Distance,
         (sprite, livestock): (Option<Graphic>, bool),
-        roles: &Roles,
+        model: &Model,
     ) -> Result<Self, GenieError> {
+        let (roles, artifact_tuning, move_to_tuning) =
+            (&model.roles, model.tuning.artifact, &model.tuning.move_to);
         let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
         let at = t.position;
         let goal = if livestock && roles.of_master(t.master).contains(MasterRoles::TOWN_CENTRE) {
             Position::new(
-                at.x() - TOWN_CENTRE_OFFSET,
-                at.y() - TOWN_CENTRE_OFFSET,
+                at.x() - artifact_tuning.town_centre_offset,
+                at.y() - artifact_tuning.town_centre_offset,
                 at.z(),
             )
         } else if holds_object(livestock, t.master, state, roles) {
-            return Self::to_target(world, me, mover, target, range, sprite);
+            return Self::to_target(world, me, mover, target, range, sprite, move_to_tuning);
         } else {
             at
         };
@@ -354,9 +357,16 @@ impl MoveToAction {
     /// A `MoveTo` of its own is not quiet: its `set_state` 1 or 13 shows slot 0x798's sprite
     /// ([`Shows::standing`], slot 0x68 with it, [`new_sprite`]) and clears the unit's `+0x7b8`.
     fn ended(&self, walk: &mut Walk<'_>, shows: &mut Shows<'_>) {
+        let sprite_tuning = walk.by_id.tuning().sprite;
         if matches!(self.state, MoveTo::Arrived | MoveTo::Failed) {
             if let Some(g) = shows.standing.or(shows.master_standing) {
-                new_sprite(shows.sprite, walk.move_stats_mut(), g, shows.rng);
+                new_sprite(
+                    shows.sprite,
+                    walk.move_stats_mut(),
+                    g,
+                    shows.rng,
+                    sprite_tuning,
+                );
             }
             walk.set_anim_speed(Speed::ZERO);
         }
@@ -376,7 +386,9 @@ impl MoveToAction {
         let mut step = MoveStep::default();
         match self.state {
             MoveTo::Moving => self.update_moving(&mut walk, &mut step, &mut shows)?,
-            MoveTo::Start => self.update_start(&mut walk, ask, &mut step, &mut shows)?,
+            MoveTo::Start => {
+                self.update_start(&mut walk, ask, &mut step, &mut shows)?;
+            }
             MoveTo::Arrived => step.done = true,
             // case 2: the timer runs by dt; at its end the MoveTo asks again (set_state 3)
             MoveTo::Waiting => {
@@ -532,7 +544,9 @@ mod tests {
     use crate::objects::{FacetCount, Frame};
     use crate::test_ids::object_id;
     use crate::testing::ids::TOWN_CENTRE;
+    use crate::testing::model;
     use crate::testing::roles;
+    use crate::testing::tuning;
 
     /// A sprite `id` whose speed factor is `factor`, looped.
     const fn graphic(id: i16, factor: f32) -> Graphic {
@@ -838,28 +852,31 @@ mod tests {
             ..cart.clone()
         };
         assert_eq!(
-            object_range(Distance::ZERO, Some(&cart)),
+            object_range(Distance::ZERO, Some(&cart), &tuning().order),
             Distance::new(0.75)
         );
         assert_eq!(
-            object_range(Distance::new(-0.0), Some(&cart)),
+            object_range(Distance::new(-0.0), Some(&cart), &tuning().order),
             Distance::new(0.75)
         );
         assert_eq!(
-            object_range(Distance::ZERO, Some(&building)),
+            object_range(Distance::ZERO, Some(&building), &tuning().order),
             Distance::new(0.0)
         );
         assert_eq!(
-            object_range(Distance::ZERO, Some(&unit)),
+            object_range(Distance::ZERO, Some(&unit), &tuning().order),
             Distance::new(0.0)
         );
-        assert_eq!(object_range(Distance::ZERO, None), Distance::new(0.0));
         assert_eq!(
-            object_range(Distance::new(0.5), Some(&cart)),
+            object_range(Distance::ZERO, None, &tuning().order),
+            Distance::new(0.0)
+        );
+        assert_eq!(
+            object_range(Distance::new(0.5), Some(&cart), &tuning().order),
             Distance::new(0.5)
         );
         assert!(
-            object_range(Distance::new(f32::NAN), Some(&cart))
+            object_range(Distance::new(f32::NAN), Some(&cart), &tuning().order)
                 .get()
                 .is_nan()
         );
@@ -880,6 +897,7 @@ mod tests {
             object_id(9185),
             Distance::ZERO,
             None,
+            &tuning().move_to,
         )
         .unwrap();
         assert!(at_hand.arrived());
@@ -892,6 +910,7 @@ mod tests {
             object_id(9186),
             Distance::ZERO,
             None,
+            &tuning().move_to,
         )
         .unwrap();
         assert!(!far.arrived());
@@ -925,7 +944,7 @@ mod tests {
                 target,
                 Distance::ZERO,
                 (None, livestock),
-                &roles(),
+                model(),
             )
             .unwrap()
         };
@@ -1013,6 +1032,7 @@ mod tests {
             object_id(9186),
             Distance::ZERO,
             None,
+            &tuning().move_to,
         )
         .unwrap();
         assert_eq!(far.point, Position::new(35.0, 40.0, 0.0));
@@ -1025,6 +1045,7 @@ mod tests {
             object_id(9186),
             Distance::ZERO,
             None,
+            &tuning().move_to,
         )
         .unwrap();
         assert_eq!(stuck.state, MoveTo::Failed);

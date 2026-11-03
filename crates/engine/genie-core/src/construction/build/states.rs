@@ -316,6 +316,7 @@ impl BuildAction {
             OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
             &c.w.model.graphics,
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )
     }
 

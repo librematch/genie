@@ -11,6 +11,7 @@ use crate::garrison::ENTER;
 use crate::gathering::DropSiteId;
 use crate::gathering::HuntTargetId;
 use crate::gathering::gather::GATHER;
+use crate::gathering::gather::Stand;
 use crate::gathering::hunt::{HUNT, HuntState, stand_sprite};
 use crate::gathering::make::MAKE;
 use crate::map::Position;
@@ -226,6 +227,7 @@ impl World {
                 self.parts.move_stats_mut(unit.id),
                 g,
                 self.streams.get(Stream::Sprite),
+                self.model.tuning.sprite,
             );
         }
         if unit.my_pasture.is_some() {
@@ -275,6 +277,7 @@ impl World {
                     self.parts.motion.layer_mut(unit.id),
                     &mut unit.sprite,
                     self.streams.get(Stream::Sprite),
+                    self.model.tuning.sprite,
                 )?;
             }
             ARTIFACT_TYPE => self.halt_artifact(p, idx, by)?,
@@ -313,9 +316,12 @@ impl World {
         );
         let released = gather.halt(
             self.parts.motion.mover_mut(unit.id),
-            stand,
-            &mut unit.sprite,
-            self.streams.get(Stream::Sprite),
+            Stand {
+                graphic: stand,
+                sprite: &mut unit.sprite,
+                rng: self.streams.get(Stream::Sprite),
+                sprite_tuning: &self.model.tuning.sprite,
+            },
         )?;
         for t in released.into_iter().flatten() {
             self.release(t, by)?;

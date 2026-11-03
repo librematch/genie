@@ -51,6 +51,7 @@ impl HuntAction {
                 c.w.parts.move_stats_mut(unit.id),
                 g,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             );
         }
         self.timer = LEAD_WAIT;
@@ -131,7 +132,7 @@ impl HuntAction {
             &f.victim,
             player,
             &walks,
-            roles,
+            &c.w.model,
         )?;
         Ok(HuntNext::Stay)
     }

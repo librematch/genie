@@ -89,6 +89,7 @@ impl Attack {
         f: &Fight,
         r: &AttackReads,
     ) -> Result<(), GenieError> {
+        let sprite_tuning = g.by_id.tuning().sprite;
         let roles = g.by_id.roles();
         self.enter(AttackState::Swing, g.motion.reborrow())?;
         let alternates = g.motion.mover().is_some_and(|m| {
@@ -126,6 +127,7 @@ impl Attack {
             g.motion.move_stats_mut(),
             shown,
             g.sprite_rng,
+            sprite_tuning,
         );
         // FUN_1413b9f00 on the unit's sprite list with its sprite (`+0x140`)
         if let Some(current) = unit.sprite.map(|sp| sp.graphic) {

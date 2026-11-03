@@ -39,6 +39,7 @@ use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use crate::unit_ai::UnitStance;
 use crate::world::WorldTime;
 use crate::world::step::Step;
@@ -193,10 +194,10 @@ impl Rig {
         self.t.parts.anim_speed_of(self.unit().id) == Some(Speed::new(0.0))
     }
 
-    /// The next draw of the world's Action stream, less [`WAIT_SHIFT`]: a random wait's timer.
+    /// The next draw of the world's Action stream, less `GatherTuning::wait_shift`: a random wait's timer.
     fn next_wait(&self) -> f32 {
         let mut action = self.t.streams.clone();
-        action.get(Stream::Action).float01() - WAIT_SHIFT
+        action.get(Stream::Action).float01() - tuning().gather.wait_shift
     }
 }
 
@@ -278,6 +279,7 @@ fn farm_stop_is_tile_centre_of_its_footprint_other_than_the_last() {
             Footprint::new(1.5, 1.5),
             last,
             &mut rng,
+            &tuning().gather,
         )
         .get();
         assert!([111.5, 112.5, 113.5].contains(&x) && [172.5, 173.5, 174.5].contains(&y));
@@ -291,6 +293,7 @@ fn farm_stop_is_tile_centre_of_its_footprint_other_than_the_last() {
         Footprint::new(0.0, 0.0),
         Point::new(10.5, 20.5),
         &mut rng,
+        &tuning().gather,
     );
     assert_eq!((at, rng.draws), (Point::new(10.5, 20.5), 20));
 }
@@ -351,7 +354,15 @@ fn stop_idles_the_gather_and_lets_its_targets_go() {
     };
     let (mut sprite, mut rng) = (None, Well512::default());
     let released = g
-        .halt(Some(&mut mover), Some(stand), &mut sprite, &mut rng)
+        .halt(
+            Some(&mut mover),
+            Stand {
+                graphic: Some(stand),
+                sprite: &mut sprite,
+                rng: &mut rng,
+                sprite_tuning: &tuning().sprite,
+            },
+        )
         .unwrap();
     assert_eq!(released, [Some(object_id(31)), Some(object_id(9))]);
     assert_eq!(
@@ -389,9 +400,14 @@ fn gather_move_to_refuses_target_past_state_6() {
         state: Some(state),
     };
     let walk = |state| {
-        g.move_to_object(to(state), &mover, &walks(Held::default()))
-            .unwrap()
-            .map(|m| (ObjectId::field(m.target), m.point, m.state))
+        g.move_to_object(
+            to(state),
+            &mover,
+            &walks(Held::default()),
+            &tuning().move_to,
+        )
+        .unwrap()
+        .map(|m| (ObjectId::field(m.target), m.point, m.state))
     };
     assert_eq!(
         walk(ObjectState::Undead),
@@ -418,6 +434,7 @@ fn past_its_time_per_stop_farmer_walks_to_the_next_stop() {
         Footprint::new(1.5, 1.5),
         Point::ORIGIN,
         &mut rng.clone(),
+        &tuning().gather,
     );
     let walks = walks(Held::default());
     let to = WalkTo {
@@ -426,8 +443,15 @@ fn past_its_time_per_stop_farmer_walks_to_the_next_stop() {
         gap: Distance::ZERO,
         state: Some(ObjectState::Alive),
     };
-    g.set_walk(to, Footprint::new(1.5, 1.5), &mut mover, &mut rng, &walks)
-        .unwrap();
+    g.set_walk(
+        to,
+        Footprint::new(1.5, 1.5),
+        &mut mover,
+        &mut rng,
+        &walks,
+        tuning(),
+    )
+    .unwrap();
     // a farm's stop: a quiet MoveTo to a point of the farm within the task's range, which asks
     // again when it moves (`+0x61` 1)
     let to_stop = MoveToAction {
@@ -496,6 +520,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         PlayerId::new(7),
         &mut mover,
         &loaded,
+        &tuning().move_to,
     )
     .unwrap();
     // a quiet MoveTo to the point within the task's range; its `+0x61` stays 0
@@ -529,6 +554,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         PlayerId::new(7),
         &mut mover,
         &loaded,
+        &tuning().move_to,
     )
     .unwrap();
     assert_eq!(
@@ -560,6 +586,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         PlayerId::new(7),
         &mut mover,
         &loaded,
+        &tuning().move_to,
     )
     .unwrap();
     assert_eq!(
@@ -573,6 +600,7 @@ fn gatherer_moved_walks_to_the_point_or_carries_its_load_to_the_drop_site() {
         PlayerId::new(7),
         &mut mover,
         &walks(carrying(Some(AttributeId::named(17)), 0.0)),
+        &tuning().move_to,
     )
     .unwrap();
     assert_eq!(
@@ -765,7 +793,7 @@ fn gatherer_drop_off_waits_walks_and_drops_its_load_at_the_site() {
     );
     assert_eq!(g.state, GatherState::Idle);
     let mut g = dropping(Some(MoveTo::Arrived), Seconds::ZERO);
-    let far = DROP_REACH + 1.0;
+    let far = tuning().gather.drop_reach + 1.0;
     assert_eq!(
         drop(&mut g, &mut rig, site(true, DistanceSquared::new(far))),
         Ok(Dropped::Going)
@@ -1276,9 +1304,12 @@ fn without_reseed_the_farmer_idles_or_computer_is_done() {
                 arrived,
                 player_type,
                 Some(&mut mover),
-                None,
-                &mut sprite,
-                &mut rng,
+                Stand {
+                    graphic: None,
+                    sprite: &mut sprite,
+                    rng: &mut rng,
+                    sprite_tuning: &tuning().sprite,
+                },
             )
             .unwrap();
         (g.state, released, g.target, g.state.move_to().copied())
@@ -1334,6 +1365,7 @@ fn forager_walks_to_its_bush() {
         &mut mover,
         &mut Well512::default(),
         &roles(),
+        tuning(),
     )
     .unwrap();
     // a quiet MoveTo to the bush that asks again when it moves
@@ -1368,6 +1400,7 @@ fn forager_walks_to_its_bush() {
         &mut mover,
         &mut Well512::default(),
         &roles(),
+        tuning(),
     )
     .unwrap();
     assert_eq!(held, carrying(Some(AttributeId::named(17)), 3.0));
@@ -1405,7 +1438,8 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             },
             &mut mover,
             &mut Well512::default(),
-            &roles()
+            &roles(),
+            tuning()
         ),
         Ok(true)
     );
@@ -1454,7 +1488,8 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                 },
                 &mut mover,
                 &mut Well512::default(),
-                &roles()
+                &roles(),
+                tuning()
             ),
             Ok(true)
         );
@@ -1484,7 +1519,8 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             },
             &mut mover,
             &mut Well512::default(),
-            &roles()
+            &roles(),
+            tuning()
         ),
         Ok(true)
     );

@@ -2,6 +2,7 @@
 //! livestock (state 12).
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, Fight, set_walker_anim};
 use crate::combat::victims::{file_kill, write_back};
 use crate::gathering::hunt::HuntState;
@@ -56,7 +57,7 @@ impl HuntAction {
             HuntState::Walk { .. } if self.timer < Seconds::ZERO => {
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
-                self.wait_then_walk(c.dt.seconds(), mover, &walks)?;
+                self.wait_then_walk(c.dt.seconds(), mover, &walks, &c.w.model.tuning.move_to)?;
                 Ok(HuntNext::Stay)
             }
             HuntState::Walk { .. } => self.update_walk(c, unit, actions, me, f, r),
@@ -135,7 +136,7 @@ impl HuntAction {
                     &f.victim,
                     player,
                     &walks,
-                    roles,
+                    &c.w.model,
                 )?;
                 Ok(HuntNext::Stay)
             }
@@ -145,7 +146,12 @@ impl HuntAction {
                 unit.hunt_release(c, [target])?;
                 let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
                 let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
-                self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)?;
+                self.set_point_walk(
+                    |move_to| HuntState::WalkSearch { move_to },
+                    mover,
+                    &walks,
+                    &c.w.model.tuning.move_to,
+                )?;
                 Ok(HuntNext::Stay)
             }
         }
@@ -247,6 +253,7 @@ impl HuntAction {
                 c.w.parts.motion_mut(unit.id),
                 c.w.streams.get(Stream::Sprite),
                 r,
+                c.w.model.tuning.sprite,
             );
             return Ok(HuntNext::Stay);
         }
@@ -269,7 +276,12 @@ impl HuntAction {
         self.set_target(None);
         let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
         let mover = c.w.parts.mover_mut(unit.id).ok_or(HUNTER_UNMOVING)?;
-        self.set_point_walk(|move_to| HuntState::WalkSearch { move_to }, mover, &walks)
+        self.set_point_walk(
+            |move_to| HuntState::WalkSearch { move_to },
+            mover,
+            &walks,
+            &c.w.model.tuning.move_to,
+        )
     }
 
     /// `FUN_140ac4670` with 8 and −1 for a class the unit AI's slot 0x1b0 gives 0 (trees, the
@@ -319,14 +331,18 @@ impl HuntAction {
             herd.arms,
             mover,
             &reads,
-            roles,
-            &c.w.model.tuning.attack,
+            BeginLayer {
+                roles,
+                attack_tuning: &c.w.model.tuning.attack,
+                move_to_tuning: &c.w.model.tuning.move_to,
+            },
         )?;
         if arrived {
             a.arrived_sprite(
                 unit,
                 c.w.parts.motion_mut(unit.id),
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
         }
         self.state = HuntState::Attack { attack: Some(a) };

@@ -2,8 +2,8 @@
 //! history's updates, an attribute's tally and a share of the player's value.
 
 use crate::math::conversions::{cvttss2si, cvttss2si_64};
-use crate::math::image::history::{BATTLE_RECORD, BATTLE_START};
 use crate::players::Amount;
+use crate::world::layer::generated::HistoryTuning;
 
 /// An entry's kind (`add_new_history_entry`'s first argument): the update's population entry
 /// is kind 0; an entry of any other kind keeps its slot zero.
@@ -181,18 +181,18 @@ impl Share {
         Self(self.0 + other.0)
     }
 
-    /// Whether a period's own share starts or goes on with a battle: [`BATTLE_START`] or more,
+    /// Whether a period's own share starts or goes on with a battle: `HistoryTuning::battle_start` or more,
     /// as doubles.
     #[must_use]
-    pub fn battling(self) -> bool {
-        f64::from(self.0) >= BATTLE_START
+    pub fn battling(self, history_tuning: &HistoryTuning) -> bool {
+        f64::from(self.0) >= history_tuning.battle_start
     }
 
-    /// Whether a battle's summed share makes it an event: [`BATTLE_RECORD`] or more, as
+    /// Whether a battle's summed share makes it an event: `HistoryTuning::battle_record` or more, as
     /// doubles.
     #[must_use]
-    pub fn recorded(self) -> bool {
-        f64::from(self.0) >= BATTLE_RECORD
+    pub fn recorded(self, history_tuning: &HistoryTuning) -> bool {
+        f64::from(self.0) >= history_tuning.battle_record
     }
 
     /// The float, as the save holds it.
@@ -205,6 +205,7 @@ impl Share {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::testing::tuning;
 
     /// A population is the count's `CVTTSS2SI` cut to 16 bits; a NaN gives 0.
     #[test]
@@ -255,10 +256,14 @@ mod tests {
         let share = Share::of(Tally::of_data(3), Tally::of_data(25));
         assert_eq!(share.get(), 3.0 / 25.0);
         // 0.12 as a float lies below the double's 0.12
-        assert!(!share.battling());
-        assert!(Share::of_data(0.13).battling());
-        assert!(!Share::of_data(0.14).recorded());
-        assert!(Share::of_data(0.1).plus(Share::of_data(0.06)).recorded());
+        assert!(!share.battling(&tuning().history));
+        assert!(Share::of_data(0.13).battling(&tuning().history));
+        assert!(!Share::of_data(0.14).recorded(&tuning().history));
+        assert!(
+            Share::of_data(0.1)
+                .plus(Share::of_data(0.06))
+                .recorded(&tuning().history)
+        );
         assert_eq!(Share::ZERO.plus(Share::of_data(0.5)), Share::of_data(0.5));
     }
 }

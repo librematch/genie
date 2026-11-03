@@ -19,12 +19,10 @@ use crate::GenieError;
 
 use crate::map::spatial::Placed;
 use crate::map::spatial::Spatial;
-use crate::math::image::build::{
-    CLEARING_REACH as BUILD_CLEARING_REACH, STUMP_HP as BUILD_STUMP_HP,
-};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::BuildTuning;
 
 /// What the footprint clearing (`FUN_1415c3620`) reads of the new building: its owner
 /// (`param_2`), its master's id (`param_3`), class and radii, its place (`param_4`,
@@ -84,11 +82,6 @@ pub struct Cleared {
     pub record_goes: bool,
 }
 
-/// The tiles the footprint clearing scans each way of the building's place (`DAT_142eb0f48`).
-pub(crate) const CLEARING_REACH: f32 = BUILD_CLEARING_REACH;
-/// The hit points a tree at most has that the builder's clearing takes (`DAT_14330eb8c`).
-pub(super) const STUMP_HP: f32 = BUILD_STUMP_HP;
-
 /// `FUN_1415c3620` with `param_7` 0, its choice: the objects whose centre is on the tiles from 4
 /// before the building's place to 4 past it (CVTTSS2SI to 16 bits, held on the map), rows then
 /// columns, each tile's list in its order (`objects_on`: the ghosts, type 25, are not on it), of
@@ -111,13 +104,14 @@ pub(crate) fn footprint_clearing(
     site: &ClearingSite,
     looks: &BTreeMap<ObjectId, ClearLook>,
     roles: &Roles,
+    build_tuning: &BuildTuning,
 ) -> Result<Vec<Cleared>, GenieError> {
     use crate::math::fmath::below_or_unordered;
     let (rx, ry) = (site.radius.x(), site.radius.y());
     if !below_or_unordered(0.0, rx) && !below_or_unordered(0.0, ry) {
         return Ok(Vec::new());
     }
-    let Some(([x0, x1], [y0, y1])) = clearing_tiles(site.at, world.map) else {
+    let Some(([x0, x1], [y0, y1])) = clearing_tiles(site.at, world.map, build_tuning) else {
         return Ok(Vec::new());
     };
     // a stopped player's units may have felled a tree there since they froze: the builder's
@@ -135,7 +129,7 @@ pub(crate) fn footprint_clearing(
     for y in y0..=y1 {
         for x in x0..=x1 {
             for (id, o) in world.objects_on(Tile::new(i32::from(x), i32::from(y))) {
-                if let Some(c) = clearing_takes(site, id, o, looks, roles)? {
+                if let Some(c) = clearing_takes(site, id, o, looks, roles, build_tuning)? {
                     cleared.push(c);
                 }
             }
@@ -146,8 +140,12 @@ pub(crate) fn footprint_clearing(
 
 /// The objects on [`footprint_clearing`]'s tiles about `at` ([`clearing_tiles`]), in its order:
 /// those it may read the [`ClearLook`] of.
-pub(crate) fn clearing_objects(world: &Spatial, at: Point) -> Vec<ObjectId> {
-    let Some(([x0, x1], [y0, y1])) = clearing_tiles(at, world.map) else {
+pub(crate) fn clearing_objects(
+    world: &Spatial,
+    at: Point,
+    build_tuning: &BuildTuning,
+) -> Vec<ObjectId> {
+    let Some(([x0, x1], [y0, y1])) = clearing_tiles(at, world.map, build_tuning) else {
         return Vec::new();
     };
     let mut ids = Vec::new();
@@ -163,14 +161,18 @@ pub(crate) fn clearing_objects(world: &Spatial, at: Point) -> Vec<ObjectId> {
     ids
 }
 
-/// [`footprint_clearing`]'s tiles: from 4 before the place to 4 past it on each axis
-/// (CVTTSS2SI to 16 bits), held on the map; none when a range is empty.
-pub(super) fn clearing_tiles(at: Point, map: GridSize) -> Option<([i16; 2], [i16; 2])> {
+/// [`footprint_clearing`]'s tiles: from `BuildTuning::clearing_reach` before the place to as far
+/// past it on each axis (CVTTSS2SI to 16 bits), held on the map; none when a range is empty.
+pub(super) fn clearing_tiles(
+    at: Point,
+    map: GridSize,
+    build_tuning: &BuildTuning,
+) -> Option<([i16; 2], [i16; 2])> {
     use crate::math::conversions::cvttss2si;
     let (w, h) = (map.width(), map.height());
     let range = |v: f32, size: i32| {
-        let low = cvttss2si(v - CLEARING_REACH) as i16;
-        let high = cvttss2si(v + CLEARING_REACH) as i16;
+        let low = cvttss2si(v - build_tuning.clearing_reach) as i16;
+        let high = cvttss2si(v + build_tuning.clearing_reach) as i16;
         let high = if size <= i32::from(high) {
             (size - 1) as i16
         } else {
@@ -197,6 +199,7 @@ pub(super) fn clearing_takes(
     o: &Placed,
     looks: &BTreeMap<ObjectId, ClearLook>,
     roles: &Roles,
+    build_tuning: &BuildTuning,
 ) -> Result<Option<Cleared>, GenieError> {
     use crate::math::fmath::below_or_unordered;
     if o.master == site.master {
@@ -218,7 +221,10 @@ pub(super) fn clearing_takes(
         "a footprint clearing of an object the slice does not hold",
     ))?;
     // the tree's test: COMISS 1.0 against its hit points, JC passes it over (a NaN too)
-    if !o.buildable_on.cleared() && !own_wall && below_or_unordered(STUMP_HP, seen.hp.get()) {
+    if !o.buildable_on.cleared()
+        && !own_wall
+        && below_or_unordered(build_tuning.stump_hp, seen.hp.get())
+    {
         return Ok(None);
     }
     let (rx, ry) = (site.radius.x(), site.radius.y());

@@ -122,6 +122,7 @@ impl Attack {
             unit,
             c.w.parts.motion_mut(unit.id),
             c.w.streams.get(Stream::Sprite),
+            c.w.model.tuning.sprite,
         )?;
         if self.voice.is_loud() {
             unit.post_own(
@@ -304,6 +305,7 @@ impl Attack {
         r: &AttackReads,
         sprite: ActiveSprite,
     ) -> Result<(), GenieError> {
+        let sprite_tuning = c.w.model.tuning.sprite;
         let ranged = self.arms.missile.is_some();
         let timer = c.w.parts.combat_of(unit.id).attack_timer;
         let mut g = c.w.attack_ground(unit.id);
@@ -351,6 +353,7 @@ impl Attack {
                 g.motion.move_stats_mut(),
                 idle,
                 g.sprite_rng,
+                sprite_tuning,
             );
             if changed && let Some(current) = unit.sprite.map(|sp| sp.graphic) {
                 let _ = reset_sprite(&mut unit.sprite, current);

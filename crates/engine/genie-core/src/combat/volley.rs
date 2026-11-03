@@ -30,11 +30,11 @@ use crate::players::PlayerId;
 use crate::unit_ai::Notify;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::UnitAi;
-use crate::world::ARMED_FIREPOWER;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::TurnTuning;
 use crate::world::step::Step;
 
 mod launch;
@@ -420,13 +420,18 @@ impl Aimed {
 
 /// `FUN_14120ea30` of an attacker of `master` with `firepower` (`+0xa00`): a building can attack
 /// when of class 51 or 54, with a missile, or with a firepower above 1; any other attacker can.
-pub(crate) fn armed(master: &Master, firepower: Firepower, roles: &Roles) -> bool {
+pub(crate) fn armed(
+    master: &Master,
+    firepower: Firepower,
+    roles: &Roles,
+    turn_tuning: &TurnTuning,
+) -> bool {
     master.kind != MasterKind::BUILDING
         || roles
             .of_class(master.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         || master.missile.master().is_some()
-        || ARMED_FIREPOWER < firepower
+        || Firepower::new(turn_tuning.armed_firepower) < firepower
 }
 
 /// Whether two lists hold the same objects, in any order.

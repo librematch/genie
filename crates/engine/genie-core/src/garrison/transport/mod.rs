@@ -34,6 +34,7 @@ mod action;
 mod shore;
 mod transport_mode;
 mod transport_state;
+mod unit;
 mod unload;
 mod work;
 
@@ -43,12 +44,7 @@ pub(crate) use self::shore::{DropDraws, in_zone, retry_point};
 pub use self::transport_mode::TransportMode;
 pub use self::transport_state::TransportState;
 use crate::map::RestrictionId;
-use crate::math::image::transport::{
-    DRAW_SCALE as TRANSPORT_DRAW_SCALE, DROP_GAP as TRANSPORT_DROP_GAP,
-    MOVE_RANGE as TRANSPORT_MOVE_RANGE, NEAR as TRANSPORT_NEAR, NONE as TRANSPORT_NONE,
-    RETRY_SPREAD as TRANSPORT_RETRY_SPREAD, SHORE_MARGIN as TRANSPORT_SHORE_MARGIN,
-    UNLOAD_REACH_SQUARED as TRANSPORT_UNLOAD_REACH_SQUARED,
-};
+use crate::math::image::transport::{DRAW_SCALE as TRANSPORT_DRAW_SCALE, NONE as TRANSPORT_NONE};
 #[cfg(test)]
 use crate::math::rng::Well512;
 use crate::objects::masters::TaskId;
@@ -61,18 +57,6 @@ pub(crate) const NO_TRANSPORT: GenieError =
 
 /// The action's point while it has none (`DAT_14330ec20`).
 pub const NONE: f32 = TRANSPORT_NONE;
-/// The reach within which a tile of the point's zone lets the unit unload (`DAT_142e8c150`).
-const NEAR: f32 = TRANSPORT_NEAR;
-/// The shore search's margin about the unit's footprint (`DAT_142e8c150`).
-const SHORE_MARGIN: f32 = TRANSPORT_SHORE_MARGIN;
-/// The squared gap from the unit's footprint within which the work unloads at once
-/// (`DAT_142eb0f48`).
-const UNLOAD_REACH_SQUARED: f32 = TRANSPORT_UNLOAD_REACH_SQUARED;
-/// The `MoveTo`'s range to the point (`DAT_142e8c148`).
-const MOVE_RANGE: f32 = TRANSPORT_MOVE_RANGE;
-/// The new point's spread about the old one (`DAT_14330ebb8`): a draw over [`RETRY_STEP`] less
-/// this.
-const RETRY_SPREAD: f32 = TRANSPORT_RETRY_SPREAD;
 /// The divisor that cuts a 15-bit draw to 0..10 tiles (`FUN_140aa3ba0`'s `0xccc`).
 const RETRY_STEP: u32 = 0xccc;
 /// The new point's draws (`FUN_140aa3ba0`).
@@ -83,7 +67,6 @@ const WATER: TerrainId = TerrainId::named(1);
 /// A drop location's draw scale (`DAT_142eb69cc`) and the gap past the footprints
 /// (`DAT_142eb99cc`).
 const DRAW_SCALE: f32 = TRANSPORT_DRAW_SCALE;
-const DROP_GAP: f32 = TRANSPORT_DROP_GAP;
 /// The draws `find_drop_location` makes (`FUN_141192d10`: 50).
 const DROP_TRIES: u16 = 50;
 
@@ -96,7 +79,7 @@ pub const STACK_PLACE: GenieError =
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct TransportAction {
     /// The action state (`+0x18`), which word 9 adds, with its sail's `MoveTo` sub-action to
-    /// the point within [`MOVE_RANGE`]: quiet, with the sprite [`Ship::given`] (`set_state` 4
+    /// the point within `TransportTuning::move_range`: quiet, with the sprite [`Ship::given`] (`set_state` 4
     /// and 11).
     pub state: TransportState,
     /// `+0x34` (the base's `+0x30` pair's second): how it was last ordered.

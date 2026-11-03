@@ -13,21 +13,19 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::AiLayer;
 use crate::unit_ai::NearestAttacker;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::StopOrder;
 use crate::unit_ai::UnitStance;
 use crate::unit_ai::best_target::category;
 use crate::unit_ai::{
-    AiMove, AttackAsk, DEFEND_LEASH, DEFEND_PATROL_LEASH, DEFEND_SLACK, Effect, FOLLOW_SLACK_HIGH,
-    FOLLOW_SLACK_LOW, INVALID_POINT, Pick, RETARGET_RANGE, RETARGET_REACH, RetargetSearch,
-    STAND_GROUND_PATROL_LEASH, STAND_GROUND_SLACK, Search, Surroundings, UnitAi, UnitSide,
-    held_action_state, patrol_distance, point_gap_squared, searches_on_class,
+    AiMove, AttackAsk, Effect, INVALID_POINT, Pick, RetargetSearch, Search, Surroundings, UnitAi,
+    UnitSide, held_action_state, patrol_distance, point_gap_squared, searches_on_class,
 };
 use crate::world::Millis;
 use crate::world::WorldTime;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::Roles;
 
 /// The least span [`UnitAi::set_randomized_retarget_timer`] draws around (`999 < span`: the
 /// immediate `1000`).
@@ -38,10 +36,10 @@ impl UnitAi {
     /// value plus 100 without one): the follow order's ([`UnitAi::follow`]) and the defend
     /// order's ([`UnitAi::defend_misc`]). Then the leash checks (not on the orders 0x2c7, 0x2dd and 0x323, nor in a
     /// group that patrols, [`GroupState::patrol`]): stance 1's (Defend) stops a unit more than 5
-    /// tiles (`DEFEND_LEASH`, squared) from its state position, forgets its target and walks
+    /// tiles (`UnitAiTuning::defend_leash`, squared) from its state position, forgets its target and walks
     /// back ([`UnitAi::walk_back`]), then goes on. Stance 2's (stand ground) stops a unit with an
     /// action value (`+0x44`, not `0x2bf` or `0x2c0`) whose squared gap to its state position
-    /// exceeds its range plus [`STAND_GROUND_SLACK`] (`COMISS`/`JBE`: a gap that is not a number
+    /// exceeds its range plus `UnitAiTuning::stand_ground_slack` (`COMISS`/`JBE`: a gap that is not a number
     /// stays), forgets its target and walks back, and slot 73 ends there (10); a unit without an
     /// order but with an action of its own can stray. With patrol information (`+0x1c0`,
     /// `FUN_140f95e10`) either leash is not modelled. Then the retarget check:
@@ -62,6 +60,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // without an order, the order whose own action the current one is (`action + 100`)
         let order = self
@@ -92,7 +91,11 @@ impl UnitAi {
             player_type,
             at.action_state,
             listed,
-            roles,
+            AiLayer {
+                roles,
+                slots: at.slots,
+                unit_ai_tuning,
+            },
         )? {
             let _ = self.retarget_search(search, player_type, at, side, ai)?;
         }
@@ -113,6 +116,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         // the leashes (unless on orders 0x2c7, 0x2dd and 0x323, which no order holds, or in a
         // group that patrols: FUN_141017c30, FUN_141017c40), measured from the unit's footprint
         // (FUN_140a847c0)
@@ -129,9 +133,9 @@ impl UnitAi {
         // it the defend stance ends slot 73 (9), stand ground goes on to the retarget check
         if let Some(saved) = self.patrol_path.as_ref().filter(|_| leashed) {
             let leash = if self.stance == UnitStance::DEFENSIVE {
-                DEFEND_PATROL_LEASH
+                Distance::new(unit_ai_tuning.defend_patrol_leash)
             } else {
-                STAND_GROUND_PATROL_LEASH
+                Distance::new(unit_ai_tuning.stand_ground_patrol_leash)
             };
             if leash < patrol_distance(&saved.path.points, at.moved_at)? {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
@@ -148,7 +152,7 @@ impl UnitAi {
             // state position stops (slot 0xb0 with 1), forgets its target and walks back ("We're
             // too far out, returning."), then on to the retarget check
             let gap = point_gap_squared(self.state_position, at.position, at.size);
-            if DEFEND_LEASH < gap.get() {
+            if unit_ai_tuning.defend_leash < gap.get() {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.walk_back(at, side, ai)?;
@@ -166,7 +170,9 @@ impl UnitAi {
             // and JBE); a unit with an action value stops, forgets its target and walks back,
             // and slot 73 returns 10 ("We're too far out, returning.", "SO Call 40.")
             let gap = point_gap_squared(self.state_position, at.position, at.size).get();
-            if (at.weapon_range + STAND_GROUND_SLACK).get() < gap && self.current_action.is_some() {
+            if (at.weapon_range + Distance::new(unit_ai_tuning.stand_ground_slack)).get() < gap
+                && self.current_action.is_some()
+            {
                 self.stop_current(StopOrder::Keep, at, side, ai)?;
                 self.remove_target();
                 let _ = self.walk_back(at, side, ai)?;
@@ -196,13 +202,14 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<u32, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         let current = Self::world_object(self.current_target, at, side)?;
         let (from, distance, any_class, work_state) =
             current.map_or((at.position, 0.0, true, false), |t| {
                 (
                     t.position,
-                    RETARGET_REACH,
+                    unit_ai_tuning.retarget_reach,
                     search.building,
                     search.work_state,
                 )
@@ -232,7 +239,7 @@ impl UnitAi {
             memory: self.memory(),
         })?;
         self.add_retries(&found);
-        self.attack_search_alert(found, player_type)?;
+        self.attack_search_alert(found, player_type, unit_ai_tuning)?;
         let keeps =
             search.building && player_type.is_computer() && self.stance == UnitStance::AGGRESSIVE;
         let new = Self::world_object(found.id, at, side)?;
@@ -290,10 +297,18 @@ impl UnitAi {
         player_type: PlayerType,
         action_state: Option<ActionState>,
         attack_listed: Option<bool>,
-        roles: &Roles,
+        layer: AiLayer<'_>,
     ) -> Result<Option<RetargetSearch>, GenieError> {
+        let AiLayer {
+            roles,
+            unit_ai_tuning,
+            ..
+        } = layer;
         let attack_order = self.current_order == Some(OrderKind::Attack);
-        if attack_order && RETARGET_RANGE < weapon_range.get() && !player_type.is_computer() {
+        if attack_order
+            && unit_ai_tuning.retarget_range < weapon_range.get()
+            && !player_type.is_computer()
+        {
             return Ok(None);
         }
         let mut search = false;
@@ -377,6 +392,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let mut defended = None;
         if let Some(target) = self.defend_target {
             let held = Self::world_object(target, at, side)?.filter(|t| t.allied);
@@ -417,7 +433,7 @@ impl UnitAi {
         } else {
             point_gap_squared(self.target_point.ground(), at.position, at.size)
         };
-        let reach = self.desired_distance.get() + DEFEND_SLACK;
+        let reach = self.desired_distance.get() + unit_ai_tuning.defend_slack;
         if reach * reach < gap.get() {
             if let Some((target, t)) = defended {
                 let range = self.desired_distance;
@@ -465,6 +481,7 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         // the world holds the current target (`at.target`) only when the AI has one
         let (Some(id), Some(target)) = (
             self.current_target,
@@ -486,10 +503,10 @@ impl UnitAi {
         }
         let dx = target.position.x() - self.target_point.x();
         let dy = target.position.y() - self.target_point.y();
-        let moved = dx < FOLLOW_SLACK_LOW
-            || FOLLOW_SLACK_HIGH < dx
-            || dy < FOLLOW_SLACK_LOW
-            || FOLLOW_SLACK_HIGH < dy;
+        let moved = dx < unit_ai_tuning.follow_slack_low
+            || unit_ai_tuning.follow_slack_high < dx
+            || dy < unit_ai_tuning.follow_slack_low
+            || unit_ai_tuning.follow_slack_high < dy;
         if !moved {
             return Ok(false);
         }

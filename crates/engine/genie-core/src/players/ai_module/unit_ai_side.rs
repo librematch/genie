@@ -7,6 +7,7 @@
 //! (`FUN_140efe4a0`, `FUN_140efe450`): the draws of the search leave no trace but its result.
 
 use crate::GenieError;
+use crate::map::Distance;
 use crate::map::Point;
 use crate::map::Tile;
 use crate::math::rng::Stream;
@@ -17,7 +18,6 @@ use crate::world::WorldTime;
 
 use crate::objects::ObjectId;
 use crate::players::ai_module::InfoModule;
-use crate::players::ai_module::search::RING_SLACK;
 use crate::players::ai_module::{AiModule, SearchUnit};
 use crate::unit_ai::world_view::{UnitView, owner_view, town_centre_unit};
 use crate::unit_ai::{AiAction, Notify, alert_owner};
@@ -99,6 +99,7 @@ impl UnitView<'_, '_> {
             civilian: roles.of_class(class_id).contains(ClassRoles::VILLAGER),
         };
         let now = self.c.w.world_time;
+        let group_tuning = self.c.w.model.tuning.group;
         let slot = module.tactical.slot(WAIT_SLOT);
         let (explorer_alive, centre) = {
             let view = owner_view(
@@ -151,7 +152,7 @@ impl UnitView<'_, '_> {
         };
         let mut tile = info.top_point();
         if tile == Tile::new(-1, -1) {
-            let spacing = sight + RING_SLACK;
+            let spacing = sight + Distance::new(group_tuning.catch_up_span);
             for ring in (1..=5).rev() {
                 info.push_ring(ring as f32 * spacing + centre_sight, at);
             }

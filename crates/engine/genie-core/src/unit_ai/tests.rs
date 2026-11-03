@@ -52,6 +52,7 @@ use crate::testing::ids;
 use crate::testing::ids::WONDER;
 use crate::testing::roles;
 use crate::testing::slots;
+use crate::testing::tuning;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::QueueEnd;
@@ -65,6 +66,7 @@ fn no_surroundings() -> Surroundings {
     Surroundings {
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     }
 }
@@ -413,42 +415,90 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
         master: master_id(38),
         hero: HeroFlags::NONE,
     };
-    assert!(can_convert(&monk, Some(&knight), false, &roles()));
+    assert!(can_convert(
+        &monk,
+        Some(&knight),
+        false,
+        &roles(),
+        &tuning().unit_ai
+    ));
     let tired = Converter {
         faith: Amount::new(99.0),
         ..monk
     };
-    assert!(!can_convert(&tired, Some(&knight), false, &roles()));
-    assert!(can_convert(&tired, Some(&knight), true, &roles()));
-    assert!(!can_convert(&monk, None, true, &roles()));
+    assert!(!can_convert(
+        &tired,
+        Some(&knight),
+        false,
+        &roles(),
+        &tuning().unit_ai
+    ));
+    assert!(can_convert(
+        &tired,
+        Some(&knight),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
+    assert!(!can_convert(&monk, None, true, &roles(), &tuning().unit_ai));
     let gaia = Convertee {
         owner: PlayerId::new(0),
         ..knight
     };
-    assert!(!can_convert(&monk, Some(&gaia), true, &roles()));
+    assert!(!can_convert(
+        &monk,
+        Some(&gaia),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
     let sheep = Convertee {
         class: class::LIVESTOCK,
         ..knight
     };
-    assert!(!can_convert(&monk, Some(&sheep), true, &roles()));
+    assert!(!can_convert(
+        &monk,
+        Some(&sheep),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
     let tc = Convertee {
         class: class::BUILDING,
         master: ids::TOWN_CENTRE,
         ..knight
     };
-    assert!(!can_convert(&monk, Some(&tc), true, &roles()));
+    assert!(!can_convert(
+        &monk,
+        Some(&tc),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
     let hero = Convertee {
         hero: HeroFlags::FULL_HERO,
         ..knight
     };
-    assert!(!can_convert(&monk, Some(&hero), true, &roles()));
+    assert!(!can_convert(
+        &monk,
+        Some(&hero),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
     // a building's task names attribute 28, which the owner holds at 0
     let house = Convertee {
         class: class::BUILDING,
         master: ids::HOUSE,
         ..knight
     };
-    assert!(!can_convert(&monk, Some(&house), true, &roles()));
+    assert!(!can_convert(
+        &monk,
+        Some(&house),
+        true,
+        &roles(),
+        &tuning().unit_ai
+    ));
 }
 
 /// `FUN_140c42080`: an order joins the history first; a ninth recycles the oldest.
@@ -539,6 +589,7 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
         class: Some(class::GATE),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut gone = HelpSide {
@@ -680,7 +731,13 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
     let mut fx = Vec::new();
     let n = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
     assert_eq!(
-        ai.sent_off(n, &mut With::new(&mut side, &mut fx), &mut rng(), &roles()),
+        ai.sent_off(
+            n,
+            &mut With::new(&mut side, &mut fx),
+            &mut rng(),
+            &roles(),
+            &tuning().unit_ai
+        ),
         Ok(GO_ON)
     );
     assert_eq!(side.1, vec![(object_id(10028), Footprint::new(1.0, 1.5))]);
@@ -752,6 +809,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         class: Some(class::PREY),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let fx = u
@@ -918,7 +976,11 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
             None,
             &mut rng(),
             &mut With::new(&mut side, &mut fx),
-            &roles(),
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai,
+            },
         )
         .unwrap();
     assert_eq!(
@@ -1388,6 +1450,7 @@ fn villager_searches_by_its_action() {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let n = Notify::own(object_id(31237), NotifyKind::REQUIRES_SEARCH, [0, -1, -1]);
@@ -1468,6 +1531,7 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = ResourceSide {
@@ -1735,6 +1799,7 @@ fn boar_attacks_its_first_attacker_and_keeps_it() {
         ],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let hit = |caller| Notify {
@@ -1796,6 +1861,7 @@ fn stop_before_an_attack_command_runs_first() {
         units: vec![attacker(27240, class::VILLAGER, DistanceSquared::new(1.0))],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = Recorder::default();
@@ -1880,6 +1946,7 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
         units: vec![attacker(29001, class::VILLAGER, DistanceSquared::new(1.0))],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let n = Notify::own(object_id(29823), NotifyKind::IN_THE_WAY, [29001, -1, -1]);
@@ -2004,6 +2071,7 @@ fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
             search_radius: Distance::new(1.0),
             roles: roles(),
             slots: slots(),
+            unit_ai_tuning: tuning().unit_ai,
             ..Surroundings::default()
         };
         let mut side = LionSide {
@@ -2240,6 +2308,7 @@ fn hit_villager() -> (UnitAi, Surroundings, Notify) {
         units: vec![foe(30, class::CLASS_6)],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let hit = Notify {
@@ -2315,6 +2384,7 @@ fn villager_invalidated_action_off_its_searches_stops_it() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let n = Notify::own(
@@ -2408,6 +2478,7 @@ fn an_invalidated_action_of_the_order_or_an_attack_stops_the_unit() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let unit = |order, action| UnitAi {
@@ -2551,6 +2622,7 @@ fn completed_action_of_the_order_or_an_attack_stops_the_unit() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let unit = |order, action| UnitAi {
@@ -2647,6 +2719,7 @@ fn the_base_handler_takes_each_kind_it_models() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let unit = || UnitAi {
@@ -3106,6 +3179,7 @@ fn soldier_at() -> Surroundings {
         position: Position::new(10.0, 10.0, 0.0),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     }
 }
@@ -3694,6 +3768,7 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
             action_state: Some(ActionState::NO_ACTION),
             roles: roles(),
             slots: slots(),
+            unit_ai_tuning: tuning().unit_ai,
             ..Surroundings::default()
         };
         let mut side = SoldierSide {
@@ -3756,6 +3831,7 @@ fn patrol_kill_ends_the_patrol_order_with_its_timers() {
         action_state: Some(ActionState::NO_ACTION),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = SoldierSide {
@@ -3799,7 +3875,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(true),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         ),
         Ok(None)
     );
@@ -3810,7 +3890,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             PlayerType::HUMAN,
             Some(ActionState::new(6)),
             Some(true),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         ),
         Ok(None)
     );
@@ -3821,7 +3905,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(true),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         ),
         Ok(Some(RetargetSearch {
             building: false,
@@ -3836,7 +3924,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             PlayerType::COMPUTER,
             Some(ActionState::new(6)),
             Some(true),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         ),
         Ok(Some(RetargetSearch {
             building: true,
@@ -3859,7 +3951,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
             PlayerType::HUMAN,
             Some(ActionState::new(4)),
             Some(false),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         ),
         Ok(None)
     );
@@ -3872,7 +3968,11 @@ fn retarget_check_stops_in_stand_ground_and_while_attacking() {
                 PlayerType::HUMAN,
                 None,
                 None,
-                &roles()
+                AiLayer {
+                    roles: &roles(),
+                    slots: slots(),
+                    unit_ai_tuning: &tuning().unit_ai
+                }
             )
             .is_err()
     );
@@ -3932,6 +4032,7 @@ fn hunter_hit_by_its_boar_ignores_the_damage() {
         units: vec![boar],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let hit = Notify {
@@ -3997,6 +4098,7 @@ fn closest_valid_attacker_skips_classes_and_flips_coin_on_tie() {
         ],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     // 1 is of class 13; 3 lies within 0.0625 of 2: the coin decides
@@ -4021,6 +4123,7 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
         units: vec![walked_off, dead],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = Recorder::default();
@@ -4085,6 +4188,7 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
         class: Some(class::VILLAGER),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let _ = u
@@ -4188,6 +4292,7 @@ fn defending_unit_beyond_five_tiles_of_its_state_position_stops_to_walk_back() {
             size: Footprint::new(0.5, 0.5),
             roles: roles(),
             slots: slots(),
+            unit_ai_tuning: tuning().unit_ai,
             ..Surroundings::default()
         };
         (u, at)
@@ -4678,6 +4783,7 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let scout = |order| UnitAi {
@@ -4791,6 +4897,7 @@ fn rock_church() -> (UnitAi, Surroundings) {
         kind: MasterKind::BUILDING,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (ai, at)
@@ -5473,6 +5580,7 @@ fn at(position: Position) -> Surroundings {
         class: Some(class::CLASS_11),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     }
 }
@@ -5724,6 +5832,7 @@ fn deer_at(position: Position) -> Surroundings {
         search_radius: Distance::new(1.0),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     }
 }
@@ -5976,6 +6085,7 @@ fn scout_at(interruptible: bool, busy: bool) -> Surroundings {
         interruptible,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     }
 }
@@ -6487,6 +6597,7 @@ fn making_building_runs_process_idle_only_without_target() {
         busy: true,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let run = |u: &mut UnitAi, at: &Surroundings| {
@@ -6564,6 +6675,7 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     for (ai_type, order, action) in [
@@ -6629,6 +6741,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = builder_done();
@@ -6650,6 +6763,7 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = UnitAi {
@@ -6692,6 +6806,7 @@ fn dead_target_stops_an_action_that_needs_live_one() {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     // 0x25b needs a live target: the target goes and the action stops
@@ -6825,6 +6940,7 @@ fn follower(deer: Position, visible: bool) -> (UnitAi, Surroundings) {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
@@ -6936,6 +7052,7 @@ fn idle_scout() -> (UnitAi, Surroundings) {
         master: ids::ID_448,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
@@ -7122,7 +7239,13 @@ fn each_unit_ai_type_has_its_own_attack_check() {
                 attack_priority: AttackPriority::of_byte(priority),
                 ..TC
             };
-            can_attack(&me, &IDLE, &Target { class, ..BOAR }, &roles())
+            can_attack(
+                &me,
+                &IDLE,
+                &Target { class, ..BOAR },
+                &roles(),
+                &tuning().unit_ai,
+            )
         };
     for t in [
         BOAR_AI,
@@ -7181,12 +7304,18 @@ fn each_unit_ai_type_has_its_own_attack_check() {
 
 #[test]
 fn tower_passes_boar_but_not_wolf() {
-    assert_eq!(can_attack(&TC, &IDLE, &BOAR, &roles()), Ok(false));
+    assert_eq!(
+        can_attack(&TC, &IDLE, &BOAR, &roles(), &tuning().unit_ai),
+        Ok(false)
+    );
     let wolf = Target {
         combat_level: CombatLevel::MILITARY,
         ..BOAR
     };
-    assert_eq!(can_attack(&TC, &IDLE, &wolf, &roles()), Ok(true));
+    assert_eq!(
+        can_attack(&TC, &IDLE, &wolf, &roles(), &tuning().unit_ai),
+        Ok(true)
+    );
     // Gaia's tower attacks nothing; a Gaia object outside classes 9 and 10 that takes owners
     // by sight neither
     assert_eq!(
@@ -7197,7 +7326,8 @@ fn tower_passes_boar_but_not_wolf() {
             },
             &IDLE,
             &wolf,
-            &roles()
+            &roles(),
+            &tuning().unit_ai
         ),
         Ok(false)
     );
@@ -7206,7 +7336,10 @@ fn tower_passes_boar_but_not_wolf() {
         capture: CaptureKind::LIVESTOCK,
         ..BOAR
     };
-    assert_eq!(can_attack(&TC, &IDLE, &sheep, &roles()), Ok(false));
+    assert_eq!(
+        can_attack(&TC, &IDLE, &sheep, &roles(), &tuning().unit_ai),
+        Ok(false)
+    );
     // a type whose attack check is not modelled (the priest's conversion test)
     assert!(
         can_attack(
@@ -7216,7 +7349,8 @@ fn tower_passes_boar_but_not_wolf() {
             },
             &IDLE,
             &BOAR,
-            &roles()
+            &roles(),
+            &tuning().unit_ai
         )
         .is_err()
     );
@@ -7230,12 +7364,18 @@ fn tower_passes_boar_but_not_wolf() {
         class: class::CLASS_6,
         ..BOAR
     };
-    assert_eq!(can_attack(&bare, &IDLE, &enemy, &roles()), Ok(false));
+    assert_eq!(
+        can_attack(&bare, &IDLE, &enemy, &roles(), &tuning().unit_ai),
+        Ok(false)
+    );
     let manned = Attacker {
         firepower: Firepower::new(2.0),
         ..bare
     };
-    assert_eq!(can_attack(&manned, &IDLE, &enemy, &roles()), Ok(true));
+    assert_eq!(
+        can_attack(&manned, &IDLE, &enemy, &roles(), &tuning().unit_ai),
+        Ok(true)
+    );
 }
 
 /// A scout cavalry (master 448, class 47) of player 1 in `StandGround` at its state position,
@@ -7271,7 +7411,9 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
         ..BOAR
     };
     // the range against it plus 0.5 from the state position to its footprint
-    let reach = |s: &Seeker, x: f32| soldier_can_attack(&SCOUT, s, &villager(x), &roles());
+    let reach = |s: &Seeker, x: f32| {
+        soldier_can_attack(&SCOUT, s, &villager(x), &roles(), &tuning().unit_ai)
+    };
     assert_eq!(reach(&STAND_GROUND, 119.2), Ok(true));
     assert_eq!(reach(&STAND_GROUND, 119.3), Ok(false));
     // on order 0x2bd anywhere; in Defend 5 more
@@ -7297,7 +7439,13 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
         ..villager(119.0)
     };
     assert_eq!(
-        soldier_can_attack(&SCOUT, &STAND_GROUND, &untargeted, &roles()),
+        soldier_can_attack(
+            &SCOUT,
+            &STAND_GROUND,
+            &untargeted,
+            &roles(),
+            &tuning().unit_ai
+        ),
         Ok(false)
     );
     let relic = Target {
@@ -7305,7 +7453,7 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
         ..villager(119.0)
     };
     assert_eq!(
-        soldier_can_attack(&SCOUT, &STAND_GROUND, &relic, &roles()),
+        soldier_can_attack(&SCOUT, &STAND_GROUND, &relic, &roles(), &tuning().unit_ai),
         Ok(false)
     );
 }
@@ -7327,6 +7475,7 @@ fn an_idle_tower_searches_with_its_classes() {
         kind: MasterKind::BUILDING,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut searched = Vec::new();
@@ -7412,6 +7561,7 @@ fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
         task_0x99: true,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     assert!(u.can_order(&plain, false));
@@ -7442,19 +7592,28 @@ fn tower_attacks_started_building_but_not_desolid_foundation() {
         master: ids::HOUSE,
         ..BOAR
     };
-    assert_eq!(tower_can_attack(&TC, &house, &roles()), Ok(true));
+    assert_eq!(
+        tower_can_attack(&TC, &house, &roles(), &tuning().unit_ai),
+        Ok(true)
+    );
     let foundation = Target {
         desolid: true,
         ..house
     };
-    assert_eq!(tower_can_attack(&TC, &foundation, &roles()), Ok(false));
+    assert_eq!(
+        tower_can_attack(&TC, &foundation, &roles(), &tuning().unit_ai),
+        Ok(false)
+    );
     let unit = Target {
         owner: PlayerId::new(1),
         class: class::CLASS_6,
         desolid: true,
         ..BOAR
     };
-    assert_eq!(tower_can_attack(&TC, &unit, &roles()), Ok(true));
+    assert_eq!(
+        tower_can_attack(&TC, &unit, &roles(), &tuning().unit_ai),
+        Ok(true)
+    );
 }
 
 /// `FUN_140b43f30` on the attackers (`+0xc0`): an id joins the set in its sorted place and
@@ -7571,7 +7730,11 @@ fn an_immediate_order_in_front_keeps_the_current_order_behind_it() {
         None,
         &mut rng(),
         &mut fx,
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     )
     .unwrap();
     let kept = QueuedOrder {
@@ -7641,7 +7804,11 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         (Point::ORIGIN, Some(class::CLASS_6)),
         &mut rng(),
         &mut fx,
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     );
     assert!(r.is_err());
     assert_eq!(fx, Vec::new());
@@ -7657,6 +7824,7 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         class: Some(class::CLASS_6),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut fx = Vec::new();
@@ -7669,7 +7837,11 @@ fn an_immediate_attack_roundup_keeps_the_target_until_it_attacks_the_next() {
         Some((&at, PlayerType::HUMAN)),
         &mut rng(),
         &mut With::new(&mut side, &mut fx),
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     )
     .unwrap();
     assert_eq!(fx, Vec::new());
@@ -7713,6 +7885,7 @@ fn unit_off_its_state_position_walks_back_and_keeps_its_target() {
         size: Footprint::new(0.5, 0.5),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut fx = Vec::new();
@@ -7846,6 +8019,7 @@ fn grouped_unit_full_update_reads_its_group() {
         group,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let run = |u: &mut UnitAi, at: &Surroundings| {
@@ -7986,6 +8160,7 @@ fn an_idle_transport_ship_check_caps_its_human_order_time_and_does_nothing() {
         class: Some(class::TRANSPORT),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let fx = u
@@ -8034,6 +8209,7 @@ fn villager_whose_attack_target_died_walks_to_its_point() {
         weapon_range: Distance::new(0.25),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut fx = Vec::new();
@@ -8079,6 +8255,7 @@ fn wolf_whose_attack_target_died_attacks_the_next_villager() {
         search_radius: Distance::new(1.0),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = LionSide {
@@ -8129,6 +8306,7 @@ fn no_attack_tower_only_searches() {
         kind: MasterKind::BUILDING,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut searched = Vec::new();
@@ -8177,6 +8355,7 @@ fn an_idle_tower_attacks_what_its_search_found() {
         kind: MasterKind::BUILDING,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = SoldierSide {
@@ -8216,6 +8395,7 @@ fn human_player_king_idle_check_only_caps() {
         master: ids::KING,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = UnitAi {
@@ -8289,6 +8469,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
         ],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = idle(UnitAiType::CIVILIAN);
@@ -8389,6 +8570,7 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         units: vec![attacker(9800, class::CLASS_6, DistanceSquared::new(1.0))],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     for (ai_type, attacks) in [
@@ -8533,6 +8715,7 @@ fn lion_drops_moved_target_out_of_its_sight() {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     // 5 tiles apart, 4 between the footprints: at its sight, attacked again
@@ -8771,6 +8954,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
         map: GridSize::new(64, 64),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut busy = UnitAi {
@@ -8974,6 +9158,7 @@ fn villager_on_the_attack_order_without_target_gives_it_up() {
         class: Some(class::VILLAGER),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = UnitAi {
@@ -9172,6 +9357,7 @@ fn human_player_king_runs_from_its_attacker() {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
@@ -9246,6 +9432,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         ],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let run = |u: &mut UnitAi, at: &Surroundings, uncon, computer| {
@@ -9453,7 +9640,12 @@ fn the_unit_ai_notify_answers_whether_it_took_it() {
 /// its attack move; one off the patrol orders ends in range and stops attack-moving.
 #[test]
 fn unit_off_patrol_asks_plain_path() {
-    let ask = UnitAi::path_ask(None, Point::new(20.0, 20.0), Point::new(30.0, 20.0));
+    let ask = UnitAi::path_ask(
+        None,
+        Point::new(20.0, 20.0),
+        Point::new(30.0, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!(
         ask,
         PathAsk {
@@ -9462,7 +9654,12 @@ fn unit_off_patrol_asks_plain_path() {
         }
     );
     let mut u = idle(UnitAiType::SOLDIER);
-    let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(30.0, 20.0));
+    let ask = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(30.0, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!(
         ask,
         PathAsk {
@@ -9472,7 +9669,12 @@ fn unit_off_patrol_asks_plain_path() {
     );
     // a saved patrol off the patrol orders stays, and so does the attack move
     u.patrol_path = Some(PatrolPath::default());
-    let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(30.0, 20.0));
+    let ask = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(30.0, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!((ask.attack_move, u.patrol_path.is_some()), (None, true));
 }
 
@@ -9484,7 +9686,12 @@ fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
         current_order: Some(OrderKind::Patrol),
         ..idle(UnitAiType::SOLDIER)
     };
-    let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(22.9, 20.0));
+    let ask = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(22.9, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!(
         ask,
         PathAsk {
@@ -9495,16 +9702,27 @@ fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
             attack_move: Some(false),
         }
     );
-    let far = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(20.0, 23.0));
+    let far = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(20.0, 23.0),
+        &tuning().unit_ai,
+    );
     assert!(far.back_and_forth);
     let nan = UnitAi::path_ask(
         Some(&mut u),
         Point::new(20.0, 20.0),
         Point::new(f32::NAN, 23.0),
+        &tuning().unit_ai,
     );
     assert!(nan.back_and_forth);
     u.current_order = Some(OrderKind::AttackMove);
-    let attack = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(22.9, 20.0));
+    let attack = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(22.9, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!((attack.patrol, attack.attack_move), (true, Some(true)));
 }
 
@@ -9522,7 +9740,12 @@ fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
         patrol_waypoint: WaypointIndex::of_data(2),
         ..idle(UnitAiType::SOLDIER)
     };
-    let ask = UnitAi::path_ask(Some(&mut u), Point::new(20.0, 20.0), Point::new(20.5, 20.0));
+    let ask = UnitAi::path_ask(
+        Some(&mut u),
+        Point::new(20.0, 20.0),
+        Point::new(20.5, 20.0),
+        &tuning().unit_ai,
+    );
     assert_eq!(
         (ask.resume.get(), ask.back_and_forth, ask.attack_move),
         (2, true, Some(false))
@@ -9552,6 +9775,7 @@ fn patroller(secondary: u32) -> (UnitAi, Surroundings) {
         busy: true,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
@@ -10000,6 +10224,7 @@ fn full_update_stops_at_its_order_on_target() {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let (fx, after) = u
@@ -10053,6 +10278,7 @@ fn the_rest_after_an_order_that_gave_an_action_reads_it() {
         action_state: Some(ActionState::new(6)),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut r = rng();
@@ -10101,6 +10327,7 @@ fn the_rest_after_an_order_that_gave_no_action_runs_the_idle_check() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut r = rng();
@@ -10178,6 +10405,7 @@ fn attacked_transport() -> (UnitAi, Surroundings) {
         }],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
@@ -10462,6 +10690,7 @@ fn the_base_attack_check_lets_every_type_without_its_own_attack() {
             }],
             roles: roles(),
             slots: slots(),
+            unit_ai_tuning: tuning().unit_ai,
             ..Surroundings::default()
         };
         let mut side = Recorder::default();
@@ -10555,6 +10784,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
         class: Some(class::FISHING_SHIP),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = idle(FISHING_AI);
@@ -10783,6 +11013,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let found = |id, distance| Found {
@@ -10960,7 +11191,9 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         state_position: Point::new(20.0, 20.0),
         ..IDLE
     };
-    let check = |me: &Attacker, s: &Seeker, t: &Target| siege_can_attack(me, s, t, false, &roles());
+    let check = |me: &Attacker, s: &Seeker, t: &Target| {
+        siege_can_attack(me, s, t, false, &roles(), &tuning().unit_ai)
+    };
     assert_eq!(
         check(&MANGONEL, &seeker(UnitStance::AGGRESSIVE), &villager(40.0)),
         Ok(true)
@@ -11058,7 +11291,8 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
             &seeker(UnitStance::AGGRESSIVE),
             &villager(30.0),
             true,
-            &roles()
+            &roles(),
+            &tuning().unit_ai
         ),
         Ok(true)
     );
@@ -11226,6 +11460,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = UnitAi {
@@ -11329,6 +11564,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = UnitAi {
@@ -11380,6 +11616,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut u = idle(SIEGE_AI);
@@ -11467,6 +11704,7 @@ fn priest_retargets_but_on_an_order_on_target() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let priest = |order| UnitAi {
@@ -11581,6 +11819,7 @@ fn tail(u: &mut UnitAi, player: PlayerId, flags: TargetFlags, fx: &mut Vec<Effec
         player,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = TailSide {
@@ -11722,6 +11961,7 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut side = TailSide {
@@ -11847,6 +12087,7 @@ fn unit_standing_its_ground_that_strayed_with_an_action_stops_and_walks_back() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let standing = |action| UnitAi {
@@ -12012,6 +12253,7 @@ fn unit_with_patrol_information_leashes_to_its_patrol_path() {
         player: PlayerId::new(1),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let unit = |stance| UnitAi {
@@ -12092,6 +12334,7 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let fx = u
@@ -12276,6 +12519,7 @@ fn run_order(
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let mut fx = Vec::new();
@@ -12286,7 +12530,11 @@ fn run_order(
         None,
         &mut r,
         &mut With::new(side, &mut fx),
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     );
     (res, fx, r.draws)
 }
@@ -12367,6 +12615,7 @@ fn the_attack_order_attacks_by_the_unit_ai_type_and_becomes_the_ai_s() {
         group: Some(GroupState::default()),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let r = u.process_order(
@@ -12375,7 +12624,11 @@ fn the_attack_order_attacks_by_the_unit_ai_type_and_becomes_the_ai_s() {
         None,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     );
     assert_eq!((r, side.group_stops), (Ok(OrderOutcome::Taken), 1));
     // a villager hunts an animal (class 9) and attacks anything else it may (class 6)
@@ -12524,6 +12777,7 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
         master: ids::TRADE_CART,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let o = queued(OrderKind::Defend, -1);
@@ -12533,7 +12787,11 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
         None,
         &mut rng(),
         &mut With::new(&mut side, &mut Vec::new()),
-        &roles(),
+        AiLayer {
+            roles: &roles(),
+            slots: slots(),
+            unit_ai_tuning: &tuning().unit_ai,
+        },
     );
     assert_eq!(r, Ok(OrderOutcome::NotTaken));
     assert_eq!(u.current_action, None);
@@ -12604,7 +12862,11 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
             None,
             &mut rng(),
             &mut With::new(&mut tail, &mut Vec::new()),
-            &roles()
+            AiLayer {
+                roles: &roles(),
+                slots: slots(),
+                unit_ai_tuning: &tuning().unit_ai
+            }
         )
         .is_err()
     );
@@ -12635,7 +12897,10 @@ fn the_explore_orders_explore_their_point_cut_to_tiles() {
             (u.current_order, u.current_action, u.last_action),
             (Some(order), Some(action), last)
         );
-        assert_eq!(u.target_point, Position::new(12.0, 30.0, EXPLORE_Z));
+        assert_eq!(
+            u.target_point,
+            Position::new(12.0, 30.0, tuning().unit_ai.explore_z)
+        );
     }
     // a point that is not a number cuts to i32::MIN (CVTTSS2SI)
     let mut u = idle(SOLDIER_AI);
@@ -13029,7 +13294,10 @@ fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
             class_of(6)
         )
     );
-    assert_eq!(u.target_point, Position::new(12.0, 30.0, EXPLORE_Z));
+    assert_eq!(
+        u.target_point,
+        Position::new(12.0, 30.0, tuning().unit_ai.explore_z)
+    );
     let destroy = OrderKind::ExploreAndDestroy;
     let mut u = idle(SOLDIER_AI);
     let (r, fx, _) = run_order(&mut u, queued(destroy, -1), class::CLASS_6, &mut side);
@@ -13051,7 +13319,7 @@ fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
             Some(destroy),
             Some(AiAction::ExploreAndDestroy),
             None,
-            Position::new(12.0, 30.0, EXPLORE_Z)
+            Position::new(12.0, 30.0, tuning().unit_ai.explore_z)
         )
     );
 }
@@ -13414,6 +13682,7 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let moved = Notify::own(object_id(6116), NotifyKind::TARGET_MOVED, [0, 0, 0]);
@@ -13456,6 +13725,7 @@ fn villager_drops_another_resource_at_the_table_building() {
         state: ObjectState::Alive,
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let other = Notify::own(object_id(20), NotifyKind::OTHER_LOAD, [0; 3]);
@@ -13511,6 +13781,7 @@ fn villager_works_the_pasture_it_built() {
         units: vec![pasture],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     for action in [AiAction::Build.value(), AiAction::Hunt.value()] {
@@ -13564,6 +13835,7 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         class: Some(class::TRANSPORT),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     let (r, fx, _) = handled(&mut u, done, &here, PlayerType::HUMAN);
@@ -13654,6 +13926,7 @@ fn packed_siege() -> (UnitAi, Surroundings) {
         }),
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
@@ -13825,13 +14098,14 @@ fn retargeting(target: i32) -> (UnitAi, Surroundings) {
         ],
         roles: roles(),
         slots: slots(),
+        unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
     (u, at)
 }
 
 /// The retarget's search for a better target ([`UnitAi::retarget_search`]): from the current
-/// target's place within `RETARGET_REACH`, any class only for a building target and in the
+/// target's place within `UnitAiTuning::retarget_reach`, any class only for a building target and in the
 /// attack work state the checks read. On the attack order a find of another attack category
 /// than the live current target's ends it (9), as does any find without a building target.
 /// Without a target the search starts from the unit, without a reference distance, any class.
@@ -13856,7 +14130,12 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
     );
     assert_eq!(
         side.searched,
-        [(Point::new(12.0, 10.0), RETARGET_REACH, false, true)]
+        [(
+            Point::new(12.0, 10.0),
+            tuning().unit_ai.retarget_reach,
+            false,
+            true
+        )]
     );
     assert_eq!((side.soldier.attacks.len(), fx.len()), (0, 0));
     // the same category: no building target, so nothing more either

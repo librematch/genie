@@ -14,12 +14,13 @@ use crate::map::Distance;
 use crate::map::GridSize;
 use crate::math::fmath::{BVector, Rotation, add, sub};
 use crate::math::fmath::{dot, rotate, sqrt};
-use crate::math::image::group::{MAP_EDGE as GROUP_MAP_EDGE, RIGHT_ANGLE as GROUP_RIGHT_ANGLE};
+use crate::math::image::group::RIGHT_ANGLE as GROUP_RIGHT_ANGLE;
 use crate::movement::PathData;
 use crate::movement::PathFlags;
 use crate::objects::ObjectKey;
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// `FUN_140f96030`: the walked level's top ancestor (the paths are walked first), none for a
@@ -238,12 +239,14 @@ impl World {
 /// A turn of more than this (`DAT_142eb0c64`, π/2) makes a formation of fewer than two
 /// sub-formations take its units anew (`FUN_14103a1f0`).
 pub(super) const RIGHT_ANGLE: f32 = GROUP_RIGHT_ANGLE;
-/// A slot's place kept this far inside the map's far edges (`FUN_14100b760`, `DAT_142eb5690`).
-pub(super) const MAP_EDGE: f32 = GROUP_MAP_EDGE;
 
 /// `FUN_14100b760`: a place kept on the map: below 0 it is 0, from the map's width on it is the
-/// width less [`MAP_EDGE`], on both axes (the y test against the height, its value the width's).
-pub(in crate::groups) fn on_map(mut p: BVector, map: GridSize) -> BVector {
+/// width less `GroupTuning::map_edge`, on both axes (the y test against the height, its value the width's).
+pub(in crate::groups) fn on_map(
+    mut p: BVector,
+    map: GridSize,
+    group_tuning: &GroupTuning,
+) -> BVector {
     if p.x() < 0.0 {
         p = p.with_x(0.0);
     }
@@ -252,10 +255,10 @@ pub(in crate::groups) fn on_map(mut p: BVector, map: GridSize) -> BVector {
     }
     let (w, h) = (map.width() as f32, map.height() as f32);
     if w <= p.x() {
-        p = p.with_x(w - MAP_EDGE);
+        p = p.with_x(w - group_tuning.map_edge);
     }
     if h <= p.y() {
-        p = p.with_y(w - MAP_EDGE);
+        p = p.with_y(w - group_tuning.map_edge);
     }
     p
 }
@@ -271,6 +274,7 @@ pub(super) fn transform_slot(
     index: i32,
     transform_type: TransformType,
     (world_time, map): (WorldTime, GridSize),
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     if index < 0 || formation.slots.len() as i32 <= index {
         return Ok(false);
@@ -286,8 +290,8 @@ pub(super) fn transform_slot(
             rotate(rotation, slot.offset)
         };
         let at = add(point, offset);
-        slot.desired_transform_position = on_map(at, map);
-        slot.transform_position = on_map(at, map);
+        slot.desired_transform_position = on_map(at, map, group_tuning);
+        slot.transform_position = on_map(at, map, group_tuning);
         slot.transformed = 1;
         slot.time = world_time;
     }

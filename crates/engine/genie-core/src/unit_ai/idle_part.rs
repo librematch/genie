@@ -2,6 +2,7 @@
 //! branch, class 3's and 52's making branch and the end.
 
 use crate::GenieError;
+use crate::combat::Firepower;
 use crate::math::rng::Well512;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
@@ -9,7 +10,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerType;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
-use crate::unit_ai::{GroupState, SINGLE_VOLLEY, Surroundings, UnitAi, UnitSide, group_lets_idle};
+use crate::unit_ai::{GroupState, Surroundings, UnitAi, UnitSide, group_lets_idle};
 use crate::world::Millis;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
@@ -115,10 +116,11 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<(), GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         if self.current_target.is_some()
             && at.kind == MasterKind::BUILDING
             && !at.ranged
-            && at.firepower <= SINGLE_VOLLEY
+            && at.firepower <= Firepower::new(unit_ai_tuning.single_volley)
         {
             self.remove_target();
         }

@@ -4,8 +4,8 @@
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::motion::{
-    EPSILON, GroupView, Lead, NEAR, PULL_DISTANCE, PULL_KEEP, PULL_SHARE, Pass, Passing, StepWorld,
-    ground, hold, passes_waypoint, path_step, point, reset_level, set_flag,
+    EPSILON, GroupView, Lead, Pass, Passing, StepWorld, ground, hold, passes_waypoint, path_step,
+    point, reset_level, set_flag,
 };
 use crate::map::Footprint;
 use crate::map::Position;
@@ -24,6 +24,7 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::WorldTime;
 use crate::world::index::ObjectsRef;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 use crate::{GenieError, math::fmath};
 use std::mem::take;
@@ -41,6 +42,7 @@ pub(super) fn steer(
     world: &mut StepWorld<'_, '_>,
     target: Option<&Placed>,
 ) -> Result<Pass, GenieError> {
+    let group_tuning = &world.by_id.tuning().group;
     let by_id = world.by_id;
     let dt = world.dt;
     let level = motion.paths.checked(0)?;
@@ -57,7 +59,7 @@ pub(super) fn steer(
     direction = BVector::new(direction.x() / l, direction.height() / l, direction.y() / l);
     let step = (dt.get() * motion.acceleration.y() + motion.velocity.y()) * dt.get();
     let next = fmath::add(at, fmath::scale(step, direction));
-    match passes_waypoint(waypoint, at, next) {
+    match passes_waypoint(waypoint, at, next, group_tuning) {
         Passing::Passes => {
             set_flag(&mut motion.paths, LevelFlags::AT_WAYPOINT, true);
             return Ok(Pass::Reached);
@@ -71,11 +73,11 @@ pub(super) fn steer(
     if let Some(pass) = way_blocked(motion, lead, world.spatial, at, next, by_id)? {
         return Ok(pass);
     }
-    if let Some(pass) = walk_ends(motion, at, target)? {
+    if let Some(pass) = walk_ends(motion, at, target, group_tuning)? {
         return Ok(pass);
     }
     turn_toward(motion, direction, dt);
-    pull_to_members(motion, group);
+    pull_to_members(motion, group, group_tuning);
     motion.velocity = motion
         .velocity
         .with_y(motion.maximum_velocity_forward.get());
@@ -96,6 +98,7 @@ fn way_blocked(
     next: BVector,
     by_id: ObjectsRef<'_>,
 ) -> Result<Option<Pass>, GenieError> {
+    let group_tuning = &by_id.tuning().group;
     let ignore: Vec<RecordId> = match lead.group.as_ref() {
         Some(g) if !g.differentiator_units.is_empty() => g.differentiator_units.clone(),
         _ => vec![lead.walker.id],
@@ -104,8 +107,8 @@ fn way_blocked(
     .map(RecordId::from)
     .collect();
     let hits = spatial.line_query(
-        hold(at, spatial.map),
-        hold(next, spatial.map),
+        hold(at, spatial.map, group_tuning),
+        hold(next, spatial.map, group_tuning),
         lead.walker.radius,
         None,
         &ignore,
@@ -185,7 +188,7 @@ fn back_to_parent(motion: &mut Motion, lead: &Lead, spatial: &Spatial) -> Result
 }
 
 /// `LAB_14104bcb6`: in range of where the walk ends, it ends. Without a target, a walked level
-/// that does not loop with a range above [`NEAR`] under a top level with a path: a group within
+/// that does not loop with a range above `GroupTuning::near` under a top level with a path: a group within
 /// the range (less [`EPSILON`]) of the top's last point (the 3D distance) arrived (the level
 /// resets, the group stands); with a target, a group whose footprint gap to it is the range
 /// (within [`EPSILON`]) counts the waypoint reached. None when the walk goes on.
@@ -193,13 +196,14 @@ fn walk_ends(
     motion: &mut Motion,
     at: BVector,
     target: Option<&Placed>,
+    group_tuning: &GroupTuning,
 ) -> Result<Option<Pass>, GenieError> {
     let level = motion.paths.checked(0)?;
     match target {
         None => {
             let top = motion.paths.last().filter(|t| t.has_path);
             if !level.path_flags.contains(PathFlags::LOOPS)
-                && NEAR < level.range.get()
+                && group_tuning.near < level.range.get()
                 && let Some(top) = top
             {
                 let end = point(top, WaypointIndex::last_of(top.points.len()));
@@ -239,9 +243,9 @@ fn turn_toward(motion: &mut Motion, direction: BVector, dt: Seconds) {
 
 /// The members' centre pulls the group while every member acts on a target: the members'
 /// mean place (where each last moved to, summed in order; none for no members) on the ground,
-/// at least [`PULL_DISTANCE`] (squared) from the group's, takes [`PULL_SHARE`] of the new place,
-/// which keeps [`PULL_KEEP`] of its own.
-fn pull_to_members(motion: &mut Motion, group: &GroupView) {
+/// at least `GroupTuning::pull_distance` (squared) from the group's, takes `GroupTuning::pull_share` of the new place,
+/// which keeps `GroupTuning::pull_keep` of its own.
+fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupTuning) {
     let all_acting = group
         .members
         .iter()
@@ -265,10 +269,10 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView) {
     let c = centre.with_height(0.0);
     let here = motion.position[0].with_height(0.0);
     let d = fmath::sub(here, c);
-    if PULL_DISTANCE <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
+    if group_tuning.pull_distance <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
         motion.new_position[0] = fmath::add(
-            fmath::scale(PULL_SHARE, c),
-            fmath::scale(PULL_KEEP, motion.new_position[0]),
+            fmath::scale(group_tuning.pull_share, c),
+            fmath::scale(group_tuning.pull_keep, motion.new_position[0]),
         );
     }
 }

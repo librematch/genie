@@ -411,8 +411,8 @@ pub fn spatial_from_save(save: &[u8]) -> Result<Spatial, Error> {
 pub fn spatial_with_tiles(save: &[u8], terrain: &TerrainTable) -> Result<Spatial, Error> {
     let chapter = de::chapters(save)?[0];
     let header = chapter.header()?;
-    let roles = &layer().map_err(Error::Unmodelled)?.roles;
-    spatial(&header, terrain, roles).map_err(Error::Unmodelled)
+    let layer = layer().map_err(Error::Unmodelled)?;
+    spatial(&header, terrain, layer).map_err(Error::Unmodelled)
 }
 
 #[cfg(test)]

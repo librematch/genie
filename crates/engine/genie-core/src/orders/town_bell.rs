@@ -6,7 +6,7 @@
 use crate::GenieError;
 use crate::garrison::ContainerId;
 use crate::garrison::ShelterReach;
-use crate::garrison::{Shelters, TOWN_BELL_REACH};
+use crate::garrison::Shelters;
 use crate::gathering::gather::GATHER;
 use crate::gathering::hunt::HUNT;
 use crate::map::Distance;
@@ -202,8 +202,6 @@ impl TownBell {
     }
 }
 
-/// The town bell's reach ([`crate::garrison::TOWN_BELL_REACH`]).
-const REACH: f32 = TOWN_BELL_REACH;
 /// A record's point on neither axis (`DAT_14330ec20`).
 const NO_POINT: f32 = GARRISON_NO_POINT;
 
@@ -235,7 +233,7 @@ impl World {
 
     /// `FUN_14163a650`: player `owner`'s town centre `tc` (master 109; any other object does
     /// nothing) rings: of its owner's live objects, in the list's order, those in state 2 not
-    /// inside another (`FUN_141188da0`) within [`REACH`] of it (`FUN_14118f8c0`; `COMISS`/`JC`: a
+    /// inside another (`FUN_141188da0`) within `GarrisonTuning::town_bell_reach` of it (`FUN_14118f8c0`; `COMISS`/`JC`: a
     /// NaN gap is out) are the units, a villager (class 4 of type 70) or master 1808, else the
     /// buildings (type 80) that take villagers
     /// ([`crate::objects::masters::GarrisonKinds::VILLAGERS`], `FUN_1411ccb60`), each with its
@@ -282,8 +280,11 @@ impl World {
             let near = |t: &Self| -> Result<bool, GenieError> {
                 let (other_at, other_radius) = t.ground(id)?;
                 let gap = footprint_gap_squared(other_at, other_radius, at, radius);
-                // COMISS REACH, gap; JC: a gap above it, or a NaN, is out
-                Ok(!below_or_unordered(REACH, gap.get()))
+                // COMISS reach, gap; JC: a gap above it, or a NaN, is out
+                Ok(!below_or_unordered(
+                    t.model.tuning.garrison.town_bell_reach,
+                    gap.get(),
+                ))
             };
             if (self
                 .model
@@ -318,7 +319,7 @@ impl World {
     /// `FUN_14163ab80`: player `owner`'s town centre `tc` (master 109; any other object does
     /// nothing) ends its bell. Each of its owner's live objects, in the list's order, of type 80
     /// in a state below 3 that takes villagers (`FUN_1411ccb60` with 1) and holds its bell flag
-    /// (`+0x9dc`) drops the flag; within [`REACH`] of the centre (`COMISS`/`JC`: a NaN gap is
+    /// (`+0x9dc`) drops the flag; within `GarrisonTuning::town_bell_reach` of the centre (`COMISS`/`JC`: a NaN gap is
     /// out) it lets each unit inside of type 70 or more that is a villager (class 4) or of master
     /// 1808 back to work, from the last in ([`crate::world::World::back_to_work`]; its sound, slot
     /// 0x4c0, is not simulation). Then every unit its owner's tracker files under class 4
@@ -360,9 +361,9 @@ impl World {
             let id = b.id;
             self.parts.set_town_bell_flag(id, false);
             let (building_at, building_radius) = self.ground(id)?;
-            // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
+            // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if below_or_unordered(REACH, gap.get()) {
+            if below_or_unordered(self.model.tuning.garrison.town_bell_reach, gap.get()) {
                 continue;
             }
             self.workers_out(owner, idx)?;
@@ -375,7 +376,7 @@ impl World {
     /// not held): `FUN_141617420` for the owner of object `id`, as the bell's end
     /// ([`crate::world::World::end_town_bell`]) without its flags: each of the owner's live
     /// objects, in the list's order, in state 2, not inside another (`+0x2f0`), of type 80, that
-    /// takes villagers (`FUN_1411ccb60` with 1) and is within [`REACH`] of the object
+    /// takes villagers (`FUN_1411ccb60` with 1) and is within `GarrisonTuning::town_bell_reach` of the object
     /// (`COMISS`/`JC`: a NaN gap is out) lets its villagers and units of master 1808 out back to
     /// work, from the last in; then the units its owner's tracker files under class 4 and master
     /// 1808 not inside another go back from where they are. The game screen's flag (`+0x1874`) is
@@ -409,9 +410,9 @@ impl World {
                 continue;
             }
             let (building_at, building_radius) = self.ground(b.id)?;
-            // COMISS REACH, gap; JC: a gap above it, or a NaN, lets none out
+            // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(building_at, building_radius, at, radius);
-            if below_or_unordered(REACH, gap.get()) {
+            if below_or_unordered(self.model.tuning.garrison.town_bell_reach, gap.get()) {
                 continue;
             }
             self.workers_out(owner, idx)?;

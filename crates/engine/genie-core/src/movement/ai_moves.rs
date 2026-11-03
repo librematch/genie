@@ -46,6 +46,8 @@ use crate::unit_ai::AiMove;
 use crate::unit_ai::UnitStance;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::MoveToTuning;
+use crate::world::layer::generated::SpriteTuning;
 use crate::world::lets::{take, torn_down};
 use crate::world::step::Step;
 use crate::world::{Unread, WALKER_UNMOVING};
@@ -63,6 +65,10 @@ pub(crate) struct MoveSprites<'a> {
     pub(crate) look: Option<&'a Look>,
     /// The build's roles.
     pub(crate) roles: &'a Roles,
+    /// The sprites' tuning values.
+    pub(crate) sprite_tuning: SpriteTuning,
+    /// The `MoveTo`'s tuning values.
+    pub(crate) move_to_tuning: &'a MoveToTuning,
 }
 
 impl Unit {
@@ -94,6 +100,8 @@ impl Unit {
                     graphics: &c.w.model.graphics,
                     look: c.w.parts.combat.of(self.id).abilities.look.as_ref(),
                     roles,
+                    sprite_tuning: c.w.model.tuning.sprite,
+                    move_to_tuning: &c.w.model.tuning.move_to,
                 },
                 sprite_rng,
             ),
@@ -106,15 +114,12 @@ impl Unit {
                 c.w.parts.motion.layer_mut(self.id),
                 m.point,
                 (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
+                &c.w.model,
                 (
                     OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                    (
-                        &c.w.model.graphics,
-                        c.w.parts.combat.of(self.id).abilities.look.as_ref(),
-                    ),
+                    c.w.parts.combat.of(self.id).abilities.look.as_ref(),
                     sprite_rng,
                 ),
-                roles,
             )?;
         }
         Ok(())
@@ -158,6 +163,8 @@ impl Unit {
             graphics,
             look,
             roles,
+            sprite_tuning,
+            ..
         } = sprites;
         if roles.of_class(class).contains(ClassRoles::PACKS_TO_MOVE) {
             return Err(GenieError::unsupported(
@@ -200,7 +207,7 @@ impl Unit {
             .and_then(|id| graphics.get(id).copied());
         let move_to = MoveToAction::to_point(m.point, m.range, sprite, motion.mover_mut());
         if move_to.shows_standing() {
-            self.shows_standing_sprite(motion, masters, graphics, sprite_rng)?;
+            self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
         actions.list.set_move_to(Some(move_to));
         Ok(false)
@@ -237,6 +244,8 @@ impl Unit {
             graphics,
             look,
             roles,
+            move_to_tuning,
+            ..
         } = sprites;
         if unread.is_some() {
             return Err(GenieError::unsupported(
@@ -258,15 +267,35 @@ impl Unit {
             ) => Ok(PointMove::Declined),
             Some(ARTIFACT_TYPE) => {
                 let sprites = self.point_sprites(sprites)?;
-                self.artifact_takes_point(actions, motion.mover_mut(), point, &sprites)
+                self.artifact_takes_point(
+                    actions,
+                    motion.mover_mut(),
+                    point,
+                    &sprites,
+                    move_to_tuning,
+                )
             }
             Some(HUNT) => {
                 let sprites = self.point_sprites(sprites)?;
-                self.hunt_takes_point(actions, motion.mover_mut(), point, player, sprites)
+                self.hunt_takes_point(
+                    actions,
+                    motion.mover_mut(),
+                    point,
+                    player,
+                    sprites,
+                    move_to_tuning,
+                )
             }
             Some(GATHER) => {
                 let sprites = self.point_sprites(sprites)?;
-                self.gather_takes_point(actions, motion.mover_mut(), point, player, sprites)
+                self.gather_takes_point(
+                    actions,
+                    motion.mover_mut(),
+                    point,
+                    player,
+                    sprites,
+                    move_to_tuning,
+                )
             }
             // the Transport's (0x140aa3e40): the caller sails it there
             Some(TRANSPORT) => Ok(PointMove::Sails),
@@ -277,7 +306,7 @@ impl Unit {
                     (graphics, look),
                     roles,
                 );
-                actions.repair_takes_point(motion.mover_mut(), point, &move_reads)
+                actions.repair_takes_point(motion.mover_mut(), point, &move_reads, move_to_tuning)
             }
             Some(other) => Err(GenieError::unreachable(
                 "a top action of a type top_action never holds",
@@ -308,10 +337,11 @@ impl Unit {
         mover: Option<&mut Mover>,
         point: Position,
         sprites: &SpriteReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<PointMove, GenieError> {
         let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
         let gone = match actions.list.artifact_mut() {
-            Some(a) => a.take_point(point, &reads)?,
+            Some(a) => a.take_point(point, &reads, move_to_tuning)?,
             None => SubActionsGone::default(),
         };
         if gone.stops {
@@ -331,6 +361,7 @@ impl Unit {
         point: Position,
         player: PlayerId,
         sprites: SpriteReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<PointMove, GenieError> {
         let my_pasture = self.my_pasture;
         let walks = Walks::of(sprites, (self, mover.as_deref()));
@@ -351,6 +382,7 @@ impl Unit {
                 gap: Distance::ZERO,
             },
             mover,
+            move_to_tuning,
         )? {
             return Ok(PointMove::Declined);
         }
@@ -366,6 +398,7 @@ impl Unit {
         point: Position,
         player: PlayerId,
         sprites: SpriteReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<PointMove, GenieError> {
         let walks = Walks::of(sprites, (self, mover.as_deref()));
         let (Some(gather), Some(mover)) = (actions.list.gather_mut(), mover) else {
@@ -374,7 +407,7 @@ impl Unit {
             ));
         };
         let old = gather.target.map(GatherTargetId::id);
-        gather.take_move(None, point, player, mover, &walks)?;
+        gather.take_move(None, point, player, mover, &walks, move_to_tuning)?;
         Ok(PointMove::Taken(old))
     }
 
@@ -421,7 +454,7 @@ impl Unit {
         )?;
         torn_down(c, self, (leaves, releases))?;
         let own = self.master(c.w.master_tables(), c.player)?;
-        let range = object_range(range, Some(own));
+        let range = object_range(range, Some(own), &c.w.model.tuning.order);
         let sprite = ai_sprite(own, false)
             .or_else(|| object_sprite(own))
             .and_then(|id| c.w.model.graphics.get(id).copied());
@@ -436,7 +469,7 @@ impl Unit {
             (target, state),
             range,
             (sprite, livestock),
-            roles,
+            &c.w.model,
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(
@@ -444,6 +477,7 @@ impl Unit {
                 OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
                 &c.w.model.graphics,
                 c.w.streams.get(Stream::Sprite),
+                c.w.model.tuning.sprite,
             )?;
         }
         actions.list.set_move_to(Some(move_to));
@@ -467,13 +501,14 @@ impl Unit {
         waits: bool,
         stance: UnitStance,
         (masters, graphics, sprite_rng): (OwnerMasters<'_>, &Graphics, &mut Well512),
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         let Some(m) = actions.list.move_to_mut() else {
             return Ok(());
         };
         m.state = m.wait.give_up(waits, stance);
         if m.state == MoveTo::Failed {
-            self.shows_standing_sprite(motion, masters, graphics, sprite_rng)?;
+            self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
         Ok(())
     }
@@ -487,6 +522,7 @@ impl Unit {
         masters: OwnerMasters<'_>,
         graphics: &Graphics,
         sprite_rng: &mut Well512,
+        sprite_tuning: SpriteTuning,
     ) -> Result<(), GenieError> {
         let standing = self
             .master_in(masters)?
@@ -505,6 +541,7 @@ impl Unit {
                 motion.move_stats_mut(),
                 standing,
                 sprite_rng,
+                sprite_tuning,
             );
         }
         motion.set_anim_speed(Speed::ZERO);
@@ -540,12 +577,13 @@ impl Action {
         mover: Option<&mut Mover>,
         point: Position,
         move_reads: &MoveToReads<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<PointMove, GenieError> {
         let repair = self
             .list
             .repair_mut()
             .ok_or(GenieError::unreachable("a Repair head without its Repair"))?;
-        let (old, counted) = repair.take_point(point, mover, move_reads)?;
+        let (old, counted) = repair.take_point(point, mover, move_reads, move_to_tuning)?;
         Ok(PointMove::Repairs(old, old.filter(|_| counted)))
     }
 }

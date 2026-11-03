@@ -6,9 +6,6 @@
 //! player's slot 0x1c0 with master 697 ([`World::remains`]).
 
 use crate::GenieError;
-use crate::math::image::treason::{
-    TREASON_COST as TREASON_TREASON_COST, TREASON_DISCOUNT_COST as TREASON_TREASON_DISCOUNT_COST,
-};
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
@@ -16,11 +13,6 @@ use crate::unit_ai::task_finder::allied;
 use crate::world::World;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
-
-/// The gold ([`attribute::GOLD`]) the treason costs: 400 (`DAT_142eb5bd4`, read at `0x141620446`),
-/// 200 (`DAT_142eb0f54`, read at `0x1416204d5`) with attribute 197 above 0.
-const TREASON_COST: f32 = TREASON_TREASON_COST;
-const TREASON_DISCOUNT_COST: f32 = TREASON_TREASON_DISCOUNT_COST;
 
 impl World {
     /// `FUN_14160ffb0`: player `p` has a castle (0x52; 0xd1 with the loaded world's content mode
@@ -60,9 +52,9 @@ impl World {
             .attribute(self.model.slots.attribute.treason_discount)
             .unwrap_or(Amount::ZERO);
         let cost = if Amount::ZERO < discount {
-            TREASON_DISCOUNT_COST
+            self.model.tuning.treason.treason_discount_cost
         } else {
-            TREASON_COST
+            self.model.tuning.treason.treason_cost
         };
         let gold = *self
             .players

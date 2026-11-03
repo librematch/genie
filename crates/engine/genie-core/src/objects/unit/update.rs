@@ -19,6 +19,7 @@ use crate::ownership::capture::Captured;
 use crate::unit_ai::task_finder::world::wait_progress;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::WaitSolidifyTuning;
 use crate::world::lets::torn_down;
 use crate::world::others::OthersRef;
 use crate::world::parts::PartTable;
@@ -149,6 +150,7 @@ impl Unit {
             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
                 OthersRef::of(&c.w.players, &c.w.index, c.player)?,
                 &c.w.parts.building,
+                c.w.model.tuning.wait_solidify,
             )),
             Some(Action::Missile(_)) => self.fly(actions, c, roles).map(|()| HeadCode::Keeps),
             Some(Action::MoveTo(_)) => self.move_to_part(actions, c, me, roles),
@@ -242,7 +244,7 @@ impl Unit {
         if let (Some(sprite), Some(speed)) =
             (self.sprite.as_mut(), c.w.parts.anim_speed_of(self.id))
         {
-            sprite.update(c.dt.seconds(), speed);
+            sprite.update(c.dt.seconds(), speed, c.w.model.tuning.sprite);
             if let Ok(master) = object_master(
                 c.w.parts.own_master.get(self.id),
                 (self.id, self.life.master_id),
@@ -255,6 +257,7 @@ impl Unit {
                     second,
                     &c.w.model.graphics,
                     c.w.streams.get(Stream::Sprite),
+                    c.w.model.tuning.sprite,
                 );
             }
         }
@@ -339,11 +342,14 @@ impl LayersAction {
         &self,
         others: OthersRef<'_>,
         buildings: &PartTable<Building>,
+        wait_solidify_tuning: WaitSolidifyTuning,
     ) -> HeadCode {
-        let ended = self
-            .list
-            .wait_solidify()
-            .is_some_and(|w| w.update(wait_progress(w.target, others, buildings)));
+        let ended = self.list.wait_solidify().is_some_and(|w| {
+            w.update(
+                wait_progress(w.target, others, buildings),
+                wait_solidify_tuning,
+            )
+        });
         HeadCode::ended(ended)
     }
 }

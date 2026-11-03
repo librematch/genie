@@ -13,9 +13,9 @@ use crate::players::PlayerType;
 use crate::players::QueryRelation;
 use crate::unit_ai::{
     AI_MOVE_RANGE, AiMove, BOAR_HOME, BOAR_LEASH, BOAR_LEASH_DRAW, BOAR_OFFSET, BOAR_STEP,
-    BOAR_WANDER, EVADE_REACH, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH,
-    HUNTED_STEP, LION_CARED, LION_IDLE_TIMEOUT, LION_SIGHT_DIVISOR, LION_SIGHT_SHARE, Memory, Pick,
-    Search, Surroundings, UnitAi, UnitSide, point_gap_squared,
+    BOAR_WANDER, Effect, Found, HUNTED_CARED, HUNTED_HOME, HUNTED_SIGHT_GROWTH, HUNTED_STEP,
+    LION_CARED, LION_IDLE_TIMEOUT, Memory, Pick, Search, Surroundings, UnitAi, UnitSide,
+    point_gap_squared,
 };
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -136,8 +136,9 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
-        let reach = (at.speed * EVADE_REACH).get();
+        let reach = (at.speed * unit_ai_tuning.evade_reach).get();
         let (dx, dy) = (other.x() - x, other.y() - y);
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
@@ -278,6 +279,7 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut dyn UnitSide,
     ) -> Result<bool, GenieError> {
+        let unit_ai_tuning = &at.unit_ai_tuning;
         let slots = at.slots;
         self.cap_human_order(side, ai)?;
         self.set_idle_timeout(LION_IDLE_TIMEOUT, ai);
@@ -306,7 +308,7 @@ impl UnitAi {
         let mut reach = if at.mode_1 {
             at.los
         } else {
-            at.los * LION_SIGHT_SHARE
+            at.los * unit_ai_tuning.lion_sight_share
         };
         if at.scenario {
             return Err(GenieError::unsupported(
@@ -321,7 +323,7 @@ impl UnitAi {
             found = side.closest(&search(None))?;
             self.alert(found, at.dt_seconds);
             if !at.mode_1 {
-                reach = at.los / LION_SIGHT_DIVISOR;
+                reach = at.los / unit_ai_tuning.lion_sight_divisor;
             }
         }
         let Some(id) = found.id else {

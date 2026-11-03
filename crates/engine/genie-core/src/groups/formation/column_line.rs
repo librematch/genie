@@ -7,7 +7,7 @@ use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::TransformType;
 use crate::groups::UnitType;
-use crate::groups::formation::{CATEGORIES, EPSILON, FLANK_SPACING, STAGGER_SHARE, TWO};
+use crate::groups::formation::{CATEGORIES, EPSILON};
 use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
 use crate::map::Distance;
@@ -16,6 +16,7 @@ use crate::math::fmath::sqrt;
 use crate::math::fmath::{BVector, add, scale, sub};
 use crate::world::World;
 use crate::world::WorldTime;
+use crate::world::layer::generated::GroupTuning;
 use crate::world::slots::CheckedIndex;
 
 /// The formation categories' count, as an array's length.
@@ -79,7 +80,7 @@ pub(super) fn sizes(count: i32, by_line: bool) -> (i32, i32) {
 /// offset (the spacing straight back, `(0, 0, -spacing)`, doubled when staggered) and step by
 /// it; a staggered line moves by a quarter of it (back on even lines, forward on odd ones), an
 /// even line of a plain one by half of it back; a flanked line's slots move apart by
-/// [`FLANK_SPACING`] less the line's share of the depth. A slot takes no unit, the offset, the
+/// `GroupTuning::flank_spacing` less the line's share of the depth. A slot takes no unit, the offset, the
 /// time, the line as its depth, the sub-formation and, with several unit types, the next one
 /// with units left (round robin; with two types the last slot of a line keeps the type for the
 /// next line). The line takes its slots' indices and its distance back, which grows by each
@@ -103,6 +104,7 @@ pub(crate) fn column_line_slots(
     column: bool,
     (staggered, flanked): (bool, bool),
     world_time: WorldTime,
+    group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     if group.members.is_empty() {
         return Ok(false);
@@ -133,6 +135,7 @@ pub(crate) fn column_line_slots(
         flanked,
         depth,
         world_time,
+        group_tuning,
     };
     let mut at = Cursor::default();
     for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
@@ -231,13 +234,15 @@ pub(super) fn fit_to_widest(cat: &Category, widest: f32) -> (i32, i32) {
     (lines, columns)
 }
 
-/// How the lines are laid out: staggered or flanked, the formation's depth and the slots' time.
+/// How the lines are laid out: staggered or flanked, the formation's depth, the slots' time and
+/// the groups' tuning values.
 #[derive(Clone, Copy)]
-struct Style {
+struct Style<'a> {
     staggered: bool,
     flanked: bool,
     depth: i32,
     world_time: WorldTime,
+    group_tuning: &'a GroupTuning,
 }
 
 /// What the layout carries from line to line: the next line's and slot's indices, the distance
@@ -294,16 +299,21 @@ fn lay_category(
     cat: &Category,
     c: FormationCategory,
     (lines, columns): (i32, i32),
-    style: Style,
+    style: Style<'_>,
     at: &mut Cursor,
 ) -> Result<(), GenieError> {
+    let group_tuning = style.group_tuning;
     let mut subs = SubTypes {
         next: if cat.types == 1 { -1 } else { 0 },
         used: [0u32; 50],
     };
     let mut single: BVector = scale(cat.spacing.get(), BVector::new(0.0, 0.0, -1.0));
     if style.staggered {
-        single = BVector::new(single.x() * TWO, single.height() * TWO, single.y() * TWO);
+        single = BVector::new(
+            single.x() * group_tuning.spacing_factor,
+            single.height() * group_tuning.spacing_factor,
+            single.y() * group_tuning.spacing_factor,
+        );
     }
     if EPSILON < at.distance_back.get()
         && EPSILON < at.last_spacing.get()
@@ -316,7 +326,7 @@ fn lay_category(
         if 1 < lines && in_category == lines - 1 {
             actual = cat.count - (lines - 1) * columns;
         }
-        let total = line_start(single, actual, at.line_index, style.staggered);
+        let total = line_start(single, actual, at.line_index, style.staggered, group_tuning);
         let line = formation.lines.checked_mut(at.line_index as usize)?;
         clear_line(line);
         let _ = reset_line(line, actual, at.line_index);
@@ -345,14 +355,20 @@ fn lay_category(
 /// Where a line of `actual` slots starts: half its slots (truncated) of `single` ahead; a
 /// staggered line moves by a quarter of `single` (back on even lines, forward on odd ones), an
 /// even line of a plain one by half of it back.
-fn line_start(single: BVector, actual: i32, line_index: i32, staggered: bool) -> BVector {
+fn line_start(
+    single: BVector,
+    actual: i32,
+    line_index: i32,
+    staggered: bool,
+    group_tuning: &GroupTuning,
+) -> BVector {
     let half = scale((actual / 2) as f32, single);
     let total = add(half, BVector::ZERO);
     if staggered {
         let quarter = BVector::new(
-            single.x() / STAGGER_SHARE,
-            single.height() / STAGGER_SHARE,
-            single.y() / STAGGER_SHARE,
+            single.x() / group_tuning.stagger_share,
+            single.height() / group_tuning.stagger_share,
+            single.y() / group_tuning.stagger_share,
         );
         if line_index & 1 == 0 {
             sub(total, quarter)
@@ -364,7 +380,11 @@ fn line_start(single: BVector, actual: i32, line_index: i32, staggered: bool) ->
             )
         }
     } else if actual & 1 == 0 {
-        let half_step = BVector::new(single.x() / TWO, single.height() / TWO, single.y() / TWO);
+        let half_step = BVector::new(
+            single.x() / group_tuning.spacing_factor,
+            single.height() / group_tuning.spacing_factor,
+            single.y() / group_tuning.spacing_factor,
+        );
         sub(total, half_step)
     } else {
         total
@@ -380,7 +400,7 @@ fn lay_line(
     cat: &Category,
     c: FormationCategory,
     (actual, mut total, single): (i32, BVector, BVector),
-    style: Style,
+    style: Style<'_>,
     at: &mut Cursor,
     subs: &mut SubTypes,
 ) -> Result<(), GenieError> {
@@ -393,7 +413,7 @@ fn lay_line(
         };
         *formation.slot_mut(i)? = Slot {
             unit_id: None,
-            offset: (flank_offset(total, at.line_index, style)),
+            offset: flank_offset(total, at.line_index, style),
             desired_transform_position: BVector::ZERO,
             time: style.world_time,
             state: SlotState::Steering,
@@ -418,12 +438,12 @@ fn lay_line(
     Ok(())
 }
 
-/// A flanked line's slot moves apart (away from the middle on y) by [`FLANK_SPACING`] less the
+/// A flanked line's slot moves apart (away from the middle on y) by `GroupTuning::flank_spacing` less the
 /// line's share of the depth; any other keeps `total`.
-fn flank_offset(total: BVector, line_index: i32, style: Style) -> BVector {
+fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
     let mut offset = total;
     if style.flanked {
-        let flank = FLANK_SPACING - line_index as f32 / style.depth as f32;
+        let flank = style.group_tuning.flank_spacing - line_index as f32 / style.depth as f32;
         if 0.0 <= offset.y() {
             offset = offset.with_y(offset.y() + flank);
         } else {
@@ -454,7 +474,14 @@ impl World {
         staggered_flanked: (bool, bool),
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
-        if !column_line_slots(formation, g, column, staggered_flanked, self.world_time)? {
+        if !column_line_slots(
+            formation,
+            g,
+            column,
+            staggered_flanked,
+            self.world_time,
+            &self.model.tuning.group,
+        )? {
             return Ok(false);
         }
         let after_column = matches!(

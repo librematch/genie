@@ -25,10 +25,7 @@ pub use self::desired_positions::{find_point_from_front, on_last_high_level_wayp
 use self::passability::{cell_mark, count_up, passability_box, slot_tile};
 #[cfg(test)]
 use crate::groups::UnitGroup;
-use crate::math::image::group::{
-    EPSILON as GROUP_EPSILON, FLANK_SPACING as GROUP_FLANK_SPACING, SPACING_FACTOR,
-    STAGGER_SHARE as GROUP_STAGGER_SHARE,
-};
+use crate::math::image::group::EPSILON as GROUP_EPSILON;
 #[cfg(test)]
 use crate::movement::PathData;
 #[cfg(test)]
@@ -37,14 +34,6 @@ use std::mem::take;
 
 /// The sub-formations a layout goes through (`FUN_141012280`'s `0..=5`).
 const CATEGORIES: i32 = 6;
-/// A flanked line's slots move apart by this less the line's share of the depth
-/// (`DAT_142eb3634`).
-const FLANK_SPACING: f32 = GROUP_FLANK_SPACING;
-/// A staggered line moves by a quarter of the slot offset (`DAT_142eb0f48`).
-const STAGGER_SHARE: f32 = GROUP_STAGGER_SHARE;
-/// A staggered line's offset is twice the spacing, and an even line moves by half the offset
-/// (`DAT_142e8c150`).
-const TWO: f32 = SPACING_FACTOR;
 /// Below this a distance back counts as none (`DAT_142eb0c60`).
 const EPSILON: f32 = GROUP_EPSILON;
 

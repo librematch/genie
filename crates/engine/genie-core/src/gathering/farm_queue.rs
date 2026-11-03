@@ -11,6 +11,7 @@
 use crate::GenieError;
 use crate::construction::FoundationId;
 use crate::gathering::QueueCount;
+use crate::gathering::gather::Stand;
 use crate::gathering::hunt::stand_sprite;
 use crate::math::image::farm_queue::{
     NO_FARM as FARM_QUEUE_NO_FARM, ONE_FARM as FARM_QUEUE_ONE_FARM,
@@ -461,9 +462,12 @@ impl World {
             arrived,
             player_type,
             self.parts.motion.mover_mut(unit.id),
-            stand,
-            &mut unit.sprite,
-            self.streams.get(Stream::Sprite),
+            Stand {
+                graphic: stand,
+                sprite: &mut unit.sprite,
+                rng: self.streams.get(Stream::Sprite),
+                sprite_tuning: &self.model.tuning.sprite,
+            },
         )?;
         for t in released.into_iter().flatten() {
             self.release(t, by)?;

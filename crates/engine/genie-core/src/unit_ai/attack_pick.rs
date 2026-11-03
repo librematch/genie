@@ -9,10 +9,6 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::math::fmath::maxss;
-use crate::math::image::unit_ai::{
-    ARMED_FIREPOWER as UNIT_AI_ARMED_FIREPOWER, DEFEND_GROWTH as UNIT_AI_DEFEND_GROWTH,
-    STANCE_RANGE_GROWTH as UNIT_AI_STANCE_RANGE_GROWTH,
-};
 use crate::movement::Speed;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
@@ -45,6 +41,7 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::UnitAiTuning;
 
 /// A unit AI's search (`FUN_140c63e20`) as the idle checks run it: it queries its player's
 /// objects in sight of `classes` within `radius` of `at` for a searcher of radii `size`
@@ -302,6 +299,7 @@ pub fn can_attack(
     seeker: &Seeker,
     t: &Target,
     roles: &Roles,
+    unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
     match me.ai_type {
         UnitAiType::HUNTED => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
@@ -318,9 +316,9 @@ pub fn can_attack(
         UnitAiType::LION => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
         CIVILIAN => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
         BUILDING_AI => Ok(false),
-        UnitAiType::TOWER => tower_can_attack(me, t, roles),
-        UnitAiType::SOLDIER => soldier_can_attack(me, seeker, t, roles),
-        SIEGE_AI => siege_can_attack(me, seeker, t, false, roles),
+        UnitAiType::TOWER => tower_can_attack(me, t, roles, unit_ai_tuning),
+        UnitAiType::SOLDIER => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
+        SIEGE_AI => siege_can_attack(me, seeker, t, false, roles, unit_ai_tuning),
         _ => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
         )),
@@ -351,7 +349,12 @@ pub(super) fn predator_may_attack(
 /// priority below 3 only of combat level 4 (`FUN_140fde120`); else when the tower is armed
 /// (`FUN_14120ea30`: classes 51 and 54, or a missile, or else a firepower, `+0xa00`, above 1)
 /// and its attack priority is not 3 or the class one of [`PRIORITY_3_CLASSES`].
-pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool, GenieError> {
+pub fn tower_can_attack(
+    me: &Attacker,
+    t: &Target,
+    roles: &Roles,
+    unit_ai_tuning: &UnitAiTuning,
+) -> Result<bool, GenieError> {
     if me.player == PlayerId::GAIA
         || roles
             .of_class(t.class)
@@ -385,7 +388,7 @@ pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool
         .of_some_class(me.class)
         .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         && me.missile.is_none()
-        && me.firepower <= ARMED_FIREPOWER
+        && me.firepower <= Firepower::new(unit_ai_tuning.armed_firepower)
     {
         return Ok(false);
     }
@@ -394,16 +397,6 @@ pub fn tower_can_attack(me: &Attacker, t: &Target, roles: &Roles) -> Result<bool
             .of_class(t.class)
             .contains(ClassRoles::PRIORITY_3_TARGET))
 }
-
-/// An attacker without a missile is armed with a firepower above this (`FUN_14120ea30`,
-/// `DAT_14330eb8c`).
-pub(super) const ARMED_FIREPOWER: Firepower = Firepower::new(UNIT_AI_ARMED_FIREPOWER);
-
-/// The soldier's range against a target grows by this for its stance checks
-/// (`DAT_142e7f384`).
-pub(super) const STANCE_RANGE_GROWTH: Distance = Distance::new(UNIT_AI_STANCE_RANGE_GROWTH);
-/// And the defend stance's by this more (`DAT_14330ebb8`).
-pub(super) const DEFEND_GROWTH: f32 = UNIT_AI_DEFEND_GROWTH;
 
 /// The squared gap between a point and an object's footprint (`FUN_140a847c0`: per axis the
 /// distance less the radius, `MAXSS 0` of it, so a gap that is not a number stays one).
@@ -447,6 +440,7 @@ pub fn soldier_can_attack(
     s: &Seeker,
     t: &Target,
     roles: &Roles,
+    unit_ai_tuning: &UnitAiTuning,
 ) -> Result<bool, GenieError> {
     if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
         return Ok(false);
@@ -489,7 +483,7 @@ pub fn soldier_can_attack(
     if s.stance == UnitStance::NO_ATTACK {
         return Ok(false);
     }
-    if !stance_reaches(me, s, t)? {
+    if !stance_reaches(me, s, t, unit_ai_tuning)? {
         return Ok(false);
     }
     Ok(!me.attack_priority.limited()
@@ -527,9 +521,14 @@ pub(super) fn never_attacks(me: &Attacker, roles: &Roles) -> bool {
 /// # Errors
 ///
 /// A range the slice does not model, and a defending patrol's range.
-pub(super) fn stance_reaches(me: &Attacker, s: &Seeker, t: &Target) -> Result<bool, GenieError> {
+pub(super) fn stance_reaches(
+    me: &Attacker,
+    s: &Seeker,
+    t: &Target,
+    unit_ai_tuning: &UnitAiTuning,
+) -> Result<bool, GenieError> {
     let d2 = point_gap_squared(s.state_position, t.position, t.radius);
-    let reach = me.range_against()? + STANCE_RANGE_GROWTH;
+    let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
     match s.stance {
         UnitStance::STAND_GROUND
             if !matches!(s.order, Some(OrderKind::Defend)) && reach.squared() < d2 =>
@@ -540,7 +539,7 @@ pub(super) fn stance_reaches(me: &Attacker, s: &Seeker, t: &Target) -> Result<bo
             if matches!(s.order, Some(OrderKind::Patrol | OrderKind::AttackMove)) || s.patrol_path {
                 defend_patrol_range()?;
             }
-            let reach = reach + Distance::new(DEFEND_GROWTH);
+            let reach = reach + Distance::new(unit_ai_tuning.defend_growth);
             if reach.squared() < d2 {
                 return Ok(false);
             }

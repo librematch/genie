@@ -51,7 +51,6 @@ pub use self::object_events::sight_taker;
 pub use self::sight::LosSight;
 pub use self::sight::MasterChange;
 use crate::math::fmath::{at_most_or_unordered, sqrt};
-use crate::math::image::visibility::EDGE as VISIBILITY_EDGE;
 use crate::objects::{IdTable, ObjectState};
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
@@ -69,9 +68,6 @@ const STEP: [i32; 16] = [0, 1, 2, 3, 4, 5, 6, 7, -8, -7, -6, -5, -4, -3, -2, -1]
 
 /// The cap of a tile's count (`explore_terrain`).
 const MOST: i16 = 0x7ffe;
-
-/// `DAT_142eb99cc`: a footprint's high edge, less this, is its last tile.
-const EDGE: f32 = VISIBILITY_EDGE;
 
 /// One player's `RGE_Visible_Map` (player `+0x70`).
 #[derive(Clone, Debug, PartialEq, Eq)]

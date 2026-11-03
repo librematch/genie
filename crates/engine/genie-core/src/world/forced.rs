@@ -22,6 +22,7 @@ use crate::vision::VisionBits;
 use crate::vision::visibility::VisibleMap;
 use crate::world::World;
 use crate::world::layer::Roles;
+use crate::world::layer::generated::VisibilityTuning;
 use crate::world::parts::{Object, Part};
 use crate::world::slots::PlayerSlots;
 use crate::world::{FrameSeed, PlayState};
@@ -299,8 +300,12 @@ impl World {
         keep_unsaved(unit, &mut forced);
         let before = unit.life.state;
         if forced.position() != unit.position() {
-            self.spatial
-                .set_position(id, forced.position(), &self.model.roles)?;
+            self.spatial.set_position(
+                id,
+                forced.position(),
+                &self.model.roles,
+                self.model.tuning.visibility,
+            )?;
         }
         self.follow_state(p, &forced, before)?;
         self.spatial.unfreeze(id);
@@ -329,7 +334,13 @@ impl World {
         if state == before {
             return Ok(());
         }
-        sight_follows(&mut self.spatial, id, (before, state), &self.model.roles)?;
+        sight_follows(
+            &mut self.spatial,
+            id,
+            (before, state),
+            &self.model.roles,
+            self.model.tuning.visibility,
+        )?;
         if before < ObjectState::DyingSprite && ObjectState::Undead < state {
             let master = forced.master(
                 MasterTables::new(&self.model.masters, &self.parts.own_master),
@@ -352,12 +363,13 @@ fn sight_follows(
     id: ObjectId,
     (before, state): (ObjectState, ObjectState),
     roles: &Roles,
+    visibility_tuning: VisibilityTuning,
 ) -> Result<(), GenieError> {
     if before <= ObjectState::Alive && ObjectState::Dying <= state {
-        spatial.sight_state(id, ObjectState::Dying, roles)?;
+        spatial.sight_state(id, ObjectState::Dying, roles, visibility_tuning)?;
     }
     if state != ObjectState::Dying {
-        spatial.sight_state(id, state, roles)?;
+        spatial.sight_state(id, state, roles, visibility_tuning)?;
     }
     Ok(())
 }
@@ -402,6 +414,7 @@ mod tests {
     use crate::test_ids::{master_id, tech_id};
     use crate::testing::ids;
     use crate::testing::roles;
+    use crate::testing::tuning;
     #[cfg(test)]
     use crate::unit_ai::Hunted;
     use crate::world::parts::Object;
@@ -436,6 +449,7 @@ mod tests {
             id,
             (ObjectState::Alive, ObjectState::Dying),
             &roles(),
+            tuning().visibility,
         )
         .unwrap();
         assert_eq!(state(&s), Some(ObjectState::Dying));
@@ -444,6 +458,7 @@ mod tests {
             id,
             (ObjectState::Dying, ObjectState::Removed),
             &roles(),
+            tuning().visibility,
         )
         .unwrap();
         assert_eq!(state(&s), Some(ObjectState::Removed));
@@ -453,6 +468,7 @@ mod tests {
             id,
             (ObjectState::Alive, ObjectState::DyingSprite),
             &roles(),
+            tuning().visibility,
         )
         .unwrap();
         assert_eq!(state(&s), Some(ObjectState::DyingSprite));

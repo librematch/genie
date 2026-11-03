@@ -14,7 +14,6 @@ use crate::gathering::hunt::{
 use crate::map::Distance;
 use crate::map::Position;
 use crate::math::fmath::at_most_or_unordered;
-use crate::math::image::hunt::DROP_REACH as HUNT_DROP_REACH;
 use crate::math::rng::Stream;
 use crate::movement::Speed;
 use crate::movement::move_to::GiveUp;
@@ -28,6 +27,7 @@ use crate::unit_ai::world_view::DropWorld;
 use crate::world::Seconds;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::MoveToTuning;
 use crate::world::lets::take;
 use crate::world::others::OthersRef;
 use crate::world::slots::PlayerSlots;
@@ -50,8 +50,6 @@ pub enum Dropped {
 
 /// The wait of a hunt's drop-off that cannot go on (`0xc0400000`).
 pub(super) const DROP_WAIT: Seconds = Seconds::new(-3.0);
-/// A hunt's drop-off reaches its drop site within this squared footprint gap (`DAT_14330eb8c`).
-pub(super) const DROP_REACH: f32 = HUNT_DROP_REACH;
 
 impl HuntAction {
     /// `set_state(8)` (`0x140ac60e0` case 8) with a load and its drop site (`carry_to`, at `site`,
@@ -64,6 +62,7 @@ impl HuntAction {
         gap: Distance,
         mover: &mut Mover,
         walks: &Walks<'_>,
+        move_to_tuning: &MoveToTuning,
     ) -> Result<(), GenieError> {
         self.tear_down(Some(mover))?;
         self.state = HuntState::Drop { move_to: None };
@@ -79,7 +78,7 @@ impl HuntAction {
             gap,
             state: None,
         };
-        let move_to = self.move_to_object(to, range, mover, walks)?;
+        let move_to = self.move_to_object(to, range, mover, walks, move_to_tuning)?;
         self.state = HuntState::Drop { move_to };
         Ok(())
     }
@@ -142,7 +141,7 @@ impl HuntAction {
                 "a drop site that does not take the load (set_state 2)",
             ));
         }
-        if DROP_REACH < site.gap_squared.get() {
+        if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
             self.timer = DROP_WAIT;
             set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
             return Ok(Dropped::Going);

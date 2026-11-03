@@ -31,6 +31,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::world::WorldTime;
 use crate::world::layer::Slots;
+use crate::world::layer::generated::HistoryTuning;
 use crate::world::slots::CheckedIndex;
 
 /// A history event's kind (`event`, `+0x0`): an age reached, a castle or wonder built or
@@ -320,6 +321,7 @@ impl History {
         world_time: WorldTime,
         period: HistoryUpdates,
         slots: Slots,
+        history_tuning: &HistoryTuning,
     ) -> Result<(), GenieError> {
         self.update_count = self.update_count.next();
         if self.update_count < period {
@@ -367,7 +369,7 @@ impl History {
                 .wrapping_add(kills_value);
             (Share::of(own, value), Share::of(all, value))
         };
-        let battling = share.battling();
+        let battling = share.battling(history_tuning);
         let goes_on = if self.battle_flag == 0 {
             if battling {
                 self.battle_flag = 1;
@@ -376,7 +378,7 @@ impl History {
         } else if battling {
             true
         } else {
-            if self.running_ave_bv_percent.recorded() {
+            if self.running_ave_bv_percent.recorded(history_tuning) {
                 self.record_battle(attributes, value, world_time)?;
             }
             self.battle_flag = 0;
@@ -484,6 +486,7 @@ mod tests {
     use super::*;
     use crate::testing::attribute;
     use crate::testing::slots;
+    use crate::testing::tuning;
 
     fn entry(civilian: i16, military: i16) -> HistoryEntry {
         HistoryEntry {
@@ -503,6 +506,7 @@ mod tests {
             WorldTime::from_millis(millis),
             HistoryUpdates::of_data(30),
             slots(),
+            &tuning().history,
         )
         .unwrap();
     }

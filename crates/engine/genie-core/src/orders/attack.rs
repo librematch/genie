@@ -1,6 +1,7 @@
 //! An attack's start, a hunt's and an action's retarget.
 
 use crate::GenieError;
+use crate::combat::attack::BeginLayer;
 use crate::combat::attack::{Attack, AttackReads, Fight};
 use crate::construction::MainBuildingId;
 use crate::gathering::hunt::HuntRetarget;
@@ -69,6 +70,7 @@ impl World {
             self.parts.unit_ai.get(u.id),
             (held.kind, world_time),
             &self.model.roles,
+            &self.model.tuning.turn,
         );
         let own = victim_of(
             (
@@ -172,6 +174,7 @@ impl World {
             self.parts.move_stats_mut(unit.id),
             standing,
             self.streams.get(Stream::Sprite),
+            self.model.tuning.sprite,
         );
         let cmd = AttackCommand {
             target,
@@ -354,8 +357,12 @@ impl World {
             &engagement,
             arms,
             mover,
-            &self.model.roles,
-            &self.model.tuning.attack,
+            BeginLayer {
+                roles: &self.model.roles,
+                attack_tuning: &self.model.tuning.attack,
+                move_to_tuning: &self.model.tuning.move_to,
+            },
+            &self.model.tuning.hunt,
         )? {
             if arrived {
                 show_arrived(
@@ -363,6 +370,7 @@ impl World {
                     &mut unit.sprite,
                     self.parts.motion.layer_mut(unit.id),
                     self.streams.get(Stream::Sprite),
+                    self.model.tuning.sprite,
                 )?;
             }
             // the hunt's slot 0x68 (FUN_140ac7980): FUN_140a7a230 on the new target, which the

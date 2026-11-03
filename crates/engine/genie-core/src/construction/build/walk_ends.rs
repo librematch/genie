@@ -4,7 +4,7 @@
 use crate::GenieError;
 use crate::construction::build::BuildState;
 use crate::construction::build::{
-    BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, REACH, SITE_GONE, UNSEEN_SITE,
+    BUILDER_UNMOVING, BuildAction, BuildReads, FOREIGN_SITE, SITE_GONE, UNSEEN_SITE,
 };
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -24,7 +24,7 @@ impl BuildAction {
     /// end, or no sub-action): off the footprint (223) it walks back to the foundation
     /// (`set_state(4)`, [`BuildAction::restart`]: in reach or not). In state 4, without a
     /// foundation, a villager, or within the task's range (the footprints' squared gap,
-    /// `FUN_14118f8c0`, at most the range squared) or [`REACH`] of it, it works (`set_state(6)`;
+    /// `FUN_14118f8c0`, at most the range squared) or `BuildTuning::reach` of it, it works (`set_state(6)`;
     /// one without a foundation waits instead, `set_state(3)`); else it walks to the foundation
     /// again (`set_state(4)`).
     ///
@@ -57,7 +57,9 @@ impl BuildAction {
             let t = *c.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
             let gap = footprint_gap_squared(at, ground, t.position, t.radius);
             let range = self.task.range;
-            if !(gap <= range.squared() || gap <= DistanceSquared::new(REACH)) {
+            if !(gap <= range.squared()
+                || gap <= DistanceSquared::new(c.w.model.tuning.build.reach))
+            {
                 return self.restart(c, builder, roles);
             }
         }
@@ -138,7 +140,13 @@ impl BuildAction {
                 full: false,
             };
             let mut path = Path::default();
-            found = planner.plan::<GenieError>(&req, false, &mut path, None)?;
+            found = planner.plan::<GenieError>(
+                &req,
+                false,
+                &mut path,
+                None,
+                &c.w.model.tuning.tile_path,
+            )?;
         }
         if found.reaches() {
             self.restart(c, builder, roles)
@@ -215,7 +223,12 @@ impl BuildAction {
             roles,
         )?;
         self.state = BuildState::WalkPoint {
-            move_to: move_reads.to_point(self.point, Distance::ZERO, self.task.moving)?,
+            move_to: move_reads.to_point(
+                self.point,
+                Distance::ZERO,
+                self.task.moving,
+                &c.w.model.tuning.move_to,
+            )?,
         };
         Ok(())
     }

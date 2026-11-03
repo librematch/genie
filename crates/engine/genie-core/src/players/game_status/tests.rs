@@ -70,6 +70,7 @@ use crate::testing::attribute;
 use crate::testing::class;
 use crate::testing::ids;
 use crate::testing::roles;
+use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::UnitAi;
@@ -342,6 +343,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
                         at: Position::new(3.5, 3.5, 0.0),
                         ground: Footprint::new(0.2, 0.2),
                     },
+                    &tuning().move_to,
                 )
                 .unwrap(),
             )),

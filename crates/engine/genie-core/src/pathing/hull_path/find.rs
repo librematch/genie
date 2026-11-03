@@ -12,8 +12,7 @@ use crate::pathing::ShortFound;
 use crate::pathing::hull_path::NO_AREA;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::pathing::hull_path::{
-    HALF, HullPather, HullQuery, NEAR_TARGET, NodeIndex, NodeList, Point, Target, Waypoints,
-    walk_length,
+    HALF, HullPather, HullQuery, NodeIndex, NodeList, Point, Target, Waypoints, walk_length,
 };
 use crate::world::slots::CheckedIndex;
 
@@ -226,6 +225,7 @@ impl HullPather<'_> {
     /// a target on it by both radii when the target moves or stands near; with a range the goal
     /// moved on by the range along the walk.
     fn quick_goal(&self, q: &HullQuery) -> Point {
+        let hull_path_tuning = &self.by_id.tuning().hull_path;
         let (from, to, r) = (q.from, q.to, self.radius);
         if q.range != Distance::ZERO
             && !q
@@ -245,7 +245,7 @@ impl HullPather<'_> {
         {
             let (dx, dy) = (to.x() - from.x(), to.y() - from.y());
             let d = dy * dy + dx * dx;
-            if t.moves || d <= NEAR_TARGET {
+            if t.moves || d <= hull_path_tuning.near_target {
                 let len = sqrt(d);
                 goal = Point::new(
                     goal.x() - (dx / len) * (r.get() + t.radius.x()),

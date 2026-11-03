@@ -2,6 +2,7 @@
 //! and closed after a player's update.
 
 use crate::GenieError;
+use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::spatial::Obstruction;
 use crate::map::spatial::{RecordId, Spatial, WalkQuery};
@@ -20,7 +21,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
-use crate::world::{GATE_COUNT_CAP, GATE_GROW, GATE_QUERY_RECORDS, World};
+use crate::world::{GATE_COUNT_CAP, GATE_QUERY_RECORDS, World};
 
 /// `FUN_1411d4a30`, a building's slot 0x678 (any other object's answers no): whether the gate
 /// `gate` (its building layer `layer`, master `master`, of player `owner`) lets a unit of
@@ -51,7 +52,7 @@ pub fn lets_pass(
 
 /// The units in gate `gate` (`FUN_1411d0570`): the obstruction manager's query from its first
 /// annex to its second (`+0xbc0`, `+0xbc8`) with flags 0x10, the gate and its annexes ignored
-/// (`FUN_1410562e0`), every record and the query grown by [`GATE_GROW`] (`FUN_1410562d0`), any
+/// (`FUN_1410562e0`), every record and the query grown by `TurnTuning::gate_grow` (`FUN_1410562d0`), any
 /// kind and player ([`Spatial::walk_hits`]; its list holds 10 records, more are not modelled).
 /// Of the objects it lists, those not of the classes 27, 39 and 52, nor of class 3 standing
 /// still, and either moving or not Gaia's count, at most 25 (the game reads the object's top
@@ -64,6 +65,7 @@ pub(crate) fn gate_units(
     annexes: &[ObjectId],
     by_id: ObjectsRef<'_>,
 ) -> Result<(Vec<ObjectId>, usize), GenieError> {
+    let turn_tuning = &by_id.tuning().turn;
     let roles = by_id.roles();
     let [a, b] = annexes[..] else {
         return Err(GenieError::unsupported("a gate without its two annexes"));
@@ -80,12 +82,12 @@ pub(crate) fn gate_units(
         .get(gate)
         .map(|p| p.player)
         .ok_or(GenieError::unsupported("a gate without a place"))?;
-    spatial.check_known_records(rect.grown(GATE_GROW))?;
+    spatial.check_known_records(rect.grown(Distance::new(turn_tuning.gate_grow)))?;
     let hits = spatial.walk_hits(WalkQuery {
         start: from,
         end: to,
         rect,
-        grow: GATE_GROW,
+        grow: Distance::new(turn_tuning.gate_grow),
         ally_factor: 1.0,
         player: Some(owner),
         ignore: &[RecordId::from(gate), RecordId::from(a), RecordId::from(b)],
