@@ -8,6 +8,8 @@ use crate::groups::GroupId;
 use crate::groups::PointLine;
 use crate::groups::TransformKind;
 use crate::groups::formation::EPSILON;
+use crate::groups::formation::LineKind;
+use crate::groups::formation::SlotOrder;
 use crate::groups::group_list::NO_FORMATION;
 use crate::groups::{Formation, UnitGroup};
 use crate::map::Distance;
@@ -202,16 +204,8 @@ impl World {
             | FormationKind::Column
                 if !laid_out =>
             {
-                self.create_column_line(
-                    &mut f,
-                    group,
-                    kind == FormationKind::Column,
-                    (
-                        kind == FormationKind::Staggered,
-                        kind == FormationKind::Flanked,
-                    ),
-                )
-                .map(|_| ())
+                self.create_column_line(&mut f, group, LineKind::of_formation(kind))
+                    .map(|_| ())
             }
             FormationKind::Phalanx if !laid_out => self.create_phalanx(&mut f, group).map(|_| ()),
             FormationKind::Box if !laid_out => self.create_box(&mut f, group).map(|_| ()),
@@ -220,16 +214,18 @@ impl World {
                 .groups
                 .held(group)
                 .and_then(|g| self.create_horde(&mut f, g))
-                .and_then(|_| self.formation_transform(&mut f, group, false))
+                .and_then(|_| self.formation_transform(&mut f, group, SlotOrder::Closest))
                 .map(|_| ()),
             FormationKind::UserDefined if !laid_out => self
                 .groups
                 .held(group)
                 .and_then(|g| self.create_udf(&mut f, g))
-                .and_then(|_| self.formation_transform(&mut f, group, false))
+                .and_then(|_| self.formation_transform(&mut f, group, SlotOrder::Closest))
                 .map(|_| ()),
             // laid out already, or a type the switch does not know: the transform alone
-            _ => self.formation_transform(&mut f, group, false).map(|_| ()),
+            _ => self
+                .formation_transform(&mut f, group, SlotOrder::Closest)
+                .map(|_| ()),
         };
         self.groups.held_mut(group)?.current_formation = Some(f);
         result

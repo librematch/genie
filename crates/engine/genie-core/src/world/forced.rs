@@ -405,6 +405,7 @@ mod tests {
     use crate::objects::layers::Motion;
     #[cfg(test)]
     use crate::objects::lifecycle::Lifecycle;
+    use crate::orders::town_bell::BellShelter;
     use crate::players::game_status::GameStatus;
     #[cfg(test)]
     use crate::production::Production;
@@ -587,7 +588,7 @@ mod tests {
             ..Production::default()
         };
         game.players[1][0].parts.production = Some(production.clone());
-        game.players[1][0].parts.town_bell.flag = true;
+        game.players[1][0].parts.town_bell.flag = BellShelter::Sheltered;
         let mut walker = walker();
         walker.waiting = 3;
         let motion = Motion::Moving(walker);
@@ -601,7 +602,7 @@ mod tests {
         assert_eq!(t.parts.unread.get(object_id(9175)), Some(&unread));
         assert_eq!(t.parts.gather_point.get(object_id(9175)), Some(&gather));
         assert_eq!(t.parts.production.get(object_id(9175)), Some(&production));
-        assert!(t.parts.town_bell_of(object_id(9175)).flag);
+        assert!(t.parts.town_bell_of(object_id(9175)).flag.is_sheltered());
         let forager = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (forager.position(), forager.stopped),

@@ -15,6 +15,7 @@ use crate::objects::Voice;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
 use crate::orders::Work;
+use crate::orders::town_bell::BellShelter;
 use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
 
@@ -103,7 +104,7 @@ impl World {
             ai.clear_notifies(world_time.since_start())?;
         }
         if villager {
-            self.parts.set_town_bell_flag(unit.id, false);
+            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
         self.parts
             .actions_mut(unit.id)?

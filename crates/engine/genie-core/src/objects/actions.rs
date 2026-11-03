@@ -284,16 +284,17 @@ impl<'a> IntoIterator for &'a ActionList {
 mod tests {
     use super::*;
     use crate::ownership::artifact::ArtifactState;
+    use crate::players::PlayerId;
 
     fn artifact(state: ArtifactState) -> Artifact {
         Artifact {
             state,
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         }
     }
 
     fn other() -> Action {
-        Action::Artifact(Artifact::new(true, None))
+        Action::Artifact(Artifact::new(PlayerId::GAIA, None))
     }
 
     #[test]

@@ -8,6 +8,7 @@ use crate::map::Rect;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{at_most_or_unordered, maxss, sqrt};
 use crate::objects::ObjectId;
+use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::{
     DIRECTIONS, HALF, HULL_ITERATIONS, HullIndex, HullPather, NUDGE, Node, NodeIndex, NodeList,
@@ -283,11 +284,12 @@ impl HullPather<'_> {
         let mut made = false;
         for dir in DIRECTIONS {
             let mut q = Point::new(d.get() * dir.x() + p.x(), d.get() * dir.y() + p.y());
-            if let Some((at, _)) =
-                self.hulls
-                    .checked(hull.index())?
-                    .intersection(false, p, q, hull_path_tuning)
-            {
+            if let Some((at, _)) = self.hulls.checked(hull.index())?.intersection(
+                AtStart::Ignored,
+                p,
+                q,
+                hull_path_tuning,
+            ) {
                 q = at;
             }
             if self.hulls.checked(hull.index())?.box_holding(q).is_none() {

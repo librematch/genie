@@ -31,6 +31,17 @@ use crate::world::World;
 use crate::world::index::Place;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
+/// Which side of a player's change a hook runs on (`FUN_141614f40`'s flag): before it (0: the
+/// volleys lose the shares of the units inside, `FUN_141217ac0`) or after it (1: they take
+/// them again, `FUN_14120b910`, and a changed sprite shows).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EffectHook {
+    /// Before the change.
+    Before,
+    /// After the change.
+    After,
+}
+
 impl World {
     /// Slot 0x148 (`FUN_1416121b0`) of player `p`: the hooks before (`FUN_141614f40` with 0),
     /// the change of attribute `attribute` by `v` on master `unit` or on the masters and
@@ -55,9 +66,9 @@ impl World {
         }) {
             return Err(GenieError::unsupported(why));
         }
-        self.effect_hooks(p, false, unit, class, attribute)?;
+        self.effect_hooks(p, EffectHook::Before, unit, class, attribute)?;
         self.change_attribute(p, change, unit, class, v, attribute)?;
-        self.effect_hooks(p, true, unit, class, attribute)
+        self.effect_hooks(p, EffectHook::After, unit, class, attribute)
     }
 
     /// `FUN_141614f40`: for each of player `p`'s live objects (its list `+0x30`), a combat unit's
@@ -69,7 +80,7 @@ impl World {
     pub(super) fn effect_hooks(
         &mut self,
         p: PlayerId,
-        after: bool,
+        hook: EffectHook,
         unit: Option<MasterId>,
         class: Option<ClassId>,
         attribute: MasterAttribute,
@@ -88,9 +99,9 @@ impl World {
             let master = u.master(self.master_tables(), p)?;
             let (kind, master_id, master_class) = (master.kind, master.id, master.class);
             if matches!(kind, MasterKind::COMBAT | MasterKind::BUILDING) {
-                self.garrison_volleys(p, id, after)?;
+                self.garrison_volleys(p, id, hook)?;
             }
-            if after
+            if hook == EffectHook::After
                 && attribute.shows_sprite()
                 && (Some(master_class) == class || Some(master_id) == unit)
             {
@@ -100,7 +111,8 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_141217ac0` (`after` false) and `FUN_14120b910` (true) on object `id` of player `p`:
+    /// `FUN_141217ac0` ([`EffectHook::Before`]) and `FUN_14120b910` ([`EffectHook::After`]) on
+    /// object `id` of player `p`:
     /// with units inside, a reload above 0 and an attack rate above 0 (`COMISS`, `JBE`: not a
     /// NaN; [`crate::garrison::attack_rate`]), each combat unit inside takes its share
     /// ([`crate::garrison::share`]) off its volleys (`+0xa00`), or adds it.
@@ -108,7 +120,7 @@ impl World {
         &mut self,
         p: PlayerId,
         id: ObjectId,
-        after: bool,
+        hook: EffectHook,
     ) -> Result<(), GenieError> {
         use crate::math::fmath::at_most_or_unordered;
         let Some((_, u)) = self.object(id) else {
@@ -148,7 +160,7 @@ impl World {
         let _ = self.object(id).ok_or(OBJECT_GONE)?;
         let combat = self.parts.combat_mut(id)?;
         for s in shares {
-            combat.firepower = if after {
+            combat.firepower = if hook == EffectHook::After {
                 s + combat.firepower
             } else {
                 combat.firepower - s

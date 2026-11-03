@@ -71,7 +71,7 @@ impl Unit {
             && let Some(q) = sight_taker(
                 mask,
                 c.player,
-                c.w.settings.game_mode.standard(),
+                c.w.settings.game_mode,
                 &c.w.players,
                 &c.w.allow_gaia_capture,
             )

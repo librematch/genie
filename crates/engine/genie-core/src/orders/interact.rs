@@ -14,6 +14,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
+use crate::orders::ReadyOrders;
 use crate::orders::{
     Interact, LISTED, MoveOrder, Place, Split, Work, grid_point, ignore_unit, offset_point,
     readiness, set_differentiator_groups,
@@ -184,7 +185,7 @@ impl World {
             .ok_or(GenieError::unreachable("unreachable: no unit AI"))?;
         let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
         if !order.queued && !order.direct {
-            readiness(&mut ai.orders, true);
+            readiness(&mut ai.orders, ReadyOrders::Drop);
             // the pass's tail: the unit's stop (its slot 0x148)
             self.object_stop(player, idx)?;
         }

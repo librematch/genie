@@ -29,6 +29,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::{MasterId, player_master};
+use crate::orders::ReadyOrders;
 use crate::orders::readiness;
 use crate::players::PlayerId;
 use crate::world::World;
@@ -384,7 +385,7 @@ impl World {
                 && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
             {
                 // the readiness pass with 0: every queued order is ready
-                readiness(&mut ai.orders, false);
+                readiness(&mut ai.orders, ReadyOrders::Keep);
             }
         }
         Ok(())

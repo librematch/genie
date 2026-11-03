@@ -17,6 +17,7 @@ use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::TileCount;
 use crate::vision::VisionBits;
+use crate::vision::visibility::BuildingSight;
 use crate::vision::visibility::{Seer, Visibility, tile_of};
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
@@ -143,8 +144,8 @@ impl Visibility {
             return Ok(TileCount::ZERO);
         };
         let (shape, centre) = match s.building {
-            Some(b) if !b.built => {
-                if !b.started {
+            Some(b) if b != BuildingSight::Built => {
+                if b == BuildingSight::Unstarted {
                     if let Some(s) = self.seers.get_mut(id) {
                         s.explored = false;
                     }
@@ -289,8 +290,8 @@ impl Visibility {
         };
         let centre = match s.building {
             Some(_) if !s.explored => return Ok(()),
-            Some(b) if !b.built => {
-                if !b.started {
+            Some(b) if b != BuildingSight::Built => {
+                if b == BuildingSight::Unstarted {
                     return Ok(());
                 }
                 centre

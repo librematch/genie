@@ -32,6 +32,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::ControlKey;
+use crate::orders::town_bell::BellShelter;
 use crate::orders::{Followed, follow_axis, follow_spread, ignore_unit};
 use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
@@ -372,7 +373,7 @@ impl World {
             .contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player, idx)?;
         if villager {
-            self.parts.set_town_bell_flag(unit.id, false);
+            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
         if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();

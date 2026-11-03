@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::combat::Firepower;
 use crate::construction::MainBuildingId;
 use crate::construction::RepairTargetId;
+use crate::construction::repair::RepairFrom;
 use crate::construction::repair::RepairOutcome;
 use crate::construction::repair::payment::PaidAttributes;
 use crate::construction::repair::{
@@ -303,7 +304,7 @@ pub(crate) fn repair_target(
             &mut set,
             0,
             amount,
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             roles,
             c.w.model.slots,

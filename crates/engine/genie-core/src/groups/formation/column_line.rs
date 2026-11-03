@@ -7,6 +7,7 @@ use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::TransformKind;
 use crate::groups::UnitKind;
+use crate::groups::formation::SlotOrder;
 use crate::groups::formation::{CATEGORIES, EPSILON};
 use crate::groups::layout::{clear_line, reset_line};
 use crate::groups::{Formation, Slot, UnitGroup};
@@ -22,6 +23,44 @@ use crate::world::slots::CheckedIndex;
 /// The formation categories' count, as an array's length.
 const CATEGORY_COUNT: usize = CATEGORIES as usize;
 
+/// The formation createColumnLine (`FUN_141012280`) lays out: a column (type 1, the column
+/// ratio 2 and the line ratio -1), else a line (ratios -1 and 2): plain (type 2), staggered
+/// (7) or flanked (8).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LineKind {
+    /// A column.
+    Column,
+    /// A plain line.
+    Line,
+    /// A staggered line: its spacing doubled, every other line a quarter of it ahead.
+    Staggered,
+    /// A flanked line: its slots apart from the middle.
+    Flanked,
+}
+
+impl LineKind {
+    /// The kind of formation type `kind`: a column, a staggered or a flanked line, any other a
+    /// plain line (the layout's callers pass these four).
+    pub(crate) const fn of_formation(kind: FormationKind) -> Self {
+        match kind {
+            FormationKind::Column => Self::Column,
+            FormationKind::Staggered => Self::Staggered,
+            FormationKind::Flanked => Self::Flanked,
+            _ => Self::Line,
+        }
+    }
+
+    /// The formation's type.
+    const fn formation_kind(self) -> FormationKind {
+        match self {
+            Self::Column => FormationKind::Column,
+            Self::Line => FormationKind::Line,
+            Self::Staggered => FormationKind::Staggered,
+            Self::Flanked => FormationKind::Flanked,
+        }
+    }
+}
+
 /// What createColumnLine reads of one sub-formation's statistic.
 #[derive(Clone, Debug)]
 pub(super) struct Category {
@@ -32,11 +71,11 @@ pub(super) struct Category {
     pub(super) unit_kind_counts: Vec<u32>,
 }
 
-/// The line and column counts of a sub-formation of `count` units for a line (`by_line`, the
-/// column ratio -1) or a column: the root of the count, rounded up, as the lines (a line's) or
-/// the columns (a column's), then fewer lines until a line is at least twice as wide as the
-/// formation is deep (a column the reverse). Returns (lines, columns).
-pub(super) fn sizes(count: i32, by_line: bool) -> (i32, i32) {
+/// The line and column counts of a sub-formation of `count` units for a line (the column ratio -1)
+/// or a column (`kind` [`LineKind::Column`]): the root of the count, rounded up, as the lines (a
+/// line's) or the columns (a column's), then fewer lines until a line is at least twice as wide as
+/// the formation is deep (a column the reverse). Returns (lines, columns).
+pub(super) fn sizes(count: i32, kind: LineKind) -> (i32, i32) {
     let root = cvttss2si(sqrt(count as f32).ceil());
     let root = root.max(1);
     let per = |a: i32| {
@@ -56,18 +95,17 @@ pub(super) fn sizes(count: i32, by_line: bool) -> (i32, i32) {
         }
         second = per(first);
     }
-    if by_line {
-        (first, second)
-    } else {
+    if kind == LineKind::Column {
         (second, first)
+    } else {
+        (first, second)
     }
 }
 
-/// The slots of createColumnLine (`FUN_141012280`, [`World::create_column_line`])
-/// up to its transform: the group's sub-formations (its unit types, by category 0 to 5) laid
-/// out in lines on `formation`, `world_time` the slots' time. `column` lays a column (the column
-/// ratio set, type 1), else a line (type 2, staggered 7, flanked 8). Returns false for a group
-/// without members (nothing laid out); its callers always pass a ratio.
+/// The slots of createColumnLine (`FUN_141012280`, [`World::create_column_line`]) up to its
+/// transform: the group's sub-formations (its unit types, by category 0 to 5) laid out in lines on
+/// `formation`, `world_time` the slots' time, as a column or a line of `kind`. Returns false for a
+/// group without members (nothing laid out); its callers always pass a ratio.
 ///
 /// Each sub-formation with units takes the lines and columns of [`sizes`]; the widest line
 /// (columns times the sub-formation's spacing) sets the width of the others when two or more
@@ -101,15 +139,14 @@ pub(super) fn sizes(count: i32, by_line: bool) -> (i32, i32) {
 pub(crate) fn column_line_slots(
     formation: &mut Formation,
     group: &UnitGroup,
-    column: bool,
-    (staggered, flanked): (bool, bool),
+    kind: LineKind,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
     if group.members.is_empty() {
         return Ok(false);
     }
-    let (lines_of, columns_of) = category_sizes(group, column)?;
+    let (lines_of, columns_of) = category_sizes(group, kind)?;
     let max_width = columns_of.iter().copied().fold(0, i32::max);
     let depth: i32 = lines_of.iter().sum();
     formation.resize_slots((depth * max_width).max(0) as usize);
@@ -117,22 +154,13 @@ pub(crate) fn column_line_slots(
     for s in formation.every_slot_mut() {
         s.active = 0;
     }
-    formation.kind = if column {
-        FormationKind::Column
-    } else if flanked {
-        FormationKind::Flanked
-    } else if staggered {
-        FormationKind::Staggered
-    } else {
-        FormationKind::Line
-    };
+    formation.kind = kind.formation_kind();
     formation.transform_kind = TransformKind::ByLines;
     formation.maximum_width = max_width;
     formation.maximum_depth = depth;
     formation.number_lines = depth;
     let style = Style {
-        staggered,
-        flanked,
+        kind,
         depth,
         world_time,
         group_tuning,
@@ -175,7 +203,7 @@ fn category(group: &UnitGroup, c: FormationCategory) -> Option<Category> {
 /// widest's width ([`fit_to_widest`]).
 fn category_sizes(
     group: &UnitGroup,
-    column: bool,
+    kind: LineKind,
 ) -> Result<([i32; CATEGORY_COUNT], [i32; CATEGORY_COUNT]), GenieError> {
     let mut lines_of = [0i32; CATEGORY_COUNT];
     let mut columns_of = [0i32; CATEGORY_COUNT];
@@ -187,7 +215,7 @@ fn category_sizes(
             continue;
         };
         valid += 1;
-        let (lines, columns) = sizes(cat.count, !column);
+        let (lines, columns) = sizes(cat.count, kind);
         *lines_of.checked_mut(k)? = lines;
         *columns_of.checked_mut(k)? = columns;
         let width = columns as f32 * cat.spacing.get();
@@ -234,12 +262,11 @@ pub(super) fn fit_to_widest(cat: &Category, widest: f32) -> (i32, i32) {
     (lines, columns)
 }
 
-/// How the lines are laid out: staggered or flanked, the formation's depth, the slots' time and
-/// the groups' tuning values.
+/// How the lines are laid out: the kind of line, the formation's depth, the slots' time and the
+/// groups' tuning values.
 #[derive(Clone, Copy)]
 struct Style<'a> {
-    staggered: bool,
-    flanked: bool,
+    kind: LineKind,
     depth: i32,
     world_time: WorldTime,
     group_tuning: &'a GroupTuning,
@@ -308,7 +335,7 @@ fn lay_category(
         used: [0u32; 50],
     };
     let mut single: BVector = scale(cat.spacing.get(), BVector::new(0.0, 0.0, -1.0));
-    if style.staggered {
+    if style.kind == LineKind::Staggered {
         single = BVector::new(
             single.x() * group_tuning.spacing_factor,
             single.height() * group_tuning.spacing_factor,
@@ -326,7 +353,7 @@ fn lay_category(
         if 1 < lines && in_category == lines - 1 {
             actual = cat.count - (lines - 1) * columns;
         }
-        let total = line_start(single, actual, at.line_index, style.staggered, group_tuning);
+        let total = line_start(single, actual, at.line_index, style.kind, group_tuning);
         let line = formation.lines.checked_mut(at.line_index as usize)?;
         clear_line(line);
         let _ = reset_line(line, actual, at.line_index);
@@ -342,7 +369,7 @@ fn lay_category(
         )?;
         at.used_slots += actual.max(0) as usize;
         at.line_index += 1;
-        at.last_spacing = if style.staggered {
+        at.last_spacing = if style.kind == LineKind::Staggered {
             cat.spacing + cat.spacing
         } else {
             cat.spacing
@@ -359,12 +386,12 @@ fn line_start(
     single: BVector,
     actual: i32,
     line_index: i32,
-    staggered: bool,
+    kind: LineKind,
     group_tuning: &GroupTuning,
 ) -> BVector {
     let half = scale((actual / 2) as f32, single);
     let total = add(half, BVector::ZERO);
-    if staggered {
+    if kind == LineKind::Staggered {
         let quarter = BVector::new(
             single.x() / group_tuning.stagger_share,
             single.height() / group_tuning.stagger_share,
@@ -442,7 +469,7 @@ fn lay_line(
 /// line's share of the depth; any other keeps `total`.
 fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
     let mut offset = total;
-    if style.flanked {
+    if style.kind == LineKind::Flanked {
         let flank = style.group_tuning.flank_spacing - line_index as f32 / style.depth as f32;
         if 0.0 <= offset.y() {
             offset = offset.with_y(offset.y() + flank);
@@ -454,9 +481,8 @@ fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
 }
 
 impl World {
-    /// createColumnLine (`FUN_141012280`) of `formation` for group `g`: a column (`column`, the
-    /// column ratio 2 and line ratio -1) or a line (ratios -1 and 2), staggered or flanked;
-    /// false without members. Its slots ([`column_line_slots`]), then the transform and the
+    /// createColumnLine (`FUN_141012280`) of `formation` for group `g`: a column or a line of
+    /// `kind`; false without members. Its slots ([`column_line_slots`]), then the transform and the
     /// units ([`World::lay_units`]) with the column-to-line flag (0x141013d20..0x141013d3a): a
     /// line (2, 7 or 8) whose group's previous formation is a column (1). The game reads that
     /// type through the
@@ -470,15 +496,13 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-        column: bool,
-        staggered_flanked: (bool, bool),
+        kind: LineKind,
     ) -> Result<bool, GenieError> {
         let g = self.groups.held(group)?;
         if !column_line_slots(
             formation,
             g,
-            column,
-            staggered_flanked,
+            kind,
             self.world_time,
             &self.model.tuning.group,
         )? {
@@ -491,7 +515,12 @@ impl World {
             .previous_formation
             .as_ref()
             .is_some_and(|p| p.kind == FormationKind::Column);
-        self.lay_units(formation, group, after_column)?;
+        let order = if after_column {
+            SlotOrder::PreviousColumn
+        } else {
+            SlotOrder::Closest
+        };
+        self.lay_units(formation, group, order)?;
         Ok(true)
     }
 }

@@ -33,6 +33,7 @@ use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::ownership::artifact::Artifact;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
+use genie_core::players::PlayerId;
 use genie_core::players::attribute::AttributeId;
 use genie_core::production::EntrySerial;
 use genie_core::production::Production;
@@ -454,7 +455,7 @@ pub(super) fn default_task(
                 .and_then(MastersMaster::default_task)
                 .and_then(|t| t.sprites.moving);
             Ok(Some(DefaultStart::Artifact(Box::new(Artifact::new(
-                s.owner == 0,
+                PlayerId::new(s.owner),
                 moving,
             )))))
         }

@@ -16,6 +16,7 @@ use crate::objects::masters::TaskFlags;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
+use crate::vision::visibility::BuildingSight;
 use crate::world::Seconds;
 use crate::world::Unread;
 use crate::world::World;
@@ -52,14 +53,14 @@ pub struct WorkTarget {
 /// [`WORKING_ACTIONS`] in state 7 with a target the world holds that has hit points above 0 or
 /// whose master stores some (`COMISS`/`JA`, `JBE`: a NaN does not) and whose master's class is
 /// the task's `object_group`, and one whose master is of type 80 does while it is built
-/// (`+0xca1` 1).
+/// (`+0xca1` 1: its sight, `building`, is [`BuildingSight::Built`]).
 #[must_use]
 pub fn generates(
     task: &Task,
     kind: MasterKind,
     master_kind: MasterKind,
     top: Option<TopWork>,
-    built: bool,
+    building: Option<BuildingSight>,
 ) -> bool {
     match kind {
         MasterKind::COMBAT if task.combat_level_flag.contains(TaskFlags::UNITS_ALWAYS) => {
@@ -80,7 +81,7 @@ pub fn generates(
     {
         return true;
     }
-    master_kind == MasterKind::BUILDING && built
+    master_kind == MasterKind::BUILDING && building == Some(BuildingSight::Built)
 }
 
 /// What a generation task makes in an update (`0x141207fc4`): the world's dt (`world+0x164`)
@@ -164,15 +165,14 @@ impl World {
                 None => None,
             }
         };
-        let built = master.kind == MasterKind::BUILDING
-            && self
-                .spatial
-                .sight
-                .as_ref()
-                .and_then(|v| v.seer(unit.id))
-                .and_then(|s| s.building)
-                .is_some_and(|b| b.built);
-        if !generates(task, master.kind, master.kind, top, built) {
+        // the sight of a master not of type 80 is never read (`generates` tests the type first)
+        let building = self
+            .spatial
+            .sight
+            .as_ref()
+            .and_then(|v| v.seer(unit.id))
+            .and_then(|s| s.building);
+        if !generates(task, master.kind, master.kind, top, building) {
             return Ok(());
         }
         let player = self.players.player_mut(owner)?;

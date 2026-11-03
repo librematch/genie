@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::map::Distance;
 use crate::pathing::ShortFound;
+use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::node_lists::{NewNode, UnrefusedNode};
 use crate::pathing::hull_path::walk_in::WalkIn;
 use crate::pathing::hull_path::walks::WalkOut;
@@ -383,8 +384,13 @@ impl HullPather<'_> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let mut crossing: Option<(HullIndex, Point, usize)> = None;
         let mut crossing_d = MOST;
+        let start = if vertex < 0 {
+            AtStart::Counts
+        } else {
+            AtStart::Ignored
+        };
         for (i, hull) in self.hulls.iter().enumerate() {
-            if let Some((p, edge)) = hull.intersection(vertex < 0, at, to, hull_path_tuning) {
+            if let Some((p, edge)) = hull.intersection(start, at, to, hull_path_tuning) {
                 let d = (p.y() - at.y()) * (p.y() - at.y()) + (p.x() - at.x()) * (p.x() - at.x());
                 if d < crossing_d {
                     crossing = Some((HullIndex::new(i), p, edge));

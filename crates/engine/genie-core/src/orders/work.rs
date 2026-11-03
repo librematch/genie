@@ -64,6 +64,16 @@ fn attack_on(top: Option<ActionKind>, a: &Attack, target: Option<ObjectId>) -> b
     top == Some(ATTACK) && a.target.map(AttackTargetId::id) == target
 }
 
+/// Whether the unit's task search ([`World::find_work_task`]) changes its master to the one
+/// whose task it found (1), or only finds the task (0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MasterSwap {
+    /// The unit takes the master.
+    Change,
+    /// The unit keeps its own.
+    Keep,
+}
+
 impl World {
     /// The work command's check of the unit's top Attack (`FUN_14106ff70`): one on this very
     /// target, the filter none or 9, keeps it when its slot 9 (`FUN_140a841d0`, [`Attack::keeps`])
@@ -582,11 +592,11 @@ impl World {
     /// The unit's slot 0x820 (`FUN_14106c6a0`) on `target` (its place the point): the task its
     /// master's list gives for the target with `filter` (the list's slot 0x10, [`find_task`] in
     /// mode 0); without one, a master with a task swap group (`+0x7b8` not 0) tries each of its
-    /// player's masters by id of the same class, type and group, its own too, with any filter;
-    /// the first with a task gives it, and with `change` the unit takes that master (slot 0x90,
-    /// [`World::change_master`], or [`World::transform_building`] for a building) though it be its
-    /// own. None: no task. The terrain under the point, which only a task for a terrain reads, is
-    /// not passed.
+    /// player's masters by id of the same class, type and group, its own too, with any filter; the
+    /// first with a task gives it, and with [`MasterSwap::Change`] the unit takes that master (slot
+    /// 0x90, [`World::change_master`], or [`World::transform_building`] for a building) though it
+    /// be its own. None: no task. The terrain under the point, which only a task for a terrain
+    /// reads, is not passed.
     ///
     /// [`find_task`]: crate::unit_ai::task_finder::find_task
     pub(crate) fn find_work_task(
@@ -595,7 +605,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         filter: Option<ActionKind>,
-        change: bool,
+        swap: MasterSwap,
     ) -> Result<Option<Task>, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let own = unit.master(self.master_tables(), player)?;
@@ -658,7 +668,7 @@ impl World {
         let Some((with, task)) = found else {
             return Ok(None);
         };
-        if change {
+        if swap == MasterSwap::Change {
             if self.master(player, with)?.kind == MasterKind::BUILDING {
                 self.transform_building(player, idx, with)?;
             } else {

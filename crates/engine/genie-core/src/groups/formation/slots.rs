@@ -32,6 +32,18 @@ pub(super) const ASSIGNMENT_CELLS: usize = ASSIGNMENT_SIDE * ASSIGNMENT_SIDE;
 /// ... and the taken marks 80 bytes (`DAT_143f1fb00`).
 pub(super) const ASSIGNMENT_MARKS: usize = 80;
 
+/// How a formation's slots take their units anew (`FormationTransform`'s `param_4`,
+/// createColumnLine's column-to-line flag): a line laid out after a column keeps the column's
+/// order ([`World::from_previous_column`]), any other takes the closest units
+/// ([`World::populate_slots`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotOrder {
+    /// The previous column's order.
+    PreviousColumn,
+    /// The closest units.
+    Closest,
+}
+
 impl World {
     /// `FUN_141011300` of `object` (`param_1`, as the world's table gives it,
     /// [`World::world_object`]): -1 for none (a null object), else its master's sub-formation
@@ -414,7 +426,7 @@ impl World {
     }
 
     /// createColumnLine's end (`FUN_141012280` after its layout), and the phalanx's and the
-    /// box's (`after_column` false): the transform ([`World::formation_transform`]); unless it
+    /// box's ([`SlotOrder::Closest`]): the transform ([`World::formation_transform`]); unless it
     /// took the units anew, every slot of the array loses its unit and its filled mark, and the
     /// units take their slots: after a column with slots transformed, the line keeps the
     /// column's order ([`World::from_previous_column`]), else the closest
@@ -427,14 +439,16 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-        after_column: bool,
+        order: SlotOrder,
     ) -> Result<(), GenieError> {
-        if self.formation_transform(formation, group, after_column)? {
+        if self.formation_transform(formation, group, order)? {
             return Ok(());
         }
         formation.clear_units();
         let g = self.groups.held(group)?;
-        if formation.number_transformed_slots < 1 || g.previous_formation.is_none() || !after_column
+        if formation.number_transformed_slots < 1
+            || g.previous_formation.is_none()
+            || order == SlotOrder::Closest
         {
             self.populate_slots(formation, g)
         } else {

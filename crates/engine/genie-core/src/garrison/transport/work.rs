@@ -2,6 +2,7 @@
 //! in the game's data) makes or retakes it.
 
 use crate::GenieError;
+use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{Changed, MapShore, Ship, TRANSPORT, TransportAction};
 use crate::map::Position;
 use crate::math::rng::Stream;
@@ -79,7 +80,11 @@ impl World {
         if !on_task || self.trade_at_own_market((p, i), target)? {
             return Ok(false);
         }
-        let by_self = target == Some(unit.id);
+        let named = if target == Some(unit.id) {
+            TransportTarget::Ship
+        } else {
+            TransportTarget::Other
+        };
         let mut t = self
             .parts
             .actions_of(unit.id)
@@ -94,7 +99,7 @@ impl World {
         let changed = self.with_shore(p, i, t.task, |ship, shore| {
             t.work(
                 point,
-                by_self,
+                named,
                 ship,
                 shore,
                 &transport_tuning,

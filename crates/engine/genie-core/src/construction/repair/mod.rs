@@ -38,8 +38,8 @@ pub(crate) mod unit;
 
 pub use self::action::work_amount;
 pub use self::payment::{
-    BUILDING_REPAIR_COST, Payer, RepairOutcome, Repaired, UNIT_REPAIR_COST, repair_building,
-    repair_unit,
+    BUILDING_REPAIR_COST, Payer, RepairFrom, RepairOutcome, Repaired, UNIT_REPAIR_COST,
+    repair_building, repair_unit,
 };
 pub use self::repair_state::RepairState;
 pub(crate) use self::unit::repair_target;

@@ -22,6 +22,7 @@ use crate::objects::layers::Motion;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterTables;
 use crate::objects::unit::Unit;
+use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::TownBell;
 use crate::production::Production;
 use crate::unit_ai::UnitAi;
@@ -461,7 +462,7 @@ impl Parts {
     }
 
     /// Object `id`'s town-bell flag (`+0x9dc`) becomes `flag` ([`Parts::set_town_bell`]).
-    pub(crate) fn set_town_bell_flag(&mut self, id: ObjectId, flag: bool) {
+    pub(crate) fn set_town_bell_flag(&mut self, id: ObjectId, flag: BellShelter) {
         let bell = TownBell {
             flag,
             ..self.town_bell_of(id)
@@ -945,9 +946,9 @@ mod tests {
         );
         t.load_parts(id, ObjectParts::default()).unwrap();
         assert!(t.parts.town_bell.is_empty());
-        t.parts.set_town_bell_flag(id, true);
-        assert!(t.parts.town_bell_of(id).flag && t.parts.town_bell.contains(id));
-        t.parts.set_town_bell_flag(id, false);
+        t.parts.set_town_bell_flag(id, BellShelter::Sheltered);
+        assert!(t.parts.town_bell_of(id).flag.is_sheltered() && t.parts.town_bell.contains(id));
+        t.parts.set_town_bell_flag(id, BellShelter::Free);
         assert!(t.parts.town_bell.is_empty());
         let mut bell = t.parts.town_bell_of(id);
         bell.record(BackToWork {
@@ -1098,7 +1099,7 @@ mod tests {
         b.parts.gather_point = Some(gather_point(2.0));
         b.parts.production = Some(Production::default());
         b.parts.own_master = Some(Master::default());
-        b.parts.town_bell.flag = true;
+        b.parts.town_bell.flag = BellShelter::Sheltered;
         b.parts.unit_ai = Some(UnitAi::default());
         b.parts.missile = Some(Missile {
             max_range: Distance::ZERO,

@@ -79,14 +79,33 @@ pub struct VisibleMap {
 }
 
 /// A building's sight state (`TRIBE_Building_Object`: its slots 0x1d0 `FUN_1411d0190` and 0x1d8
-/// `FUN_1411e6f60`).
+/// `FUN_1411e6f60`), by its construction's stage: `built` (`+0xca1`) first, then whether its
+/// `build_pts` (`+0xc50`) are 0. The slots read the build points only of a building not built.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct BuildingSight {
-    /// `built` (`+0xca1`): the construction completed, and the sight is the line of sight.
-    pub built: bool,
-    /// `build_pts` (`+0xc50`) is not 0: a foundation's construction started, and its sight is its
+pub enum BuildingSight {
+    /// A foundation whose construction has not started (`built` 0, no build points): it sees
+    /// nothing.
+    #[default]
+    Unstarted,
+    /// A foundation whose construction started (`built` 0, build points not 0): it sees its
     /// footprint.
-    pub started: bool,
+    Started,
+    /// The construction completed (`built` 1): it sees its line of sight.
+    Built,
+}
+
+impl BuildingSight {
+    /// The stage of the saved `built` byte and build points.
+    #[must_use]
+    pub fn of_saved(built: u8, build_pts: f32) -> Self {
+        if built != 0 {
+            Self::Built
+        } else if build_pts != 0.0 {
+            Self::Started
+        } else {
+            Self::Unstarted
+        }
+    }
 }
 
 /// What an object's sight reads of it.

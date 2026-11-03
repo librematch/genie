@@ -5,6 +5,7 @@ use crate::map::Point;
 use crate::map::Restriction;
 use crate::map::TerrainId;
 use crate::map::Tile;
+use crate::pathing::tile_path::goal_marks::Mark;
 use crate::testing::tuning;
 use std::iter::from_fn;
 
@@ -462,7 +463,7 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
     );
     assert!(p.level(GridLevel::new(0))[0].kind.contains(CellKind::NODE));
     // the corners swapped and the low y off the map
-    p.close_rect(PlanRect::new(5, 3, 1, -2), true);
+    p.close_rect(PlanRect::new(5, 3, 1, -2), Mark::Set);
     assert_eq!(p.region, PlanRect::new(1, 0, 5, 3));
     let closed = |p: &Planner, l: u8, x: usize, y: usize| {
         let l = GridLevel::new(l);
@@ -490,11 +491,11 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
     }
     // the closed bit is added once
     let once = p.clone();
-    p.close_rect(PlanRect::new(1, 0, 5, 3), true);
+    p.close_rect(PlanRect::new(1, 0, 5, 3), Mark::Set);
     assert_eq!(p, once);
     assert_eq!(p.level(GridLevel::new(0))[1].edges, CellEdges::CLOSED);
     // the high corner past the map's size holds at its last tile: everything reopens
-    p.close_rect(PlanRect::new(0, 0, 20, 9), false);
+    p.close_rect(PlanRect::new(0, 0, 20, 9), Mark::Clear);
     assert_eq!(p.region, PlanRect::new(0, 0, 15, 7));
     p.region = open.region;
     assert_eq!(p, open);

@@ -11,6 +11,16 @@ use crate::pathing::hull_path::{
 use crate::world::layer::generated::HullPathTuning;
 use crate::world::slots::CheckedIndex;
 
+/// Whether a hull's meeting at the walk's start counts (`getHullIntersection`'s flag): a walk
+/// from a hull's vertex leaves it out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum AtStart {
+    /// It counts.
+    Counts,
+    /// It does not.
+    Ignored,
+}
+
 impl Hull {
     /// `MConvexHull::InsideHull` (`FUN_140f87760`): whether `p`, moved a little toward the bounding
     /// box's middle, lies inside the hull (the crossings of a ray to the right).
@@ -36,10 +46,10 @@ impl Hull {
 
     /// `MConvexHull::getHullIntersection` (`FUN_140f879e0`): the nearest point where the walk
     /// `a` -> `b` meets the hull's sides, and the side (from point `k - 1` to point `k`, the last
-    /// side 0); unless `at_start`, a meeting at `a` itself does not count.
+    /// side 0); a meeting at `a` itself counts only with [`AtStart::Counts`].
     pub(super) fn intersection(
         &self,
-        at_start: bool,
+        start: AtStart,
         a: Point,
         b: Point,
         hull_path_tuning: &HullPathTuning,
@@ -68,7 +78,10 @@ impl Hull {
                 continue;
             }
             let p = Point::new(dx * t + a.x(), dy * t + a.y());
-            if !at_start && (p.x() - a.x()).abs() < EPSILON && (p.y() - a.y()).abs() < EPSILON {
+            if start == AtStart::Ignored
+                && (p.x() - a.x()).abs() < EPSILON
+                && (p.y() - a.y()).abs() < EPSILON
+            {
                 continue;
             }
             let d = (p.y() - a.y()) * (p.y() - a.y()) + (p.x() - a.x()) * (p.x() - a.x());
@@ -122,9 +135,10 @@ impl Hull {
             (max, Point::new(x0, y1)),
             (min, Point::new(x0, y1)),
         ];
-        let meets = sides
-            .iter()
-            .any(|&(a, b)| self.intersection(true, a, b, hull_path_tuning).is_some());
+        let meets = sides.iter().any(|&(a, b)| {
+            self.intersection(AtStart::Counts, a, b, hull_path_tuning)
+                .is_some()
+        });
         (u8::from(meets), outside)
     }
 

@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::abilities::Look;
 use crate::garrison::transport::TransportMode;
 use crate::garrison::transport::TransportState;
+use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{
     Changed, MapShore, NO_TRANSPORT, NONE, Ship, Shore, TransportAction, TransportReads, Updated,
 };
@@ -194,15 +195,16 @@ impl TransportAction {
         )
     }
 
-    /// Slot 9 (`FUN_140aa4830`), the work order on `point` (x, y and the height), `by_self` when
-    /// the object it names is the unit itself (the unload command's); `+0x34` becomes 1. Near
-    /// enough to unload there — a tile of the zone of the point's tile (`CVTTSS2SI`,
-    /// [`Shore::zone`]) within `TransportTuning::near` of the unit ([`Shore::near`], exactly 1), and the point
-    /// within `TransportTuning::unload_reach_squared` of the unit's footprint on the ground (each axis' gap past
-    /// the master's radius, `MAXSS` with 0: a NaN gap stays; `COMISS`/`JC`: a NaN is not
-    /// within) — it takes the point and unloads (`set_state(6)`). Else a point below 0 on either
-    /// axis (`COMISS`/`JC`: a NaN too) changes nothing; any other becomes the point, and the
-    /// unit sails there to unload (`set_state(4)`) from the unit itself, else just sails (11).
+    /// Slot 9 (`FUN_140aa4830`), the work order on `point` (x, y and the height) naming `target`
+    /// ([`TransportTarget::Ship`] the unit itself, as the unload command's); `+0x34` becomes 1.
+    /// Near enough to unload there — a tile of the zone of the point's tile (`CVTTSS2SI`,
+    /// [`Shore::zone`]) within `TransportTuning::near` of the unit ([`Shore::near`], exactly 1),
+    /// and the point within `TransportTuning::unload_reach_squared` of the unit's footprint on the
+    /// ground (each axis' gap past the master's radius, `MAXSS` with 0: a NaN gap stays;
+    /// `COMISS`/`JC`: a NaN is not within) — it takes the point and unloads (`set_state(6)`). Else
+    /// a point below 0 on either axis (`COMISS`/`JC`: a NaN too) changes nothing; any other becomes
+    /// the point, and the unit sails there to unload (`set_state(4)`) from the unit itself, else
+    /// just sails (11).
     ///
     /// # Errors
     ///
@@ -210,7 +212,7 @@ impl TransportAction {
     pub fn work(
         &mut self,
         point: Position,
-        by_self: bool,
+        target: TransportTarget,
         ship: &Ship<'_>,
         shore: &mut impl Shore,
         transport_tuning: &TransportTuning,
@@ -229,7 +231,7 @@ impl TransportAction {
             TransportState::Unload
         } else if below_or_unordered(x, 0.0) || below_or_unordered(y, 0.0) {
             return Ok(Changed::default());
-        } else if by_self {
+        } else if target == TransportTarget::Ship {
             TransportState::SailToUnload { move_to: None }
         } else {
             TransportState::Sail { move_to: None }

@@ -18,6 +18,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
 use crate::objects::{ObjectId, ObjectKey};
+use crate::orders::MasterSwap;
 use crate::orders::gather::HuntOrder;
 use crate::orders::{HUNT_TARGET_GONE, NO_HUNT_TASK};
 use crate::players::PlayerId;
@@ -57,7 +58,7 @@ impl World {
         let (_, t) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
         let point = t.position();
         let task = self
-            .find_work_task(player, idx, target, None, true)?
+            .find_work_task(player, idx, target, None, MasterSwap::Change)?
             .ok_or(NO_HUNT_TASK)?;
         self.start_hunt(HuntOrder {
             player,
@@ -100,7 +101,7 @@ impl World {
             ));
         }
         let task = self
-            .find_work_task(player, idx, target, None, true)?
+            .find_work_task(player, idx, target, None, MasterSwap::Change)?
             .ok_or(GenieError::unsupported("a gather command without a task"))?;
         let unit = &self.players.live(player, idx)?;
         if self.parts.actions_of(unit.id).top_action_kind() == Some(GATHER)

@@ -90,14 +90,14 @@ fn task_with_its_kind_flag_bit_generates_always() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
-        false
+        None
     ));
     assert!(!generates(
         &t,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
-        false
+        None
     ));
     t.combat_level_flag = TaskFlags::BUILDINGS_ALWAYS;
     assert!(generates(
@@ -105,14 +105,14 @@ fn task_with_its_kind_flag_bit_generates_always() {
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
-        false
+        None
     ));
     assert!(!generates(
         &t,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
-        false
+        None
     ));
 }
 
@@ -124,14 +124,14 @@ fn building_generates_once_built() {
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
-        false
+        None
     ));
     assert!(generates(
         &t,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
-        true
+        Some(BuildingSight::Built)
     ));
     // a combat unit's master is not a building's
     assert!(!generates(
@@ -139,7 +139,7 @@ fn building_generates_once_built() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
-        true
+        Some(BuildingSight::Built)
     ));
 }
 
@@ -165,7 +165,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
             MasterKind::COMBAT,
             MasterKind::COMBAT,
             top(kind, ActionState::new(7), Some(target)),
-            false
+            None
         ));
     }
     assert!(!generates(
@@ -173,28 +173,28 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(MOVE_TO, ActionState::new(7), Some(target)),
-        false
+        None
     ));
     assert!(!generates(
         &t,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(6), Some(target)),
-        false
+        None
     ));
     assert!(!generates(
         &t,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), None),
-        false
+        None
     ));
     assert!(!generates(
         &t,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
-        false
+        None
     ));
     // another class
     let other = WorkTarget {
@@ -206,7 +206,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(other)),
-        false
+        None
     ));
     // a dead target counts while its master stores some, never with a NaN
     let dead = WorkTarget {
@@ -219,7 +219,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(dead)),
-        false
+        None
     ));
     let empty = WorkTarget {
         hp: HitPoints::ZERO,
@@ -231,7 +231,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(empty)),
-        false
+        None
     ));
     let nan = WorkTarget {
         hp: HitPoints::new(f32::NAN),
@@ -243,7 +243,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(nan)),
-        false
+        None
     ));
 }
 
@@ -772,8 +772,8 @@ fn rewards(t: &mut World, p: PlayerId, id: i32, leaves: bool) -> Vec<Reward> {
     t.abilities((object_id(id), p, i), p, leaves).unwrap()
 }
 
-/// The players' sight with `id` a building of player `p` that is `built`.
-fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
+/// The players' sight with `id` a building of player `p` whose sight is `sight`.
+fn building_sight(t: &mut World, p: PlayerId, id: i32, sight: BuildingSight) {
     let map = || VisibleMap {
         counts: vec![0; 400],
         explored: TileCount::ZERO,
@@ -794,10 +794,7 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, built: bool) {
             los: Distance::new(6.0),
             state: ObjectState::Alive,
             explored: true,
-            building: Some(BuildingSight {
-                built,
-                started: true,
-            }),
+            building: Some(sight),
             umv: 0,
             capture: CaptureKind::None,
             kind: MasterKind::BUILDING,
@@ -825,7 +822,7 @@ fn built_feitoria_trickles_food_through_its_player_store() {
         HitPoints::new(2000.0),
         Point::new(5.5, 5.5),
     );
-    building_sight(&mut t, PlayerId::new(1), 50, true);
+    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Built);
     t.players[1].attributes[205] = Amount::new(1.0);
     run(&mut t, PlayerId::new(1), 50);
     let made = 0.5_f32 * 1.6 * 1.0;
@@ -837,11 +834,11 @@ fn built_feitoria_trickles_food_through_its_player_store() {
     assert_eq!(t.players[1].attributes[166], Amount::new(given));
     assert_eq!(t.players[1].generated[0], Amount::ZERO);
     // unbuilt, nothing
-    building_sight(&mut t, PlayerId::new(1), 50, false);
+    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Started);
     run(&mut t, PlayerId::new(1), 50);
     assert_eq!(t.players[1].generated[0], Amount::ZERO);
     // the player's attribute 205 at 0: nothing joins the store
-    building_sight(&mut t, PlayerId::new(1), 50, true);
+    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Built);
     t.players[1].attributes[205] = Amount::ZERO;
     run(&mut t, PlayerId::new(1), 50);
     assert_eq!(t.players[1].generated[0], Amount::ZERO);

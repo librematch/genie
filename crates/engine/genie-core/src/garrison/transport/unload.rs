@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::garrison::SIEGE_UNLOAD;
 use crate::garrison::transport::TransportState;
+use crate::garrison::transport::TransportTarget;
 use crate::garrison::transport::{
     Around, Changed, DropDraws, MapShore, NONE, Ship, Shore, TRANSPORT, TransportAction, in_zone,
     retry_point,
@@ -110,7 +111,7 @@ impl World {
         {
             vec![t.work(
                 ship.position,
-                true,
+                TransportTarget::Ship,
                 &ship,
                 &mut shore,
                 &self.model.tuning.transport,
@@ -127,7 +128,7 @@ impl World {
             )?;
             let worked = t.work(
                 to,
-                true,
+                TransportTarget::Ship,
                 &ship,
                 &mut shore,
                 &self.model.tuning.transport,

@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::TransformKind;
+use crate::groups::formation::SlotOrder;
 use crate::groups::formation::{RIGHT_ANGLE, find_point_from_front, transform_slot};
 use crate::groups::motion::YawLimit;
 use crate::groups::{Formation, Slot};
@@ -36,23 +37,23 @@ pub(super) const PASS_CELLS: i32 = 100;
 pub(super) const GRID_BYTES: usize = 10000;
 
 impl World {
-    /// `FormationTransform` (`FUN_14103a1f0`) of `formation` for group `g`, `column_to_line`
-    /// (`param_4`) a line laid out after a column: nothing without slots in use. The group's yaw
-    /// from the canon forward (x, or -x about faced) and the formation's last one
-    /// (`calculateYawAngle`) give the rotation about the group's up; the formation takes the
-    /// group's forward as its orientation, every slot's transform mark clears and none counts as
-    /// transformed. The line transform (type 0) takes each line's point behind the group (its
-    /// distance back, or its index times the group's spacing): the stored positions' point there
-    /// ([`find_point_from_front`]), else the group's place less its forward times the distance;
-    /// each of the line's slots is placed there ([`transform_slot`]) and the line counts as
-    /// transformed (below 256 places), while fewer than the array's slots are. The group (1) and
+    /// `FormationTransform` (`FUN_14103a1f0`) of `formation` for group `g`, the slots' `order`
+    /// (`param_4`, [`SlotOrder::PreviousColumn`] for a line laid out after a column): nothing
+    /// without slots in use. The group's yaw from the canon forward (x, or -x about faced) and the
+    /// formation's last one (`calculateYawAngle`) give the rotation about the group's up; the
+    /// formation takes the group's forward as its orientation, every slot's transform mark clears
+    /// and none counts as transformed. The line transform (type 0) takes each line's point behind
+    /// the group (its distance back, or its index times the group's spacing): the stored positions'
+    /// point there ([`find_point_from_front`]), else the group's place less its forward times the
+    /// distance; each of the line's slots is placed there ([`transform_slot`]) and the line counts
+    /// as transformed (below 256 places), while fewer than the array's slots are. The group (1) and
     /// horde (3) transforms place every slot of the array from the group's place, the target
     /// transform (2) from the target's original place, all counting. A turn of more than
-    /// [`RIGHT_ANGLE`] with fewer than two sub-formations takes the units anew: every slot of
-    /// the array loses its unit and its filled mark and the slots take their units (from the
-    /// previous column, [`World::from_previous_column`], for `column_to_line`, else the closest,
-    /// [`World::populate_slots`]). Then the slots' passability ([`World::passable_slots`]).
-    /// Returns whether the slots took their units anew (`*param_3`).
+    /// [`RIGHT_ANGLE`] with fewer than two sub-formations takes the units anew: every slot of the
+    /// array loses its unit and its filled mark and the slots take their units (from the previous
+    /// column, [`World::from_previous_column`], in that order, else the closest,
+    /// [`World::populate_slots`]). Then the slots' passability ([`World::passable_slots`]). Returns
+    /// whether the slots took their units anew (`*param_3`).
     ///
     /// # Errors
     ///
@@ -61,7 +62,7 @@ impl World {
         &mut self,
         formation: &mut Formation,
         group: GroupId,
-        column_to_line: bool,
+        order: SlotOrder,
     ) -> Result<bool, GenieError> {
         if formation.slots.is_empty() {
             return Ok(false);
@@ -166,7 +167,7 @@ impl World {
         let mut took = false;
         if flips {
             formation.clear_units();
-            if column_to_line {
+            if order == SlotOrder::PreviousColumn {
                 self.from_previous_column(formation, g)?;
             } else {
                 self.populate_slots(formation, g)?;

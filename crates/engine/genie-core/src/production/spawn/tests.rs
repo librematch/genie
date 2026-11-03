@@ -35,6 +35,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::orders::town_bell::BellShelter;
 use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerKind;
@@ -900,7 +901,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     let walked = |notified| {
         let mut t = forage_world();
         let u = &mut t.players[1].objects[ListIndex::new(0)];
-        t.parts.set_town_bell_flag(u.id, true);
+        t.parts.set_town_bell_flag(u.id, BellShelter::Sheltered);
         t.parts
             .unit_ai
             .get_mut(u.id)
@@ -919,7 +920,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     };
     let u = walked(true);
     assert_eq!(u.parts.mover().unwrap().waiting, 1);
-    assert!(!u.parts.town_bell.flag);
+    assert!(!u.parts.town_bell.flag.is_sheltered());
     let ai = u.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),

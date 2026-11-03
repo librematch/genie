@@ -130,23 +130,24 @@ impl Spatial {
     }
 
     /// The objects whose centre is on `site`'s footprint, edges included, and that the game counts
-    /// as occupying it (`FUN_14123bb20`): objects other than the site below state 3, or of a
-    /// type other than a building's below state 7 (their state and type `looks`'); for a site
-    /// whose master does not obstruct (`FUN_1411205c0`: obstruction type 0 or 12, `obstructs`
-    /// false) only those that do not move ([`Placed::moves`], the master's slot 0xe8); a desolid building foundation
-    /// (`+0xc60`) only of a player that and the site's count each other allied
-    /// (`FUN_141663d90` with the ally flag, both ways); not those the site may be built over
-    /// (`can_be_built_on` 1); with all three radii. An object `looks` does not hold (the owner's
-    /// sleeping objects, which the unit's view does not hold: of types below 30, alive, in
-    /// state 2 or 6) passes the state and foundation tests.
+    /// as occupying it (`FUN_14123bb20`): objects other than the site below state 3, or of a type
+    /// other than a building's below state 7 (their state and type `looks`'); for a site whose
+    /// master does not obstruct (`FUN_1411205c0`: obstruction type 0 or 12,
+    /// [`crate::objects::masters::ObstructionKind::recorded`] false) only those that do not move
+    /// ([`Placed::moves`], the master's slot 0xe8); a desolid building foundation (`+0xc60`) only
+    /// of a player that and the site's count each other allied (`FUN_141663d90` with the ally flag,
+    /// both ways); not those the site may be built over (`can_be_built_on` 1); with all three
+    /// radii. An object `looks` does not hold (the owner's sleeping objects, which the unit's view
+    /// does not hold: of types below 30, alive, in state 2 or 6) passes the state and foundation
+    /// tests.
     pub fn footprint_occupants(
         &self,
         site_id: FoundationId,
         site: &Placed,
-        obstructs: bool,
         looks: &BTreeMap<ObjectId, ClearLook>,
     ) -> Result<Vec<ObjectId>, GenieError> {
         use crate::objects::masters::MasterKind;
+        let obstructs = site.obstruction_kind.recorded();
         let (sx, sy) = (site.position.x(), site.position.y());
         let (rx, ry) = (site.radius.x(), site.radius.y());
         self.check_known(Rect::new(sx - rx, sy - ry, sx + rx, sy + ry))?;

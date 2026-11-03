@@ -419,8 +419,8 @@ fn artifacts_of_every_player_start_updating_in_the_second_tick() {
         id: object_id(id),
         ..Unit::default()
     };
-    let layer = |gaia| Action {
-        list: ActionList::default().with_artifact(Some(Artifact::new(gaia, None))),
+    let layer = |owner| Action {
+        list: ActionList::default().with_artifact(Some(Artifact::new(owner, None))),
         ..Default::default()
     };
     let players = vec![
@@ -440,7 +440,10 @@ fn artifacts_of_every_player_start_updating_in_the_second_tick() {
         vec![Millis::ZERO, Millis::ZERO],
         players,
     )
-    .with_actions([(object_id(1), layer(true)), (object_id(2), layer(false))]);
+    .with_actions([
+        (object_id(1), layer(PlayerId::GAIA)),
+        (object_id(2), layer(PlayerId::new(1))),
+    ]);
     let state = |t: &World, p: usize| {
         t.parts
             .actions_of(t.players[p].objects[ListIndex::new(0)].id)
@@ -7235,7 +7238,7 @@ fn livestock_enter_world() -> World {
         .of_mut(v.id)
         .unwrap()
         .list
-        .set_artifact(Some(Artifact::new(false, None)));
+        .set_artifact(Some(Artifact::new(PlayerId::new(1), None)));
     t
 }
 
@@ -8585,7 +8588,7 @@ fn livestock_without_actions_starts_its_artifact_again() {
         .artifact()
         .copied()
         .expect("the Artifact again");
-    assert_eq!(a, Artifact::new(false, None));
+    assert_eq!(a, Artifact::new(PlayerId::new(1), None));
     // its first update checks for a new owner, finds none and waits a second
     t.tick(Millis::new(50));
     let a = t
@@ -8759,7 +8762,7 @@ fn an_artifact_in_state_100_hands_its_sheep_to_gaia() {
         Action {
             list: ActionList::default().with_artifact(Some(Artifact {
                 state: ArtifactState::ToGaia,
-                ..Artifact::new(false, None)
+                ..Artifact::new(PlayerId::new(1), None)
             })),
             ..Default::default()
         },
@@ -11913,7 +11916,7 @@ fn clearing_the_actions_tears_the_artifact_fly_enter_and_build_down() {
                     ..MoveToAction::sub_in(MoveTo::Moving)
                 },
             }),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         }));
     t.clear_actions(PlayerId::new(1), ListIndex::new(0))
         .unwrap();
@@ -13197,7 +13200,7 @@ fn an_artifact_move_to_an_object_lets_the_old_one_go_and_takes_the_new() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_artifact(Some(Artifact::new(false, None)));
+        .set_artifact(Some(Artifact::new(PlayerId::new(1), None)));
     t.artifact_take_object(PlayerId::new(1), ListIndex::new(0), object_id(9149))
         .unwrap();
     assert_eq!(
@@ -13650,7 +13653,7 @@ fn gaia_sheep_player_stands_by_goes_to_it() {
     .with_actions([(
         object_id(9520),
         Action {
-            list: ActionList::default().with_artifact(Some(Artifact::new(true, None))),
+            list: ActionList::default().with_artifact(Some(Artifact::new(PlayerId::GAIA, None))),
             ..Default::default()
         },
     )]);

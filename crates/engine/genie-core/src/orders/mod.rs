@@ -67,6 +67,7 @@ mod work;
 use self::actions::{SwitchWorld, switch_master};
 pub use self::dispatch::Dispatch;
 use self::points::{centroid, follow_axis, follow_spread, grid_point, offset_point};
+pub(crate) use self::work::MasterSwap;
 use crate::combat::AttackPowerup;
 use crate::gathering::DropSiteId;
 #[cfg(test)]
@@ -427,17 +428,27 @@ impl World {
     }
 }
 
+/// What the readiness pass of a unit AI's queue ([`readiness`]) does with an order already
+/// ready: it leaves the queue (1: after MOVE's and INTERACT's order that is neither queued nor
+/// direct), or it stays (0: BUILD's and `BUILD_WALL`'s).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ReadyOrders {
+    /// It leaves the queue.
+    Drop,
+    /// It stays.
+    Keep,
+}
+
 /// `FUN_140c42b60`, the readiness pass of a unit AI's queue: from the last queued order to the
-/// first, one not ready becomes ready, and with `drop_ready` one already ready leaves the queue
-/// (the orders after it move up). With `drop_ready` (1: after MOVE's and INTERACT's order that
-/// is neither queued nor direct) the pass ends in the unit's stop (its slot 0x148, a tail jump at
-/// 0x140c42cd4), which the caller runs ([`World::object_stop`]); with 0 (BUILD's and
-/// `BUILD_WALL`'s) every order is ready after it.
-pub(crate) fn readiness(orders: &mut Vec<QueuedOrder>, drop_ready: bool) {
+/// first, one not ready becomes ready, and one already ready leaves the queue with
+/// [`ReadyOrders::Drop`] (the orders after it move up). Then the pass ends in the unit's stop
+/// (its slot 0x148, a tail jump at 0x140c42cd4), which the caller runs
+/// ([`World::object_stop`]); with [`ReadyOrders::Keep`] every order is ready after it.
+pub(crate) fn readiness(orders: &mut Vec<QueuedOrder>, ready: ReadyOrders) {
     // each order is judged alone, so the walk's direction does not matter
     orders.retain_mut(|order| {
         if order.ready {
-            !drop_ready
+            ready == ReadyOrders::Keep
         } else {
             order.ready = true;
             true

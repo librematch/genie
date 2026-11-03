@@ -21,6 +21,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
 use crate::orders::Dispatch;
+use crate::orders::MasterSwap;
 use crate::orders::object_gone;
 use crate::orders::{NO_POINT, Work, nearest_table_site};
 use crate::players::Amount;
@@ -233,7 +234,7 @@ impl World {
             match self.table_drop_site(p, at, held, class)? {
                 None => DropSearch::Nothing,
                 Some(id) => {
-                    let found = self.find_work_task(p, idx, id.id(), None, false)?;
+                    let found = self.find_work_task(p, idx, id.id(), None, MasterSwap::Keep)?;
                     let range = found.map_or(task_range, |t| t.work_range);
                     let sprite = found.and_then(|t| t.sprites.carrying);
                     DropSearch::Site { id, range, sprite }

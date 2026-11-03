@@ -16,6 +16,7 @@ use crate::vision::SightLayer;
 use crate::vision::SightShape;
 use crate::vision::SightTiles;
 use crate::vision::registry::UnitUpdate;
+use crate::world::GameMode;
 
 fn world(players: PlayerId) -> Visibility {
     let n = 120 * 120;
@@ -83,7 +84,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b0111),
             PlayerId::new(0),
-            true,
+            GameMode::RandomMap,
             &humans,
             &none
         ),
@@ -93,7 +94,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b0110),
             PlayerId::new(1),
-            true,
+            GameMode::RandomMap,
             &humans,
             &none
         ),
@@ -103,7 +104,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b0001),
             PlayerId::new(1),
-            true,
+            GameMode::RandomMap,
             &humans,
             &none
         ),
@@ -113,7 +114,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(1 << 33 | 0b10),
             PlayerId::new(1),
-            true,
+            GameMode::RandomMap,
             &humans,
             &none
         ),
@@ -125,7 +126,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b1110),
             PlayerId::new(0),
-            false,
+            GameMode::Scenario,
             &ai,
             &allows
         ),
@@ -135,7 +136,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b1010),
             PlayerId::new(0),
-            false,
+            GameMode::Scenario,
             &ai,
             &allows
         ),
@@ -145,7 +146,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b0010),
             PlayerId::new(0),
-            false,
+            GameMode::Scenario,
             &ai,
             &allows
         ),
@@ -155,7 +156,7 @@ fn the_first_other_player_that_sees_the_object_takes_it_over() {
         sight_taker(
             VisionBits::from_bits_retain(0b0010),
             PlayerId::new(0),
-            true,
+            GameMode::RandomMap,
             &ai,
             &allows
         ),
@@ -797,12 +798,7 @@ fn building_sees_its_footprint_while_built_then_its_circle_from_tile_corner() {
         .unwrap();
     let seen = |v: &Visibility| (0..120 * 120).filter(|&i| 0 < v.maps[2].counts[i]).count();
     assert_eq!(seen(&v), 4);
-    v.seer_mut(object_id(9))
-        .unwrap()
-        .building
-        .as_mut()
-        .unwrap()
-        .built = true;
+    *v.seer_mut(object_id(9)).unwrap().building.as_mut().unwrap() = BuildingSight::Built;
     v.sight_off(
         object_id(9),
         at,

@@ -49,7 +49,7 @@ use genie_core::objects::masters::MasterId;
 use genie_core::objects::masters::ObstructionClass;
 use genie_core::objects::masters::ObstructionKind;
 use genie_core::objects::unit::Unit;
-use genie_core::orders::town_bell::TownBell;
+use genie_core::orders::town_bell::{BellShelter, TownBell};
 use genie_core::ownership::CaptureKind;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
@@ -508,7 +508,7 @@ fn ai_parts(
 pub(super) fn town_bell(c: &TribeCombatObject) -> Result<TownBell, GenieError> {
     use genie_core::orders::town_bell::BackToWork;
     Ok(TownBell {
-        flag: c.town_bell_flag != 0,
+        flag: BellShelter::of_byte(c.town_bell_flag),
         work: BackToWork {
             target: ObjectId::of_field(c.back_to_work1_town_bell_target_id),
             target_class: ClassId::of_param(c.back_to_work1_town_bell_target_kind)?,

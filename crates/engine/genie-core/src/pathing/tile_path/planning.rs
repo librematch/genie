@@ -6,6 +6,7 @@ use crate::map::Distance;
 use crate::map::Point;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
+use crate::pathing::tile_path::goal_marks::Mark;
 use crate::pathing::tile_path::{
     CellKind, Found, GridLevel, Path, PlanTile, Planner, Request, SegmentTest, smooth,
 };
@@ -26,7 +27,7 @@ impl Planner {
         tile_path_tuning: &TilePathTuning,
     ) -> Result<Found, GenieError> {
         for &r in &req.closed {
-            self.close_rect(r, true);
+            self.close_rect(r, Mark::Set);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
@@ -34,7 +35,7 @@ impl Planner {
             return Ok(Found::OffMap);
         }
         self.open.clear();
-        self.mark_goal(req.goal(), true, tile_path_tuning);
+        self.mark_goal(req.goal(), Mark::Set, tile_path_tuning);
         self.best = None;
         let mut found = (None, Found::Nearest);
         for level in GridLevel::ALL.into_iter().rev() {
@@ -78,10 +79,10 @@ impl Planner {
         for &p in self.points.iter().rev() {
             let _ = out.push(p);
         }
-        self.mark_goal(req.goal(), false, tile_path_tuning);
+        self.mark_goal(req.goal(), Mark::Clear, tile_path_tuning);
         self.clear_nodes();
         for &r in &req.closed {
-            self.close_rect(r, false);
+            self.close_rect(r, Mark::Clear);
         }
         Ok(result)
     }
@@ -276,14 +277,14 @@ impl Planner {
         tile_path_tuning: &TilePathTuning,
     ) -> Result<Found, GenieError> {
         for &r in &req.closed {
-            self.close_rect(r, true);
+            self.close_rect(r, Mark::Set);
         }
         let start = PlanTile::of_point(req.from);
         let goal = PlanTile::of_point(req.to);
         if !self.on_map(start) || !self.on_map(goal) {
             return Ok(Found::OffMap);
         }
-        self.mark_goal_tiles(req.goal(), true);
+        self.mark_goal_tiles(req.goal(), Mark::Set);
         self.best = None;
         let found = match self.search_tiles(start, tile_path_tuning)? {
             None => (self.best, Found::Nearest),
@@ -313,10 +314,10 @@ impl Planner {
         for &p in self.points.iter().rev() {
             let _ = out.push(p);
         }
-        self.mark_goal_tiles(req.goal(), false);
+        self.mark_goal_tiles(req.goal(), Mark::Clear);
         self.clear_nodes();
         for &r in &req.closed {
-            self.close_rect(r, false);
+            self.close_rect(r, Mark::Clear);
         }
         Ok(result)
     }

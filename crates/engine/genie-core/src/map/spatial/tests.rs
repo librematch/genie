@@ -1585,7 +1585,6 @@ fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new()
         ),
         Ok(vec![object_id(9175)])
@@ -1595,7 +1594,6 @@ fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new()
         ),
         Ok(vec![object_id(9175)])
@@ -1642,12 +1640,7 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         ])
     };
     let occupants = |s: &Spatial, wall| {
-        s.footprint_occupants(
-            FoundationId::new(object_id(10028)),
-            &house,
-            true,
-            &looks(wall),
-        )
+        s.footprint_occupants(FoundationId::new(object_id(10028)), &house, &looks(wall))
     };
     assert_eq!(
         occupants(
@@ -1688,7 +1681,6 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new()
         ),
         Ok(vec![object_id(9175), object_id(33990)])
@@ -2070,7 +2062,6 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new()
         )
         .is_ok()
@@ -2082,7 +2073,6 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
         s.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new()
         )
         .is_ok()
@@ -2092,7 +2082,6 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
         .footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
-            true,
             &BTreeMap::new(),
         )
         .unwrap_err();

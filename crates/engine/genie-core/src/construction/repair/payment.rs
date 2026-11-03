@@ -93,14 +93,24 @@ pub(super) fn find(set: &[Repaired], id: ObjectId) -> Result<usize, GenieError> 
         .ok_or(GenieError::unreachable("a repair's object outside its set"))
 }
 
-/// A building's slot 0x8c8 (`FUN_1411d37d0`) by `amount` for the repairer (`payer`): a
-/// trebuchet's class repairs as a unit ([`repair_unit`]); one below 1 hit point (`COMISS`: a NaN
-/// is) takes nothing ([`RepairOutcome::Unpaid`]). From its repairer (`top`) an annex's repair is its main building's.
-/// Else each of its annexes (a combat unit's or a building's type) is repaired by the amount
-/// first (not `top`); then the amount, at most what its hit points lack of its master's, costs
-/// its owner's building repair rate times the amount over its master's hit points of its
-/// master's costs ([`crate::production::pay`]); paid, it heals as a unit's does, else
-/// [`RepairOutcome::Unpaid`].
+/// Who asks a building's repair (slot 0x8c8's flag): its repairer (1), or its main building for
+/// each of its annexes (0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RepairFrom {
+    /// The repairer.
+    Repairer,
+    /// The annex's main building.
+    MainBuilding,
+}
+
+/// A building's slot 0x8c8 (`FUN_1411d37d0`) by `amount` for the repairer (`payer`): a trebuchet's
+/// class repairs as a unit ([`repair_unit`]); one below 1 hit point (`COMISS`: a NaN is) takes
+/// nothing ([`RepairOutcome::Unpaid`]). From its repairer ([`RepairFrom::Repairer`]) an annex's
+/// repair is its main building's. Else each of its annexes (a combat unit's or a building's type)
+/// is repaired by the amount first ([`RepairFrom::MainBuilding`]); then the amount, at most what
+/// its hit points lack of its master's, costs its owner's building repair rate times the amount
+/// over its master's hit points of its master's costs ([`crate::production::pay`]); paid, it heals
+/// as a unit's does, else [`RepairOutcome::Unpaid`].
 ///
 /// # Errors
 ///
@@ -109,7 +119,7 @@ pub fn repair_building(
     set: &mut [Repaired],
     idx: usize,
     amount: HitPoints,
-    top: bool,
+    from: RepairFrom,
     payer: &mut Payer<'_>,
     roles: &Roles,
     slots: Slots,
@@ -124,9 +134,11 @@ pub fn repair_building(
     if below_or_unordered(o.hp.get(), ONE) {
         return Ok(RepairOutcome::Unpaid);
     }
-    if top && let Some(main) = o.main {
+    if from == RepairFrom::Repairer
+        && let Some(main) = o.main
+    {
         let m = find(set, main.id())?;
-        return repair_building(set, m, amount, true, payer, roles, slots);
+        return repair_building(set, m, amount, RepairFrom::Repairer, payer, roles, slots);
     }
     for annex in o.annexes.clone() {
         let a = find(set, annex)?;
@@ -135,7 +147,15 @@ pub fn repair_building(
                 let _ = repair_unit(set, a, amount, payer, roles, slots)?;
             }
             MasterKind::BUILDING => {
-                let _ = repair_building(set, a, amount, false, payer, roles, slots)?;
+                let _ = repair_building(
+                    set,
+                    a,
+                    amount,
+                    RepairFrom::MainBuilding,
+                    payer,
+                    roles,
+                    slots,
+                )?;
             }
             _ => {}
         }

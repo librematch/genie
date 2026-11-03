@@ -1,6 +1,7 @@
 use super::*;
 use crate::combat::damage::ArmorPair;
 use crate::construction::MainBuildingId;
+use crate::construction::repair::RepairFrom;
 use crate::gathering::hunt::tests::walker;
 use crate::map::TerrainFlags;
 use crate::math::rng::Well512;
@@ -236,7 +237,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             &mut set,
             0,
             HitPoints::new(10.0),
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             &roles(),
             slots()
@@ -255,7 +256,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             &mut set,
             0,
             HitPoints::new(50.0),
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             &roles(),
             slots()
@@ -274,7 +275,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             &mut set,
             0,
             HitPoints::new(10.0),
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             &roles(),
             slots()
@@ -288,7 +289,7 @@ fn building_repair_pays_its_share_of_the_cost_and_heals() {
             &mut set,
             0,
             HitPoints::new(10.0),
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             &roles(),
             slots()
@@ -327,7 +328,7 @@ fn an_annex_repair_goes_to_its_main_building_and_its_annexes() {
             &mut set,
             0,
             HitPoints::new(20.0),
-            true,
+            RepairFrom::Repairer,
             &mut payer,
             &roles(),
             slots()

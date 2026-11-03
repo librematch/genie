@@ -25,6 +25,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::Task;
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
+use crate::orders::MasterSwap;
 use crate::orders::object_gone;
 use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::players::PlayerId;
@@ -99,7 +100,9 @@ impl World {
         {
             return Ok(true);
         }
-        let Some(task) = self.find_work_task(player, idx, target, Some(GARRISON), true)? else {
+        let Some(task) =
+            self.find_work_task(player, idx, target, Some(GARRISON), MasterSwap::Change)?
+        else {
             return Ok(false);
         };
         let under_artifact = top == Some(ARTIFACT_KIND);

@@ -123,6 +123,7 @@ mod spatial {
     use genie_core::ownership::CaptureKind;
     use genie_core::players::PlayerId;
     use genie_core::players::{ByPlayer, UnitRelation};
+    use genie_core::vision::visibility::BuildingSight;
     use genie_save::generated::world::Master;
     use genie_save::generated::world::{Object, RgeMapRow, RgeTile};
 
@@ -233,7 +234,7 @@ mod spatial {
         let standing = sight.seer(object_id(11)).unwrap();
         assert_eq!(standing.kind, MasterKind::BUILDING);
         assert!(standing.explored);
-        assert!(standing.building.is_some_and(|b| b.built && !b.started));
+        assert_eq!(standing.building, Some(BuildingSight::Built));
         assert!(out.get(object_id(11)).unwrap().obstruction.is_some());
         assert_ne!(sight.link(Tile::new(2, 2)).unwrap().0, 0);
         let desolid = sight.seer(object_id(12)).unwrap();

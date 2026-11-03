@@ -13,6 +13,7 @@ mod desired_positions;
 mod passability;
 mod slots;
 
+pub(crate) use self::column_line::LineKind;
 #[cfg(test)]
 pub(crate) use self::column_line::column_line_slots;
 #[cfg(test)]
@@ -23,6 +24,7 @@ use self::desired_positions::{RIGHT_ANGLE, transform_slot};
 pub use self::desired_positions::{find_point_from_front, on_last_high_level_waypoint};
 #[cfg(test)]
 use self::passability::{cell_mark, count_up, passability_box, slot_tile};
+pub use self::slots::SlotOrder;
 #[cfg(test)]
 use crate::groups::UnitGroup;
 use crate::math::image::group::EPSILON as GROUP_EPSILON;

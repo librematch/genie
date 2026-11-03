@@ -29,6 +29,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
+use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::ownership::artifact::ArtifactSub;
 use crate::players::AllyTest;
@@ -557,7 +558,7 @@ impl Unit {
         {
             return Ok(());
         }
-        if !bell.flag {
+        if !bell.flag.is_sheltered() {
             let action = ai
                 .map(|ai| ai.current_action)
                 .ok_or(GenieError::unsupported(
@@ -577,7 +578,7 @@ impl Unit {
                 .building
                 .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS))
         {
-            bell.flag = true;
+            bell.flag = BellShelter::Sheltered;
         }
         Ok(())
     }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::combat::damage::Victim;
+use crate::garrison::transport::TransportTarget;
 use crate::gathering::hunt::tests::walker;
 use crate::map::GridSize;
 use crate::map::TerrainFlags;
@@ -383,7 +384,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(
             Position::new(15.0, 8.5, 1.0),
-            true,
+            TransportTarget::Ship,
             &s,
             &mut c,
             &tuning().transport,
@@ -403,7 +404,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(
             Position::new(15.1, 8.5, 1.0),
-            true,
+            TransportTarget::Ship,
             &s,
             &mut c,
             &tuning().transport,
@@ -421,7 +422,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(
             Position::new(15.1, 8.5, 1.0),
-            false,
+            TransportTarget::Other,
             &s,
             &mut c,
             &tuning().transport,
@@ -435,7 +436,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(
             Position::new(13.0, 8.5, 0.0),
-            true,
+            TransportTarget::Ship,
             &s,
             &mut far,
             &tuning().transport,
@@ -455,7 +456,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         assert_eq!(
             t.work(
                 bad,
-                true,
+                TransportTarget::Ship,
                 &s,
                 &mut far,
                 &tuning().transport,
@@ -478,7 +479,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let _ = t
         .work(
             Position::new(12.5, 8.5, 0.0),
-            true,
+            TransportTarget::Ship,
             &nan_ship,
             &mut c,
             &tuning().transport,

@@ -76,6 +76,7 @@ use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::Dispatch;
 use crate::orders::Work;
+use crate::orders::town_bell::BellShelter;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::pathing::Pathing;
 use crate::players::Amount;
@@ -2081,7 +2082,8 @@ fn grouped_unit_that_enters_building_leaves_its_group() {
     t.parts.put_mover(v.id, Some(walker));
     v.group.id = Some(group_id(7));
     let _ = t.push_live(PlayerId::new(1), v).unwrap();
-    t.parts.set_town_bell_flag(object_id(400), true);
+    t.parts
+        .set_town_bell_flag(object_id(400), BellShelter::Sheltered);
     t.spatial.insert(
         object_id(400),
         Placed {
@@ -2298,7 +2300,7 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(2), 2000, VILLAGER);
     let v = &mut t.players[2].objects[ListIndex::new(0)];
-    t.parts.set_town_bell_flag(v.id, true);
+    t.parts.set_town_bell_flag(v.id, BellShelter::Sheltered);
     t.parts.town_bell_of(v.id).work = BackToWork {
         point: Point::new(4.5, 4.5),
         ..BackToWork::NONE
@@ -2311,7 +2313,7 @@ fn back_to_work_lets_an_allys_villager_out_toward_its_record() {
     t.go_back_to_work(player_id(1), &object_ids([100])).unwrap();
     let v = &t.players[2].objects[ListIndex::new(0)];
     assert_eq!(v.life.inside, None);
-    assert!(!t.parts.town_bell_of(v.id).flag);
+    assert!(!t.parts.town_bell_of(v.id).flag.is_sheltered());
     assert_eq!(t.players[1].objects[ListIndex::new(0)].garrison.len(), 0);
     assert_eq!(
         t.parts
@@ -3596,7 +3598,7 @@ fn unit_inside_transport_unloaded_goes_ashore_about_it() {
     assert_eq!(v.life.inside, None);
     assert_eq!(v.position(), spot.with_height(0.0));
     assert_eq!(t.parts.unit_ai.get(v.id).unwrap().state_position, spot);
-    assert!(!t.parts.town_bell_of(v.id).flag);
+    assert!(!t.parts.town_bell_of(v.id).flag.is_sheltered());
     let ship = t.object(object_id(200)).unwrap().1;
     assert_eq!(ship.garrison, Vec::<ObjectId>::new());
     assert_eq!(
@@ -3716,7 +3718,7 @@ fn villager_beside_ship_enters_it_at_once() {
             .map(|e| e.state),
         Some(EnterState::Done)
     );
-    assert!(!t.parts.town_bell_of(v.id).flag);
+    assert!(!t.parts.town_bell_of(v.id).flag.is_sheltered());
     assert_eq!(
         t.parts.town_bell_of(v.id).work,
         BackToWork {
@@ -3859,7 +3861,8 @@ fn unload_of_building_lets_every_unit_inside_out() {
         .garrison
         .insert(0, object_id(1500));
     for id in [1000, 1001] {
-        t.parts.set_town_bell_flag(object_id(id), true);
+        t.parts
+            .set_town_bell_flag(object_id(id), BellShelter::Sheltered);
         t.parts.set_unit_ai(
             object_id(id),
             Some(UnitAi {
@@ -3884,7 +3887,7 @@ fn unload_of_building_lets_every_unit_inside_out() {
     for id in [1000, 1001] {
         let v = t.object(object_id(id)).unwrap().1;
         assert_eq!(v.life.inside, None, "{id}");
-        assert!(!t.parts.town_bell_of(v.id).flag, "{id}");
+        assert!(!t.parts.town_bell_of(v.id).flag.is_sheltered(), "{id}");
         assert!(t.parts.unit_ai.get(v.id).unwrap().orders.is_empty(), "{id}");
     }
     let mut t = let_out_world();
@@ -3916,7 +3919,8 @@ fn unload_lets_unit_out_of_the_building_it_is_inside() {
     let mut t = let_out_world();
     inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
     inside_tc(&mut t, PlayerId::new(1), 1001, VILLAGER);
-    t.parts.set_town_bell_flag(object_id(1000), true);
+    t.parts
+        .set_town_bell_flag(object_id(1000), BellShelter::Sheltered);
     t.parts
         .set_unit_ai(object_id(1000), Some(UnitAi::default()));
     UnloadCommand {
@@ -3930,7 +3934,7 @@ fn unload_lets_unit_out_of_the_building_it_is_inside() {
     .unwrap();
     let v = t.object(object_id(1000)).unwrap().1;
     assert_eq!(v.life.inside, None);
-    assert!(!t.parts.town_bell_of(v.id).flag);
+    assert!(!t.parts.town_bell_of(v.id).flag.is_sheltered());
     assert_eq!(
         t.players[1].objects[ListIndex::new(0)].garrison,
         [object_id(1001)]

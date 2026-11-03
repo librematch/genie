@@ -9,7 +9,6 @@ use crate::objects::layers::DefaultTask;
 use crate::objects::masters::Master;
 use crate::objects::unit::Unit;
 use crate::ownership::artifact::Artifact;
-use crate::players::PlayerId;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 
@@ -61,7 +60,7 @@ impl Unit {
                     .and_then(|t| t.sprites.moving);
                 actions
                     .list
-                    .set_artifact(Some(Artifact::new(c.player == PlayerId::GAIA, moving)));
+                    .set_artifact(Some(Artifact::new(c.player, moving)));
                 Ok(true)
             }
             DefaultTask::Fails(f) => Err(f.error()),

@@ -75,6 +75,17 @@ const DROP_TRIES: u16 = 50;
 pub const STACK_PLACE: GenieError =
     GenieError::unsupported("a drop location's first draw of side 4 (the place the stack holds)");
 
+/// What a Transport's work order (slot 9, [`TransportAction::work`]) names: the ship itself,
+/// as the unload command's does (out of reach it sails to unload), or another object or none
+/// (it sails).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransportTarget {
+    /// The ship itself.
+    Ship,
+    /// Another object, or none.
+    Other,
+}
+
 /// A unit's Transport action.
 #[derive(Clone, Copy, Debug, PartialEq, Diff)]
 pub struct TransportAction {

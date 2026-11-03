@@ -26,6 +26,7 @@ use crate::objects::masters::player_master;
 use crate::objects::masters::work_master;
 use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::orders::Dispatch;
+use crate::orders::ReadyOrders;
 use crate::orders::{Work, readiness};
 use crate::players::Amount;
 use crate::players::PlayerId;
@@ -144,7 +145,7 @@ impl World {
     ) -> Result<(), GenieError> {
         self.queue_build(q, idx, site, position)?;
         if commits && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id) {
-            readiness(&mut ai.orders, false);
+            readiness(&mut ai.orders, ReadyOrders::Keep);
         }
         Ok(())
     }

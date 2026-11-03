@@ -15,6 +15,7 @@ use crate::objects::ObjectState;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::orders::object_gone;
+use crate::orders::town_bell::BellShelter;
 use crate::world::Seconds;
 use crate::world::slots::PlayerSlots;
 
@@ -152,7 +153,7 @@ impl World {
             .kind;
         let u = self.players.live_mut(up, ui)?;
         if MasterKind::COMBAT <= kind {
-            self.parts.set_town_bell_flag(u.id, false);
+            self.parts.set_town_bell_flag(u.id, BellShelter::Free);
         }
         if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
             ai.orders.clear();
@@ -212,7 +213,7 @@ impl World {
             let u = self.players.live_mut(up, ui)?;
             // a unit (type 70) is no longer under the town bell (`+0x9dc`)
             if MasterKind::COMBAT <= kind {
-                self.parts.set_town_bell_flag(u.id, false);
+                self.parts.set_town_bell_flag(u.id, BellShelter::Free);
             }
             if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
                 ai.orders.clear();
@@ -284,7 +285,7 @@ impl World {
         }
         if MasterKind::COMBAT <= made.kind {
             let id = self.players.live(up, ui)?.id;
-            self.parts.set_town_bell_flag(id, false);
+            self.parts.set_town_bell_flag(id, BellShelter::Free);
         }
         Ok(())
     }
@@ -463,7 +464,7 @@ impl World {
         };
         let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?;
         if out && self.object(id).is_some() {
-            self.parts.set_town_bell_flag(id, false);
+            self.parts.set_town_bell_flag(id, BellShelter::Free);
         }
         Ok(out)
     }

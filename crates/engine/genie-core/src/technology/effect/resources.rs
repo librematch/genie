@@ -10,6 +10,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
 use crate::technology::ResourceChange;
+use crate::technology::effect::attribute_modifier::EffectHook;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
@@ -29,12 +30,12 @@ impl World {
         amount: Amount,
         change: ResourceChange,
     ) -> Result<(), GenieError> {
-        self.all_garrison_volleys(p, false)?;
+        self.all_garrison_volleys(p, EffectHook::Before)?;
         match change {
             ResourceChange::Set => self.set_player_attribute(p, attribute, amount)?,
             ResourceChange::Add => self.add_player_attribute(p, attribute, amount)?,
         }
-        self.all_garrison_volleys(p, true)
+        self.all_garrison_volleys(p, EffectHook::After)
     }
 
     /// Slot 0x1b8 (`FUN_141620e30`) of player `p` on resource `attribute` by `v`: as
@@ -45,18 +46,18 @@ impl World {
         attribute: AttributeId,
         v: f32,
     ) -> Result<(), GenieError> {
-        self.all_garrison_volleys(p, false)?;
+        self.all_garrison_volleys(p, EffectHook::Before)?;
         let value = self.attribute_of(p, attribute) * v;
         self.set_player_attribute(p, attribute, value)?;
-        self.all_garrison_volleys(p, true)
+        self.all_garrison_volleys(p, EffectHook::After)
     }
 
-    /// `FUN_141217ac0` (`after` false) or `FUN_14120b910` on each of player `p`'s live combat
-    /// units and buildings ([`World::garrison_volleys`]).
+    /// `FUN_141217ac0` ([`EffectHook::Before`]) or `FUN_14120b910` on each of player `p`'s live
+    /// combat units and buildings ([`World::garrison_volleys`]).
     pub(super) fn all_garrison_volleys(
         &mut self,
         p: PlayerId,
-        after: bool,
+        hook: EffectHook,
     ) -> Result<(), GenieError> {
         let ids: Vec<ObjectId> = self
             .players
@@ -72,7 +73,7 @@ impl World {
                 .and_then(|m| player_master(&self.model.masters, p, m))
                 .map(|m| m.kind);
             if matches!(kind, Some(MasterKind::COMBAT | MasterKind::BUILDING)) {
-                self.garrison_volleys(p, id, after)?;
+                self.garrison_volleys(p, id, hook)?;
             }
         }
         Ok(())

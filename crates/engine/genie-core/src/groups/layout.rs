@@ -10,6 +10,7 @@ use crate::groups::GroupId;
 use crate::groups::SlotState;
 use crate::groups::TransformKind;
 use crate::groups::UnitKind;
+use crate::groups::formation::SlotOrder;
 use crate::groups::{Formation, FormationLine, Slot, UnitGroup};
 use crate::map::Distance;
 use crate::math::conversions::cvttss2si;
@@ -47,8 +48,18 @@ fn length(v: BVector) -> f32 {
     sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
 }
 
+/// The formation the slots by place ([`slots_by_place`]) lay out: a horde (`createHorde`) or a
+/// user defined one (`createUDF`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PlaceLayout {
+    /// A horde (type 0, the transform type 3).
+    Horde,
+    /// A user defined formation (type 5, the transform type 1).
+    UserDefined,
+}
+
 /// The slots of `createHorde` (`FUN_141013eb0`), or of `createUDF` (`FUN_141014f60`) for
-/// `user_defined` ([`World::create_horde`], [`World::create_udf`],
+/// [`PlaceLayout::UserDefined`] ([`World::create_horde`], [`World::create_udf`],
 /// which look the members up), of `formation` for `group`, `members` its members (None for one
 /// the world does not hold): false without members. The slots' array grows to the members (`FUN_14102d580`) and every
 /// slot turns inactive; the type is a horde (0) or user defined (5), the width and depth -1, no
@@ -63,7 +74,7 @@ pub(crate) fn slots_by_place(
     formation: &mut Formation,
     group: &UnitGroup,
     members: &[Option<MemberPlace>],
-    user_defined: bool,
+    layout: PlaceLayout,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
 ) -> Result<bool, GenieError> {
@@ -75,7 +86,7 @@ pub(crate) fn slots_by_place(
     for s in formation.every_slot_mut() {
         s.active = 0;
     }
-    formation.kind = if user_defined {
+    formation.kind = if layout == PlaceLayout::UserDefined {
         FormationKind::UserDefined
     } else {
         FormationKind::Horde
@@ -83,7 +94,7 @@ pub(crate) fn slots_by_place(
     formation.maximum_width = -1;
     formation.maximum_depth = -1;
     formation.number_lines = 0;
-    formation.transform_kind = if user_defined {
+    formation.transform_kind = if layout == PlaceLayout::UserDefined {
         TransformKind::Turned
     } else {
         TransformKind::Unturned
@@ -108,7 +119,7 @@ pub(crate) fn slots_by_place(
         s.desired_sub_category = UnitKind::NONE;
     }
     formation.use_slots(n);
-    if user_defined {
+    if layout == PlaceLayout::UserDefined {
         let mut ahead = 0.0f32;
         for s in &formation.slots {
             // MAXSS at 0x141015208: a NaN offset keeps the farthest so far
@@ -573,7 +584,7 @@ impl World {
             formation,
             g,
             &members,
-            false,
+            PlaceLayout::Horde,
             self.world_time,
             &self.model.tuning.group,
         )
@@ -595,7 +606,7 @@ impl World {
             formation,
             g,
             &members,
-            true,
+            PlaceLayout::UserDefined,
             self.world_time,
             &self.model.tuning.group,
         )
@@ -641,7 +652,7 @@ impl World {
         )? {
             return Ok(false);
         }
-        self.lay_units(formation, group, false)?;
+        self.lay_units(formation, group, SlotOrder::Closest)?;
         Ok(true)
     }
 
@@ -665,7 +676,7 @@ impl World {
         )? {
             return Ok(false);
         }
-        self.lay_units(formation, group, false)?;
+        self.lay_units(formation, group, SlotOrder::Closest)?;
         Ok(true)
     }
 }
@@ -726,7 +737,7 @@ mod tests {
                 &mut f,
                 &g,
                 &members,
-                false,
+                PlaceLayout::Horde,
                 WorldTime::from_millis(640),
                 &tuning().group
             )
@@ -773,7 +784,7 @@ mod tests {
                 &mut f,
                 &group(0, 1.0, &[]),
                 &[],
-                false,
+                PlaceLayout::Horde,
                 WorldTime::ZERO,
                 &tuning().group
             )
@@ -798,7 +809,7 @@ mod tests {
                 &mut f,
                 &g,
                 &members,
-                true,
+                PlaceLayout::UserDefined,
                 WorldTime::from_millis(640),
                 &tuning().group
             )
@@ -835,7 +846,7 @@ mod tests {
                 &mut f,
                 &g,
                 &members,
-                true,
+                PlaceLayout::UserDefined,
                 WorldTime::from_millis(640),
                 &tuning().group
             )
@@ -952,7 +963,8 @@ mod tests {
         assert!(t.create_phalanx(&mut whole, group_id(1)).unwrap());
         let mut parts = start.clone();
         assert!(phalanx_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap());
-        t.lay_units(&mut parts, group_id(1), false).unwrap();
+        t.lay_units(&mut parts, group_id(1), SlotOrder::Closest)
+            .unwrap();
         assert_eq!(whole, parts);
         let mut ids: Vec<Option<ObjectId>> = whole.slots.iter().map(|s| s.unit_id).collect();
         ids.sort_unstable();
@@ -974,7 +986,8 @@ mod tests {
         assert!(t.create_box(&mut whole, group_id(1)).unwrap());
         let mut parts = start;
         assert!(box_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap());
-        t.lay_units(&mut parts, group_id(1), false).unwrap();
+        t.lay_units(&mut parts, group_id(1), SlotOrder::Closest)
+            .unwrap();
         assert_eq!(whole, parts);
         assert!(whole.slots.iter().all(|s| s.unit_id.is_some()));
         // without members, nothing

@@ -16,6 +16,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::ObstructionClass;
 use crate::objects::masters::ObstructionKind;
 use crate::pathing::ShortFound;
+use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::rounds::Rounds;
 use crate::players::PlayerId;
 use crate::test_ids::object_id;
@@ -66,7 +67,7 @@ fn walk_meets_the_nearest_side_it_crosses() {
     // the side from point 2 (low left) to point 3 (high left)
     assert_eq!(
         h.intersection(
-            false,
+            AtStart::Ignored,
             Point::new(-1.0, 0.5),
             Point::new(2.0, 0.5),
             &tuning().hull_path
@@ -76,7 +77,7 @@ fn walk_meets_the_nearest_side_it_crosses() {
     // the last side ends at point 0: it is side 0
     assert_eq!(
         h.intersection(
-            false,
+            AtStart::Ignored,
             Point::new(0.5, 2.0),
             Point::new(0.5, 0.5),
             &tuning().hull_path
@@ -85,7 +86,7 @@ fn walk_meets_the_nearest_side_it_crosses() {
     );
     assert_eq!(
         h.intersection(
-            false,
+            AtStart::Ignored,
             Point::new(2.0, 2.0),
             Point::new(3.0, 2.0),
             &tuning().hull_path

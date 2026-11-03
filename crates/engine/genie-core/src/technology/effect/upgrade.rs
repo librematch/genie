@@ -22,6 +22,7 @@ use crate::ownership::change::DEAD_COPY_KINDS;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::technology::UpgradeMode;
+use crate::technology::effect::attribute_modifier::EffectHook;
 use crate::technology::{CostEdit, CostUnits, ObjectsKind};
 use crate::world::Player;
 use crate::world::World;
@@ -51,11 +52,11 @@ impl World {
         mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> Result<(), GenieError> {
-        self.all_garrison_volleys(p, false)?;
+        self.all_garrison_volleys(p, EffectHook::Before)?;
         if let (Some(from), Some(to)) = (from, to) {
             self.upgrade_objects(p, from, to, mode, object)?;
         }
-        self.all_garrison_volleys(p, true)
+        self.all_garrison_volleys(p, EffectHook::After)
     }
 
     /// `FUN_141657d10`, the upgrade's own part: of two masters `from` and `to` of player `p`'s

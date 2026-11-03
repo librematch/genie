@@ -10,6 +10,7 @@ use crate::map::spatial::RecordId;
 use crate::map::spatial::{Placed, tile_record_id};
 use crate::math::fmath::at_most_or_unordered;
 use crate::objects::ObjectId;
+use crate::pathing::hull_path::convex::AtStart;
 use crate::pathing::hull_path::{HALF, Hull, HullIndex, HullPather, Point, Shape};
 use crate::players::PlayerId;
 use crate::world::layer::ClassRoles;
@@ -102,7 +103,7 @@ impl HullPather<'_> {
                         o.points
                             .get(k)
                             .zip(o.points.get(prev))
-                            .is_some_and(|(a, b)| h.intersection(true, *a, *b, hull_path_tuning).is_some())
+                            .is_some_and(|(a, b)| h.intersection(AtStart::Counts, *a, *b, hull_path_tuning).is_some())
                     });
                 if !overlaps {
                     continue;

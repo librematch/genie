@@ -283,7 +283,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
         )
     };
     let bell = whole(&object).parts.town_bell;
-    assert!(bell.flag);
+    assert!(bell.flag.is_sheltered());
     assert_eq!(
         (bell.work.action, bell.before_building.action),
         (Some(AiAction::Gather), None)

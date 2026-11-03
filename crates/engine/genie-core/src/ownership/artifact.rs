@@ -119,13 +119,14 @@ use crate::world::lets::release;
 use std::mem::take;
 
 impl Artifact {
-    /// A new action of a task whose moving sprite is `moving`, about to check for a new owner.
+    /// A new action of an object of player `owner` and a task whose moving sprite is `moving`,
+    /// about to check for a new owner.
     #[must_use]
-    pub const fn new(gaia: bool, moving: Option<SpriteId>) -> Self {
+    pub fn new(owner: PlayerId, moving: Option<SpriteId>) -> Self {
         Self {
             state: ArtifactState::Check,
             timer: Seconds::ZERO,
-            gaia,
+            gaia: owner == PlayerId::GAIA,
             sub: None,
             goal: None,
             target: None,
@@ -678,7 +679,7 @@ mod tests {
 
     #[test]
     fn check_finds_no_owner_and_waits_one_second() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let _ = a.step(Millis::new(50), None).unwrap();
         assert_eq!((a.state, a.timer), (ArtifactState::Wait, Seconds::new(1.0)));
     }
@@ -689,7 +690,7 @@ mod tests {
         let mut a = Artifact {
             state: ArtifactState::Wait,
             timer: Seconds::new(0.4),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         assert_eq!(
             a.take_point(
@@ -759,7 +760,7 @@ mod tests {
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         let mut a = Artifact {
             sub: Some(ArtifactSub::Walk { move_to: walk }),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         assert_eq!((a.move_to(), a.enter()), (Some(&walk), None));
         assert_eq!(a.take_enter(), None);
@@ -795,7 +796,7 @@ mod tests {
             stops: true,
             released: Some(object_id(11970)),
         };
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         a.sub = Some(ArtifactSub::Enter {
             enter: walking_enter(),
         });
@@ -820,7 +821,7 @@ mod tests {
             )
         );
         // to an object: the old target goes and the new one comes first, then the Enter
-        let mut b = Artifact::new(false, None);
+        let mut b = Artifact::new(PlayerId::new(1), None);
         b.sub = Some(ArtifactSub::Enter {
             enter: walking_enter(),
         });
@@ -842,7 +843,7 @@ mod tests {
             (None, Some(MoveTo::Start))
         );
         // an Enter that does not walk stops nothing
-        let mut c = Artifact::new(false, None);
+        let mut c = Artifact::new(PlayerId::new(1), None);
         c.sub = Some(ArtifactSub::Enter {
             enter: EnterAction::new(
                 ContainerId::new(object_id(11970)),
@@ -878,7 +879,7 @@ mod tests {
             stops: true,
             released: Some(object_id(11970)),
         };
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         (a.sub, a.goal, a.target, a.state) = (
             Some(ArtifactSub::Enter { enter: e }),
             Some(Position::new(1.0, 2.0, 0.0)),
@@ -890,12 +891,12 @@ mod tests {
             (a.enter().copied(), a.goal, a.target, a.state),
             (None, None, None, ArtifactState::Check)
         );
-        let mut b = Artifact::new(false, None);
+        let mut b = Artifact::new(PlayerId::new(1), None);
         (b.sub, b.target) = (Some(ArtifactSub::Enter { enter: e }), Some(object_id(77)));
         assert_eq!(b.tear_down(), (Some(object_id(77)), by_enter));
         assert_eq!((b.enter().copied(), b.target), (None, None));
         // the check that finds an owner deletes it too
-        let mut c = Artifact::new(false, None);
+        let mut c = Artifact::new(PlayerId::new(1), None);
         c.sub = Some(ArtifactSub::Enter { enter: e });
         let found = c.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
         assert_eq!(
@@ -923,7 +924,7 @@ mod tests {
             )
         };
         let gone = |stops, released| SubActionsGone { stops, released };
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         // nothing held: nothing to let go, nothing walking
         assert_eq!(
             a.hold_enter(enter(ContainerId::new(object_id(7934)))),
@@ -963,14 +964,14 @@ mod tests {
 
     #[test]
     fn gaia_waits_half_second() {
-        let mut a = Artifact::new(true, None);
+        let mut a = Artifact::new(PlayerId::GAIA, None);
         let _ = a.step(Millis::new(50), None).unwrap();
         assert_eq!(a.timer, Seconds::new(0.5));
     }
 
     #[test]
     fn the_wait_ends_when_the_timer_reaches_zero_then_one_check_follows() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let _ = a.step(Millis::new(50), None).unwrap();
         // 1.0 - 20 × 0.05 in f32 is -1.56e-7, so the 20th update ends the wait
         let waits = (0..30).take_while(|_| {
@@ -985,7 +986,7 @@ mod tests {
 
     #[test]
     fn check_that_finds_new_owner_hands_the_animal_over_and_stays_check() {
-        let mut a = Artifact::new(true, None);
+        let mut a = Artifact::new(PlayerId::GAIA, None);
         let found = a.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
         assert_eq!(
             (found, a.state),
@@ -998,14 +999,14 @@ mod tests {
             )
         );
         // no owner found (a combat-type animal whose +0x924 is 0 never asks): it waits
-        let mut b = Artifact::new(true, None);
+        let mut b = Artifact::new(PlayerId::GAIA, None);
         let found = b.step(Millis::new(50), None).unwrap();
         assert_eq!((found, b.state), (None, ArtifactState::Wait));
         // the conversion's stop: the check again, no MoveTo went
         assert_eq!(b.stop(), (SubActionsGone::default(), None));
         assert_eq!(b.state, ArtifactState::Check);
         // a walking animal's MoveTo goes (its teardown stops the unit), and its target is let go
-        let mut walking = Artifact::new(false, None);
+        let mut walking = Artifact::new(PlayerId::new(1), None);
         let _ = walking
             .take_point(
                 Position::new(28.5, 94.5, 0.0),
@@ -1029,7 +1030,7 @@ mod tests {
             (None, None, None)
         );
         // without a sub-action the point and the target stay (FUN_140a98730 false)
-        let mut kept = Artifact::new(false, None);
+        let mut kept = Artifact::new(PlayerId::new(1), None);
         (kept.goal, kept.target, kept.state) = (
             Some(Position::new(3.0, 4.0, 0.0)),
             Some(object_id(77)),
@@ -1051,7 +1052,7 @@ mod tests {
     /// leaves (no sub-action).
     #[test]
     fn walking_animal_taken_over_keeps_its_point_and_target() {
-        let mut a = Artifact::new(true, None);
+        let mut a = Artifact::new(PlayerId::GAIA, None);
         a.goal = Some(Position::new(5.0, 6.0, 0.0));
         a.target = Some(object_id(9149));
         a.sub = Some(ArtifactSub::Walk {
@@ -1086,7 +1087,7 @@ mod tests {
     fn state_100_hands_the_animal_to_gaia() {
         let mut a = Artifact {
             state: ArtifactState::ToGaia,
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         let found = a.step(Millis::new(50), None).unwrap();
         assert_eq!(
@@ -1100,7 +1101,7 @@ mod tests {
     /// The teardown lets the target go and stops a walk.
     #[test]
     fn move_to_an_object_lets_the_old_target_go_and_takes_the_new() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let (t, gone) = a
             .take_object(
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
@@ -1189,7 +1190,7 @@ mod tests {
     /// (0x1f9 with the move action value).
     #[test]
     fn walk_the_motion_step_gives_up_at_its_start_fails() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let _ = a
             .take_point(
                 Position::new(35.5, 88.5, 0.0),
@@ -1314,7 +1315,7 @@ mod tests {
             graphics: &graphics,
         };
         let shown = |a: &Artifact| a.move_to().copied().and_then(|m| m.sprite).map(|g| g.id);
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let _ = a
             .take_point(
                 Position::new(28.5, 93.5, 0.0),
@@ -1375,7 +1376,7 @@ mod tests {
     /// the point 0.2 below the centre's on both axes, without the target.
     #[test]
     fn livestock_moved_to_town_centre_walks_to_the_point_below_it() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let _ = a
             .take_object(
                 object(9149, Position::new(10.0, 12.0, 0.0), true),
@@ -1404,7 +1405,7 @@ mod tests {
     /// to the unit AI at once, starting or walking on.
     #[test]
     fn an_artifact_walk_shows_its_sprite_as_it_starts() {
-        let mut a = Artifact::new(false, Some(SpriteId::named(3)));
+        let mut a = Artifact::new(PlayerId::new(1), Some(SpriteId::named(3)));
         let graphics = Graphics::from([(SpriteId::named(3), graphic(3))]);
         let with_3 = SpriteReads {
             defaults: MoveDefaults::default(),
@@ -1433,7 +1434,7 @@ mod tests {
             (Some(MoveTo::Failed), Some(SpriteId::named(3)))
         );
         assert_eq!(rig.posted(), vec![in_the_way]);
-        let mut walking = Artifact::new(false, None);
+        let mut walking = Artifact::new(PlayerId::new(1), None);
         let _ = walking
             .take_point(
                 Position::new(35.5, 88.5, 0.0),
@@ -1470,7 +1471,7 @@ mod tests {
                     ..start
                 },
             }),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         let mut rig = Rig::on_the_path(Victim::default());
         rig.mover_mut().in_the_way = vec![object_id(77)];
@@ -1497,7 +1498,7 @@ mod tests {
                     ..MoveToAction::sub_in(MoveTo::Start)
                 },
             }),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         rig.run(50, |c, u, _, _, _| lost.walk(c, u, me(), &reads()))
             .unwrap();
@@ -1518,7 +1519,7 @@ mod tests {
                 },
             }),
             target: Some(object_id(600)),
-            ..Artifact::new(false, None)
+            ..Artifact::new(PlayerId::new(1), None)
         };
         rig.run(50, |c, u, _, _, _| dying.walk(c, u, me(), &reads()))
             .unwrap();
@@ -1533,7 +1534,7 @@ mod tests {
         let mut rig = Rig::on_the_path(Victim::default())
             .holding(9149, PlayerId::new(1))
             .holding(77, PlayerId::new(1));
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         a.target = Some(object_id(9149));
         a.goal = Some(Position::new(1.0, 1.0, 0.0));
         a.sub = Some(ArtifactSub::Walk {
@@ -1571,7 +1572,7 @@ mod tests {
     /// held Enter's transport is let go and the walking unit stops.
     #[test]
     fn an_update_checks_after_its_walk_and_lets_go_what_handover_drops() {
-        let mut a = Artifact::new(false, None);
+        let mut a = Artifact::new(PlayerId::new(1), None);
         let mut rig = Rig::on_the_path(Victim::default());
         let found = rig.run(50, |c, u, _, _, _| a.update(c, u, me(), &reads(), &roles()));
         assert_eq!((found, a.state), (Ok(None), ArtifactState::Wait));
@@ -1584,7 +1585,7 @@ mod tests {
         e = e.walking(MoveTo::Moving);
         let mut rig = Rig::on_the_path(Victim::default()).holding(11970, PlayerId::new(1));
         rig.mover_mut().animated.speed = Speed::new(1.0);
-        let mut b = Artifact::new(false, None);
+        let mut b = Artifact::new(PlayerId::new(1), None);
         b.sub = Some(ArtifactSub::Enter { enter: e });
         let found = b.step(Millis::new(50), Some(PlayerId::new(2))).unwrap();
         let Some(Handover::Taken { new, gone }) = found else {

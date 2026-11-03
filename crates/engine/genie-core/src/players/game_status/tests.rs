@@ -381,7 +381,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
             ..Unit::default()
         },
         Action {
-            list: ActionList::default().with_artifact(Some(Artifact::new(false, None))),
+            list: ActionList::default().with_artifact(Some(Artifact::new(PlayerId::new(1), None))),
             ..Default::default()
         },
     ));

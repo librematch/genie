@@ -69,6 +69,8 @@ use crate::objects::masters::{Masters, Task, WorkValue};
 use crate::objects::sprite::{ActiveSprite, Graphic};
 use crate::objects::{FacetCount, Frame, WorkerCount};
 use crate::orders::ControlKey;
+use crate::orders::MasterSwap;
+use crate::orders::ReadyOrders;
 use crate::orders::split::JoinTest;
 use crate::orders::split::splits_together;
 use crate::ownership::artifact::Artifact;
@@ -2018,7 +2020,7 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
         order(Some(Issuer::Player(player_id(4))), false),
     ];
     let mut kept = orders.clone();
-    readiness(&mut orders, true);
+    readiness(&mut orders, ReadyOrders::Drop);
     assert_eq!(
         orders,
         [
@@ -2027,10 +2029,10 @@ fn the_readiness_pass_readies_the_unready_and_drops_the_ready() {
         ]
     );
     let mut none: Vec<QueuedOrder> = Vec::new();
-    readiness(&mut none, true);
+    readiness(&mut none, ReadyOrders::Drop);
     assert_eq!(none.len(), 0);
     // with 0 (BUILD's) the ready ones stay and every order is ready
-    readiness(&mut kept, false);
+    readiness(&mut kept, ReadyOrders::Keep);
     assert_eq!(
         kept,
         [
@@ -2782,7 +2784,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
         .of_mut(t.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
-        .set_artifact(Some(Artifact::new(false, None)));
+        .set_artifact(Some(Artifact::new(PlayerId::new(1), None)));
     assert_eq!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
         Ok(true)
@@ -3515,7 +3517,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             ListIndex::new(0),
             object_id(60),
             Some(GARRISON),
-            false,
+            MasterSwap::Keep,
         )
         .unwrap();
     assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
@@ -3529,7 +3531,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             ListIndex::new(0),
             object_id(60),
             None,
-            true,
+            MasterSwap::Change,
         )
         .unwrap();
     assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
@@ -3544,7 +3546,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             ListIndex::new(0),
             object_id(60),
             None,
-            true
+            MasterSwap::Change
         )
         .unwrap()
         .is_some()

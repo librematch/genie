@@ -3,6 +3,8 @@ use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
 use crate::groups::TransformKind;
+use crate::groups::formation::LineKind;
+use crate::groups::formation::SlotOrder;
 use crate::groups::{LinePoint, Member, PointLine, UnitGroups, UnitKindStatistic, WorldObject};
 use crate::map::Distance;
 use crate::map::Footprint;
@@ -567,7 +569,9 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
             ..slot_at(BVector::ZERO, 1)
         }];
         f.spare_slots = vec![Slot::default()];
-        let took = t.formation_transform(&mut f, group_id(1), false).unwrap();
+        let took = t
+            .formation_transform(&mut f, group_id(1), SlotOrder::Closest)
+            .unwrap();
         (
             took,
             f.slots[0].transform_position,
@@ -588,7 +592,10 @@ fn the_group_target_and_horde_transforms_place_every_slot() {
     f.transform_kind = TransformKind::Unturned;
     f.transform_orientation = BVector::new(0.0, 0.0, -1.0);
     f.slots = vec![slot_at(BVector::ZERO, 1)];
-    assert!(t.formation_transform(&mut f, group_id(1), false).unwrap());
+    assert!(
+        t.formation_transform(&mut f, group_id(1), SlotOrder::Closest)
+            .unwrap()
+    );
     assert_eq!(
         (f.slots[0].unit_id, f.slots[0].position_filled),
         (Some(object_id(10)), 1)
@@ -834,7 +841,9 @@ fn nan_distance_back_takes_the_index_times_the_spacing() {
             ..FormationLine::default()
         },
     ];
-    let _ = t.formation_transform(&mut f, group_id(1), false).unwrap();
+    let _ = t
+        .formation_transform(&mut f, group_id(1), SlotOrder::Closest)
+        .unwrap();
     assert_eq!(f.slots[1].transform_position, BVector::new(7.0, 0.0, 5.0));
 }
 
@@ -904,7 +913,7 @@ fn line_after_column_takes_its_units_in_the_column_order() {
         let g = t.groups.get(group_id(1)).unwrap().clone();
         let mut whole = Formation::new();
         assert!(
-            t.create_column_line(&mut whole, group_id(1), false, (false, false))
+            t.create_column_line(&mut whole, group_id(1), LineKind::Line)
                 .unwrap()
         );
         let mut parts = Formation::new();
@@ -912,15 +921,18 @@ fn line_after_column_takes_its_units_in_the_column_order() {
             column_line_slots(
                 &mut parts,
                 &g,
-                false,
-                (false, false),
+                LineKind::Line,
                 t.world_time,
                 &tuning().group
             )
             .unwrap()
         );
-        t.lay_units(&mut parts, group_id(1), previous == FormationKind::Column)
-            .unwrap();
+        let order = if previous == FormationKind::Column {
+            SlotOrder::PreviousColumn
+        } else {
+            SlotOrder::Closest
+        };
+        t.lay_units(&mut parts, group_id(1), order).unwrap();
         assert_eq!(whole, parts);
         whole.slots.iter().map(|s| s.unit_id).collect::<Vec<_>>()
     };
@@ -1124,13 +1136,13 @@ fn lock_or_given_kind_overrides_the_groups_own_choice() {
 /// way round.
 #[test]
 fn line_is_twice_as_wide_as_deep_and_column_the_reverse() {
-    assert_eq!(sizes(1, true), (1, 1));
+    assert_eq!(sizes(1, LineKind::Line), (1, 1));
     // root 4: 10 / 4 = 2 lines of 5
-    assert_eq!(sizes(10, true), (2, 5));
+    assert_eq!(sizes(10, LineKind::Line), (2, 5));
     // root 3: 9 / 3 = 3 lines of 3, too deep: 2 lines of 5
-    assert_eq!(sizes(9, true), (2, 5));
-    assert_eq!(sizes(16, true), (3, 6));
-    assert_eq!(sizes(10, false), (5, 2));
+    assert_eq!(sizes(9, LineKind::Line), (2, 5));
+    assert_eq!(sizes(16, LineKind::Line), (3, 6));
+    assert_eq!(sizes(10, LineKind::Column), (5, 2));
 }
 
 fn group_of(category: i32, count: usize, spacing: f32, kinds: &[(u32, u32)]) -> UnitGroup {
@@ -1171,8 +1183,7 @@ fn line_of_two_unit_kinds_alternates_its_slots() {
         column_line_slots(
             &mut f,
             &g,
-            false,
-            (false, false),
+            LineKind::Line,
             WorldTime::from_millis(77),
             &tuning().group
         )
@@ -1212,8 +1223,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
         column_line_slots(
             &mut f,
             &g,
-            false,
-            (true, false),
+            LineKind::Staggered,
             WorldTime::ZERO,
             &tuning().group
         )
@@ -1228,8 +1238,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
         column_line_slots(
             &mut f,
             &g,
-            false,
-            (false, true),
+            LineKind::Flanked,
             WorldTime::ZERO,
             &tuning().group
         )
@@ -1243,8 +1252,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
         column_line_slots(
             &mut f,
             &g,
-            true,
-            (false, false),
+            LineKind::Column,
             WorldTime::ZERO,
             &tuning().group
         )
@@ -1258,8 +1266,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
         !column_line_slots(
             &mut f,
             &UnitGroup::default(),
-            false,
-            (false, false),
+            LineKind::Line,
             WorldTime::ZERO,
             &tuning().group
         )
@@ -1281,15 +1288,7 @@ fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
     }));
     let mut f = Formation::new();
     assert!(
-        column_line_slots(
-            &mut f,
-            &g,
-            false,
-            (false, false),
-            WorldTime::ZERO,
-            &tuning().group
-        )
-        .unwrap()
+        column_line_slots(&mut f, &g, LineKind::Line, WorldTime::ZERO, &tuning().group).unwrap()
     );
     assert_eq!((f.maximum_width, f.maximum_depth), (5, 3));
     let first: Vec<(f32, i32)> = f.slots[..3]

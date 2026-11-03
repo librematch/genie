@@ -229,10 +229,7 @@ pub(super) fn spatial(
                     state: ObjectState::of_byte(s.object_state)?,
                     // a foundation made in the game explores first when its construction starts
                     explored: building.is_none_or(|b| b.built != 0 || b.build_pts != 0.0),
-                    building: building.map(|b| BuildingSight {
-                        built: b.built != 0,
-                        started: b.build_pts != 0.0,
-                    }),
+                    building: building.map(|b| BuildingSight::of_saved(b.built, b.build_pts)),
                     umv: umv as u8,
                     // the save's +0x924 (a map's objects keep what the map gave them, as
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part

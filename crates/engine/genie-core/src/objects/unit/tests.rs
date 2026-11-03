@@ -453,7 +453,7 @@ fn an_object_inside_another_runs_its_inside_update() {
             .actions_of(t.players[1].objects[ListIndex::new(0)].id)
             .list
             .artifact(),
-        Some(&Artifact::new(false, None)),
+        Some(&Artifact::new(PlayerId::new(1), None)),
         "the Artifact the default task made has not run yet"
     );
 }
@@ -563,7 +563,7 @@ fn every_kind_of_top_action_shows_its_sub_action() {
         layer.list.put(action);
         layer.top_sub_action()
     };
-    let mut artifact = Artifact::new(false, None);
+    let mut artifact = Artifact::new(PlayerId::new(1), None);
     artifact.sub = Some(ArtifactSub::Walk {
         move_to: MoveToAction::sub_in(MoveTo::Moving),
     });

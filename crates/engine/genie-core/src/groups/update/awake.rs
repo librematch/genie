@@ -10,6 +10,7 @@ use crate::groups::LeavingWalk;
 use crate::groups::MotionFlags;
 use crate::groups::SlotState;
 use crate::groups::UnitGroup;
+use crate::groups::formation::SlotOrder;
 use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, member_gone};
 use crate::groups::stats::weapon_range;
@@ -312,7 +313,7 @@ impl World {
         self.groups.held_mut(group)?.motion.drop_to_high_level()?;
         self.motion_update(group, true)?;
         if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
-            let moved = self.formation_transform(&mut f, group, false);
+            let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
             self.groups.held_mut(group)?.current_formation = Some(f);
             let _ = moved?;
         }

@@ -17,7 +17,9 @@ use crate::vision::SightShape;
 use crate::vision::VisionBits;
 use crate::vision::registry::Entry;
 use crate::vision::registry::UnitUpdate;
+use crate::vision::visibility::BuildingSight;
 use crate::vision::visibility::Visibility;
+use crate::world::GameMode;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::VisibilityTuning;
 use crate::world::player::Player;
@@ -31,7 +33,7 @@ const NO_REGISTRY: GenieError =
 /// 1 on, in order, each with its type (`player+0x10`, [`Player::kind`]) and
 /// its `mAllowCapturingGaiaUnits` (`+0x670`, `allows`, the world's
 /// `allow_gaia_capture`), as they stand. Outside the game modes whose descriptor's `+0x9c` is 1
-/// (`standard`, `FUN_141302450`) a computer player that does not allow it is passed over; the
+/// (`mode`'s, [`GameMode::standard`]) a computer player that does not allow it is passed over; the
 /// test `DAT_143e76fc3` guards before (`FUN_140ca6be0` on the AI's table) is never run, the
 /// flag being 0 in the image and never written. The first other player than `owner` whose bit
 /// is in `mask` ends the loop: it is the answer, which takes the object when it has its master.
@@ -39,7 +41,7 @@ const NO_REGISTRY: GenieError =
 pub fn sight_taker(
     mask: VisionBits,
     owner: PlayerId,
-    standard: bool,
+    mode: GameMode,
     players: &[Player],
     allows: &[bool],
 ) -> Option<PlayerId> {
@@ -47,7 +49,7 @@ pub fn sight_taker(
         .zip(players)
         .skip(1)
         .filter(|&(q, player)| {
-            standard
+            mode.standard()
                 || !player.kind.is_computer()
                 || allows.get(q.index()).copied().unwrap_or(false)
         })
@@ -278,10 +280,10 @@ impl Visibility {
         let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
             return Ok(());
         };
-        if b.built {
+        if *b == BuildingSight::Built {
             return Ok(());
         }
-        b.built = true;
+        *b = BuildingSight::Built;
         self.sight_off(
             id,
             position,
@@ -317,8 +319,10 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> Result<(), GenieError> {
-        if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) {
-            b.started = true;
+        if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut())
+            && *b == BuildingSight::Unstarted
+        {
+            *b = BuildingSight::Started;
         }
         let _ = self.sight_on(
             id,

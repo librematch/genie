@@ -130,7 +130,7 @@ fn capture_stop_keeps_the_artifact_and_lets_its_target_go() {
         }),
         goal: Some(Position::new(32.5, 89.5, 0.0)),
         target: Some(object_id(600)),
-        ..Artifact::new(false, None)
+        ..Artifact::new(PlayerId::new(1), None)
     };
     let mut t = forage_world();
     t.parts

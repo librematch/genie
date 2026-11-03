@@ -34,6 +34,23 @@ pub(super) struct Goal {
     pub(super) range: Distance,
 }
 
+/// Whether a planner's pass sets a cell's mark (the goal's, [`CellKind::GOAL`], or a closed
+/// rectangle's, [`CellEdges::CLOSED`]) or clears it (the routines' flag 1 or 0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Mark {
+    /// The mark goes on.
+    Set,
+    /// The mark goes off.
+    Clear,
+}
+
+impl Mark {
+    /// Whether the mark goes on.
+    const fn is_set(self) -> bool {
+        matches!(self, Self::Set)
+    }
+}
+
 impl Request {
     pub(super) const fn goal(&self) -> Goal {
         Goal {
@@ -116,12 +133,12 @@ impl Planner {
     }
 
     /// Toggle a cell's goal mark; true when it changed.
-    pub(super) fn toggle_goal(&mut self, i: CellIndex, set: bool) -> bool {
+    pub(super) fn toggle_goal(&mut self, i: CellIndex, mark: Mark) -> bool {
         let b1 = self.cells[i].kind;
-        if set == b1.contains(CellKind::GOAL) {
+        if mark.is_set() == b1.contains(CellKind::GOAL) {
             return false;
         }
-        self.cells[i].kind = if set {
+        self.cells[i].kind = if mark.is_set() {
             b1.plus(CellKind::GOAL)
         } else {
             b1.minus(CellKind::GOAL)
@@ -131,14 +148,14 @@ impl Planner {
 
     /// `FUN_140f7d540`: mark (or clear) the node cells within the goal's ranges; when none is, the
     /// coarsest node cell holding the goal's tile.
-    pub(super) fn mark_goal(&mut self, goal: Goal, set: bool, tile_path_tuning: &TilePathTuning) {
+    pub(super) fn mark_goal(&mut self, goal: Goal, mark: Mark, tile_path_tuning: &TilePathTuning) {
         self.goal_square(goal, tile_path_tuning.far_side);
         self.goal_marked = false;
         let [x0, y0, x1, y1] = self.region.get();
         let mut marked = 0;
         for cx in (x0 >> 3)..=(x1 >> 3) {
             for cy in (y0 >> 3)..=(y1 >> 3) {
-                marked += self.mark_cells(GridLevel::TOP, PlanTile::new(cx, cy), goal, set);
+                marked += self.mark_cells(GridLevel::TOP, PlanTile::new(cx, cy), goal, mark);
             }
         }
         if marked != 0 {
@@ -151,7 +168,7 @@ impl Planner {
         }) else {
             return;
         };
-        if self.toggle_goal(i, set) && set {
+        if self.toggle_goal(i, mark) && mark.is_set() {
             self.goal_marked = true;
         }
     }
@@ -163,7 +180,7 @@ impl Planner {
         level: GridLevel,
         cell: PlanTile,
         goal: Goal,
-        set: bool,
+        mark: Mark,
     ) -> i32 {
         if !self.region.holds_at(level, cell) {
             return 0;
@@ -176,15 +193,15 @@ impl Planner {
             return cell
                 .children()
                 .into_iter()
-                .map(|c| self.mark_cells(level.down(), c, goal, set))
+                .map(|c| self.mark_cells(level.down(), c, goal, mark))
                 .sum();
         }
-        i32::from(self.in_range(level, cell, goal) && self.toggle_goal(i, set))
+        i32::from(self.in_range(level, cell, goal) && self.toggle_goal(i, mark))
     }
 
     /// `FUN_140f7a990`: mark (or clear) the tiles within the goal's ranges; when none is, the
     /// goal's own tile.
-    pub(super) fn mark_goal_tiles(&mut self, goal: Goal, set: bool) {
+    pub(super) fn mark_goal_tiles(&mut self, goal: Goal, mark: Mark) {
         self.goal_square(goal, 0.0);
         let [x0, y0, x1, y1] = self.region.get();
         let mut changed = false;
@@ -193,19 +210,19 @@ impl Planner {
                 let t = PlanTile::new(tx, ty);
                 if self.in_range(GridLevel::TILES, t, goal) {
                     let i = self.index(GridLevel::TILES, t);
-                    changed |= self.toggle_goal(i, set);
+                    changed |= self.toggle_goal(i, mark);
                 }
             }
         }
         if !changed {
             let i = self.index(GridLevel::TILES, self.goal);
-            let _ = self.toggle_goal(i, set);
+            let _ = self.toggle_goal(i, mark);
         }
     }
 
     /// `FUN_140f7be80`: close (or reopen) the node cells over a rectangle of tiles
     /// (`FUN_140f7e070`).
-    pub(super) fn close_rect(&mut self, rect: PlanRect, set: bool) {
+    pub(super) fn close_rect(&mut self, rect: PlanRect, mark: Mark) {
         let [x0, y0, x1, y1] = rect.get();
         let (lo_x, hi_x) = if x0 <= x1 { (x0, x1) } else { (x1, x0) };
         let (lo_y, hi_y) = if y0 <= y1 { (y0, y1) } else { (y1, y0) };
@@ -217,30 +234,30 @@ impl Planner {
         self.region = PlanRect::new(rx0, ry0, rx1, ry1);
         for cx in (rx0 >> 3)..=(rx1 >> 3) {
             for cy in (ry0 >> 3)..=(ry1 >> 3) {
-                self.close_cells(GridLevel::TOP, PlanTile::new(cx, cy), set);
+                self.close_cells(GridLevel::TOP, PlanTile::new(cx, cy), mark);
             }
         }
     }
 
     /// `FUN_140f7e070`: the node cells under `cell` of `level` within the region closed or
     /// reopened; the last child is walked by the loop, the others by recursion.
-    pub(super) fn close_cells(&mut self, mut level: GridLevel, mut cell: PlanTile, set: bool) {
+    pub(super) fn close_cells(&mut self, mut level: GridLevel, mut cell: PlanTile, mark: Mark) {
         while !self.cell(level, cell).kind.contains(CellKind::NODE) {
             if level == GridLevel::TILES {
                 return;
             }
             level = level.down();
             let [c0, c1, c2, c3] = cell.children();
-            self.close_cells(level, c0, set);
-            self.close_cells(level, c1, set);
-            self.close_cells(level, c3, set);
+            self.close_cells(level, c0, mark);
+            self.close_cells(level, c1, mark);
+            self.close_cells(level, c3, mark);
             cell = c2;
         }
         if self.region.holds_at(level, cell) {
             let i = self.index(level, cell);
             let b0 = self.cells[i].edges;
-            if set != b0.contains(CellEdges::CLOSED) {
-                self.cells[i].edges = if set {
+            if mark.is_set() != b0.contains(CellEdges::CLOSED) {
+                self.cells[i].edges = if mark.is_set() {
                     b0.plus(CellEdges::CLOSED)
                 } else {
                     b0.minus(CellEdges::CLOSED)

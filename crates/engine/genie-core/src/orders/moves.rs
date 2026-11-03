@@ -20,6 +20,8 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
 use crate::objects::sprite::Graphic;
 use crate::orders::Dispatch;
+use crate::orders::ReadyOrders;
+use crate::orders::town_bell::BellShelter;
 use crate::orders::{MoveOrder, Work, ignore_unit, packs, readiness, work_reach};
 use crate::players::AllyTest;
 use crate::players::Amount;
@@ -137,7 +139,7 @@ impl World {
             };
             let _ = ai.queue_order(state, queued, Dispatch::Queued, QueueEnd::Back)?;
             if !order.queued && !order.direct {
-                readiness(&mut ai.orders, true);
+                readiness(&mut ai.orders, ReadyOrders::Drop);
                 // the pass's tail: the unit's stop (its slot 0x148)
                 self.object_stop(player, idx)?;
             }
@@ -570,7 +572,7 @@ impl World {
             .contains(ClassRoles::VILLAGER);
         let unit = self.players.live_mut(player, idx)?;
         if villager {
-            self.parts.set_town_bell_flag(unit.id, false);
+            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
         if a14 && let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
