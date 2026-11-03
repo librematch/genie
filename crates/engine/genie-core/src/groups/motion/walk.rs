@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::motion::FlagChange;
+use crate::groups::motion::YawLimit;
 use crate::groups::motion::{
     EPSILON, GroupView, Lead, Pass, Passing, StepWorld, ground, hold, passes_waypoint, path_step,
     point, reset_level, set_flag,
@@ -239,7 +240,7 @@ fn turn_toward(motion: &mut Motion, direction: BVector, dt: Seconds) {
     let forward = motion.position[1].with_height(0.0);
     let f = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
     let forward = BVector::new(forward.x() / f, forward.height() / f, forward.y() / f);
-    let yaw = motion.calculate_yaw_angle(forward, direction, dt, true);
+    let yaw = motion.calculate_yaw_angle(forward, direction, dt, YawLimit::Clamped);
     motion.turn(yaw);
 }
 

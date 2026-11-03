@@ -832,6 +832,7 @@ mod tests {
 mod clearing_tests {
     use super::*;
     use crate::construction::MainBuildingId;
+    use crate::construction::build::Clearer;
     use crate::map::Distance;
     use crate::map::Footprint;
     use crate::map::GridSize;
@@ -1033,8 +1034,13 @@ mod clearing_tests {
             t.spatial.tiles().list(Tile::new(10, 10)),
             [object_id(6084), object_id(6083)]
         );
-        t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), false)
-            .unwrap();
+        t.clear_footprint(
+            PlayerId::new(1),
+            ids::HOUSE,
+            Point::new(10.5, 10.5),
+            Clearer::Constructor,
+        )
+        .unwrap();
         let ids: Vec<ObjectId> = t.players[0].objects.iter().map(|u| u.id).collect();
         assert_eq!(ids, [object_id(1), object_id(6084), object_id(6083)]);
         assert_eq!(t.players[0].sleeping.len(), 0);
@@ -1060,8 +1066,13 @@ mod clearing_tests {
         corpse.life.class = Class::Animated;
         let mut t = world(vec![], vec![], vec![corpse]);
         t.players[1].attributes[7] = Amount::new(3.0);
-        t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), false)
-            .unwrap();
+        t.clear_footprint(
+            PlayerId::new(1),
+            ids::HOUSE,
+            Point::new(10.5, 10.5),
+            Clearer::Constructor,
+        )
+        .unwrap();
         let u = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (u.life.state, u.life.hp),
@@ -1078,8 +1089,13 @@ mod clearing_tests {
         let mut t = world(vec![object(40, master_id(254), 10.5, 10.5)], vec![], vec![]);
         t.players[0].attributes[98] = Amount::new(5.0);
         assert!(t.spatial.get(object_id(40)).unwrap().obstruction.is_some());
-        t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), true)
-            .unwrap();
+        t.clear_footprint(
+            PlayerId::new(1),
+            ids::HOUSE,
+            Point::new(10.5, 10.5),
+            Clearer::Builder,
+        )
+        .unwrap();
         let u = &t.players[0].objects[ListIndex::new(0)];
         assert_eq!(
             (u.life.state, u.life.hp, u.roo_called),
@@ -1097,8 +1113,13 @@ mod clearing_tests {
     #[test]
     fn cleared_dead_farm_goes_through_the_building_destroy() {
         let mut t = world(vec![], vec![], vec![object(50, ids::ID_357, 10.5, 10.5)]);
-        t.clear_footprint(PlayerId::new(1), ids::HOUSE, Point::new(10.5, 10.5), false)
-            .unwrap();
+        t.clear_footprint(
+            PlayerId::new(1),
+            ids::HOUSE,
+            Point::new(10.5, 10.5),
+            Clearer::Constructor,
+        )
+        .unwrap();
         let u = &t.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (u.life.state, u.life.hp, u.roo_called),

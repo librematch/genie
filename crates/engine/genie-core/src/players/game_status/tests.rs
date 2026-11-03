@@ -81,6 +81,7 @@ use crate::world::Seconds;
 use crate::world::WholeSeconds;
 use crate::world::parts::Object;
 use crate::world::parts::Part;
+use crate::world::settings::FarmMode;
 use crate::world::{FrameSeed, GameMode, PlayState};
 use std::sync::Arc;
 
@@ -287,7 +288,7 @@ fn each_action_with_its_own_stop_halts_and_answers_true() {
         },
         Action {
             list: ActionList::default().with_gather(Some(
-                GatherAction::new(task, &bush, false, rate, &roles()).unwrap(),
+                GatherAction::new(task, &bush, FarmMode::Fixed, rate, &roles()).unwrap(),
             )),
             ..Default::default()
         },

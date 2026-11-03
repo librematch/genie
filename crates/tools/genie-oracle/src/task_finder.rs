@@ -12,6 +12,7 @@ use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::ActionKind;
 use genie_core::objects::masters::PlayersMasters;
 use genie_core::objects::masters::{MasterId, Masters};
+use genie_core::players::AllyTest;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::PlayerId;
@@ -81,10 +82,10 @@ pub struct FinderObject {
 impl Diplomacy for FinderWorld {
     /// [`genie_core::unit_ai::task_finder::allied`] with `from`'s relations: a player without
     /// them counts only itself.
-    fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
+    fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
         self.relations
             .get(from)
-            .map_or(from == to, |r| task_finder_allied(r, from, to, with_ally))
+            .map_or(from == to, |r| task_finder_allied(r, from, to, test))
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {

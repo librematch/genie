@@ -78,7 +78,7 @@ pub use self::seek_shelter::SeekShelterCommand;
 pub use self::set_gather_state::SetGatherStateCommand;
 pub use self::shift::Shift;
 pub use self::stop::StopCommand;
-pub use self::town_bell::TownBellCommand;
+pub use self::town_bell::{Bell, TownBellCommand};
 pub use self::trade::TradeCommand;
 pub use self::transform_object::TransformObjectCommand;
 pub use self::tribute::TributeCommand;

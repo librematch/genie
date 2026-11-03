@@ -13,6 +13,7 @@ use crate::groups::formation::on_map;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::TerrainMask;
+use crate::map::spatial::Movers;
 use crate::map::spatial::RecordId;
 use crate::map::{GroundOffset, Point};
 use crate::math::fmath::BVector;
@@ -181,7 +182,7 @@ impl World {
                 at.ground(),
                 grow,
                 &members,
-                true,
+                Movers::LeftOut,
                 ObjectsRef::new(
                     &self.players,
                     &self.index,

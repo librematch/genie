@@ -16,6 +16,7 @@ use crate::objects::UpdateCode;
 use crate::objects::layers::Action;
 use crate::objects::masters::OwnerMasters;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::sprite::Cargo;
 use crate::objects::sprite::standing;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
@@ -262,7 +263,7 @@ impl Unit {
                 let graphic =
                     |id: Option<SpriteId>| id.and_then(|id| c.w.model.graphics.get(id).copied());
                 let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
-                let standing = graphic(master.and_then(|m| standing(m, look, false, roles)));
+                let standing = graphic(master.and_then(|m| standing(m, look, Cargo::Empty, roles)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
                 let (walk, rng) = c.walk_and_sprites(&mut self.place, me)?;
                 let shows = Shows {

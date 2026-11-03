@@ -3,6 +3,7 @@
 use crate::encode::encode;
 use crate::names::unmodelled_command;
 use genie_core::GenieError;
+use genie_core::commands::Bell;
 use genie_core::commands::GameSub;
 use genie_core::commands::GatherPointState;
 use genie_core::commands::QueueId;
@@ -396,7 +397,7 @@ fn single_command(packet: &Packet) -> Result<Option<Command>, GenieError> {
         Packet::TownBell(c) => Command::TownBell(TownBellCommand {
             player: PlayerId::from(c.commp_id),
             id: ObjectId::try_from(c.uid)?,
-            activate: c.activate != 0,
+            bell: Bell::of_byte(c.activate),
         }),
         Packet::Gate(c) => Command::Gate(GateCommand {
             player: PlayerId::from(c.commp_id),

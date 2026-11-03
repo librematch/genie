@@ -21,6 +21,7 @@ use crate::math::image::diplomacy::NO_POINT as DIPLOMACY_NO_POINT;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::MasterKind;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::Relation;
 use crate::players::Stance;
@@ -49,7 +50,7 @@ pub fn unit_kind(p: PlayerId, q: PlayerId, relation: Relation) -> UnitRelation {
         UnitRelation::Gaia
     } else if p == q {
         UnitRelation::Own
-    } else if relation.allied(true) {
+    } else if relation.allied(AllyTest::WithRelation4) {
         UnitRelation::Ally
     } else if relation == Relation::Neutral {
         UnitRelation::Neutral

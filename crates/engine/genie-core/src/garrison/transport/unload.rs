@@ -18,6 +18,7 @@ use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{Master, OwnerMasters};
+use crate::pathing::zones::Relabel;
 use crate::pathing::zones::ZoneId;
 use crate::pathing::zones::{NO_TERRAIN, UNKNOWN_RESTRICTION};
 use crate::players::PlayerId;
@@ -401,7 +402,7 @@ impl World {
                 let values = terrain.restriction(r).ok_or(UNKNOWN_RESTRICTION)?;
                 Some(
                     self.zones
-                        .find(self.spatial.map, &terrain.kinds, values, false),
+                        .find(self.spatial.map, &terrain.kinds, values, Relabel::Kept),
                 )
             }
             _ => None,

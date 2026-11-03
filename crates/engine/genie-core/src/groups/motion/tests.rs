@@ -2,6 +2,7 @@ use super::*;
 use crate::groups::GroupFlags;
 use crate::groups::MotionFlags;
 use crate::groups::motion::FlagChange;
+use crate::groups::motion::YawLimit;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::GridSize;
@@ -389,19 +390,19 @@ fn querys_ends_stay_inside_the_map() {
 fn turn_is_limited_by_the_yaw_per_second() {
     let mut m = Motion::new();
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
-    let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), true);
+    let free = m.calculate_yaw_angle(x, z, Seconds::new(0.1), YawLimit::Clamped);
     assert_eq!(free, Angle::new(-FRAC_PI_2));
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
     assert_eq!(
-        m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
+        m.calculate_yaw_angle(x, z, Seconds::new(0.1), YawLimit::Clamped),
         Angle::new(-0.1)
     );
     assert_eq!(
-        m.calculate_yaw_angle(z, x, Seconds::new(0.1), true),
+        m.calculate_yaw_angle(z, x, Seconds::new(0.1), YawLimit::Clamped),
         Angle::new(0.1)
     );
     assert_eq!(
-        m.calculate_yaw_angle(z, x, Seconds::new(0.1), false),
+        m.calculate_yaw_angle(z, x, Seconds::new(0.1), YawLimit::Free),
         Angle::new(FRAC_PI_2)
     );
 }
@@ -415,11 +416,16 @@ fn the_yaw_clamp_keeps_the_angle_for_nan_operand() {
     let (x, z) = (BVector::new(1.0, 0.0, 0.0), BVector::new(0.0, 0.0, 1.0));
     m.maximum_yaw_per_second_moving = TurnRate::new(f32::NAN);
     assert_eq!(
-        m.calculate_yaw_angle(x, z, Seconds::new(0.1), true),
+        m.calculate_yaw_angle(x, z, Seconds::new(0.1), YawLimit::Clamped),
         Angle::new(-FRAC_PI_2)
     );
     m.maximum_yaw_per_second_moving = TurnRate::new(1.0);
-    let nan = m.calculate_yaw_angle(BVector::new(f32::NAN, 0.0, 0.0), z, Seconds::new(0.1), true);
+    let nan = m.calculate_yaw_angle(
+        BVector::new(f32::NAN, 0.0, 0.0),
+        z,
+        Seconds::new(0.1),
+        YawLimit::Clamped,
+    );
     assert!(nan.get().is_nan(), "{nan}");
 }
 

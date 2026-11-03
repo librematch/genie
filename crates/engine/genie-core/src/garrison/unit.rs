@@ -31,6 +31,7 @@ use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::orders::town_bell::{BackToWork, TownBell};
 use crate::ownership::artifact::ArtifactSub;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -134,7 +135,12 @@ impl Unit {
                 )?;
                 // FUN_141663dc0 with allies, or Gaia's
                 view.allied = tp == PlayerId::GAIA
-                    || allied(&c.w.players.player(c.player)?.relations, c.player, tp, true);
+                    || allied(
+                        &c.w.players.player(c.player)?.relations,
+                        c.player,
+                        tp,
+                        AllyTest::WithRelation4,
+                    );
                 (Some(view), start)
             }
             None => (

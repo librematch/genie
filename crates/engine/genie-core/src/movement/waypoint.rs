@@ -6,6 +6,7 @@ use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
 use crate::map::Rect;
+use crate::map::spatial::Movers;
 use crate::map::spatial::{Spatial, WalkQuery};
 use crate::math::fmath::BVector;
 use crate::math::fmath::{sqrt, sub};
@@ -217,7 +218,7 @@ impl Mover {
                 Point::new(x, y),
                 world.manager_grow(),
                 &ignore,
-                false,
+                Movers::Counted,
                 by_id,
             )? {
                 let level = self.paths.walked_mut()?;

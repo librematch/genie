@@ -18,6 +18,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::{GatherGroup, MasterTables};
 use crate::objects::unit::Unit;
 use crate::objects::unit::object_master;
+use crate::players::AllyTest;
 use crate::unit_ai::task_finder::allied;
 use crate::world::HUNTER_UNMOVING;
 use crate::world::layer::Roles;
@@ -99,7 +100,7 @@ impl Unit {
             state: t.life.state,
             player: tp,
             amount: t.life.amount,
-            allied: allied(own, c.player, tp, true),
+            allied: allied(own, c.player, tp, AllyTest::WithRelation4),
             top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };

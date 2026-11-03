@@ -7,6 +7,7 @@ use crate::map::TerrainId;
 use crate::map::Tile;
 use crate::movement::Speed;
 use crate::objects::masters::MasterKind;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::NO_RELATIONS;
 use crate::players::PlayerId;
@@ -83,13 +84,13 @@ impl PlaceMap for WorldMap<'_> {
         t.shapes.get(i).copied()
     }
 
-    fn allied(&self, a: PlayerId, b: PlayerId, with_4: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool {
         let relations = self
             .turns
             .players
             .player(a)
             .map_or(&NO_RELATIONS, |p| &p.relations);
-        task_finder_allied(relations, a, b, with_4)
+        task_finder_allied(relations, a, b, test)
     }
 
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {

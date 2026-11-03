@@ -203,7 +203,7 @@ fn single(command: &Command) -> Result<Packet, GenieError> {
         Command::TownBell(c) => Packet::TownBell(packets::TownBell {
             commp_id: c.player.get(),
             uid: c.id.get(),
-            activate: u8::from(c.activate),
+            activate: c.bell.byte(),
         }),
         Command::Gate(c) => Packet::Gate(packets::Gate {
             commp_id: c.player.get(),

@@ -1,6 +1,7 @@
 //! The command enum's issuing player and the lane a failed run stops.
 
 use crate::GenieError;
+use crate::commands::Bell;
 use crate::commands::GameSub;
 use crate::commands::ResourceWord;
 use crate::commands::Shift;
@@ -136,7 +137,7 @@ fn one_of_each(p: u8) -> Vec<Command> {
         Command::TownBell(TownBellCommand {
             player: player_id(p),
             id: object_id(7),
-            activate: true,
+            bell: Bell::Ring,
         }),
         Command::Delete(DeleteCommand {
             player: player_id(p),

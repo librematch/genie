@@ -22,6 +22,7 @@ use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObstructionKind;
 use crate::objects::masters::PlacementTerrains;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::production::spawn::PlacementCode;
 use crate::production::spawn::{BuildSite, Tested, hill_fails, placement_terrains};
@@ -183,8 +184,8 @@ pub trait PlaceMap {
     /// it.
     fn shape(&self, tile: Tile) -> Option<u8>;
     /// Player `a` counts player `b` as an ally (`FUN_141663dc0`): itself; never Gaia; relation 0,
-    /// or with `with_4` relation 4 too (the zone mode's relation 1 is not modelled).
-    fn allied(&self, a: PlayerId, b: PlayerId, with_4: bool) -> bool;
+    /// or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
+    fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool;
     /// The objects on `tile` (their centre there), in the tile list's order; `Err` where it
     /// cannot tell.
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError>;
@@ -453,7 +454,9 @@ pub(super) fn build_sees(
                 && MasterKind::RGE_COMBAT <= o.kind
                 && o.fog_mask
                     .is_some_and(|m| m.intersects(masks.explored) && m.intersects(masks.visible));
-            if !shown && (o.player != player || !map.allied(o.player, player, true)) {
+            if !shown
+                && (o.player != player || !map.allied(o.player, player, AllyTest::WithRelation4))
+            {
                 return Ok(false);
             }
         }
@@ -521,7 +524,8 @@ pub(super) fn build_ignores(
             .of_class(o.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         && o.desolid
-        && !(map.allied(player, o.player, true) && map.allied(o.player, player, true));
+        && !(map.allied(player, o.player, AllyTest::WithRelation4)
+            && map.allied(o.player, player, AllyTest::WithRelation4));
     !alive || !standing || gate_wall || foundation
 }
 
@@ -541,7 +545,8 @@ pub(super) fn build_passes(
         && o.moving
         && (o.player == player
             || o.player == PlayerId::GAIA
-            || (map.allied(player, o.player, false) && map.allied(o.player, player, false)));
+            || (map.allied(player, o.player, AllyTest::AlliesOnly)
+                && map.allied(o.player, player, AllyTest::AlliesOnly)));
     // a felled tree (at most 1 hit point) passes off a forest (`FUN_140f5efb0` on its
     // tile's terrain)
     passes

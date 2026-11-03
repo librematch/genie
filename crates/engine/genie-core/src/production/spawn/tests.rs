@@ -35,6 +35,7 @@ use crate::objects::masters::{Master, Masters};
 use crate::objects::sprite::Graphic;
 use crate::objects::unit::Unit;
 use crate::objects::{FacetCount, Frame};
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerKind;
 use crate::test_ids::master_id;
@@ -165,7 +166,7 @@ impl PlaceMap for Hill {
     fn shape(&self, _: Tile) -> Option<u8> {
         Some(self.0)
     }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
         a == b
     }
     fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
@@ -322,7 +323,7 @@ impl PlaceMap for Fogged {
     fn shape(&self, _: Tile) -> Option<u8> {
         Some(0)
     }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
         a == b
     }
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
@@ -424,7 +425,7 @@ impl PlaceMap for Flat {
     fn shape(&self, _: Tile) -> Option<u8> {
         Some(0)
     }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
         a == b
     }
     fn objects(&self, tile: Tile) -> Result<Vec<Near>, GenieError> {
@@ -1169,7 +1170,7 @@ impl PlaceMap for Dark {
     fn shape(&self, _: Tile) -> Option<u8> {
         Some(0)
     }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
         a == b
     }
     fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {
@@ -1668,7 +1669,7 @@ impl PlaceMap for Terrains {
     fn shape(&self, _: Tile) -> Option<u8> {
         Some(0)
     }
-    fn allied(&self, a: PlayerId, b: PlayerId, _: bool) -> bool {
+    fn allied(&self, a: PlayerId, b: PlayerId, _: AllyTest) -> bool {
         a == b
     }
     fn objects(&self, _: Tile) -> Result<Vec<Near>, GenieError> {

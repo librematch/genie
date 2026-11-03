@@ -25,6 +25,7 @@ use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
 use crate::pathing::hull_path::{NO_RESTRICTION, NO_TERRAIN, quick_reach};
 use crate::pathing::tile_path::Path;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::Relations;
@@ -481,7 +482,7 @@ impl AttackPicker for WorldPicker<'_> {
         let a = self.attacker;
         Ok(Some(Thing {
             owner,
-            allied: allied(self.relations, self.player, owner, true),
+            allied: allied(self.relations, self.player, owner, AllyTest::WithRelation4),
             state: t.life.state,
             has_ai: self.parts.unit_ai.contains(t.id),
             inside: t.life.inside.is_some(),

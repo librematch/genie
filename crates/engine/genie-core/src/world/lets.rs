@@ -19,6 +19,7 @@ use crate::objects::unit::Unit;
 use crate::objects::{ObjectId, ObjectKey};
 use crate::objects::{ObjectState, WorkerCount};
 use crate::orders::object_gone;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::tracker::Tracker;
 use crate::players::{NO_RELATIONS, Relations};
@@ -416,6 +417,6 @@ impl Lets<'_> {
             let other = view.players().player(from);
             other.map_or(&NO_RELATIONS, |p| &p.relations)
         };
-        task_finder_allied(relations, from, to, true)
+        task_finder_allied(relations, from, to, AllyTest::WithRelation4)
     }
 }

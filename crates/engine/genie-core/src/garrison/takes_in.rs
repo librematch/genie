@@ -17,6 +17,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Task, player_master};
 use crate::objects::unit::Unit;
 use crate::orders::GARRISON;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Diplomacy;
 use crate::unit_ai::task_finder::world::TaskWorld;
@@ -209,7 +210,10 @@ impl World {
                 players: &self.players,
                 drop_sites: &self.model.drop_sites,
             };
-            if !others || !world.allied(bp, player, true) || !world.allied(player, bp, true) {
+            if !others
+                || !world.allied(bp, player, AllyTest::WithRelation4)
+                || !world.allied(player, bp, AllyTest::WithRelation4)
+            {
                 return Ok(false);
             }
         }

@@ -91,6 +91,15 @@ pub(crate) struct LeadGroup {
     pub(crate) lowered: Vec<ObjectId>,
 }
 
+/// Whether `calculateYawAngle` (`param_5`) holds the turn to the yaw per second.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum YawLimit {
+    /// At most the yaw per second (`+0xa0`) times the update's time (1).
+    Clamped,
+    /// The whole angle (0).
+    Free,
+}
+
 impl LeadGroup {
     const fn patrols(&self) -> bool {
         self.flags.contains(GroupFlags::PATROL)
@@ -173,22 +182,22 @@ impl Motion {
     }
 
     /// `BMotion::calculateYawAngle` (`FUN_141046270`): the angle from `forward` (`param_2`) to
-    /// `direction` (`param_3`, `FUN_14087e650`); with `clamp` (`param_5` 1) at most `+0xa0`
-    /// (the yaw per second moving) times `dt` (`param_4`), as `MINSS` takes it at 0x1410463e2
-    /// (the limit when it is below the angle, else the angle, also when either is NaN); negated
-    /// when `direction × forward` (`FUN_14087e4d0`) points up (`COMISS`/`JBE` at 0x141046400:
-    /// not for a NaN). The warning for a `dt` of `f32::MAX` with a yaw per second above 1 and
-    /// the one of the result are log lines only.
+    /// `direction` (`param_3`, `FUN_14087e650`); [`YawLimit::Clamped`] (`param_5` 1) at most
+    /// `+0xa0` (the yaw per second moving) times `dt` (`param_4`), as `MINSS` takes it at
+    /// 0x1410463e2 (the limit when it is below the angle, else the angle, also when either is NaN);
+    /// negated when `direction × forward` (`FUN_14087e4d0`) points up (`COMISS`/`JBE` at
+    /// 0x141046400: not for a NaN). The warning for a `dt` of `f32::MAX` with a yaw per second
+    /// above 1 and the one of the result are log lines only.
     #[must_use]
     pub fn calculate_yaw_angle(
         &self,
         forward: BVector,
         direction: BVector,
         dt: Seconds,
-        clamp: bool,
+        limit: YawLimit,
     ) -> Angle {
         let mut angle = angle_between(direction, forward);
-        if clamp {
+        if limit == YawLimit::Clamped {
             angle = minss((self.maximum_yaw_per_second_moving * dt).get(), angle);
         }
         Angle::new(if 0.0 < cross(direction, forward).height() {

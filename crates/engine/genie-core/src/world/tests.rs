@@ -12,6 +12,7 @@ use crate::combat::missile::{MissSpread, Missile, MissileState, ProjectileKind, 
 use crate::combat::victims::{KillLeft, file_kill, write_back};
 use crate::combat::volley::Aimed;
 use crate::combat::{AttackCount, AttackTargetId, MissileCount};
+use crate::commands::Bell;
 use crate::commands::GameSub;
 use crate::commands::GatherPointState;
 use crate::commands::ResourceWord;
@@ -178,6 +179,7 @@ use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::ownership::change::change_hands;
 use crate::ownership::change::dead_master_of;
 use crate::pathing::tile_path::{Path, PlanRect};
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::ByPlayer;
@@ -271,6 +273,7 @@ use crate::world::layer::ClassRoles;
 use crate::world::others::OthersRef;
 use crate::world::parts::{Object, Part, PartTable, no_own_masters};
 use crate::world::player::Player;
+use crate::world::settings::FarmMode;
 use ids::FISH_TRAP;
 use std::iter::{once, repeat_n};
 use std::sync::Arc;
@@ -2592,9 +2595,9 @@ fn unit_side_reads_the_other_players_relations_around_its_own() {
         foreign,
         drop_sites: &[],
     };
-    assert!(world.allied(PlayerId::new(1), PlayerId::new(2), false));
-    assert!(!world.allied(PlayerId::new(2), PlayerId::new(1), false));
-    assert!(world.allied(PlayerId::new(1), PlayerId::new(1), false));
+    assert!(world.allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
+    assert!(!world.allied(PlayerId::new(2), PlayerId::new(1), AllyTest::AlliesOnly));
+    assert!(world.allied(PlayerId::new(1), PlayerId::new(1), AllyTest::AlliesOnly));
 }
 
 /// The wait's foundation as its update reads it: its build points among the owner's other
@@ -4063,7 +4066,7 @@ fn drop_off_order_takes_forager_to_its_nearest_drop_site() {
 #[test]
 fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     let mut t = forage_world();
-    t.settings.walkable_farms = true;
+    t.settings.farm_mode = FarmMode::Walkable;
     for masters in &mut t.model.masters {
         Arc::make_mut(masters)
             .get_mut(master_id(120))
@@ -4190,7 +4193,7 @@ fn the_empire_wars_start_puts_villager_on_its_farm_to_work() {
     t.players[1].objects[ListIndex::new(0)].life.master_id = master_id(13);
     assert!(t.start_work(PlayerId::new(1)).is_err());
     let mut t = world;
-    t.settings.walkable_farms = false;
+    t.settings.farm_mode = FarmMode::Fixed;
     assert!(t.start_work(PlayerId::new(1)).is_err());
 }
 
@@ -12149,7 +12152,7 @@ fn deaths_world() -> World {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let gather = GatherAction::new(chop, &tree, false, rate, &roles()).unwrap();
+    let gather = GatherAction::new(chop, &tree, FarmMode::Fixed, rate, &roles()).unwrap();
     let villagers = vec![
         dead(object_id(40)),
         dead(object_id(41)),
@@ -16072,7 +16075,7 @@ fn an_ai_move_hands_the_point_to_the_gather() {
         capacity: Amount::new(10.0),
         productivity: Amount::new(1.0),
     };
-    let mut gather = GatherAction::new(task, &bush, false, rate, &roles()).unwrap();
+    let mut gather = GatherAction::new(task, &bush, FarmMode::Fixed, rate, &roles()).unwrap();
     gather.state = GatherState::Idle;
     let (mut u, mut actions, mut motion) = mover_unit(31139);
     actions.list.set_gather(Some(gather));
@@ -17470,7 +17473,7 @@ fn reseed_world() -> World {
         state: GatherState::ReseedWalk { move_to: None },
         target: None,
         worked: true,
-        ..GatherAction::new(task, &farm, false, rate, &roles()).unwrap()
+        ..GatherAction::new(task, &farm, FarmMode::Fixed, rate, &roles()).unwrap()
     };
     let farmer = Object::with_actions(
         Unit {
@@ -22993,10 +22996,10 @@ fn the_command_phase_runs_each_building_command_by_its_handler() {
             &Command::TownBell(TownBellCommand {
                 player: player_id(1),
                 id: object_id(700),
-                activate: true,
+                bell: Bell::Ring,
             }),
             PlayerId::new(1),
-            |w| w.town_bell(player_id(1), object_id(700), true),
+            |w| w.town_bell(player_id(1), object_id(700), Bell::Ring),
         ),
         routes(
             &t,

@@ -32,6 +32,7 @@ use crate::objects::masters::{MasterTables, OwnerMasters};
 use crate::objects::release::Releaser;
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::{Unit, second_target_checked};
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -194,7 +195,7 @@ impl Unit {
                 .unit_ai
                 .get(self.id)
                 .map_or(UnitStance::Aggressive, |ai| ai.stance),
-            farm_stops: c.w.settings.walkable_farms,
+            farm_mode: c.w.settings.farm_mode,
             player_kind: c.w.players.player(c.player)?.kind,
             stop_productivity: productivity_of(
                 task.productivity,
@@ -504,7 +505,7 @@ pub(crate) fn give_load(
     let own = relations.get(player).unwrap_or(&NO_RELATIONS);
     let allied = PlayerId::each(own.len())
         .skip(1)
-        .any(|q| q != player && allied(own, player, q, true));
+        .any(|q| q != player && allied(own, player, q, AllyTest::WithRelation4));
     if sharing && allied {
         return Err(GenieError::unsupported(
             "a load given to a player with allies (+0x1426)",

@@ -12,6 +12,7 @@ use crate::map::{Rect, Segment};
 use crate::movement::explore::InfluenceMap;
 use crate::objects::ObjectId;
 use crate::objects::masters::ObstructionKind;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, PlayerSet};
 use crate::unit_ai::task_finder::allied as task_finder_allied;
@@ -224,7 +225,7 @@ impl Spatial {
     /// stands to it in relation 0 or 4; Gaia counts for no one else.
     pub(super) fn allied(&self, from: PlayerId, to: PlayerId) -> bool {
         let relations = self.relations.get(from).unwrap_or(&NO_RELATIONS);
-        task_finder_allied(relations, from, to, true)
+        task_finder_allied(relations, from, to, AllyTest::WithRelation4)
     }
 
     /// `FUN_1410562e0` on the obstruction manager: its ignore list becomes `ids` (none for an

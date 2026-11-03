@@ -7,6 +7,7 @@ use crate::map::spatial::TileSight;
 use crate::math::fmath::at_most_or_unordered;
 use crate::math::fmath::log;
 use crate::objects::masters::MasterKind;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -18,6 +19,16 @@ use crate::world::Seconds;
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
+
+/// Whether a resource add (slot 0xf8's fifth argument) goes on to the players its player
+/// shares its gathered resources with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ResourceShare {
+    /// It does (1).
+    Shared,
+    /// It does not (0): their own shares, a market's trade.
+    Unshared,
+}
 
 impl World {
     /// The trickles of player `p`: each of attributes 230 to 233 above 0 (`COMISS` with 0,
@@ -32,7 +43,13 @@ impl World {
             if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
             }
-            self.add_resource(p, kind, rate / MINUTE, ResourceStat::Gathered, true)?;
+            self.add_resource(
+                p,
+                kind,
+                rate / MINUTE,
+                ResourceStat::Gathered,
+                ResourceShare::Shared,
+            )?;
         }
         Ok(())
     }
@@ -74,17 +91,17 @@ impl World {
             self.model.slots.attribute.food,
             Amount::new(rate * (time * grows)),
             ResourceStat::Gathered,
-            true,
+            ResourceShare::Shared,
         )?;
         Ok(())
     }
 
-    /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource
-    /// `kind` (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument)
-    /// and `share` (its fifth): with `stat` 1 the gathered total grows first (166 to 168; gold:
-    /// any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to 169), then the resource
-    /// ([`World::add_attribute_base`]). The resource panel's event when a resource crosses 100
-    /// (`FUN_140c898a0` 0x80) is the interface's. The kinds 50, 183 and 196 and the others are
+    /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource `kind`
+    /// (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument) and
+    /// `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first (166 to
+    /// 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to 169), then the
+    /// resource ([`World::add_attribute_base`]). The resource panel's event when a resource crosses
+    /// 100 (`FUN_140c898a0` 0x80) is the interface's. The kinds 50, 183 and 196 and the others are
     /// not resources: their branches are [`crate::world::Player::add_attribute`]'s.
     pub fn add_resource(
         &mut self,
@@ -92,7 +109,7 @@ impl World {
         kind: AttributeId,
         amount: Amount,
         stat: ResourceStat,
-        share: bool,
+        share: ResourceShare,
     ) -> Result<(), GenieError> {
         if self
             .model
@@ -131,8 +148,8 @@ impl World {
     /// player `p`, for a kind out of 0 to the attribute count nothing: the attribute takes
     /// `amount` plus its value. A computer player's resource fills its escrow: an `amount` above
     /// 0 with a share above 0 (`COMISS`, `JBE`) adds the share times it; an escrow above the
-    /// resource (`JBE` skips a NaN) falls to it, or to 0 when the resource is below 0. With
-    /// `share`, a player who shares its gathered resources (`+0x1426`,
+    /// resource (`JBE` skips a NaN) falls to it, or to 0 when the resource is below 0.
+    /// [`ResourceShare::Shared`], a player who shares its gathered resources (`+0x1426`,
     /// [`crate::world::Player::sharing`]) gives each resource to the players, in order, it counts
     /// as allies and who count it as theirs ([`World::shares_with`]): their slot 0xf8 with `stat`
     /// and no sharing. Attribute 11's peak (`+0x6fc`, unsaved) is not held; no resource add
@@ -143,7 +160,7 @@ impl World {
         kind: AttributeId,
         amount: Amount,
         stat: ResourceStat,
-        share: bool,
+        share: ResourceShare,
     ) -> Result<(), GenieError> {
         let player = self.players.player_mut(p)?;
         let k = kind.index();
@@ -165,10 +182,10 @@ impl World {
                 };
             }
         }
-        if share && player.sharing && kind.is_resource() {
+        if share == ResourceShare::Shared && player.sharing && kind.is_resource() {
             for q in PlayerId::each(self.players.len()) {
                 if q != p && self.shares_with(p, q) {
-                    self.add_resource(q, kind, amount, stat, false)?;
+                    self.add_resource(q, kind, amount, stat, ResourceShare::Unshared)?;
                 }
             }
         }
@@ -191,7 +208,7 @@ impl World {
             .player(p)
             .ok()
             .and_then(|pl| pl.relations.get(q).copied());
-        if !mine.is_some_and(|r| r.allied(true)) {
+        if !mine.is_some_and(|r| r.allied(AllyTest::WithRelation4)) {
             return false;
         }
         p != PlayerId::GAIA
@@ -201,7 +218,7 @@ impl World {
                 .player(q)
                 .ok()
                 .and_then(|pl| pl.relations.get(p))
-                .is_some_and(|r| r.allied(true))
+                .is_some_and(|r| r.allied(AllyTest::WithRelation4))
     }
 
     /// `WorldPlayer::update` after `WorldPlayerBase::update`: player `p`'s scout map (`+0x1370`,

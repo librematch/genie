@@ -16,6 +16,7 @@ use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::unit::Unit;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::AmountRate;
 use crate::players::PlayerId;
@@ -53,8 +54,8 @@ pub(crate) fn victim_in(
         roles,
     );
     v.allied = Allied {
-        by_attacker: dip.allied(attacker, p, true),
-        by_target: dip.allied(p, attacker, true),
+        by_attacker: dip.allied(attacker, p, AllyTest::WithRelation4),
+        by_target: dip.allied(p, attacker, AllyTest::WithRelation4),
     };
     v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
     v.tile_place = spatial.tile_place(u.id);

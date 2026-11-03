@@ -2,6 +2,7 @@
 //! the packet's bytes; a packet whose command would not stays raw.
 
 use crate::{decode, encode};
+use genie_core::commands::Bell;
 use genie_core::commands::Shift;
 use genie_core::commands::{
     AllBackToWorkCommand, AttackMoveCommand, AutoScoutCommand, BuildCommand, BuildWallCommand,
@@ -805,7 +806,7 @@ fn the_object_commands_keep_their_fields() {
             Command::TownBell(TownBellCommand {
                 player: player_id(2),
                 id: object_id(94),
-                activate: true,
+                bell: Bell::Ring,
             }),
         ),
         (

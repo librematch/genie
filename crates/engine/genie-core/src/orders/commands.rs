@@ -14,6 +14,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::sprite::new_sprite;
 use crate::orders::{lock_gate, set_stance};
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
@@ -396,9 +397,9 @@ impl World {
     /// player the world lacks.
     pub(crate) fn mutual_allies(&self, a: PlayerId, b: PlayerId) -> bool {
         let allied = |from: PlayerId, to: PlayerId| {
-            self.players
-                .get(from.index())
-                .is_some_and(|p| task_finder_allied(&p.relations, from, to, true))
+            self.players.get(from.index()).is_some_and(|p| {
+                task_finder_allied(&p.relations, from, to, AllyTest::WithRelation4)
+            })
         };
         allied(a, b) && allied(b, a)
     }

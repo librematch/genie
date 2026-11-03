@@ -54,7 +54,7 @@ mod walks;
 pub(crate) mod world_side;
 
 pub use self::build_state::BuildState;
-pub use self::clearing::{ClearLook, Cleared, ClearingSite};
+pub use self::clearing::{ClearLook, Cleared, Clearer, ClearingSite};
 pub(crate) use self::clearing::{clearing_objects, footprint_clearing};
 
 pub use self::drop_off::DropSearch;

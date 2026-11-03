@@ -45,6 +45,7 @@ use crate::world::WorldTime;
 
 mod counts;
 mod income;
+pub use self::income::ResourceShare;
 mod tech_tree;
 use genie_model::players::world_player::tree_ids;
 mod update;

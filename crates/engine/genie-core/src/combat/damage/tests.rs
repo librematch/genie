@@ -75,6 +75,8 @@ fn building_relics_scale_its_elevation_factor() {
 use super::*;
 use crate::combat::abilities::REMOVAL_REWARD;
 use crate::combat::damage::armor::{OwnSlot, class_armor};
+use crate::combat::damage::blasts::BlastHit;
+use crate::combat::damage::shown_values::HpPart;
 use crate::construction::MainBuildingId;
 use crate::construction::build::NOT_HELD;
 use crate::map::Tile;
@@ -424,10 +426,10 @@ fn hunter_strikes_its_sheep_for_twelve() {
 fn hit_point_share_reads_the_powerups_and_the_master() {
     let mut v = hunter();
     assert_eq!(
-        (v.shown_hp(), v.most_hp(), v.hp_share(false)),
+        (v.shown_hp(), v.most_hp(), v.hp_share(HpPart::Held)),
         (HitPoints::new(25.0), HitPoints::new(25.0), 1.0)
     );
-    assert_eq!(v.hp_share(true), 0.0);
+    assert_eq!(v.hp_share(HpPart::Lacking), 0.0);
     v.hp = HitPoints::new(10.0);
     v.armored.as_mut().unwrap().hp_powerup = HpPowerup {
         taken: HitPoints::new(2.0),
@@ -437,10 +439,10 @@ fn hit_point_share_reads_the_powerups_and_the_master() {
         (v.shown_hp(), v.most_hp()),
         (HitPoints::new(13.0), HitPoints::new(30.0))
     );
-    assert_eq!(v.hp_share(false), 13.0 / 30.0);
-    assert_eq!(v.hp_share(true), 1.0 - 13.0 / 30.0);
+    assert_eq!(v.hp_share(HpPart::Held), 13.0 / 30.0);
+    assert_eq!(v.hp_share(HpPart::Lacking), 1.0 - 13.0 / 30.0);
     v.hp = HitPoints::new(40.0);
-    assert_eq!(v.hp_share(false), 1.0);
+    assert_eq!(v.hp_share(HpPart::Held), 1.0);
     let mut rge = hunter();
     rge.kind = MasterKind::RGE_COMBAT;
     rge.hp = HitPoints::new(10.0);
@@ -454,13 +456,16 @@ fn hit_point_share_reads_the_powerups_and_the_master() {
     );
     let mut none = hunter();
     none.master_hp = MasterHitPoints::of_data(0);
-    assert_eq!((none.hp_share(false), none.hp_share(true)), (0.0, 0.0));
+    assert_eq!(
+        (none.hp_share(HpPart::Held), none.hp_share(HpPart::Lacking)),
+        (0.0, 0.0)
+    );
     let mut nan = hunter();
     nan.armored.as_mut().unwrap().hp_powerup = HpPowerup {
         taken: HitPoints::ZERO,
         max: HitPoints::new(f32::NAN),
     };
-    assert!(nan.hp_share(false).is_nan());
+    assert!(nan.hp_share(HpPart::Held).is_nan());
 }
 
 /// `FUN_14107ce60`: each task of action type 0xa0 that fits the target adds its amount per
@@ -2123,7 +2128,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &melee,
             &enemy,
             (1.0, d2),
-            false,
+            BlastHit::Splash,
             &tuning().damage
         ),
         1.0
@@ -2138,7 +2143,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &falling,
             &enemy,
             (1.0, d2),
-            false,
+            BlastHit::Splash,
             &tuning().damage
         ),
         0.5
@@ -2149,7 +2154,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &falling,
             &enemy,
             (1.0, d2),
-            true,
+            BlastHit::Main,
             &tuning().damage
         ),
         1.0
@@ -2164,7 +2169,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &missile,
             &enemy,
             (1.0, d2),
-            true,
+            BlastHit::Main,
             &tuning().damage
         ),
         0.5
@@ -2179,7 +2184,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &missile,
             &main,
             (1.0, d2),
-            true,
+            BlastHit::Main,
             &tuning().damage
         ),
         1.0
@@ -2191,7 +2196,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &missile,
             &main,
             (1.0, d2),
-            false,
+            BlastHit::Splash,
             &tuning().damage
         ),
         0.5
@@ -2204,7 +2209,7 @@ fn blast_factor_takes_the_friendly_fire_and_the_falloff() {
             &melee,
             &enemy,
             (1.0, d2),
-            false,
+            BlastHit::Splash,
             &tuning().damage
         ),
         0.25

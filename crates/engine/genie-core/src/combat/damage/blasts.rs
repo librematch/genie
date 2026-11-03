@@ -266,7 +266,11 @@ pub(super) fn blast_one(
     {
         return Ok(());
     }
-    let is_main = Some(t.id) == b.main;
+    let hit = if Some(t.id) == b.main {
+        BlastHit::Main
+    } else {
+        BlastHit::Splash
+    };
     let ledger = blast_ledger(targets, i)?;
     let (share, defense, blast_taken) = ledger_values(targets, i, ledger, a)?;
     if !(BlastDefense::ALWAYS_REACHED <= defense || a.blast_level.reaches(defense)) {
@@ -277,7 +281,7 @@ pub(super) fn blast_one(
         .of_master(a.master_id)
         .contains(MasterRoles::BUILDINGS_ONLY_BLAST)
         && t.kind != MasterKind::BUILDING
-        && !is_main
+        && hit == BlastHit::Splash
     {
         return Ok(());
     }
@@ -287,8 +291,8 @@ pub(super) fn blast_one(
     if MasterKind::COMBAT <= t.kind && shield(t, false) {
         return Ok(());
     }
-    let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), is_main, damage_tuning);
-    if !is_main {
+    let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), hit, damage_tuning);
+    if hit == BlastHit::Splash {
         if outside_cone(attacker, a, t, (d2, b.wide.get()), damage_tuning)? {
             return Ok(());
         }
@@ -382,17 +386,26 @@ pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f3
     }
 }
 
+/// Whom a blast hits: its main target (the missile's or the attack's) or another in its radius.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BlastHit {
+    /// The main target.
+    Main,
+    /// Another.
+    Splash,
+}
+
 /// The blast's damage factor on `t` at square distance `d2` within radius `r`: the attacker's
 /// elevation factor, times `t`'s `friendly_fire_damage` when it is of type 70 and up and its player
 /// is the attacker's or allied, times the falloff `(r - d) / r` (a melee attacker's only with
-/// [`BlastLevel::FALLS_OFF`] and not on `main`; a missile's everywhere, at distance 0 on a `main`
-/// building).
+/// [`BlastLevel::FALLS_OFF`] and not on the main target; a missile's everywhere, at distance 0 on
+/// the main target's building, [`BlastHit`]).
 pub(super) fn blast_falloff(
     attacker: &Victim,
     a: &Attacker,
     t: &Victim,
     (r, d2): (f32, f32),
-    is_main: bool,
+    hit: BlastHit,
     damage_tuning: &DamageTuning,
 ) -> f32 {
     let mut f = elevation_factor(
@@ -405,11 +418,11 @@ pub(super) fn blast_falloff(
         f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire.get());
     }
     if a.missile.is_none() {
-        if a.blast_level.contains(BlastLevel::FALLS_OFF) && !is_main {
+        if a.blast_level.contains(BlastLevel::FALLS_OFF) && hit == BlastHit::Splash {
             f *= (r - sqrt(d2)) / r;
         }
     } else {
-        let d = if !is_main || t.kind != MasterKind::BUILDING {
+        let d = if hit == BlastHit::Splash || t.kind != MasterKind::BUILDING {
             sqrt(d2)
         } else {
             0.0

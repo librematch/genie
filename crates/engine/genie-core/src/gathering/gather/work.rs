@@ -20,6 +20,7 @@ use crate::world::layer::AttributeRoles;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::settings::FarmMode;
 use crate::world::slots::PlayerSlots;
 use crate::world::step::Step;
 use std::mem::take as mem_take;
@@ -92,7 +93,7 @@ impl GatherAction {
         self.state = GatherState::Work;
         self.worked = true;
         self.timer = Seconds::ZERO;
-        if !r.farm_stops {
+        if r.farm_mode == FarmMode::Fixed {
             let at = unit.place.position();
             self.gather_at = at.ground();
         }

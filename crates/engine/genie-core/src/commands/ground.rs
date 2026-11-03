@@ -2,6 +2,7 @@
 //! clearing and its place.
 
 use crate::construction::FoundationId;
+use crate::construction::build::Clearer;
 use crate::map::Footprint;
 use crate::map::Point;
 use crate::map::Position;
@@ -249,8 +250,8 @@ impl World {
     }
 
     /// The footprint clearing (`FUN_1415c3620` with `param_7` 0) of a new building of `master`
-    /// of `player` at `at`: the building constructor's (`FUN_1411de5f0`, `trees` false) and a new
-    /// object's (`FUN_14162ce00` with its flag, `trees` true). The objects it takes
+    /// of `player` at `at`, by the [`Clearer`]: the building constructor (`FUN_1411de5f0`) or a
+    /// new object (`FUN_14162ce00` with its flag). The objects it takes
     /// ([`crate::construction::build::footprint_clearing`]), each in the tiles' order: [`World::clear_object`].
     /// Nothing for a master the player has not got.
     ///
@@ -262,7 +263,7 @@ impl World {
         player: PlayerId,
         master: MasterId,
         at: Point,
-        trees: bool,
+        by: Clearer,
     ) -> Result<(), GenieError> {
         let Some(m) = player_master(&self.model.masters, player, master) else {
             return Ok(());
@@ -273,7 +274,7 @@ impl World {
             class: m.class,
             radius: m.radius,
             at,
-            trees,
+            by,
         };
         let mut looks: BTreeMap<ObjectId, ClearLook> = BTreeMap::new();
         for id in clearing_objects(&self.spatial, at, &self.model.tuning.build) {
@@ -290,7 +291,7 @@ impl World {
         )?;
         for cl in cleared {
             self.clear_object(cl, false)?;
-            if !trees {
+            if by == Clearer::Constructor {
                 continue;
             }
             // FUN_141189670 after its destroy: unless +0x686 is set, a tall master's (COMISS: a

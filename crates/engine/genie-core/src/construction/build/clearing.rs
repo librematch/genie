@@ -40,9 +40,18 @@ pub struct ClearingSite {
     pub radius: Footprint,
     /// Its place.
     pub at: Point,
-    /// `param_6`: the builder's call (the Build's `set_state(7)`) or a new object's
-    /// (`FUN_14162ce00` with its flag).
-    pub trees: bool,
+    /// `param_6`: who clears.
+    pub by: Clearer,
+}
+
+/// Who calls the footprint clearing (`FUN_1415c3620`'s `param_6`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Clearer {
+    /// The builder (1: the Build's `set_state(7)`) or a new object with its flag
+    /// (`FUN_14162ce00`): the trees go too.
+    Builder,
+    /// The building constructor (0, `FUN_1411de5f0`).
+    Constructor,
 }
 
 /// What the footprint clearing reads of an object on a tile besides its place: its hit points
@@ -117,7 +126,7 @@ pub(crate) fn footprint_clearing(
     // a stopped player's units may have felled a tree there since they froze: the builder's
     // choice, which reads the trees' hit points, wants the tiles known; the constructor's reads
     // only masters and owners, which they do not change
-    if site.trees {
+    if site.by == Clearer::Builder {
         world.check_known(Rect::new(
             f32::from(x0),
             f32::from(y0),
@@ -213,7 +222,7 @@ pub(super) fn clearing_takes(
     // The wall class (27, `0x1b`): two walls beside a builder on a footprint's diagonal stop it.
     let own_wall =
         o.player == site.player && under_gate && roles.of_class(o.class).contains(ClassRoles::WALL);
-    let tree = site.trees && roles.of_class(o.class).contains(ClassRoles::TREE);
+    let tree = site.by == Clearer::Builder && roles.of_class(o.class).contains(ClassRoles::TREE);
     if !o.buildable_on.cleared() && !own_wall && !tree {
         return Ok(None);
     }
@@ -248,7 +257,7 @@ pub(super) fn clearing_takes(
         MasterKind::COMBAT <= seen.kind && seen.state < ObjectState::Dying && !seen.roo_called;
     let destroy_drops = dies
         && (seen.kind < MasterKind::BUILDING || (!seen.desolid && Distance::ZERO < seen.height));
-    let roo_drops = site.trees
+    let roo_drops = site.by == Clearer::Builder
         && !seen.roo_called
         && !dies
         && (below_or_unordered(0.0, seen.height.get()) || o.obstruction.is_some());

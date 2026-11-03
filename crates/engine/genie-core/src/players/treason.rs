@@ -6,6 +6,7 @@
 //! player's slot 0x1c0 with master 697 ([`World::remains`]).
 
 use crate::GenieError;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
@@ -71,7 +72,12 @@ impl World {
             .checked_mut(self.model.slots.attribute.gold.index())? = gold - Amount::new(cost);
         let n = self.players.len();
         for i in PlayerId::each(n).skip(1) {
-            if allied(&self.players.player(p)?.relations, p, i, false) {
+            if allied(
+                &self.players.player(p)?.relations,
+                p,
+                i,
+                AllyTest::AlliesOnly,
+            ) {
                 continue;
             }
             let Some(king) = self
@@ -94,7 +100,12 @@ impl World {
                 None => king.position(),
             };
             for j in PlayerId::each(n).skip(1) {
-                if allied(&self.players.player(p)?.relations, p, j, false) {
+                if allied(
+                    &self.players.player(p)?.relations,
+                    p,
+                    j,
+                    AllyTest::AlliesOnly,
+                ) {
                     self.remains(j, self.model.slots.master.flare_4, at, None)?;
                     self.made_new_object(j)?;
                 }

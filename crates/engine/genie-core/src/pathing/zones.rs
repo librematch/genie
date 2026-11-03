@@ -376,6 +376,15 @@ pub struct Zones {
     maps: Vec<ZoneMap>,
 }
 
+/// Whether the zone maps' lookup ([`Zones::find`]) labels a found map again from the terrain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Relabel {
+    /// It labels it again (`FUN_141413190`).
+    Again,
+    /// It keeps its labels.
+    Kept,
+}
+
 impl Zones {
     /// The zone maps a save holds, in its order.
     #[must_use]
@@ -392,7 +401,7 @@ impl Zones {
     /// The index of the zone map of a restriction whose value per terrain is `values`
     /// (`FUN_1414138d0`): the first map whose own values are no more than the query's and agree
     /// with the query's first ones in their signs (`0 < v`; a map of no values matches any
-    /// query), labelled again from the terrain `kinds` when `relabel` is set (`FUN_141413190`,
+    /// query), labelled again from the terrain `kinds` with [`Relabel::Again`] (`FUN_141413190`,
     /// only the random map's terrain generator asks); else a new map of the terrain `kinds`,
     /// appended.
     pub fn find(
@@ -400,7 +409,7 @@ impl Zones {
         size: GridSize,
         kinds: &[TerrainId],
         values: &Restriction,
-        relabel: bool,
+        relabel: Relabel,
     ) -> usize {
         let query = values.values();
         let found = self.maps.iter().position(|m| {
@@ -408,7 +417,9 @@ impl Zones {
                 && m.passable.iter().zip(query).all(|(&p, &v)| p == (0.0 < v))
         });
         if let Some(i) = found {
-            if relabel && let Some(map) = self.maps.get_mut(i) {
+            if relabel == Relabel::Again
+                && let Some(map) = self.maps.get_mut(i)
+            {
                 map.label(kinds);
             }
             return i;
@@ -438,7 +449,7 @@ impl Zones {
         kinds: &[TerrainId],
         values: &Restriction,
     ) -> Result<&ZoneMap, GenieError> {
-        let i = self.find(size, kinds, values, false);
+        let i = self.find(size, kinds, values, Relabel::Kept);
         self.maps.checked(i)
     }
 }
@@ -753,7 +764,7 @@ mod tests {
                 GridSize::new(2, 2),
                 &ids(&kinds),
                 &Restriction::new(vec![1.0, 0.0]),
-                false
+                Relabel::Kept
             ),
             0
         );
@@ -763,7 +774,7 @@ mod tests {
                 GridSize::new(2, 2),
                 &ids(&kinds),
                 &Restriction::new(vec![1.0, 0.0, 1.0]),
-                false
+                Relabel::Kept
             ),
             0
         );
@@ -773,7 +784,7 @@ mod tests {
                 GridSize::new(2, 2),
                 &ids(&kinds),
                 &Restriction::new(vec![1.0]),
-                false
+                Relabel::Kept
             ),
             1
         );
@@ -784,7 +795,7 @@ mod tests {
                 GridSize::new(2, 2),
                 &ids(&kinds),
                 &Restriction::new(vec![]),
-                false
+                Relabel::Kept
             ),
             0
         );
@@ -793,7 +804,7 @@ mod tests {
                 GridSize::new(2, 2),
                 &ids(&kinds),
                 &Restriction::new(vec![0.0, 1.0]),
-                false
+                Relabel::Kept
             ),
             0
         );
@@ -806,7 +817,7 @@ mod tests {
             GridSize::new(3, 3),
             &ids(&WALL),
             &Restriction::new(vec![1.0, 0.0]),
-            false,
+            Relabel::Kept,
         );
         let before = zones.map(i).unwrap().clone();
         // the wall is gone: one patch, the count 1; the tile counts and the adjacency stay
@@ -814,7 +825,7 @@ mod tests {
             GridSize::new(3, 3),
             &ids(&[0; 9]),
             &Restriction::new(vec![1.0, 0.0]),
-            true,
+            Relabel::Again,
         );
         let after = zones.map(i).unwrap();
         assert_eq!(after.zone(Tile::new(2, 2)), ZoneId::OFF_MAP);
@@ -828,7 +839,7 @@ mod tests {
             GridSize::new(3, 3),
             &ids(&WALL),
             &Restriction::new(vec![1.0, 0.0]),
-            false,
+            Relabel::Kept,
         );
         assert_eq!(zones.map(i).unwrap().zone(Tile::new(1, 0)), ZoneId::OFF_MAP);
     }

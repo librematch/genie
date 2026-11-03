@@ -21,6 +21,16 @@ use crate::map::spatial::{Placed, QUERY_HITS, RecordId, Spatial, tile_record_id}
 use crate::math::image::spatial::{NO_SPOT as SPATIAL_NO_SPOT, TILE_CENTRE};
 use crate::world::index::ObjectsRef;
 
+/// Whether the obstruction manager's point query counts a moving object's record (its flag
+/// 0x40, [`Spatial::point_hit`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Movers {
+    /// It counts (no flag).
+    Counted,
+    /// It is left out (0x40).
+    LeftOut,
+}
+
 impl Spatial {
     /// `FUN_1411566b0`: the tile beside a footprint at `at` of radii `radius` a unit at `from`
     /// with terrain mask `mask` goes to: a flood over passable tiles from the footprint's own
@@ -220,7 +230,7 @@ impl Spatial {
         let own = [RecordId::from(me)];
         self.set_manager_ignore(&own);
         self.set_manager_buffer(None);
-        Ok(!self.point_hit(point, grow, &own, false, by_id)?)
+        Ok(!self.point_hit(point, grow, &own, Movers::Counted, by_id)?)
     }
 
     /// Slot 0x270 of unit `me` (`FUN_141158940`): whether it could stand at `point` among the
@@ -258,17 +268,17 @@ impl Spatial {
         self.set_manager_ignore(&ignore);
         // the buffer it set for the query it resets after (FUN_1410562d0 with 0)
         self.set_manager_buffer(None);
-        Ok(!self.point_hit(point, grow, &ignore, false, by_id)?)
+        Ok(!self.point_hit(point, grow, &ignore, Movers::Counted, by_id)?)
     }
 
     /// The obstruction manager's point query (`FUN_141051900` with flags 0x20, any player, the
     /// point test `FUN_141052160`) at `point` with the manager's buffer `grow` (`+0x57`, `+0x58`)
-    /// and ignore list `ignore` (`+0x2c`, `FUN_1410562e0`): whether a record holds the point
-    /// within its box grown by `grow`, edges included, of the records of every kind in the cells
-    /// the query visits ([`Spatial::visits`]), the temporary tile records still put among them
-    /// ([`Spatial::put_tile_records`]); with `still` (flag 0x40) an object that moves (the
-    /// record's `+3` bit 0x10, [`Gait::moving`]) is left out. A grown point beyond the map's edge
-    /// meets the edge's records ([`Spatial::edge_records`]).
+    /// and ignore list `ignore` (`+0x2c`, `FUN_1410562e0`): whether a record holds the point within
+    /// its box grown by `grow`, edges included, of the records of every kind in the cells the query
+    /// visits ([`Spatial::visits`]), the temporary tile records still put among them
+    /// ([`Spatial::put_tile_records`]); with [`Movers::LeftOut`] (flag 0x40) an object that moves
+    /// (the record's `+3` bit 0x10, [`Gait::moving`]) is left out. A grown point beyond the map's
+    /// edge meets the edge's records ([`Spatial::edge_records`]).
     ///
     /// # Errors
     ///
@@ -280,7 +290,7 @@ impl Spatial {
         point: Point,
         grow: Distance,
         ignore: &[RecordId],
-        still: bool,
+        movers: Movers,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
@@ -298,12 +308,12 @@ impl Spatial {
         if tile {
             return Ok(true);
         }
-        self.object_holds(point, grow, ignore, still, by_id)
+        self.object_holds(point, grow, ignore, movers, by_id)
     }
 
-    /// The objects' records of [`Spatial::point_hit`]'s query (`FUN_141051900` with flags 0x20,
-    /// the point test `FUN_141052160`): whether a record with an object (`+8`), not one of
-    /// `ignore`, holds `point` within its box grown by `grow`, edges included (with `still` a
+    /// The objects' records of [`Spatial::point_hit`]'s query (`FUN_141051900` with flags 0x20, the
+    /// point test `FUN_141052160`): whether a record with an object (`+8`), not one of `ignore`,
+    /// holds `point` within its box grown by `grow`, edges included (with [`Movers::LeftOut`] a
     /// moving object's is left out); the edge's and the tiles' records have no object.
     ///
     /// # Errors
@@ -314,7 +324,7 @@ impl Spatial {
         point: Point,
         grow: Distance,
         ignore: &[RecordId],
-        still: bool,
+        movers: Movers,
         by_id: ObjectsRef<'_>,
     ) -> Result<bool, GenieError> {
         let rect = Rect::between(point, point).grown(grow);
@@ -326,7 +336,7 @@ impl Spatial {
             else {
                 return false;
             };
-            if still && by_id.moving(id) {
+            if movers == Movers::LeftOut && by_id.moving(id) {
                 return false;
             }
             if !self.visits(p, o.kind, rect) {

@@ -16,6 +16,7 @@ use crate::objects::masters::TaskGroup;
 use crate::objects::masters::{Master, Masters};
 use crate::objects::masters::{MasterTables, Task};
 use crate::objects::unit::Unit;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::{NO_RELATIONS, Relations};
 use crate::unit_ai::task_finder::{Actor, Diplomacy, DropSite, TaskOn, TaskTarget};
@@ -46,12 +47,12 @@ pub(crate) struct TaskWorld<'a> {
 
 impl Diplomacy for TaskWorld<'_> {
     /// [`crate::unit_ai::task_finder::allied`] with `from`'s diplomacy.
-    fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
+    fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
         let relations = self
             .players
             .player(from)
             .map_or(&NO_RELATIONS, |p| &p.relations);
-        task_finder_allied(relations, from, to, with_ally)
+        task_finder_allied(relations, from, to, test)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
@@ -71,7 +72,7 @@ pub(crate) struct SideWorld<'a> {
 
 impl Diplomacy for SideWorld<'_> {
     /// [`crate::unit_ai::task_finder::allied`] with `from`'s diplomacy.
-    fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
+    fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
         let relations = if from == self.player {
             self.relations
         } else {
@@ -79,7 +80,7 @@ impl Diplomacy for SideWorld<'_> {
                 .player(from)
                 .map_or(&NO_RELATIONS, |p| &p.relations)
         };
-        task_finder_allied(relations, from, to, with_ally)
+        task_finder_allied(relations, from, to, test)
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {

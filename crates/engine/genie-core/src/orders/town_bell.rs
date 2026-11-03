@@ -4,6 +4,7 @@
 //! `mBackToWork1` and `mBackToWork2`.
 
 use crate::GenieError;
+use crate::commands::Bell;
 use crate::garrison::ContainerId;
 use crate::garrison::ShelterReach;
 use crate::garrison::Shelters;
@@ -25,6 +26,7 @@ use crate::objects::masters::MasterKind;
 use crate::orders::Dispatch;
 use crate::orders::Work;
 use crate::orders::{GARRISON, own_order_target};
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::tracker::ListKey;
 use crate::unit_ai::AiAction;
@@ -210,14 +212,14 @@ impl World {
     /// `TOWN_BELL` (0x7f, `do_command`): the object `id` (none for −1, `FUN_140e6bad0`) of the
     /// commanding `player`, or of any player while players may order each other's
     /// ([`crate::world::settings::Settings::cheats_enabled`], `FUN_1412ffe00`; the cheat `+0xb12` is not held),
-    /// rings its owner's bell (`activate`, [`crate::world::World::ring_town_bell`]) or ends it
+    /// rings its owner's bell ([`Bell::Ring`], [`crate::world::World::ring_town_bell`]) or ends it
     /// ([`crate::world::World::end_town_bell`]). A special object's (`+0x30c` bit 0) UI flag is
     /// not simulation.
     pub(crate) fn town_bell(
         &mut self,
         player: PlayerId,
         id: ObjectId,
-        activate: bool,
+        bell: Bell,
     ) -> Result<(), GenieError> {
         let Some((owner, _)) = self.object(id) else {
             return Ok(());
@@ -225,10 +227,9 @@ impl World {
         if owner != player && !self.settings.cheats_enabled {
             return Ok(());
         }
-        if activate {
-            self.ring_town_bell(owner, id)
-        } else {
-            self.end_town_bell(owner, id)
+        match bell {
+            Bell::Ring => self.ring_town_bell(owner, id),
+            Bell::End => self.end_town_bell(owner, id),
         }
     }
 
@@ -566,7 +567,7 @@ impl World {
             };
             (tm.kind == MasterKind::BUILDING
                 && t.life.state == ObjectState::Alive
-                && world.allied(player, tp, true)
+                && world.allied(player, tp, AllyTest::WithRelation4)
                 && tm
                     .building
                     .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS)))
@@ -864,6 +865,7 @@ mod tests {
 
     mod rings {
         use super::{bell, set_bell};
+        use crate::commands::Bell;
         #[cfg(test)]
         use crate::garrison::ContainerId;
         use crate::garrison::tests::{
@@ -907,7 +909,8 @@ mod tests {
                 Point::new(45.5, 45.5),
             );
             walker(&mut t, PlayerId::new(1), 1002, ARCHER, Point::new(6.5, 5.5));
-            t.town_bell(player_id(1), object_id(100), true).unwrap();
+            t.town_bell(player_id(1), object_id(100), Bell::Ring)
+                .unwrap();
             assert_eq!(
                 [1000, 1001, 1002].map(|id| enter(&t, id)),
                 [Some(object_id(100)), None, None]
@@ -926,10 +929,12 @@ mod tests {
                 Point::new(5.5, 5.5),
             );
             // player 2 rings player 1's centre: refused
-            t.town_bell(player_id(2), object_id(100), true).unwrap();
+            t.town_bell(player_id(2), object_id(100), Bell::Ring)
+                .unwrap();
             assert_eq!(enter(&t, 1000), None);
             t.settings.cheats_enabled = true;
-            t.town_bell(player_id(2), object_id(100), true).unwrap();
+            t.town_bell(player_id(2), object_id(100), Bell::Ring)
+                .unwrap();
             assert_eq!(enter(&t, 1000), Some(object_id(100)));
             // an object that is no town centre rings nothing; nor does an id the world lacks
             let mut t = let_out_world();
@@ -940,8 +945,10 @@ mod tests {
                 VILLAGER,
                 Point::new(5.5, 5.5),
             );
-            t.town_bell(player_id(1), object_id(1000), true).unwrap();
-            t.town_bell(player_id(1), object_id(4242), true).unwrap();
+            t.town_bell(player_id(1), object_id(1000), Bell::Ring)
+                .unwrap();
+            t.town_bell(player_id(1), object_id(4242), Bell::Ring)
+                .unwrap();
             assert_eq!(enter(&t, 1000), None);
         }
 
@@ -990,7 +997,8 @@ mod tests {
             set_bell(&mut t, 1003, |b| b.flag = true);
             set_bell(&mut t, 1003, |b| b.work.point = Point::new(1.5, 1.5));
             tracked(&mut t, VILLAGER, &[1000, 1001, 1002]);
-            t.town_bell(player_id(1), object_id(100), false).unwrap();
+            t.town_bell(player_id(1), object_id(100), Bell::End)
+                .unwrap();
             assert!(!bell(&t, 100).flag);
             let v = t.object(object_id(1000)).unwrap().1;
             assert_eq!(
@@ -1026,7 +1034,8 @@ mod tests {
                 v.work.point = Point::new(3.5, -1.0);
             });
             tracked(&mut t, VILLAGER, &[1001]);
-            t.town_bell(player_id(1), object_id(100), false).unwrap();
+            t.town_bell(player_id(1), object_id(100), Bell::End)
+                .unwrap();
             assert_eq!(goal(&t, 1001), (None, true));
         }
         #[test]

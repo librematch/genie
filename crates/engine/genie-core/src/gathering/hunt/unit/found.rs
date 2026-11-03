@@ -14,6 +14,7 @@ use crate::objects::masters::MasterTables;
 use crate::objects::masters::TaskSprites;
 use crate::objects::sprite::new_sprite;
 use crate::objects::unit::Unit;
+use crate::players::AllyTest;
 use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied;
 use crate::world::layer::MasterRoles;
@@ -60,7 +61,7 @@ impl Unit {
             state: t.life.state,
             player: owner,
             amount: t.life.amount,
-            allied: allied(relations, c.player, owner, true),
+            allied: allied(relations, c.player, owner, AllyTest::WithRelation4),
             top_action: c.w.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         };

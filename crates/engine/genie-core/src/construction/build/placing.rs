@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::construction::FootprintWaits;
 use crate::construction::FoundationId;
 use crate::construction::build::BuildState;
+use crate::construction::build::Clearer;
 use crate::construction::build::{
     BUILDER_UNMOVING, BuildAction, BuildReads, ClearingSite, FOREIGN_SITE, SITE_GONE,
     footprint_clearing,
@@ -80,7 +81,7 @@ impl BuildAction {
             class: placed.class,
             radius: placed.radius,
             at: placed.position.ground(),
-            trees: true,
+            by: Clearer::Builder,
         };
         let cleared = footprint_clearing(
             &c.w.spatial,

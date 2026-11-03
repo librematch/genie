@@ -12,6 +12,7 @@ use genie_core::objects::ObjectId;
 use genie_core::objects::ObjectState;
 use genie_core::objects::lifecycle::Held;
 use genie_core::objects::masters::{Master, Masters};
+use genie_core::players::AllyTest;
 use genie_core::players::Amount;
 use genie_core::players::CivId;
 use genie_core::players::PlayerId;
@@ -77,13 +78,13 @@ fn world(relation: u8) -> FinderWorld {
 #[test]
 fn allied_follows_the_relation() {
     let w = world(0);
-    assert!(w.allied(PlayerId::new(1), PlayerId::new(1), false));
-    assert!(!w.allied(PlayerId::new(1), PlayerId::new(0), true));
-    assert!(w.allied(PlayerId::new(1), PlayerId::new(2), false));
-    assert!(world(4).allied(PlayerId::new(1), PlayerId::new(2), true));
-    assert!(!world(4).allied(PlayerId::new(1), PlayerId::new(2), false));
-    assert!(!world(3).allied(PlayerId::new(1), PlayerId::new(2), true));
-    assert!(!w.allied(PlayerId::new(5), PlayerId::new(2), true));
+    assert!(w.allied(PlayerId::new(1), PlayerId::new(1), AllyTest::AlliesOnly));
+    assert!(!w.allied(PlayerId::new(1), PlayerId::new(0), AllyTest::WithRelation4));
+    assert!(w.allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
+    assert!(world(4).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::WithRelation4));
+    assert!(!world(4).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
+    assert!(!world(3).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::WithRelation4));
+    assert!(!w.allied(PlayerId::new(5), PlayerId::new(2), AllyTest::WithRelation4));
 }
 
 /// An annex stands for its main building, one step for each of `steps`; an object or a

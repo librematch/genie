@@ -23,6 +23,15 @@ pub enum Relation {
     Other(Unnamed),
 }
 
+/// Which relations the alliance test (`FUN_141663dc0`'s `with_ally` flag) counts as allied.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AllyTest {
+    /// An ally's and relation 4 (the flag set).
+    WithRelation4,
+    /// An ally's alone.
+    AlliesOnly,
+}
+
 /// A raw value of [`Relation`] that names none of its variants: only the set's own
 /// constructors make one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -57,11 +66,12 @@ impl Relation {
         self.raw()
     }
 
-    /// Whether the relation counts as allied (`FUN_141663dc0`): an ally always, relation 4 with
-    /// the ally flag `with_4`.
+    /// Whether the relation counts as allied (`FUN_141663dc0`): an ally always, relation 4 by
+    /// `test`.
     #[must_use]
-    pub const fn allied(self, with_4: bool) -> bool {
-        self.raw() == Self::Ally.raw() || (with_4 && self.raw() == Self::Relation4.raw())
+    pub const fn allied(self, test: AllyTest) -> bool {
+        self.raw() == Self::Ally.raw()
+            || (matches!(test, AllyTest::WithRelation4) && self.raw() == Self::Relation4.raw())
     }
 }
 
@@ -101,16 +111,16 @@ impl genie_diff::Diff for Relation {
 
 #[cfg(test)]
 mod tests {
-    use crate::players::Relation;
+    use crate::players::{AllyTest, Relation};
 
     /// An ally counts as allied; relation 4 only with the flag; a neutral or an enemy never.
     #[test]
     fn an_ally_and_relation_4_with_the_flag_count_as_allied() {
-        assert!(Relation::Ally.allied(false));
-        assert!(!Relation::Relation4.allied(false));
-        assert!(Relation::Relation4.allied(true));
-        assert!(!Relation::Neutral.allied(true));
-        assert!(!Relation::Enemy.allied(true));
+        assert!(Relation::Ally.allied(AllyTest::AlliesOnly));
+        assert!(!Relation::Relation4.allied(AllyTest::AlliesOnly));
+        assert!(Relation::Relation4.allied(AllyTest::WithRelation4));
+        assert!(!Relation::Neutral.allied(AllyTest::WithRelation4));
+        assert!(!Relation::Enemy.allied(AllyTest::WithRelation4));
         assert_eq!(Relation::from(3), Relation::Enemy);
         assert_eq!(Relation::default().get(), 0);
     }

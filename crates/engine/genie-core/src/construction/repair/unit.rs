@@ -29,6 +29,7 @@ use crate::objects::masters::{AttackPriority, MasterTables};
 use crate::objects::teardown::HeadCode;
 use crate::objects::unit::Unit;
 use crate::ownership::CaptureKind;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -214,7 +215,12 @@ fn repairee_of(
         state: t.life.state,
         hp: t.life.hp,
         owner: q,
-        allied: allied(&c.w.players.player(c.player)?.relations, c.player, q, true),
+        allied: allied(
+            &c.w.players.player(c.player)?.relations,
+            c.player,
+            q,
+            AllyTest::WithRelation4,
+        ),
         position: t.position(),
         radius: tm.radius,
         class: tm.class,

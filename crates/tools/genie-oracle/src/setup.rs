@@ -59,7 +59,7 @@ use genie_core::vision::VisionBits;
 use genie_core::vision::ghost::Ghost;
 use genie_core::world::parts::ObjectParts;
 use genie_core::world::parts::Part;
-use genie_core::world::settings::Settings;
+use genie_core::world::settings::{FarmMode, Settings};
 use genie_core::world::{
     Age, ContentMode, Formations, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Unread,
     Visibility,
@@ -521,7 +521,7 @@ pub const fn settings(o: &GameOptions) -> Settings {
         visibility_kind: Visibility::of_data(o.visibility_kind),
         sub_game_mode_flag: SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
         full_tech_tree: o.full_tech_tree_enabled != 0,
-        walkable_farms: o.walkable_farms != 0,
+        farm_mode: FarmMode::of_option(o.walkable_farms),
         selected_content_mode: ContentMode::of_data(o.selected_content_mode),
         villager_force_drop: o.villager_force_drop != 0,
         cheats_enabled: o.cheats_enabled != 0,

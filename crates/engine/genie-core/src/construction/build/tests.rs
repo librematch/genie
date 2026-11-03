@@ -1,5 +1,6 @@
 use super::*;
 use crate::construction::MainBuildingId;
+use crate::construction::build::Clearer;
 use crate::map::Footprint;
 use crate::map::GridSize;
 use crate::map::GroundOffset;
@@ -169,13 +170,13 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
     }
     let look: BTreeMap<ObjectId, ClearLook> =
         objects.iter().map(|o| (object_id(o.0), o.2)).collect();
-    let site = |class: ClassId, trees: bool| ClearingSite {
+    let site = |class: ClassId, by: Clearer| ClearingSite {
         player: PlayerId::new(1),
         master: ids::HOUSE,
         class,
         radius: Footprint::new(1.0, 1.0),
         at: Point::new(10.5, 10.5),
-        trees,
+        by,
     };
     let ids = |world: &Spatial, s: ClearingSite| -> Vec<ObjectId> {
         footprint_clearing(world, &s, &look, &roles(), &tuning().build)
@@ -185,15 +186,15 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
             .collect()
     };
     assert_eq!(
-        ids(&world, site(class::BUILDING, false)),
+        ids(&world, site(class::BUILDING, Clearer::Constructor)),
         [object_id(5), object_id(3), object_id(7)]
     );
     assert_eq!(
-        ids(&world, site(class::BUILDING, true)),
+        ids(&world, site(class::BUILDING, Clearer::Builder)),
         [object_id(5), object_id(3), object_id(8), object_id(7)]
     );
     assert_eq!(
-        ids(&world, site(class::GATE, false)),
+        ids(&world, site(class::GATE, Clearer::Constructor)),
         [object_id(4), object_id(5), object_id(3), object_id(7)]
     );
     // a wall of another player stays under a gate
@@ -205,11 +206,11 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
         },
     );
     assert_eq!(
-        ids(&world, site(class::GATE, false)),
+        ids(&world, site(class::GATE, Clearer::Constructor)),
         [object_id(5), object_id(3), object_id(7)]
     );
     // a master without radii clears nothing; a NaN radius is not 0 or less
-    let mut none = site(class::BUILDING, true);
+    let mut none = site(class::BUILDING, Clearer::Builder);
     none.radius = Footprint::new(0.0, 0.0);
     assert_eq!(ids(&world, none), Vec::<ObjectId>::new());
     none.radius = Footprint::new(f32::NAN, 0.0);
@@ -316,14 +317,14 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
     }
     let look: BTreeMap<ObjectId, ClearLook> =
         looks.iter().map(|&(id, l)| (object_id(id), l)).collect();
-    let goes = |trees: bool| -> Vec<ObjectId> {
+    let goes = |by: Clearer| -> Vec<ObjectId> {
         let s = ClearingSite {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             class: class::BUILDING,
             radius: Footprint::new(1.0, 1.0),
             at: Point::new(10.5, 10.5),
-            trees,
+            by,
         };
         footprint_clearing(&world, &s, &look, &roles(), &tuning().build)
             .unwrap()
@@ -333,10 +334,10 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
             .collect()
     };
     assert_eq!(
-        goes(true),
+        goes(Clearer::Builder),
         [object_id(1), object_id(2), object_id(5), object_id(7)]
     );
-    assert_eq!(goes(false), [object_id(5), object_id(7)]);
+    assert_eq!(goes(Clearer::Constructor), [object_id(5), object_id(7)]);
 }
 
 /// The completion's first part (`FUN_1411c6bd0`) of a farm whose build points reached its

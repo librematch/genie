@@ -34,6 +34,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::player_master;
 use crate::orders::nearest_table_site;
 use crate::orders::object_gone;
+use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
 use crate::unit_ai::OrderForce;
@@ -253,7 +254,7 @@ impl UnitSide for UnitView<'_, '_> {
                 &self.c.w.players.player(self.player)?.relations,
                 self.player,
                 owner,
-                true,
+                AllyTest::WithRelation4,
             ),
         }))
     }

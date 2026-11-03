@@ -24,6 +24,7 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::Task;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::allied;
@@ -244,7 +245,7 @@ impl World {
         owner: PlayerId,
     ) -> Result<Option<Bystander>, GenieError> {
         let relations = &self.players.player(owner)?.relations;
-        let allied = |q: PlayerId| allied(relations, owner, q, true);
+        let allied = |q: PlayerId| allied(relations, owner, q, AllyTest::WithRelation4);
         if let Some((q, u)) = self.object(id) {
             let m = u.master(self.master_tables(), q)?;
             return Ok(Some(Bystander {

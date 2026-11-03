@@ -18,6 +18,7 @@ use crate::players::MarketTrade;
 use crate::players::PlayerId;
 use crate::players::ResourceStat;
 use crate::players::attribute::AttributeId;
+use crate::players::world_player::ResourceShare;
 use crate::players::{NetTrades, Price, PriceSwing};
 use crate::world::World;
 use crate::world::layer::AttributeRoles;
@@ -210,10 +211,16 @@ impl World {
                 self.model.slots.attribute.gold,
                 Amount::new(gold),
                 ResourceStat::Gathered,
-                true,
+                ResourceShare::Shared,
             )?;
             let lot = volume.negated_f32();
-            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::None, true)?;
+            self.add_resource(
+                p,
+                commodity,
+                Amount::new(lot),
+                ResourceStat::None,
+                ResourceShare::Shared,
+            )?;
         }
         Ok(())
     }
@@ -260,7 +267,7 @@ impl World {
                 self.model.slots.attribute.gold,
                 Amount::new(-paid),
                 ResourceStat::None,
-                true,
+                ResourceShare::Shared,
             )?;
             self.market.trade(
                 commodity,
@@ -268,7 +275,13 @@ impl World {
                 &self.model.roles,
                 &self.model.tuning.market,
             );
-            self.add_resource(p, commodity, Amount::new(lot), ResourceStat::None, true)?;
+            self.add_resource(
+                p,
+                commodity,
+                Amount::new(lot),
+                ResourceStat::None,
+                ResourceShare::Shared,
+            )?;
         }
         Ok(())
     }

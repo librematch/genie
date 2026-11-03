@@ -3,6 +3,7 @@ use crate::construction::FoundationId;
 use crate::map::GridSize;
 use crate::map::TerrainMask;
 use crate::map::Tile;
+use crate::map::spatial::Movers;
 use crate::map::{Rect, Segment};
 use crate::movement::Speed;
 use crate::objects::HitPoints;
@@ -756,7 +757,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             &[],
-            true,
+            Movers::LeftOut,
             ObjectsRef::empty()
         )
         .unwrap()
@@ -772,7 +773,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             &[],
-            true,
+            Movers::LeftOut,
             ObjectsRef::empty()
         )
         .unwrap()
@@ -782,7 +783,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.85, 5.5),
             Distance::new(0.1),
             &[],
-            true,
+            Movers::LeftOut,
             ObjectsRef::empty()
         )
         .unwrap()
@@ -792,7 +793,7 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             Point::new(3.95, 5.5),
             Distance::new(0.1),
             &[tile_record_id(Tile::new(4, 5))],
-            true,
+            Movers::LeftOut,
             ObjectsRef::empty()
         )
         .unwrap()
@@ -2195,7 +2196,7 @@ fn the_manager_keeps_the_last_ignore_list_set() {
             Point::new(0.05, 4.5),
             Distance::new(0.1),
             &[],
-            false,
+            Movers::Counted,
             ObjectsRef::empty()
         )
         .unwrap()
@@ -2205,7 +2206,7 @@ fn the_manager_keeps_the_last_ignore_list_set() {
             Point::new(0.05, 4.5),
             Distance::new(0.1),
             &[],
-            false,
+            Movers::Counted,
             ObjectsRef::empty()
         )
         .unwrap()

@@ -6,6 +6,7 @@ use crate::GenieError;
 use crate::commands::GatherPoint;
 use crate::commands::GatherPointState;
 use crate::construction::FoundationId;
+use crate::construction::build::Clearer;
 use crate::construction::build::{Completion, Construction, StackUnit};
 use crate::gathering::PastureId;
 use crate::map::Position;
@@ -418,7 +419,7 @@ impl World {
             let idx = self.combat_object(p, master, &made, at)?;
             let id = self.players.live(p, idx)?.id;
             if flagged {
-                self.clear_footprint(p, master, at.ground(), true)?;
+                self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
                 self.made_new_object(p)?;
@@ -431,7 +432,7 @@ impl World {
             let idx = self.plain_object(p, master, &made, at, Facing::Drawn)?;
             let id = self.players.live(p, idx)?.id;
             if flagged {
-                self.clear_footprint(p, master, at.ground(), true)?;
+                self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
                 self.made_new_object(p)?;
@@ -441,7 +442,7 @@ impl World {
         let ai = Ok(unit_ai_kind(&made, master, &self.model.roles));
         let (id, _) = self.make_building(p, master, ai, at)?;
         if flagged {
-            self.clear_footprint(p, master, at.ground(), true)?;
+            self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
             // the building made on a flagged stack is the foundation its work builds
             let _ = self.work_building(
                 FoundationId::new(id),

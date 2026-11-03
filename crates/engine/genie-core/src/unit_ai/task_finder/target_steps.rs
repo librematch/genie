@@ -13,6 +13,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{Master, Task};
 use crate::orders::GARRISON;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::task_finder::Actor;
@@ -154,10 +155,10 @@ pub(super) fn garrison_into<'m>(
     roles: &Roles,
 ) -> (Finding<'m>, bool) {
     let own = actor.master;
-    let allied = dip.allied(actor.player, t.player, false);
+    let allied = dip.allied(actor.player, t.player, AllyTest::AlliesOnly);
     let own_or_allied = t.player == actor.player
-        || (dip.allied(actor.player, t.player, true)
-            && dip.allied(t.player, actor.player, true)
+        || (dip.allied(actor.player, t.player, AllyTest::WithRelation4)
+            && dip.allied(t.player, actor.player, AllyTest::WithRelation4)
             && allied);
     // the garrison into the target (a transport): the first task of action 3 on its class
     // (the whole shorts) the filter takes (any, or 3); with none, the garrison filter has
@@ -198,7 +199,7 @@ pub(super) fn repair_finding<'m>(
 ) -> Finding<'m> {
     let repairable = t.player == actor.player
         || t.player == PlayerId::GAIA
-        || dip.allied(actor.player, t.player, true);
+        || dip.allied(actor.player, t.player, AllyTest::WithRelation4);
     let repair_class = t.master.kind == MasterKind::BUILDING
         || roles.of_class(t.master.class).intersects(
             ClassRoles::TRANSPORT

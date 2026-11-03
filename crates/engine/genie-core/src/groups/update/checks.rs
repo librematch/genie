@@ -31,6 +31,7 @@ use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::sprite::Cargo;
 use crate::objects::sprite::{new_sprite, running, standing, walking};
 use crate::objects::{ObjectId, ObjectKey};
 use crate::players::PlayerId;
@@ -542,8 +543,8 @@ impl World {
         // trade cart's goods are passed above
         let look = self.parts.combat_of(u.id).abilities.look.as_ref();
         let sprite = match shown {
-            Shown::Standing => standing(master, look, false, &self.model.roles),
-            Shown::Walking => walking(master, look, false, &self.model.roles),
+            Shown::Standing => standing(master, look, Cargo::Empty, &self.model.roles),
+            Shown::Walking => walking(master, look, Cargo::Empty, &self.model.roles),
             Shown::Running => running(master, look),
         };
         Ok(sprite)

@@ -30,6 +30,7 @@ use crate::pathing::FixedPoint;
 use crate::pathing::ShortFound;
 use crate::pathing::hull_path::HullPather;
 use crate::pathing::tile_path::{Found, Path, Request};
+use crate::players::AllyTest;
 use crate::players::NO_RELATIONS;
 use crate::unit_ai::task_finder::allied as task_finder_allied;
 use crate::world::Seconds;
@@ -261,7 +262,7 @@ impl Mover {
                 }
                 let allied = owner.is_some_and(|o| {
                     let relations = world.relations.get(p.player).unwrap_or(&NO_RELATIONS);
-                    task_finder_allied(relations, p.player, o, true)
+                    task_finder_allied(relations, p.player, o, AllyTest::WithRelation4)
                 });
                 let gap = footprint_gap_squared(p.position, p.radius, t.position, t.radius);
                 if !allied || gap <= DistanceSquared::new(r * r) {

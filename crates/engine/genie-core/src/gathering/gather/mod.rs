@@ -38,6 +38,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::world::Seconds;
 use crate::world::layer::generated::SpriteTuning;
+use crate::world::settings::FarmMode;
 use genie_diff::Diff;
 
 mod gather_state;
@@ -146,7 +147,7 @@ pub struct GatherAction {
     /// `+0x84`, `+0x88`: `mFarmX`, `mFarmY`, a farm's place.
     pub farm: Point,
     /// `+0x8c`, `+0x90`: `mGatherX`, `mGatherY`, where the gathering started (−1 while the
-    /// game's farm setting holds them, [`GatherReads::farm_stops`]).
+    /// game's farm setting is walkable, [`GatherReads::farm_mode`]).
     pub gather_at: Point,
 }
 
@@ -232,7 +233,7 @@ pub(crate) struct GatherReads {
     pub(crate) stance: UnitStance,
     /// The game's setting at `FUN_140c87b90()`'s `+0x69` (farmers walk their farm's stops); with
     /// it `set_state(7)` leaves `mGatherX`, `mGatherY` as they are.
-    pub(crate) farm_stops: bool,
+    pub(crate) farm_mode: FarmMode,
     /// The gatherer's player's type (`player+0x10`): a computer player's (`FUN_141659cf0`)
     /// moved gatherer is done at the point.
     pub(crate) player_kind: PlayerKind,

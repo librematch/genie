@@ -335,14 +335,23 @@ pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
         .and_then(|t| t.sprites.carrying)
 }
 
-/// `FUN_14106a940`: a trade cart (its master's class 19) that carries goods (`goods`,
-/// `FUN_141188160`: an amount above 0 in its resource store, `+0x7a0`).
+/// Whether an object carries goods (`FUN_141188160`: an amount above 0 in its resource store,
+/// `+0x7a0`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cargo {
+    /// It does.
+    Goods,
+    /// It carries none.
+    Empty,
+}
+
+/// `FUN_14106a940`: a trade cart (its master's class 19) that carries goods (`cargo`).
 #[must_use]
-pub fn loaded_cart(master: &Master, goods: bool, roles: &Roles) -> bool {
+pub fn loaded_cart(master: &Master, cargo: Cargo, roles: &Roles) -> bool {
     roles
         .of_class(master.class)
         .contains(ClassRoles::TRADE_CART)
-        && goods
+        && cargo == Cargo::Goods
 }
 
 /// Slot 0x798 of a combat object (`FUN_1412029f0`, types 70 and 80): a loaded trade cart's
@@ -352,10 +361,10 @@ pub fn loaded_cart(master: &Master, goods: bool, roles: &Roles) -> bool {
 pub fn standing(
     master: &Master,
     look: Option<&Look>,
-    goods: bool,
+    cargo: Cargo,
     roles: &Roles,
 ) -> Option<SpriteId> {
-    if loaded_cart(master, goods, roles) {
+    if loaded_cart(master, cargo, roles) {
         return trade_sprite(master, roles);
     }
     look.map_or_else(|| master.standing_sprite, |l| l.standing)
@@ -367,10 +376,10 @@ pub fn standing(
 pub fn walking(
     master: &Master,
     look: Option<&Look>,
-    goods: bool,
+    cargo: Cargo,
     roles: &Roles,
 ) -> Option<SpriteId> {
-    if loaded_cart(master, goods, roles) {
+    if loaded_cart(master, cargo, roles) {
         return trade_sprite(master, roles);
     }
     look.map_or_else(|| master.moving_part().move_sprite, |l| l.walking)
@@ -772,11 +781,11 @@ mod tests {
     fn combat_object_slots_show_its_look_else_its_master_s() {
         let m = barracks();
         assert_eq!(
-            standing(&m, None, false, &roles()),
+            standing(&m, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(2575))
         );
         assert_eq!(
-            walking(&m, None, false, &roles()),
+            walking(&m, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(10))
         );
         assert_eq!(running(&m, None), Some(SpriteId::named(11)));
@@ -785,11 +794,11 @@ mod tests {
         assert_eq!(undead(&m, None), None);
         let l = look();
         assert_eq!(
-            standing(&m, Some(&l), false, &roles()),
+            standing(&m, Some(&l), Cargo::Empty, &roles()),
             Some(SpriteId::named(1))
         );
         assert_eq!(
-            walking(&m, Some(&l), false, &roles()),
+            walking(&m, Some(&l), Cargo::Empty, &roles()),
             Some(SpriteId::named(2))
         );
         // the look's null sprite is its own, not the master's
@@ -826,19 +835,19 @@ mod tests {
             ..Master::default()
         };
         assert_eq!(
-            standing(&cart, None, true, &roles()),
+            standing(&cart, None, Cargo::Goods, &roles()),
             Some(SpriteId::named(4))
         );
         assert_eq!(
-            walking(&cart, Some(&look()), true, &roles()),
+            walking(&cart, Some(&look()), Cargo::Goods, &roles()),
             Some(SpriteId::named(4))
         );
         assert_eq!(
-            standing(&cart, None, false, &roles()),
+            standing(&cart, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(20))
         );
         assert_eq!(
-            walking(&cart, None, false, &roles()),
+            walking(&cart, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(21))
         );
         // without a trade task, none
@@ -849,14 +858,14 @@ mod tests {
             }),
             ..cart
         };
-        assert_eq!(standing(&bare, None, true, &roles()), None);
+        assert_eq!(standing(&bare, None, Cargo::Goods, &roles()), None);
         // another class's goods do not count
         let villager = Master {
             class: class::VILLAGER,
             ..bare
         };
         assert_eq!(
-            standing(&villager, None, true, &roles()),
+            standing(&villager, None, Cargo::Goods, &roles()),
             Some(SpriteId::named(20))
         );
     }

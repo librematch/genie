@@ -36,6 +36,7 @@ use crate::world::layer::Roles;
 use crate::world::layer::generated::GatherTuning;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::layer::generated::Tuning;
+use crate::world::settings::FarmMode;
 use crate::world::step::Step;
 
 /// What a gather's start takes besides its mover and stream ([`GatherAction::start`]'s
@@ -68,8 +69,9 @@ pub struct GatherRetarget<'a> {
     pub player_kind: PlayerKind,
     /// What the gatherer carries and the sprites its `MoveTo`s take for none.
     pub walks: Walks<'a>,
-    /// The game's farm setting: a stop farm or a fish trap keeps its place as the farm's.
-    pub farm_stops: bool,
+    /// The game's farm setting: walkable, a stop farm or a fish trap keeps its place as the
+    /// farm's.
+    pub farm_mode: FarmMode,
     /// What times a farm's stops.
     pub rate: StopRate,
 }
@@ -178,7 +180,7 @@ impl GatherAction {
     pub fn new(
         task: HuntTask,
         target: &Resource,
-        farm_stops: bool,
+        farm_mode: FarmMode,
         rate: StopRate,
         roles: &Roles,
     ) -> Result<Self, GenieError> {
@@ -191,7 +193,7 @@ impl GatherAction {
         } else {
             Point::ORIGIN
         };
-        let (stops, time_per_stop) = if farm_stops
+        let (stops, time_per_stop) = if farm_mode == FarmMode::Walkable
             && roles.of_class(target.class).contains(ClassRoles::FARM)
             && roles
                 .of_master(target.master)
@@ -328,7 +330,7 @@ impl GatherAction {
             player,
             player_kind,
             walks,
-            farm_stops,
+            farm_mode,
             rate,
         } = retarget;
         let held = walks.held.amount;
@@ -360,7 +362,7 @@ impl GatherAction {
         self.target = Some(taken);
         self.point = target.position;
         self.target_class = target.class.or_none();
-        if farm_stops {
+        if farm_mode == FarmMode::Walkable {
             if roles
                 .of_master(target.master)
                 .contains(MasterRoles::STOP_FARM)

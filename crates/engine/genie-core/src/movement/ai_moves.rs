@@ -12,6 +12,7 @@ use crate::objects::layers::MotionMut;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
+use crate::objects::sprite::Cargo;
 use crate::players::PlayerId;
 use crate::unit_ai::OrderForce;
 
@@ -204,7 +205,7 @@ impl Unit {
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
         let sprite = ai_sprite(master, m.walk)
-            .or_else(|| point_sprite(master, look, false, roles))
+            .or_else(|| point_sprite(master, look, Cargo::Empty, roles))
             .and_then(|id| graphics.get(id).copied());
         let move_to = MoveToAction::to_point(m.point, m.range, sprite, motion.mover_mut());
         if move_to.shows_standing() {

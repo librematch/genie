@@ -23,6 +23,7 @@ use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::{ClassId, Master, MasterTables, Task};
 use crate::objects::release::Releaser;
 use crate::objects::unit::Unit;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
@@ -92,7 +93,7 @@ impl World {
             radius: tm.radius,
         };
         let player_kind = owner.kind;
-        let farm_stops = self.settings.walkable_farms;
+        let farm_mode = self.settings.farm_mode;
         let by = self.releaser(player, idx)?;
         // a stop farm's time per stop: the gatherer's work rate (its master's plus its powerup),
         // capacity and the task's productivity attribute (none: 1.0)
@@ -139,7 +140,7 @@ impl World {
                 player,
                 player_kind,
                 walks,
-                farm_stops,
+                farm_mode,
                 rate,
             },
             mover,
@@ -358,7 +359,7 @@ impl World {
             state: t.life.state,
             player: tp,
             amount: t.life.amount,
-            allied: world.allied(player, tp, true),
+            allied: world.allied(player, tp, AllyTest::WithRelation4),
             top_action: self.parts.actions_of(t.id).top_action_kind(),
             drop_site: false,
         })
@@ -420,7 +421,7 @@ impl World {
         let mut gather = GatherAction::new(
             task,
             &resource,
-            self.settings.walkable_farms,
+            self.settings.farm_mode,
             rate,
             &self.model.roles,
         )?;

@@ -6,6 +6,7 @@ use crate::map::Distance;
 use crate::map::Rect;
 use crate::map::Tile;
 use crate::map::TileRect;
+use crate::map::spatial::Movers;
 use crate::map::spatial::RecordId;
 use crate::math::fmath::{at_most_or_unordered, below_or_unordered};
 use crate::objects::ObjectId;
@@ -29,7 +30,7 @@ impl HullPather<'_> {
         let grow = self.buffer.unwrap_or(Distance::ZERO);
         if !self
             .world
-            .point_hit(to, grow, &self.ignore, false, self.by_id)?
+            .point_hit(to, grow, &self.ignore, Movers::Counted, self.by_id)?
         {
             return Ok(None);
         }
@@ -50,7 +51,10 @@ impl HullPather<'_> {
                     .filter(|&&o| o != id)
                     .map(|&o| RecordId::from(o)),
             );
-            if !self.world.point_hit(to, grow, &others, false, self.by_id)? {
+            if !self
+                .world
+                .point_hit(to, grow, &others, Movers::Counted, self.by_id)?
+            {
                 continue;
             }
             let Some(p) = self.world.get(id) else {

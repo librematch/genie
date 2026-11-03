@@ -24,6 +24,7 @@ use crate::players::game_status::GameStatus;
 use crate::players::history::HistoryUpdates;
 use crate::players::relation_row;
 use crate::players::tracker::Key;
+use crate::players::world_player::ResourceShare;
 use crate::technology::ResearchState;
 use crate::technology::TechState;
 use crate::test_ids::amounts;
@@ -284,7 +285,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         attribute::FOOD,
         Amount::new(10.0),
         ResourceStat::Gathered,
-        true,
+        ResourceShare::Shared,
     )
     .unwrap();
     assert_eq!(
@@ -296,7 +297,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         attribute::FOOD,
         Amount::new(-20.0),
         ResourceStat::Gathered,
-        true,
+        ResourceShare::Shared,
     )
     .unwrap();
     assert_eq!(t.players[1].escrow[0], Amount::ZERO);
@@ -311,7 +312,7 @@ fn the_income_fills_computer_escrow_and_goes_to_mutual_allies() {
         attribute::WOOD,
         Amount::new(4.0),
         ResourceStat::Gathered,
-        true,
+        ResourceShare::Shared,
     )
     .unwrap();
     assert_eq!(

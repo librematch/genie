@@ -6,6 +6,7 @@ use crate::combat::Charge;
 use crate::combat::abilities::Abilities;
 use crate::combat::damage::ArmorPair;
 use crate::combat::{AttackCount, AttackPowerup, Firepower, MissileCount};
+use crate::construction::build::Clearer;
 use crate::construction::build::Construction;
 use crate::construction::build::{NO_CONSTRUCTION, NOT_HELD};
 use crate::construction::{Annexes, BuilderCount, FootprintWaits, FoundationId, MainBuildingId};
@@ -407,7 +408,7 @@ impl World {
             let at = Position::new(position.x() + off.x(), position.y() + off.y(), given_z);
             let (aid, at) = self.make_building(player, annex, ai, at)?;
             self.link_annex(player, (id, slot), aid, &made, &am)?;
-            self.clear_footprint(player, annex, at.ground(), false)?;
+            self.clear_footprint(player, annex, at.ground(), Clearer::Constructor)?;
         }
         self.watch_started(player, id)?;
         Ok((id, position))
@@ -429,7 +430,7 @@ impl World {
         if foundation && WholeSeconds::ZERO < made.creatable_part().build_time {
             self.construction_terrain(player, master, position)?;
         }
-        self.clear_footprint(player, master, position.ground(), false)
+        self.clear_footprint(player, master, position.ground(), Clearer::Constructor)
     }
 
     /// The building constructor's link of a new annex `aid` (master `am`) to its building `id`

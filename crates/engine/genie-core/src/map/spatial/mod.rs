@@ -40,6 +40,7 @@ use genie_diff::Diff;
 use std::collections::BTreeMap;
 
 mod footprint;
+pub use self::footprint::Movers;
 mod grid;
 mod objects;
 mod pather;

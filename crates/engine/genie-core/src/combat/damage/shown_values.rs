@@ -21,6 +21,15 @@ use crate::world::layer::Roles;
 /// The action type of a bonus damage task (`FUN_14107ce60`).
 pub const BONUS_DAMAGE: ActionKind = ActionKind::named(0xa0);
 
+/// Which share of its hit points `FUN_141188880` gives.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HpPart {
+    /// The share it has.
+    Held,
+    /// The share it lacks.
+    Lacking,
+}
+
 impl Victim {
     /// A combat unit or building (types 70 and 80, `TRIBE_Combat_Object` and
     /// `TRIBE_Building_Object`): its powerups and charges count; a combat object of type 50 or
@@ -55,17 +64,20 @@ impl Victim {
     }
 
     /// `FUN_141188880`: the share of its most hit points it has (slot 0xc0, at most slot 0xc8 by
-    /// `MINSS`, over slot 0xc8), with `lacking` the share it lacks (1 less that); 0 when its most
+    /// `MINSS`, over slot 0xc8), or the share it lacks (1 less that) by `part`; 0 when its most
     /// hit points are not above 0 (`COMISS 0, most` with `JNC`: a NaN divides).
     #[must_use]
-    pub fn hp_share(&self, lacking: bool) -> f32 {
+    pub fn hp_share(&self, part: HpPart) -> f32 {
         let most = self.most_hp();
         let least = minss(most.get(), self.shown_hp().get());
         if !below_or_unordered(0.0, most.get()) {
             return 0.0;
         }
         let share = least / most.get();
-        if lacking { ONE - share } else { share }
+        match part {
+            HpPart::Held => share,
+            HpPart::Lacking => ONE - share,
+        }
     }
 }
 
@@ -100,7 +112,11 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
             target
         };
         // the task's `+0x26` read as a flag: other than 0 (none, −1, is other too)
-        let share = whose.hp_share(AttributeId::field(t.attribute_kind4) != 0);
+        let share = whose.hp_share(if AttributeId::field(t.attribute_kind4) == 0 {
+            HpPart::Held
+        } else {
+            HpPart::Lacking
+        });
         if at_most_or_unordered(t.work_val2.get(), 0.0)
             || at_most_or_unordered(target.shown_hp().get(), 0.0)
         {

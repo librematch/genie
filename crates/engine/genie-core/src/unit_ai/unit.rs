@@ -22,6 +22,7 @@ use crate::objects::unit::object_master;
 use crate::objects::unit::{Outcome, Unit};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
+use crate::players::AllyTest;
 use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
@@ -615,7 +616,12 @@ impl Unit {
                 master: u.life.master_id,
                 kind: m.kind,
                 main: c.w.parts.building_of(u.id).annex_of,
-                allied: allied(view.relations(c.w)?, view.player, owner, true),
+                allied: allied(
+                    view.relations(c.w)?,
+                    view.player,
+                    owner,
+                    AllyTest::WithRelation4,
+                ),
             });
         }
         Ok(seen)

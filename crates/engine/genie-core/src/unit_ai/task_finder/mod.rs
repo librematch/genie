@@ -32,6 +32,7 @@ use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::TargetOwner;
 use crate::objects::masters::{Master, Task};
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::attribute::AttributeId;
@@ -112,25 +113,25 @@ pub struct TaskOn<'t, 'a> {
 }
 
 /// What the finder reads of the world: the players' relations (`FUN_141663dc0`: whether `from`
-/// counts `to` as its own or allied, the game's `with_ally` flag set or not) and the drop sites.
+/// counts `to` as its own or allied by the game's `with_ally` flag) and the drop sites.
 /// `FUN_141663dc0` for a player of diplomacy `relations` (`player+0x260`): one's own player
-/// counts; Gaia never does; else relation 0 does, and 4 with the ally flag; relation 1 counts only
+/// counts; Gaia never does; else relation 0 does, and 4 by `test`; relation 1 counts only
 /// under allied victory (`FUN_1415e8e10`), which the slice does not model.
 #[must_use]
-pub fn allied(relations: &Relations, from: PlayerId, to: PlayerId, with_ally: bool) -> bool {
+pub fn allied(relations: &Relations, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
     if from == to {
         return true;
     }
     if to == PlayerId::GAIA {
         return false;
     }
-    relations.get(to).is_some_and(|r| r.allied(with_ally))
+    relations.get(to).is_some_and(|r| r.allied(test))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.
 pub trait Diplomacy {
-    /// Player `from` counts `to` as its own or allied (with its allies when `with_ally`).
-    fn allied(&self, from: PlayerId, to: PlayerId, with_ally: bool) -> bool;
+    /// Player `from` counts `to` as its own or allied, by `test`.
+    fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool;
     /// `FUN_140fdd190`: a building of master `building` takes what `actor` carries.
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool;
 }
@@ -240,17 +241,22 @@ fn applies(task: &Task, actor: &Actor<'_>, target: &TaskTarget<'_>, dip: &impl D
     let (me, them) = (actor.player, target.player);
     let ok = match task.owner_kind {
         TargetOwner::OWN => them == me,
-        TargetOwner::ENEMY => them != me && them != PlayerId::GAIA && !dip.allied(me, them, true),
+        TargetOwner::ENEMY => {
+            them != me && them != PlayerId::GAIA && !dip.allied(me, them, AllyTest::WithRelation4)
+        }
         TargetOwner::GAIA => them == PlayerId::GAIA,
         // type 4 answers at once, the unit itself included
         TargetOwner::FRIENDLY => {
             return them == me
                 || them == PlayerId::GAIA
-                || (dip.allied(me, them, true) && dip.allied(them, me, true));
+                || (dip.allied(me, them, AllyTest::WithRelation4)
+                    && dip.allied(them, me, AllyTest::WithRelation4));
         }
         // of Gaia's targets only for a unit whose own master has a combat level
         TargetOwner::ENEMY_OR_GAIA => {
-            if them == me || (them != PlayerId::GAIA && dip.allied(me, them, true)) {
+            if them == me
+                || (them != PlayerId::GAIA && dip.allied(me, them, AllyTest::WithRelation4))
+            {
                 false
             } else {
                 them != PlayerId::GAIA || actor.master.combat_level.is_some()
@@ -321,8 +327,8 @@ fn garrison_task<'m>(
     let Some(t) = target else {
         return Ok(None);
     };
-    let mutual =
-        dip.allied(actor.player, t.player, true) && dip.allied(t.player, actor.player, true);
+    let mutual = dip.allied(actor.player, t.player, AllyTest::WithRelation4)
+        && dip.allied(t.player, actor.player, AllyTest::WithRelation4);
     if (t.player == actor.player || mutual)
         && t.player != PlayerId::GAIA
         && t.state == ObjectState::Alive
@@ -543,7 +549,7 @@ fn finder_tail<'m>(
         // allied or artifact target in a state below 3
         if t.state < ObjectState::Dying
             && (t.player == actor.player
-                || dip.allied(actor.player, t.player, true)
+                || dip.allied(actor.player, t.player, AllyTest::WithRelation4)
                 || roles
                     .of_class(t.master.class)
                     .contains(ClassRoles::ARTIFACT))
@@ -608,7 +614,7 @@ mod tests {
     struct Alone;
 
     impl Diplomacy for Alone {
-        fn allied(&self, from: PlayerId, to: PlayerId, _: bool) -> bool {
+        fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
             from == to
         }
 
@@ -670,7 +676,7 @@ mod tests {
     struct Teams;
 
     impl Diplomacy for Teams {
-        fn allied(&self, from: PlayerId, to: PlayerId, _: bool) -> bool {
+        fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
             from == to || matches!((from.get(), to.get()), (1 | 3, 3 | 1) | (1, 4))
         }
 

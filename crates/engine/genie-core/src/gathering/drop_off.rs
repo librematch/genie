@@ -234,10 +234,7 @@ impl Unit {
         let (owner, resource) =
             self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
         let master = self.master(c.w.master_tables(), c.player)?;
-        let (player_kind, farm_stops) = (
-            c.w.players.player(c.player)?.kind,
-            c.w.settings.walkable_farms,
-        );
+        let (player_kind, farm_mode) = (c.w.players.player(c.player)?.kind, c.w.settings.farm_mode);
         let walks = self.move_walks(
             c.w.parts.mover_of(self.id),
             MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
@@ -272,7 +269,7 @@ impl Unit {
                 player: c.player,
                 player_kind,
                 walks,
-                farm_stops,
+                farm_mode,
                 rate,
             },
             mover,

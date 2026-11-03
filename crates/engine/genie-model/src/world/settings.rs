@@ -8,6 +8,29 @@ use crate::world::{
     Age, ContentMode, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Visibility,
 };
 
+/// How farmers work a farm: the walkable farms option (`mWalkableFarms`, `+0x69`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FarmMode {
+    /// One stop (0): a Gather's `set_state(7)` takes where the gathering started.
+    #[default]
+    Fixed,
+    /// Farmers walk their farm's stops (any other byte): a farm's Gather of four stops, and a
+    /// Gather's `set_state(7)` leaves `mGatherX`, `mGatherY` at −1.
+    Walkable,
+}
+
+impl FarmMode {
+    /// The mode of the option's byte `value`: walkable when it is not 0.
+    #[must_use]
+    pub const fn of_option(value: u8) -> Self {
+        if value == 0 {
+            Self::Fixed
+        } else {
+            Self::Walkable
+        }
+    }
+}
+
 /// What the simulation reads of the game options.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Settings {
@@ -24,9 +47,8 @@ pub struct Settings {
     /// `mFullTechTreeEnabled` (`+0x63`): a civilisation's own technologies of a mode other than
     /// 1 are disabled like another civilisation's (`genie_core::world::World::update_dependents`).
     pub full_tech_tree: bool,
-    /// `mWalkableFarms` (`+0x69`): farmers walk their farm's stops (a farm's Gather of four
-    /// stops), and a Gather's `set_state(7)` leaves `mGatherX`, `mGatherY` at −1.
-    pub walkable_farms: bool,
+    /// `mWalkableFarms` (`+0x69`): how farmers work a farm.
+    pub farm_mode: FarmMode,
     /// `mSelectedContentMode` (`+0x98`). The option is a tagged value read through
     /// `FUN_140ec0cd0` (`+0x9c` the kind: 0 for the value itself, 1 for 2 where the value is 3,
     /// else 0); the load reads the value alone and the kind stays 0, as the object's
@@ -119,7 +141,7 @@ impl Settings {
             14 => flags.contains(SubModeFlags::REGICIDE),
             15 => return Err(ROOT_MODE),
             16 => m == 16,
-            17 => !self.walkable_farms,
+            17 => self.farm_mode == FarmMode::Fixed,
             18 => self.shared_exploration,
             _ => return Err(mode_outside("a rule mode outside 2 to 18", n)),
         })
@@ -386,7 +408,7 @@ mod tests {
             );
         }
         let walkable = Settings {
-            walkable_farms: true,
+            farm_mode: FarmMode::Walkable,
             ..mode(9)
         };
         assert_eq!(walkable.tech_mode_allows(TechMode::of_data(17)), Ok(false));
@@ -424,7 +446,7 @@ mod tests {
         assert_eq!(mode(9).tech_mode_allows(TechMode::of_data(35)), Ok(true));
         assert_eq!(
             mode(9).tech_mode_allows(TechMode::of_data(17)),
-            Ok(!mode(9).walkable_farms)
+            Ok(mode(9).farm_mode == FarmMode::Fixed)
         );
     }
 
@@ -473,7 +495,7 @@ mod tests {
         let options = Settings {
             sub_game_mode_flag: SubModeFlags::from_bits_retain(1),
             resource_level: ResourceLevel::of_data(3),
-            walkable_farms: true,
+            farm_mode: FarmMode::Walkable,
             antiquity: true,
             ..Settings::default()
         };

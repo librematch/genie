@@ -46,7 +46,7 @@ pub use self::query_relation::QueryRelation;
 pub(crate) use self::relation::NO_RELATIONS;
 #[cfg(test)]
 pub(crate) use self::relation::relation_row;
-pub use self::relation::{Relation, Relations};
+pub use self::relation::{AllyTest, Relation, Relations};
 pub use self::resource_stat::ResourceStat;
 pub use self::stance::Stance;
 pub use self::team::Team;

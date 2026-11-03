@@ -42,6 +42,7 @@ use crate::world::index::ObjectsRef;
 use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
+use crate::world::settings::FarmMode;
 use crate::world::slots::PlayerSlots;
 
 /// The gather groups the resource search tries, in order (0 to 4).
@@ -135,7 +136,7 @@ impl World {
                 i = i.next();
                 continue;
             }
-            if !self.settings.walkable_farms {
+            if self.settings.farm_mode == FarmMode::Fixed {
                 return Err(GenieError::unsupported(
                     "the Empire Wars start without the farm setting (the nearest unworked farm)",
                 ));

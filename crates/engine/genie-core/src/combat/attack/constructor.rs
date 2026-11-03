@@ -31,6 +31,7 @@ use crate::objects::masters::PlayersMasters;
 use crate::objects::masters::TaskSprites;
 use crate::objects::masters::{Master, MasterTables, OwnerMasters};
 use crate::objects::sprite::ActiveSprite;
+use crate::objects::sprite::Cargo;
 use crate::objects::sprite::new_sprite;
 use crate::objects::sprite::{running, walking};
 use crate::objects::unit::Unit;
@@ -464,7 +465,7 @@ pub fn arms_looking(
     Arms {
         move_sprite: g(moving)
             .or_else(|| g(running(master, look)))
-            .or_else(|| g(walking(master, look, false, roles))),
+            .or_else(|| g(walking(master, look, Cargo::Empty, roles))),
         sprite: g(sprites.proceeding).or_else(|| g(master.combat_part().attack_sprite)),
         second_sprite: g(master.combat_part().attack_sprite2),
         idle_sprite: g(master.standing_sprite),

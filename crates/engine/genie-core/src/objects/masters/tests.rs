@@ -38,6 +38,7 @@ use crate::objects::facing::SpriteFacets;
 use crate::objects::masters::Availability;
 use crate::objects::masters::DisableMode;
 use crate::objects::sprite::Graphic;
+use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::CivId;
 use crate::players::PlayerId;
@@ -164,7 +165,7 @@ fn villagers() -> Masters {
 struct Alone;
 
 impl Diplomacy for Alone {
-    fn allied(&self, from: PlayerId, to: PlayerId, _: bool) -> bool {
+    fn allied(&self, from: PlayerId, to: PlayerId, _: AllyTest) -> bool {
         from == to
     }
 

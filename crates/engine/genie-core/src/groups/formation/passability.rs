@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::groups::GroupId;
 use crate::groups::TransformKind;
 use crate::groups::formation::{RIGHT_ANGLE, find_point_from_front, transform_slot};
+use crate::groups::motion::YawLimit;
 use crate::groups::{Formation, Slot};
 use crate::map::Distance;
 use crate::map::GridSize;
@@ -79,10 +80,15 @@ impl World {
         let [position, forward, up, _right] = g.motion.position;
         // calculateYawAngle without its clamp (`param_5` 0), with the world's update time
         let dt = self.dt_seconds;
-        let yaw = g.motion.calculate_yaw_angle(canon, forward, dt, false);
-        let old = g
+        let yaw = g
             .motion
-            .calculate_yaw_angle(canon, formation.transform_orientation, dt, false);
+            .calculate_yaw_angle(canon, forward, dt, YawLimit::Free);
+        let old = g.motion.calculate_yaw_angle(
+            canon,
+            formation.transform_orientation,
+            dt,
+            YawLimit::Free,
+        );
         let flips = RIGHT_ANGLE < (yaw - old).get().abs() && g.unit_kinds.len() < 2;
         let rotation = rotation(yaw.get(), up);
         formation.transform_orientation = forward;
