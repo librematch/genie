@@ -7230,7 +7230,7 @@ const IDLE: Seeker = Seeker {
     target_class: None,
     last_target_class: None,
     patrol_path: false,
-    target_kind: None,
+    target_master_kind: None,
 };
 
 /// Slot 0xa0 by unit-AI type: the base's always, the building's never, the hunted
@@ -11354,7 +11354,7 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
     };
     let on_building = Seeker {
         target: Some(object_id(900)),
-        target_kind: Some(MasterKind::BUILDING),
+        target_master_kind: Some(MasterKind::BUILDING),
         ..seeker(UnitStance::AGGRESSIVE)
     };
     for (priority, attacks) in [(0, false), (1, true), (2, false), (3, false), (4, true)] {

@@ -361,7 +361,7 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
 /// action packs or unpacks (124, 125). Not `any`, by attack priority 0 a ram attacks only
 /// [`ClassRoles::RAM_TARGET`](crate::world::layer::ClassRoles::RAM_TARGET) and a trebuchet (classes
 /// 51, 54) [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET);
-/// masters 1744 and 1746 with a building as their current target ([`Seeker::target_kind`]) by their
+/// masters 1744 and 1746 with a building as their current target ([`Seeker::target_master_kind`]) by their
 /// priority alone (1 or 4 and up); attack priority 3 only
 /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 ///
@@ -473,7 +473,7 @@ pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles
         .of_master(me.master)
         .contains(MasterRoles::BUILDING_BY_PRIORITY)
         && s.target.is_some()
-        && s.target_kind == Some(MasterKind::BUILDING)
+        && s.target_master_kind == Some(MasterKind::BUILDING)
     {
         return priority == AttackPriority::PRIORITY_1 || priority.past_3();
     }

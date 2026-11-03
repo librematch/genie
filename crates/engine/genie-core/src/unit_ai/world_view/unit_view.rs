@@ -193,7 +193,7 @@ impl UnitView<'_, '_> {
                     .map_or(Speed::ZERO, |m| m.stats.speed),
             ),
         );
-        let target_kind = match ai.current_target.and_then(find) {
+        let target_master_kind = match ai.current_target.and_then(find) {
             Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),
             None => None,
         };
@@ -201,7 +201,7 @@ impl UnitView<'_, '_> {
         let (target, _) = picker.target(&self.c.w.spatial, attacker)?;
         can_attack(
             &me,
-            &ai.seeker_with(target_kind),
+            &ai.seeker_with(target_master_kind),
             &target,
             roles,
             &self.c.w.model.tuning.unit_ai,

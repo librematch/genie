@@ -274,7 +274,7 @@ pub struct Seeker {
     /// which the siege unit's attack check reads.
     ///
     /// [`Surroundings::target`]: crate::unit_ai::Surroundings::target
-    pub target_kind: Option<MasterKind>,
+    pub target_master_kind: Option<MasterKind>,
 }
 
 impl Seeker {

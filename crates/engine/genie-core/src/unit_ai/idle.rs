@@ -610,9 +610,9 @@ impl UnitAi {
     }
 
     /// What the attack tests read of the unit AI ([`Seeker`]), its current target's master type
-    /// `target_kind` as the world holds it.
+    /// `target_master_kind` as the world holds it.
     #[must_use]
-    pub(crate) const fn seeker_with(&self, target_kind: Option<MasterKind>) -> Seeker {
+    pub(crate) const fn seeker_with(&self, target_master_kind: Option<MasterKind>) -> Seeker {
         Seeker {
             stance: self.stance,
             state_position: self.state_position,
@@ -622,7 +622,7 @@ impl UnitAi {
             target_class: self.target_class,
             last_target_class: self.last_target_class,
             patrol_path: self.patrol_path.is_some(),
-            target_kind,
+            target_master_kind,
         }
     }
 
