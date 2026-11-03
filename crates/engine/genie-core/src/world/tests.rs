@@ -5391,6 +5391,24 @@ pub(crate) fn in_update<R>(
     Ok(answer.unwrap())
 }
 
+/// [`in_update`] whose `f` also says how the step ends (its [`Outcome`]): the list's loop then
+/// files the object by it ([`World::file_step`]: a captured unit goes to its new owner).
+pub(crate) fn in_update_filed<R>(
+    t: &mut World,
+    (p, i): (PlayerId, ListIndex),
+    dt: u32,
+    f: impl FnOnce(&mut Unit, &mut Action, &mut step::Step<'_>) -> Result<(R, Outcome), GenieError>,
+) -> Result<R, GenieError> {
+    let mut answer = None;
+    let stepped = t.step_object((p, i), (Millis::new(dt), None, false), |u, actions, c| {
+        let (r, outcome) = f(u, actions, c)?;
+        answer = Some(r);
+        Ok(outcome)
+    })?;
+    let _ = t.file_step(p, stepped.slot, stepped.outcome)?;
+    answer.ok_or(GenieError::unreachable("a step without its answer"))
+}
+
 /// [`hunt_world`]'s hunter on deer 500 (the hunt command's), its hunt then set by `set`.
 fn hunter_in(set: impl FnOnce(&mut HuntAction)) -> World {
     let mut t = hunt_world();

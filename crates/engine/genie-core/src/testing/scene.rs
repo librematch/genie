@@ -151,7 +151,8 @@ pub struct Thing {
     pub inside: Option<ContainerId>,
     /// Its action layer, none for an empty one.
     pub actions: Option<Action>,
-    /// Its combat layer's capture flag (`+0x924`).
+    /// Its capture flag (`+0x924`): its combat layer's and, in the sight registry, its seer's,
+    /// as a save's load fills both.
     pub capture: CaptureKind,
     /// The pasture it stands in (`+0x790`).
     pub pasture: Option<PastureId>,
@@ -778,10 +779,10 @@ fn foundation(master: &Master) -> Building {
     }
 }
 
-/// The object enters the sight registry: its seer with a building's sight and UMV entry
-/// ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
-/// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the
-/// players of `mask` ([`Registry::update_unit`]).
+/// The object enters the sight registry: its seer with its capture flag, a building's sight and UMV
+/// entry ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
+/// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the players of
+/// `mask` ([`Registry::update_unit`]).
 fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
     let Thing {
         id,
@@ -790,6 +791,7 @@ fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
         at,
         state,
         desolid,
+        capture,
         ..
     } = *thing;
     let building = master.kind == MasterKind::BUILDING;
@@ -816,7 +818,7 @@ fn register(w: &mut World, thing: &Thing, mask: VisionBits) {
                 BuildingSight::Built
             }),
             umv: u8::try_from(umv).expect("a UMV entry of a byte"),
-            capture: CaptureKind::None,
+            capture,
             kind: master.kind,
         },
     );

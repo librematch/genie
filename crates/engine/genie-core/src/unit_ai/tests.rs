@@ -12,12 +12,14 @@ use crate::groups::{Member, Motion, UnitGroup};
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
 use crate::map::GridSize;
+use crate::map::Radii;
 use crate::map::RestrictionId;
 use crate::map::Tile;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
 use crate::math::fmath::sqrt;
 use crate::math::rng::Stream;
+use crate::movement::MoveStats;
 use crate::movement::PathFlags;
 use crate::movement::Speed;
 use crate::movement::move_to::{MoveTo, MoveToAction};
@@ -35,6 +37,7 @@ use crate::objects::masters::BlastLevel;
 use crate::objects::masters::ChargeKind;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::CombatPart;
 use crate::objects::masters::CreatablePart;
 use crate::objects::masters::GatherGroup;
 use crate::objects::masters::HeroFlags;
@@ -47,11 +50,11 @@ use crate::objects::unit::UnitFlags;
 use crate::objects::{FacetCount, Frame, SpeedMultiplier, SpriteFlags, SpriteId};
 use crate::orders::Dispatch;
 use crate::ownership::CaptureKind;
+use crate::ownership::artifact::Artifact;
 use crate::players::Amount;
 use crate::players::Chance;
 use crate::players::PlayerKind;
 use crate::players::Posture;
-use crate::players::QueryRelation;
 use crate::players::attribute::AttributeId;
 use crate::test_ids::attack_category;
 use crate::test_ids::class_id;
@@ -4703,80 +4706,6 @@ fn new_artifact_unit_ai_draws_four_timers() {
     );
 }
 
-/// What the artifact's tests answer: the search's answer and the owner of the object found,
-/// with the searches asked (their radius, classes and reach test) and the unit's
-/// under-attack value.
-struct ArtifactSide {
-    found: Found,
-    owner: Option<PlayerId>,
-    searches: Vec<(f32, Vec<ClassId>, bool)>,
-    under_attack: bool,
-}
-
-impl ArtifactSide {
-    fn finding(id: i32, players: u32, owner: Option<PlayerId>) -> Self {
-        Self {
-            found: Found {
-                id: ObjectId::of_field(id),
-                players,
-                distance: WholeDistance::of_data(-1),
-                position: Some(Position::new(140.0, 100.0, 0.0)),
-                ..Found::NONE
-            },
-            owner,
-            searches: Vec::new(),
-            under_attack: false,
-        }
-    }
-}
-
-impl UnitSide for ArtifactSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
-    }
-    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
-        let reach = match search.pick {
-            Pick::Closest { reach, .. } => reach,
-            _ => true,
-        };
-        self.searches
-            .push((search.radius.get(), search.classes.to_vec(), reach));
-        Ok(self.found)
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Ok(Attacked {
-            attacks: false,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, value: bool) {
-        self.under_attack = value;
-    }
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Ok(None)
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Ok(None)
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Ok(None)
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Ok(())
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok(self.owner.map(|owner| UnitSeen {
-            id,
-            owner,
-            ..UnitSeen::default()
-        }))
-    }
-}
-
 /// Player 1's scout cavalry 30 (master 448, class 12, line of sight 4) at (20.5, 92.5) on a
 /// map of 120 by 120 tiles of land, its unit AI `ai`, its owner of `kind`; the player has
 /// explored every tile but `unexplored`.
@@ -4912,10 +4841,9 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
     assert_eq!((ai.current_target, ai.current_action), (None, None));
 }
 
-/// A Gaia rock church (MarvinBlue/426048706's 7108: line of sight 5, no speed) and what it
-/// stands on.
-fn rock_church() -> (UnitAi, Surroundings) {
-    let ai = UnitAi {
+/// MarvinBlue/426048706's rock church 7108's unit AI (type 0xe, the artifact's), idle.
+fn church_ai() -> UnitAi {
+    UnitAi {
         ai_kind: UnitAiKind::Artifact,
         current_order: None,
         current_action: None,
@@ -4924,72 +4852,127 @@ fn rock_church() -> (UnitAi, Surroundings) {
         adjusted_idle_timeout: Millis::new(3881),
         retarget_timer: Millis::new(1224),
         ..UnitAi::default()
-    };
-    let at = Surroundings {
-        position: Position::new(136.0, 100.0, 0.0),
-        size: Footprint::new(2.0, 2.0),
-        los: Distance::new(5.0),
-        search_radius: Distance::new(5.0),
-        player: PlayerId::new(0),
-        state: ObjectState::Alive,
-        class: Some(class::ARTIFACT),
+    }
+}
+
+/// The rock church 7108 of `owner` (master 285, an artifact of radius 2, line of sight 5 and
+/// search radius 5, its speed `speed`: none stands) at (136, 100) on a map of 200 by 200
+/// tiles, under its Artifact (its default task), its unit AI `ai`; the `others` (id, owner,
+/// x, y), walkers of class 6, each in Gaia's and player 1's lists; rocks on `rocks`; player 1
+/// has only explored the tiles `fogged` and sees every other.
+fn church_world(
+    (owner, ai): (PlayerId, UnitAi),
+    speed: Option<Speed>,
+    others: &[(i32, PlayerId, f32, f32)],
+    (rocks, fogged): (&[Tile], &[Tile]),
+) -> World {
+    let church = Master {
+        id: master_id(285),
         kind: MasterKind::BUILDING,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+        class: class::ARTIFACT,
+        radius: Footprint::new(2.0, 2.0),
+        height: Distance::new(2.0),
+        hit_points: MasterHitPoints::of_data(1000),
+        line_of_sight: Distance::new(5.0),
+        terrain_restriction: Some(RestrictionId::named(7)),
+        move_stats: speed.map(walking),
+        action: Some(ActionPart {
+            search_radius: Distance::new(5.0),
+            ..ActionPart::default()
+        }),
+        ..Master::default()
     };
-    (ai, at)
+    let artifact = Action {
+        list: ActionList::default().with_artifact(Some(Artifact::new(owner, None))),
+        ..Action::default()
+    };
+    let mut scene = Scene::open(GridSize::new(200, 200))
+        .players(3)
+        .rocks(rocks.iter().copied())
+        .sight_on(fogged.iter().copied(), TileSight::Explored)
+        .thing(SceneThing {
+            ai: Some(ai),
+            actions: Some(artifact),
+            ..SceneThing::new(7108, owner, church, Position::new(136.0, 100.0, 0.0))
+        });
+    for &(id, player, x, y) in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(PlayerId::GAIA) | VisionBits::visible(player_id(1))),
+            ..SceneThing::new(
+                id,
+                player,
+                walker(5, class::CLASS_6),
+                Position::new(x, y, 0.0),
+            )
+        });
+    }
+    scene.build()
+}
+
+/// The owner of the rock church in `w`, and whether it still holds its Artifact.
+fn church(w: &World) -> (PlayerId, bool) {
+    let (owner, _) = w.object(object_id(7108)).expect("the church");
+    let busy = w
+        .parts
+        .actions
+        .of(object_id(7108))
+        .list
+        .artifact()
+        .is_some();
+    (owner, busy)
 }
 
 /// The artifact's processIdle (`FUN_140c1e410`): `ClosestObject` over its cared classes from
 /// its place within its line of sight and a tile, without the reach test for a unit that
-/// does not move; the object found takes it over for its owner (slot 0x70, 6) while the
-/// lists hold one player's objects at most; two players, none found, the world without it
-/// or its own owner's leave it (5).
+/// does not move; the object found takes it over for its owner (slot 0x70, 6: the list's loop
+/// then files the church in its new owner's list) while the lists hold one player's objects at
+/// most; two players, none found or its own owner's leave it (5). A moving one asks for the
+/// reach test: a unit walled in by rocks is found by the church that stands only.
 #[test]
 fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
-    let (mut ai, at) = rock_church();
-    let mut side = ArtifactSide::finding(500, 1, Some(PlayerId::new(2)));
-    let mut fx = Vec::new();
-    let took = ai.process_idle(
-        &at,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut fx),
-    );
-    assert_eq!(took, Ok(IdleOutcome::Acted));
-    assert_eq!(fx, [Effect::ChangeOwner(PlayerId::new(2))]);
-    assert_eq!(side.searches, [(6.0, ARTIFACT_CARED.to_vec(), false)]);
-    for (players, id, owner) in [
-        (2, 500, Some(PlayerId::new(2))),
-        (1, -1, Some(PlayerId::new(2))),
-        (1, 500, None),
-        (0, 500, Some(PlayerId::new(0))),
-    ] {
-        let mut side = ArtifactSide::finding(id, players, owner);
-        let mut fx = Vec::new();
-        let took = ai.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx),
+    let gaia = PlayerId::GAIA;
+    let idle_of = |speed, others: &[(i32, PlayerId, f32, f32)], rocks: &[Tile]| {
+        let mut w = church_world((gaia, church_ai()), speed, others, (rocks, &[]));
+        let took = run_ai(
+            &mut w,
+            (gaia, object_id(7108)),
+            |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
         );
-        assert_eq!((took, fx), (Ok(IdleOutcome::Idle), vec![]));
-    }
-    // a moving one asks for the reach test
-    let walking = Surroundings {
-        speed: Speed::new(0.8),
-        ..at
+        (took, church(&w).0)
     };
-    let mut side = ArtifactSide::finding(-1, 0, None);
-    let _ = ai.process_idle(
-        &walking,
-        PlayerKind::Human,
-        &mut rng(),
-        &mut With::new(&mut side, &mut Vec::new()),
+    let two = player_id(2);
+    assert_eq!(
+        idle_of(None, &[(500, two, 140.0, 100.0)], &[]),
+        (Ok(IdleOutcome::Acted), two)
     );
-    assert!(side.searches[0].2);
+    // two players' objects, none, or Gaia's own
+    for others in [
+        &[(500, two, 140.0, 100.0), (501, player_id(3), 140.0, 101.0)][..],
+        &[],
+        &[(500, gaia, 140.0, 100.0)],
+    ] {
+        assert_eq!(idle_of(None, others, &[]), (Ok(IdleOutcome::Idle), gaia));
+    }
+    // player 2's unit walled in at (141, 100): reached only by a church that does not move
+    let walled = [
+        Tile::new(140, 99),
+        Tile::new(141, 99),
+        Tile::new(142, 99),
+        Tile::new(140, 100),
+        Tile::new(142, 100),
+        Tile::new(140, 101),
+        Tile::new(141, 101),
+        Tile::new(142, 101),
+    ];
+    let inside = [(500, two, 141.5, 100.5)];
+    assert_eq!(
+        idle_of(None, &inside, &walled),
+        (Ok(IdleOutcome::Acted), two)
+    );
+    assert_eq!(
+        idle_of(Some(Speed::new(0.8)), &inside, &walled),
+        (Ok(IdleOutcome::Idle), gaia)
+    );
 }
 
 /// The artifact's slot 73 (`FUN_140c21d40`) in its full update: its processIdle every
@@ -4997,64 +4980,76 @@ fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
 /// ownership change, and its idle timer is 0.
 #[test]
 fn the_artifact_update_hands_it_over_then_stops() {
-    let (mut ai, at) = rock_church();
-    ai.idle_timer = Millis::new(900);
-    let mut side = ArtifactSide::finding(500, 1, Some(PlayerId::new(3)));
-    let fx = ai
-        .update_fx(
-            Millis::new(100),
-            WorldTime::from_millis(5000),
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(fx, [Effect::ChangeOwner(PlayerId::new(3)), Effect::Stop]);
-    assert_eq!((ai.current_target, ai.idle_timer), (None, Millis::ZERO));
+    let update = |others: &[(i32, PlayerId, f32, f32)]| {
+        let ai = UnitAi {
+            idle_timer: Millis::new(900),
+            ..church_ai()
+        };
+        let mut w = church_world((PlayerId::GAIA, ai), None, others, (&[], &[]));
+        let r = run_ai(
+            &mut w,
+            (PlayerId::GAIA, object_id(7108)),
+            |ai, at, side, kind, rng| {
+                ai.update(
+                    Millis::new(100),
+                    WorldTime::from_millis(5000),
+                    kind,
+                    at,
+                    rng,
+                    side,
+                )
+            },
+        );
+        assert_eq!(r, Ok(None));
+        let ai = w.parts.unit_ai.get(object_id(7108)).unwrap();
+        (church(&w), ai.current_target, ai.idle_timer)
+    };
+    assert_eq!(
+        update(&[(500, player_id(2), 140.0, 100.0)]),
+        ((player_id(2), false), None, Millis::ZERO)
+    );
     // nobody near: nothing, the idle timer runs
-    let (mut ai, at) = rock_church();
-    let mut side = ArtifactSide::finding(-1, 0, None);
-    let fx = ai
-        .update_fx(
-            Millis::new(100),
-            WorldTime::from_millis(5000),
-            PlayerKind::Human,
-            &at,
-            &mut rng(),
-            &mut side,
-        )
-        .unwrap();
-    assert_eq!(fx, []);
-    assert_eq!(ai.idle_timer, Millis::new(100));
+    assert_eq!(
+        update(&[]),
+        ((PlayerId::GAIA, true), None, Millis::new(1000))
+    );
 }
 
-/// The artifact's notify handler (`FUN_140c21f70`): the kinds it lets be go on; a unit
-/// attacking it joins its attackers and puts it under attack; its own action's completion or
-/// failure (with an order, the order's action) and any kind it does not know end in its
-/// stop; a moved target it still sees goes on, one it does not see ends.
+/// The artifact's notify handler (`FUN_140c21f70`), here on player 1's church: the kinds it
+/// lets be go on; a unit attacking it joins its attackers and puts it under attack; its own
+/// action's completion or failure (with an order, the order's action) and any kind it does
+/// not know end in its stop (its Artifact goes); a moved target it still sees goes on, one it
+/// does not see ends.
 #[test]
 fn the_artifact_notifies_stop_it_or_go_on() {
-    let run = |ai: &mut UnitAi, kind: NotifyKind, p: [i32; 3], at: &Surroundings| {
+    let one = player_id(1);
+    let run = |ai: &UnitAi, kind: NotifyKind, p: [i32; 3], sight: TileSight| {
         let n = Notify {
             caller: Some(object_id(500)),
             recipient: object_id(7108),
             kind,
             p,
         };
-        let mut side = ArtifactSide::finding(-1, 0, None);
-        let mut fx = Vec::new();
-        let r = ai.handle(
-            n,
-            Millis::ZERO,
-            at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx),
-        );
-        (r, fx, side.under_attack)
+        let others = [
+            (500, player_id(2), 140.0, 100.0),
+            (9, player_id(2), 140.5, 104.5),
+        ];
+        let fogged: &[Tile] = match sight {
+            TileSight::Explored => &[Tile::new(140, 104)],
+            _ => &[],
+        };
+        let mut w = church_world((one, ai.clone()), None, &others, (&[], fogged));
+        let r = run_ai(&mut w, (one, object_id(7108)), |ai, at, side, kind, rng| {
+            ai.handle(n, Millis::ZERO, at, kind, rng, side)
+        });
+        let unit = w.players[1].objects.by_id(object_id(7108)).unwrap();
+        let under_attack = unit.flags.contains(UnitFlags::UNDER_ATTACK);
+        let stopped = !church(&w).1;
+        let after = w.parts.unit_ai.get(object_id(7108)).unwrap().clone();
+        ((r, stopped, under_attack), after)
     };
-    let (mut ai, at) = rock_church();
+    let seen = TileSight::Seen;
+    let mut ai = church_ai();
     for kind in [
         NotifyKind::DAMAGED,
         NotifyKind::from(0x1f7),
@@ -5066,56 +5061,40 @@ fn the_artifact_notifies_stop_it_or_go_on() {
         NotifyKind::NO_LONGER_ON_ME,
         NotifyKind::from(0x2be),
     ] {
-        assert_eq!(run(&mut ai, kind, [0; 3], &at), (Ok(GO_ON), vec![], false));
+        assert_eq!(run(&ai, kind, [0; 3], seen).0, (Ok(GO_ON), false, false));
     }
-    assert_eq!(
-        run(&mut ai, NotifyKind::ATTACKED, [0; 3], &at),
-        (Ok(GO_ON), vec![], true)
-    );
-    assert_eq!(ai.attackers, Attackers::of_saved(&[500]));
+    let (r, after) = run(&ai, NotifyKind::ATTACKED, [0; 3], seen);
+    assert_eq!(r, (Ok(GO_ON), false, true));
+    assert_eq!(after.attackers, Attackers::of_saved(&[500]));
+    ai = after;
     ai.current_action = Some(AiAction::Move);
     ai.current_target = Some(object_id(9));
-    assert_eq!(
-        run(&mut ai, NotifyKind::ACTION_COMPLETED, [0x261, 0, 0], &at),
-        (Ok(GO_ON), vec![], false)
-    );
-    assert_eq!(
-        run(&mut ai, NotifyKind::ACTION_FAILED, [0x262, 0, 0], &at),
-        (Ok(GO_ON), vec![Effect::Stop], false)
-    );
-    assert_eq!((ai.current_action, ai.current_target), (None, None));
+    let (r, after) = run(&ai, NotifyKind::ACTION_COMPLETED, [0x261, 0, 0], seen);
+    assert_eq!(r, (Ok(GO_ON), false, false));
+    ai = after;
+    let (r, after) = run(&ai, NotifyKind::ACTION_FAILED, [0x262, 0, 0], seen);
+    assert_eq!(r, (Ok(GO_ON), true, false));
+    assert_eq!((after.current_action, after.current_target), (None, None));
+    ai = after;
     // with an order: its action's (action + 100 = order)
     ai.current_order = Some(OrderKind::Move);
     ai.current_action = Some(AiAction::Move);
+    let (r, after) = run(&ai, NotifyKind::ACTION_COMPLETED, [0x1, 0, 0], seen);
+    assert_eq!(r, (Ok(GO_ON), true, false));
+    ai = after;
     assert_eq!(
-        run(&mut ai, NotifyKind::ACTION_COMPLETED, [0x1, 0, 0], &at),
-        (Ok(GO_ON), vec![Effect::Stop], false)
+        run(&ai, NotifyKind::from(0x210), [0; 3], seen).0,
+        (Ok(GO_ON), true, false)
     );
-    let unknown = run(&mut ai, NotifyKind::from(0x210), [0; 3], &at);
-    assert_eq!(unknown, (Ok(GO_ON), vec![Effect::Stop], false));
     // a moved target it sees goes on; one it does not see stops it
     ai.current_target = Some(object_id(9));
-    let seen = Surroundings {
-        target: Some(Seen {
-            sight: TileSight::Seen,
-            ..Seen::default()
-        }),
-        ..at.clone()
-    };
     assert_eq!(
-        run(&mut ai, NotifyKind::TARGET_MOVED, [0; 3], &seen),
-        (Ok(GO_ON), vec![], false)
+        run(&ai, NotifyKind::TARGET_MOVED, [0; 3], seen).0,
+        (Ok(GO_ON), false, false)
     );
-    let explored = Surroundings {
-        target: Some(Seen {
-            sight: TileSight::Explored,
-            ..Seen::default()
-        }),
-        ..at
-    };
     assert_eq!(
-        run(&mut ai, NotifyKind::TARGET_MOVED, [0; 3], &explored),
-        (Ok(GO_ON), vec![Effect::Stop], false)
+        run(&ai, NotifyKind::TARGET_MOVED, [0; 3], TileSight::Explored).0,
+        (Ok(GO_ON), true, false)
     );
 }
 
@@ -6677,12 +6656,6 @@ fn making_building_runs_process_idle_only_without_target() {
     );
 }
 
-/// The full update with a target on the orders and action values the recordings met (it
-/// reads the target generally, whatever the order): a town centre's make action on the
-/// attack order (6091, p6's 27171), a wolf's own attack, a building a MOVE took (no action
-/// value, its research's 620), a builder and a hunter sent off a footprint, a hunt without
-/// an order after `HuntObject`, a villager waiting for its foundation (734/634 with the
-/// foundation), a boar moved aside off its attacker (-1/703).
 /// Unit 9 of `player` at (20, 20), a walker of class `class` (master 4), busy with its
 /// `MoveTo` following its target, its unit AI `ai`; the target `target` (id, owner, class) at
 /// (24, 20), alive, a walker of master 5.
@@ -6740,6 +6713,12 @@ fn following(w: &World) -> Option<(Position, Option<ObjectId>)> {
         .map(|m| (m.point, m.target))
 }
 
+/// The full update with a target on the orders and action values the recordings met (it
+/// reads the target generally, whatever the order): a town centre's make action on the
+/// attack order (6091, p6's 27171), a wolf's own attack, a building a MOVE took (no action
+/// value, its research's 620), a builder and a hunter sent off a footprint, a hunt without
+/// an order after `HuntObject`, a villager waiting for its foundation (734/634 with the
+/// foundation), a boar moved aside off its attacker (-1/703).
 #[test]
 fn unit_ai_with_target_runs_its_update_on_any_order() {
     for (ai_kind, order, action) in [
@@ -10736,162 +10715,98 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
     }
 }
 
-/// A ship's world: its searches answer from `found` (one answer per call, in order) and are
-/// recorded; the objects it names stand at their places; every point can be stood on and
-/// every target reached within `reach`.
-#[derive(Default)]
-struct ShipSide {
-    found: Vec<Found>,
-    searched: Vec<(f32, Vec<ClassId>, Pick)>,
-    units: Vec<UnitSeen>,
-    reach: bool,
-}
-
-impl UnitSide for ShipSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
+/// Player 1's ship 500 of class `class` (master 4, a walker of speed 1 and line of sight 4)
+/// at (20, 30) on a map of 64 by 64, its unit AI `ai`, its owner of `kind`; the `others` (id,
+/// owner, class, x), walkers at (x, 30), each in player 1's lists. The ship's last human order
+/// time is past the cap.
+fn ship_world(
+    (class, ai): (ClassId, UnitAi),
+    kind: PlayerKind,
+    others: &[(i32, PlayerId, ClassId, f32)],
+) -> World {
+    let ship = Master {
+        line_of_sight: Distance::new(4.0),
+        ..walker(4, class)
+    };
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .kind(player_id(1), kind)
+        .thing(SceneThing {
+            ai: Some(ai),
+            ..SceneThing::new(500, player_id(1), ship, Position::new(20.0, 30.0, 0.0))
+        });
+    for &(id, owner, class, x) in others {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(player_id(1))),
+            ..SceneThing::new(
+                id,
+                owner,
+                walker(i16::try_from(id).expect("a master's id"), class),
+                Position::new(x, 30.0, 0.0),
+            )
+        });
     }
-    fn builds(&self, _: FoundationId) -> Result<bool, GenieError> {
-        Ok(true)
-    }
-    fn closest(&mut self, search: &Search<'_>) -> Result<Found, GenieError> {
-        self.searched
-            .push((search.radius.get(), search.classes.to_vec(), search.pick));
-        Ok(if self.found.is_empty() {
-            Found::NONE
-        } else {
-            self.found.remove(0)
-        })
-    }
-    fn attack(&mut self, _: ObjectId, _: OrderForce, _: &UnitAi) -> Result<Attacked, GenieError> {
-        Err(GenieError::unsupported("no attack here"))
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn can_stand(&mut self, _: Point) -> Result<bool, GenieError> {
-        Ok(true)
-    }
-    fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
-        Ok(self.units.iter().find(|u| u.id == id).copied())
-    }
-    fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
-        Ok(self.reach)
-    }
+    let mut w = scene.build();
+    w.players[1]
+        .objects
+        .by_id_mut(object_id(500))
+        .unwrap()
+        .last_human_order = WorldTime::from_millis(9000);
+    w
 }
 
 /// The ships' idle check (`FUN_140c21930`, `FUN_140c1eab0`): a human player's only caps the
 /// last human order time and searches nothing (5); a computer player's fishing ship looks for
-/// the closest object of its classes, its radius grown by 7, and moves away from it by seven
-/// times its speed (6); a trade cart searches its own classes; finding nothing, 5.
+/// the closest object of its classes, any relation, reached, its radius grown by 7 (12: an
+/// object 11 tiles off is found, one 13 off is not), and moves away from it by seven times its
+/// speed (6); a trade cart searches its own classes; finding nothing, 5.
 #[test]
 fn computer_player_ship_evades_the_closest_object_it_sees() {
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 30.0, 0.0),
-        speed: Speed::new(1.0),
-        map: GridSize::new(64, 64),
-        los: Distance::new(4.0),
-        player: PlayerId::new(1),
-        class: Some(class::FISHING_SHIP),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let idle_of = |class, ai: UnitAi, kind, others: &[(i32, PlayerId, ClassId, f32)]| {
+        let mut w = ship_world((class, ai), kind, others);
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
+        );
+        (r, w)
     };
-    let mut u = idle(UnitAiKind::Fishing);
-    let mut fx = Vec::new();
-    let mut side = ShipSide::default();
-    assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Idle)
+    let fishing = idle(UnitAiKind::Fishing);
+    let warship = |x| [(77, player_id(2), class::WARSHIP, x)];
+    let (r, w) = idle_of(
+        class::FISHING_SHIP,
+        fishing.clone(),
+        PlayerKind::Human,
+        &warship(22.0),
     );
-    assert_eq!(
-        (fx, side.searched.len()),
-        (vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)], 0)
+    assert_eq!(r, Ok(IdleOutcome::Idle));
+    assert!(w.spatial.searched().is_none());
+    assert_eq!(walks_to(&w), None);
+    let ship = w.players[1].objects.by_id(object_id(500)).unwrap();
+    assert_eq!(ship.last_human_order, HUMAN_ORDER_CAP);
+    let computer = PlayerKind::Computer;
+    let (r, w) = idle_of(
+        class::FISHING_SHIP,
+        fishing.clone(),
+        computer,
+        &warship(22.0),
     );
-    let mut side = ShipSide {
-        found: vec![Found {
-            id: Some(object_id(77)),
-            ..Found::NONE
-        }],
-        units: vec![UnitSeen {
-            id: object_id(77),
-            position: Position::new(22.0, 30.0, 0.0),
-            ..UnitSeen::default()
-        }],
-        ..ShipSide::default()
-    };
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Acted)
+    assert_eq!(r, Ok(IdleOutcome::Acted));
+    assert_eq!(walks_to(&w), Some(Position::new(13.0, 30.0, 0.0)));
+    // the radius: 12 from the footprints' gap (0.4 apart at the centres' 11.4 and 13.4)
+    let (r, w) = idle_of(
+        class::FISHING_SHIP,
+        fishing.clone(),
+        computer,
+        &warship(31.4),
     );
-    assert_eq!(
-        fx,
-        vec![
-            Effect::CapHumanOrder(HUMAN_ORDER_CAP),
-            Effect::Move(AiMove {
-                point: Position::new(13.0, 30.0, 0.0),
-                range: Distance::ZERO,
-                force: OrderForce::Forced,
-                pace: Pace::Run,
-            }),
-        ]
-    );
-    let (radius, classes, pick) = side.searched[0].clone();
-    assert_eq!((radius, classes), (12.0, FISHING_CARED.to_vec()));
-    assert!(matches!(
-        pick,
-        Pick::Closest {
-            group: None,
-            relation: None,
-            reach: true,
-            ..
-        }
-    ));
+    assert_eq!((r, walks_to(&w).is_some()), (Ok(IdleOutcome::Acted), true));
+    let (r, w) = idle_of(class::FISHING_SHIP, fishing, computer, &warship(33.4));
+    assert_eq!((r, walks_to(&w)), (Ok(IdleOutcome::Idle), None));
     // a trade cart (class 19) finding nothing
-    let mut cart = idle(UnitAiKind::Trade);
-    let mut side = ShipSide::default();
-    let at = Surroundings {
-        class: Some(class::TRADE_CART),
-        ..at
-    };
-    assert_eq!(
-        cart.process_idle(
-            &at,
-            PlayerKind::Computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(IdleOutcome::Idle)
-    );
-    assert_eq!(side.searched[0].0, 5.0);
-    assert_eq!(side.searched[0].1, TRADE_CART_CARED.to_vec());
+    let (r, w) = idle_of(class::TRADE_CART, idle(UnitAiKind::Trade), computer, &[]);
+    assert_eq!(r, Ok(IdleOutcome::Idle));
+    assert!(w.spatial.searched().is_some());
 }
 
 /// The trade ship's case 0x202 (`FUN_140c29bf0`) off its trade and explore actions: the
@@ -10940,47 +10855,37 @@ fn trade_ship_whose_action_needs_search_stops() {
 }
 
 /// The trade ship's damage notify (`FUN_140c29bf0`): an attacker it knows raises no alert
-/// and no call for help; without an order, off the move action, the action stops and it
-/// runs from its attackers (3); on the move action it runs on (no stop).
+/// and no call for help; without an order, off the move action, the action stops (the last
+/// action the stopped one) and it runs from its attackers (3); on the move action it runs on
+/// (no stop: the move stays the last action's successor).
 #[test]
 fn trade_ship_stops_and_runs_from_its_attackers() {
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
-    let (mut u, at) = attacked_transport();
-    u.ai_kind = UnitAiKind::Trade;
-    u.current_action = Some(AiAction::Gather);
-    let mut fx = Vec::new();
-    let mut side = ShipSide::default();
+    let trade = |action| UnitAi {
+        ai_kind: UnitAiKind::Trade,
+        current_action: Some(action),
+        ..ship_ai()
+    };
+    let (r, w) = ship_hears(n, trade(AiAction::Gather), None, PlayerKind::Human);
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
+        (r, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    assert_eq!(fx.first(), Some(&Effect::Stop));
-    assert_eq!(fx.len(), 2);
-    assert_eq!(u.orders, Vec::new());
-    let (mut u, at) = attacked_transport();
-    u.ai_kind = UnitAiKind::Trade;
-    u.current_action = Some(AiAction::Move);
-    let mut fx = Vec::new();
+    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
+        (u.current_action, u.last_action, u.orders.len()),
+        (Some(AiAction::Move), None, 0)
     );
-    assert_eq!(u.current_action, Some(AiAction::Move));
-    assert!(!fx.contains(&Effect::Stop));
+    let (r, w) = ship_hears(n, trade(AiAction::Move), None, PlayerKind::Human);
+    assert_eq!(
+        (r, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
+    );
+    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!(
+        (u.current_action, u.last_action),
+        (Some(AiAction::Move), Some(AiAction::Move))
+    );
 }
 
 /// The fishing ship's damage notify (`FUN_140c25ca0`): on the move action it neither stops
@@ -10988,149 +10893,106 @@ fn trade_ship_stops_and_runs_from_its_attackers() {
 #[test]
 fn fishing_ship_on_the_move_takes_its_damage_without_running() {
     let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
-    let (mut u, at) = attacked_transport();
-    u.ai_kind = UnitAiKind::Fishing;
-    u.current_action = Some(AiAction::Move);
-    let mut fx = Vec::new();
-    let mut side = ShipSide::default();
+    let fishing = |action| UnitAi {
+        ai_kind: UnitAiKind::Fishing,
+        current_action: Some(action),
+        ..ship_ai()
+    };
+    let (r, w) = ship_hears(n, fishing(AiAction::Move), None, PlayerKind::Human);
+    assert_eq!((r, walks_to(&w)), (Ok(BREAK), None));
+    let (r, w) = ship_hears(n, fishing(AiAction::Gather), None, PlayerKind::Human);
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
+        (r, walks_to(&w)),
+        (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    assert_eq!(fx, Vec::new());
-    let (mut u, at) = attacked_transport();
-    u.ai_kind = UnitAiKind::Fishing;
-    u.current_action = Some(AiAction::Gather);
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(fx.first(), Some(&Effect::Stop));
-    assert_eq!(fx.len(), 2);
 }
 
 /// The fishing ship's builder search (`FUN_140c25ca0`, case 0x202 on its build): its own
 /// foundations (relation 3, state 0) of the classes 3, 27, 39, 52 and 49, in that order;
 /// the nearest by `ClosestObject`'s distance (a tie keeps the first) that it reaches it
-/// builds (3). Reaching none, a human player's ship goes on (2); a computer player's posts
-/// itself its build's completion.
+/// builds (3). Finding none, a human player's ship goes on (2); a computer player's posts
+/// itself its build's completion. A search for state 0 meets `ClosestObject`'s unbuilt farm
+/// test on the first foundation it finds, which is not modelled (MISSING.md): the build of
+/// foundation 42, the nearest of three, and the walk past one walled in by rocks wait for it.
 #[test]
 fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 30.0, 0.0),
-        los: Distance::new(4.0),
-        player: PlayerId::new(1),
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let found = |id, distance| Found {
-        id,
-        distance,
-        ..Found::NONE
-    };
-    let mut u = UnitAi {
+    let builder = UnitAi {
         current_action: Some(AiAction::Build),
         ..idle(UnitAiKind::Fishing)
-    };
-    let mut side = ShipSide {
-        found: vec![
-            found(None, WholeDistance::of_data(-1)),
-            found(Some(object_id(41)), WholeDistance::of_data(6)),
-            found(Some(object_id(42)), WholeDistance::of_data(3)),
-            found(Some(object_id(43)), WholeDistance::of_data(3)),
-            Found::NONE,
-        ],
-        reach: true,
-        ..ShipSide::default()
     };
     let n = Notify::own(
         object_id(500),
         NotifyKind::REQUIRES_SEARCH,
         [AiAction::Build.value(), 0, 0],
     );
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(BREAK)
-    );
-    assert_eq!(
-        fx,
-        vec![Effect::Command(AiCommand::BuildObject(FoundationId::new(
-            object_id(42)
-        )))]
-    );
-    let groups: Vec<Option<ClassId>> = side
-        .searched
-        .iter()
-        .map(|(_, _, p)| match p {
-            Pick::Closest {
-                group,
-                relation: Some(QueryRelation::Itself),
-                state: Some(ObjectState::Foundation),
-                ..
-            } => *group,
-            _ => Some(class_id(99)),
-        })
-        .collect();
-    assert_eq!(groups, FISHING_BUILDS.map(Some).to_vec());
-    // out of reach: the human's goes on, the computer's posts its completion
-    let mut side = ShipSide {
-        found: vec![found(Some(object_id(41)), WholeDistance::of_data(6))],
-        ..ShipSide::default()
+    let site = |id: i32, class, at| SceneThing {
+        desolid: true,
+        state: ObjectState::Foundation,
+        seen_by: Some(VisionBits::visible(player_id(1))),
+        ..SceneThing::new(
+            id,
+            player_id(1),
+            Master {
+                kind: MasterKind::BUILDING,
+                radius: Footprint::new(1.0, 1.0),
+                ..walker(i16::try_from(id).expect("a master's id"), class)
+            },
+            at,
+        )
     };
-    let mut fx = Vec::new();
+    let ship = Master {
+        line_of_sight: Distance::new(4.0),
+        action: Some(ActionPart {
+            tasks: vec![build_task()],
+            ..ActionPart::default()
+        }),
+        ..walker(4, class::FISHING_SHIP)
+    };
+    let hear = |kind, sites: Vec<SceneThing>| {
+        let mut scene = Scene::open(GridSize::new(64, 64))
+            .kind(player_id(1), kind)
+            .thing(SceneThing {
+                ai: Some(builder.clone()),
+                ..SceneThing::new(
+                    500,
+                    player_id(1),
+                    ship.clone(),
+                    Position::new(20.0, 30.0, 0.0),
+                )
+            });
+        for s in sites {
+            scene = scene.thing(s);
+        }
+        let mut w = scene.build();
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+        );
+        (r, w)
+    };
+    let at = |x, y| Position::new(x, y, 0.0);
+    // the gaps 6.5, 3.5 and 3.5: the distances 6, 3 and 3
+    let sites = vec![
+        site(41, class::BUILDING, at(27.7, 30.0)),
+        site(42, class::WALL, at(24.7, 30.0)),
+        site(43, class::GATE, at(15.3, 30.0)),
+    ];
+    let (r, _) = hear(PlayerKind::Human, sites);
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(GO_ON)
+        r,
+        Err(GenieError::unsupported("ClosestObject's unbuilt farm test"))
     );
-    assert_eq!((fx.len(), u.buffered.len(), u.notifies.len()), (0, 0, 0));
-    let mut side = ShipSide::default();
+    // none found: the human's goes on, the computer's posts its completion
+    let (r, w) = hear(PlayerKind::Human, Vec::new());
+    assert_eq!(r, Ok(GO_ON));
+    assert!(w.parts.actions.of(object_id(500)).list.build().is_none());
+    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!((u.buffered.len(), u.notifies.len()), (0, 0));
+    let (r, w) = hear(PlayerKind::Computer, Vec::new());
+    assert_eq!(r, Ok(GO_ON));
     assert_eq!(
-        u.handle(
-            n,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Computer,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(GO_ON)
-    );
-    assert_eq!(
-        u.notifies,
+        w.parts.unit_ai.get(object_id(500)).unwrap().notifies,
         vec![Notify::own(
             object_id(500),
             NotifyKind::ACTION_COMPLETED,
@@ -11416,310 +11278,244 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
     ));
 }
 
-/// A siege unit's world: its search finds `found`, the attack check lets `allowed` be
-/// attacked, the attack command takes, and `reach` answers the reach test.
-#[derive(Default)]
-struct SiegeSide {
-    found: Option<Found>,
-    allowed: Option<(ClassId, Position)>,
-    attacks: Vec<(ObjectId, OrderForce)>,
-    reach: bool,
-    searches: usize,
+/// The mangonel of the siege tests: master 280 of class 13, line of sight 9, weapon range 7,
+/// radius 0.6, speed 0.6, standing on [`STANDING`].
+fn mangonel() -> Master {
+    let walk = walker(280, class::SIEGE);
+    Master {
+        radius: Footprint::new(0.6, 0.6),
+        line_of_sight: Distance::new(9.0),
+        standing_sprite: Some(STANDING.id),
+        move_stats: Some(MoveStats {
+            radius: Radii::new(0.6, 0.6, 0.5),
+            ..walking(Speed::new(0.6))
+        }),
+        combat: Some(CombatPart {
+            weapon_range: Distance::new(7.0),
+            ..CombatPart::default()
+        }),
+        ..walk
+    }
 }
 
-impl UnitSide for SiegeSide {
-    fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
-        None
+/// Mangonel 500 of `owner` at (20, 20) ([`mangonel`]) on its sprite, its unit AI `ai`.
+fn mangonel_thing(owner: PlayerId, ai: UnitAi) -> SceneThing {
+    SceneThing {
+        ai: Some(ai),
+        sprite: Some(STANDING.id),
+        ..SceneThing::new(500, owner, mangonel(), Position::new(20.0, 20.0, 0.0))
     }
-    fn closest(&mut self, _: &Search<'_>) -> Result<Found, GenieError> {
-        self.searches += 1;
-        Ok(self.found.unwrap_or(Found::NONE))
+}
+
+/// A map of 64 by 64 with the mangonel `siege` on it ([`mangonel_thing`]) and player 2's
+/// villagers `targets` (id, place), each in the mangonel's owner's lists; water on `water`.
+fn siege_world(siege: SceneThing, targets: &[(i32, Point)], water: &[Tile]) -> World {
+    let owner = siege.player;
+    let mut scene = Scene::open(GridSize::new(64, 64))
+        .players(2)
+        .graphic(STANDING)
+        .water(water.iter().copied())
+        .thing(siege);
+    for &(id, at) in targets {
+        scene = scene.thing(SceneThing {
+            seen_by: Some(VisionBits::visible(owner)),
+            ai: Some(idle(UnitAiKind::Civilian)),
+            ..SceneThing::new(
+                id,
+                player_id(2),
+                villager_master(),
+                Position::new(at.x(), at.y(), 0.0),
+            )
+        });
     }
-    fn attack(
-        &mut self,
-        target: ObjectId,
-        force: OrderForce,
-        _: &UnitAi,
-    ) -> Result<Attacked, GenieError> {
-        self.attacks.push((target, force));
-        Ok(Attacked {
-            attacks: true,
-            posted: Vec::new(),
-        })
-    }
-    fn set_under_attack(&mut self, _: bool) {}
-    fn may_attack(
-        &mut self,
-        _: ObjectId,
-        _: &Seeker,
-    ) -> Result<Option<(ClassId, Position)>, GenieError> {
-        Ok(self.allowed)
-    }
-    fn seek_unexplored(&mut self, _: &UnitAi, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn seek_beyond_sight(&mut self, _: &mut Well512) -> Result<Option<Tile>, GenieError> {
-        Err(GenieError::unsupported("no search here"))
-    }
-    fn make_scout_map(&mut self) -> Result<(), GenieError> {
-        Err(GenieError::unsupported("no world here"))
-    }
-    fn reaches(&mut self, _: ObjectId, _: Distance) -> Result<bool, GenieError> {
-        Ok(self.reach)
-    }
+    scene.build()
+}
+
+/// The target of mangonel 500's Attack in `w`, none without one.
+fn siege_attacks(w: &World) -> Option<ObjectId> {
+    w.parts
+        .actions
+        .of(object_id(500))
+        .list
+        .attack()
+        .and_then(|a| a.target)
+        .map(AttackTargetId::id)
 }
 
 /// The siege unit's idle check (`FUN_140c206b0`): it caps the last human order time, finds a
-/// target with `bestUnitToAttack` and attacks it (forced), the order going (6); finding
-/// nothing, a unit in a group gives 5 and one defending walks back. Gaia's that takes no
-/// owners by sight does nothing.
+/// target with `bestUnitToAttack` (villager 77 within its range) and attacks it (forced: its
+/// Attack at once), the order going (6); finding nothing, a unit in a group gives 5 and one
+/// defending walks back to its state position. Gaia's that takes no owners by sight does
+/// nothing and searches nothing.
 #[test]
 fn siege_unit_attacks_what_its_idle_search_finds() {
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 20.0, 0.0),
-        player: PlayerId::new(1),
-        class: Some(class::SIEGE),
-        kind: MasterKind::COMBAT,
-        los: Distance::new(9.0),
-        weapon_range: Distance::new(7.0),
-        state: ObjectState::Alive,
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let one = player_id(1);
+    let idle_of = |w: &mut World, owner: PlayerId| {
+        run_ai(w, (owner, object_id(500)), |ai, at, side, kind, rng| {
+            ai.process_idle(at, kind, rng, side)
+        })
     };
-    let mut u = UnitAi {
+    let u = UnitAi {
         current_order: Some(OrderKind::Move),
         ..idle(UnitAiKind::Siege)
     };
-    let mut side = SiegeSide {
-        found: Some(Found {
-            id: Some(object_id(77)),
-            ..Found::NONE
-        }),
-        allowed: Some((class::VILLAGER, Position::new(25.0, 20.0, 0.0))),
-        ..SiegeSide::default()
-    };
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Acted)
-    );
-    assert_eq!(fx, vec![Effect::CapHumanOrder(HUMAN_ORDER_CAP)]);
-    assert_eq!(side.attacks, vec![(object_id(77), OrderForce::Forced)]);
+    let mut w = siege_world(mangonel_thing(one, u), &[(77, Point::new(25.0, 20.0))], &[]);
+    assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Acted));
+    assert_eq!(siege_attacks(&w), Some(object_id(77)));
+    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(
         (u.current_action, u.current_target, u.current_order),
         (Some(AiAction::Attack), Some(object_id(77)), None)
     );
     // nothing found: in a group 5 and no walk; defending without a group walks back
-    let grouped = Surroundings {
-        group: Some(GroupState::default()),
-        ..at.clone()
-    };
-    let mut u = UnitAi {
+    let defending = UnitAi {
         stance: UnitStance::Defensive,
         state_position: Point::new(10.0, 20.0),
         ..idle(UnitAiKind::Siege)
     };
-    let mut side = SiegeSide::default();
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.process_idle(
-            &grouped,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Idle)
-    );
-    assert_eq!(fx.len(), 1);
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut fx)
-        ),
-        Ok(IdleOutcome::Idle)
-    );
-    assert!(matches!(fx.last(), Some(Effect::Move(_))));
-    // Gaia's that does not take owners by sight
-    let gaia = Surroundings {
-        player: PlayerId::new(0),
+    let mut w = siege_world(mangonel_thing(one, defending.clone()), &[], &[]);
+    w.groups.groups.push(UnitGroup {
+        id: group_id(7),
+        owner: Some(player_id(1)),
+        members: vec![Member {
+            id: object_id(500),
+            ..Member::default()
+        }],
+        ..UnitGroup::default()
+    });
+    w.players[1]
+        .objects
+        .by_id_mut(object_id(500))
+        .unwrap()
+        .group
+        .id = Some(group_id(7));
+    assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Idle));
+    assert_eq!(walks_to(&w), None);
+    let mut w = siege_world(mangonel_thing(one, defending), &[], &[]);
+    assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Idle));
+    assert!(walks_to(&w).is_some_and(|p| p.x() < 20.0));
+    // Gaia's that does not take owners by sight (its seer's flag)
+    let gaia = SceneThing {
         capture: CaptureKind::BySight,
-        ..at.clone()
+        seen_by: Some(VisionBits::empty()),
+        ..mangonel_thing(PlayerId::GAIA, idle(UnitAiKind::Siege))
     };
-    let mut side = SiegeSide::default();
-    assert_eq!(
-        idle(UnitAiKind::Siege).process_idle(
-            &gaia,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(IdleOutcome::Idle)
-    );
-    assert_eq!(side.searches, 0);
+    let mut w = siege_world(gaia, &[(77, Point::new(25.0, 20.0))], &[]);
+    assert_eq!(idle_of(&mut w, PlayerId::GAIA), Ok(IdleOutcome::Idle));
+    assert!(w.spatial.searched().is_none());
 }
 
 /// With retargeting off and its current target held, a top target the siege unit reaches
-/// within its range ends the check (5); not reached, retargeting comes back on.
+/// within its range ends the check (5). Not reached, retargeting comes back on and the unit
+/// attacks it (forced: its Attack replaces its walk): the mangonel stands at a lake's corner,
+/// its target on an island within its range by the footprints' gap, but every land tile the
+/// mangonel walks to lies beyond the planner's range (the radii and the weapon range from the
+/// target's centre).
 #[test]
 fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
-    let at = Surroundings {
-        id: object_id(500),
-        position: Position::new(20.0, 20.0, 0.0),
-        player: PlayerId::new(1),
-        class: Some(class::SIEGE),
-        kind: MasterKind::COMBAT,
-        weapon_range: Distance::new(7.0),
-        state: ObjectState::Alive,
-        target: Some(Seen::default()),
-        top_target: Some(TopTarget {
-            id: object_id(88),
-            kind: MasterKind::COMBAT,
-            position: Position::new(24.0, 20.0, 0.0),
-            radius: Footprint::new(0.2, 0.2),
-        }),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
-    };
-    let mut u = UnitAi {
+    let u = UnitAi {
         retarget_disabled: 1,
         current_target: Some(object_id(88)),
         ..idle(UnitAiKind::Siege)
     };
-    let mut side = SiegeSide {
-        reach: true,
-        ..SiegeSide::default()
+    let walk = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            target: Some(object_id(88)),
+            point: Position::new(14.3, 14.3, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
     };
-    assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::at(&mut side, &mut Vec::new(), &at)
-        ),
-        Ok(IdleOutcome::Idle)
-    );
-    assert_eq!((u.retarget_disabled, side.attacks.len()), (1, 0));
-    let mut side = SiegeSide {
-        allowed: Some((class::VILLAGER, Position::new(24.0, 20.0, 0.0))),
-        ..SiegeSide::default()
+    let check = |water: &[Tile]| {
+        let siege = SceneThing {
+            actions: Some(walk.clone()),
+            ..mangonel_thing(player_id(1), u.clone())
+        };
+        let mut w = siege_world(siege, &[(88, Point::new(14.3, 14.3))], water);
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
+        );
+        let disabled = w
+            .parts
+            .unit_ai
+            .get(object_id(500))
+            .unwrap()
+            .retarget_disabled;
+        (r, disabled, siege_attacks(&w))
     };
+    assert_eq!(check(&[]), (Ok(IdleOutcome::Idle), 1, None));
+    let lake: Vec<Tile> = (0..64)
+        .flat_map(|y| (0..64).map(move |x| Tile::new(x, y)))
+        .filter(|t| (t.x() < 20 || t.y() < 20) && *t != Tile::new(14, 14))
+        .collect();
     assert_eq!(
-        u.process_idle(
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::at(&mut side, &mut Vec::new(), &at)
-        ),
-        Ok(IdleOutcome::Acted)
-    );
-    assert_eq!(
-        (u.retarget_disabled, side.attacks.clone()),
-        (0, vec![(object_id(88), OrderForce::Forced)])
+        check(&lake),
+        (Ok(IdleOutcome::Acted), 0, Some(object_id(88)))
     );
 }
 
 /// The siege unit's handler (`FUN_140c287e0`): a target under its least range makes it back
 /// up (not modelled); a human player's executed action and damage are the base handler's; a
-/// computer player's executed attack draws whether it keeps its distance.
+/// computer player's executed attack draws whether it keeps its distance, but not on a
+/// building target; its run: a top target (its walk to villager 77) keeps it.
 #[test]
 fn siege_unit_hands_its_notifies_to_the_base_handler() {
-    let at = Surroundings {
-        id: object_id(500),
-        weapon_range: Distance::new(7.0),
-        player: PlayerId::new(1),
-        roles: roles(),
-        slots: slots(),
-        unit_ai_tuning: tuning().unit_ai,
-        ..Surroundings::default()
+    let hear = |ai: UnitAi, n: Notify, kind: PlayerKind| {
+        let mut w = siege_world(
+            mangonel_thing(player_id(1), ai),
+            &[(77, Point::new(25.0, 20.0))],
+            &[],
+        );
+        w.players[1].kind = kind;
+        let r = run_ai(
+            &mut w,
+            (player_id(1), object_id(500)),
+            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+        );
+        (r, w.streams.get(Stream::Ai).draws)
     };
-    let mut u = idle(UnitAiKind::Siege);
-    let mut side = SiegeSide::default();
+    let u = idle(UnitAiKind::Siege);
     let under = Notify::own(object_id(500), NotifyKind::TOO_CLOSE, [77, 0, 0]);
-    assert!(
-        u.handle(
-            under,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        )
-        .is_err()
-    );
+    assert!(hear(u.clone(), under, PlayerKind::Human).0.is_err());
     let executed = Notify::own(object_id(500), NotifyKind::ACTION_EXECUTED, [600, 77, 0]);
-    assert_eq!(
-        u.handle(
-            executed,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(GO_ON)
-    );
+    assert_eq!(hear(u.clone(), executed, PlayerKind::Human).0, Ok(GO_ON));
     // a computer player's, off the attack action: one draw, then 2
-    let mut r = rng();
     assert_eq!(
-        u.handle(
-            executed,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Computer,
-            &mut r,
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(GO_ON)
+        hear(u.clone(), executed, PlayerKind::Computer),
+        (Ok(GO_ON), 1)
     );
-    assert_eq!(r.draws, 1);
     // a building target: no draw, the base handler's
-    let mut on_house = UnitAi {
+    let on_house = UnitAi {
         target_class: class_of(3),
         ..idle(UnitAiKind::Siege)
     };
-    let mut r = rng();
     assert_eq!(
-        on_house.handle(
-            executed,
-            Millis::ZERO,
-            &at,
-            PlayerKind::Computer,
-            &mut r,
-            &mut With::new(&mut side, &mut Vec::new())
-        ),
-        Ok(GO_ON)
+        hear(on_house, executed, PlayerKind::Computer),
+        (Ok(GO_ON), 0)
     );
-    assert_eq!(r.draws, 0);
-    // its run: a top target or class 54 keeps it
-    let pinned = Surroundings {
-        top_target: Some(TopTarget::default()),
-        ..at.clone()
+    // its run: a top target keeps it
+    let walk = Action {
+        list: ActionList::default().with_move_to(Some(MoveToAction {
+            target: Some(object_id(77)),
+            point: Position::new(25.0, 20.0, 0.0),
+            ..MoveToAction::sub_in(MoveTo::Moving)
+        })),
+        ..Action::default()
     };
-    let mut fx = Vec::new();
-    assert_eq!(
-        u.run_away(
-            OrderForce::Forced,
-            &pinned,
-            PlayerKind::Human,
-            &mut rng(),
-            &mut With::at(&mut side, &mut fx, &pinned)
-        ),
-        Ok(Answer::NotTaken)
+    let pinned = SceneThing {
+        actions: Some(walk),
+        ..mangonel_thing(player_id(1), u)
+    };
+    let mut w = siege_world(pinned, &[(77, Point::new(25.0, 20.0))], &[]);
+    let r = run_ai(
+        &mut w,
+        (player_id(1), object_id(500)),
+        |ai, at, side, kind, rng| ai.run_away(OrderForce::Forced, at, kind, rng, side),
     );
-    assert_eq!(fx, Vec::new());
+    assert_eq!(r, Ok(Answer::NotTaken));
+    assert_eq!(walks_to(&w), Some(Position::new(25.0, 20.0, 0.0)));
 }
 
 /// The priest's slot 73 (`FUN_140c21f30`): the base's retarget check (a used timer redrawn),

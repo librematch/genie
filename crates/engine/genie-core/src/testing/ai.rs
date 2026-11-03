@@ -6,17 +6,24 @@ use crate::GenieError;
 use crate::math::rng::Well512;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
+use crate::objects::unit::Outcome;
+use crate::ownership::capture::Captured;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::UnitSide;
 use crate::unit_ai::{Surroundings, UnitAi};
 use crate::world::World;
 use crate::world::slots::PlayerSlots;
-use crate::world::tests::in_update;
+use crate::world::tests::in_update_filed;
+use std::mem::take;
 
-/// Runs `f` on object `me` of player `player` of `w` inside its update (dt 0, outside a turn):
-/// on its unit AI, what the AI reads of the unit and the world, its side, its owner's type and
-/// the AI stream. The AI is the unit's again after it, the side's calls made on the world.
+/// Runs `f` on object `me` of player `player` of `w` inside its update (dt 0, outside a turn),
+/// after the update's start took its sprite's facets
+/// ([`Unit::take_sprite_facets`](crate::objects::unit::Unit::take_sprite_facets)): on its unit
+/// AI, what the AI reads of the unit and the world, its side, its owner's type and the AI
+/// stream. The AI is the unit's again after it, the side's calls made on the world; a
+/// takeover they made ends the step as the unit's update ends it, and the list's loop hands the
+/// object to its new owner.
 ///
 /// # Errors
 ///
@@ -43,12 +50,24 @@ pub(crate) fn run_ai<R>(
         .iter()
         .position(|u| u.id == me)
         .expect("the unit in its player's list");
-    in_update(w, (player, ListIndex::new(i)), 0, |unit, actions, c| {
+    in_update_filed(w, (player, ListIndex::new(i)), 0, |unit, actions, c| {
+        unit.take_sprite_facets(c.w.parts.mover_mut(unit.id));
         let mut answer = None;
         unit.run_ai(actions, c, |ai, at, side, kind, rng| {
             answer = Some(f(ai, at, side, kind, rng)?);
             Ok(())
         })?;
-        answer.ok_or(GenieError::unreachable("a unit AI's run that did not run"))
+        let answer = answer.ok_or(GenieError::unreachable("a unit AI's run that did not run"))?;
+        // as the unit's update ends after its AI's run (`Unit::ai_part`)
+        let outcome = match c.taken_over.take() {
+            Some((new, main)) => Outcome::Captured(Captured {
+                new,
+                main,
+                also: Vec::new(),
+                building: take(&mut c.building_handover),
+            }),
+            None => Outcome::Stay,
+        };
+        Ok((answer, outcome))
     })
 }
