@@ -4,6 +4,7 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::FormationKind;
 use crate::groups::GroupId;
+use crate::groups::Layout;
 use crate::groups::SlotState;
 use crate::groups::TransformKind;
 use crate::groups::UnitKind;
@@ -104,26 +105,25 @@ pub(super) fn sizes(count: i32, kind: LineKind) -> (i32, i32) {
 
 /// The slots of createColumnLine (`FUN_141012280`, [`World::create_column_line`]) up to its
 /// transform: the group's sub-formations (its unit types, by category 0 to 5) laid out in lines on
-/// `formation`, `world_time` the slots' time, as a column or a line of `kind`. Returns false for a
+/// `formation`, `world_time` the slots' time, as a column or a line of `kind`. Not laid for a
 /// group without members (nothing laid out); its callers always pass a ratio.
 ///
-/// Each sub-formation with units takes the lines and columns of [`sizes`]; the widest line
-/// (columns times the sub-formation's spacing) sets the width of the others when two or more
-/// have units: one that fits takes one line, else as many lines as its width needs, and a line
-/// less while its columns are fewer than its empty places. The slots' array grows to the
-/// widest line's columns times the lines (`FUN_14102d580`), the lines' to the lines
-/// (`FUN_14102d490`); every slot turns inactive. Then, sub-formation by sub-formation (its unit
-/// types' used counts start over, `DAT_143f20640`), line by line (the last of a sub-formation
-/// takes the rest of its units): the line's slots start at half its columns of the single
-/// offset (the spacing straight back, `(0, 0, -spacing)`, doubled when staggered) and step by
-/// it; a staggered line moves by a quarter of it (back on even lines, forward on odd ones), an
-/// even line of a plain one by half of it back; a flanked line's slots move apart by
-/// `GroupTuning::flank_spacing` less the line's share of the depth. A slot takes no unit, the offset, the
-/// time, the line as its depth, the sub-formation and, with several unit types, the next one
-/// with units left (round robin; with two types the last slot of a line keeps the type for the
-/// next line). The line takes its slots' indices and its distance back, which grows by each
-/// line's spacing (doubled when staggered) and, when a wider sub-formation follows, by the
-/// difference.
+/// Each sub-formation with units takes the lines and columns of [`sizes`]; the widest line (columns
+/// times the sub-formation's spacing) sets the width of the others when two or more have units: one
+/// that fits takes one line, else as many lines as its width needs, and a line less while its
+/// columns are fewer than its empty places. The slots' array grows to the widest line's columns
+/// times the lines (`FUN_14102d580`), the lines' to the lines (`FUN_14102d490`); every slot turns
+/// inactive. Then, sub-formation by sub-formation (its unit types' used counts start over,
+/// `DAT_143f20640`), line by line (the last of a sub-formation takes the rest of its units): the
+/// line's slots start at half its columns of the single offset (the spacing straight back, `(0, 0,
+/// -spacing)`, doubled when staggered) and step by it; a staggered line moves by a quarter of it
+/// (back on even lines, forward on odd ones), an even line of a plain one by half of it back; a
+/// flanked line's slots move apart by `GroupTuning::flank_spacing` less the line's share of the
+/// depth. A slot takes no unit, the offset, the time, the line as its depth, the sub-formation and,
+/// with several unit types, the next one with units left (round robin; with two types the last slot
+/// of a line keeps the type for the next line). The line takes its slots' indices and its distance
+/// back, which grows by each line's spacing (doubled when staggered) and, when a wider
+/// sub-formation follows, by the difference.
 ///
 /// The roots and the line counts are the CRT's `ceilf` (the ucrtbase import at 0x142a8e728),
 /// for which `f32::ceil` stands: both are exact (the result is the integer above, a NaN stays
@@ -142,9 +142,9 @@ pub(crate) fn column_line_slots(
     kind: LineKind,
     world_time: WorldTime,
     group_tuning: &GroupTuning,
-) -> Result<bool, GenieError> {
+) -> Result<Layout, GenieError> {
     if group.members.is_empty() {
-        return Ok(false);
+        return Ok(Layout::NotLaid);
     }
     let (lines_of, columns_of) = category_sizes(group, kind)?;
     let max_width = columns_of.iter().copied().fold(0, i32::max);
@@ -180,7 +180,7 @@ pub(crate) fn column_line_slots(
         )?;
     }
     formation.use_slots(at.used_slots);
-    Ok(true)
+    Ok(Layout::Laid)
 }
 
 /// The statistic of the group's sub-formation of formation category `c`, none without one.
@@ -465,8 +465,8 @@ fn lay_line(
     Ok(())
 }
 
-/// A flanked line's slot moves apart (away from the middle on y) by `GroupTuning::flank_spacing` less the
-/// line's share of the depth; any other keeps `total`.
+/// A flanked line's slot moves apart (away from the middle on y) by `GroupTuning::flank_spacing`
+/// less the line's share of the depth; any other keeps `total`.
 fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
     let mut offset = total;
     if style.kind == LineKind::Flanked {
@@ -482,12 +482,11 @@ fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
 
 impl World {
     /// createColumnLine (`FUN_141012280`) of `formation` for group `g`: a column or a line of
-    /// `kind`; false without members. Its slots ([`column_line_slots`]), then the transform and the
-    /// units ([`World::lay_units`]) with the column-to-line flag (0x141013d20..0x141013d3a): a
-    /// line (2, 7 or 8) whose group's previous formation is a column (1). The game reads that
-    /// type through the
-    /// previous formation's pointer, which `UpdateDesiredPositions` sets whenever it lays a
-    /// formation out anew; a group without one is not a column here.
+    /// `kind`; not laid without members. Its slots ([`column_line_slots`]), then the transform and
+    /// the units ([`World::lay_units`]) with the column-to-line flag (0x141013d20..0x141013d3a): a
+    /// line (2, 7 or 8) whose group's previous formation is a column (1). The game reads that type
+    /// through the previous formation's pointer, which `UpdateDesiredPositions` sets whenever it
+    /// lays a formation out anew; a group without one is not a column here.
     ///
     /// # Errors
     ///
@@ -497,16 +496,17 @@ impl World {
         formation: &mut Formation,
         group: GroupId,
         kind: LineKind,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Layout, GenieError> {
         let g = self.groups.held(group)?;
-        if !column_line_slots(
+        if column_line_slots(
             formation,
             g,
             kind,
             self.world_time,
             &self.model.tuning.group,
-        )? {
-            return Ok(false);
+        )? == Layout::NotLaid
+        {
+            return Ok(Layout::NotLaid);
         }
         let after_column = matches!(
             formation.kind,
@@ -521,6 +521,6 @@ impl World {
             SlotOrder::Closest
         };
         self.lay_units(formation, group, order)?;
-        Ok(true)
+        Ok(Layout::Laid)
     }
 }

@@ -38,6 +38,7 @@ use crate::orders::object_gone;
 use crate::players::AllyTest;
 use crate::players::PlayerId;
 use crate::players::UnitRelation;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::task_finder::allied;
 use crate::unit_ai::world_view::owner_view;
@@ -597,7 +598,7 @@ impl UnitSide for UnitView<'_, '_> {
     /// on the target and its main building); with a task the new wait replaces the unit's actions,
     /// which the caller makes after the update ([`Wait`](crate::unit_ai::world_view::Wait),
     /// [`World::wait_for_foundation`](crate::world::World::wait_for_foundation)).
-    fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
+    fn command(&mut self, command: UnitCommand) -> Result<Answer, GenieError> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
         match command {
@@ -612,7 +613,7 @@ impl UnitSide for UnitView<'_, '_> {
                     .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
                         w.transport_order(p, i, to)
                     })?;
-                Ok(true)
+                Ok(Answer::Taken)
             }
             _ => Err(UNMODELLED_COMMAND),
         }
@@ -624,7 +625,7 @@ impl UnitSide for UnitView<'_, '_> {
         self.builds_on(foundation, slots, roles)
     }
 
-    fn wait_solidify(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
         let roles = &self.c.w.model.roles.clone();
         let slots = self.c.w.model.slots;
         self.start_wait_now(target, slots, roles)

@@ -13,6 +13,7 @@ use crate::objects::masters::ClassId;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
@@ -84,7 +85,7 @@ impl UnitAi {
     /// the AI stream), by twice its speed, a defensive unit of a player at most 5 tiles from its
     /// state position, through `evasiveMoveTo` with both its flags ([`UnitAi::evasive_move`]). A
     /// computer's unit attacked by class 22 (its group's runs) and a computer's transport ship are
-    /// not modelled; neither are unit groups (`+0x6d0`). True when the unit moves.
+    /// not modelled; neither are unit groups (`+0x6d0`). Taken when the unit moves.
     pub(super) fn run_away(
         &mut self,
         force: OrderForce,
@@ -92,7 +93,7 @@ impl UnitAi {
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
         // the siege unit's slot 0x160 (FUN_140c2a8f0): with a top action's target or of class 54
@@ -104,7 +105,7 @@ impl UnitAi {
                 .contains(ClassRoles::UNPACKED_TREBUCHET)
                 || Self::top_target_live(at, side)?.is_some()
             {
-                return Ok(false);
+                return Ok(Answer::NotTaken);
             }
             if player_kind.is_computer() {
                 return Err(GenieError::unsupported(
@@ -115,10 +116,10 @@ impl UnitAi {
         if matches!(self.stance, UnitStance::StandGround | UnitStance::NoAttack)
             && at.player != PlayerId::GAIA
         {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let (mut vx, mut vy) = (0.0f32, 0.0f32);
@@ -182,7 +183,7 @@ impl UnitAi {
     /// the unit could not stand at (its slot 0x278) moves by up to 3 on each axis, five times at
     /// most, each move four draws of the AI stream (the x sign, its amount, the y sign, its
     /// amount), held on the map again. Then the unit's move there (slot 0x340, forced, running,
-    /// range 0): the AI holds the move action and the point without a target. True when it moves.
+    /// range 0): the AI holds the move action and the point without a target. Taken when it moves.
     pub(super) fn evasive_move(
         &mut self,
         point: Position,
@@ -190,10 +191,10 @@ impl UnitAi {
         at: &Surroundings,
         ai: &mut Well512,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let near = |p: f32, own: f32| {
             if !p.is_nan() {
@@ -243,7 +244,7 @@ impl UnitAi {
         }
         // the move (slot 0x340) gives the unit its MoveTo at once: the update's later checks see
         // it busy
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// The boar's damage notify (`FUN_140c25770`, case 500): at no hit points left

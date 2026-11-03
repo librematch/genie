@@ -263,7 +263,7 @@ impl Unit {
         };
         let old = gather.targets();
         let rng = c.w.streams.get(Stream::Action);
-        let _ = gather.retarget(
+        gather.retarget(
             GatherRetarget {
                 target: &resource,
                 player: c.player,

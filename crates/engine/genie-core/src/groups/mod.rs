@@ -39,6 +39,7 @@ mod group_list;
 mod motion_flags;
 mod move_reason;
 mod objects;
+mod outcomes;
 mod slot_state;
 mod transform_kind;
 mod unit_kind;
@@ -54,6 +55,10 @@ pub use self::motion_flags::MotionFlags;
 pub use self::move_reason::{MovePath, MoveReason};
 pub(crate) use self::objects::WorldObject;
 pub use self::objects::sub_formation;
+pub use self::outcomes::{
+    GroupFate, GroupMove, Join, Layout, MemberMove, Orientation, Progress, QueueRun, Resize,
+    SlotTry, SpriteShow,
+};
 pub use self::slot_state::SlotState;
 pub use self::target::GroupTarget;
 pub use self::transform_kind::TransformKind;
@@ -68,7 +73,8 @@ pub use self::create::LeavingWalk;
 use crate::math::fmath::{sqrt, sub};
 pub use command::MoveFlags;
 pub use command::MoveTo as CommandMoveTo;
-/// What `commandMoveTo` is told besides the target and the point ([`crate::world::World::command_move_to`]).
+/// What `commandMoveTo` is told besides the target and the point
+/// ([`crate::world::World::command_move_to`]).
 pub use order::CommandArgs;
 pub mod formation;
 mod layout;

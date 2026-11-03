@@ -11,6 +11,7 @@ use crate::objects::masters::ClassId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::OrderOutcome;
@@ -144,15 +145,15 @@ impl UnitAi {
             OrderKind::Stop => {
                 self.remove_target();
                 self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
-                true
+                Answer::Taken
             }
-            OrderKind::Move | OrderKind::GroupGather => {
-                let m = self.move_to(order_move(o));
-                if let Some(m) = m {
+            OrderKind::Move | OrderKind::GroupGather => match self.move_to(order_move(o)) {
+                Some(m) => {
                     side.effect_now(Effect::Move(m), self, ai)?;
+                    Answer::Taken
                 }
-                m.is_some()
-            }
+                None => Answer::NotTaken,
+            },
             OrderKind::ExploreAndDestroy => self.explore_and_destroy(
                 o.point.tile(),
                 OrderForce::Forced,
@@ -166,7 +167,7 @@ impl UnitAi {
                 self.current_action = Some(AiAction::Wait);
                 self.leave_patrol_timers(ai);
                 self.current_order = Some(OrderKind::Wait);
-                true
+                Answer::Taken
             }
             OrderKind::Scout => {
                 let explored =
@@ -185,9 +186,9 @@ impl UnitAi {
                 explored
             }
             // the patrol order (0x2c7) and the orders the switch has no case for
-            _ => false,
+            _ => Answer::NotTaken,
         };
-        if !taken {
+        if taken == Answer::NotTaken {
             return Ok(OrderOutcome::NotTaken);
         }
         Ok(self.order_tail(Some(o.order), o.priority, class, taken_as, ai, roles))
@@ -204,14 +205,14 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         taken_as: &mut TakenAs,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
             (OrderKind::Attack, Some(t)) => self.attack_slot(t, TargetRules::Any, at, side, ai)?,
             (OrderKind::Defend, target) => {
                 if roles.of_master(at.master).contains(MasterRoles::DEFENDLESS) {
-                    return Ok(false);
+                    return Ok(Answer::NotTaken);
                 }
                 match target {
                     None => self.defend_point(o.point.ground(), o.range, OrderForce::Forced, at),
@@ -235,14 +236,16 @@ impl UnitAi {
                     *taken_as = TakenAs::Attack;
                     self.attack_slot(t, TargetRules::Any, at, side, ai)?
                 } else {
-                    let m = self.move_to(order_move(o));
-                    if let Some(m) = m {
-                        side.effect_now(Effect::Move(m), self, ai)?;
+                    match self.move_to(order_move(o)) {
+                        Some(m) => {
+                            side.effect_now(Effect::Move(m), self, ai)?;
+                            Answer::Taken
+                        }
+                        None => Answer::NotTaken,
                     }
-                    m.is_some()
                 }
             }
-            _ => false,
+            _ => Answer::NotTaken,
         })
     }
 
@@ -256,7 +259,7 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
         // the hunt's stops the unit (`hunt_order`)
@@ -283,12 +286,12 @@ impl UnitAi {
             (OrderKind::Foundation, target) => {
                 let waits = match target {
                     Some(t) => self.wait_for_foundation(t, OrderForce::Forced, side)?,
-                    None => false,
+                    None => Answer::NotTaken,
                 };
                 self.set_action(Some(AiAction::WaitSolidify));
                 waits
             }
-            _ => false,
+            _ => Answer::NotTaken,
         })
     }
 
@@ -300,7 +303,7 @@ impl UnitAi {
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): its lookup finds nothing, so it takes no order
         Ok(match (o.order, o.target) {
@@ -317,7 +320,7 @@ impl UnitAi {
                     (at, side),
                 )?
             }
-            _ => false,
+            _ => Answer::NotTaken,
         })
     }
 
@@ -461,17 +464,19 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         match self.ai_kind {
             CIVILIAN => self.civilian_attack(target, at, side, rng),
             SOLDIER_AI => {
-                if !self.attack_object(target, OrderForce::Forced, rules, at, side)? {
-                    return Ok(false);
+                if self.attack_object(target, OrderForce::Forced, rules, at, side)?
+                    == Answer::NotTaken
+                {
+                    return Ok(Answer::NotTaken);
                 }
                 if at.group.is_some() {
                     side.group_attack_stop()?;
                 }
-                Ok(true)
+                Ok(Answer::Taken)
             }
             _ => self.attack_object(target, OrderForce::Forced, rules, at, side),
         }
@@ -490,21 +495,21 @@ impl UnitAi {
         target: ObjectId,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if self.current_target == Some(target) {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let Some((class, position)) = self.attack_check(target, TargetRules::Own, at, side)? else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         if self.current_action.is_some() && !side.reaches(target, at.weapon_range)? {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !self.attack_command(target, OrderForce::Forced, at, side)? {
-            return Ok(false);
+        if self.attack_command(target, OrderForce::Forced, at, side)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Attack));
         self.target_at(Some(target), Some(class), position);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 }

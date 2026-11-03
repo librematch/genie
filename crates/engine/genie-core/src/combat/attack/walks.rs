@@ -55,6 +55,15 @@ pub(crate) fn speed_of(mover: Option<&Mover>) -> Result<Speed, GenieError> {
     Ok(mover.ok_or(ATTACKER_UNMOVING)?.stats.speed)
 }
 
+/// How the Attack's `MoveTo` to its target started ([`Attack::walk_to_target`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum MoveStart {
+    /// Within 0.01 of the target's footprint: state 1.
+    Arrived,
+    /// Walking (state 3, or 13 without speed), or no `MoveTo` (the list deleted it).
+    UnderWay,
+}
+
 impl Attack {
     /// The sprite the Attack gives its `MoveTo`s (`+0x68`): its constructor's argument, the
     /// master's running or walking one; none leaves the `MoveTo` constructor's default.
@@ -70,8 +79,7 @@ impl Attack {
     /// action list adds and starts it ([`MoveToReads::to_object`]): `at` is the target's place
     /// and `gap` the unit's from the target's footprint (`FUN_14118f680`). A unit within 0.01 of
     /// it is there already, state 1; else state 3, or 13 for a unit without speed. None for a
-    /// unit whose state is 3 or more: the list deletes it. The timer is 0. True when it started
-    /// arrived.
+    /// unit whose state is 3 or more: the list deletes it. The timer is 0. How it started.
     ///
     /// # Errors
     ///
@@ -82,7 +90,7 @@ impl Attack {
         gap: Distance,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveStart, GenieError> {
         if self.target.is_none() {
             return Err(ATTACK_WITHOUT_TARGET.with("state", self.state));
         }
@@ -101,7 +109,11 @@ impl Attack {
         )?;
         self.state = AttackState::Move { move_to };
         self.timer = Seconds::ZERO;
-        Ok(move_to.is_some_and(|m| m.arrived()))
+        Ok(if move_to.is_some_and(|m| m.arrived()) {
+            MoveStart::Arrived
+        } else {
+            MoveStart::UnderWay
+        })
     }
 
     /// The `MoveTo` to a point of states 5 and 11 (`FUN_140aa0d30` to where the target was seen,

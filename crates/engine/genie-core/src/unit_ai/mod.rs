@@ -109,7 +109,7 @@ pub use self::life::{Notifies, OrderHistory};
 pub use self::notifies::{AiLayer, Inbox};
 pub use self::notify_kind::NotifyKind;
 pub use self::order_kind::OrderKind;
-pub use self::order_outcome::OrderOutcome;
+pub use self::order_outcome::{Answer, OrderOutcome};
 pub use self::order_priority::OrderPriority;
 pub(crate) use self::process_order::TakenAs;
 pub use self::queue_end::QueueEnd;

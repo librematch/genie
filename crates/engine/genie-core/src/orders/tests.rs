@@ -100,6 +100,7 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::NotifyKind;
@@ -719,7 +720,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             at,
             Notifies::Cleared
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(
         t.keep_attack(
@@ -730,7 +731,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             at,
             Notifies::Cleared
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     let ai = |t: &World| {
         t.parts
@@ -748,7 +749,7 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
             at,
             Notifies::Cleared
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(ai(&t), Some(WorldTime::from_millis(3500)));
 }
@@ -2750,7 +2751,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
     let point = Position::new(25.0, 21.0, 0.0);
     assert_eq!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     t.parts
         .actions
@@ -2774,7 +2775,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
             Some(object_id(11)),
             point
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     t.parts
         .actions
@@ -2790,7 +2791,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
         .set_artifact(Some(Artifact::new(PlayerId::new(1), None)));
     assert_eq!(
         t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let artifact = t
         .parts
@@ -4415,7 +4416,7 @@ fn move_runs_the_stop_of_pending_completion_first() {
             ListIndex::new(0),
             Position::new(30.0, 20.0, 0.0)
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     let u = &t.players[1].objects[ListIndex::new(0)];
     let ai = t.parts.unit_ai.get(u.id).unwrap();
@@ -5037,7 +5038,7 @@ fn gather_takes_farm_but_no_other_building() {
     let world = t.clone();
     assert_eq!(
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800)),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let g = t
         .parts
@@ -5081,7 +5082,7 @@ fn gather_takes_farm_but_no_other_building() {
     let mut t = world;
     assert_eq!(
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(700)),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert!(
         t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(4444))
@@ -5470,7 +5471,10 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             took,
             t.parts.actions_of(v.id).list.gather().map(|g| g.target)
         ),
-        (true, Some(Some(GatherTargetId::new(object_id(601)))))
+        (
+            Answer::Taken,
+            Some(Some(GatherTargetId::new(object_id(601))))
+        )
     );
     let ai = t.parts.unit_ai.get(v.id).unwrap();
     assert_eq!(
@@ -5603,7 +5607,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             &task,
             MasterSwap::Keep
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
@@ -5615,7 +5619,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             &task,
             MasterSwap::Keep
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let other = Task {
         id: task_id(9),
@@ -5661,7 +5665,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
             &moving,
             MasterSwap::Keep
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     let mut t = forage_world();
     let build = BuildTask {

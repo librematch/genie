@@ -18,6 +18,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Task;
 use crate::players::Amount;
+use crate::unit_ai::Answer;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
@@ -85,13 +86,13 @@ impl UnitView<'_, '_> {
     /// The unit AI's wait for a foundation while it runs ([`crate::unit_ai::UnitSide::wait_solidify`]):
     /// the task the unit's slot 0x820 finds on `target` (any action type, with the master switch)
     /// gives the wait, made at once on the unit lent back to its slot
-    /// ([`crate::world::World::wait_for_foundation`]); false without one.
+    /// ([`crate::world::World::wait_for_foundation`]); not taken without one.
     pub(crate) fn start_wait_now(
         &mut self,
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -131,7 +132,7 @@ impl UnitView<'_, '_> {
                 MasterTables::new(&self.c.w.model.masters, &self.c.w.parts.own_master),
             )?,
         ) else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let masters = self
             .c
@@ -180,7 +181,7 @@ impl UnitView<'_, '_> {
             roles,
         )?
         else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let wait = Wait {
             target: FoundationId::new(target),
@@ -191,7 +192,7 @@ impl UnitView<'_, '_> {
             .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
                 w.wait_for_foundation(p, i, wait)
             })?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 }
 

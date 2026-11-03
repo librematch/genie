@@ -16,6 +16,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::PlayerId;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::{
@@ -295,9 +296,9 @@ impl UnitSide for With<'_> {
         self.side.master_class(player, master)
     }
 
-    fn wait_solidify(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
         let waits = self.side.wait_solidify(target)?;
-        self.commanded |= waits;
+        self.commanded |= waits == Answer::Taken;
         Ok(waits)
     }
 
@@ -313,9 +314,9 @@ impl UnitSide for With<'_> {
         self.side.target_flags(id)
     }
 
-    fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
+    fn command(&mut self, command: UnitCommand) -> Result<Answer, GenieError> {
         let takes = self.side.command(command)?;
-        self.commanded |= takes;
+        self.commanded |= takes == Answer::Taken;
         Ok(takes)
     }
 

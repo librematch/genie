@@ -12,6 +12,7 @@
 //! [`crate::combat::damage`]'s).
 
 use crate::GenieError;
+use crate::combat::attack::walks::MoveStart;
 use crate::combat::damage::Victim;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
@@ -221,8 +222,8 @@ pub(crate) struct ReadyReads {
 enum Begun {
     /// The unit can move: its `MoveTo` started.
     Moves {
-        /// Its last `MoveTo` started arrived.
-        arrived: bool,
+        /// How its last `MoveTo` started.
+        start: MoveStart,
         /// readyToAttack's `set_state(13)` came before the start's `set_state(4)`.
         failed_first: bool,
     },
@@ -235,7 +236,13 @@ enum Begun {
 impl Begun {
     /// The unit's last `MoveTo` started arrived.
     const fn arrived(self) -> bool {
-        matches!(self, Self::Moves { arrived: true, .. })
+        matches!(
+            self,
+            Self::Moves {
+                start: MoveStart::Arrived,
+                ..
+            }
+        )
     }
 
     /// readyToAttack's `set_state(13)` came before the start's `set_state(4)`.

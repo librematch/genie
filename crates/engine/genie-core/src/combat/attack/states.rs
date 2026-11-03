@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
 use crate::combat::attack::update::let_go;
+use crate::combat::attack::walks::MoveStart;
 use crate::combat::attack::{
     AiOrder, Attack, AttackReads, Engagement, Fight, HALF, NO_RANGE, NONE, set_walker_anim,
 };
@@ -65,14 +66,14 @@ impl Attack {
 
     /// `set_state(4)` (`0x140a820c0` case 4): the sub-actions go (a `MoveTo`'s teardown stops the unit,
     /// slot 0x5d0), the range is slot 0x238's again, and a `MoveTo` to the target with that range
-    /// starts ([`Attack::moving`]). True when it arrived.
+    /// starts ([`Attack::moving`]): how it started.
     pub(super) fn set_move(
         &mut self,
         e: &Engagement,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveStart, GenieError> {
         if self.state.take_move_to().is_some() {
             mover.stop()?;
         }
@@ -81,7 +82,7 @@ impl Attack {
     }
 
     /// `set_state(4)`'s own part: the range (slot 0x238's), the timer, the `MoveTo` to the target
-    /// at `at`, which starts arrived (state 1, true) within 0.01 of a `gap` away
+    /// at `at`, which starts arrived (state 1) within 0.01 of a `gap` away
     /// ([`Attack::walk_to_target`]).
     ///
     /// # Errors
@@ -94,7 +95,7 @@ impl Attack {
         gap: Distance,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MoveStart, GenieError> {
         self.range = range;
         self.walk_to_target(at, gap, reads, move_to_tuning)
     }

@@ -36,6 +36,7 @@ use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::world::TaskWorld;
@@ -81,7 +82,7 @@ impl World {
     /// The work command's check of the unit's top Attack (`FUN_14106ff70`): one on this very
     /// target, the filter none or 9, keeps it when its slot 9 (`FUN_140a841d0`, [`Attack::keeps`])
     /// does, and the unit AI hears of it as of a new one (slot 0x828: the attack order and
-    /// action, the target, the retarget time). True when kept.
+    /// action, the target, the retarget time). Taken when kept.
     ///
     /// [`Attack::keeps`]: crate::combat::attack::Attack::keeps
     pub(super) fn keep_attack(
@@ -92,7 +93,7 @@ impl World {
         filter: Option<ActionKind>,
         point: Position,
         notifies: Notifies,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
         let attacking = self
@@ -102,13 +103,13 @@ impl World {
             .attack()
             .filter(|a| attack_on(top, a, target));
         let Some(a) = attacking.filter(|_| matches!(filter, None | Some(ATTACK))) else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         if !a.keeps(target)? {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         self.tell_of_attack(player, idx, (target, point), notifies)?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// The unit AI hears of the kept Attack as of a new one ([`World::keep_attack`]'s last part).
@@ -224,7 +225,7 @@ impl World {
             // LAB_1410706a8 without a task: the top Attack on the target keeps it; else a unit
             // whose master moves (slot 0xe8, its speed `+0x740`) is told of a move (slot 0x828)
             // and moves there (slot 0x138), which is not modelled; one that does not, nothing
-            if self.keep_attack(player, idx, target, filter, point, notifies)? {
+            if self.keep_attack(player, idx, target, filter, point, notifies)? == Answer::Taken {
                 return Ok(());
             }
             return self.work_move(player, idx, target, point, (notifies, source));
@@ -250,7 +251,7 @@ impl World {
         if carry_test {
             self.carried_resource_test(player, idx, &task)?;
         }
-        if self.keep_attack(player, idx, target, filter, point, notifies)? {
+        if self.keep_attack(player, idx, target, filter, point, notifies)? == Answer::Taken {
             return Ok(());
         }
         // the top action of type 0x7e would hear the target through its slot 0x48: the slice
@@ -258,7 +259,7 @@ impl World {
         if top == Some(ARTIFACT_KIND) && task.action_kind == ENTER {
             return Ok(());
         }
-        if kept {
+        if kept == Answer::Taken {
             return Ok(());
         }
         self.start_task(player, idx, (target, point), &task, (notifies, source))
@@ -329,7 +330,7 @@ impl World {
     /// top takes the target again, a Transport on the same task works at the point
     /// ([`World::retake_transport`]); the base action types on top answer 0 (the factory
     /// follows).
-    /// Answers whether an action kept the work.
+    /// Taken when an action kept the work.
     pub(super) fn retake_task(
         &mut self,
         player: PlayerId,
@@ -337,7 +338,7 @@ impl World {
         (target, point, notifies): (Option<ObjectId>, Position, Notifies),
         task: &Task,
         master: MasterSwap,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = &self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
         Ok(match self.parts.actions_of(unit.id).list.hunt().copied() {
@@ -347,7 +348,7 @@ impl World {
                     idx,
                     (target.ok_or(TERRAIN_TASK)?, point, notifies),
                 )?;
-                true
+                Answer::Taken
             }
             _ if top == Some(task.action_kind) && task.action_kind == ActionKind::BUILD => {
                 if master == MasterSwap::Change {
@@ -356,11 +357,11 @@ impl World {
                     ));
                 }
                 self.retake_build(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
-                true
+                Answer::Taken
             }
             _ if top == Some(task.action_kind) && task.action_kind == REPAIR => {
                 self.retake_repair(player, idx, target.ok_or(TERRAIN_TASK)?, point, notifies)?;
-                true
+                Answer::Taken
             }
             _ if top == Some(GATHER)
                 && task.action_kind == GATHER
@@ -384,7 +385,7 @@ impl World {
             // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
             // wait for a foundation's) answers 0, and the work goes on to the factory
             _ if top == Some(task.action_kind) && top != Some(HUNT) => match top {
-                Some(MOVE_TO | ENTER | MISSILE | FLY | MAKE | WAIT_SOLIDIFY) => false,
+                Some(MOVE_TO | ENTER | MISSILE | FLY | MAKE | WAIT_SOLIDIFY) => Answer::NotTaken,
                 _ => {
                     return Err(GenieError::unsupported(
                         "a work command on the unit's current task",
@@ -394,7 +395,7 @@ impl World {
                     .with("target", ObjectId::field(target)));
                 }
             },
-            _ => false,
+            _ => Answer::NotTaken,
         })
     }
 
@@ -444,7 +445,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let t = self.task_target(target, 0)?;
         if self
             .model
@@ -459,7 +460,7 @@ impl World {
         }
         let class = t.master.class;
         let took = self.retarget_gather(player, idx, target)?;
-        if took {
+        if took == Answer::Taken {
             let unit = self.players.live_mut(player, idx)?;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.notify_work(

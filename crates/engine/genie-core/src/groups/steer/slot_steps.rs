@@ -4,10 +4,13 @@
 use crate::GenieError;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::MemberMove;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
+use crate::groups::SlotTry;
 use crate::groups::SpecificMove;
+use crate::groups::SpriteShow;
 use crate::groups::formation::top_path;
 use crate::groups::group_list::{NO_FORMATION, NO_MOVER, member_gone, slot_gone};
 use crate::groups::motion::passes_waypoint;
@@ -58,7 +61,7 @@ impl World {
             .slots
             .checked(slot)?
             .state;
-        let mut placed = false;
+        let mut placed = SlotTry::NoWay;
         match state {
             SlotState::Stopping => {
                 if !g.motion.moving() {
@@ -70,7 +73,7 @@ impl World {
             SlotState::Steering | SlotState::Arriving => return Ok(false),
         }
         self.show_standing(id)?;
-        if placed {
+        if placed == SlotTry::Placed {
             self.face_group(group, id)?;
         }
         self.groups
@@ -94,7 +97,7 @@ impl World {
         group: GroupId,
         id: ObjectId,
         to: BVector,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<SlotTry, GenieError> {
         let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
         let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
         let g = self.groups.held(group)?;
@@ -172,7 +175,11 @@ impl World {
             self.place_member(id, to)?;
             self.face_group(group, id)?;
         }
-        Ok(found)
+        Ok(if found {
+            SlotTry::Placed
+        } else {
+            SlotTry::NoWay
+        })
     }
 
     /// The steering of a member on a clear line to its slot (`0x1410277eb`..`0x141027bff`):
@@ -251,8 +258,9 @@ impl World {
         Ok(())
     }
 
-    /// A member far from its slot: the group's flag 0x200, and the member walks at its speed
-    /// within `GroupTuning::slot_reach`, else runs, faster the farther it is (up to `GroupTuning::catch_up`).
+    /// A member far from its slot: the group's flag 0x200, and the member walks at its speed within
+    /// `GroupTuning::slot_reach`, else runs, faster the farther it is (up to
+    /// `GroupTuning::catch_up`).
     fn catch_up_to_slot(
         &mut self,
         group: GroupId,
@@ -273,7 +281,7 @@ impl World {
                         / self.model.tuning.group.catch_up_span
             };
             self.set_member_speed(id, Speed::new(v));
-            if !self.show_running(id)? {
+            if self.show_running(id)? == SpriteShow::NoSprite {
                 let _ = self.show_walking(id)?;
             }
         }
@@ -395,7 +403,7 @@ impl World {
     /// `FUN_141039f60`: member `id`'s own move in group `group`: with a reason other than -1 it
     /// is active (1) with path `path`, reason `reason`, the goal, timer and distance of `goal`
     /// and the place it last moved to (slot 0x520) as its last position, its failures (`+0x1c`)
-    /// left; with -1 it ends (zeroed, its path and reason -1). False (0) for a unit that is no
+    /// left; with -1 it ends (zeroed, its path and reason -1). No member (0) for a unit that is no
     /// member or that the world does not hold.
     pub(crate) fn set_specific_move(
         &mut self,
@@ -403,16 +411,16 @@ impl World {
         id: ObjectId,
         (path, reason): (MovePath, MoveReason),
         (goal, timer, distance): (BVector, f32, f32),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<MemberMove, GenieError> {
         let Some(index) = self
             .groups
             .get(group)
             .and_then(|g| g.members.iter().position(|m| m.id == id))
         else {
-            return Ok(false);
+            return Ok(MemberMove::NoMember);
         };
         let Some((_, u)) = self.object(id) else {
-            return Ok(false);
+            return Ok(MemberMove::NoMember);
         };
         let last = u.moved_vector(self.parts.mover_of(u.id));
         let own = &mut self
@@ -439,6 +447,6 @@ impl World {
                 ..*own
             }
         };
-        Ok(true)
+        Ok(MemberMove::Set)
     }
 }

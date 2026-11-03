@@ -31,6 +31,7 @@ use crate::orders::object_gone;
 use crate::ownership::artifact::{ARTIFACT_KIND, ArtifactSub};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -97,11 +98,11 @@ impl World {
     }
 
     /// Slot 0x3a0 (`FUN_1410847e0`, the enter command) of the unit at `idx` of `player` on
-    /// `target`, `force` its third argument: a target the world does not hold is false;
-    /// unforced, a unit entering the target already (its top action an Enter on it) is true.
+    /// `target`, `force` its third argument: a target the world does not hold is not taken;
+    /// unforced, a unit entering the target already (its top action an Enter on it) is taken.
     /// Slot 0x820 ([`World::find_work_task`]) looks for a task on the target with the garrison
     /// filter (3) and the switch (the unit takes the master that gave it, slot 0x90): none is
-    /// false; else its Enter ([`World::enter_with`]): true.
+    /// not taken; else its Enter ([`World::enter_with`]): taken.
     ///
     /// # Errors
     ///
@@ -112,9 +113,9 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         force: OrderForce,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if self.object(target).is_none() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let unit = self.players.live(player, idx)?;
         let top = self.parts.actions_of(unit.id).top_action_kind();
@@ -122,17 +123,17 @@ impl World {
             && top == Some(ENTER)
             && self.parts.actions_of(unit.id).top_target() == Some(target)
         {
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         let Some(task) =
             self.find_work_task(player, idx, target, Some(GARRISON), MasterSwap::Change)?
         else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let slot = EnterSlot::under(top);
         let failed = self.enter_with(player, idx, target, &task, slot)?;
         self.post_own_failure(player, idx, failed)?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// The notify an Enter's install gave the unit's own unit AI ([`World::install_enter_as`]),

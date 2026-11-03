@@ -10,6 +10,7 @@ use crate::groups::FormationCategory;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::GroupMove;
 use crate::groups::MoveFlags;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
@@ -78,12 +79,12 @@ impl UnitGroup {
 impl World {
     /// `FUN_14100f7f0` of group `group` on `target`: the object the command is on stands for its
     /// main building (`FUN_141189b20`). A group already on it, whose members with a target are all
-    /// on it, and without [`GroupFlags::JOINED`] only notes the target's place (false). Else the
-    /// target's data resets, the range comes from the members' pass ([`World::reach_pass`], with
-    /// fewer than two queued commands) or is the group's smallest unit range, the special units and
-    /// the categories' attack ranges take the target ([`World::refill_special_units`],
+    /// on it, and without [`GroupFlags::JOINED`] only notes the target's place (not begun). Else
+    /// the target's data resets, the range comes from the members' pass ([`World::reach_pass`],
+    /// with fewer than two queued commands) or is the group's smallest unit range, the special
+    /// units and the categories' attack ranges take the target ([`World::refill_special_units`],
     /// [`World::raise_attack_ranges`]), the target's data is set, and the group moves to the target
-    /// ([`World::command_move_to`]: its range, the move not queued, direct, flag 1). True when the
+    /// ([`World::command_move_to`]: its range, the move not queued, direct, flag 1). Begun when the
     /// move began: the group is then in command 9, [`GroupFlags::ARRIVED`] off and
     /// [`GroupFlags::ATTACKING`] on.
     ///
@@ -96,7 +97,7 @@ impl World {
         group: GroupId,
         target: ObjectId,
         order: AttackOrder,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GroupMove, GenieError> {
         let main = self.main_object(target)?;
         let at = self.moved_place_of(main)?;
         let g = self.groups.held(group)?;
@@ -108,7 +109,7 @@ impl World {
                 .held_mut(group)?
                 .current_target
                 .original_position = at;
-            return Ok(false);
+            return Ok(GroupMove::NotBegun);
         }
         let g = self.groups.held_mut(group)?;
         g.forget_target_data();
@@ -144,14 +145,14 @@ impl World {
             },
         )?;
         let g = self.groups.held_mut(group)?;
-        if !moved {
+        if moved == GroupMove::NotBegun {
             g.forget_target_data();
-            return Ok(false);
+            return Ok(GroupMove::NotBegun);
         }
         g.current_command = GroupCommandKind::ATTACK;
         g.flags &= !GroupFlags::ARRIVED;
         g.flags |= GroupFlags::ATTACKING;
-        Ok(true)
+        Ok(GroupMove::Begun)
     }
 
     /// `FUN_141189b20` of `target`: a building's main building (`+0xbb8`) when it has one, else

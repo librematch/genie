@@ -17,6 +17,7 @@ use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderOutcome;
 use crate::unit_ai::Pace;
@@ -44,18 +45,18 @@ impl UnitAi {
         force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let Some(t) = Self::world_object(target, at, side)? else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         self.set_action(Some(AiAction::Defend));
         self.target_at(Some(target), Some(t.class), t.position);
         self.desired_distance = range;
         self.defend_target = Some(target);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x178 (`FUN_140c4ce30`), the defend of `point` within `range`, `force`d or without an
@@ -68,15 +69,15 @@ impl UnitAi {
         range: Distance,
         force: OrderForce,
         at: &Surroundings,
-    ) -> bool {
+    ) -> Answer {
         if matches!(force, OrderForce::Unforced) && self.current_action.is_some() {
-            return false;
+            return Answer::NotTaken;
         }
         self.set_action(Some(AiAction::Defend));
         self.target_at(None, None, point.with_height(at.position.z()));
         self.desired_distance = range;
         self.defend_target = None;
-        true
+        Answer::Taken
     }
 
     /// `BuildObject` (slot 0xf0, `FUN_140c47d80`) on foundation `target`, `force`d or off the
@@ -85,7 +86,7 @@ impl UnitAi {
     /// ([`AiCommand::BuildObject`]); its 0 ([`UnitSide::builds`]: the foundation gone, no task)
     /// leaves the AI as it was. Then the build action value (the last keeping the old) and the
     /// foundation as the target at its place with its class as the world holds it, else class −1
-    /// at (0, 0, 0) (the target and class before becoming the last). True when it builds.
+    /// at (0, 0, 0) (the target and class before becoming the last). Taken when it builds.
     ///
     /// # Errors
     ///
@@ -98,11 +99,11 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if (force == OrderForce::Unforced && self.current_action == Some(AiAction::Build))
             || !side.builds(target)?
         {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
         self.set_action(Some(AiAction::Build));
@@ -110,7 +111,7 @@ impl UnitAi {
             Some(t) => self.set_target(Some(target.id()), t.class.or_none(), t.position),
             None => self.set_target(Some(target.id()), None, Position::ORIGIN),
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// The work slots on object `target` (heal 0xe0, `FUN_140c4e010`; conversion 0xd8,
@@ -125,19 +126,19 @@ impl UnitAi {
         force: OrderForce,
         (action, command): (AiAction, UnitCommand),
         (at, side): (&Surroundings, &mut dyn UnitSide),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action == Some(action) {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !side.command(command)? {
-            return Ok(false);
+        if side.command(command)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(action));
         match Self::world_object(target, at, side)? {
             Some(t) => self.set_target(Some(target), t.class.or_none(), t.position),
             None => self.set_target(Some(target), None, Position::ORIGIN),
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `GatherObject` (slot 0xd0, `FUN_140c4dd50`) forced on the order's `target`: the unit's
@@ -150,9 +151,9 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let Some(t) = Self::world_object(target, at, side)? else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         self.gather_object(
             Gatherable {
@@ -163,7 +164,7 @@ impl UnitAi {
             side,
             rng,
         )?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `HuntObject` (slot 0xc8, `FUN_140c4e220`) forced on the order's `target`: the action stops
@@ -176,17 +177,17 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let held = match target {
             Some(id) => Self::world_object(id, at, side)?.map(|t| (id, t)),
             None => None,
         };
         let Some((target, t)) = held else {
             self.stop_current(StopOrder::Keep, at, side, rng)?;
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         self.hunt_object(target, t.class, t.position, at, side, rng)?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x168 (`FUN_140c4dab0`, "GOT A FOLLOW ORDER"), the follow of object `target` within
@@ -203,12 +204,12 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let Some(t) = Self::world_object(target, at, side)? else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         self.set_action(Some(AiAction::Follow));
         self.target_at(Some(target), Some(t.class), t.position);
@@ -228,7 +229,7 @@ impl UnitAi {
                 rng,
             )?;
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x110, the enter into object `target`, `force`d or without an action value (the
@@ -241,16 +242,16 @@ impl UnitAi {
         target: ObjectId,
         force: OrderForce,
         (at, side): (&Surroundings, &mut dyn UnitSide),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let held = Self::world_object(target, at, side)?;
         if self.ai_kind == CIVILIAN && held.is_none() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !side.command(UnitCommand::Enter(target))? {
-            return Ok(false);
+        if side.command(UnitCommand::Enter(target))? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Enter));
         self.target_at(
@@ -258,7 +259,7 @@ impl UnitAi {
             held.map(|t| t.class),
             Position::from([-1.0; 3]),
         );
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x128 (`FUN_140c65400`), the transport to `point`, `force`d or without an action
@@ -270,16 +271,16 @@ impl UnitAi {
         point: Position,
         force: OrderForce,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !side.command(UnitCommand::Transport(point))? {
-            return Ok(false);
+        if side.command(UnitCommand::Transport(point))? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Transport));
         self.target_at(None, None, point);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slots 0x118 (`FUN_140c660d0`) and, `over_wall`, 0x120 (`FUN_140c66330`): the unload at
@@ -292,13 +293,13 @@ impl UnitAi {
         point: Point,
         (force, over_wall): (OrderForce, bool),
         (at, side): (&Surroundings, &mut dyn UnitSide),
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let to = point.with_height(at.position.z());
-        if !side.command(UnitCommand::Unload { to, over_wall })? {
-            return Ok(false);
+        if side.command(UnitCommand::Unload { to, over_wall })? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(if over_wall {
             AiAction::UnloadOverWall
@@ -306,7 +307,7 @@ impl UnitAi {
             AiAction::Unload
         }));
         self.set_target(Some(at.id), at.class, at.position);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x180 (`FUN_140c64ab0`), seek and destroy object `target` from the tile `tile`,
@@ -320,13 +321,13 @@ impl UnitAi {
         force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !self.attack_command(target, force, at, side)? {
-            return Ok(false);
+        if self.attack_command(target, force, at, side)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::SeekAndDestroy));
         let class = Self::world_object(target, at, side)?.map(|t| t.class);
@@ -335,7 +336,7 @@ impl UnitAi {
             class,
             Position::new(tile.x() as f32, tile.y() as f32, unit_ai_tuning.explore_z),
         );
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x188 (`FUN_140c4d9b0`), explore and destroy to the tile `tile`, `force`d or without
@@ -349,15 +350,15 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let point = Point::new(tile.x() as f32, tile.y() as f32);
         side.effect_now(Effect::Explore(point), self, rng)?;
         self.set_action(Some(AiAction::ExploreAndDestroy));
         self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x230's case for the order on a target (`0x2db`, `0x325`): on a target the world holds,
@@ -463,22 +464,22 @@ impl UnitAi {
 
     /// Slot 0x108 (`FUN_140c68a60`), with `force` (its argument 3) or without an action value:
     /// the unit's slot 0x388 on the foundation `target` ([`UnitSide::wait_solidify`]); on its 1
-    /// the action value becomes [`AiAction::WaitSolidify`], the old one the last. True when it
+    /// the action value becomes [`AiAction::WaitSolidify`], the old one the last. Taken when it
     /// waits.
     pub(super) fn wait_for_foundation(
         &mut self,
         target: ObjectId,
         force: OrderForce,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
-        if !side.wait_solidify(target)? {
-            return Ok(false);
+        if side.wait_solidify(target)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::WaitSolidify));
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x100 (`FUN_140c4d910`), forced (its argument 4) or without an action value:
@@ -492,15 +493,15 @@ impl UnitAi {
         side: &mut dyn UnitSide,
         rng: &mut Well512,
         unit_ai_tuning: &UnitAiTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let point = tile.corner();
         side.effect_now(Effect::Explore(point), self, rng)?;
         self.last_action = self.current_action.replace(AiAction::Explore);
         self.target_at(None, None, point.with_height(unit_ai_tuning.explore_z));
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// Slot 0x28 (`FUN_140c55c90`) with Immediate set and inFront clear: for a unit in state 2 or

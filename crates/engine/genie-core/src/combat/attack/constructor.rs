@@ -361,9 +361,9 @@ impl Attack {
             ready_end = true;
         }
         if movable {
-            let arrived = self.set_move(e, mover, reads, move_to_tuning)?;
+            let start = self.set_move(e, mover, reads, move_to_tuning)?;
             return Ok(Begun::Moves {
-                arrived,
+                start,
                 failed_first,
             });
         }

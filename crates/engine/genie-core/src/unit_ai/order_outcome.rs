@@ -1,4 +1,5 @@
-//! What an order's processing answers ([`OrderOutcome`]).
+//! What an order's processing answers ([`OrderOutcome`]) and what an order slot or a unit's
+//! command answers ([`Answer`]).
 
 /// What slot 0x230 (`FUN_140c5c170`, [`crate::unit_ai::UnitAi::process_order`]) answers for an
 /// order: the queue keeps an order that is not ready and drops the others; one taken ends the
@@ -11,6 +12,18 @@ pub enum OrderOutcome {
     Taken,
     /// 0xe: the order is not ready; the queue keeps it.
     NotReady,
+}
+
+/// What a slot answers for an order, a command, a move or a new target it is given (the
+/// game's 1 or 0): a unit AI's order slots, a unit's commands, an action's take of a move or
+/// a target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub enum Answer {
+    /// 0: the slot does not take it.
+    NotTaken,
+    /// 1: the slot takes it.
+    Taken,
 }
 
 impl OrderOutcome {

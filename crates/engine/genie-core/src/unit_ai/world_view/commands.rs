@@ -24,6 +24,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::ai_module::SearchArea;
 use crate::players::world_player::town_centres;
+use crate::unit_ai::Answer;
 use crate::unit_ai::task_finder::Actor;
 use crate::unit_ai::task_finder::TaskOn;
 use crate::unit_ai::task_finder::world::{SideWorld, point_terrain, task_search, task_target_with};
@@ -52,7 +53,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -77,7 +78,7 @@ impl UnitView<'_, '_> {
             others.find(id)
         };
         let Some((_, target_unit)) = find(target) else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         // slot 0x820's point: the target's place
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), target_unit.position());
@@ -87,7 +88,7 @@ impl UnitView<'_, '_> {
                 .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
                     w.repair_order(p, i, order)
                 })?;
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         let masters = self
             .c
@@ -157,7 +158,7 @@ impl UnitView<'_, '_> {
             roles,
         )?;
         if switch.is_none() && found.is_none() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let order = RepairOrder::Start {
             target,
@@ -167,7 +168,11 @@ impl UnitView<'_, '_> {
             ],
             task: found.map(|(task, _)| task),
         };
-        let repairs = found.is_some();
+        let repairs = if found.is_some() {
+            Answer::Taken
+        } else {
+            Answer::NotTaken
+        };
         self.c
             .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
                 w.repair_order(p, i, order)
@@ -187,7 +192,7 @@ impl UnitView<'_, '_> {
         target: ObjectId,
         slots: Slots,
         roles: &Roles,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = &*self.unit;
         let (player, others, foreign) = (
             self.player,
@@ -212,7 +217,7 @@ impl UnitView<'_, '_> {
             others.find(id)
         };
         let Some((_, target_unit)) = find(target) else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let slot = EnterSlot::under(self.actions.top_action_kind());
         let masters = self
@@ -281,7 +286,7 @@ impl UnitView<'_, '_> {
             roles,
         )?
         else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
         let order = EnterOrder {
             target,
@@ -297,7 +302,7 @@ impl UnitView<'_, '_> {
         {
             self.c.notify_own(self.unit, n)?;
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// What an explorer's searches ask of the world, the map's size and the unit's line of sight.

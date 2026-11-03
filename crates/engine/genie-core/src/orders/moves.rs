@@ -30,6 +30,7 @@ use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::NotifyKind;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -171,7 +172,7 @@ impl World {
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             let ai_stream = self.streams.get(Stream::Ai);
             match cell {
-                None => ai.notify_move(!taken, None, order.point, ai_stream),
+                None => ai.notify_move(taken == Answer::NotTaken, None, order.point, ai_stream),
                 Some(c) => ai.notify_grid_move(c, ai_stream),
             }
         }
@@ -181,13 +182,13 @@ impl World {
     /// `FUN_14106d340` on a move of the unit at `idx` to `point`: a unit with a unit AI
     /// (`FUN_140c5dc10` clears its notifies with the world time) lets its head action take the
     /// point ([`World::head_takes_move`]) unless it stops after a kill (`FUN_140c41c10`); else a
-    /// `MoveTo` to the point replaces its actions. True when the action took it.
+    /// `MoveTo` to the point replaces its actions. Taken when the action took it.
     pub(crate) fn move_to_point(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         // a unit with a unit AI (FUN_140c5dc10 clears its notifies with the world time) lets its
         // head action's slot 0x40 take the point unless it stops after a kill (FUN_140c41c10)
         let world_time = self.world_time;
@@ -217,10 +218,12 @@ impl World {
             .unit_ai
             .get(unit.id)
             .is_some_and(|ai| ai.stop_after_kill);
-        let taken = self.parts.unit_ai.contains(unit.id)
-            && !stop_after_kill
-            && self.head_takes_move(player, idx, None, point)?;
-        if !taken {
+        let taken = if self.parts.unit_ai.contains(unit.id) && !stop_after_kill {
+            self.head_takes_move(player, idx, None, point)?
+        } else {
+            Answer::NotTaken
+        };
+        if taken == Answer::NotTaken {
             // the MoveTo to the point (FUN_140aa0d30: range 0, the walking sprite) and its
             // install (slot 0x808: the MoveTo's slot 0x70, FUN_140a78050, does nothing; the list
             // clears, then the start)
@@ -410,7 +413,7 @@ impl World {
             .of_class(master.class)
             .contains(ClassRoles::LIVESTOCK)
             && let Some(target) = order.target
-            && !self.enter_command(player, idx, target, OrderForce::Unforced)?
+            && self.enter_command(player, idx, target, OrderForce::Unforced)? == Answer::NotTaken
         {
             let at = self
                 .spatial

@@ -2,6 +2,7 @@
 //! check and a hibernating group.
 
 use crate::GenieError;
+use crate::groups::GroupFate;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
@@ -39,7 +40,7 @@ impl World {
             .map(|g| g.id)
             .collect();
         for id in ids {
-            if self.group_update(id)? {
+            if self.group_update(id)? == GroupFate::Kept {
                 self.group_update_end(id)?;
             } else {
                 self.delete_group(id)?;
@@ -100,15 +101,15 @@ impl World {
         Ok(())
     }
 
-    /// `BUnitGroup::update` (`FUN_14103d910`) of group `group`: true keeps the group, false (the
-    /// routine's 0) has the world delete it. Flags bit 13 clears; the units the group keeps apart
+    /// `BUnitGroup::update` (`FUN_14103d910`) of group `group`: kept (1), or deleted (the
+    /// routine's 0: the world deletes it). Flags bit 13 clears; the units the group keeps apart
     /// are checked ([`World::keep_apart`], `FUN_141007ca0`); a member the world does not hold,
     /// without a unit AI (a ghost has none), below 1 hit point (`COMISS` then `JA`: not a NaN) or
     /// of another player leaves the group (`removeUnit` with target -1, [`World::remove_unit`]) and
     /// then stops (slot 0x5d0 on the object the world holds, [`crate::movement::Mover:: stop`]);
     /// any such leave sets [`GroupFlags::STATISTICS`]. A hibernating group (`mHibernating`,
     /// `+0x13c`) runs its own check ([`World::hibernating_update`]) and, unless that deletes it,
-    /// stays asleep (true) without [`MotionFlags::NEW`]; with it, and for an awake group, the
+    /// stays asleep (kept) without [`MotionFlags::NEW`]; with it, and for an awake group, the
     /// update goes on ([`World::awake_update`]).
     ///
     /// # Errors
@@ -117,13 +118,13 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn group_update(&mut self, group: GroupId) -> Result<bool, GenieError> {
+    pub fn group_update(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
         self.groups.held_mut(group)?.flags &= !GroupFlags::UPDATE_CLEARED;
         self.keep_apart(group)?;
         self.drop_lost_members(group)?;
         if self.groups.held(group)?.hibernating != 0 {
-            if !self.hibernating_update(group)? {
-                return Ok(false);
+            if self.hibernating_update(group)? == GroupFate::Deleted {
+                return Ok(GroupFate::Deleted);
             }
             if !self
                 .groups
@@ -132,7 +133,7 @@ impl World {
                 .flags
                 .contains(MotionFlags::NEW)
             {
-                return Ok(true);
+                return Ok(GroupFate::Kept);
             }
         }
         self.awake_update(group)
@@ -175,17 +176,17 @@ impl World {
         Ok(())
     }
 
-    /// A hibernating group's check (`0x14103db22`..`0x14103dd5b`): false deletes the group;
-    /// else the queued commands run (`checkQueuedOrders`, [`World::check_queued_orders`]) when
-    /// [`World::hibernation`] asks for them.
-    pub(super) fn hibernating_update(&mut self, group: GroupId) -> Result<bool, GenieError> {
+    /// A hibernating group's check (`0x14103db22`..`0x14103dd5b`): deleted, the world deletes the
+    /// group; else the queued commands run (`checkQueuedOrders`, [`World::check_queued_orders`])
+    /// when [`World::hibernation`] asks for them.
+    pub(super) fn hibernating_update(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
         let Some(runs_queue) = self.hibernation(group)? else {
-            return Ok(false);
+            return Ok(GroupFate::Deleted);
         };
         if runs_queue {
             self.check_queued_orders(group)?;
         }
-        Ok(true)
+        Ok(GroupFate::Kept)
     }
 
     /// What a hibernating group does by its current command (`+0x3a8`): None deletes it, else

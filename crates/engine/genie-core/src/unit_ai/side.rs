@@ -19,6 +19,7 @@ use crate::objects::{ObjectState, WorkerCount};
 use crate::ownership::CaptureKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::{
     Attacked, Duel, Effect, Found, Notify, PatrolPath, Search, Seeker, UnitAi, UnitSeen,
@@ -322,12 +323,12 @@ pub trait UnitSide {
     /// (`FUN_1415417a0`) and the unit's slot 0x820 finds a task on it (any action type, with the
     /// master switch), a new `TRIBE_Action_Wait_Solidify` on that task
     /// ([`crate::construction::wait_solidify`]) replaces the unit's actions (`FUN_140a98620`, slot 0x808);
-    /// true then.
+    /// taken then.
     ///
     /// # Errors
     ///
     /// What the task search does not model.
-    fn wait_solidify(&mut self, _target: ObjectId) -> Result<bool, GenieError> {
+    fn wait_solidify(&mut self, _target: ObjectId) -> Result<Answer, GenieError> {
         Err(GenieError::unsupported(
             "a wait for a foundation without the world",
         ))
@@ -357,13 +358,13 @@ pub trait UnitSide {
         Ok(None)
     }
 
-    /// A command of the unit's that the unit AI's order slots give ([`UnitCommand`]): true when
+    /// A command of the unit's that the unit AI's order slots give ([`UnitCommand`]): taken when
     /// the unit takes it (the slot's 1).
     ///
     /// # Errors
     ///
     /// The commands the slice holds no action for.
-    fn command(&mut self, _command: UnitCommand) -> Result<bool, GenieError> {
+    fn command(&mut self, _command: UnitCommand) -> Result<Answer, GenieError> {
         Err(UNMODELLED_COMMAND)
     }
 

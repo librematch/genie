@@ -10,6 +10,7 @@ use crate::objects::masters::ClassId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -113,7 +114,7 @@ impl UnitAi {
     }
 
     /// `AttackObject` (slot 0xb8, `FUN_140c43720`): `+0x1d5` clears; not `force`d, an AI with an
-    /// action fails (false). The target must pass [`UnitAi::attack_check`] by `rules`; then the
+    /// action fails (not taken). The target must pass [`UnitAi::attack_check`] by `rules`; then the
     /// unit's attack command ([`UnitAi::attack_command`]), on success the action is the attack
     /// (600, the last action keeping the old) and the target its point and class
     /// (`FUN_140c64c10`). The group flag's attack by the unit's group (behind the byte
@@ -125,19 +126,19 @@ impl UnitAi {
         rules: TargetRules,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let Some((class, position)) = self.attack_check(target, rules, at, side)? else {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         };
-        if !self.attack_command(target, force, at, side)? {
-            return Ok(false);
+        if self.attack_command(target, force, at, side)? == Answer::NotTaken {
+            return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::Attack));
         self.target_at(Some(target), Some(class), position);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `AttackObject`'s test of `target` (`FUN_140c43720`, and `attackRoundupObject`'s): the world
@@ -196,26 +197,30 @@ impl UnitAi {
     /// The unit's attack command (slot 0x338, [`UnitSide::attack`]) on `target`, `force`d or not,
     /// as `AttackObject`, `attackRoundupObject` and seek and destroy give it, at once. The
     /// notifies the command posts (the unit's slot 0x328 -> the AI's slot 0x38) go into the
-    /// queue, or the buffer while it is full. True when the unit attacks.
+    /// queue, or the buffer while it is full. Taken when the unit attacks.
     pub(super) fn attack_command(
         &mut self,
         target: ObjectId,
         force: OrderForce,
         at: &Surroundings,
         side: &mut dyn UnitSide,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let attacked = side.attack(target, force, self)?;
         for (kind, p) in attacked.posted {
             self.post(Notify::own(at.id, kind, p), at.state)?;
         }
-        Ok(attacked.attacks)
+        Ok(if attacked.attacks {
+            Answer::Taken
+        } else {
+            Answer::NotTaken
+        })
     }
 
     /// The civilian's `AttackObject` (slot 0xb8, `FUN_140c17370`) with its force flag 1, as every
     /// caller in the slice passes it (the damage notify and the unit in the way): an object the
-    /// world does not hold (`FUN_1415417a0`) gets nothing (false); an animal or a tree (classes 9,
+    /// world does not hold (`FUN_1415417a0`) gets nothing (not taken); an animal or a tree (classes 9,
     /// 10 and 15) is hunted (slot 0xc8, [`UnitAi::hunt_object`]); any other goes to the base
-    /// `AttackObject` by its own rules and the group flag 1 ([`UnitAi::attack_object`]). True when
+    /// `AttackObject` by its own rules and the group flag 1 ([`UnitAi::attack_object`]). Taken when
     /// it hunts or attacks.
     pub(super) fn civilian_attack(
         &mut self,
@@ -223,13 +228,13 @@ impl UnitAi {
         at: &Surroundings,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let roles = &at.roles;
         let t = match at.unit(target) {
             Some(t) => *t,
             None => match side.seen_unit(target)? {
                 Some(t) => t,
-                None => return Ok(false),
+                None => return Ok(Answer::NotTaken),
             },
         };
         if roles
@@ -237,7 +242,7 @@ impl UnitAi {
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR | ClassRoles::TREE)
         {
             self.hunt_object(target, t.class, t.position, at, side, rng)?;
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
     }

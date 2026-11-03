@@ -5,7 +5,9 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::GroupMove;
 use crate::groups::MoveFlags;
+use crate::groups::Progress;
 use crate::groups::attack::AttackOrder;
 use crate::groups::command::MoveTo;
 use crate::groups::group_list::member_gone;
@@ -27,10 +29,10 @@ use crate::world::World;
 const CATEGORIES: [FormationCategory; 6] = FormationCategory::EACH;
 
 impl World {
-    /// `FUN_14103f4e0` of group `group`: the attack command's update. True when the command is
+    /// `FUN_14103f4e0` of group `group`: the attack command's update. Finished when the command is
     /// finished (the caller deletes the group or lets it hibernate, [`World::command_update`]);
     /// `relayout` is the update's relayout flag. Without a first member the world holds, nothing
-    /// happens (false). The target is the object the group's target names or, for a target
+    /// happens (going). The target is the object the group's target names or, for a target
     /// group, its first member.
     ///
     /// With the target not pending ([`World::target_pending`]) a group with queued commands is
@@ -48,7 +50,7 @@ impl World {
         &mut self,
         group: GroupId,
         relayout: &mut bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Progress, GenieError> {
         let g = self.groups.held(group)?;
         let Some(owner) = g
             .members
@@ -56,7 +58,7 @@ impl World {
             .and_then(|m| self.world_object(m.id))
             .map(|o| o.player())
         else {
-            return Ok(false);
+            return Ok(Progress::Going);
         };
         let target = self.attacked_object(group);
         if !self.target_pending(group)? {
@@ -71,7 +73,7 @@ impl World {
             .ok_or_else(|| member_gone(target))?
             .player();
         if owner == target_player {
-            return Ok(true);
+            return Ok(Progress::Finished);
         }
         let finished = self.release_categories(group, target)?;
         if let Some(done) = self.attack_chase(group, target, owner)? {
@@ -95,13 +97,13 @@ impl World {
     }
 
     /// The target is not pending (`FUN_14103f4e0`'s first branch): a group with queued
-    /// commands is finished (true). Any other forgets the target for good: its walk stops
+    /// commands is finished. Any other forgets the target for good: its walk stops
     /// ([`crate::groups::Motion::stop_walk`], `FUN_14104a050`), its command is none, and its
     /// target's data, range too, resets. A target the world holds has the members' nearest to
     /// it found (a member other than the target, by the footprint gap, `FUN_14118f680`, below
     /// [`FARTHEST`]); the range rises to that member's line of sight; with the gap within the
-    /// range the command is finished (true). Else the group moves to the place the target was
-    /// first seen at, with that range, forgetting the target, and asks for a relayout (false).
+    /// range the command is finished. Else the group moves to the place the target was
+    /// first seen at, with that range, forgetting the target, and asks for a relayout (going).
     ///
     /// # Errors
     ///
@@ -111,10 +113,10 @@ impl World {
         group: GroupId,
         target: Option<ObjectId>,
         relayout: &mut bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Progress, GenieError> {
         let g = self.groups.held_mut(group)?;
         if !g.command_queue.is_empty() {
-            return Ok(true);
+            return Ok(Progress::Finished);
         }
         let to = g.current_target.original_position.ground();
         let mut range = g.current_target.range;
@@ -133,7 +135,7 @@ impl World {
                 }
             }
             if gap <= range.get() {
-                return Ok(true);
+                return Ok(Progress::Finished);
             }
         }
         let _ = self.command_move_to(
@@ -146,7 +148,7 @@ impl World {
             },
         )?;
         *relayout = true;
-        Ok(false)
+        Ok(Progress::Going)
     }
 
     /// The member of group `group`, other than `target`, nearest to it by the footprint gap
@@ -175,21 +177,26 @@ impl World {
         Ok(best)
     }
 
-    /// The target is pending, and not the first member's player's: each formation category
-    /// (0 to 5) with units, the first of its number, either is released ([`World::release_units`])
-    /// or keeps `finished`. With [`GroupFlags::ARRIVED`] the category is released at
-    /// once; else it is when one of its units is within its attack range of the target: the
-    /// footprint gap less a slack, at most the category's range (negative or unordered: 0). The
-    /// slack is `GroupTuning::contact_slack` for a category without a range, `GroupTuning::ranged_slack` for one
-    /// with, and `GroupTuning::chasing_slack` when the target moves (slot 0x5c8) and the category's range
-    /// is above the target's own weapon range (slot 0x230) plus `GroupTuning::ranged_slack`. A category
-    /// without one in range ends `finished` (the returned flag, false). A released category
-    /// stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its units at the target.
+    /// The target is pending, and not the first member's player's: each formation category (0 to 5)
+    /// with units, the first of its number, either is released ([`World::release_units`]) or keeps
+    /// `finished`. With [`GroupFlags::ARRIVED`] the category is released at once; else it is when
+    /// one of its units is within its attack range of the target: the footprint gap less a slack,
+    /// at most the category's range (negative or unordered: 0). The slack is
+    /// `GroupTuning::contact_slack` for a category without a range, `GroupTuning::ranged_slack` for
+    /// one with, and `GroupTuning::chasing_slack` when the target moves (slot 0x5c8) and the
+    /// category's range is above the target's own weapon range (slot 0x230) plus
+    /// `GroupTuning::ranged_slack`. A category without one in range ends `finished` (going). A
+    /// released category stops the group's walk, clears [`GroupFlags::ATTACKING`] and sends its
+    /// units at the target.
     ///
     /// # Errors
     ///
     /// A master the world lacks, and what the release does not model.
-    fn release_categories(&mut self, group: GroupId, target: ObjectId) -> Result<bool, GenieError> {
+    fn release_categories(
+        &mut self,
+        group: GroupId,
+        target: ObjectId,
+    ) -> Result<Progress, GenieError> {
         let mut finished = true;
         for category in CATEGORIES {
             let Some((units, range)) = self
@@ -217,7 +224,11 @@ impl World {
                 self.release_units(group, &units, target)?;
             }
         }
-        Ok(finished)
+        Ok(if finished {
+            Progress::Finished
+        } else {
+            Progress::Going
+        })
     }
 
     /// One of the `units` is within `range` of the target as [`World::release_categories`]
@@ -267,14 +278,14 @@ impl World {
     }
 
     /// The group follows a target that moved (`FUN_14103f4e0`'s object-target tail): a target more
-    /// than `GroupTuning::close` from where it stood (`+0x3c8`, the ground length of the difference of the
-    /// places slot 0x520 gives). One the first member's player cannot see ([`World::sees_object`],
-    /// `FUN_141188ea0`) sends the group back to that place, forgetting the target, and the update
-    /// ends (`Some(false)`). One it sees is attacked anew ([`World::command_attack`]): a move begun
-    /// ends the update (`Some(false)`); else the group moves to the target's place within its
-    /// range, is in command 9 with [`GroupFlags::ARRIVED`] off and [`GroupFlags::ATTACKING`] on,
-    /// and the update ends (`Some(false)`). None for a group whose target is no object or has not
-    /// moved.
+    /// than `GroupTuning::close` from where it stood (`+0x3c8`, the ground length of the difference
+    /// of the places slot 0x520 gives). One the first member's player cannot see
+    /// ([`World::sees_object`], `FUN_141188ea0`) sends the group back to that place, forgetting the
+    /// target, and the update ends (`Some(Going)`). One it sees is attacked anew
+    /// ([`World::command_attack`]): a move begun ends the update (`Some(Going)`); else the group
+    /// moves to the target's place within its range, is in command 9 with [`GroupFlags::ARRIVED`]
+    /// off and [`GroupFlags::ATTACKING`] on, and the update ends (`Some(Going)`). None for a group
+    /// whose target is no object or has not moved.
     ///
     /// # Errors
     ///
@@ -285,7 +296,7 @@ impl World {
         group: GroupId,
         target: ObjectId,
         owner: PlayerId,
-    ) -> Result<Option<bool>, GenieError> {
+    ) -> Result<Option<Progress>, GenieError> {
         let g = self.groups.held(group)?;
         if !matches!(g.current_target.target, GroupTarget::Object(_)) {
             return Ok(None);
@@ -312,7 +323,7 @@ impl World {
                     flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
                 },
             )?;
-            return Ok(Some(false));
+            return Ok(Some(Progress::Going));
         }
         let order = AttackOrder {
             disable_retargeting: g.current_target.disable_retargeting != 0,
@@ -321,8 +332,8 @@ impl World {
         let id = Some(target).ok_or_else(|| {
             GenieError::unreachable("an attack target without an id").with("group", group)
         })?;
-        if self.command_attack(group, id, order)? {
-            return Ok(Some(false));
+        if self.command_attack(group, id, order)? == GroupMove::Begun {
+            return Ok(Some(Progress::Going));
         }
         let range = self.groups.held(group)?.current_target.range;
         let at = self
@@ -342,7 +353,7 @@ impl World {
         g.current_command = ATTACK;
         g.flags &= !GroupFlags::ARRIVED;
         g.flags |= GroupFlags::ATTACKING;
-        Ok(Some(false))
+        Ok(Some(Progress::Going))
     }
 
     /// The end of the update (`FUN_14103f4e0` after the chase): a moving group asks for a relayout,
@@ -360,9 +371,9 @@ impl World {
         &mut self,
         group: GroupId,
         target: ObjectId,
-        finished: bool,
+        finished: Progress,
         relayout: &mut bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Progress, GenieError> {
         let t = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
@@ -385,13 +396,13 @@ impl World {
             return Ok(if self.any_member_held(group) {
                 finished
             } else {
-                true
+                Progress::Finished
             });
         }
         g.flags &= !GroupFlags::ATTACKING;
         let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
         self.release_units(group, &members, target)?;
-        Ok(true)
+        Ok(Progress::Finished)
     }
 }
 

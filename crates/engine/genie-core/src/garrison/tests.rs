@@ -105,6 +105,7 @@ use crate::testing::ids;
 use crate::testing::roles;
 use crate::testing::tuning;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
@@ -3519,7 +3520,7 @@ fn transport_beside_the_shore_puts_its_units_ashore() {
         .transport()
         .copied()
         .unwrap();
-    assert!(taken);
+    assert_eq!(taken, Answer::Taken);
     assert_eq!(
         (
             tr.state.bare(),

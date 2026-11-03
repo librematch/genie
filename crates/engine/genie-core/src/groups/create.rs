@@ -5,9 +5,11 @@ use crate::GenieError;
 use crate::groups::FormationCategory;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::Join;
 use crate::groups::MotionFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
+use crate::groups::Resize;
 use crate::groups::UnitKind;
 use crate::groups::WorldObject;
 use crate::groups::group_list::member_gone;
@@ -81,17 +83,17 @@ impl UnitGroup {
     }
 
     /// `FUN_14102d710`: the members' arrays (ids `+0xf0`, own moves `+0xf8`,
-    /// `mSecondsSinceAttacking` `+0x480`) grow to `n`. False, with nothing changed, for `n` of 0
+    /// `mSecondsSinceAttacking` `+0x480`) grow to `n`. Unchanged for `n` of 0
     /// or less or not above the capacity (`+0xe8`). Else the members keep their ids, moves and
     /// seconds, and every place past them is fresh: no unit (-1), no move (active 0, path and
     /// reason -1, the rest 0) and its seconds at `f32::MAX` (`0x7f7fffff`), an earlier spare
     /// value gone; the capacity is `n`. Allocation failure is Rust's abort.
-    pub fn resize_members(&mut self, n: i32) -> bool {
+    pub fn resize_members(&mut self, n: i32) -> Resize {
         if n <= 0 || n as usize <= self.member_capacity() {
-            return false;
+            return Resize::Unchanged;
         }
         self.spare_seconds = vec![Seconds::MAX; n as usize - self.members.len()];
-        true
+        Resize::Grown
     }
 
     /// The members' arrays' room for one more (`FUN_1410083c0`): a full array (the members at
@@ -190,10 +192,10 @@ impl World {
     /// object its sub-formation is reckoned against (`FUN_141011300`'s rams rule, which no code
     /// enables) and `walk` (`param_4`): false for a unit not a member. A member the world holds
     /// whose group link names the group stands (slot 0x560, [`crate::movement::Mover::stand`],
-    /// unless it [`LeavingWalk::KeepsMoving`]) and its link clears (`+0x6d0` -1). The members' ids and
-    /// own moves close up; `mSecondsSinceAttacking` keeps its places (the last member's value
-    /// goes to the spare ones). It leaves its sub-formation's statistic (`FUN_14102c480`); a
-    /// lead that leaves gives way to the member nearest the target (`FUN_141016870`,
+    /// unless it [`LeavingWalk::KeepsMoving`]) and its link clears (`+0x6d0` -1). The members' ids
+    /// and own moves close up; `mSecondsSinceAttacking` keeps its places (the last member's value
+    /// goes to the spare ones). It leaves its sub-formation's statistic (`FUN_14102c480`); a lead
+    /// that leaves gives way to the member nearest the target (`FUN_141016870`,
     /// [`World::nearest_to_target`]); the flags take `0x10002`.
     ///
     /// # Errors
@@ -336,10 +338,10 @@ pub(crate) fn count_unit_kinds(
 }
 
 impl World {
-    /// `AddUnit` (`FUN_1410083c0` with `param_4` 0) of unit `id` to group `group`: false for an
+    /// `AddUnit` (`FUN_1410083c0` with `param_4` 0) of unit `id` to group `group`: refused for an
     /// object the world's table does not hold ([`World::world_object`]), of no sub-formation
     /// ("Invalid formation category", [`World::unit_category`]) or when the group holds
-    /// [`MAX_MEMBERS`] already; true when it is a member already. Else the members' arrays make
+    /// [`MAX_MEMBERS`] already; joined when it is a member already. Else the members' arrays make
     /// room ([`UnitGroup::resize_members`]); a unit in another group the world holds leaves it
     /// ([`World::remove_unit`]); the unit's group link names the group (`+0x6d0`), its unit AI
     /// drops the actions of [`CLEARED_ACTIONS`] and the defend order ([`OrderKind::Defend`])
@@ -357,26 +359,26 @@ impl World {
     ///
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
-    pub fn add_to_group(&mut self, group: GroupId, id: ObjectId) -> Result<bool, GenieError> {
+    pub fn add_to_group(&mut self, group: GroupId, id: ObjectId) -> Result<Join, GenieError> {
         let Some(object) = self.world_object(id) else {
-            return Ok(false);
+            return Ok(Join::Refused);
         };
         let sub = self.unit_category(Some(object))?;
         // a ghost (type 25) has no sub-formation: only a unit gets past this
         let WorldObject::Unit(p, u, _) = object else {
-            return Ok(false);
+            return Ok(Join::Refused);
         };
         if sub == FormationCategory::ANY {
-            return Ok(false);
+            return Ok(Join::Refused);
         }
         let unit = FormationUnit::of(u.master(self.master_tables(), p)?, &self.model.tuning.group);
         let old = u.group.id;
         let g = self.groups.held(group)?;
         if g.has(id) {
-            return Ok(true);
+            return Ok(Join::Joined);
         }
         if MAX_MEMBERS <= g.members.len() {
-            return Ok(false);
+            return Ok(Join::Refused);
         }
         if let Some(old) = old
             && self.groups.get(old).is_some()
@@ -439,7 +441,7 @@ impl World {
             g.flags |= GroupFlags::STATISTICS | GroupFlags::RELAYOUT;
         }
         self.groups.unit_kinds_scratch = scratch;
-        Ok(true)
+        Ok(Join::Joined)
     }
 }
 
@@ -449,8 +451,10 @@ mod tests {
     use crate::groups::FormationCategory;
     use crate::groups::FormationKind;
     use crate::groups::GroupFlags;
+    use crate::groups::Join;
     use crate::groups::LeavingWalk;
     use crate::groups::MotionFlags;
+    use crate::groups::Resize;
     use crate::groups::{Member, UnitGroup, UnitGroups, UnitKindStatistic};
     use crate::map::Distance;
     use crate::map::Footprint;
@@ -591,11 +595,11 @@ mod tests {
             ..Member::default()
         }];
         g.spare_seconds = vec![Seconds::new(7.0), Seconds::new(8.0)];
-        assert!(!g.resize_members(0));
-        assert!(!g.resize_members(-4));
-        assert!(!g.resize_members(3));
+        assert_eq!(g.resize_members(0), Resize::Unchanged);
+        assert_eq!(g.resize_members(-4), Resize::Unchanged);
+        assert_eq!(g.resize_members(3), Resize::Unchanged);
         assert_eq!(g.spare_seconds, [Seconds::new(7.0), Seconds::new(8.0)]);
-        assert!(g.resize_members(4));
+        assert_eq!(g.resize_members(4), Resize::Grown);
         assert_eq!(
             (g.members[0].id, g.members[0].seconds_since_attacking),
             (object_id(5), Seconds::new(2.0))
@@ -619,7 +623,10 @@ mod tests {
         };
         asleep.life.master_id = master_id(4);
         let _ = t.push_asleep(PlayerId::new(1), asleep).unwrap();
-        assert!(t.add_to_group(group_id(1), object_id(13)).unwrap());
+        assert_eq!(
+            t.add_to_group(group_id(1), object_id(13)).unwrap(),
+            Join::Joined
+        );
         assert_eq!(
             t.players[1].sleeping[ListIndex::new(0)].group.id,
             Some(group_id(1))
@@ -631,7 +638,10 @@ mod tests {
             [object_id(10), object_id(11), object_id(13)]
         );
         // an object the world's table does not hold, or of no sub-formation, joins nothing
-        assert!(!t.add_to_group(group_id(1), object_id(99)).unwrap());
+        assert_eq!(
+            t.add_to_group(group_id(1), object_id(99)).unwrap(),
+            Join::Refused
+        );
     }
 
     /// `FUN_14102c480`: a held unit of no sub-formation (type below 70) or of one no statistic

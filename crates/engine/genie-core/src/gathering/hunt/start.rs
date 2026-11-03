@@ -27,6 +27,7 @@ use crate::objects::unit::Unit;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
+use crate::unit_ai::Answer;
 use crate::unit_ai::UnitStance;
 use crate::world::Seconds;
 use crate::world::layer::ClassRoles;
@@ -368,7 +369,7 @@ impl HuntAction {
     }
 
     /// Slot 0x40 (`FUN_140ac52c0`): the hunt takes a move's `target` (None for a point) and
-    /// `point`; true when it does. A point with a task of a work range it does not take. A unit
+    /// `point`; taken when it does. A point with a task of a work range it does not take. A unit
     /// on a pasture (`mMyPastureId` +0x794) of another target would leave it (`FUN_141189ca0`),
     /// not modelled. Its own player's drop site (`drops_here`) while it carries something
     /// (`held`) takes the load there: unless it walks there already (state 8), the target goes
@@ -382,7 +383,7 @@ impl HuntAction {
         take: HuntMove<'_>,
         mover: &mut Mover,
         move_to_tuning: &MoveToTuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let HuntMove {
             target,
             point,
@@ -394,7 +395,7 @@ impl HuntAction {
         } = take;
         let held = walks.held.amount;
         if target.is_none() && self.task.range != Distance::ZERO {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         if my_pasture.is_some()
             && target.is_none_or(|t| Some(t.id) != my_pasture.map(PastureId::id))
@@ -408,14 +409,14 @@ impl HuntAction {
             if Some(t.id) == self.carry_to.map(DropSiteId::id)
                 && matches!(self.state, HuntState::Drop { .. })
             {
-                return Ok(true);
+                return Ok(Answer::Taken);
             }
             self.set_target(None);
             self.point = Position::from([-1.0; 3]);
             self.target_class = Some(t.class);
             self.carry_to = Some(DropSiteId::new(t.id));
             self.set_drop(t.position, gap, mover, &walks, move_to_tuning)?;
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         self.point = point;
         self.target_class = None;
@@ -426,7 +427,7 @@ impl HuntAction {
             &walks,
             move_to_tuning,
         )?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `set_state(11)` after a drop-off that found no next target: the walk to the hunt's point

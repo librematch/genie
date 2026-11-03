@@ -27,6 +27,7 @@ use crate::players::AllyTest;
 use crate::players::Amount;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::task_finder::Diplomacy;
@@ -60,7 +61,7 @@ pub(super) struct HuntOrder {
 
 impl World {
     /// The Gather's slot 0x48 (`0x140a903a0`) on the work command's new target
-    /// ([`crate::gathering::gather::GatherAction::retarget`]): false when it does not take it, for a building
+    /// ([`crate::gathering::gather::GatherAction::retarget`]): not taken for for a building
     /// (type 80 without object flag 0x20) other than a farm, so the work command makes a new
     /// action. The targets that changed are let go (slot 0x180) and taken (slot 0x178). Not
     /// modelled: a building packing or unpacking (its top action 0x7d), a foundation or master
@@ -70,13 +71,13 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
         let tm = t.master(self.master_tables(), tp)?;
         if !self.gatherable_building(player, (tp, t), tm)? {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let owner = self.players.player(player)?;
         let unit = owner.live(idx)?;
@@ -135,7 +136,7 @@ impl World {
         };
         let old = gather.targets();
         let rng = self.streams.get(Stream::Action);
-        let took = gather.retarget(
+        gather.retarget(
             GatherRetarget {
                 target: &resource,
                 player,
@@ -157,7 +158,7 @@ impl World {
             self.take(target, by)?;
             self.release(target, by)?;
         }
-        Ok(took)
+        Ok(Answer::Taken)
     }
 
     /// The Gather's targets that changed (its target and its second target, `old` and `new`): the
@@ -181,16 +182,17 @@ impl World {
         Ok(())
     }
 
-    /// The Gather's slot 0x40 (`0x140a8b740`, [`crate::gathering::gather::GatherAction::take_move`]) on a
-    /// move of the gatherer at `idx` to `point` toward the object `target`: always taken; the
-    /// targets that changed are let go and taken.
+    /// The Gather's slot 0x40 (`0x140a8b740`,
+    /// [`crate::gathering::gather::GatherAction::take_move`]) on a move of the gatherer at `idx` to
+    /// `point` toward the object `target`: always taken; the targets that changed are let go and
+    /// taken.
     pub(crate) fn gather_take_move(
         &mut self,
         player: PlayerId,
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let (tp, o) = self.object(target).ok_or(GenieError::unsupported(
             "a move to an object the slice does not hold",
         ))?;
@@ -236,7 +238,7 @@ impl World {
         )?;
         let new = gather.targets();
         self.exchange_gather_targets(old, new, by)?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `FUN_14109d4f0` of the unit at `idx` on `target`, or on a building annex's main building
@@ -272,7 +274,7 @@ impl World {
     }
 
     /// The Hunt's slot 0x40 from a move toward the object `target` ([`HuntAction::take_move`])
-    /// with `point`: true when it takes it. The target it had goes (slot 0x68 with none:
+    /// with `point`: taken when it takes it. The target it had goes (slot 0x68 with none:
     /// [`World::release`]), and a drop site it carries its load to becomes its second target
     /// (`FUN_140a7a190`: [`World::take`]).
     ///
@@ -283,7 +285,7 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let mut q = self.quarry(player, target)?;
         q.drop_site = self.drops_at_main(player, idx, target)?;
         let quarry = Some(q);
@@ -310,7 +312,7 @@ impl World {
             ));
         };
         let (old_target, old_second) = (hunt.target, hunt.carry_to);
-        if !hunt.take_move(
+        if hunt.take_move(
             HuntMove {
                 target: quarry.as_ref(),
                 point,
@@ -322,8 +324,9 @@ impl World {
             },
             mover,
             &self.model.tuning.move_to,
-        )? {
-            return Ok(false);
+        )? == Answer::NotTaken
+        {
+            return Ok(Answer::NotTaken);
         }
         let new_second = hunt.carry_to;
         if let Some(old) = old_target
@@ -339,7 +342,7 @@ impl World {
             }
             self.take(new.id(), by)?;
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// What a hunt reads of its target.
@@ -366,13 +369,13 @@ impl World {
         })
     }
 
-    /// The work command's Gather (its task of action type 5, the base factory `FUN_140a97e00`
-    /// case 5 with a target): the constructor ([`crate::gathering::gather::GatherAction::new`]) takes its
-    /// target (slot 0x178); the unit AI's notify (slot 0x828: the gather order and action, the
+    /// The work command's Gather (its task of action type 5, the base factory `FUN_140a97e00` case
+    /// 5 with a target): the constructor ([`crate::gathering::gather::GatherAction::new`]) takes
+    /// its target (slot 0x178); the unit AI's notify (slot 0x828: the gather order and action, the
     /// target with its class, the work's point; `notify`'s point and clearing, None for the gather
     /// command's, which has none); the install (slot 0x808) clears the action list and starts the
-    /// Gather ([`crate::gathering::gather::GatherAction::start`]). A load to its own drop site takes the
-    /// target as the second target, then lets it go as the first.
+    /// Gather ([`crate::gathering::gather::GatherAction::start`]). A load to its own drop site
+    /// takes the target as the second target, then lets it go as the first.
     pub(super) fn start_gather(
         &mut self,
         player: PlayerId,
@@ -514,8 +517,8 @@ impl World {
         )
     }
 
-    /// [`crate::combat::attack::arms`] of the unit at `idx` for its hunt's Attack (Hunt's `set_state` 12:
-    /// the `MoveTo` shows the hunt's walking sprite, [`HuntTask::walk_sprite_id`]).
+    /// [`crate::combat::attack::arms`] of the unit at `idx` for its hunt's Attack (Hunt's
+    /// `set_state` 12: the `MoveTo` shows the hunt's walking sprite, [`HuntTask::walk_sprite_id`]).
     pub(super) fn arms(
         &self,
         player: PlayerId,

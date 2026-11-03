@@ -12,6 +12,7 @@ use crate::objects::ObjectId;
 use crate::objects::masters::{Task, TaskId};
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Notifies;
 use crate::unit_ai::OrderKind;
 use crate::world::World;
@@ -61,7 +62,7 @@ impl World {
     /// found (its `+0x48`): the top action's slot 0x48 ([`TransportAction::work`] at the work's
     /// point, from the unit itself when the target is the unit), then the unit AI's notify as
     /// [`World::start_transport`]'s. A trade cart or boat (classes 19, 2) ordered to its own
-    /// player's market (84) is never retaken. Answers whether the Transport kept the work.
+    /// player's market (84) is never retaken. Taken when the Transport kept the work.
     ///
     /// # Errors
     ///
@@ -74,7 +75,7 @@ impl World {
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         notifies: Notifies,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = self.players.live(p, i)?;
         let on_task = self.parts.actions_of(unit.id).top_action_kind() == Some(TRANSPORT)
             && self
@@ -86,7 +87,7 @@ impl World {
                 .and_then(|t| t.task)
                 == Some(task.id);
         if !on_task || self.trade_at_own_market((p, i), target)? {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let named = if target == Some(unit.id) {
             TransportTarget::Ship
@@ -120,7 +121,7 @@ impl World {
             .set_transport(Some(t));
         self.transport_changed(p, i, changed)?;
         self.notify_transport((p, i), (target, point), notifies)?;
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `LAB_1410706a8`'s exception: the unit is a trade cart or boat (`FUN_141195400`,

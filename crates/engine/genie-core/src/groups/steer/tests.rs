@@ -1,6 +1,7 @@
 use super::*;
 use crate::gathering::hunt::tests::walker;
 use crate::groups::GroupFlags;
+use crate::groups::MemberMove;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
 use crate::groups::SlotState;
@@ -113,11 +114,11 @@ fn slot(unit: i32, x: f32, y: f32) -> Slot {
     }
 }
 
-/// Player 1's units 10 at (5, 5) and 11 at (6, 5) in group 1 (its top speed 0.9), whose
-/// formation's slots are at (10, 5) and (6, 9); master 4 a combat unit of class 6 with
-/// standing sprite 6 (no factor), walking sprite 7 (factor 1.125) and running sprite 8 (factor
-/// 1.875), which the slice's graphics hold (not the units' sprites); a 32 by 32
-/// map of the terrain class bit 2 (in the walker's mask) at the world's time 100 and an update of 69 ms.
+/// Player 1's units 10 at (5, 5) and 11 at (6, 5) in group 1 (its top speed 0.9), whose formation's
+/// slots are at (10, 5) and (6, 9); master 4 a combat unit of class 6 with standing sprite 6 (no
+/// factor), walking sprite 7 (factor 1.125) and running sprite 8 (factor 1.875), which the slice's
+/// graphics hold (not the units' sprites); a 32 by 32 map of the terrain class bit 2 (in the
+/// walker's mask) at the world's time 100 and an update of 69 ms.
 fn world() -> World {
     let (members, parts) = World::split_layers([member(10, 5.0, 5.0), member(11, 6.0, 5.0)]);
     let players = vec![
@@ -253,14 +254,15 @@ fn member_own_move_is_set_or_ended() {
     t.groups.get_mut(group_id(1)).unwrap().members[0]
         .specific_move
         .consecutive_move_failures = 4;
-    assert!(
+    assert_eq!(
         t.set_specific_move(
             group_id(1),
             object_id(10),
             (MovePath::of_data(7), MoveReason::Detour),
             (BVector::new(1.0, 2.0, 3.0), 3.0, 2.5)
         )
-        .unwrap()
+        .unwrap(),
+        MemberMove::Set
     );
     let own = t.groups.get(group_id(1)).unwrap().members[0].specific_move;
     assert_eq!(
@@ -276,14 +278,15 @@ fn member_own_move_is_set_or_ended() {
             last_position: BVector::new(5.0, 0.0, 5.0),
         }
     );
-    assert!(
+    assert_eq!(
         t.set_specific_move(
             group_id(1),
             object_id(10),
             (MovePath::of_data(7), MoveReason::None),
             (BVector::from([1.0; 3]), 1.0, 1.0)
         )
-        .unwrap()
+        .unwrap(),
+        MemberMove::Set
     );
     let own = t.groups.get(group_id(1)).unwrap().members[0].specific_move;
     assert_eq!(
@@ -294,27 +297,29 @@ fn member_own_move_is_set_or_ended() {
             ..SpecificMove::default()
         }
     );
-    assert!(
-        !t.set_specific_move(
+    assert_eq!(
+        t.set_specific_move(
             group_id(1),
             object_id(12),
             (MovePath::of_data(0), MoveReason::Detour),
             (BVector::ZERO, 0.0, 0.0)
         )
-        .unwrap()
+        .unwrap(),
+        MemberMove::NoMember
     );
     t.groups.get_mut(group_id(1)).unwrap().members.push(Member {
         id: object_id(99),
         ..Member::default()
     });
-    assert!(
-        !t.set_specific_move(
+    assert_eq!(
+        t.set_specific_move(
             group_id(1),
             object_id(99),
             (MovePath::of_data(0), MoveReason::Detour),
             (BVector::ZERO, 0.0, 0.0)
         )
-        .unwrap()
+        .unwrap(),
+        MemberMove::NoMember
     );
 }
 

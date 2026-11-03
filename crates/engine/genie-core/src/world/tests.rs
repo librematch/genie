@@ -242,6 +242,7 @@ use crate::testing::tuning;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Attackers;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::NotifyKind;
@@ -3892,7 +3893,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             point,
             OrderSource::Queued
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let g = t
         .parts
@@ -3934,7 +3935,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             Position::new(20.0, 89.5, 0.0),
             OrderSource::Queued
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let g = t
         .parts
@@ -3966,7 +3967,7 @@ fn gather_takes_move_toward_an_object_as_its_point_or_drop_site() {
             Position::new(20.0, 89.5, 0.0),
             OrderSource::Queued
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
     assert_eq!(
@@ -5307,7 +5308,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
             point,
             OrderSource::Queued
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let h = t
         .parts
@@ -5337,7 +5338,7 @@ fn hunt_takes_move_toward_an_object_as_its_point_or_drop_site() {
             Position::new(20.0, 89.5, 0.0),
             OrderSource::Queued
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let h = t
         .parts
@@ -6946,7 +6947,7 @@ fn the_unit_ai_repair_command_is_the_unit_within_its_run() {
     assert_eq!(
         seen.map(|(s, _)| s),
         Ok((
-            true,
+            Answer::Taken,
             156,
             Some(Some(RepairTargetId::new(object_id(10028)))),
             Some(object_id(10028))
@@ -7069,7 +7070,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
             object_id(4242),
             OrderForce::Forced
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(
         t.parts
@@ -7086,7 +7087,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
             object_id(10028),
             OrderForce::Forced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let first = t
         .parts
@@ -7117,7 +7118,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
             object_id(10028),
             OrderForce::Unforced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         t.parts
@@ -7136,7 +7137,7 @@ fn the_enter_command_enters_or_keeps_the_enter_on_its_target() {
             object_id(10028),
             OrderForce::Forced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         t.parts
@@ -7164,7 +7165,7 @@ fn an_enter_of_unit_inside_an_object_fails_at_its_start() {
             object_id(10028),
             OrderForce::Forced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(
@@ -7200,7 +7201,10 @@ fn the_unit_ai_enter_from_inside_tells_its_ai_as_the_side_returns() {
     );
     assert_eq!(
         seen.map(|(s, ai)| (s, ai.map(|ai| ai.notifies))),
-        Ok(((true, Some(EnterState::Failed)), Some(vec![failed])))
+        Ok((
+            (Answer::Taken, Some(EnterState::Failed)),
+            Some(vec![failed])
+        ))
     );
 }
 
@@ -7266,7 +7270,7 @@ fn livestock_enter_command_becomes_its_artifact_sub_action() {
             object_id(10028),
             OrderForce::Unforced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
     assert_eq!(t.parts.actions_of(v.id).list.enter().copied(), None);
@@ -7420,7 +7424,7 @@ fn livestock_second_enter_command_stops_the_walk_and_lets_the_old_enter_target_g
             object_id(10028),
             OrderForce::Forced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     let v = &t.players[1].objects[ListIndex::new(0)];
     let velocity = t.parts.mover_of(v.id).unwrap().velocity.unwrap();
@@ -18179,7 +18183,7 @@ fn livestock_got_in_by_its_artifact_enter_keeps_the_artifact_to_its_next_update(
             object_id(10028),
             OrderForce::Unforced
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(t.players[1].objects[ListIndex::new(0)].life.inside, None);
     // the first update runs no Artifact (its first update is in the second)

@@ -310,8 +310,8 @@ impl GatherAction {
     /// farm (masters 50, 1187) too, with its four stops from the first and the time per stop of
     /// `rate`, its time at the stop cleared. A farm another farmer works (with this one, two or
     /// more) is walked to as a point (`set_state(11)`) and let go again (slot 0x68 with none, then
-    /// `FUN_140a7a190` with none): the caller takes it and lets it go. Always true: the gather
-    /// took the target.
+    /// `FUN_140a7a190` with none): the caller takes it and lets it go. The gather always
+    /// takes the target.
     ///
     /// # Errors
     ///
@@ -323,7 +323,7 @@ impl GatherAction {
         rng: &mut Well512,
         roles: &Roles,
         tuning: &Tuning,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<(), GenieError> {
         let move_to_tuning = &tuning.move_to;
         let GatherRetarget {
             target,
@@ -338,12 +338,12 @@ impl GatherAction {
         if self.target.map(GatherTargetId::id) == Some(target.id) {
             match self.state {
                 GatherState::Face | GatherState::Work | GatherState::Moved { .. } => {
-                    return Ok(true);
+                    return Ok(());
                 }
                 GatherState::Walk { .. } | GatherState::WalkBack { .. }
                     if player_kind.is_computer() =>
                 {
-                    return Ok(true);
+                    return Ok(());
                 }
                 _ => {}
             }
@@ -354,7 +354,7 @@ impl GatherAction {
             self.point = Position::from([-1.0; 3]);
             self.carry_to = Some(DropSiteId::new(target.id));
             self.set_drop(target.position, target.gap, mover, &walks, move_to_tuning)?;
-            return Ok(true);
+            return Ok(());
         }
         // slot 0x68 takes the target: its workers count it once it is new
         let taken = GatherTargetId::new(target.id);
@@ -391,11 +391,11 @@ impl GatherAction {
             self.set_walk_back(Distance::new(radius), mover, &walks, move_to_tuning)?;
             self.target = None;
             self.carry_to = None;
-            return Ok(true);
+            return Ok(());
         }
         self.carry_to = None;
         self.set_walk(target.walk_to(), target.radius, mover, rng, &walks, tuning)?;
-        Ok(true)
+        Ok(())
     }
 
     /// `set_state(4)` (`0x140a8cd40` case 4) with its target at `position` (its master's radii

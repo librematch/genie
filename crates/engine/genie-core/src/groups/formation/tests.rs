@@ -2,6 +2,7 @@ use super::*;
 use crate::groups::FormationKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupTarget;
+use crate::groups::Layout;
 use crate::groups::TransformKind;
 use crate::groups::formation::LineKind;
 use crate::groups::formation::SlotOrder;
@@ -912,12 +913,13 @@ fn line_after_column_takes_its_units_in_the_column_order() {
         t.groups.groups[0].previous_formation = Some(before);
         let g = t.groups.get(group_id(1)).unwrap().clone();
         let mut whole = Formation::new();
-        assert!(
+        assert_eq!(
             t.create_column_line(&mut whole, group_id(1), LineKind::Line)
-                .unwrap()
+                .unwrap(),
+            Layout::Laid
         );
         let mut parts = Formation::new();
-        assert!(
+        assert_eq!(
             column_line_slots(
                 &mut parts,
                 &g,
@@ -925,7 +927,8 @@ fn line_after_column_takes_its_units_in_the_column_order() {
                 t.world_time,
                 &tuning().group
             )
-            .unwrap()
+            .unwrap(),
+            Layout::Laid
         );
         let order = if previous == FormationKind::Column {
             SlotOrder::PreviousColumn
@@ -1179,7 +1182,7 @@ fn group_of(category: i32, count: usize, spacing: f32, kinds: &[(u32, u32)]) -> 
 fn line_of_two_unit_kinds_alternates_its_slots() {
     let g = group_of(3, 10, 1.0, &[(4, 5), (24, 5)]);
     let mut f = Formation::new();
-    assert!(
+    assert_eq!(
         column_line_slots(
             &mut f,
             &g,
@@ -1187,7 +1190,8 @@ fn line_of_two_unit_kinds_alternates_its_slots() {
             WorldTime::from_millis(77),
             &tuning().group
         )
-        .unwrap()
+        .unwrap(),
+        Layout::Laid
     );
     assert_eq!(
         (f.kind, f.maximum_width, f.maximum_depth),
@@ -1219,7 +1223,7 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             .collect()
     };
     let mut f = Formation::new();
-    assert!(
+    assert_eq!(
         column_line_slots(
             &mut f,
             &g,
@@ -1227,14 +1231,15 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             WorldTime::ZERO,
             &tuning().group
         )
-        .unwrap()
+        .unwrap(),
+        Layout::Laid
     );
     assert_eq!(f.kind, FormationKind::Staggered);
     assert_eq!(offsets(&f, 0), [-3.5, -1.5, 0.5, 2.5, 4.5]);
     assert_eq!(offsets(&f, 1), [-4.5, -2.5, -0.5, 1.5, 3.5]);
     assert_eq!(f.lines[1].distance_back, Distance::new(2.0));
     let mut f = Formation::new();
-    assert!(
+    assert_eq!(
         column_line_slots(
             &mut f,
             &g,
@@ -1242,13 +1247,14 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             WorldTime::ZERO,
             &tuning().group
         )
-        .unwrap()
+        .unwrap(),
+        Layout::Laid
     );
     assert_eq!(f.kind, FormationKind::Flanked);
     assert_eq!(offsets(&f, 0), [-4.5, -3.5, 2.5, 3.5, 4.5]);
     assert_eq!(offsets(&f, 1), [-4.0, -3.0, 2.0, 3.0, 4.0]);
     let mut f = Formation::new();
-    assert!(
+    assert_eq!(
         column_line_slots(
             &mut f,
             &g,
@@ -1256,21 +1262,23 @@ fn staggered_line_shifts_its_lines_and_flanked_one_parts_them() {
             WorldTime::ZERO,
             &tuning().group
         )
-        .unwrap()
+        .unwrap(),
+        Layout::Laid
     );
     assert_eq!(
         (f.kind, f.maximum_width, f.maximum_depth),
         (FormationKind::Column, 2, 5)
     );
-    assert!(
-        !column_line_slots(
+    assert_eq!(
+        column_line_slots(
             &mut f,
             &UnitGroup::default(),
             LineKind::Line,
             WorldTime::ZERO,
             &tuning().group
         )
-        .unwrap()
+        .unwrap(),
+        Layout::NotLaid
     );
 }
 
@@ -1287,8 +1295,9 @@ fn narrow_sub_formation_takes_one_line_ahead_of_wider_one() {
         ..Member::default()
     }));
     let mut f = Formation::new();
-    assert!(
-        column_line_slots(&mut f, &g, LineKind::Line, WorldTime::ZERO, &tuning().group).unwrap()
+    assert_eq!(
+        column_line_slots(&mut f, &g, LineKind::Line, WorldTime::ZERO, &tuning().group).unwrap(),
+        Layout::Laid
     );
     assert_eq!((f.maximum_width, f.maximum_depth), (5, 3));
     let first: Vec<(f32, i32)> = f.slots[..3]

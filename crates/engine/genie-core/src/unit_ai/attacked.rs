@@ -15,6 +15,7 @@ use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiCommand;
+use crate::unit_ai::Answer;
 use crate::unit_ai::AttackChecks;
 use crate::unit_ai::GroupState;
 use crate::unit_ai::Issuer;
@@ -131,7 +132,7 @@ impl UnitAi {
                 return Ok(GO_ON);
             }
             let ran = self.run_away(OrderForce::Forced, at, player_kind, ai_rng, side)?;
-            return Ok(if ran { BREAK } else { GO_ON });
+            return Ok(if ran == Answer::Taken { BREAK } else { GO_ON });
         }
         if self.best_this_update != Some(attacker_id) {
             return Ok(GO_ON);
@@ -290,7 +291,7 @@ impl UnitAi {
                 self.save_patrol(side);
             }
             self.ask_for_help(attacker_id, at, PlayerKind::Computer, side)?;
-            if self.attack_slot(attacker_id, TargetRules::Any, at, side, ai_rng)? {
+            if self.attack_slot(attacker_id, TargetRules::Any, at, side, ai_rng)? == Answer::Taken {
                 self.leave_patrol_timers(ai_rng);
                 self.current_order = None;
             }
@@ -330,7 +331,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_slot(attacker, TargetRules::Any, at, side, ai_rng)? {
+        if self.attack_slot(attacker, TargetRules::Any, at, side, ai_rng)? == Answer::Taken {
             self.leave_patrol_timers(ai_rng);
             self.current_order = None;
         }
@@ -442,19 +443,19 @@ impl UnitAi {
     /// action value becomes [`AiAction::MoveAside`], the old one the last, and the target stays.
     /// The caller's slot 0x340 is `FUN_1410866e0`, which always gives 1, but for classes 51 and
     /// 54 (`FUN_141216c50`, their packing), which it does not run. The move gives the unit its
-    /// `MoveTo` at once: the update's later checks see it busy. True when it moves.
+    /// `MoveTo` at once: the update's later checks see it busy. Taken when it moves.
     pub(super) fn move_aside(
         &mut self,
         m: AiMove,
         side: &mut dyn UnitSide,
         rng: &mut Well512,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if m.force == OrderForce::Unforced && self.current_action.is_some() {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         side.effect_now(Effect::Command(AiCommand::MoveAside(m)), self, rng)?;
         self.set_action(Some(AiAction::MoveAside));
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// The action values of an explorer (the base handler's case 0x202, a bit test of the action

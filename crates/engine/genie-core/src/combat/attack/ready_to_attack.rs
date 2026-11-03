@@ -5,6 +5,7 @@ use crate::GenieError;
 use crate::combat::MissileCount;
 use crate::combat::attack::AttackState;
 use crate::combat::attack::AttackerFlags;
+use crate::combat::attack::walks::MoveStart;
 use crate::combat::attack::{
     Attack, AttackReads, Fight, Ground, HALF, NO_RANGE, NONE, Readiness, TARGET_GONE, face_target,
     move_reads,
@@ -93,7 +94,8 @@ impl Attack {
             gap,
             &reads,
             move_to_tuning,
-        )? {
+        )? == MoveStart::Arrived
+        {
             self.arrived_sprite(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
         }
         Ok(())

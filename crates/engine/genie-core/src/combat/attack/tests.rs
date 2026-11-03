@@ -5,6 +5,7 @@ use crate::combat::abilities::Look;
 use crate::combat::attack::Armament;
 use crate::combat::attack::AtOnce;
 use crate::combat::attack::AttackerFlags;
+use crate::combat::attack::walks::MoveStart;
 use crate::combat::damage::Allied;
 use crate::combat::damage::HitKind;
 use crate::combat::missile::StrikeResult;
@@ -2982,7 +2983,7 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         TargetMoved::AsksAgain,
     );
     let m = m.unwrap();
-    assert_eq!((arrived, timer), (false, Seconds::ZERO));
+    assert_eq!((arrived, timer), (MoveStart::UnderWay, Seconds::ZERO));
     assert_eq!(
         (
             m.state,
@@ -3010,7 +3011,10 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
     );
     assert_eq!(
         (arrived, m.map(|m| (m.state, m.on_target_moved))),
-        (true, Some((MoveTo::Arrived, TargetMoved::Follows)))
+        (
+            MoveStart::Arrived,
+            Some((MoveTo::Arrived, TargetMoved::Follows))
+        )
     );
     let (arrived, _, m) = made(
         Distance::new(1.0),
@@ -3018,14 +3022,17 @@ fn an_attack_move_to_the_target_takes_its_range_sprite_and_target_moved_mode() {
         ObjectState::Alive,
         TargetMoved::Follows,
     );
-    assert_eq!((arrived, m.map(|m| m.state)), (false, Some(MoveTo::Failed)));
+    assert_eq!(
+        (arrived, m.map(|m| m.state)),
+        (MoveStart::UnderWay, Some(MoveTo::Failed))
+    );
     let (arrived, _, m) = made(
         Distance::ZERO,
         1.0,
         ObjectState::Dying,
         TargetMoved::Follows,
     );
-    assert_eq!((arrived, m), (false, None));
+    assert_eq!((arrived, m), (MoveStart::UnderWay, None));
     let mut none = own_attack(-1, AttackState::Move { move_to: None }, Distance::new(2.0));
     let reads = walking_reads(&table, MoveDefaults::default(), ObjectState::Alive, 1.0);
     assert!(

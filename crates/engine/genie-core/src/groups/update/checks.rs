@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::combat::attack::ATTACK;
 use crate::groups::GroupId;
+use crate::groups::SpriteShow;
 use crate::groups::attack::moved_place;
 use crate::groups::group_list::member_gone;
 use crate::groups::update::{
@@ -470,7 +471,7 @@ impl World {
     }
 
     /// Slot 0x658 of object `id` (an action object's `FUN_14106e340`): it shows its walking
-    /// sprite; false when it has none. A trade cart (class 19) with goods (`FUN_14106a940`)
+    /// sprite; no sprite when it has none. A trade cart (class 19) with goods (`FUN_14106a940`)
     /// shows its trade task's (slot 0x7c8 then slot 0x68); an action object's top action is
     /// asked next (slot 0x430, then the action's slot 0x58 with 0: only a trade's answers, the
     /// slice holds none); then `FUN_14115d0e0` shows the walking sprite (slot 0x7c8: the
@@ -481,20 +482,20 @@ impl World {
     /// # Errors
     ///
     /// As [`World::show_standing`].
-    pub(crate) fn show_walking(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn show_walking(&mut self, id: ObjectId) -> Result<SpriteShow, GenieError> {
         self.show_sprite(id, Shown::Walking)
     }
 
-    /// Slot 0x650 of object `id` (an action object's `FUN_14106e3c0`): it shows its running
-    /// sprite; false when it has none. An action object's top action is asked first (slot 0x430,
-    /// then the action's slot 0x58 with 1: only a trade's answers); then `FUN_14115d300` shows the
+    /// Slot 0x650 of object `id` (an action object's `FUN_14106e3c0`): it shows its running sprite;
+    /// no sprite when it has none. An action object's top action is asked first (slot 0x430, then
+    /// the action's slot 0x58 with 1: only a trade's answers); then `FUN_14115d300` shows the
     /// master's running sprite (`+0x750`) when it has one (slot 0x68: the top speed is the running
     /// sprite's, [`crate::objects::sprite::top_speed`]).
     ///
     /// # Errors
     ///
     /// As [`World::show_standing`], a trade cart aside.
-    pub(crate) fn show_running(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn show_running(&mut self, id: ObjectId) -> Result<SpriteShow, GenieError> {
         self.show_sprite(id, Shown::Running)
     }
 
@@ -551,9 +552,13 @@ impl World {
     }
 
     /// Slots 0x660, 0x658 and 0x650 of object `id` ([`Shown`]): whether it shows the sprite.
-    pub(super) fn show_sprite(&mut self, id: ObjectId, shown: Shown) -> Result<bool, GenieError> {
+    pub(super) fn show_sprite(
+        &mut self,
+        id: ObjectId,
+        shown: Shown,
+    ) -> Result<SpriteShow, GenieError> {
         let Some(sprite) = self.sprite_to_show(id, shown)? else {
-            return Ok(false);
+            return Ok(SpriteShow::NoSprite);
         };
         let graphic = self.model.graphics.get(sprite).copied();
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
@@ -567,7 +572,7 @@ impl World {
             m.shows(graphic.as_ref());
         }
         if u.sprite.is_none() {
-            return Ok(true);
+            return Ok(SpriteShow::Shown);
         }
         let g = graphic.ok_or(GenieError::unsupported(
             "a unit without its sprite's graphic",
@@ -580,7 +585,7 @@ impl World {
             rng,
             self.model.tuning.sprite,
         );
-        Ok(true)
+        Ok(SpriteShow::Shown)
     }
 
     /// `FUN_141016870`: the group's lead (`+0xc4`) is the member the world holds nearest (in 3D,

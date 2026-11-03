@@ -4,6 +4,7 @@
 use crate::GenieError;
 use crate::groups::FarMembers;
 use crate::groups::FormationKind;
+use crate::groups::GroupFate;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
@@ -35,9 +36,9 @@ impl World {
     /// lead is the member nearest the target's place ([`World::nearest_to_target`]); a lead found
     /// has the motion update with 0 ([`World::motion_update`]), then without [`MotionFlags::NEW`]
     /// the statistics ([`World::group_statistics`]) and the centroid (`+0x144`) as the motion's
-    /// position and new position (`+0x8`, `+0x38`), and bit 18 clears. Then the group goes (false)
-    /// without members; without a queued command or a current one but with a formation, it goes
-    /// when every slot is in state 3 (or it has none). With a member held and
+    /// position and new position (`+0x8`, `+0x38`), and bit 18 clears. Then the group goes
+    /// (deleted) without members; without a queued command or a current one but with a formation,
+    /// it goes when every slot is in state 3 (or it has none). With a member held and
     /// [`GroupFlags::STATISTICS`] the statistics run; with [`GroupFlags::NO_PATH_UNIT`] the group
     /// goes; the lead is again the member nearest the target, and without a held lead
     /// (`FUN_1410465d0`) the group goes. A held lead re-places the group
@@ -49,7 +50,7 @@ impl World {
     /// # Errors
     ///
     /// What the update does not model.
-    pub(super) fn awake_update(&mut self, group: GroupId) -> Result<bool, GenieError> {
+    pub(super) fn awake_update(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
         let g = self.groups.held(group)?;
         let far = if g.command_queue.is_empty() {
             self.kept_apart_leave(group)?
@@ -66,7 +67,7 @@ impl World {
         }
         let g = self.groups.held(group)?;
         if awake_group_ends(g) {
-            return Ok(false);
+            return Ok(GroupFate::Deleted);
         }
         if self.any_member_held(group) && g.flags.contains(GroupFlags::STATISTICS) {
             self.group_statistics(group, far)?;
@@ -77,13 +78,13 @@ impl World {
             .flags
             .contains(GroupFlags::NO_PATH_UNIT)
         {
-            return Ok(false);
+            return Ok(GroupFate::Deleted);
         }
         let lead = self.nearest_to_target(group);
         self.groups.held_mut(group)?.motion.lead = lead;
         let g = self.groups.held(group)?;
         if self.lead_object(&g.motion).is_none() {
-            return Ok(false);
+            return Ok(GroupFate::Deleted);
         }
         let horde = g
             .current_formation
@@ -195,7 +196,7 @@ impl World {
     /// members' own moves ([`World::specific_moves_step`]), the order queue's due orders go
     /// (`FUN_14100d940`, [`World::drop_due_orders`], when it has any), and the idle timer
     /// ([`World::idle_timer_step`]). The debug drawing (`DAT_143f15a9c`) and the owner's computer
-    /// test (`FUN_141659cf0`, its answer unread) hold no state. True while the group has members.
+    /// test (`FUN_141659cf0`, its answer unread) hold no state. Kept while the group has members.
     ///
     /// # Errors
     ///
@@ -206,7 +207,7 @@ impl World {
         group: GroupId,
         far: FarMembers,
         forward: BVector,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GroupFate, GenieError> {
         if self.groups.held(group)?.flags.contains(GroupFlags::TURN) {
             self.turn_formation(group, forward)?;
         }
@@ -225,8 +226,8 @@ impl World {
         let differentiators = self.groups.differentiator_units(g, DIFFERENTIATORS);
         self.line_ranges(group)?;
         let (mut relayout, refill) = self.relayout_choice(group, count)?;
-        if !self.command_update(group, &mut relayout)? {
-            return Ok(false);
+        if self.command_update(group, &mut relayout)? == GroupFate::Deleted {
+            return Ok(GroupFate::Deleted);
         }
         if !self.any_member_held(group) {
             relayout = false;
@@ -266,14 +267,18 @@ impl World {
     }
 
     /// [`World::after_motion`]'s last steps: the members' own moves, the order queue's due
-    /// orders and the idle timer. True while the group has members.
-    fn update_end_steps(&mut self, group: GroupId) -> Result<bool, GenieError> {
+    /// orders and the idle timer. Kept while the group has members.
+    fn update_end_steps(&mut self, group: GroupId) -> Result<GroupFate, GenieError> {
         self.specific_moves_step(group)?;
         if !self.groups.held(group)?.order_queue.is_empty() {
             self.drop_due_orders(group);
         }
         self.idle_timer_step(group)?;
-        Ok(!self.groups.held(group)?.members.is_empty())
+        Ok(if self.groups.held(group)?.members.is_empty() {
+            GroupFate::Deleted
+        } else {
+            GroupFate::Kept
+        })
     }
 
     /// The formation's turn (`0x14103e037`..`0x14103e37b`, [`GroupFlags::TURN`]): when the motion

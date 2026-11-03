@@ -8,6 +8,7 @@ use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::Motion;
 use crate::groups::MotionFlags;
+use crate::groups::Orientation;
 use crate::groups::WorldObject;
 use crate::groups::formation::on_map;
 use crate::map::Distance;
@@ -88,19 +89,19 @@ pub enum Orient {
 impl Motion {
     /// `FUN_141049e10`: the motion faces `forward` with `up`, both normalized, and their cross
     /// product `up × forward` (normalized) as its right; the new position takes all three, and with
-    /// [`Orient::Both`] (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. False, with
-    /// nothing changed, when the dot product of the two lies outside `GroupTuning::square_min` to
-    /// `GroupTuning::square_max`.
+    /// [`Orient::Both`] (`param_4` 1) the position too. [`MotionFlags::MOVED`] is set. Unchanged,
+    /// with nothing changed, when the dot product of the two lies outside `GroupTuning::square_min`
+    /// to `GroupTuning::square_max`.
     pub fn set_orientation(
         &mut self,
         forward: BVector,
         up: BVector,
         places: Orient,
         group_tuning: &GroupTuning,
-    ) -> bool {
+    ) -> Orientation {
         let d = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
         if d < group_tuning.square_min || group_tuning.square_max < d {
-            return false;
+            return Orientation::Unchanged;
         }
         let right = normalize(cross(up, forward));
         let (forward, up) = (normalize(forward), normalize(up));
@@ -113,7 +114,7 @@ impl Motion {
             self.position[3] = right;
         }
         self.flags |= MotionFlags::MOVED;
-        true
+        Orientation::Set
     }
 }
 
@@ -484,23 +485,29 @@ mod tests {
     fn an_orientation_takes_the_cross_product_of_up_and_forward_as_its_right() {
         let mut m = Motion::new();
         m.flags = MotionFlags::NONE;
-        assert!(m.set_orientation(
-            BVector::new(2.0, 0.0, 0.0),
-            BVector::new(0.0, 1.0, 0.0),
-            Orient::Both,
-            &tuning().group
-        ));
+        assert_eq!(
+            m.set_orientation(
+                BVector::new(2.0, 0.0, 0.0),
+                BVector::new(0.0, 1.0, 0.0),
+                Orient::Both,
+                &tuning().group
+            ),
+            Orientation::Set
+        );
         assert_eq!(m.position[1], BVector::new(1.0, 0.0, 0.0));
         assert_eq!(m.position[3], BVector::new(0.0, 0.0, -1.0));
         assert_eq!(m.new_position[3], BVector::new(0.0, 0.0, -1.0));
         assert_eq!(m.flags, MotionFlags::MOVED);
         // a forward too far from square to the up is refused
-        assert!(!m.set_orientation(
-            BVector::new(1.0, 0.1, 0.0),
-            BVector::new(0.0, 1.0, 0.0),
-            Orient::Both,
-            &tuning().group
-        ));
+        assert_eq!(
+            m.set_orientation(
+                BVector::new(1.0, 0.1, 0.0),
+                BVector::new(0.0, 1.0, 0.0),
+                Orient::Both,
+                &tuning().group
+            ),
+            Orientation::Unchanged
+        );
     }
 
     /// A unit at `[x, y]` (the unit's order: x, y, height) of master 4.

@@ -3,6 +3,7 @@
 
 use crate::GenieError;
 use crate::groups::GroupCommandKind;
+use crate::groups::GroupFate;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
 use crate::groups::LeavingWalk;
@@ -10,6 +11,7 @@ use crate::groups::MotionFlags;
 use crate::groups::MoveFlags;
 use crate::groups::MovePath;
 use crate::groups::MoveReason;
+use crate::groups::Progress;
 use crate::groups::SlotState;
 use crate::groups::command::MOVE_COMMAND;
 use crate::groups::command::MoveTo;
@@ -32,10 +34,10 @@ use crate::world::{IN_THE_WAY, WALKER_UNMOVING};
 use std::mem::take;
 
 impl World {
-    /// The current command's update (`0x14103e5f7`..`0x14103e865`): false deletes the group. No
-    /// command does nothing; a move ([`World::move_update`], `FUN_141041420`) that finished
-    /// hibernates the group (`+0x13c` 1) while commands are queued, else deletes it. A follow (2)
-    /// with its target held and a lead (the member nearest the target's place, [`World::
+    /// The current command's update (`0x14103e5f7`..`0x14103e865`): deleted, the world deletes the
+    /// group. No command does nothing; a move ([`World::move_update`], `FUN_141041420`) that
+    /// finished hibernates the group (`+0x13c` 1) while commands are queued, else deletes it. A
+    /// follow (2) with its target held and a lead (the member nearest the target's place, [`World::
     /// nearest_to_target`]) moves the group to the target (`commandMoveTo` with the target's x and
     /// y, the range half the lead's master's line of sight, at once) when the target is that range
     /// or more (`COMISS` then `JC`: a NaN is not) from where the group's target was (`+0x3c8`, the
@@ -48,10 +50,10 @@ impl World {
         &mut self,
         group: GroupId,
         relayout: &mut bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GroupFate, GenieError> {
         let g = self.groups.held(group)?;
         let finished = match g.current_command {
-            NO_COMMAND => false,
+            NO_COMMAND => Progress::Going,
             MOVE_COMMAND => self.move_update(group, relayout)?,
             FOLLOW => {
                 let target = g.current_target.target.key();
@@ -90,34 +92,34 @@ impl World {
                             )?;
                         }
                         self.groups.held_mut(group)?.flags |= GroupFlags::FOLLOWED;
-                        return Ok(true);
+                        return Ok(GroupFate::Kept);
                     }
-                    _ => true,
+                    _ => Progress::Finished,
                 }
             }
             ATTACK => {
-                if self.attack_update(group, relayout)? {
+                if self.attack_update(group, relayout)? == Progress::Finished {
                     let g = self.groups.held(group)?;
                     if g.command_queue.is_empty() && !self.target_pending(group)? {
-                        return Ok(false);
+                        return Ok(GroupFate::Deleted);
                     }
                     self.groups.held_mut(group)?.hibernating = 1;
                 }
-                return Ok(true);
+                return Ok(GroupFate::Kept);
             }
             _ => return Err(OTHER_COMMANDS),
         };
-        if finished {
+        if finished == Progress::Finished {
             if self.groups.held(group)?.command_queue.is_empty() {
-                return Ok(false);
+                return Ok(GroupFate::Deleted);
             }
             self.groups.held_mut(group)?.hibernating = 1;
         }
-        Ok(true)
+        Ok(GroupFate::Kept)
     }
 
-    /// `FUN_141041420`, a move's update: true when the move finished. [`MotionFlags::NEW`] asks for
-    /// a relayout. A moving group (`FUN_141046600`) asks for one too, unless with
+    /// `FUN_141041420`, a move's update: finished when the move finished. [`MotionFlags::NEW`] asks
+    /// for a relayout. A moving group (`FUN_141046600`) asks for one too, unless with
     /// [`GroupFlags::FOLLOWED`] (a follow's) its target the world holds stands a squared 1 or more
     /// (`COMISS` then `JNC`: not a NaN) from the top path's end (`FUN_140f95fb0`: its last point,
     /// the static zero point `DAT_143f0dc78` for fewer than two), when the command becomes a follow
@@ -139,11 +141,15 @@ impl World {
     /// What the leaves, the lock and the members' moves do not model.
     ///
     /// When the world does not hold `group`: the group update passes its own.
-    pub fn move_update(&mut self, group: GroupId, relayout: &mut bool) -> Result<bool, GenieError> {
+    pub fn move_update(
+        &mut self,
+        group: GroupId,
+        relayout: &mut bool,
+    ) -> Result<Progress, GenieError> {
         let g = self.groups.held(group)?;
         if g.motion.flags.contains(MotionFlags::NEW) {
             *relayout = true;
-            return Ok(false);
+            return Ok(Progress::Going);
         }
         let walks = g
             .motion
@@ -156,10 +162,10 @@ impl World {
         }
         if follows {
             self.groups.held_mut(group)?.current_command = FOLLOW;
-            return Ok(false);
+            return Ok(Progress::Going);
         }
         if g.motion.number_wait_delays != DelayCount::ZERO || g.motion.waits_to_move() {
-            return Ok(false);
+            return Ok(Progress::Going);
         }
         let patrol =
             top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
@@ -196,13 +202,13 @@ impl World {
                 }
                 if kept != 0 && kept != slots.len() {
                     self.move_to_desired_positions(group, MOVE_COMMAND, None)?;
-                    return Ok(false);
+                    return Ok(Progress::Going);
                 }
                 if !walks {
                     if kept == slots.len() {
                         self.lock_formation(group, kind)?;
                         self.groups.held_mut(group)?.current_command = NO_COMMAND;
-                        return Ok(false);
+                        return Ok(Progress::Going);
                     }
                     self.groups.held_mut(group)?.current_command = NO_COMMAND;
                 }
@@ -216,18 +222,18 @@ impl World {
     }
 
     /// [`World::move_update`] of a group whose motion moves: a following group
-    /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target goes on
-    /// following; any other asks for a layout anew. The update does not end.
+    /// ([`GroupFlags::FOLLOWED`]) whose top path ends at least `GroupTuning::close` from its target
+    /// goes on following; any other asks for a layout anew. The update does not end.
     fn moving_step(
         &mut self,
         group: GroupId,
         follows: bool,
         relayout: &mut bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Progress, GenieError> {
         let g = self.groups.held(group)?;
         if follows {
             let Some(target) = self.world_object(g.current_target.target) else {
-                return Ok(false);
+                return Ok(Progress::Going);
             };
             if let Some(top) = top_path(&g.motion.paths) {
                 let end = match top.points.as_slice() {
@@ -239,12 +245,12 @@ impl World {
                 let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
                 if !below_or_unordered(squared, self.model.tuning.group.close) {
                     self.groups.held_mut(group)?.current_command = FOLLOW;
-                    return Ok(false);
+                    return Ok(Progress::Going);
                 }
             }
         }
         *relayout = true;
-        Ok(false)
+        Ok(Progress::Going)
     }
 
     /// `FUN_141041420`'s end (`0x1410416dc`): [`GroupFlags::LINE`] clears,
@@ -256,11 +262,15 @@ impl World {
         group: GroupId,
         walks: bool,
         patrolling: bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Progress, GenieError> {
         let g = self.groups.held_mut(group)?;
         g.flags = (g.flags & !GroupFlags::LINE) | GroupFlags::MEMBERS_SENT;
         self.move_to_desired_positions(group, MOVE_COMMAND, None)?;
-        Ok(!walks && !patrolling)
+        Ok(if !walks && !patrolling {
+            Progress::Finished
+        } else {
+            Progress::Going
+        })
     }
 
     /// `AutomaticMoveUnitsToDesiredPositions` (`FUN_14100aaa0`) of group `group`'s formation
@@ -347,7 +357,7 @@ impl World {
             if m.specific_move.reason != MoveReason::Aside {
                 // slot 0x608 (FUN_1411581e0): the unit's own motion step (FUN_141150f00), then
                 // its facet from its angle (FUN_14114d8b0, not held)
-                if self.member_step(m.id)? {
+                if self.member_step(m.id)? == Progress::Finished {
                     self.groups
                         .held_mut(group)?
                         .members
@@ -402,7 +412,7 @@ impl World {
 
     /// Slot 0x608 (`FUN_1411581e0`) of member `id`: the unit's own motion step (`FUN_141150f00`,
     /// [`crate::movement::Mover::motion`] with its top action's state, the update's seconds and
-    /// the world's planners); true when it is done (the step answers other than 0: arrived or
+    /// the world's planners); finished when it is done (the step answers other than 0: arrived or
     /// given up). Its place follows the world's; the units its walk paused take their pauses
     /// (slot 0x5f0). The walk reads the other objects' gaits as they are now (the group's
     /// members as its update left them); the member itself is out of its slot meanwhile, as an
@@ -411,10 +421,10 @@ impl World {
     /// # Errors
     ///
     /// What the motion step does not model, and a walk's unit in the way (notify 0x215).
-    pub(crate) fn member_step(&mut self, id: ObjectId) -> Result<bool, GenieError> {
+    pub(crate) fn member_step(&mut self, id: ObjectId) -> Result<Progress, GenieError> {
         use crate::movement::{Motion, Planning};
         let Some(place) = self.place(id) else {
-            return Ok(true);
+            return Ok(Progress::Finished);
         };
         let Place::Live(p, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
@@ -459,7 +469,11 @@ impl World {
         for (other, pause) in pauses {
             self.pause(other, pause);
         }
-        Ok(motion != Motion::Moving)
+        Ok(if motion == Motion::Moving {
+            Progress::Going
+        } else {
+            Progress::Finished
+        })
     }
 
     /// `FUN_14100d940` (its log lines aside): the order queue's orders whose time (`+0x18`) is not

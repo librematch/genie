@@ -871,7 +871,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
         .unwrap();
     assert_eq!(
         ai.attack_command(object_id(70), OrderForce::Forced, &at, &mut side),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         (side.caps, side.stops, side.attacks),
@@ -885,7 +885,7 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
 
 /// What the unit's slot 0x388 answers ([`UnitSide::wait_solidify`]), and the foundations
 /// asked.
-struct WaitSide(bool, Vec<ObjectId>);
+struct WaitSide(Answer, Vec<ObjectId>);
 
 impl UnitSide for WaitSide {
     fn patrol_information(&self) -> Option<(PatrolPath, WaypointIndex)> {
@@ -917,7 +917,7 @@ impl UnitSide for WaitSide {
     fn make_scout_map(&mut self) -> Result<(), GenieError> {
         Err(GenieError::unsupported("no world here"))
     }
-    fn wait_solidify(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
         self.1.push(target);
         Ok(self.0)
     }
@@ -987,7 +987,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         }],
         ..scout_at(true, false)
     };
-    let mut side = WaitSide(false, Vec::new());
+    let mut side = WaitSide(Answer::NotTaken, Vec::new());
     let order = ai.orders[0];
     let mut fx = Vec::new();
     let r = ai
@@ -1044,7 +1044,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
 #[test]
 fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
     let mut ai = sent_off_queue();
-    let mut side = WaitSide(true, Vec::new());
+    let mut side = WaitSide(Answer::Taken, Vec::new());
     let fx = ai
         .off_turn_fx(
             &scout_at(true, false),
@@ -1073,7 +1073,7 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
 #[test]
 fn foundation_order_without_wait_goes_and_the_work_runs() {
     let mut ai = sent_off_queue();
-    let mut side = WaitSide(false, Vec::new());
+    let mut side = WaitSide(Answer::NotTaken, Vec::new());
     // the world holds the work's target
     let at = Surroundings {
         units: vec![UnitSeen {
@@ -1110,20 +1110,20 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
         last_action: Some(AiAction::Heal),
         ..UnitAi::default()
     };
-    let mut side = WaitSide(true, Vec::new());
+    let mut side = WaitSide(Answer::Taken, Vec::new());
     assert_eq!(
         ai.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(side.1, Vec::new());
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::Gather), Some(AiAction::Heal))
     );
-    let mut refused = WaitSide(false, Vec::new());
+    let mut refused = WaitSide(Answer::NotTaken, Vec::new());
     assert_eq!(
         ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut refused),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(refused.1, vec![object_id(10028)]);
     assert_eq!(
@@ -1132,7 +1132,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
     );
     assert_eq!(
         ai.wait_for_foundation(object_id(10028), OrderForce::Forced, &mut side),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         (ai.current_action, ai.last_action),
@@ -1144,7 +1144,7 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
     };
     assert_eq!(
         idle.wait_for_foundation(object_id(10028), OrderForce::Unforced, &mut side),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         (idle.current_action, idle.last_action),
@@ -1576,7 +1576,7 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(fx, vec![]);
     assert_eq!(u, before);
@@ -1590,7 +1590,7 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         fx,
@@ -6500,7 +6500,7 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
             Dispatch::Queued,
             QueueEnd::Back
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(ai.orders, Vec::<QueuedOrder>::new());
     for (target, end) in [
@@ -6515,7 +6515,7 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
                 Dispatch::Queued,
                 end
             ),
-            Ok(true)
+            Ok(Answer::Taken)
         );
     }
     let targets: Vec<Option<ObjectId>> = ai.orders.iter().map(|o| o.target).collect();
@@ -8521,7 +8521,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut nobody, &mut fx),
             &mut rng()
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(
         u.civilian_attack(
@@ -8530,7 +8530,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         fx,
@@ -8552,7 +8552,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(side.attacks, vec![(object_id(9800), OrderForce::Forced)]);
     assert_eq!(
@@ -8567,7 +8567,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(
         u.civilian_attack(
@@ -8576,7 +8576,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(
         u.civilian_attack(
@@ -8585,7 +8585,7 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
             &mut With::new(&mut side, &mut fx),
             &mut rng()
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         side.attacks,
@@ -8610,9 +8610,9 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         ..Surroundings::default()
     };
     for (ai_kind, attacks) in [
-        (UnitAiKind::TRANSPORT, true),
-        (UnitAiKind::LIVESTOCK, true),
-        (UnitAiKind::BUILDING, false),
+        (UnitAiKind::TRANSPORT, Answer::Taken),
+        (UnitAiKind::LIVESTOCK, Answer::Taken),
+        (UnitAiKind::BUILDING, Answer::NotTaken),
     ] {
         let mut u = idle(ai_kind);
         let mut side = Recorder::default();
@@ -9020,7 +9020,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
             &mut rng(),
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!((fx.len(), side.tested.len()), (0, 0));
     let mut u = idle(UnitAiKind::HUNTED);
@@ -9045,7 +9045,7 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
             &mut r,
             &mut With::new(&mut side, &mut fx)
         ),
-        Ok(true)
+        Ok(Answer::Taken)
     );
     assert_eq!(
         side.tested,
@@ -9102,14 +9102,16 @@ fn move_off_footprint_needs_force_or_no_action() {
         ..idle(UnitAiKind::CIVILIAN)
     };
     let mut fx = Vec::new();
-    assert!(
-        !u.move_aside(m(OrderForce::Unforced), &mut fx, &mut rng())
-            .unwrap()
+    assert_eq!(
+        u.move_aside(m(OrderForce::Unforced), &mut fx, &mut rng())
+            .unwrap(),
+        Answer::NotTaken
     );
     assert_eq!((fx.len(), u.current_action), (0, Some(AiAction::Gather)));
-    assert!(
+    assert_eq!(
         u.move_aside(m(OrderForce::Forced), &mut fx, &mut rng())
-            .unwrap()
+            .unwrap(),
+        Answer::Taken
     );
     assert_eq!(
         fx,
@@ -9125,10 +9127,11 @@ fn move_off_footprint_needs_force_or_no_action() {
     );
     let mut idle_unit = idle(UnitAiKind::CIVILIAN);
     let mut fx = Vec::new();
-    assert!(
+    assert_eq!(
         idle_unit
             .move_aside(m(OrderForce::Unforced), &mut fx, &mut rng())
-            .unwrap()
+            .unwrap(),
+        Answer::Taken
     );
     assert_eq!(
         fx,
@@ -9536,7 +9539,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         };
         assert_eq!(
             run(&mut u, &at, OrderForce::Forced, PlayerKind::Human),
-            (Ok(false), vec![])
+            (Ok(Answer::NotTaken), vec![])
         );
         let gaia = Surroundings {
             player: PlayerId::new(0),
@@ -9557,7 +9560,7 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     };
     assert_eq!(
         run(&mut u, &at, OrderForce::Unforced, PlayerKind::Human),
-        (Ok(false), vec![])
+        (Ok(Answer::NotTaken), vec![])
     );
     let mut u = runner(vec![77, 4242]);
     assert_eq!(
@@ -10788,7 +10791,7 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
                 &at,
                 &mut side
             ),
-            Ok(true),
+            Ok(Answer::Taken),
             "type {ai_kind}"
         );
         assert_eq!(
@@ -11783,7 +11786,7 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
             &mut rng(),
             &mut With::at(&mut side, &mut fx, &pinned)
         ),
-        Ok(false)
+        Ok(Answer::NotTaken)
     );
     assert_eq!(fx, Vec::new());
 }
@@ -12542,13 +12545,21 @@ impl UnitSide for OrderSide {
     fn seen_unit(&mut self, id: ObjectId) -> Result<Option<UnitSeen>, GenieError> {
         Ok(self.world.iter().find(|u| u.id == id).copied())
     }
-    fn wait_solidify(&mut self, target: ObjectId) -> Result<bool, GenieError> {
+    fn wait_solidify(&mut self, target: ObjectId) -> Result<Answer, GenieError> {
         self.waits.push(target);
-        Ok(!self.refuses)
+        Ok(if self.refuses {
+            Answer::NotTaken
+        } else {
+            Answer::Taken
+        })
     }
-    fn command(&mut self, command: UnitCommand) -> Result<bool, GenieError> {
+    fn command(&mut self, command: UnitCommand) -> Result<Answer, GenieError> {
         self.commands.push(command);
-        Ok(!self.refuses)
+        Ok(if self.refuses {
+            Answer::NotTaken
+        } else {
+            Answer::Taken
+        })
     }
     fn group_attack_stop(&mut self) -> Result<(), GenieError> {
         self.group_stops += 1;

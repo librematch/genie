@@ -12,6 +12,7 @@ use crate::orders::Dispatch;
 use crate::players::PlayerKind;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::GroupState;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderKind;
@@ -478,25 +479,23 @@ impl UnitAi {
         Ok(())
     }
 
-    /// Slot 0x28 (`FUN_140c55c90`, every type's; slot 0x30, `FUN_140c563d0`, takes 14 arguments
-    /// and passes it the order's x and y as the shown point and its last argument's low byte as
-    /// the ready flag), an order for the
-    /// queue: a unit in a state above 2 takes none (false); an order of kind −1 neither (true),
-    /// which no [`QueuedOrder`] holds: its callers without an order ([`UnitAi::queue_current`])
-    /// stop first;
-    /// an order [`Dispatch::Queued`] goes into the queue at its `end` (`FUN_140c42640`: before
-    /// the first queued order at [`QueueEnd::Front`], else after the last). One
-    /// [`Dispatch::Now`], which keeps or drops the current order and runs the queue at once, is
-    /// not modelled.
+    /// Slot 0x28 (`FUN_140c55c90`, every type's; slot 0x30, `FUN_140c563d0`, takes 14 arguments and
+    /// passes it the order's x and y as the shown point and its last argument's low byte as the
+    /// ready flag), an order for the queue: a unit in a state above 2 takes none (not taken); an
+    /// order of kind −1 neither (taken), which no [`QueuedOrder`] holds: its callers without an
+    /// order ([`UnitAi::queue_current`]) stop first; an order [`Dispatch::Queued`] goes into the
+    /// queue at its `end` (`FUN_140c42640`: before the first queued order at [`QueueEnd::Front`],
+    /// else after the last). One [`Dispatch::Now`], which keeps or drops the current order and runs
+    /// the queue at once, is not modelled.
     pub fn queue_order(
         &mut self,
         unit_state: ObjectState,
         order: QueuedOrder,
         dispatch: Dispatch,
         end: QueueEnd,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         if ObjectState::Alive < unit_state {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
 
         if dispatch == Dispatch::Now {
@@ -507,7 +506,7 @@ impl UnitAi {
             ));
         }
         self.insert_order(order, end);
-        Ok(true)
+        Ok(Answer::Taken)
     }
 
     /// `FUN_140c4dfa0`: an order in the queue is not ready (its `+0x2c` is 0).
@@ -516,9 +515,9 @@ impl UnitAi {
         self.orders.iter().any(|o| !o.ready)
     }
 
-    /// The order queue (`FUN_140c5d790`): while the AI has an action, an order below priority
-    /// 100 waits; each order runs through slot 0x230 ([`UnitAi::process_order`] with the unit's
-    /// `at`, `side` and owner's type `player_type`, the AI stream `ai`): one that is not ready (0xe)
+    /// The order queue (`FUN_140c5d790`): while the AI has an action, an order below priority 100
+    /// waits; each order runs through slot 0x230 ([`UnitAi::process_order`] with the unit's `at`,
+    /// `side` and owner's type `player_type`, the AI stream `ai`): one that is not ready (0xe)
     /// stays and the next is tried, any other result removes it, and 1 (taken) ends the queue's
     /// turn.
     ///

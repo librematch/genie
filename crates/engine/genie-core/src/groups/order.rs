@@ -6,6 +6,7 @@ use crate::groups::GroupCommand;
 use crate::groups::GroupCommandKind;
 use crate::groups::GroupFlags;
 use crate::groups::GroupId;
+use crate::groups::GroupMove;
 use crate::groups::MoveFlags;
 use crate::groups::StopScope;
 use crate::groups::attack::AttackOrder;
@@ -53,7 +54,7 @@ impl World {
     /// its target forgotten); for 1, 7, 9, `0x68` and `0x7d` the attack path
     /// ([`World::command_attack`], or a queue entry); the other tasks' general command
     /// ([`World::general_command`]) runs. A move begun stops the members (`stopAllUnits` with 0,
-    /// [`World::stop_all_units`]), and [`GroupFlags::JOINED`] clears. True when the move began.
+    /// [`World::stop_all_units`]), and [`GroupFlags::JOINED`] clears. Begun when the move began.
     ///
     /// # Errors
     ///
@@ -64,7 +65,7 @@ impl World {
         target: Option<ObjectId>,
         point: Point,
         order: CommandArgs,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GroupMove, GenieError> {
         let g = self.groups.held_mut(group)?;
         g.flags &= !GroupFlags::MEMBERS_SENT;
         let target = target.filter(|&t| self.world_object(t).is_some());
@@ -80,7 +81,7 @@ impl World {
         let g = self.groups.held_mut(group)?;
         g.replaces_queue = u8::from(!order.queued);
         let command = task.map(|t| GroupCommandKind::of_action(t.command));
-        let mut moved = false;
+        let mut moved = GroupMove::NotBegun;
         if command.is_none_or(|c| c == MOVE_COMMAND) {
             let mut flags = MoveFlags::FORGET_TARGET;
             flags.set(MoveFlags::QUEUED, order.queued);
@@ -109,7 +110,7 @@ impl World {
                 )?;
             }
         }
-        if moved {
+        if moved == GroupMove::Begun {
             self.stop_all_units(group, StopScope::Busy)?;
         }
         let g = self.groups.held_mut(group)?;
@@ -119,16 +120,16 @@ impl World {
 
     /// The general command (`FUN_14100fc50`) of group `group`: `command` on `target` at `point`
     /// within `range`, for the tasks that are no attack. Not queued, not direct and with commands
-    /// queued, it joins the queue unapproved, the approved ones go and the queue runs (true);
+    /// queued, it joins the queue unapproved, the approved ones go and the queue runs (begun);
     /// queued, it joins the queue (approved when direct), and a group without a command that is
-    /// told directly hibernates (false). Else a group whose last command was not queued empties
+    /// told directly hibernates (not begun). Else a group whose last command was not queued empties
     /// its queue, its target's data resets (the range too), each member's seconds since
     /// attacking are `f32::MAX`, and the group moves to the point ([`World::command_move_to`]
     /// with `range`, the target forgotten, direct). A move begun without a target sets the
     /// target data to the point (range, no radius); with one it raises the categories' attack
     /// ranges ([`World::raise_attack_ranges`]) and sets the target (kind 1, the place it last
     /// moved to, the range, the radii's length, no retargeting, certain action -1). Either
-    /// way the group is in `command`. True when the move began.
+    /// way the group is in `command`. Begun when the move began.
     ///
     /// # Errors
     ///
@@ -140,7 +141,7 @@ impl World {
         point: Point,
         range: Distance,
         order: CommandArgs,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<GroupMove, GenieError> {
         let g = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command,
@@ -156,13 +157,13 @@ impl World {
             if g.current_command == GroupCommandKind::NONE && order.direct && g.hibernating != 1 {
                 g.hibernating = 1;
             }
-            return Ok(false);
+            return Ok(GroupMove::NotBegun);
         }
         if !order.direct && !g.command_queue.is_empty() {
             g.queue_command(entry(0));
             g.approve_queued();
             self.check_queued_orders(group)?;
-            return Ok(true);
+            return Ok(GroupMove::Begun);
         }
         if g.replaces_queue != 0 {
             g.clear_command_queue();
@@ -181,8 +182,8 @@ impl World {
                 flags: MoveFlags::FORGET_TARGET | MoveFlags::DIRECT,
             },
         )?;
-        if !moved {
-            return Ok(false);
+        if moved == GroupMove::NotBegun {
+            return Ok(GroupMove::NotBegun);
         }
         self.raise_attack_ranges(group, target)?;
         let at = self.moved_place_of(target)?;
@@ -197,12 +198,12 @@ impl World {
             certain_action: None,
         };
         g.current_command = command;
-        Ok(true)
+        Ok(GroupMove::Begun)
     }
 
     /// `BUnitGroup::command`'s attack tasks (1, 7, 9, `0x68`, `0x7d`) on `target`, `moved` what
     /// task 1's move before it returned: a command not queued either joins the command queue
-    /// (not direct, with commands queued: the queue is approved and run, true) or runs
+    /// (not direct, with commands queued: the queue is approved and run, begun) or runs
     /// [`World::command_attack`] after the queue empties when the last command was not queued; a
     /// queued one joins the queue (approved when direct), a group without a command that is told
     /// directly hibernating, and answers what the move before it did.
@@ -212,8 +213,8 @@ impl World {
         target: ObjectId,
         point: Point,
         (task, order): (TargetTask, CommandArgs),
-        moved: bool,
-    ) -> Result<bool, GenieError> {
+        moved: GroupMove,
+    ) -> Result<GroupMove, GenieError> {
         let g = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command: GroupCommandKind::of_action(task.command),
@@ -235,7 +236,7 @@ impl World {
             g.queue_command(entry(0));
             g.approve_queued();
             self.check_queued_orders(group)?;
-            return Ok(true);
+            return Ok(GroupMove::Begun);
         }
         if g.replaces_queue != 0 {
             g.clear_command_queue();

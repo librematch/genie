@@ -12,6 +12,7 @@ use crate::objects::masters::MasterKind;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
 use crate::unit_ai::AlertMode;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::OrderHistory;
 use crate::unit_ai::OrderKind;
@@ -225,7 +226,9 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)? {
+        if self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)?
+            == Answer::Taken
+        {
             if self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, OrderHistory::Skipped, ai);
             }
@@ -456,7 +459,7 @@ impl UnitAi {
         ) {
             self.save_patrol(side);
         }
-        if self.attack_slot(target, TargetRules::Own, at, side, ai)? {
+        if self.attack_slot(target, TargetRules::Own, at, side, ai)? == Answer::Taken {
             if self.retarget_disabled == 0 && self.current_order != Some(OrderKind::Defend) {
                 self.set_order_with(None, OrderHistory::Skipped, ai);
             }
@@ -616,7 +619,10 @@ impl UnitAi {
             return Ok(false);
         };
         // slot 0xb8 with 1 (`+0x1d5` then 1, not held)
-        self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)
+        Ok(
+            self.attack_object(id, OrderForce::Forced, TargetRules::Own, at, side)?
+                == Answer::Taken,
+        )
     }
 
     /// What `bestUnitToAttack` reads of this unit AI ([`Seeker`]), its current target's master

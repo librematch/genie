@@ -39,6 +39,7 @@ use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::unit_ai::AiAction;
 use crate::unit_ai::AiLayer;
+use crate::unit_ai::Answer;
 use crate::unit_ai::Issuer;
 use crate::unit_ai::OrderKind;
 use crate::unit_ai::{OrderPriority, OrderTargetKind, QueuedOrder};
@@ -268,7 +269,7 @@ impl World {
         )?;
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
-            if !taken {
+            if taken == Answer::NotTaken {
                 ai.set_order(Some(OrderKind::Follow), rng);
                 ai.set_action(Some(AiAction::Follow));
             }
@@ -365,7 +366,7 @@ impl World {
         target: ObjectId,
         point: Position,
         source: OrderSource,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let world_time = self.world_time;
         let class = self
             .players
@@ -387,7 +388,7 @@ impl World {
             ai.orders.clear();
         }
         if target == unit.id {
-            return Ok(false);
+            return Ok(Answer::NotTaken);
         }
         let place = (unit.position().ground(), Some(class));
         if self.parts.unit_ai.contains(unit.id) {
@@ -411,9 +412,9 @@ impl World {
             .is_some_and(|ai| ai.stop_after_kill);
         if self.parts.unit_ai.contains(unit.id)
             && !stop_after_kill
-            && self.head_takes_move(player, idx, Some(target), point)?
+            && self.head_takes_move(player, idx, Some(target), point)? == Answer::Taken
         {
-            return Ok(true);
+            return Ok(Answer::Taken);
         }
         let unit = &self.players.live(player, idx)?;
         if self.parts.unread.contains(unit.id) {
@@ -435,12 +436,13 @@ impl World {
             self.take(target, self.releaser(player, idx)?)?;
         }
         self.clear_actions(player, idx)?;
-        self.start_object_move(player, idx, (target, target_state), livestock)
+        self.start_object_move(player, idx, (target, target_state), livestock)?;
+        Ok(Answer::NotTaken)
     }
 
     /// [`World::move_to_object_with`]'s new `MoveTo` toward `target` (in state `target_state`), once the
     /// unit's actions are cleared: its range and sprite, the action's start and the standing
-    /// sprite it may show. Always false: no action took the move.
+    /// sprite it may show; no action took the move.
     ///
     /// # Errors
     ///
@@ -451,7 +453,7 @@ impl World {
         idx: ListIndex,
         (target, target_state): (ObjectId, ObjectState),
         livestock: bool,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<(), GenieError> {
         let master = self
             .players
             .live(player, idx)?
@@ -488,11 +490,11 @@ impl World {
             .actions_mut(unit.id)?
             .list
             .set_move_to(Some(move_to));
-        Ok(false)
+        Ok(())
     }
 
     /// The head action's slot 0x40 (`FUN_140a97730`) on a move of the unit at `idx` to `point`,
-    /// toward the object `target` if any: true when the action takes the move. Without a target
+    /// toward the object `target` if any: taken when the action takes the move. Without a target
     /// it is the unit's own [`crate::objects::unit::Unit::head_takes_point`], whose released target goes
     /// here ([`World::release`]). Toward an object, an empty list takes nothing, nor does the
     /// base slot (`FUN_140a78490`) of a `MoveTo`, an Explore, a Build (0x140aade60), an Attack,
@@ -506,7 +508,7 @@ impl World {
         idx: ListIndex,
         target: Option<ObjectId>,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let unit = self.players.live_mut(player, idx)?;
         let Some(target) = target else {
             return self.point_taken(player, idx, point);
@@ -528,10 +530,10 @@ impl World {
                 | MISSILE
                 | MAKE
                 | WAIT_SOLIDIFY,
-            ) => Ok(false),
+            ) => Ok(Answer::NotTaken),
             Some(ARTIFACT_KIND) => {
                 self.artifact_take_object(player, idx, target)?;
-                Ok(true)
+                Ok(Answer::Taken)
             }
             Some(HUNT) => self.hunt_take_move(player, idx, target, point),
             Some(GATHER) => self.gather_take_move(player, idx, target, point),
@@ -552,7 +554,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         point: Position,
-    ) -> Result<bool, GenieError> {
+    ) -> Result<Answer, GenieError> {
         let by = self.releaser(player, idx)?;
         let id = self.players.live(player, idx)?.id;
         let (released, left) = match self.players.live_mut(player, idx)?.head_takes_point(
@@ -569,12 +571,12 @@ impl World {
                 move_to_tuning: &self.model.tuning.move_to,
             },
         )? {
-            PointMove::Declined => return Ok(false),
+            PointMove::Declined => return Ok(Answer::NotTaken),
             PointMove::Taken(released) => (released, None),
             PointMove::Repairs(released, left) => (released, left),
             PointMove::Sails => {
                 self.transport_move(player, idx, point)?;
-                return Ok(true);
+                return Ok(Answer::Taken);
             }
         };
         if let Some(t) = left {
@@ -583,6 +585,6 @@ impl World {
         if let Some(t) = released {
             self.release(t, by)?;
         }
-        Ok(true)
+        Ok(Answer::Taken)
     }
 }

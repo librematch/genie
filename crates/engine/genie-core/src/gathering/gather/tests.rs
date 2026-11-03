@@ -1484,7 +1484,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             &roles(),
             tuning()
         ),
-        Ok(true)
+        Ok(())
     );
     let to_bush = MoveToAction {
         point: Position::new(23.5, 93.5, 0.0),
@@ -1534,7 +1534,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
                 &roles(),
                 tuning()
             ),
-            Ok(true)
+            Ok(())
         );
         // it keeps on: the walk keeps its MoveTo (facing or working, it holds none)
         let kept = matches!(state, GatherState::Walk { .. });
@@ -1565,7 +1565,7 @@ fn gatherer_sent_again_to_its_bush_walks_to_it_anew() {
             &roles(),
             tuning()
         ),
-        Ok(true)
+        Ok(())
     );
     assert_eq!(
         (g.state.bare(), g.target, g.carry_to, g.point),

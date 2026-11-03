@@ -15,6 +15,7 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::PlayersMasters;
 use crate::objects::sprite::Cargo;
 use crate::players::PlayerId;
+use crate::unit_ai::Answer;
 use crate::unit_ai::OrderForce;
 use crate::unit_ai::Pace;
 
@@ -375,7 +376,7 @@ impl Unit {
             ));
         };
         let old = hunt.target.map(HuntTargetId::id);
-        if !hunt.take_move(
+        if hunt.take_move(
             HuntMove {
                 target: None,
                 point,
@@ -387,7 +388,8 @@ impl Unit {
             },
             mover,
             move_to_tuning,
-        )? {
+        )? == Answer::NotTaken
+        {
             return Ok(PointMove::Declined);
         }
         Ok(PointMove::Taken(old))
