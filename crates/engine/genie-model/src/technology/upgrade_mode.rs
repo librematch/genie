@@ -1,10 +1,13 @@
 //! How an upgrade effect changes a master's objects ([`UpgradeMode`]).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// An upgrade effect's mode (its third argument, `FUN_141657d10`'s): 2 changes the effect's
 /// own object alone, −1 and 3 keep the objects' masters, 3 also takes the objects whose own
 /// master has the upgraded master's id; any other walks the objects and gives them masters
 /// of their own.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UpgradeMode(i16);
 

@@ -3,6 +3,8 @@
 
 use crate::math::Angle;
 use crate::world::Seconds;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 use std::ops::{Div, Mul};
 
@@ -11,7 +13,7 @@ use std::ops::{Div, Mul};
 /// time), a group's most yaw per second moving and standing. The largest float
 /// ([`TurnRate::MAX`]) turns at once. Each operator is the one `f32` operation the game does, in
 /// its order; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TurnRate(f32);
 

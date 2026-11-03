@@ -1,10 +1,15 @@
 //! The count of the actions that work on an object, and the caps on it.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A count of workers: the actions that have an object as their target (`worker_num`,
 /// `+0x644`: a farm's farmer, a resource's gatherers, a building's builders), and a cap on
 /// them (a drop site's target's `worker_num`, a search's argument, [`WorkerCount::NO_CAP`]
 /// for none). Every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkerCount(i32);
 

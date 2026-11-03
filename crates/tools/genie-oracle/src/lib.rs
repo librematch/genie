@@ -49,6 +49,8 @@
 pub mod census;
 pub mod groups;
 pub use genie_import::dat as masters;
+// the `.dat`'s tables in the cache's form (FD-046-D18, D59)
+pub use genie_import::cache;
 pub mod survey;
 pub mod tick_trace;
 pub mod views;

@@ -19,6 +19,8 @@ use crate::objects::masters::RestrictionField;
 use crate::objects::masters::Shown;
 use crate::world::Seconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::LazyLock;
 
 /// The combat layer of a master of type 50 and up but 90 (`RGE_Master_Combat_Object`,
@@ -39,7 +41,7 @@ use std::sync::LazyLock;
 /// (`+0x8e8`); an attacker of it reads `area_effect_range` (`+0x82c`), `area_effect_level`
 /// (`+0x830`), `area_damage` (`+0x834`) and the creatable layer's `max_charge` (`+0x918`) and
 /// `charge_target` (`+0x924`).
-#[derive(Clone, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CombatPart {
     /// `weapon_range` (`+0x828`, object slot 0x230).

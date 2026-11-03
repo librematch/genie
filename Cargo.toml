@@ -62,6 +62,7 @@ serde_json = { version = "1", features = ["preserve_order"] }
 schemars = "1.2"
 # the model's schema hash, a part of the model cache's key (FD-046-D18)
 sha2 = "0.10"
+postcard = { version = "1", default-features = false, features = ["use-std"] }
 indexmap = { version = "2", features = ["serde"] }
 rayon = "1"
 # the engine's spans and events (genie-core::trace); without the proc-macro attributes

@@ -1,8 +1,11 @@
 //! A master's spacing in a group's formation.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A master's spacing modifier (`+0x8b8`, `mSpacingModifier`; the `.dat`'s "flank attack
 /// modifier"): with its radius on x the unit's radius in a group's formation (`FUN_141025920`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpacingModifier(f32);
 

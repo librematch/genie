@@ -1,8 +1,13 @@
 //! A sprite's facets: their count and the facet an object faces.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A graphic's facet count (`angle_count`, `+0xa`, a short): how many directions it draws.
 /// Every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct FacetCount(i16);
 

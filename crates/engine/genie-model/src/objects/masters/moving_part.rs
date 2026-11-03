@@ -6,6 +6,8 @@ use crate::objects::masters::Master;
 use crate::objects::masters::Trail;
 use crate::world::Seconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::LazyLock;
 
 /// The moving layer of a master of type 30 and up but 90 (`RGE_Master_Moving_Object`,
@@ -13,7 +15,7 @@ use std::sync::LazyLock;
 /// running sprites, its turn speed and its trail. A moving object (30) and every type above hold
 /// it; what its objects move with is [`Master::move_stats`], which these values and the base's
 /// follow.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MovingPart {
     /// Its walking sprite (`+0x748`, `move_sprite_id`; the unit's slot 0x7c8) and its running

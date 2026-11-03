@@ -3,11 +3,13 @@
 //! ([`ModifyLocation`]), and the technology a disable names ([`DisabledTech`]).
 
 use crate::technology::TechId;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// How a technology's cost or research time changes (`'e'`'s and `'g'`'s third argument's low
 /// byte, or kind 8's mode through its map): 0 sets, 2 scales by the amount less 1 (rounded half
 /// away from 1), any other adds. Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ChangeMode(u8);
 
@@ -36,7 +38,7 @@ impl ChangeMode {
 /// argument. The cost modes (0 to 3, `0x4000` to `0x4003`, `0xd` to `0x11`) and the research
 /// time modes (−1 to −3) map to a [`ChangeMode`]; the others name a field. Every short is kept.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ModifyMode(i16);
 
 impl ModifyMode {
@@ -70,7 +72,7 @@ impl ModifyMode {
 /// location, else the entry at that index (past the technology's locations a new one, a copy of
 /// the last with no building). Every short is kept.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ModifyLocation(i16);
 
 impl ModifyLocation {
@@ -97,7 +99,7 @@ impl ModifyLocation {
 /// none; the shared kind's test (`FUN_1413d1020`) reads the whole number, the disabling
 /// (`FUN_1413cdb00`) its low 16 bits, a negative one every technology.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DisabledTech(i32);
 
 impl DisabledTech {

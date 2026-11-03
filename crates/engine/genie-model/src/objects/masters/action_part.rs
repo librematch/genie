@@ -10,6 +10,8 @@ use crate::objects::masters::Task;
 use crate::objects::masters::TaskGroup;
 use crate::objects::masters::TaskIndex;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::LazyLock;
 
 /// The action layer of a master of type 40 and up but 90 (`RGE_Master_Action_Object`,
@@ -17,7 +19,7 @@ use std::sync::LazyLock;
 /// one, its task swap group, its work rate, its search radius, its drop sites and its run pattern.
 /// An action unit (40), a combat master (50), a missile (60), a combat unit (70) and a building
 /// (80) hold it.
-#[derive(Clone, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ActionPart {
     /// `+0x7b8`, the `.dat`'s `TaskSwapGroup` (the save does not carry it); 0 for none.

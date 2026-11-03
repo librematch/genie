@@ -1,9 +1,11 @@
 //! A master's `disabled` (`+0x5f1`, [`DisableMode`]).
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's `disabled` (`+0x5f1`, the `.dat`'s byte): whether an effect's enable command leaves its availability as it is; the attribute setters change it as a byte, and the trainable count reads its bits (`FUN_141625a20`: bit 0, bits 1 and 2). Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DisableMode(u8);
 

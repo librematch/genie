@@ -2,6 +2,8 @@
 
 use crate::objects::masters::WorkValue;
 use crate::world::Seconds;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 use std::ops::{Add, AddAssign, Mul, MulAssign};
 
@@ -12,7 +14,7 @@ use std::ops::{Add, AddAssign, Mul, MulAssign};
 /// work done, in the task's own unit (an amount, build or repair points, training progress).
 /// Each operator is the one `f32` operation the game does, in its order; a comparison is
 /// `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkRate(f32);
 

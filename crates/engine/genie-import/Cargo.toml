@@ -17,6 +17,17 @@ genie-dat = { version = "0.1.0", path = "../../formats/genie-dat" }
 genie-json = { version = "0.1.0", path = "../../formats/genie-json" }
 genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
 serde_json.workspace = true
+# the import's tables in the model's cache (FD-046-D18): their serde form, postcard's bytes
+# (D59) and the key's hash
+serde.workspace = true
+postcard.workspace = true
+sha2.workspace = true
+
+[features]
+default = ["fs"]
+# the cache directory (FD-046-D19)
+fs = []
 
 [lints]
 workspace = true
+

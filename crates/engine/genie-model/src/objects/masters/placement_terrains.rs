@@ -2,11 +2,13 @@
 
 use crate::map::TerrainId;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A master's placement terrains (`+0x5f2`..`+0x5f8`, the `.dat`'s `placement_side_terrain` and
 /// `placement_terrain`, each none for −1): the terrains it must stand beside and the terrains it
 /// must stand on (`genie_core::production::spawn::placement_terrains`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlacementTerrains {
     /// The side terrains (`+0x5f2`, `+0x5f4`).

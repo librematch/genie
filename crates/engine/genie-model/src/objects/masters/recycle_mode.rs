@@ -1,9 +1,11 @@
 //! A master's `recyclable` (`+0x680`, [`RecycleMode`]).
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's `recyclable` (`+0x680`, the `.dat`'s byte): whether its objects are recycled: a recycled object takes its id from the negative range (`FUN_1415301b0`). Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RecycleMode(u8);
 

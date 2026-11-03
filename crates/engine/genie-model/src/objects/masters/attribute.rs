@@ -2,13 +2,28 @@
 //! string 12200 plus the number names each).
 
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// An attribute an effect changes on a master (an attribute command's third argument, its low
 /// byte: `FUN_140ec2ac0` reads `c & 0xff`). The simulation names the ones it tells apart (below);
 /// any other is a number the data holds, which each master type's setter passes to its base's
 /// and the last one ignores.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterAttribute(
     /// Its number in the game's attribute list.

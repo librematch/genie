@@ -4,9 +4,11 @@ use crate::players::CivId;
 use crate::players::world_player::{TreeMaster, TreeTech};
 use crate::world::Age;
 use crate::world::settings::Settings;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// One unit of a building in a civilisation's tech tree (`0x48` bytes).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TreeUnit {
     /// `+0x0`: the unit's master.
@@ -20,7 +22,7 @@ pub struct TreeUnit {
 }
 
 /// One building of a civilisation's tech tree (`0x48` bytes): its master and its units.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TreeBuilding {
     /// `+0x0`: the building's master.
@@ -32,7 +34,7 @@ pub struct TreeBuilding {
 /// A civilisation's unique unit (its data's `+0xec`, `+0xf0`, `+0xf4`, `FUN_140e868f0`,
 /// `FUN_140e868b0`, `FUN_140e86630`).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UniqueUnit {
     /// The technology that makes it elite.
     pub elite_tech: TreeTech,
@@ -56,7 +58,7 @@ pub struct UniqueUnit {
 /// index 0 alone: a player of civilisation 1 or more without the full tech tree finds no
 /// civilisation in it, as in the empty table genie-oracle leaves; the full tech tree's index 0
 /// is not loaded yet.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechTree {
     /// The civilisations' buildings.

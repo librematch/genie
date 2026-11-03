@@ -1,6 +1,8 @@
 //! A distance on the map in tiles ([`Distance`]) and its square ([`DistanceSquared`]), each
 //! with the game's `f32` operations.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -8,7 +10,7 @@ use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 /// work range, search radius and line of sight, a reach, a gap between two footprints, a group's
 /// ranges. Each operator is the one `f32` operation the game does, in its order; a comparison is
 /// `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Distance(f32);
 

@@ -9,6 +9,8 @@ use crate::map::Radii;
 use crate::movement::Speed;
 use crate::objects::masters::FlyMode;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// What a missile's master holds for the flight: the `.dat`'s `projectile_type` (`+0x880`, not
 /// saved), `smart_mode` (`+0x881`, the save's `targetting_type`), `hit_mode` (`+0x882`,
@@ -16,7 +18,7 @@ use genie_diff::Diff;
 /// (`+0x888`, `ballistics_ratio`); its master's speed (slot 0xe8, `+0x740`), radii
 /// (`+0x5d8`..`+0x5e0`) and the `.dat`'s `fly_mode` (`+0x608`: 0 holds it on the ground, 1 above
 /// it, `FUN_141193a10`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissileStats {
     /// `projectile_type` (`+0x880`).

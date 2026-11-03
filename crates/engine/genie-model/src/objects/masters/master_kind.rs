@@ -2,6 +2,8 @@
 //! or a building, which the `.dat` names `unit_type`.
 
 use genie_diff::{Diff, Differ};
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's type (`+0x8`, the `.dat`'s `unit_type`): 10 to 80 in steps the game names (its
@@ -12,7 +14,9 @@ use std::fmt::{Display, Error, Formatter};
 /// own kinds), so the type is a newtype with named constants, not an enum: any byte the data holds
 /// is a type, and the named ones are values of the type (the reasoning of
 /// [`crate::objects::masters::ClassId`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterKind(
     /// Its value, as the `.dat` and the save hold it.

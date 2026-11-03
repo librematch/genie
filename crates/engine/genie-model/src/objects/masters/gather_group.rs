@@ -2,6 +2,8 @@
 //! look for, the value the `.dat` names `resource_gather_group`.
 
 use crate::GenieError;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// A master's gather group (`+0x683`, the `.dat`'s `resource_gather_group`): the kind of
@@ -11,7 +13,9 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// target's class (`genie_core::unit_ai::civilian_kind`), the work's search by a resource held
 /// (`genie_core::gathering::gather_search::gather_group`). The `.dat` may hold others, so the
 /// group is a newtype with named constants.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GatherGroup(u8);
 

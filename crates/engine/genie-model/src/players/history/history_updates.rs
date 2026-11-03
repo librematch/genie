@@ -1,10 +1,15 @@
 //! A number of the history's updates: the period the `.dat` gives (`time_slice`) and a count
 //! of runs (FD-046: the model's part of the history).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A number of the history's updates, one a game second: the period (the `.dat`'s
 /// `time_slice`, `world+0x8b8`) and the runs since the last one (`update_history_count`,
 /// `+0x28`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct HistoryUpdates(i32);
 
 impl HistoryUpdates {

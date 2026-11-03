@@ -1,10 +1,13 @@
 //! A terrain's flags ([`TerrainFlags`], the `.dat`'s `is_water` byte).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A terrain's flags: the `.dat`'s `is_water` byte, which the map's load copies to the
     /// terrain table (`FUN_1413fc340`, `DAT_143cc7b40 + 0x2c`). Named by the terrains of build
     /// 158041's `.dat` that carry each bit; every bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct TerrainFlags: u8 {
         /// Water (bit 0: `Water, Medium`, the normal waters).
         const WATER = 1;

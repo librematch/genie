@@ -1,12 +1,16 @@
 //! A sprite's frame and its animation state.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::ops::{Add, Neg, Rem, Sub};
 
 /// A frame of a sprite (a short): the frame a sprite shows (`+0x24`) and showed before
 /// (`+0x30`), a graphic's frame count (`frame_count`, `+0x8`, one past its last frame), a
 /// master's fire and interrupt frames and the frame a BUILD command chose. Each operator is the
 /// game's 16-bit one; every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Frame(i16);
 

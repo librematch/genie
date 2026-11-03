@@ -2,10 +2,12 @@
 
 use crate::players::AmountRate;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// What the dead-object steps read from an object's master that the header save does not hold;
 /// they come from the `.dat`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterData {
     /// Master `+0x620`: how much of the held attribute a dead object loses per second.

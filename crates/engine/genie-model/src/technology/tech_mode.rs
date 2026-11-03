@@ -1,9 +1,12 @@
 //! The game modes a technology is for.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A technology's game modes (`+0x28`, the `.dat`'s `full_tech_mode`, a short): 0 and 1 every
 /// one, 2 to 34 a rule, a mode or a starting age, a negative one its opposite
 /// ([`crate::world::settings::Settings::tech_mode_allows`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechMode(i16);
 

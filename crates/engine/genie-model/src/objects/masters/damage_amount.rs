@@ -1,12 +1,16 @@
 //! An attack's or an armor's amount.
 
 use crate::math::conversions::cvttss2si;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// An attack's or an armor's amount: the `.dat`'s `amount` of an attack or armor entry, the base
 /// armor (`+0x800`), the shown attack and armors, and an object's armor powerups and the armor
 /// its charge's hits took off it. A signed short, which the armor slots add and subtract
 /// wrapping and the damage reads as a float.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageAmount(i16);
 

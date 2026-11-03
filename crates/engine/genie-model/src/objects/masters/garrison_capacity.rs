@@ -1,9 +1,14 @@
 //! A master's garrison capacity (`+0x5d4`): how many units an object of it holds.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A master's garrison capacity (`obj_max`, `+0x5d4`, the `.dat`'s `garrison_capacity`): how many
 /// units an object of it holds; a building of any takes a gather point (`FUN_140e7e9a0`). Every
 /// byte the data or an effect leaves is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GarrisonCapacity(u8);
 

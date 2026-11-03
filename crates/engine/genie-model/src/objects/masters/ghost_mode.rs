@@ -1,10 +1,12 @@
 //! A master's `create_doppelganger_on_death` (`+0x682`): whether its objects leave ghosts.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's `create_doppelganger_on_death` (`+0x682`): whether its dying objects leave ghosts in
 /// the other players' fog. Every byte is kept; only 2 leaves them.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GhostMode(u8);
 

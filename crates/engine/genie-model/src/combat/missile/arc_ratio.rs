@@ -1,11 +1,13 @@
 //! A missile master's arc.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::ops::{AddAssign, MulAssign};
 
 /// A missile master's arc (the `.dat`'s `projectile_arc`, `+0x888`, the save's
 /// `ballistics_ratio`): 0 flies flat; else the launch makes the arc's rise of it and the way
 /// (`−arc × way × way` for one at most 0, `−arc × way` above).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ArcRatio(f32);
 

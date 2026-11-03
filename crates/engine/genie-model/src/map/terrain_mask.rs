@@ -1,12 +1,14 @@
 //! The terrain classes an object may stand on, as the obstruction manager's tile words test them.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// The terrain classes an object may stand on (its terrain restriction's, `FUN_141054630`'s
 /// table): a bit per class of the obstruction manager's tile word, whose low byte holds the
 /// tile's class (`genie_core::map::terrain::terrain_class`); bit 7 of the word is a temporary
 /// record's.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TerrainMask(u8);
 

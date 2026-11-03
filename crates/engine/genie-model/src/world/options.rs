@@ -1,6 +1,9 @@
 //! The game options' values: the game mode, the ages, the visibility, the resource level, the
 //! sub-mode's rules, the content mode and the treaty.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A game mode (`mGameMode`, the options' `+0x34`), named by aoc-mgz's game types; mode 9 and
 /// 14 have no name there, and 16 is the mode whose QUEUE trains one military unit at a time
 /// early on.
@@ -69,7 +72,7 @@ impl GameMode {
 
 /// An age option (`mStartingAge`, `+0x3c`, and `mEndingAge`, `+0x40`), and a tech tree unit's
 /// age: 0 the mode's default, 2 Feudal, 3 Castle, 4 Imperial, 5 post-Imperial, 6.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Age(i32);
 

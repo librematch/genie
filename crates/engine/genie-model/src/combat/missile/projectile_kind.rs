@@ -1,9 +1,12 @@
 //! A missile master's projectile type.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A missile master's projectile type (the `.dat`'s `projectile_type`, `+0x880`, not saved): how
 /// its missile flies. Type 0 flies straight along its unit direction, type 3 takes its whole way
 /// in one step; types 1 and 2 are not modelled.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ProjectileKind(u8);
 

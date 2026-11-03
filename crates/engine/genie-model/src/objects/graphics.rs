@@ -2,13 +2,15 @@
 
 use crate::objects::SpriteId;
 use crate::objects::sprite::Graphic;
+use serde::Deserialize;
+use serde::Serialize;
 use std::iter::Enumerate;
 use std::slice::Iter as SliceIter;
 
 /// What the sprite clock reads of each graphic (the `.dat`'s), by sprite id: a dense column
 /// by the id (the `.dat`'s ids are 0 and up), walked in the ids' order. Two tables are equal
 /// when they hold the same sprites and graphics, as two maps are.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Graphics {
     /// The graphics by sprite id.

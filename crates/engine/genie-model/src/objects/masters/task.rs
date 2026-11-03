@@ -14,10 +14,12 @@ use crate::objects::masters::WorkValue;
 use crate::players::attribute::AttributeId;
 use crate::world::Seconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// One task of a master's task list (`RGE_Task`), with the memory offsets the task finder reads
 /// (the save's names; the `.dat`'s in brackets where they differ).
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Task {
     /// `+0xa`.

@@ -11,9 +11,11 @@ use crate::objects::masters::FlyMode;
 use crate::objects::sprite::{Graphic, top_speed};
 use crate::world::Seconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// What movement reads of the unit's master.
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MoveStats {
     /// The master's `fly_mode` (`+0x608`): how its place takes the ground's height

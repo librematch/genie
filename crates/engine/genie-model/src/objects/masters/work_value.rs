@@ -1,11 +1,14 @@
 //! A task's work values.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A task's work value (`work_val1`, `+0x28`, and `work_val2`, `+0x2c`, floats of the `.dat`):
 /// what its action reads by its type. A gather's and a build's `work_val1` scales the worker's
 /// work rate, a generation's the attribute it grows, a movement damage's the hit points it takes
 /// and its `work_val2` the seconds between; a task whose `work_val1` is at most 0 is no target's
 /// (the task finder). Every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WorkValue(f32);
 

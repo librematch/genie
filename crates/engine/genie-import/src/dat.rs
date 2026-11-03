@@ -26,7 +26,6 @@ use genie_model::technology::TechId;
 use genie_model::world::Seconds;
 use genie_model::world::WholeSeconds;
 use genie_save::generated::world::PlayerObjects;
-use std::collections::HashMap;
 
 mod dat_work;
 
@@ -49,6 +48,8 @@ use genie_model::technology::{
     Cost, Effect, EffectCommand, Effects, Linked, TechDef, TechKind, TechMode,
 };
 use genie_model::unit_ai::task_finder::DropSite;
+use serde::Deserialize;
+use serde::Serialize;
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fmt::{Display, Error as FmtError, Formatter};
@@ -58,7 +59,7 @@ use std::path::Path;
 
 /// The action an action object's first update starts from its master's default task
 /// (`RGE_Action_Object::update`, 0x14106ac90).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DefaultAction {
     /// The master has no default task.
     None,
@@ -153,7 +154,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
 }
 
 /// One master's row.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct Row {
     data: MasterData,
     default_action: DefaultAction,
@@ -169,7 +170,7 @@ struct Row {
 /// What the save does not hold of a moving master's movement (the `.dat` unit's moving part).
 /// Its turning is not here: every copy of a master derives it from its turn speed and walking
 /// sprite ([`turn_rate`](fn@genie_model::movement::turn_rate)).
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Turning {
     /// Master `+0x768`, `old_move_algorithm`: bit 0 has a stop reset the unit's sprite.
     pub move_algorithm: MoveAlgorithm,
@@ -181,7 +182,7 @@ pub struct Turning {
 /// `is_water` flags: 1 water, 2 shallows and beach, 4 land, 0 none) and each terrain restriction's
 /// mask, the classes it can pass (the obstruction manager's table, `FUN_141054630`). Checked
 /// against the game's table, dumped by the tick oracle.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct TerrainTable {
     classes: Vec<u8>,
     /// Each terrain's record as the map's terrain reads see it.
@@ -281,11 +282,11 @@ impl TerrainTable {
 }
 
 /// Every master of every civ of a data file.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MasterTable {
-    rows: HashMap<(CivId, MasterId), Row>,
+    rows: BTreeMap<(CivId, MasterId), Row>,
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
-    sprite_speed: HashMap<SpriteId, SpeedMultiplier>,
+    sprite_speed: BTreeMap<SpriteId, SpeedMultiplier>,
     /// What the sprite clock reads of each graphic.
     pub graphics: Graphics,
     /// The terrain table.
@@ -502,7 +503,7 @@ impl MasterTable {
                     )
                 })
                 .collect(),
-            sprite_speed: HashMap::new(),
+            sprite_speed: BTreeMap::new(),
             graphics: Graphics::default(),
             terrain: TerrainTable::default(),
             drop_sites: Vec::new(),
@@ -625,6 +626,25 @@ impl MasterTable {
     #[must_use]
     pub fn with_masks(mut self, masks: Vec<u8>) -> Self {
         self.terrain.masks = masks.into_iter().map(TerrainMask::of_bits).collect();
+        self
+    }
+
+    /// The table with `master`'s work-command values for `civ` ([`MasterTable::work`]); a
+    /// master the table lacks gets a row of no other values.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn with_work(mut self, civ: CivId, master: MasterId, work: work::Master) -> Self {
+        self.rows
+            .entry((civ, master))
+            .or_insert_with(|| Row {
+                data: MasterData::default(),
+                default_action: DefaultAction::None,
+                work: None,
+                turning: None,
+                projectile_kind: None,
+                fly_mode: FlyMode::default(),
+            })
+            .work = Some(work);
         self
     }
 }

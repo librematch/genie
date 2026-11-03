@@ -1,6 +1,8 @@
 //! An object's hit points ([`HitPoints`]), with the game's `f32` operations, and a master's whole
 //! hit points ([`MasterHitPoints`]).
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -8,7 +10,7 @@ use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 /// heal, a gain or a loss moves, a building's loss while it is built. A master holds whole hit
 /// points ([`MasterHitPoints`], [`HitPoints::of_master`]). Each operator is the one `f32` operation
 /// the game does, in its order; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitPoints(f32);
 
@@ -39,7 +41,9 @@ impl HitPoints {
 /// starts with and heals up to (before powerups), a short the effects set, add to and scale
 /// (capped at 32767 where the game caps them). Every short is kept; [`HitPoints::of_master`] is
 /// the game's conversion.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MasterHitPoints(i16);
 

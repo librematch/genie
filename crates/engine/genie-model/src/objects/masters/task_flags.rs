@@ -1,8 +1,11 @@
 //! A task's flags ([`TaskFlags`], `combat_level_flag`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A task's flags (`combat_level_flag`, the task's `+0x15`). Every bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct TaskFlags: u8 {
         /// A combat unit's generation or heal task works whatever its top action (bit 1).
         const UNITS_ALWAYS = 1 << 1;

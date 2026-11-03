@@ -4,11 +4,13 @@
 //! from a point ([`Point`]).
 
 use crate::geometry::{Point, Position};
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A displacement on the map in the map's order: x and y in tiles, z the height. A missile's
 /// direction (`+0x68`..`+0x70`) and its step of an update (`+0x7dc`..`+0x7e4`), a master's
 /// weapon offset from its object's place (`+0x844`..`+0x84c`).
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Offset(
     /// Its x, y and z.
@@ -100,7 +102,7 @@ impl Position {
 /// A displacement on the map's ground, x and y in tiles: a step of a walk or a search (a
 /// spiral's, a landing walk's, a pather's ray), a direction of a table, an annex's place off its
 /// building's, a volley missile's scatter.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GroundOffset(
     /// Its x and y.

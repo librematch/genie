@@ -2,10 +2,13 @@
 //! them) and their part on the ground ([`Footprint`], x and y), apart from a place
 //! ([`crate::map::Position`]) and a displacement ([`crate::map::Offset`]).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// An object's three radii in the map's order: x and y in tiles, z the height (a master's
 /// `radius_x`, `radius_y`, `radius_z`, `+0x5d8`..`+0x5e0`). Each is half the object's size along
 /// its axis.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Radii(
     /// Its x, y and z.
@@ -81,7 +84,7 @@ impl genie_diff::Diff for Radii {
 /// An object's radii on the ground: x and y in tiles, half its size along each axis (a master's
 /// `radius_x` and `radius_y`, `+0x5d8`, `+0x5dc`). The area it covers is its place plus and minus
 /// them.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Footprint(
     /// Its x and y.

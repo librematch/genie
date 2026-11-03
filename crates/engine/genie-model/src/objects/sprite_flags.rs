@@ -1,9 +1,12 @@
 //! A sprite's sequence flags ([`SpriteFlags`], the `.dat`'s `sequence_type`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A sprite's sequence flags: the `.dat`'s `sequence_type` (the sprite's `+0x1a`). Every
     /// bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct SpriteFlags: u8 {
         /// The sprite is animated (bit 0): it steps through its frames.
         const ANIMATED = 1;

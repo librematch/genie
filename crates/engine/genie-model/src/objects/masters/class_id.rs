@@ -99,6 +99,34 @@ impl ClassId {
     }
 }
 
+/// A master's class in its serde form (the model's cache, FD-046-D18): the short the master
+/// holds, −1 too ([`ClassId::of_master`]). `ClassId`'s own form, which the build layer's roles
+/// read, refuses a negative class.
+pub mod master_class {
+    use crate::objects::masters::ClassId;
+    use serde::Deserialize;
+    use serde::Deserializer;
+    use serde::Serializer;
+
+    /// Writes the class's short.
+    ///
+    /// # Errors
+    ///
+    /// The serializer's.
+    pub fn serialize<S: Serializer>(class: &ClassId, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_i16(class.get())
+    }
+
+    /// Reads a short as a master's class.
+    ///
+    /// # Errors
+    ///
+    /// The deserializer's, for a value that is no short.
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<ClassId, D::Error> {
+        i16::deserialize(deserializer).map(ClassId::of_master)
+    }
+}
+
 impl Display for ClassId {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         self.0.fmt(f)

@@ -1,12 +1,16 @@
 //! A master's attack priority: which targets its unit AI's checks let it choose.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's attack priority (`+0x92c`, `FUN_141202220`; the `.dat`'s combat part): a number
 /// the unit AIs' attack checks read by value. Priority 3 limits most of them to the classes of
 /// `PRIORITY_3_CLASSES`; 1 and 2 let the lion and the predators choose anything; 0 holds the
 /// rams and the trebuchets to their own targets and 1 ranks the best target.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AttackPriority(u8);
 

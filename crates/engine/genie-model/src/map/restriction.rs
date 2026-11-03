@@ -2,12 +2,14 @@
 //! the restriction may stand on and the terrain bonus's damage multipliers.
 
 use crate::map::TerrainId;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A terrain restriction's values (the `.dat`'s `passable_buildable_dmg_multiplier`, the
 /// world's table `+0x18` each), one a terrain by its id. An object of the restriction may stand
 /// on a terrain whose value is above 0; a terrain bonus multiplies the damage by it. A terrain
 /// past the values has none.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Restriction(Vec<f32>);
 
 impl Restriction {

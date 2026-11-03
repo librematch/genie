@@ -1,9 +1,12 @@
 //! A master's combat abilities ([`CombatAbility`], `combat_ability`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A master's combat abilities (`combat_ability`, `+0x840`), named by their readers. Every
     /// bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct CombatAbility: u8 {
         /// Its attacks (of a master of type 60 and up) meet no melee or pierce armor (bit 0).
         const IGNORES_ARMOR = 1;

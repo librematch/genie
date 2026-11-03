@@ -5,6 +5,8 @@
 
 use crate::GenieError;
 use genie_diff::{Diff, Differ};
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error as FmtError, Formatter};
 
 /// An action type: a task's `action_type` (`+0x10`, the `.dat`'s) and an action's type (`+0x8`),
@@ -12,7 +14,9 @@ use std::fmt::{Display, Error as FmtError, Formatter};
 /// so the type is a newtype with named constants, not an enum: any value 0 or more the data
 /// holds is a type, and the named ones are values of the type. A field or a filter that holds −1
 /// for none or any is `Option<ActionKind>`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ActionKind(
     /// Its value, as the `.dat`, the save and a checkpoint hold it.

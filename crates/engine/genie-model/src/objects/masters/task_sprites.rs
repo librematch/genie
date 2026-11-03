@@ -2,10 +2,12 @@
 
 use crate::objects::SpriteId;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A task's moving, proceeding, working and carrying sprites (`+0x40`..`+0x58`, the `.dat`'s
 /// graphic ids), each None for −1.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskSprites {
     /// `+0x40`: the sprite while it walks to its target.

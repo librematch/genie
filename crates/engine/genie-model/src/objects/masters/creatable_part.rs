@@ -33,12 +33,14 @@ use crate::objects::masters::TrainLocationEntry;
 use crate::objects::masters::VolleySpread;
 use crate::world::WholeSeconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::LazyLock;
 
 /// The creatable layer of a master of type 70 or 80 (`TRIBE_Master_Combat_Object`,
 /// `+0x880`..`+0x94f`; the `.dat`'s creatable section): its costs, train locations, volleys, charge
 /// and the values its interface shows.
-#[derive(Clone, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CreatablePart {
     /// `+0x880`, the cost slots in their places (an empty one among them).

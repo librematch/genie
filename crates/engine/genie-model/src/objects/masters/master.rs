@@ -48,6 +48,7 @@ use crate::objects::masters::Occlusion;
 use crate::objects::masters::PlacementTerrains;
 use crate::objects::masters::SelectionEffect;
 use crate::objects::masters::Task;
+use crate::objects::masters::class_id::master_class;
 use crate::objects::masters::{AutoGatherMode, Availability, BuiltMode, DisableMode, RecycleMode};
 use crate::players::Amount;
 use crate::players::attribute::AttributeId;
@@ -55,6 +56,8 @@ use crate::production::{HotkeyId, LocationButton};
 use crate::technology::TechId;
 use crate::world::WholeSeconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 impl Master {
     /// Its default task (`FUN_14109e0c0`: the task list's entry at the default task's index,
@@ -120,7 +123,7 @@ impl Master {
 
 /// What a building's completion (`FUN_1411dbb70` with 2) reads of its master, the `.dat`'s type
 /// 80 values.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BuildingMaster {
     /// `+0x980`, `adjacent_mode`: walls and gates join their neighbours (`FUN_1411ce890`).
@@ -162,7 +165,7 @@ pub struct BuildingMaster {
 }
 
 /// The master values the task finder and the work command read.
-#[derive(Clone, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Master {
     /// The master's id.
@@ -176,7 +179,10 @@ pub struct Master {
     /// 770 into 691): the master whose availability says whether the player can make this one
     /// (`FUN_141663f80`, `genie_core::world::World::can_make`); an upgrade's copy keeps it.
     pub base_id: Option<MasterId>,
-    /// `+0x410`.
+    /// `+0x410`: −1 for a master without one, which its serde form keeps
+    /// ([`crate::objects::masters::class_id::master_class`]).
+    #[serde(with = "master_class")]
+    #[cfg_attr(feature = "schema", schemars(with = "ClassId"))]
     pub class: ClassId,
     /// The action layer (types 40 and up but 90, `+0x790`..`+0x7b9`): tasks, default task, work
     /// rate, search radius, drop sites; None for other masters.
@@ -307,7 +313,7 @@ pub struct Master {
 /// One train location of a combat master (`+0x898`'s 12-byte entries; the save's
 /// `train_location`).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Serialize, Deserialize)]
 pub struct TrainLocation {
     /// `+0x0`, `trainLocationID`: the master that makes it.
     pub location: Option<MasterId>,
@@ -322,7 +328,7 @@ pub struct TrainLocation {
 /// What a combat master shows of its values (`+0x856`, `+0x858`, `+0x854`; the pierce armor it
 /// shows is the creatable layer's, [`CreatablePart::pierce_armor_shown`]).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 pub struct Shown {
     /// `+0x856`, `orig_weapon`.
     pub attack: DamageAmount,
@@ -333,7 +339,7 @@ pub struct Shown {
 }
 
 /// A player's masters by id.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Masters {
     pub(super) by_id: Vec<Option<Master>>,

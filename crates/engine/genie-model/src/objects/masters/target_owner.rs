@@ -1,11 +1,13 @@
 //! A task's owner type (`+0x18`): whose targets the task is for.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A task's owner type (`+0x18`, `owner_type`; the `.dat`'s `target_diplomacy`): whose targets
 /// it is for, as the task's test on a target reads it (`FUN_1411a8620`). Every byte is kept;
 /// one not named here is for anyone's.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TargetOwner(u8);
 

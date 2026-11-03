@@ -1,10 +1,13 @@
 //! A master's hero flags ([`HeroFlags`], `hero_flag`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A master's hero flags (`hero_flag`, `+0x8d9`; the `.dat`'s hero mode). A full hero has
     /// each feature; [`HeroFlags::INVERTED`] takes away the features it is set with. Every bit
     /// is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct HeroFlags: u8 {
         /// A full hero (bit 0): every feature.
         const FULL_HERO = 1;

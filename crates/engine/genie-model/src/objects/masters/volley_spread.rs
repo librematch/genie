@@ -3,11 +3,13 @@
 use crate::map::Distance;
 use crate::objects::masters::MasterAttribute;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A master's `volley_x_spread`, `volley_y_spread` and `volley_start_spread_adjustment`
 /// (`+0x8c8`..`+0x8d0`, the `.dat`'s projectile spawning area): how far a volley's missiles
 /// scatter across and along the shot, and how far forward they start.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VolleySpread {
     /// `volley_x_spread` (`+0x8c8`, the attribute "Spawning Area Width").

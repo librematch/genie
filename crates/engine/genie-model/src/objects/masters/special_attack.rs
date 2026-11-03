@@ -1,10 +1,12 @@
 //! A master's special attack (`+0x8d8`): what a hit on its objects or their charge does.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's special attack (`special_attack_flag`, `+0x8d8`), as a hit on its object reads it
 /// (`FUN_1412108e0`). Every byte is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpecialAttack(u8);
 

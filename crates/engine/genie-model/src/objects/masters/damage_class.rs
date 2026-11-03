@@ -2,12 +2,16 @@
 //! classes.
 
 use crate::objects::masters::DamageAmount;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// An armor or attack class (the `.dat`'s `class` of an armor or attack entry; an attribute
 /// effect's amount's high byte): a hit's weapon of a class meets the victim's armor of the same
 /// class. The simulation's tests name melee (4), pierce (3) and the classes the garrison's
 /// firepower sums (31, 38); every other value is a class the tests do not tell apart.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DamageClass(i16);
 
@@ -42,7 +46,7 @@ impl genie_diff::Diff for DamageClass {
 }
 
 /// One armor or attack entry (`+0x808` and `+0x818`, 4 bytes each): its class and amount.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ClassAmount {
     /// The class.

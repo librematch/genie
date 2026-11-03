@@ -1,10 +1,13 @@
 //! A missile's hit mode.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A missile's hit mode (its master's `hit_mode`, `+0x882`, the save's `missile_hit_info`; the
 /// missile's copy `+0x80`): which objects on its way it hits. Mode 0 hits its target alone; a
 /// miss turns it into mode 1, which hits another player's objects too. Mode 2 strikes its
 /// target on landing as mode 0 does; its hits on the way are not modelled.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HitMode(u8);
 

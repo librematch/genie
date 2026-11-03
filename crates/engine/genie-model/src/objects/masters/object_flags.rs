@@ -1,13 +1,15 @@
 //! A master's object flags ([`ObjectFlags`]): its traits and the master its upper half names.
 
 use crate::objects::masters::MasterId;
+use serde::Deserialize;
+use serde::Serialize;
 
 bitflags::bitflags! {
     /// A master's object flags (`+0x654`, the `.dat`'s unit trait in the low byte): what kind
     /// of unit it is, by the masters build 158041's `.dat` gives each bit. The upper half
     /// (`+0x656`) is the trait piece, a master ([`ObjectFlags::piece`]). Every bit is kept
     /// (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct ObjectFlags: u32 {
         /// It takes units inside (bit 0: the rams, the siege towers, the transport ships;
         /// AGE's "Garrison unit").

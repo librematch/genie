@@ -1,13 +1,15 @@
 //! A terrain restriction's id: which terrains an object may stand on.
 
 use crate::GenieError;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A terrain restriction (the `.dat`'s table; a master's `+0x606`, the save's
 /// `terrain_restriction_mask_id`): its place in the restrictions' tables, each the terrains'
 /// values an object of it reads (`genie_core::map::terrain::Terrain::restriction_mask`, the
 /// pathing's planners). A field holds −1 for none.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct RestrictionId(u16);
 

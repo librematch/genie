@@ -10,10 +10,12 @@ use crate::technology::TechId;
 use crate::technology::TechKind;
 use crate::technology::TechMode;
 use crate::world::WholeSeconds;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// How a group of the game's `linkedTechs.json` links its technologies: the `+4` byte of the
 /// record the game settings' table (`FUN_140f39f40`) holds for each of them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Linked {
     /// `MutuallyExclusive` (0).
@@ -38,7 +40,7 @@ impl Linked {
 }
 
 /// One cost entry of a technology in the `.dat`.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Cost {
     /// The attribute it takes, none for −1.
@@ -51,7 +53,7 @@ pub struct Cost {
 
 /// A technology of the `.dat` as the tech tree holds it (its 0x88-byte record).
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TechDef {
     /// `+0x2a`, `+0x30`, `+0x36`: the cost entries' attributes, amounts and paid flags.
     pub costs: [Cost; 3],

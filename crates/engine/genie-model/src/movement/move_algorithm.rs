@@ -1,9 +1,12 @@
 //! A moving master's move algorithm ([`MoveAlgorithm`], `move_algorithm`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// A moving master's move algorithm (`+0x768`, the `.dat`'s `move_algorithm`). Every bit is
     /// kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct MoveAlgorithm: u8 {
         /// The unit takes its two attack or standing sprites in turn instead of drawing one
         /// (bit 0, slot 0x5d8): a stop resets the turn, the idle swap draws nothing.

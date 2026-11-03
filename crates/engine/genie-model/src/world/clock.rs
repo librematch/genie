@@ -3,6 +3,8 @@
 //! span in seconds and the timers that count it down are `f32` ([`Seconds`]).
 
 use crate::math::image::facing::MS_PER_SECOND;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Neg, Sub, SubAssign};
 
@@ -130,7 +132,9 @@ impl genie_diff::Diff for Millis {
 /// A build, train or research time in whole seconds as a master's or a technology's data holds it
 /// (a short: a master's `+0x898` train locations, its build time): every short is kept, and
 /// [`Seconds::of_master`] is the game's conversion.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct WholeSeconds(i16);
 
@@ -166,7 +170,7 @@ impl genie_diff::Diff for WholeSeconds {
 /// A span in seconds as the game's `f32` holds it: an update's (`world+0x164`, the dt over
 /// 1000), the timers that count it down or up, the masters' times. Each operator is the one
 /// `f32` operation the game does; a comparison is `f32`'s (a NaN compares false).
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seconds(f32);
 

@@ -3,12 +3,14 @@
 use crate::map::Distance;
 use genie_diff::Diff;
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 
 bitflags::bitflags! {
     /// A master's blast level (`area_effect_level`, `+0x830`): a level in its low bits, which
     /// the game compares as a whole byte with a [`BlastDefense`] ([`BlastLevel::reaches`]), and
     /// flags above it. Every bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct BlastLevel: u8 {
         /// A ranged attacker's blast spares its own and allied objects (bit 2, `FUN_1410bfcb0`);
         /// a melee one's always does.
@@ -58,7 +60,21 @@ impl Diff for BlastLevel {
 
 /// A master's blast defence (`area_effect_object_level`): the blast levels that reach it
 /// ([`BlastLevel::reaches`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Diff,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct BlastDefense(
     /// Its byte, as the master holds it.

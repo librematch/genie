@@ -3,6 +3,8 @@
 use crate::objects::masters::CostAmount;
 use crate::players::attribute::AttributeId;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// The number of a master's cost slots (`+0x880`, six bytes each).
 pub const COST_SLOTS: usize = 3;
@@ -11,7 +13,7 @@ pub const COST_SLOTS: usize = 3;
 /// bytes): the `.dat`'s `resource_costs` and the save's `build_inventory` entry in its place. An
 /// empty slot holds attribute −1 (none); the readers pass over it, and the slots after it keep
 /// their places (the queue's gold slot, the upgrade effect's removal and addition).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostSlot {
     /// The attribute it costs, none for an empty slot (−1).

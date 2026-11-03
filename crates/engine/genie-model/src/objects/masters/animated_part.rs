@@ -4,12 +4,14 @@
 use crate::movement::Speed;
 use crate::objects::masters::Master;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 use std::sync::LazyLock;
 
 /// The animated layer of a master of type 20 and up but 90 (`RGE_Master_Animated_Object`, `+0x740`;
 /// the `.dat`'s `speed`, read for the types 20 and up): its top speed. An animated object (20), a
 /// doppelganger (25), a moving one (30) and every type above hold it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct AnimatedPart {
     /// `+0x740`, `mMaxSpeed` (the `.dat`'s `speed`): the top speed before a sprite's factor, from

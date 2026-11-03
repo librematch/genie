@@ -6,11 +6,13 @@ use crate::objects::masters::ClassId;
 use crate::objects::masters::MasterId;
 use crate::players::CivId;
 use crate::players::attribute::AttributeId;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// One entry of the drop-site table (`DAT_143cc2948`, the game's `dropsites.json`): the building,
 /// the workers it serves (their class, −1 any, or else a list of their masters), the civs it is
 /// for (empty: all) and the resource kinds it takes.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DropSite {
     /// The building's master.
@@ -35,7 +37,7 @@ pub struct DropSite {
 }
 
 /// A drop site's target (`FUN_140fdf480`'s record of 0x14 bytes; each −1 when its key is missing).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct DropTarget {
     /// `object_group`: the class of the objects.

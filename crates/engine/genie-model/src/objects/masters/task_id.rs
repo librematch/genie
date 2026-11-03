@@ -4,11 +4,27 @@
 use crate::GenieError;
 use genie_diff::Diff;
 use getset::CopyGetters;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A task's id ([`crate::objects::masters::Task::id`], `+0xa`, the `.dat`'s task id): 0 to 85
 /// in the current data ([`TaskId::of_task`]). A field that holds −1 for none holds
 /// `Option<TaskId>` ([`TaskId::of_field`], which rejects any other negative value).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Diff, CopyGetters)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Diff,
+    CopyGetters,
+    Serialize,
+    Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TaskId(
     /// Its value, as the task list holds it.

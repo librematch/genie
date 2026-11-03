@@ -11,12 +11,14 @@
 //! `FUN_140fdd6f0`.
 
 use crate::objects::masters::MasterId;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Table 2's entries (`DAT_143cc2990`, the builder's 200).
 pub const LINES: usize = 200;
 
 /// A unit line's id (`LineID`, an int): −399 and the 199 after it index table 2.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineId(i32);
 
@@ -46,7 +48,7 @@ impl LineId {
 
 /// One entry of the file's `UnitLines` as the builder reads it. A key the entry leaves out is
 /// `None` (`LineID`, `IDChain`) or false (`Building`) or empty (`Identifier`).
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UnitLine {
     /// `LineID`.
     pub line: Option<LineId>,
@@ -59,7 +61,7 @@ pub struct UnitLine {
 }
 
 /// A master's entry of table 1 (12 bytes).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LineEntry {
     /// `+0`: the master after it in its chain (none for the last, the game's −1).
@@ -81,7 +83,7 @@ impl LineEntry {
 
 /// The two tables and the identifiers' list (`DAT_143f15808`: each line's identifiers with its
 /// id). Empty, as the game's when the file is missing, until [`UnitLines::build`].
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnitLines {
     /// Table 1, by master id.

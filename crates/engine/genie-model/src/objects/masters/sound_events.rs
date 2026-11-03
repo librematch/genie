@@ -1,10 +1,12 @@
 //! A task's two sound events ([`SoundEvents`]) and a sound event's id ([`SoundEventId`]).
 
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A sound event by its id (`mEventId`, the audio engine's event): what a task's sounds name
 /// (`+0x60`, `+0x78`). The `.dat`'s event 0 with sound files is the default event.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SoundEventId(i32);
 
@@ -25,7 +27,7 @@ impl SoundEventId {
 /// `+0x60` and `+0x78` of a task: the event ids of its gathering and its deposit sound, as the
 /// task's load (`FUN_141062470`) leaves them. A terrain look task (159) names its dying and its
 /// undead sprite with their ids (`genie_core::combat::abilities`).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SoundEvents {
     /// The gathering sound's event (`+0x60`).

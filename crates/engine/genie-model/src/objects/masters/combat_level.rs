@@ -1,8 +1,11 @@
 //! A master's combat level (`+0x62c`): which of the unit AI's kinds of fighter it is.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A master's combat level (`+0x62c`, the `.dat`'s `combat_level`), every byte the data or an
 /// effect leaves kept. Named by the masters of build 158041's `.dat` that carry each value.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CombatLevel(u8);
 

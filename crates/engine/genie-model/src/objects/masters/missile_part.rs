@@ -9,11 +9,13 @@ use crate::combat::missile::SmartMode;
 use crate::combat::missile::VanishMode;
 use crate::objects::masters::Master;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// The missile layer of a master of type 60 (`RGE_Master_Missile_Object`, `+0x880`..`+0x888`;
 /// the `.dat`'s projectile section, genieutils' `Projectile`): its projectile type, smart, hit
 /// and vanish modes and its arc. Only a missile holds it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct MissilePart {
     /// `projectile_type` (`+0x880`, the `.dat`'s; the save does not hold it).

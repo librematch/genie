@@ -7,9 +7,11 @@ use crate::objects::SpriteId;
 use crate::objects::{FacetCount, Frame};
 use crate::world::Seconds;
 use genie_diff::Diff;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// What the clock reads of a sprite (the `.dat` graphic, memory `+0x8`..`+0x1a`).
-#[derive(Clone, Copy, Debug, PartialEq, Diff)]
+#[derive(Clone, Copy, Debug, PartialEq, Diff, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Graphic {
     /// The graphic's id.

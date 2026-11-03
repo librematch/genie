@@ -1,13 +1,15 @@
 //! A volley's size: the firepower (missiles a volley), the missiles counted and the swings that
 //! fired.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::ops::{Add, AddAssign, MulAssign, Sub, SubAssign};
 
 /// A firepower: the missiles a volley fires (a float: a master's `volley_fire_amount`, `+0x8c0`,
 /// which the effects set, add to and scale; an object's `+0xa00`, its master's plus the shares
 /// of the units inside it). Each operator is the one `f32` operation the game does; every value
 /// is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Firepower(f32);
 
@@ -77,7 +79,9 @@ impl genie_diff::Diff for Firepower {
 /// `+0x8c4`, which the effects set, add to and scale) and those of the volley under way an
 /// object fired already (`next_volley`, `+0xa04`). Every byte is kept.
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct MissileCount(u8);
 
 impl MissileCount {

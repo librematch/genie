@@ -3,9 +3,11 @@
 
 use crate::map::TerrainFlags;
 use crate::map::TerrainMask;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// What the `.dat` says of a terrain (its record at map `+0x6238`, 0x1f0 bytes each).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TerrainKind {
     /// The record's first byte (`enabled`) or its `terrain_to_draw` (`+0xf8`) of 0 or more: the
     /// map's terrain reads (`FUN_140f690e0`, `FUN_140f69000`) see the terrain, else terrain 0.

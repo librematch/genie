@@ -1,12 +1,14 @@
 //! A regeneration rate: the hit points an object gains a minute.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::ops::{Add, AddAssign, MulAssign};
 
 /// A regeneration rate in hit points a minute (a float): a master's (`regeneration_rate`,
 /// `+0x8b4`, which the effects set, add to and scale), an object's powerup (`+0xa0c`) and
 /// stinger, and a hero's bonus. A negative rate takes hit points. Each operator is the one
 /// `f32` operation the game does; every value is kept.
-#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Regeneration(f32);
 

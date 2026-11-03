@@ -9,6 +9,8 @@ repository.workspace = true
 [dependencies]
 # the geometry's and the angle's field differences (genie-core's per-object diff, FD-045-D14)
 genie-diff = { path = "../../base/genie-diff" }
+# the types' serde form: the model's cache (FD-046-D18)
+serde.workspace = true
 # the types' JSON Schema, which genie-nickel writes as Nickel contracts (FD-046-D15)
 schemars = { workspace = true, optional = true }
 

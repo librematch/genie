@@ -1,13 +1,17 @@
 //! An object's state: where it stands between its placing and its leaving.
 
 use crate::GenieError;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// An object's state (`+0x640`, the save's `object_state`, `RGE_Static_Object::set_object_state`):
 /// the steps of its update (`genie_core::objects::lifecycle::Lifecycle::update`). The game compares
 /// the numbers (`state < 3` alive or not yet built, `7 <= state` on its way out), so the states
 /// keep their order.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum ObjectState {
     /// 0: placed but not built, a foundation; it updates as an alive object does.

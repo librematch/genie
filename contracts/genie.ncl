@@ -506,7 +506,7 @@
     kind | MasterKind | doc "The master's type (`+0x8`): 70 for a combat unit, 80 (`'P'`) for a building.",
     copy_id | MasterId | optional | doc "`+0x158`, the `.dat`'s `copy_id`: the master a garrison order asks a building about\n(`FUN_141621220`).",
     base_id | MasterId | optional | doc "`+0x260`, the `.dat`'s `base_id` (the master load `FUN_1411319f0` turns 768 into 420 and\n770 into 691): the master whose availability says whether the player can make this one\n(`FUN_141663f80`, `genie_core::world::World::can_make`); an upgrade's copy keeps it.",
-    class | ClassId | doc "`+0x410`.",
+    class | ClassId | doc "`+0x410`: −1 for a master without one, which its serde form keeps\n([`crate::objects::masters::class_id::master_class`]).",
     action | ActionPart | optional | doc "The action layer (types 40 and up but 90, `+0x790`..`+0x7b9`): tasks, default task, work\nrate, search radius, drop sites; None for other masters.",
     radius | Footprint | doc "`radius_x`, `radius_y` (`+0x5d8`, `+0x5dc`).",
     height | Distance | doc "`radius_z` (`+0x5e0`): how high a missile may pass over its objects and hit them\n(`FUN_14113f740`).",

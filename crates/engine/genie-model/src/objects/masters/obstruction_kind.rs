@@ -1,6 +1,8 @@
 //! A master's obstruction type as one type: the shape of the record its objects file in the
 //! obstruction manager, the value the `.dat` names `obstruction_type`.
 
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::{Display, Error, Formatter};
 
 /// A master's obstruction type (`+0x651`, the `.dat`'s `obstruction_type`; an obstruction
@@ -8,7 +10,9 @@ use std::fmt::{Display, Error, Formatter};
 /// tests (a box or a circle) and whether the record marks its tiles. The `.dat` holds types the
 /// simulation does not tell apart, so the type is a newtype: the named ones are those its tests
 /// name.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ObstructionKind(u8);
 

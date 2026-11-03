@@ -1,10 +1,12 @@
 //! A sprite's speed factor.
 
 use crate::movement::Speed;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// A `.dat` graphic's `speed_multiplier` (`+0xc`): it scales the sprite's frame duration and,
 /// above 0, a moving object's top speed.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SpeedMultiplier(f32);
 

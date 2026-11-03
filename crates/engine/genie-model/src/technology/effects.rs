@@ -4,9 +4,11 @@
 use crate::technology::EffectCommand;
 use crate::technology::EffectId;
 use crate::technology::Party;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// An effect: its commands, in the `.dat`'s order.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Effect {
     /// The commands, each parsed by its kind ([`EffectCommand::of_data`]).
@@ -42,7 +44,7 @@ impl Effect {
 
 /// The effect table by id (the world's `+0x128`): a technology's effect (`TechDef::effect_id`),
 /// a scenario's and a world effect attribute's read it.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Effects(Vec<Effect>);
 

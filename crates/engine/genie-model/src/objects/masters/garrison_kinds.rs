@@ -1,9 +1,12 @@
 //! The kinds of units a building takes in ([`GarrisonKinds`], `garrison_type`).
 
+use serde::Deserialize;
+use serde::Serialize;
+
 bitflags::bitflags! {
     /// The kinds of units a building takes in (`garrison_type`, `+0x9bc`), by the classes the
     /// switch of `FUN_14120eb10` gives each bit. Every bit is kept (`_ = !0`).
-    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
     pub struct GarrisonKinds: u8 {
         /// Villagers, trade carts and kings (bit 0: classes 4, 19, 59).
         const VILLAGERS = 1;

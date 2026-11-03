@@ -1,9 +1,12 @@
 //! A technology's type as one type: its record's `+0x3c`, the `.dat`'s `type`.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A technology's type (its record's `+0x3c`, the `.dat`'s `type`): the tech tree's tests name
 /// the shared research (0x20) and the type a disable command makes available instead (0x21);
 /// every other value is a type the simulation does not tell apart.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct TechKind(i16);
 

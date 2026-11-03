@@ -1,9 +1,14 @@
 //! A cost's whole amount.
 
+use serde::Deserialize;
+use serde::Serialize;
+
 /// A cost's whole amount (a short): a master's cost slot (`+0x880`), a technology's `.dat`
 /// cost, a research's cost adjustment (`+0x6`) and a cost override's amount (`+0x42`). The
 /// arithmetic on it is the game's 16-bit one.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CostAmount(i16);
 
