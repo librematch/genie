@@ -10,6 +10,7 @@ use serde::Serialize;
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct HistoryUpdates(i32);
 
 impl HistoryUpdates {

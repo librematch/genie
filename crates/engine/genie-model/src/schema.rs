@@ -8,6 +8,7 @@ use crate::layer::generated::AttributeRoles;
 use crate::layer::generated::ClassRoles;
 use crate::layer::generated::MasterRoles;
 use crate::layer::generated::TechRoles;
+use crate::map::TerrainFlags;
 use crate::movement::MoveAlgorithm;
 use crate::objects::SpriteFlags;
 use crate::objects::masters::BlastLevel;
@@ -54,6 +55,7 @@ bit_set_schemas!(
     SmartMode,
     SpriteFlags,
     TaskFlags,
+    TerrainFlags,
     VanishMode,
 );
 

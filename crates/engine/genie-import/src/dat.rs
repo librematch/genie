@@ -31,12 +31,7 @@ mod dat_work;
 
 pub use self::dat_work::attributes;
 use self::dat_work::dat_work;
-use crate::tables::DropSitesError;
-use crate::tables::UnitLinesError;
-use crate::tables::drop_sites;
-use crate::tables::linked_techs;
-use crate::tables::unit_lines;
-use genie_dat::de::{Effect as DatEffect, Error, ResearchResourceCost, Sound, Tech, Unit};
+use genie_dat::de::{Effect as DatEffect, ResearchResourceCost, Sound, Tech, Unit};
 use genie_model::map::terrain::{TerrainKind, terrain_class};
 use genie_model::map::{Restriction, TerrainMask};
 use genie_model::objects::lines::UnitLine;
@@ -48,18 +43,15 @@ use genie_model::technology::{
     Cost, Effect, EffectCommand, Effects, Linked, TechDef, TechKind, TechMode,
 };
 use genie_model::unit_ai::task_finder::DropSite;
+use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::BTreeMap;
-use std::error::Error as StdError;
-use std::fmt::{Display, Error as FmtError, Formatter};
-use std::fs::{File, read_to_string};
 use std::iter::once;
-use std::path::Path;
 
 /// The action an action object's first update starts from its master's default task
 /// (`RGE_Action_Object::update`, 0x14106ac90).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum DefaultAction {
     /// The master has no default task.
     None,
@@ -154,7 +146,7 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> Result<Row, GenieErro
 }
 
 /// One master's row.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 struct Row {
     data: MasterData,
     default_action: DefaultAction,
@@ -170,7 +162,7 @@ struct Row {
 /// What the save does not hold of a moving master's movement (the `.dat` unit's moving part).
 /// Its turning is not here: every copy of a master derives it from its turn speed and walking
 /// sprite ([`turn_rate`](fn@genie_model::movement::turn_rate)).
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct Turning {
     /// Master `+0x768`, `old_move_algorithm`: bit 0 has a stop reset the unit's sprite.
     pub move_algorithm: MoveAlgorithm,
@@ -182,7 +174,7 @@ pub struct Turning {
 /// `is_water` flags: 1 water, 2 shallows and beach, 4 land, 0 none) and each terrain restriction's
 /// mask, the classes it can pass (the obstruction manager's table, `FUN_141054630`). Checked
 /// against the game's table, dumped by the tick oracle.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct TerrainTable {
     classes: Vec<u8>,
     /// Each terrain's record as the map's terrain reads see it.
@@ -282,7 +274,7 @@ impl TerrainTable {
 }
 
 /// Every master of every civ of a data file.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MasterTable {
     rows: BTreeMap<(CivId, MasterId), Row>,
     /// Each sprite's speed factor (the `.dat` graphic's `speed_multiplier`, sprite `+0xc`).
@@ -291,14 +283,15 @@ pub struct MasterTable {
     pub graphics: Graphics,
     /// The terrain table.
     pub terrain: TerrainTable,
-    /// The drop-site table (`dropsites.json` beside the `.dat`, [`drop_sites`]); empty
-    /// when not loaded.
+    /// The drop-site table (`dropsites.json` beside the `.dat`,
+    /// [`drop_sites`](crate::tables::drop_sites)); empty when not loaded.
     pub drop_sites: Vec<DropSite>,
-    /// The linked technologies (`linkedTechs.json` beside the `.dat`, [`linked_techs`]);
-    /// empty when not loaded.
+    /// The linked technologies (`linkedTechs.json` beside the `.dat`,
+    /// [`linked_techs`](crate::tables::linked_techs)); empty when not loaded.
     pub linked_techs: BTreeMap<TechId, Linked>,
-    /// The unit lines (`unitlines.json` beside the `.dat`, [`unit_lines`]) as the file
-    /// holds them; empty when not loaded (the game then builds tables of no line).
+    /// The unit lines (`unitlines.json` beside the `.dat`,
+    /// [`unit_lines`](crate::tables::unit_lines)) as the file holds them; empty when not loaded
+    /// (the game then builds tables of no line).
     pub unit_lines: Vec<UnitLine>,
     /// The technologies, by id.
     pub techs: Vec<TechDef>,
@@ -367,70 +360,7 @@ fn effect(e: &DatEffect) -> Result<Effect, GenieError> {
     Ok(Effect { commands })
 }
 
-/// What stops [`MasterTable::read`].
-#[derive(Debug)]
-pub enum ReadError {
-    /// The data file could not be opened or read.
-    Dat(Error),
-    /// The drop-site table beside it is out of shape.
-    DropSites(DropSitesError),
-    /// The linked technologies beside it are out of shape.
-    LinkedTechs(serde_json::Error),
-    /// The unit lines beside it are out of shape.
-    UnitLines(UnitLinesError),
-}
-
-impl Display for ReadError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        match self {
-            Self::Dat(e) => write!(f, "the data file: {e}"),
-            Self::DropSites(e) => write!(f, "dropsites.json: {e}"),
-            Self::LinkedTechs(e) => write!(f, "linkedTechs.json: {e}"),
-            Self::UnitLines(e) => write!(f, "unitlines.json: {e}"),
-        }
-    }
-}
-
-impl StdError for ReadError {}
-
 impl MasterTable {
-    /// The table of the data file at `path` (an `empires2_x2_p1.dat`), with the drop-site table
-    /// (`dropsites.json`), the linked technologies (`linkedTechs.json`) and the unit lines
-    /// (`unitlines.json`) beside it when there are.
-    ///
-    /// # Errors
-    ///
-    /// When the data file cannot be read, or a table beside it is out of shape.
-    pub fn read(path: &Path) -> Result<Self, ReadError> {
-        let file = File::open(path).map_err(|e| {
-            ReadError::Dat(
-                GenieError::io("a data file that does not open")
-                    .with("path", path.display())
-                    .with_source(e),
-            )
-        })?;
-        let dat = DatFile::read_from(file).map_err(ReadError::Dat)?;
-        let mut table = Self::from_dat(&dat).map_err(ReadError::Dat)?;
-        table.read_tables_beside(path)?;
-        Ok(table)
-    }
-
-    /// The drop sites (`dropsites.json`), linked technologies (`linkedTechs.json`) and unit
-    /// lines (`unitlines.json`) beside the data file at `path`, each where there is one.
-    fn read_tables_beside(&mut self, path: &Path) -> Result<(), ReadError> {
-        let table = self;
-        if let Ok(json) = read_to_string(path.with_file_name("dropsites.json")) {
-            table.drop_sites = drop_sites(&json).map_err(ReadError::DropSites)?;
-        }
-        if let Ok(json) = read_to_string(path.with_file_name("linkedTechs.json")) {
-            table.linked_techs = linked_techs(&json).map_err(ReadError::LinkedTechs)?;
-        }
-        if let Ok(json) = read_to_string(path.with_file_name("unitlines.json")) {
-            table.unit_lines = unit_lines(&json).map_err(ReadError::UnitLines)?;
-        }
-        Ok(())
-    }
-
     /// The rows of every unit every civ of `dat` has: decay (`resource_decay`), the undead flag
     /// (`undead_mode`) and the default action (the action part's default task).
     ///
@@ -653,6 +583,7 @@ impl MasterTable {
 mod tests {
     use super::*;
     use crate::dat::dat_work::sound_event;
+    use crate::tables::{linked_techs, unit_lines};
     #[cfg(test)]
     use genie_dat::de::{DebugString, SoundItem};
     #[cfg(test)]
@@ -662,72 +593,10 @@ mod tests {
     #[cfg(test)]
     use genie_model::players::AmountRate;
     #[cfg(test)]
-    use std::env::temp_dir;
-    #[cfg(test)]
-    use std::fs::{create_dir_all, remove_dir_all, write};
-    #[cfg(test)]
     use std::iter::empty;
-    #[cfg(test)]
-    use std::path::PathBuf;
-    #[cfg(test)]
-    use std::process::id;
 
     /// The Artifact action's type (genie-core's `ownership::artifact::ARTIFACT_TYPE`).
     const ARTIFACT_TYPE: ActionKind = ActionKind::named(107);
-
-    /// A directory of its own under the system's temporary one, emptied first.
-    fn scratch(name: &str) -> PathBuf {
-        let dir = temp_dir().join(format!("genie-import-{}-{name}", id()));
-        let _ = remove_dir_all(&dir);
-        create_dir_all(&dir).unwrap();
-        dir
-    }
-
-    /// A data file that does not open is the data file's error; one that is not a `.dat`
-    /// too.
-    #[test]
-    fn data_file_that_does_not_read_is_its_error() {
-        let dir = scratch("no-dat");
-        let path = dir.join("empires2_x2_p1.dat");
-        assert!(matches!(MasterTable::read(&path), Err(ReadError::Dat(_))));
-        write(&path, b"not a dat").unwrap();
-        assert!(matches!(MasterTable::read(&path), Err(ReadError::Dat(_))));
-        remove_dir_all(dir).unwrap();
-    }
-
-    /// The tables beside the data file are read where there are; one out of shape is its own
-    /// error, and none leaves the table as it was.
-    #[test]
-    fn the_tables_beside_the_data_file_are_read_where_there_are() {
-        let dir = scratch("tables");
-        let path = dir.join("empires2_x2_p1.dat");
-        let mut table = MasterTable::default();
-        table.read_tables_beside(&path).unwrap();
-        assert_eq!(table, MasterTable::default());
-        write(dir.join("dropsites.json"), r#"{"drop_site_list": []}"#).unwrap();
-        write(dir.join("linkedTechs.json"), r#"{"LinkedTechs": []}"#).unwrap();
-        write(dir.join("unitlines.json"), r#"{"UnitLines": []}"#).unwrap();
-        table.read_tables_beside(&path).unwrap();
-        for (file, check) in [
-            ("dropsites.json", 0),
-            ("linkedTechs.json", 1),
-            ("unitlines.json", 2),
-        ] {
-            let good = read_to_string(dir.join(file)).unwrap();
-            write(dir.join(file), "[").unwrap();
-            let error = table.read_tables_beside(&path).unwrap_err();
-            let kind = match error {
-                ReadError::DropSites(_) => 0,
-                ReadError::LinkedTechs(_) => 1,
-                ReadError::UnitLines(_) => 2,
-                ReadError::Dat(_) => 3,
-            };
-            assert_eq!(kind, check, "{file}");
-            assert_ne!(error.to_string(), "");
-            write(dir.join(file), good).unwrap();
-        }
-        remove_dir_all(dir).unwrap();
-    }
 
     /// The fields' −1 is no attribute and any other value 0 or more its attribute, in their
     /// order; a value below −1 fails the parse.

@@ -12,8 +12,8 @@
 
 mod support;
 
-use genie_oracle::MasterTable;
 use genie_oracle::census::census_run;
+use genie_oracle::install;
 use std::env::{args, var};
 use std::error::Error;
 use std::fs::read;
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         _ => return Err("usage: census REC DAT [UPDATES]".into()),
     };
     let recording = read(rec)?;
-    let masters = MasterTable::read(dat.as_ref())?;
+    let masters = install::read(dat.as_ref())?;
     let run = census_run(&recording, Some(&masters), limit)?;
     println!(
         "{} updates ({:?}), {} checkpoints",

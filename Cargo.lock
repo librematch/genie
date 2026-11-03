@@ -771,6 +771,7 @@ dependencies = [
  "genie-model",
  "genie-save",
  "postcard",
+ "schemars",
  "serde",
  "serde_json",
  "sha2",

@@ -10,6 +10,7 @@ use serde::Serialize;
 /// on a terrain whose value is above 0; a terrain bonus multiplies the damage by it. A terrain
 /// past the values has none.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Restriction(Vec<f32>);
 
 impl Restriction {

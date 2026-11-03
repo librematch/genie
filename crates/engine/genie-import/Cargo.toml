@@ -7,8 +7,8 @@ license = "AGPL-3.0-only"
 repository.workspace = true
 
 [dependencies]
-# the game data the importers fill (FD-046)
-genie-model = { path = "../genie-model" }
+# the game data the importers fill (FD-046); its JSON Schema is the cache's layout hash (D60)
+genie-model = { path = "../genie-model", features = ["schema"] }
 # the f32 operations as the game's code does them and the map's geometry (FD-046-D28)
 genie-math = { path = "../genie-math" }
 # the error every crate returns: its kind, reason, place and context
@@ -22,11 +22,15 @@ serde_json.workspace = true
 serde.workspace = true
 postcard.workspace = true
 sha2.workspace = true
+schemars.workspace = true
 
 [features]
 default = ["fs"]
-# the cache directory (FD-046-D19)
+# the files: the `.dat` and the tables beside it read from their paths, the cache directory
+# (FD-046-D19)
 fs = []
+# the browser build's own parts (D19); the import of bytes needs none, so nothing yet
+wasm = []
 
 [lints]
 workspace = true

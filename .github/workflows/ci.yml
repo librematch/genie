@@ -120,8 +120,13 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      # The engine core must stay compilable to WebAssembly. Add every new engine crate here.
-      - run: cargo build --locked -p genie-error -p genie-diff -p genie-math -p genie-model -p genie-import -p genie-core -p genie-command-codec -p genie-oracle --target wasm32-unknown-unknown
+      # The engine core must stay compilable to WebAssembly. Add every new engine crate here; a
+      # crate with features builds in a step of its own below (`--no-default-features` applies
+      # to every package of one build, FD-046-D19).
+      - run: cargo build --locked -p genie-error -p genie-diff -p genie-math -p genie-model -p genie-core -p genie-command-codec --target wasm32-unknown-unknown
+      # the importers and the oracle in their browser form: no file system, the bytes passed in
+      - run: cargo build --locked -p genie-import --no-default-features --features wasm --target wasm32-unknown-unknown
+      - run: cargo build --locked -p genie-oracle --no-default-features --features wasm --target wasm32-unknown-unknown
       # Nickel's evaluator, which the build layer and the mods run in the browser too (FD-046-D13)
       - run: cargo build --locked -p genie-nickel --target wasm32-unknown-unknown
 

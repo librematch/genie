@@ -1,6 +1,6 @@
-//! The key of a cached import (FD-046-D18): the SHA-256 over the files the import reads (each
-//! its name and its content's hash), the build whose layer applies, the build layer's text and
-//! genie-model's schema hash, so a changed `.dat`, build, layer or model type misses the cache.
+//! The key of a cached import (FD-046-D18, D60): the SHA-256 over the files the import reads
+//! (each its name and its content's hash) and the tables' layout hash, so a changed `.dat`, a
+//! changed table beside it or a changed type of the tables misses the cache.
 
 use sha2::Digest;
 use sha2::Sha256;
@@ -23,11 +23,11 @@ impl Key {
     }
 }
 
-/// The key of an import of `files` (each its name and its content) for build `build`, with the
-/// build layer's text `layer` and the model's schema hash `schema`: each part changes it. A
-/// count, a name and a text enter with their lengths, so no two inputs run together.
+/// The key of an import of `files` (each its name and its content) into tables of the layout
+/// hash `layout`: each part changes it. A count and a name enter with their lengths, so no two
+/// inputs run together.
 #[must_use]
-pub fn key(files: &[(&str, &[u8])], build: u32, layer: &[u8], schema: &[u8; 32]) -> Key {
+pub fn key(files: &[(&str, &[u8])], layout: &[u8; 32]) -> Key {
     let mut h = Sha256::new();
     h.update((files.len() as u64).to_le_bytes());
     for (name, content) in files {
@@ -35,10 +35,7 @@ pub fn key(files: &[(&str, &[u8])], build: u32, layer: &[u8], schema: &[u8; 32])
         h.update(name.as_bytes());
         h.update(Sha256::digest(content));
     }
-    h.update(build.to_le_bytes());
-    h.update((layer.len() as u64).to_le_bytes());
-    h.update(layer);
-    h.update(schema);
+    h.update(layout);
     Key(h.finalize().into())
 }
 

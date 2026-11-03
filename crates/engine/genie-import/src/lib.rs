@@ -1,8 +1,8 @@
 //! The game's files as genie's model (FD-046): the `.dat`'s masters per civ, technologies,
 //! effects and terrains ([`dat`]), a save's masters ([`save`]) and the JSON tables beside the
-//! `.dat` ([`tables`]). Each importer reads the bytes or text it is given; [`dat::MasterTable::read`]
-//! also opens the `.dat` and the tables beside it. The `.dat`'s tables are cached by a [`key`]
-//! of their inputs ([`cache`]).
+//! `.dat` ([`tables`]). Each importer reads the bytes or text it is given; [`install`] imports
+//! the `.dat` with the tables beside it, from bytes or, behind the `fs` feature, from their
+//! files through a cache of the tables ([`cache`]) by a [`key`] of their inputs.
 
 // The port's exceptions to the workspace's lints, genie-oracle's own for the code that left it
 // (FD-046-D35): the importers convert the files' values as the game's code does.
@@ -28,6 +28,9 @@
 
 pub mod cache;
 pub mod dat;
+pub mod install;
 pub mod key;
 pub mod save;
+#[cfg(test)]
+mod scratch;
 pub mod tables;

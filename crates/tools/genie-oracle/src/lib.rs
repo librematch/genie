@@ -51,11 +51,13 @@ pub mod groups;
 pub use genie_import::dat as masters;
 // the `.dat`'s tables in the cache's form (FD-046-D18, D59)
 pub use genie_import::cache;
+// the `.dat`'s tables from its bytes or, with `fs`, its files through the cache (D60)
+pub use genie_import::install;
 pub mod survey;
 pub mod tick_trace;
 pub mod views;
 
-pub use masters::{DefaultAction, MasterTable, ReadError, TerrainTable};
+pub use masters::{DefaultAction, MasterTable, TerrainTable};
 
 use genie_core::GenieError;
 use genie_core::objects::ObjectId;

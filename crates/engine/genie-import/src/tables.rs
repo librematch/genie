@@ -236,8 +236,46 @@ pub fn drop_sites(json: &str) -> Result<Vec<DropSite>, DropSitesError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tables::{DropSitesError, drop_sites};
+    use crate::tables::{DropSitesError, UnitLinesError, drop_sites};
     use genie_model::objects::ObjectState;
+
+    /// Each error names the entry and the key it found out of shape; a file that is not JSON
+    /// gives the parser's message.
+    #[test]
+    fn table_errors_name_their_entry_and_key() {
+        let json = || serde_json::from_str::<serde_json::Value>("[").unwrap_err();
+        let drop_sites = [
+            (DropSitesError::Json(json()), "EOF while parsing"),
+            (
+                DropSitesError::Class(2, "object_group"),
+                "drop_site_list[2]: object_group is no master class",
+            ),
+            (
+                DropSitesError::Building(3),
+                "drop_site_list[3]: building_id is no master",
+            ),
+            (
+                DropSitesError::Attribute(4, "attribute_type"),
+                "drop_site_list[4]: attribute_type is no attribute",
+            ),
+            (
+                DropSitesError::State(5),
+                "drop_site_list[5]: object_state is no object state",
+            ),
+        ];
+        for (error, text) in drop_sites {
+            assert!(error.to_string().starts_with(text), "{error}");
+        }
+        assert!(
+            UnitLinesError::Json(json())
+                .to_string()
+                .starts_with("EOF while parsing")
+        );
+        assert_eq!(
+            UnitLinesError::Value(1, "LineID").to_string(),
+            "UnitLines[1]: LineID is not what the game reads"
+        );
+    }
 
     /// A table of one entry whose target has `object_state` `state` (absent for `None`).
     fn table(state: Option<i64>) -> String {

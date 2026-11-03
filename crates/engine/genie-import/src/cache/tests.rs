@@ -1,6 +1,7 @@
 use crate::cache::{decode, encode, read_cached, write_cached};
 use crate::dat::{DefaultAction, MasterTable};
 use crate::key::key;
+use crate::scratch::scratch;
 use genie_model::objects::FacetCount;
 use genie_model::objects::SpeedMultiplier;
 use genie_model::objects::SpriteFlags;
@@ -9,10 +10,7 @@ use genie_model::objects::lifecycle::MasterData;
 use genie_model::objects::masters::{ClassId, Master, MasterId, MasterKind};
 use genie_model::players::CivId;
 use genie_model::technology::{Effect, EffectCommand, EffectId, Effects, TechDef};
-use std::env::temp_dir;
 use std::fs::{read_dir, remove_dir_all};
-use std::path::PathBuf;
-use std::process;
 
 /// A table of one master of each type (the layers its type holds; the static one without a
 /// class, −1), two technologies, one effect and one sprite.
@@ -65,13 +63,6 @@ fn small_table() -> MasterTable {
     )
 }
 
-/// A directory of its own under the system's temporary one, made empty.
-fn scratch(test: &str) -> PathBuf {
-    let dir = temp_dir().join(format!("genie-import-{test}-{}", process::id()));
-    let _ = remove_dir_all(&dir);
-    dir
-}
-
 /// The tables' form decodes to the same tables: every layer, the class −1, the technologies,
 /// the effect and the sprite.
 #[test]
@@ -93,10 +84,10 @@ fn cut_off_bytes_do_not_decode() {
 fn the_cache_returns_what_it_wrote_and_nothing_for_another_key() {
     let dir = scratch("cache");
     let table = small_table();
-    let k = key(&[("a", b"1")], 1, b"", &[0; 32]);
+    let k = key(&[("a", b"1")], &[0; 32]);
     write_cached(&dir, &k, &table).unwrap();
     assert_eq!(read_cached(&dir, &k).unwrap(), Some(table));
-    let other = key(&[("a", b"2")], 1, b"", &[0; 32]);
+    let other = key(&[("a", b"2")], &[0; 32]);
     assert_eq!(read_cached(&dir, &other).unwrap(), None);
     assert!(
         read_dir(&dir).unwrap().all(|e| !e
@@ -112,7 +103,7 @@ fn the_cache_returns_what_it_wrote_and_nothing_for_another_key() {
 #[test]
 fn second_writes_replace_the_first() {
     let dir = scratch("rewrite");
-    let k = key(&[], 1, b"", &[0; 32]);
+    let k = key(&[], &[0; 32]);
     write_cached(&dir, &k, &MasterTable::default()).unwrap();
     write_cached(&dir, &k, &small_table()).unwrap();
     assert_eq!(read_cached(&dir, &k).unwrap(), Some(small_table()));

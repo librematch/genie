@@ -13,8 +13,8 @@ genie-diff = { path = "../../base/genie-diff" }
 genie-command-codec = { path = "../../engine/genie-command-codec" }
 genie-core = { path = "../../engine/genie-core" }
 genie-dat = { version = "0.1.0", path = "../../formats/genie-dat" }
-# the .dat, save and table importers (FD-046-D26)
-genie-import = { path = "../../engine/genie-import" }
+# the .dat, save and table importers (FD-046-D26), its features this crate's (D19)
+genie-import = { path = "../../engine/genie-import", default-features = false }
 # the build layer from its Nickel source (FD-046-D08)
 genie-nickel = { path = "../../engine/genie-nickel" }
 # the build layer's type
@@ -25,6 +25,21 @@ genie-save = { version = "0.1.0", path = "../../formats/genie-save" }
 flate2.workspace = true
 rayon.workspace = true
 serde_json.workspace = true
+
+[features]
+default = ["fs"]
+# the `.dat` and the tables beside it from their files, through the cache (FD-046-D19, D60)
+fs = ["genie-import/fs"]
+# the browser build (D19)
+wasm = ["genie-import/wasm"]
+
+[[example]]
+name = "census"
+required-features = ["fs"]
+
+[[example]]
+name = "checkpoints"
+required-features = ["fs"]
 
 [dev-dependencies]
 # the subscriber of the examples that run the engine (examples/support/mod.rs): text lines on

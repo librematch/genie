@@ -49,6 +49,7 @@ impl LineId {
 /// One entry of the file's `UnitLines` as the builder reads it. A key the entry leaves out is
 /// `None` (`LineID`, `IDChain`) or false (`Building`) or empty (`Identifier`).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct UnitLine {
     /// `LineID`.
     pub line: Option<LineId>,
