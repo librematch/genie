@@ -12,6 +12,7 @@ use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
+use genie_support::reserved;
 use std::io::{Read, Write};
 
 #[derive(Debug, Clone)]
@@ -61,7 +62,7 @@ impl ScxFormat {
             player_version: f32,
         ) -> Result<Vec<ScenarioPlayerData>> {
             let num = input.read_u32::<LE>()?;
-            let mut players = Vec::with_capacity(num as usize);
+            let mut players = reserved(num as usize);
             log::debug!("number of scenario players: {num}");
             for _ in 1..num {
                 players.push(ScenarioPlayerData::read_from(&mut input, player_version)?);
@@ -74,10 +75,10 @@ impl ScxFormat {
             num_players: u32,
             version: ScxVersion,
         ) -> Result<Vec<Vec<ScenarioObject>>> {
-            let mut player_objects = Vec::with_capacity(num_players as usize);
+            let mut player_objects = reserved(num_players as usize);
             for _ in 0..num_players {
                 let num_objects = input.read_u32::<LE>()?;
-                let mut objects = Vec::with_capacity(num_objects as usize);
+                let mut objects = reserved(num_objects as usize);
                 log::debug!("number of objects: {num_objects}");
                 for _ in 0..num_objects {
                     objects.push(ScenarioObject::read_from(&mut input, version)?);
@@ -98,7 +99,7 @@ impl ScxFormat {
 
         let num_players = input.read_u32::<LE>()?;
         log::debug!("number of players: {num_players}");
-        let mut world_players = Vec::with_capacity(num_players as usize);
+        let mut world_players = reserved(num_players as usize);
         for _ in 1..num_players {
             world_players.push(WorldPlayerData::read_from(&mut input, player_version)?);
         }

@@ -1,9 +1,10 @@
 use crate::Result;
+use crate::area;
 use crate::element::{ReadableHeaderElement, WritableHeaderElement};
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::ReadSkipExt;
+use genie_support::{ReadSkipExt, read_i8s, read_le, read_list};
 use std::io::{Read, Write};
 
 /// Data about a map tile.
@@ -128,12 +129,11 @@ impl ReadableHeaderElement for MapZone {
         let mut zone = Self::default();
         input.read_i8_into(&mut zone.info)?;
         input.read_i32_into::<LE>(&mut zone.tiles)?;
-        zone.zone_map = vec![0; input.tile_count()];
-        input.read_i8_into(&mut zone.zone_map)?;
+        let tiles = input.tile_count();
+        zone.zone_map = read_i8s(input, tiles)?;
 
         let num_rules = input.read_u32::<LE>()?;
-        zone.passability_rules = vec![0.0; num_rules as usize];
-        input.read_f32_into::<LE>(&mut zone.passability_rules)?;
+        zone.passability_rules = read_le(input, fits(num_rules)?, f32::from_le_bytes)?;
 
         zone.num_zones = input.read_u32::<LE>()?;
         Ok(zone)
@@ -175,8 +175,7 @@ impl ReadableHeaderElement for VisibilityMap {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let width = input.read_u32::<LE>()?;
         let height = input.read_u32::<LE>()?;
-        let mut visibility = vec![0; fits(width * height)?];
-        input.read_u32_into::<LE>(&mut visibility)?;
+        let visibility = read_le(input, area(width, height)?, u32::from_le_bytes)?;
         Ok(Self {
             width,
             height,
@@ -226,16 +225,10 @@ impl ReadableHeaderElement for Map {
 
         input.set_map_size(map.width, map.height);
         let num_zones = input.read_u32::<LE>()?;
-        map.zones = Vec::with_capacity(fits(num_zones)?);
-        for _ in 0..num_zones {
-            map.zones.push(MapZone::read_from(input)?);
-        }
+        map.zones = read_list(fits(num_zones)?, || MapZone::read_from(input))?;
         map.all_visible = input.read_u8()? != 0;
         map.fog_of_war = input.read_u8()? != 0;
-        map.tiles = Vec::with_capacity(fits(map.width * map.height)?);
-        for _ in 0..(map.width * map.height) {
-            map.tiles.push(Tile::read_from(input)?);
-        }
+        map.tiles = read_list(area(map.width, map.height)?, || Tile::read_from(input))?;
 
         {
             let data_count = input.read_u32::<LE>()?;
@@ -257,6 +250,26 @@ impl ReadableHeaderElement for Map {
 mod tests {
     use super::*;
     use crate::test_support::{writes_back, writes_back_with};
+
+    /// A visibility map, a zone and a map whose sizes claim more than the file holds: each
+    /// list grows as its entries come, so the read fails at the file's end.
+    #[test]
+    fn map_lists_past_the_file_fail_at_its_end() {
+        use crate::test_support::header_reader;
+        let huge: Vec<u8> = [u32::MAX, u32::MAX]
+            .iter()
+            .flat_map(|w| w.to_le_bytes())
+            .collect();
+        assert!(VisibilityMap::read_from(&mut header_reader(&huge, 11.97)).is_err());
+        let mut map = huge;
+        map.extend([0u8; 6]);
+        assert!(Map::read_from(&mut header_reader(&map, 11.97)).is_err());
+        let mut zone = vec![0u8; 255 + 255 * 4];
+        zone.extend(u32::MAX.to_le_bytes());
+        let mut input = header_reader(&zone, 11.97);
+        input.set_map_size(0, 0);
+        assert!(MapZone::read_from(&mut input).is_err());
+    }
 
     /// A tile with its original terrain behind the marker 0xFF, one without in two bytes.
     #[test]

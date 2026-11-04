@@ -1,10 +1,12 @@
 //! What a player sees: its visible map and the resource objects it knows of.
 
+use crate::area;
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
+use genie_support::{read_i8s, read_list, reserved};
 use std::io::Read;
 
 /// A player's view of the map: which tiles it has explored and currently sees.
@@ -33,8 +35,7 @@ impl ReadableHeaderElement for VisibleMap {
             map.explored_tiles_count = input.read_u32::<LE>()?;
         }
         map.player_id = fits(input.read_u16::<LE>()?)?;
-        map.tiles = vec![0; fits(map.width * map.height)?];
-        input.read_i8_into(&mut map.tiles)?;
+        map.tiles = read_i8s(input, area(map.width, map.height)?)?;
         Ok(map)
     }
 }
@@ -73,18 +74,15 @@ pub struct VisibleResources {
 impl ReadableHeaderElement for VisibleResources {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<Self> {
         let num_lists = input.read_u32::<LE>()?;
-        let mut sizes = vec![];
-        for _ in 0..num_lists {
+        let sizes = read_list(fits(num_lists)?, || {
             let _capacity = input.read_u32::<LE>()?;
-            sizes.push(input.read_u32::<LE>()?);
-        }
-        let mut lists = Vec::with_capacity(sizes.len());
+            input.read_u32::<LE>()
+        })?;
+        let mut lists = reserved(sizes.len());
         for size in sizes {
-            let mut list = Vec::with_capacity(fits(size)?);
-            for _ in 0..size {
-                list.push(VisibleResource::read_from(input)?);
-            }
-            lists.push(list);
+            lists.push(read_list(fits(size)?, || {
+                VisibleResource::read_from(input)
+            })?);
         }
         Ok(Self { lists })
     }

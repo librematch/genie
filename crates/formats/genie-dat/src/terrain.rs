@@ -9,7 +9,8 @@ use crate::unit_kind::UnitKindId;
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_support::{
-    MapInto, fallible_try_from, fallible_try_into, infallible_try_into, read_opt_u16, read_opt_u32,
+    MapInto, fallible_try_from, fallible_try_into, infallible_try_into, read_le, read_list,
+    read_opt_u16, read_opt_u32,
 };
 use std::io::{Read, Result, Write};
 
@@ -240,16 +241,12 @@ impl TerrainRestriction {
         version: FileVersion,
         num_terrains: u16,
     ) -> Result<Self> {
-        let mut passability = vec![0.0; num_terrains as usize];
-        for value in &mut passability {
-            *value = input.read_f32::<LE>()?;
-        }
+        let passability = read_le(&mut input, usize::from(num_terrains), f32::from_le_bytes)?;
 
         // Apparently AoK+ only
-        let mut pass_graphics = Vec::with_capacity(num_terrains as usize);
-        for _ in 0..num_terrains {
-            pass_graphics.push(TerrainPassGraphic::read_from(&mut input, version)?);
-        }
+        let pass_graphics = read_list(usize::from(num_terrains), || {
+            TerrainPassGraphic::read_from(&mut input, version)
+        })?;
 
         Ok(Self {
             passability,

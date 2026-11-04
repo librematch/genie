@@ -2,8 +2,9 @@
 
 use crate::Result;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_support::read_bytes;
 use rgb::RGBA8;
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 
 /// Bitmap header info.
 #[derive(Debug, Default, Clone)]
@@ -97,9 +98,15 @@ impl Bitmap {
 
         if width > 0 && height > 0 {
             let info = BitmapInfo::read_from(&mut input)?;
-            let aligned_width = height * ((width + 3) & !3);
-            let mut pixels = vec![0u8; aligned_width as usize];
-            input.read_exact(&mut pixels)?;
+            // the rows are padded to four bytes
+            let size = u64::from(height) * ((u64::from(width) + 3) & !3);
+            let size = usize::try_from(size).map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "a bitmap past the address space",
+                )
+            })?;
+            let pixels = read_bytes(&mut input, size)?;
             Ok(Some(Self {
                 own_memory,
                 width,
@@ -137,6 +144,19 @@ impl Bitmap {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A bitmap whose size claims more pixels than the file holds fails at the file's end,
+    /// and one past the address space fails too, not on its allocation.
+    #[test]
+    fn bitmap_past_the_file_fails_at_its_end() {
+        let mut bytes = vec![];
+        for word in [1u32, u32::MAX, u32::MAX] {
+            bytes.extend(word.to_le_bytes());
+        }
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend([0u8; 40 + 1024]);
+        assert!(Bitmap::read_from(bytes.as_slice()).is_err());
+    }
 
     /// A bitmap with a size: its header, the info with its 256 colours and the rows of pixels
     /// padded to 4 bytes; written back byte for byte. One without a size has no more.

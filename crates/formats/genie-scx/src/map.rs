@@ -145,7 +145,7 @@ impl Map {
             .into());
         }
 
-        map.tiles.reserve((map.height * map.height) as usize);
+        map.tiles.reserve((map.width * map.height) as usize);
         for _ in 0..map.height {
             for _ in 0..map.width {
                 map.tiles.push(Tile::read_from(&mut input, map.version)?);

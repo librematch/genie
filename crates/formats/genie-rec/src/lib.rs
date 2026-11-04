@@ -187,6 +187,15 @@ pub(crate) fn fits<T, U: TryInto<T>>(value: U) -> Result<T> {
     value.try_into().map_err(|_| Error::ValueOutOfRange)
 }
 
+/// The tiles of a map `width` by `height`.
+///
+/// # Errors
+///
+/// [`Error::ValueOutOfRange`] when they do not fit the address space.
+pub(crate) fn area(width: u32, height: u32) -> Result<usize> {
+    fits(u64::from(width) * u64::from(height))
+}
+
 /// An optional id as its field: `none` for no id.
 ///
 /// # Errors

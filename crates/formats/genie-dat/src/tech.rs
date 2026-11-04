@@ -5,7 +5,7 @@ use arrayvec::{ArrayString, ArrayVec};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
 pub use genie_support::TechId;
-use genie_support::{MapInto, StringKey, read_opt_u16, read_opt_u32};
+use genie_support::{MapInto, StringKey, read_bytes, read_opt_u16, read_opt_u32};
 use std::io::{Read, Result, Write};
 
 /// An effect command specifies an attribute change when a tech effect is triggered.
@@ -230,8 +230,7 @@ impl Tech {
         tech.hotkey = read_opt_u32(&mut input)?;
         tech.name = {
             let name_len = input.read_u16::<LE>()?;
-            let mut bytes = vec![0; name_len as usize];
-            input.read_exact(&mut bytes)?;
+            let bytes = read_bytes(&mut input, usize::from(name_len))?;
             let bytes = &bytes[..bytes.iter().position(|&c| c == 0).unwrap_or(bytes.len())];
             let (name, _encoding, _failed) = WINDOWS_1252.decode(bytes);
             name.to_string()

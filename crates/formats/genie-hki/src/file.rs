@@ -6,6 +6,7 @@ use flate2::Compression;
 use flate2::read::DeflateDecoder;
 use flate2::write::DeflateEncoder;
 use genie_lang::LangFile;
+use genie_support::read_list;
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::{fmt, io, slice, vec};
@@ -25,10 +26,7 @@ impl HotkeyInfo {
     pub(super) fn read_uncompressed<R: Read>(input: &mut R) -> io::Result<Self> {
         let version = input.read_f32::<LE>()?;
         let num_groups = input.read_u32::<LE>()?;
-        let mut groups = Vec::with_capacity(num_groups as usize);
-        for _ in 0..num_groups {
-            groups.push(HotkeyGroup::read_from(input)?);
-        }
+        let groups = read_list(num_groups as usize, || HotkeyGroup::read_from(input))?;
 
         Ok(Self { version, groups })
     }

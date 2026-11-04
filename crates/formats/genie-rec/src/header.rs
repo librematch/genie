@@ -7,8 +7,8 @@ use crate::string_table::StringTable;
 use crate::{GameVersion, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_scx::TribeScen;
-use genie_support::ReadSkipExt;
 pub use genie_support::SpriteId;
+use genie_support::{ReadSkipExt, read_bytes};
 use std::fmt::{self, Debug};
 use std::io::Read;
 
@@ -398,8 +398,7 @@ fn skip_lobby_players<R: Read>(input: &mut RecordingHeaderReader<R>) -> Result<(
             let _player_id = input.read_u32::<LE>()?;
             let _player_humanity = input.read_u32::<LE>()?;
             let name_length = input.read_u32::<LE>()?;
-            let mut name = vec![0; name_length as usize];
-            input.read_exact(&mut name)?;
+            let _name = read_bytes(input, fits(name_length)?)?;
         }
     }
     if input.version() >= 11.35 {

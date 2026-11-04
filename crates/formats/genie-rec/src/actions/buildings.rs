@@ -4,7 +4,7 @@ use crate::actions::{Location2, ObjectsList};
 use crate::{ObjectId, PlayerId, Result};
 use crate::{fits, opt_fits};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadSkipExt, TechId, UnitKindId, read_opt_u32};
+use genie_support::{ReadSkipExt, TechId, UnitKindId, read_le, read_opt_u32};
 use std::io::{Read, Write};
 
 /// Train a unit at a building (command `0x64`; aoc-mgz calls it the AI queue command).
@@ -184,8 +184,7 @@ impl BuildWallCommand {
         let builders = if selected_count == -1 {
             ObjectsList::SameAsLast
         } else {
-            let mut list = vec![0; fits(selected_count)?];
-            input.read_i32_into::<LE>(&mut list)?;
+            let mut list = read_le(&mut input, fits(selected_count)?, i32::from_le_bytes)?;
             if selected_count == 1 && list[0] == -1 {
                 list.clear();
             }

@@ -3,6 +3,7 @@ use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{Error, Result};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_support::{read_bytes, reserved};
 use std::io::{Read, Write};
 use std::vec::IntoIter as VecIntoIter;
 
@@ -56,11 +57,10 @@ impl ReadableHeaderElement for StringTable {
         let num_strings = input.read_u16::<LE>()?;
         let _ptr = input.read_u32::<LE>()?;
 
-        let mut strings = Vec::with_capacity(max_strings as usize);
+        let mut strings = reserved(usize::from(max_strings));
         for _ in 0..num_strings {
             let length = input.read_u32::<LE>()?;
-            let mut bytes = vec![0; length as usize];
-            input.read_exact(&mut bytes)?;
+            let bytes = read_bytes(input, fits(length)?)?;
             strings.push(String::from_utf8(bytes).map_err(|_| Error::InvalidString)?);
         }
 

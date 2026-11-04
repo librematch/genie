@@ -1,7 +1,7 @@
 use crate::Result;
 use crate::values::{DataSet, DlcPackage, ScxVersion};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadStringsExt, write_opt_i32_str};
+use genie_support::{ReadStringsExt, read_list, write_opt_i32_str};
 use std::convert::TryFrom;
 use std::io::{Read, Write};
 use std::result::Result as StdResult;
@@ -53,10 +53,9 @@ impl DlcOptions {
         };
 
         let num_dependencies = input.read_u32::<LE>()?;
-        let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
-        for dependency in &mut dependencies {
-            *dependency = DlcPackage::from(input.read_i32::<LE>()?);
-        }
+        let dependencies = read_list(num_dependencies as usize, || {
+            input.read_i32::<LE>().map(DlcPackage::from)
+        })?;
 
         Ok(Self {
             version,

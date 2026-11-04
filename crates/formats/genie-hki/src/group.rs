@@ -3,6 +3,7 @@
 use crate::{Hotkey, HotkeyIndexError};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use genie_lang::{LangFile, StringKey};
+use genie_support::read_list;
 use std::io::{Read, Write};
 use std::{fmt, io, slice, vec};
 
@@ -20,10 +21,7 @@ impl HotkeyGroup {
     /// Reads a hotkey group from an input stream.
     pub(crate) fn read_from<R: Read>(input: &mut R) -> io::Result<Self> {
         let num_hotkeys = input.read_u32::<LE>()?;
-        let mut hotkeys = Vec::with_capacity(num_hotkeys as usize);
-        for _ in 0..num_hotkeys {
-            hotkeys.push(Hotkey::read_from(input)?);
-        }
+        let hotkeys = read_list(num_hotkeys as usize, || Hotkey::read_from(input))?;
 
         Ok(Self { hotkeys })
     }

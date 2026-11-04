@@ -19,6 +19,7 @@ genie-error = { path = "../../base/genie-error" }
 byteorder.workspace = true
 flate2.workspace = true
 genie-lang = { version = "0.3.0", path = "../genie-lang" }
+genie-support = { version = "1.0.0", path = "../genie-support" }
 thiserror.workspace = true
 
 [dev-dependencies]

@@ -13,7 +13,7 @@ use crate::terrain::{Terrain, TerrainBorder, TerrainRestriction, TileSize};
 use crate::{DatFile, FileVersion, GameVersion};
 use byteorder::{LE, ReadBytesExt};
 use flate2::read::DeflateDecoder;
-use genie_support::ReadSkipExt;
+use genie_support::{ReadSkipExt, read_list};
 use std::io::{Read, Result};
 
 impl DatFile {
@@ -46,7 +46,7 @@ impl DatFile {
         // Two lists of pointers
         input.skip(4 * u64::from(num_terrain_tables) + 4 * u64::from(num_terrain_tables))?;
 
-        let terrain_tables = read_array(num_terrain_tables.into(), || {
+        let terrain_tables = read_list(num_terrain_tables.into(), || {
             TerrainRestriction::read_from(&mut input, file_version, num_terrains)
         })?;
         let color_tables = read_color_tables(&mut input)?;
@@ -54,19 +54,19 @@ impl DatFile {
         let sprites = read_sprites(&mut input)?;
         skip_map_header(&mut input)?;
         let tile_sizes = read_tile_sizes(&mut input)?;
-        let terrains = read_array(num_terrains_fixed.into(), || {
+        let terrains = read_list(num_terrains_fixed.into(), || {
             Terrain::read_from(&mut input, file_version, num_terrains_fixed)
         })?;
-        let terrain_borders = read_array(16, || TerrainBorder::read_from(&mut input))?;
+        let terrain_borders = read_list(16, || TerrainBorder::read_from(&mut input))?;
         skip_map_bounds(&mut input)?;
         skip_map_search(&mut input)?;
         let random_maps = read_random_maps(&mut input)?;
         let num_effects = input.read_u32::<LE>()? as usize;
-        let effects = read_array(num_effects, || TechEffect::read_from(&mut input))?;
+        let effects = read_list(num_effects, || TechEffect::read_from(&mut input))?;
         let task_lists = read_task_lists(&mut input)?;
         let civilizations = read_civilizations(&mut input, game_version)?;
         let num_techs = input.read_u16::<LE>()?;
-        let techs = read_array(num_techs.into(), || Tech::read_from(&mut input))?;
+        let techs = read_list(num_techs.into(), || Tech::read_from(&mut input))?;
         skip_kill_rates(&mut input)?;
         let tech_tree = TechTree::read_from(&mut input)?;
 
@@ -90,15 +90,6 @@ impl DatFile {
     }
 }
 
-/// `num` items, each of `read`.
-fn read_array<T>(num: usize, mut read: impl FnMut() -> Result<T>) -> Result<Vec<T>> {
-    let mut list = vec![];
-    for _ in 0..num {
-        list.push(read()?);
-    }
-    Ok(list)
-}
-
 /// The game a file is for: version 5.7 with 32 terrains is `AoK`, with 100 HD, else `AoC`.
 fn game_version(file_version: FileVersion, num_terrains: u16) -> GameVersion {
     if file_version == FileVersion(*b"VER 5.7\0") {
@@ -116,7 +107,7 @@ fn game_version(file_version: FileVersion, num_terrains: u16) -> GameVersion {
 /// The colour tables and their count.
 fn read_color_tables(mut input: impl Read) -> Result<Vec<ColorTable>> {
     let num_color_tables = input.read_u16::<LE>()?;
-    read_array(num_color_tables.into(), || {
+    read_list(num_color_tables.into(), || {
         ColorTable::read_from(&mut input)
     })
 }
@@ -124,7 +115,7 @@ fn read_color_tables(mut input: impl Read) -> Result<Vec<ColorTable>> {
 /// The sounds and their count.
 fn read_sounds(mut input: impl Read, file_version: FileVersion) -> Result<Vec<Sound>> {
     let num_sounds = input.read_u16::<LE>()?;
-    read_array(num_sounds.into(), || {
+    read_list(num_sounds.into(), || {
         Sound::read_from(&mut input, file_version)
     })
 }
@@ -132,7 +123,7 @@ fn read_sounds(mut input: impl Read, file_version: FileVersion) -> Result<Vec<So
 /// The sprites: their count, whether each exists, then those that do.
 fn read_sprites(mut input: impl Read) -> Result<Vec<Option<Sprite>>> {
     let num_sprites = input.read_u16::<LE>()?;
-    let sprites_exist = read_array(num_sprites.into(), || {
+    let sprites_exist = read_list(num_sprites.into(), || {
         input.read_u32::<LE>().map(|n| n != 0)
     })?;
     let mut sprites = vec![];
@@ -215,9 +206,11 @@ fn read_random_maps(mut input: impl Read) -> Result<Vec<RandomMapInfo>> {
     let num_random_maps = input.read_u32::<LE>()? as usize;
     let _random_maps_pointer = input.read_u32::<LE>()?;
 
-    let mut random_maps = read_array(num_random_maps, || RandomMapInfo::read_from(&mut input))?;
-    for map in &mut random_maps {
-        map.finish(&mut input)?;
+    let heads = read_list(num_random_maps, || RandomMapInfo::read_from(&mut input))?;
+    let mut random_maps = Vec::new();
+    for (mut map, counts) in heads {
+        map.finish(counts, &mut input)?;
+        random_maps.push(map);
     }
     Ok(random_maps)
 }
@@ -225,7 +218,7 @@ fn read_random_maps(mut input: impl Read) -> Result<Vec<RandomMapInfo>> {
 /// The task lists: their count, then each behind its flag.
 fn read_task_lists(mut input: impl Read) -> Result<Vec<Option<TaskList>>> {
     let num_task_lists = input.read_u32::<LE>()? as usize;
-    read_array(num_task_lists, || {
+    read_list(num_task_lists, || {
         if input.read_u8()? != 0 {
             TaskList::read_from(&mut input).map(Some)
         } else {
@@ -240,7 +233,7 @@ fn read_civilizations(
     game_version: GameVersion,
 ) -> Result<Vec<Civilization>> {
     let num_civilizations = input.read_u16::<LE>()?;
-    read_array(num_civilizations.into(), || {
+    read_list(num_civilizations.into(), || {
         let player_kind = input.read_i8()?;
         if player_kind != 1 {
             return Err(invalid_data("a civilization whose player type is not 1"));
@@ -264,8 +257,6 @@ pub(super) fn skip_kill_rates(mut input: impl Read) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(test)]
-    use std::io::Error;
 
     /// Version 5.7 with 32 terrains is for Age of Kings, with 100 for HD Edition, with any
     /// other count for The Conquerors; any other version too.
@@ -279,19 +270,6 @@ mod tests {
             game_version(FileVersion(*b"VER 5.8\0"), 32),
             GameVersion::Aoc
         );
-    }
-
-    /// A count of items, each read in turn; the first error ends it.
-    #[test]
-    fn an_array_reads_its_count_of_items() {
-        let mut next = 0;
-        let read = read_array(3, || {
-            next += 1;
-            Ok(next)
-        });
-        assert_eq!(read.unwrap(), [1, 2, 3]);
-        let failed = read_array(3, || Err::<u8, _>(Error::other("short")));
-        assert!(failed.is_err());
     }
 
     /// The task lists behind their flags, a list of none for a 0 flag.

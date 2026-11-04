@@ -3,7 +3,7 @@
 use crate::conv::fits;
 use crate::unit_kind::UnitKindId;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::ReadSkipExt;
+use genie_support::{ReadSkipExt, read_list};
 use std::io::{Read, Result, Write};
 
 /// A random map: its basic layout, and the lands, terrains, objects and elevations placed on it.
@@ -31,18 +31,32 @@ pub struct RandomMapInfo {
     pub elevations: Vec<RandomMapElevation>,
 }
 
+/// The lengths of a random map's four lists, which its header names and the file holds after
+/// all map headers.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RandomMapCounts {
+    /// Its lands.
+    pub lands: usize,
+    /// Its terrains.
+    pub terrains: usize,
+    /// Its objects.
+    pub objects: usize,
+    /// Its elevations.
+    pub elevations: usize,
+}
+
 impl RandomMapInfo {
-    /// Read a map's header from an input stream. The lists get their lengths but default
-    /// entries; [`finish`](Self::finish) reads the entries, which the file stores after all map
-    /// headers.
+    /// Read a map's header from an input stream: the map with empty lists and the lengths its
+    /// header names. [`finish`](Self::finish) reads the entries, which the file stores after
+    /// all map headers.
     ///
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
     ///
     /// Also fails if a count does not fit a `usize` (on targets with 16-bit pointers).
-    pub fn read_from<R: Read>(input: &mut R) -> Result<Self> {
-        let mut info = Self {
+    pub fn read_from<R: Read>(input: &mut R) -> Result<(Self, RandomMapCounts)> {
+        let info = Self {
             id: input.read_i32::<LE>()?,
             borders: (
                 input.read_i32::<LE>()?,
@@ -67,44 +81,38 @@ impl RandomMapInfo {
         let num_elevations = input.read_u32::<LE>()?;
         let _pointer = input.read_u32::<LE>()?;
 
-        info.lands = vec![RandomMapLand::default(); fits(num_lands)?];
-        info.terrains = vec![RandomMapTerrain::default(); fits(num_terrains)?];
-        info.objects = vec![RandomMapObject::default(); fits(num_objects)?];
-        info.elevations = vec![RandomMapElevation::default(); fits(num_elevations)?];
-
-        Ok(info)
+        let counts = RandomMapCounts {
+            lands: fits(num_lands)?,
+            terrains: fits(num_terrains)?,
+            objects: fits(num_objects)?,
+            elevations: fits(num_elevations)?,
+        };
+        Ok((info, counts))
     }
 
-    /// Read the map's lands, terrains, objects and elevations from an input stream, skipping the
-    /// copies of the header data in between.
+    /// Read the map's lands, terrains, objects and elevations of the lengths `counts` from an
+    /// input stream, skipping the copies of the header data in between; each list grows as its
+    /// entries come.
     ///
     /// # Errors
     ///
     /// Returns an error if reading from `input` fails.
-    pub fn finish<R: Read>(&mut self, input: &mut R) -> Result<()> {
+    pub fn finish<R: Read>(&mut self, counts: RandomMapCounts, input: &mut R) -> Result<()> {
         // duplicate data
         input.skip(44)?;
-        for land in &mut self.lands {
-            *land = RandomMapLand::read_from(input)?;
-        }
+        self.lands = read_list(counts.lands, || RandomMapLand::read_from(input))?;
 
         // duplicate data
         input.skip(8)?;
-        for terrain in &mut self.terrains {
-            *terrain = RandomMapTerrain::read_from(input)?;
-        }
+        self.terrains = read_list(counts.terrains, || RandomMapTerrain::read_from(input))?;
 
         // duplicate data
         input.skip(8)?;
-        for object in &mut self.objects {
-            *object = RandomMapObject::read_from(input)?;
-        }
+        self.objects = read_list(counts.objects, || RandomMapObject::read_from(input))?;
 
         // duplicate data
         input.skip(8)?;
-        for elevation in &mut self.elevations {
-            *elevation = RandomMapElevation::read_from(input)?;
-        }
+        self.elevations = read_list(counts.elevations, || RandomMapElevation::read_from(input))?;
         Ok(())
     }
 
@@ -455,6 +463,20 @@ impl RandomMapElevation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A header whose lists claim more entries than the file holds: each list grows as its
+    /// entries come, so the read fails at the file's end, not on its allocation.
+    #[test]
+    fn random_map_lists_past_the_file_fail_at_its_end() {
+        let mut head: Vec<u8> = [0i32; 10].iter().flat_map(|w| w.to_le_bytes()).collect();
+        for count in [u32::MAX, 0, 0, 0, 0, 0, 0, 0] {
+            head.extend(count.to_le_bytes());
+        }
+        let (mut map, counts) = RandomMapInfo::read_from(&mut head.as_slice()).unwrap();
+        assert_eq!(counts.lands, fits::<usize, _>(u32::MAX).unwrap());
+        let rest = [0u8; 60];
+        assert!(map.finish(counts, &mut rest.as_slice()).is_err());
+    }
 
     /// A map elevation's six words, read in file order and written back byte for byte.
     #[test]

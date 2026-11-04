@@ -6,7 +6,7 @@ use crate::unit_kind::{UnitKind, UnitKindId};
 use arrayvec::ArrayString;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
-use genie_support::{fallible_try_from, infallible_try_into, read_opt_u16};
+use genie_support::{fallible_try_from, infallible_try_into, read_le, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// An ID identifying a civilization
@@ -92,10 +92,7 @@ impl Civilization {
         civ.civ_effect = input.read_u16::<LE>()?;
         civ.bonus_effect = read_opt_u16(&mut input)?;
 
-        civ.attributes.reserve(num_attributes as usize);
-        for _ in 0..num_attributes {
-            civ.attributes.push(input.read_f32::<LE>()?);
-        }
+        civ.attributes = read_le(&mut input, usize::from(num_attributes), f32::from_le_bytes)?;
 
         civ.culture = input.read_u8()?;
 

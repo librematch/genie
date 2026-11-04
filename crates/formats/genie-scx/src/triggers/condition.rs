@@ -2,6 +2,7 @@
 
 use crate::{Result, UnitKindId};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_support::reserved;
 use std::convert::TryInto;
 use std::io::{Read, Write};
 
@@ -27,7 +28,7 @@ impl TriggerCondition {
         } else {
             13
         };
-        let mut properties = Vec::with_capacity(num_properties as usize);
+        let mut properties = reserved(num_properties as usize);
         for _ in 0..num_properties {
             properties.push(input.read_i32::<LE>()?);
         }

@@ -13,7 +13,7 @@ use crate::unit_kind::CompactUnitKind;
 use crate::{ObjectId, Result};
 use byteorder::{LE, ReadBytesExt};
 use genie_dat::tech_tree::TechTree;
-use genie_support::ReadStringsExt;
+use genie_support::{ReadStringsExt, read_bytes, read_le};
 use std::io::Read;
 
 impl ReadableHeaderElement for Player {
@@ -60,8 +60,8 @@ impl Player {
             ..Default::default()
         };
         expect_marker(input, 11)?;
-        player.relations = vec![0; input.num_players() as usize];
-        input.read_exact(&mut player.relations)?;
+        let players = usize::from(input.num_players());
+        player.relations = read_bytes(input, players)?;
         input.read_u32_into::<LE>(&mut player.diplomacy)?;
         player.allied_los = input.read_u32::<LE>()? != 0;
         player.allied_victory = input.read_u8()? != 0;
@@ -79,8 +79,7 @@ impl Player {
         expect_marker(input, 22)?;
         let num_attributes = input.read_u32::<LE>()?;
         expect_marker(input, 33)?;
-        self.attributes = vec![0.0; fits(num_attributes)?];
-        input.read_f32_into::<LE>(&mut self.attributes)?;
+        self.attributes = read_le(input, fits(num_attributes)?, f32::from_le_bytes)?;
         expect_marker(input, 11)?;
         self.initial_view = (input.read_f32::<LE>()?, input.read_f32::<LE>()?);
         if input.version() >= 11.62 {

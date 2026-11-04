@@ -1,3 +1,4 @@
+use crate::read_bytes;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
 use encoding_rs::WINDOWS_1252;
 use std::io::{self, Read, Write};
@@ -157,8 +158,7 @@ pub trait ReadStringsExt: Read {
     /// Returns an error if reading fails or the bytes are not valid WINDOWS-1252.
     fn read_str(&mut self, length: usize) -> Result<Option<String>, ReadStringError> {
         if length > 0 {
-            let mut bytes = vec![0; length];
-            self.read_exact(&mut bytes)?;
+            let mut bytes = read_bytes(self, length)?;
             if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
                 bytes.truncate(end);
             }
@@ -214,8 +214,7 @@ pub trait ReadStringsExt: Read {
             return Err(DecodeStringError.into());
         }
         let len = self.read_u16::<LE>()? as usize;
-        let mut bytes = vec![0; len];
-        self.read_exact(&mut bytes[0..len])?;
+        let bytes = read_bytes(self, len)?;
         Ok(Some(decode_str(&bytes)?))
     }
 }

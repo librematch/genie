@@ -6,8 +6,8 @@ use crate::player::PlayerStartResources;
 use crate::values::{DiplomaticStance, StartingAge};
 use crate::victory::{LegacyVictoryInfo, VictoryInfo};
 use byteorder::{LE, ReadBytesExt};
-use genie_support::{ReadStringsExt, f32_eq};
-use std::io::Read;
+use genie_support::{ReadStringsExt, f32_eq, read_le};
+use std::io::{self, Read};
 
 /// Embeddable scenario data. This includes all scenario settings, but not map data, triggers, and
 /// placed objects.
@@ -401,14 +401,14 @@ impl DisabledLists {
     }
 }
 
-/// The counts, then each list of its count's ids.
-// The format stores the counts as i32, never negative in valid files.
-#[allow(clippy::cast_sign_loss)]
+/// The counts, then each list of its count's ids, read as they come.
 fn read_counted(mut input: impl Read, nums: &mut [i32], lists: &mut [Vec<i32>]) -> Result<()> {
     input.read_i32_into::<LE>(nums)?;
     for (list, &num) in lists.iter_mut().zip(nums.iter()) {
-        *list = vec![0; num as usize];
-        input.read_i32_into::<LE>(list)?;
+        // the format stores the counts as i32, never negative in valid files
+        let count = usize::try_from(num)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "a negative count of ids"))?;
+        *list = read_le(&mut input, count, i32::from_le_bytes)?;
     }
     Ok(())
 }
@@ -422,8 +422,7 @@ fn read_fixed(
 ) -> Result<()> {
     input.read_i32_into::<LE>(nums)?;
     for list in lists {
-        *list = vec![0; size];
-        input.read_i32_into::<LE>(list)?;
+        *list = read_le(&mut input, size, i32::from_le_bytes)?;
     }
     Ok(())
 }

@@ -1,12 +1,13 @@
 //! What the information AI remembers: important objects, building lots, walls, attacks,
 //! resources, influence maps and quadrants.
 
+use crate::area;
 use crate::element::ReadableHeaderElement;
 use crate::fits;
 use crate::reader::RecordingHeaderReader;
 use crate::{ObjectId, PlayerId, Result};
 use byteorder::{LE, ReadBytesExt};
-use genie_support::{ReadSkipExt, UnitKindId, read_opt_u16, read_opt_u32};
+use genie_support::{ReadSkipExt, UnitKindId, read_i8s, read_opt_u16, read_opt_u32};
 use std::io::Read;
 
 /// What the information AI remembers about an important object.
@@ -320,8 +321,7 @@ impl ReadableHeaderElement for InfluenceMap {
         map.height = input.read_u32::<LE>()?;
         map.reference_point = (input.read_u32::<LE>()?, input.read_u32::<LE>()?);
         map.unchangeable_limit = input.read_u8()?;
-        map.values = vec![0; (map.width * map.height) as usize];
-        input.read_i8_into(&mut map.values)?;
+        map.values = read_i8s(input, area(map.width, map.height)?)?;
         Ok(map)
     }
 }

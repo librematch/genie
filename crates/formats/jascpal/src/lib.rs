@@ -38,10 +38,12 @@
 #![deny(unsafe_code)]
 #![warn(unused)]
 
+use nom::Err as NomErr;
 use nom::IResult;
 use nom::bytes::complete::tag;
 use nom::character::complete::{digit1, one_of};
 use nom::combinator::{map, map_res};
+use nom::error::{Error as NomError, ErrorKind as NomErrorKind};
 use nom::multi::many1;
 use rgb::RGB;
 use std::convert::{TryFrom, TryInto};
@@ -141,6 +143,9 @@ fn parse_rgb(input: &[u8]) -> IResult<&[u8], Color> {
     Ok((input, RGB { r, g, b }))
 }
 
+/// The bytes of the shortest colour line, `0 0 0\r\n`.
+const SHORTEST_COLOR: usize = 7;
+
 /// Parse a header and colours from an input stream.
 fn parse(input: &[u8]) -> IResult<&[u8], Vec<Color>> {
     let (input, _) = tag(b"JASC-PAL\r\n")(input)?;
@@ -148,8 +153,16 @@ fn parse(input: &[u8]) -> IResult<&[u8], Vec<Color>> {
     let (input, num_colors): (_, i32) = parse_number(input)?;
     let (input, _) = tag(b"\r\n")(input)?;
 
-    // `digit1` takes no sign, so the count is never negative.
-    let mut colors = Vec::with_capacity(usize::try_from(num_colors).unwrap_or(0));
+    // `digit1` takes no sign, so the count is never negative; a colour's line holds at least
+    // `0 0 0\r\n`, so a count the bytes left cannot hold fails before room is reserved for it
+    let count = usize::try_from(num_colors).unwrap_or(0);
+    if input.len() / SHORTEST_COLOR < count {
+        return Err(NomErr::Failure(NomError::new(
+            input,
+            NomErrorKind::TooLarge,
+        )));
+    }
+    let mut colors = Vec::with_capacity(count);
     let mut input = input;
     for _ in 0..num_colors {
         let (remaining, color) = parse_rgb(input)?;
@@ -360,6 +373,12 @@ impl From<ReadPaletteError> for genie_error::GenieError {
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    /// A count of colours the bytes left cannot hold fails before room is reserved for it.
+    #[test]
+    fn count_past_the_bytes_fails() {
+        assert!(parse(b"JASC-PAL\r\n0100\r\n999999999\r\n0 0 0\r\n").is_err());
+    }
 
     #[test]
     fn parse_test() {

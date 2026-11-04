@@ -3,7 +3,9 @@
 use crate::Result;
 use crate::triggers::{TriggerCondition, TriggerEffect, write_opt_string_key};
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadStringsExt, StringKey, read_opt_u32, write_i32_str, write_opt_i32_str};
+use genie_support::{
+    ReadStringsExt, StringKey, read_le, read_opt_u32, write_i32_str, write_opt_i32_str,
+};
 use std::io::{Read, Write};
 use std::iter::repeat;
 
@@ -255,9 +257,7 @@ impl TriggerSystem {
             input.read_u32_into::<LE>(&mut variable_values)?;
             let enabled_techs = {
                 let num_enabled_techs = input.read_u32::<LE>()?;
-                let mut enabled_techs = vec![0; num_enabled_techs as usize];
-                input.read_u32_into::<LE>(&mut enabled_techs)?;
-                enabled_techs
+                read_le(&mut input, num_enabled_techs as usize, u32::from_le_bytes)?
             };
             let variable_names = {
                 let num_var_names = input.read_u32::<LE>()?;

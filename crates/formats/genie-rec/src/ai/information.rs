@@ -6,9 +6,9 @@ use crate::ai::{
 };
 use crate::element::ReadableHeaderElement;
 use crate::reader::RecordingHeaderReader;
-use crate::{ObjectId, Result};
+use crate::{ObjectId, Result, fits};
 use byteorder::{LE, ReadBytesExt};
-use genie_support::{ReadSkipExt, ReadStringsExt};
+use genie_support::{ReadSkipExt, ReadStringsExt, read_list};
 use std::io::Read;
 
 /// The information AI module: what the AI knows about the map, objects and other players.
@@ -249,10 +249,7 @@ fn read_resource_memories<R: Read>(
 
     let mut resources = [vec![], vec![], vec![], vec![]];
     for (list, &num) in resources.iter_mut().zip(num_resources.iter()) {
-        list.reserve(num as usize);
-        for _ in 0..num {
-            list.push(ResourceMemory::read_from(input)?);
-        }
+        *list = read_list(fits(num)?, || ResourceMemory::read_from(input))?;
     }
     Ok(resources)
 }

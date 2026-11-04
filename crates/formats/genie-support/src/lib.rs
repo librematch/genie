@@ -14,6 +14,7 @@
     clippy::todo
 )]
 
+mod bounded;
 mod ids;
 mod macros;
 mod map_into;
@@ -21,6 +22,7 @@ mod read;
 #[cfg(feature = "strings")]
 mod strings;
 
+pub use bounded::*;
 pub use ids::*;
 pub use map_into::*;
 pub use read::*;

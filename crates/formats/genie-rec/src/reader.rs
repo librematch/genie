@@ -261,7 +261,7 @@ impl<R> RecordingHeaderReader<R> {
     pub const fn set_map_size(&mut self, width: u32, height: u32) {
         self.state.map_width = width;
         self.state.map_height = height;
-        self.state.tile_count = width as usize * height as usize;
+        self.state.tile_count = (width as usize).saturating_mul(height as usize);
     }
 
     /// Record the number of players the per-player data depends on.

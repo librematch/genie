@@ -2,6 +2,14 @@ use super::*;
 use anyhow::Context;
 use std::fs::File;
 
+/// A group whose count claims more hotkeys than the file holds fails at the file's end, not on
+/// its allocation.
+#[test]
+fn hotkeys_past_the_file_fail_at_its_end() {
+    let bytes = u32::MAX.to_le_bytes();
+    assert!(HotkeyGroup::read_from(&mut bytes.as_slice()).is_err());
+}
+
 #[test]
 fn aoc1() -> anyhow::Result<()> {
     let mut f = File::open("test/files/aoc1.hki")?;

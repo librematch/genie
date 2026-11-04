@@ -3,6 +3,7 @@ use byteorder::{LE, ReadBytesExt};
 use chardet::detect as detect_encoding;
 use encoding_rs::Encoding;
 use genie_scx::{self as scx, DlcPackage, Scenario};
+use genie_support::{read_bytes, read_list};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::result::Result as StdResult;
 
@@ -47,8 +48,7 @@ fn decode_str(bytes: &[u8]) -> Result<String> {
 }
 
 pub fn read_fixed_str<R: Read>(input: &mut R, len: usize) -> Result<Option<String>> {
-    let mut bytes = vec![0; len];
-    input.read_exact(&mut bytes[0..len])?;
+    let mut bytes = read_bytes(input, len)?;
 
     if let Some(end) = bytes.iter().position(|&byte| byte == 0) {
         bytes.truncate(end);
@@ -67,8 +67,7 @@ fn read_hd_or_later_string<R: Read>(input: &mut R) -> Result<Option<String>> {
         return Err(ReadCampaignError::DecodeStringError);
     }
     let len = input.read_u16::<LE>()? as usize;
-    let mut bytes = vec![0; len];
-    input.read_exact(&mut bytes[0..len])?;
+    let bytes = read_bytes(input, len)?;
     decode_str(&bytes).map(Some)
 }
 
@@ -87,10 +86,9 @@ fn read_campaign_header<R: Read>(input: &mut R) -> Result<CampaignHeader> {
         // supports all packages.[citation needed]
         if version == AOE2_DE {
             let num_dependencies = input.read_u32::<LE>()?;
-            let mut dependencies = vec![DlcPackage::AgeOfKings; num_dependencies as usize];
-            for dependency in &mut dependencies {
-                *dependency = DlcPackage::from(input.read_i32::<LE>()?);
-            }
+            let _dependencies = read_list(num_dependencies as usize, || {
+                input.read_i32::<LE>().map(DlcPackage::from)
+            })?;
         }
 
         name = read_fixed_str(input, 256)?.ok_or(ReadCampaignError::MissingNameError)?;
@@ -335,6 +333,13 @@ mod tests {
     use crate::{AOE_AOK, AOE1_DE, AOE2_DE};
     use anyhow::Context;
     use std::fs::File;
+
+    /// A fixed string longer than the input fails at its end, not on its allocation.
+    #[test]
+    fn fixed_string_past_the_input_fails_at_its_end() {
+        let mut input: &[u8] = b"short";
+        assert!(read_fixed_str(&mut input, usize::MAX).is_err());
+    }
 
     /// Try to parse a file with an encoding that is not compatible with UTF-8.
     /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=884>

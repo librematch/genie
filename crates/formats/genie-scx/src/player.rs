@@ -1,7 +1,7 @@
 use crate::Result;
 use crate::victory::VictoryConditions;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{ReadStringsExt, write_opt_str};
+use genie_support::{ReadStringsExt, reserved, write_opt_str};
 use std::io::{Read, Write};
 
 #[derive(Debug, Default, Clone)]
@@ -143,7 +143,7 @@ impl ScenarioPlayerData {
         };
 
         let diplo_count = input.read_i16::<LE>()?;
-        let mut relations = Vec::with_capacity(diplo_count as usize);
+        let mut relations = reserved(diplo_count as usize);
         for _ in 0..diplo_count {
             relations.push(input.read_i8()?);
         }

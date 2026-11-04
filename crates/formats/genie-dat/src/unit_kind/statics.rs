@@ -7,7 +7,7 @@ use crate::sprite::{GraphicId, SpriteId};
 use crate::unit_kind::{UnitClass, write_opt_string_key};
 use arrayvec::ArrayVec;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
-use genie_support::{StringKey, UnitKindId, read_opt_u16};
+use genie_support::{StringKey, UnitKindId, read_bytes, read_opt_u16};
 use std::io::{Read, Result, Write};
 
 /// A resource a unit stores (e.g. the food in a sheep), with how it is stored.
@@ -249,8 +249,7 @@ impl StaticUnitKindAttributes {
         unit_kind.read_attributes(&mut input)?;
         unit_kind.name = {
             // TODO use not-UTF8 for the name
-            let mut bytes = vec![0; usize::from(name_len)];
-            input.read_exact(&mut bytes)?;
+            let bytes = read_bytes(&mut input, usize::from(name_len))?;
             String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect())
                 .map_err(invalid_data)?
         };

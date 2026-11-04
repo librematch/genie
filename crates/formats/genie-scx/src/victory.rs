@@ -1,6 +1,7 @@
 use crate::Result;
 use crate::values::VictoryCondition;
 use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use genie_support::reserved;
 use num_enum::{FromPrimitive, IntoPrimitive};
 use std::io::{Read, Write};
 
@@ -307,7 +308,7 @@ impl VictoryConditions {
         let num_conditions = input.read_i32::<LE>()?;
         let victory = VictoryState::from(input.read_u8()?);
 
-        let mut entries = Vec::with_capacity(num_conditions as usize);
+        let mut entries = reserved(num_conditions as usize);
         for _ in 0..num_conditions {
             entries.push(VictoryEntry::read_from(&mut input)?);
         }
