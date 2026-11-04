@@ -33,30 +33,35 @@ impl World {
     /// A map without its terrain, and what the actions' teardowns do not model.
     pub(crate) fn start_transport(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         notifies: Notifies,
     ) -> GenieResult<()> {
-        self.notify_transport((p, i), (target, point), notifies)?;
-        self.clear_actions(p, i)?;
-        let mut t = TransportAction::on_task(Some(task.id), point);
+        self.notify_transport((player_id, list_index), (target, point), notifies)?;
+        self.clear_actions(player_id, list_index)?;
+        let mut transport_action = TransportAction::on_task(Some(task.id), point);
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
-        let changed = self.with_shore(p, i, t.task, |ship, shore| {
-            t.start(
-                StartCall::Added,
-                ship,
-                shore,
-                &transport_tuning,
-                &move_to_tuning,
-            )
-        })?;
+        let changed = self.with_shore(
+            player_id,
+            list_index,
+            transport_action.task,
+            |ship, shore| {
+                transport_action.start(
+                    StartCall::Added,
+                    ship,
+                    shore,
+                    &transport_tuning,
+                    &move_to_tuning,
+                )
+            },
+        )?;
         self.parts
-            .actions_mut(self.players.live(p, i)?.id)?
+            .actions_mut(self.players.live(player_id, list_index)?.id)?
             .list
-            .set_transport(Some(t));
-        self.transport_changed(p, i, changed)
+            .set_transport(Some(transport_action));
+        self.transport_changed(player_id, list_index, changed)
     }
 
     /// The work command's retake (`LAB_1410706a8`) of the Transport on top on the `task` it
@@ -72,21 +77,21 @@ impl World {
     /// [`World`]: crate::world::World
     pub(crate) fn retake_transport(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         task: &Task,
         notifies: Notifies,
     ) -> GenieResult<Answer> {
-        let unit = self.players.live(p, i)?;
+        let unit = self.players.live(player_id, list_index)?;
         // the Transport on top, on the task the work found
         let on_task = match self.parts.actions_of(unit.id).list.head() {
             Some(Action::Transport(t)) if t.task == Some(task.id) => Some(*t),
             _ => None,
         };
-        let Some(mut t) = on_task else {
+        let Some(mut transport_action) = on_task else {
             return Ok(Answer::NotTaken);
         };
-        if self.trade_at_own_market((p, i), target)? {
+        if self.trade_at_own_market((player_id, list_index), target)? {
             return Ok(Answer::NotTaken);
         }
         let named = if target == Some(unit.id) {
@@ -96,22 +101,27 @@ impl World {
         };
         let move_to_tuning = self.model.tuning.move_to;
         let transport_tuning = self.model.tuning.transport;
-        let changed = self.with_shore(p, i, t.task, |ship, shore| {
-            t.work(
-                point,
-                named,
-                ship,
-                shore,
-                &transport_tuning,
-                &move_to_tuning,
-            )
-        })?;
+        let changed = self.with_shore(
+            player_id,
+            list_index,
+            transport_action.task,
+            |ship, shore| {
+                transport_action.work(
+                    point,
+                    named,
+                    ship,
+                    shore,
+                    &transport_tuning,
+                    &move_to_tuning,
+                )
+            },
+        )?;
         self.parts
-            .actions_mut(self.players.live(p, i)?.id)?
+            .actions_mut(self.players.live(player_id, list_index)?.id)?
             .list
-            .set_transport(Some(t));
-        self.transport_changed(p, i, changed)?;
-        self.notify_transport((p, i), (target, point), notifies)?;
+            .set_transport(Some(transport_action));
+        self.transport_changed(player_id, list_index, changed)?;
+        self.notify_transport((player_id, list_index), (target, point), notifies)?;
         Ok(Answer::Taken)
     }
 
@@ -119,23 +129,23 @@ impl World {
     /// `FUN_141195490`) and the target its own player's market.
     fn trade_at_own_market(
         &self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         target: Option<ObjectId>,
     ) -> GenieResult<bool> {
-        let Some((tp, t)) = self.object(target) else {
+        let Some((tp, unit)) = self.object(target) else {
             return Ok(false);
         };
         // The market (`0x60f0` raw), whose own trade units the work command never retakes.
-        let market = tp == p
+        let market = tp == player_id
             && self
                 .model
                 .roles
-                .of_master(t.master(self.master_tables(), tp)?.id)
+                .of_master(unit.master(self.master_tables(), tp)?.id)
                 .contains(MasterRoles::MARKET);
         let class = self
             .players
-            .live(p, i)?
-            .master(self.master_tables(), p)?
+            .live(player_id, list_index)?
+            .master(self.master_tables(), player_id)?
             .class;
         Ok(market
             && self
@@ -150,15 +160,17 @@ impl World {
     /// world does not hold) and the work's point.
     fn notify_transport(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         (target, point): (Option<ObjectId>, Position),
         notifies: Notifies,
     ) -> GenieResult<()> {
         let named = match target.and_then(|id| Some((id, self.object(id)?))) {
-            Some((target, (tp, t))) => Some((target, t.master(self.master_tables(), tp)?.class)),
+            Some((target, (tp, unit))) => {
+                Some((target, unit.master(self.master_tables(), tp)?.class))
+            }
             None => None,
         };
-        let id = self.players.live(p, i)?.id;
+        let id = self.players.live(player_id, list_index)?.id;
         if let Some(ai) = self.parts.unit_ai.get_mut(id) {
             ai.notify_work(
                 Some(OrderKind::Transport),
@@ -169,28 +181,28 @@ impl World {
                 self.streams.get(Stream::Ai),
             )?;
             self.remember_order(
-                p,
-                i,
+                player_id,
+                list_index,
                 (Some(OrderKind::Transport), Some(AiAction::Transport)),
             )?;
         }
         Ok(())
     }
 
-    /// `f` on the view of the Transport on `task` of player `p`'s object at `i` ([`Ship`])
-    /// and of the map ([`MapShore`] with the unit's terrain restriction).
+    /// `f` on the view of the Transport on `task` of player `player_id`'s object at `list_index`
+    /// ([`Ship`]) and of the map ([`MapShore`] with the unit's terrain restriction).
     ///
     /// [`World`]: crate::world::World
     fn with_shore(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        player_id: PlayerId,
+        list_index: ListIndex,
         task: Option<TaskId>,
         f: impl FnOnce(&Ship<'_>, &mut MapShore<'_>) -> GenieResult<Changed>,
     ) -> GenieResult<Changed> {
         let ship = {
-            let unit = self.players.live(p, i)?;
-            let master = unit.master(self.master_tables(), p)?;
+            let unit = self.players.live(player_id, list_index)?;
+            let master = unit.master(self.master_tables(), player_id)?;
             Ship::of_unit(
                 (unit, self.parts.mover_of(unit.id)),
                 master,
@@ -205,8 +217,8 @@ impl World {
         };
         let restriction = self
             .players
-            .live(p, i)?
-            .master(self.master_tables(), p)?
+            .live(player_id, list_index)?
+            .master(self.master_tables(), player_id)?
             .terrain_restriction;
         let mut shore = MapShore::new(
             &self.spatial,

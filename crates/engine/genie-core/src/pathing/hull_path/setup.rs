@@ -78,10 +78,10 @@ pub fn quick_reach_from(
     radius: Distance,
     range: Distance,
 ) -> GenieResult<Option<Distance>> {
-    let Some(t) = world.get_known(target)? else {
+    let Some(placed) = world.get_known(target)? else {
         return Ok(None);
     };
-    let to = t.position.ground();
+    let to = placed.position.ground();
     let mut pather = HullPather::new((world, by_id), me, target, mask, radius);
     let (result, path) = pather.find_quick(from, to, target, range)?;
     // the slot removes the manager's temporary tile records after (FUN_1410561f0), which the
@@ -114,7 +114,7 @@ impl<'w> HullPather<'w> {
         mask: TerrainMask,
         radius: Distance,
     ) -> Self {
-        let player = world.get(unit).map(|p| p.player);
+        let player = world.get(unit).map(|placed| placed.player);
         let ids: Vec<ObjectId> = [Some(unit), target].into_iter().flatten().collect();
         Self::for_list((world, by_id), &ids, mask, radius, player)
     }
@@ -137,11 +137,11 @@ impl<'w> HullPather<'w> {
     ) -> Self {
         let mut ignore: Vec<RecordId> = ids.iter().copied().map(RecordId::from).collect();
         for &id in ids {
-            let Some(p) = world.get(id) else {
+            let Some(placed) = world.get(id) else {
                 continue;
             };
-            let (x, y) = (p.position.x(), p.position.y());
-            if p.radius == Footprint::new(HALF, HALF) && x % ONE == HALF && y % ONE == HALF {
+            let (x, y) = (placed.position.x(), placed.position.y());
+            if placed.radius == Footprint::new(HALF, HALF) && x % ONE == HALF && y % ONE == HALF {
                 let (tx, ty) = (cvttss2si(x.floor()), cvttss2si(y.floor()));
                 let word = world.tiles().word(Tile::new(tx, ty)).unwrap_or(0);
                 if word & mask.blocked() != 0 {

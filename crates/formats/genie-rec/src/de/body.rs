@@ -239,9 +239,9 @@ impl Op<'_> {
         let words =
             |out: &mut Vec<u8>, ws: &[u32]| ws.iter().for_each(|w| out.extend(w.to_le_bytes()));
         match self {
-            Op::Pregame(p) => {
+            Op::Pregame(pregame) => {
                 words(out, &[5]);
-                write_fixed(p, out)?;
+                write_fixed(pregame, out)?;
             }
             Op::Command { packet, world_time } => {
                 words(out, &[1, packet.len() as u32]);
@@ -253,17 +253,17 @@ impl Op<'_> {
                 words(out, &[2, *dt, 0]);
                 write_fixed(checkpoint.as_ref(), out)?;
             }
-            Op::View(v) => {
+            Op::View(view) => {
                 words(out, &[3]);
-                write_fixed(v, out)?;
+                write_fixed(view, out)?;
             }
             Op::Chat { channel, text } => {
                 words(out, &[4, channel.cast_unsigned(), text.len() as u32]);
                 out.extend_from_slice(text);
             }
-            Op::TriggerSync(t) => {
+            Op::TriggerSync(trigger_sync) => {
                 words(out, &[5]);
-                write_fixed(t, out)?;
+                write_fixed(trigger_sync, out)?;
             }
             Op::End { trailer } => {
                 words(out, &[6]);
@@ -281,9 +281,9 @@ where
 {
     let mut cursor = Cursor::new(out);
     cursor.set_position(cursor.get_ref().len() as u64);
-    value
-        .write_le(&mut cursor)
-        .map_err(|e| GenieError::io("a fixed-size record that does not write").with("binrw", e))
+    value.write_le(&mut cursor).map_err(|error| {
+        GenieError::io("a fixed-size record that does not write").with("binrw", error)
+    })
 }
 
 #[cfg(test)]
@@ -422,9 +422,9 @@ mod tests {
         body.extend([1, 2, 3]);
         let ops = read(&body, false);
         assert_eq!(ops, vec![Ok(Op::Sync { dt: 20 }), Err(truncated(BASE + 8))]);
-        let e = ops[1].clone().unwrap_err();
+        let error = ops[1].clone().unwrap_err();
         assert_eq!(
-            e.context().collect::<Vec<_>>(),
+            error.context().collect::<Vec<_>>(),
             [("at", format!("{:#x}", BASE + 8).as_str())]
         );
     }
@@ -434,9 +434,9 @@ mod tests {
         let body = le(&[9]);
         let ops = read(&body, false);
         assert_eq!(ops, vec![Err(unknown_op(9, BASE))]);
-        let e = ops[0].clone().unwrap_err();
+        let error = ops[0].clone().unwrap_err();
         assert_eq!(
-            e.context().collect::<Vec<_>>(),
+            error.context().collect::<Vec<_>>(),
             [("op", "9"), ("at", format!("{BASE:#x}").as_str())]
         );
     }

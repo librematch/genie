@@ -89,17 +89,17 @@ impl Mover {
             // slot 0x5f0 with the walker's player's view of the hit's (FUN_141663d90 with the
             // ally flag): an ally pauses 0.1, anyone else 0.5 (Gaia counts for no one)
             let allied = world.allied_with(player, other.player);
-            if outranks && by_id.gait(id).is_some_and(|g| g.pause.is_some()) {
+            if outranks && by_id.gait(id).is_some_and(|gait| gait.pause.is_some()) {
                 self.pauses.push((id, hit_pause(allied, movement_tuning)));
             }
             // a hit that neither counts the other an ally, of the walked level's target's
             // master, notifies the walker's unit AI (0x215)
             if !allied
                 && !world.allied_with(other.player, player)
-                && let Some(t) = level.target.filter(|t| !t.is_recyclable())
+                && let Some(t) = level.target.filter(|object_id| !object_id.is_recyclable())
             {
-                let target = world.get(t).map(|t| t.master);
-                if target.is_some_and(|m| m == other.master) {
+                let target = world.get(t).map(|placed| placed.master);
+                if target.is_some_and(|master_id| master_id == other.master) {
                     self.in_the_way.push(id);
                 }
             }
@@ -209,8 +209,8 @@ impl Mover {
     ///
     /// Without the current sprite's facets: a unit whose sprites differ in their facets.
     pub(crate) fn yaw(&mut self, turn: Angle, facets: Option<SpriteFacets>) -> GenieResult<()> {
-        let m = rotation(turn.get(), UP);
-        let forward = normalize(rotate(&m, self.forward));
+        let rotation = rotation(turn.get(), UP);
+        let forward = normalize(rotate(&rotation, self.forward));
         self.set_orientation(forward, UP);
         let facets = facets.ok_or(GenieError::unsupported(
             "the yaw of a unit whose sprites differ in their facets",
@@ -242,8 +242,8 @@ impl Mover {
                 acceleration: BVector::ZERO,
             });
         }
-        if let Some(v) = self.velocity.as_mut() {
-            v.velocity = v.velocity.with_y(speed.get());
+        if let Some(velocity) = self.velocity.as_mut() {
+            velocity.velocity = velocity.velocity.with_y(speed.get());
         }
     }
 
@@ -253,7 +253,7 @@ impl Mover {
     pub fn paused(&self) -> bool {
         self.paths
             .first()
-            .is_some_and(|l| Seconds::ZERO < l.pause_time)
+            .is_some_and(|path_data| Seconds::ZERO < path_data.pause_time)
     }
 
     /// The speed control toward the waypoint (slot 198, `0x141150a80`): a unit whose turn fell
@@ -263,7 +263,7 @@ impl Mover {
     /// [`Mover::moved_at`]).
     pub(super) fn control_speed(&mut self, waypoint: BVector, clipped: Turn) {
         let position = self.moved_at.vector();
-        let Some(v) = self.velocity.as_mut() else {
+        let Some(velocity) = self.velocity.as_mut() else {
             self.velocity = Some(Velocity {
                 velocity: BVector::ZERO,
                 acceleration: BVector::new(0.0, 0.0, f32::MAX),
@@ -271,17 +271,18 @@ impl Mover {
             return;
         };
         if clipped == Turn::Clipped {
-            v.acceleration = v.acceleration.with_y(-f32::MAX);
-            v.velocity = v.velocity.with_y(0.0);
+            velocity.acceleration = velocity.acceleration.with_y(-f32::MAX);
+            velocity.velocity = velocity.velocity.with_y(0.0);
             return;
         }
         let d = waypoint - position;
         let distance = sqrt(d.height() * d.height() + d.x() * d.x() + d.y() * d.y());
         let toward = BVector::new(d.x() / distance, d.height() / distance, d.y() / distance);
         let angle = angle_between(self.forward, toward);
-        let radius =
-            ((self.stats.turn_radius * v.velocity.y()) / self.stats.turn_radius_speed.get()).get();
-        if 0.0 < v.velocity.y() && EPSILON < angle.abs() {
+        let radius = ((self.stats.turn_radius * velocity.velocity.y())
+            / self.stats.turn_radius_speed.get())
+        .get();
+        if 0.0 < velocity.velocity.y() && EPSILON < angle.abs() {
             let mut side = self.right;
             if 0.0 < cross(toward, self.forward).height() {
                 side = -side;
@@ -292,14 +293,14 @@ impl Mover {
                 side.y() * radius + position.y(),
             );
             if length(waypoint - centre) < radius {
-                v.acceleration = v.acceleration.with_y(-f32::MAX);
+                velocity.acceleration = velocity.acceleration.with_y(-f32::MAX);
                 return;
             }
         }
-        if self.stats.speed <= Speed::new(v.velocity.y()) {
+        if self.stats.speed <= Speed::new(velocity.velocity.y()) {
             return;
         }
-        v.acceleration = v.acceleration.with_y(f32::MAX);
+        velocity.acceleration = velocity.acceleration.with_y(f32::MAX);
     }
 }
 

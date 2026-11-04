@@ -94,7 +94,7 @@ impl FormationKind {
     #[must_use]
     pub const fn field(kind: Option<Self>) -> i32 {
         match kind {
-            Some(k) => k.raw(),
+            Some(formation_kind) => formation_kind.raw(),
             None => -1,
         }
     }
@@ -137,14 +137,14 @@ impl From<i32> for FormationKind {
 }
 
 impl Display for FormationKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.raw().fmt(f)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        self.raw().fmt(formatter)
     }
 }
 
 impl genie_diff::Diff for FormationKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

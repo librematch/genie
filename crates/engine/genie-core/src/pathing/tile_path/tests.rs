@@ -41,7 +41,7 @@ fn open_map(size: GridSize) -> Tiles {
 /// goal: a start off the map ends the search there, without the tile search.
 #[test]
 fn plan_from_off_the_map_reads_no_start_cell() {
-    let mut p = Planner::new(
+    let mut planner = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
@@ -56,7 +56,7 @@ fn plan_from_off_the_map_reads_no_start_cell() {
         full: true,
     };
     let mut out = Path::default();
-    let found = p
+    let found = planner
         .plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
         .unwrap();
     assert_eq!(found, Found::OffMap);
@@ -68,7 +68,7 @@ fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
     let terrain: Vec<TerrainId> = (0..128)
         .map(|i| TerrainId::named(u8::from(10 <= i % 16)))
         .collect();
-    let mut p = Planner::new(
+    let mut planner = Planner::new(
         GridSize::new(16, 8),
         terrain,
         Restriction::new(vec![1.0, 0.0]),
@@ -76,32 +76,35 @@ fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
     );
     // a goal on the water: the path's end
     assert_eq!(
-        p.last_open_point(
-            Point::new(2.5, 4.5),
-            Point::new(7.5, 4.5),
-            &tuning().tile_path
-        )
-        .unwrap(),
+        planner
+            .last_open_point(
+                Point::new(2.5, 4.5),
+                Point::new(7.5, 4.5),
+                &tuning().tile_path
+            )
+            .unwrap(),
         Some(Point::new(7.5, 4.5))
     );
     // ashore: the path ends at the node nearest the goal, the last water tile
     assert_eq!(
-        p.last_open_point(
-            Point::new(2.5, 4.5),
-            Point::new(13.5, 4.5),
-            &tuning().tile_path
-        )
-        .unwrap(),
+        planner
+            .last_open_point(
+                Point::new(2.5, 4.5),
+                Point::new(13.5, 4.5),
+                &tuning().tile_path
+            )
+            .unwrap(),
         Some(Point::new(9.5, 4.5))
     );
     // a goal off the map (result 0): none
     assert_eq!(
-        p.last_open_point(
-            Point::new(2.5, 4.5),
-            Point::new(16.5, 4.5),
-            &tuning().tile_path
-        )
-        .unwrap(),
+        planner
+            .last_open_point(
+                Point::new(2.5, 4.5),
+                Point::new(16.5, 4.5),
+                &tuning().tile_path
+            )
+            .unwrap(),
         None
     );
 }
@@ -110,7 +113,7 @@ fn the_last_open_point_walks_the_path_back_to_tile_with_an_edge() {
 /// downward while strictly nearer; neither: none.
 #[test]
 fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
-    let p = Planner::new(
+    let planner = Planner::new(
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
@@ -129,22 +132,22 @@ fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
     };
     // above at 7 (2 off), below at 4 (1 off): the nearer below
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 7])),
+        planner.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 7])),
         Some(4)
     );
     // one off either way: a tie goes up
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 6])),
+        planner.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[4, 6])),
         Some(6)
     );
     // above at 6 only
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[6])),
+        planner.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[6])),
         Some(6)
     );
     // below at 1 only, beyond nothing found above
     assert_eq!(
-        p.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[1])),
+        planner.nearest_on_boundary(5, 0, 7, CellEdges::N, edges(&[1])),
         Some(1)
     );
     // another edge only: none
@@ -152,14 +155,17 @@ fn the_nearest_tile_with_the_edge_is_found_up_then_nearer_down() {
         edges: CellEdges::S,
         kind: CellKind::NONE,
     };
-    assert_eq!(p.nearest_on_boundary(5, 0, 7, CellEdges::N, south), None);
+    assert_eq!(
+        planner.nearest_on_boundary(5, 0, 7, CellEdges::N, south),
+        None
+    );
 }
 
 /// `FUN_140f78ba0` on an open map: the tiles' A* (`FUN_140f79250`, its neighbours by
 /// `FUN_140f76840`) reaches the goal, and the path runs from the start to the goal point.
 #[test]
 fn the_tile_search_reaches_goal_on_an_open_map() {
-    let mut p = Planner::new(
+    let mut planner = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
@@ -175,7 +181,8 @@ fn the_tile_search_reaches_goal_on_an_open_map() {
     };
     let mut out = Path::default();
     assert_eq!(
-        p.search_on_tiles(&req, &mut out, &tuning().tile_path)
+        planner
+            .search_on_tiles(&req, &mut out, &tuning().tile_path)
             .unwrap(),
         Found::Goal
     );
@@ -184,7 +191,8 @@ fn the_tile_search_reaches_goal_on_an_open_map() {
     // the search leaves its marks behind: the same search again finds the same path
     let mut again = Path::default();
     assert_eq!(
-        p.search_on_tiles(&req, &mut again, &tuning().tile_path)
+        planner
+            .search_on_tiles(&req, &mut again, &tuning().tile_path)
             .unwrap(),
         Found::Goal
     );
@@ -195,8 +203,8 @@ fn the_tile_search_reaches_goal_on_an_open_map() {
 /// on the start's side.
 #[test]
 fn the_tile_search_ends_nearest_the_goal_behind_wall() {
-    let wall = |t: Tile| t.x() == 3;
-    let mut p = Planner::new(
+    let wall = |tile: Tile| tile.x() == 3;
+    let mut planner = Planner::new(
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
@@ -212,7 +220,8 @@ fn the_tile_search_ends_nearest_the_goal_behind_wall() {
     };
     let mut out = Path::default();
     assert_eq!(
-        p.search_on_tiles(&req, &mut out, &tuning().tile_path)
+        planner
+            .search_on_tiles(&req, &mut out, &tuning().tile_path)
             .unwrap(),
         Found::Nearest
     );
@@ -225,7 +234,7 @@ fn the_tile_search_ends_nearest_the_goal_behind_wall() {
 /// (`shorter_start`); either way the path runs from the start to the goal.
 #[test]
 fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
-    let mut p = Planner::new(
+    let mut planner = Planner::new(
         GridSize::new(64, 8),
         vec![TerrainId::named(0); 512],
         Restriction::new(vec![1.0]),
@@ -242,7 +251,8 @@ fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
         };
         let mut out = Path::default();
         assert_eq!(
-            p.plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
+            planner
+                .plan::<crate::GenieError>(&req, false, &mut out, None, &tuning().tile_path)
                 .unwrap(),
             Found::Goal
         );
@@ -253,45 +263,51 @@ fn full_plan_searches_the_tiles_near_and_shortens_the_start_far() {
 
 #[test]
 fn an_open_map_is_one_node_cell_per_eight_tiles() {
-    let p = Planner::new(
+    let planner = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
         Restriction::new(vec![1.0]),
         &open_map(GridSize::new(16, 8)),
     );
     let levels = [(16, 8), (8, 4), (4, 2), (2, 1)].map(|(w, h)| GridSize::new(w, h));
-    assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
+    assert_eq!(
+        GridLevel::ALL.map(|grid_level| planner.level_size(grid_level)),
+        levels
+    );
     // level 3: two uniform node cells, joined across their shared edge only
     let node = |edges| Cell {
         edges,
         kind: CellKind::NODE,
     };
     assert_eq!(
-        p.level(GridLevel::new(3)),
+        planner.level(GridLevel::new(3)),
         &[node(CellEdges::E), node(CellEdges::W)]
     );
     // an inner tile has all four edges; a corner tile two
-    let tile = |x: usize, y: usize| p.level(GridLevel::new(0))[y * 16 + x].bytes();
+    let tile = |x: usize, y: usize| planner.level(GridLevel::new(0))[y * 16 + x].bytes();
     assert_eq!(tile(3, 3), [CellEdges::EDGES.bits(), 0]);
     assert_eq!(tile(0, 0), [(CellEdges::E | CellEdges::S).bits(), 0]);
 }
 
 #[test]
 fn padding_tiles_of_map_that_is_not_multiple_of_eight_lie_off_the_map() {
-    let p = Planner::new(
+    let planner = Planner::new(
         GridSize::new(6, 6),
         vec![TerrainId::named(0); 36],
         Restriction::new(vec![1.0]),
         &open_map(GridSize::new(6, 6)),
     );
     let levels = [8, 4, 2, 1].map(|s| GridSize::new(s, s));
-    assert_eq!(GridLevel::ALL.map(|l| p.level_size(l)), levels);
-    let tile = |x: usize, y: usize| p.level(GridLevel::new(0))[y * 8 + x].bytes();
+    assert_eq!(
+        GridLevel::ALL.map(|grid_level| planner.level_size(grid_level)),
+        levels
+    );
+    let tile = |x: usize, y: usize| planner.level(GridLevel::new(0))[y * 8 + x].bytes();
     assert_eq!(tile(6, 0), [0, 0xf]);
     assert_eq!(tile(5, 5), [(CellEdges::N | CellEdges::W).bits(), 0]);
     // the level-1 cell (3, 0) covers tiles 6 and 7: off the map, both of its children
     assert_eq!(
-        p.level(GridLevel::new(1))[3].kind.off_map(),
+        planner.level(GridLevel::new(1))[3].kind.off_map(),
         CellKind::OFF_MAP
     );
 }
@@ -299,8 +315,8 @@ fn padding_tiles_of_map_that_is_not_multiple_of_eight_lie_off_the_map() {
 #[test]
 fn wall_splits_its_level_three_cell_into_its_children() {
     // a blocked column at x = 3 cuts the first 8 × 8 cell in two
-    let wall = |t: Tile| t.x() == 3;
-    let p = Planner::new(
+    let wall = |tile: Tile| tile.x() == 3;
+    let planner = Planner::new(
         GridSize::new(8, 8),
         vec![TerrainId::named(0); 64],
         Restriction::new(vec![1.0]),
@@ -308,12 +324,12 @@ fn wall_splits_its_level_three_cell_into_its_children() {
     );
     let node_or_mixed = CellKind::NODE | CellKind::MIXED;
     assert_eq!(
-        p.level(GridLevel::new(3))[0].kind & node_or_mixed,
+        planner.level(GridLevel::new(3))[0].kind & node_or_mixed,
         CellKind::MIXED
     );
-    assert_eq!(p.level(GridLevel::new(0))[3], Cell::EMPTY);
+    assert_eq!(planner.level(GridLevel::new(0))[3], Cell::EMPTY);
     assert_eq!(
-        p.level(GridLevel::new(0))[2].edges,
+        planner.level(GridLevel::new(0))[2].edges,
         CellEdges::W | CellEdges::S
     );
 }
@@ -368,7 +384,7 @@ fn the_smoothing_keeps_the_points_before_blocked_walk() {
     let mut path = Path {
         points: points
             .iter()
-            .map(|p| BVector::new(p.x(), 0.0, p.y()))
+            .map(|point| BVector::new(point.x(), 0.0, point.y()))
             .collect(),
         length: Distance::ZERO,
     };
@@ -449,7 +465,7 @@ fn an_appended_path_takes_the_source_length_or_measures_short_or_nan_one() {
 fn closed_rectangle_closes_the_node_cells_under_it() {
     // tile (0, 0) has no passable neighbour: its level-3, 2 and 1 cells are mixed, and the
     // four tiles of the level-1 cell are nodes
-    let walls = |t: Tile| t == Tile::new(1, 0) || t == Tile::new(0, 1);
+    let walls = |tile: Tile| tile == Tile::new(1, 0) || tile == Tile::new(0, 1);
     let mut p = Planner::new(
         GridSize::new(16, 8),
         vec![TerrainId::named(0); 128],
@@ -466,10 +482,12 @@ fn closed_rectangle_closes_the_node_cells_under_it() {
     // the corners swapped and the low y off the map
     p.close_rect(PlanRect::new(5, 3, 1, -2), Mark::Set);
     assert_eq!(p.region, PlanRect::new(1, 0, 5, 3));
-    let closed = |p: &Planner, l: u8, x: usize, y: usize| {
-        let l = GridLevel::new(l);
-        let w = p.level_size(l).width() as usize;
-        p.level(l)[y * w + x].edges.contains(CellEdges::CLOSED)
+    let closed = |planner: &Planner, l: u8, x: usize, y: usize| {
+        let grid_level = GridLevel::new(l);
+        let level_size = planner.level_size(grid_level).width() as usize;
+        planner.level(grid_level)[y * level_size + x]
+            .edges
+            .contains(CellEdges::CLOSED)
     };
     let expected: [(u8, usize, usize, bool); 14] = [
         (0, 0, 0, false),

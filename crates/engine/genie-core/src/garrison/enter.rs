@@ -148,7 +148,7 @@ impl World {
         let unit = self.players.live_mut(player, idx)?;
         let state = unit.life.state;
         match (failed, self.parts.unit_ai.get_mut(unit.id)) {
-            (Some(n), Some(ai)) => ai.post(n, state),
+            (Some(notify), Some(ai)) => ai.post(notify, state),
             _ => Ok(()),
         }
     }
@@ -220,9 +220,9 @@ impl World {
                 target
             },
         );
-        let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
-        let tm = t.master(self.master_tables(), tp)?;
-        let (class, height) = (tm.class, t.position().z());
+        let (tp, unit) = self.object(target).ok_or_else(|| object_gone(target))?;
+        let tm = unit.master(self.master_tables(), tp)?;
+        let (class, height) = (tm.class, unit.position().z());
         let (at, _) = self.enter_meeting(player, idx, target)?;
         let action = EnterAction::new(target, at.with_height(height), task);
         self.take(target.id(), self.releaser(player, idx)?)?;
@@ -272,14 +272,14 @@ impl World {
         if self.players.live(player, idx)?.life.inside.is_some() {
             return self.enter_from_inside(player, idx, action, slot).map(Some);
         }
-        let (tp, t) = self.object(target).ok_or_else(|| object_gone(target))?;
-        if !self.has_room(tp, t, Some(id))? {
+        let (tp, unit) = self.object(target).ok_or_else(|| object_gone(target))?;
+        if !self.has_room(tp, unit, Some(id))? {
             return Err(GenieError::unsupported(
                 "an Enter into a building without room (state 11)",
             ));
         }
-        let (t, start) = self.entering(player, idx, target, task.work_range)?;
-        let walking = self.enter_walk_again(player, idx, &mut action, &t, start)?;
+        let (enter_target, start) = self.entering(player, idx, target, task.work_range)?;
+        let walking = self.enter_walk_again(player, idx, &mut action, &enter_target, start)?;
         match walking {
             // the enter's set_state(1) reads the Enter as the unit's; a sub-action goes back
             Walking::Enter => {
@@ -291,9 +291,13 @@ impl World {
                 let entered = self.enter_now(player, idx, target);
                 if slot == EnterSlot::UnderArtifact {
                     let actions = self.parts.actions.of_mut(id)?;
-                    let e = actions.list.take_enter();
-                    if let (Some(e), Some(art)) = (e, actions.list.artifact_mut()) {
-                        art.sub = Some(ArtifactSub::Enter { enter: e });
+                    let take_enter = actions.list.take_enter();
+                    if let (Some(enter_action), Some(art)) =
+                        (take_enter, actions.list.artifact_mut())
+                    {
+                        art.sub = Some(ArtifactSub::Enter {
+                            enter: enter_action,
+                        });
                     }
                 }
                 entered.map(|()| None)
@@ -331,14 +335,14 @@ impl World {
                 ))?;
         let gone = art.hold_enter(action);
         // the old Enter's teardown lets its target go before its MoveTo's stops the unit
-        if let Some(t) = gone.released {
-            self.release(t, by)?;
+        if let Some(object_id) = gone.released {
+            self.release(object_id, by)?;
         }
         let unit = self.players.live(player, idx)?;
         if gone.stops
-            && let Some(m) = self.parts.mover_mut(unit.id)
+            && let Some(mover) = self.parts.mover_mut(unit.id)
         {
-            m.stop()?;
+            mover.stop()?;
         }
         Ok(())
     }
@@ -397,16 +401,20 @@ impl World {
             &self.model.tuning,
         );
         let id = self.players.live(player, idx)?.id;
-        let (tp, t) = self.object(target).ok_or(UNPLACED)?;
-        let tm = t.master(self.master_tables(), tp)?.clone();
-        let room = self.has_room(tp, t, Some(id))?;
-        let t = placed_object(&self.players, self.place(target))?;
+        let (tp, target_unit) = self.object(target).ok_or(UNPLACED)?;
+        let tm = target_unit.master(self.master_tables(), tp)?.clone();
+        let room = self.has_room(tp, target_unit, Some(id))?;
+        let placed_object = placed_object(&self.players, self.place(target))?;
         let unit = self.players.live(player, idx)?;
         enter_view(
             &mut self.spatial,
             &self.model.masters,
             (unit, self.parts.mover_of(unit.id)),
-            ((t, self.parts.mover_of(t.id)), &tm, room),
+            (
+                (placed_object, self.parts.mover_of(placed_object.id)),
+                &tm,
+                room,
+            ),
             range,
             by_id,
         )
@@ -425,7 +433,7 @@ impl World {
         player: PlayerId,
         idx: ListIndex,
         action: &mut EnterAction,
-        t: &EnterTarget,
+        enter_target: &EnterTarget,
         start: WalkStart,
     ) -> GenieResult<Walking> {
         let by_id = ObjectsRef::new(
@@ -454,14 +462,14 @@ impl World {
             zones: &mut self.zones,
             target,
             master: &master,
-            room: t.room,
+            room: enter_target.room,
             unit,
             mover: self.parts.mover_of(unit.id),
             target_actions: self.parts.actions_of(target.id),
             target_unread: self.parts.unread.get(target.id),
             target_mover: self.parts.mover_of(target.id),
         };
-        action.walk_again(t, start, meeting, &reads, by_id)
+        action.walk_again(enter_target, start, meeting, &reads, by_id)
     }
 
     /// `FUN_140a85f30` ([`meeting`], [`Meeting::point`]) for unit `idx` of `player` and its
@@ -487,9 +495,9 @@ impl World {
             &self.model.tuning,
         );
         let id = self.players.live(player, idx)?.id;
-        let (tp, t) = self.object(target).ok_or(UNPLACED)?;
-        let master = t.master(self.master_tables(), tp)?.clone();
-        let room = self.has_room(tp, t, Some(id))?;
+        let (tp, target_unit) = self.object(target).ok_or(UNPLACED)?;
+        let master = target_unit.master(self.master_tables(), tp)?.clone();
+        let room = self.has_room(tp, target_unit, Some(id))?;
         let target = placed_object(&self.players, self.place(target))?;
         let unit = self.players.live(player, idx)?;
         Meeting {
@@ -555,7 +563,7 @@ impl World {
     /// The transport's slot 0x340 (`FUN_141216c50`, [`World::move_aside`]: range 0, forced,
     /// running) to `to`, where it meets an entering unit.
     pub(crate) fn ship_move(&mut self, ship: Option<ContainerId>, to: Position) -> GenieResult<()> {
-        let Some(Place::Live(p, i)) = self.place(ship) else {
+        let Some(Place::Live(player_id, list_index)) = self.place(ship) else {
             return Err(UNREACHED);
         };
         let walk = AiMove {
@@ -564,7 +572,7 @@ impl World {
             force: OrderForce::Forced,
             pace: Pace::Run,
         };
-        self.move_aside(p, i, walk)
+        self.move_aside(player_id, list_index, walk)
     }
 
     /// The enter at the Enter's start ([`crate::objects::unit::Unit::enter_building`] into its
@@ -580,19 +588,19 @@ impl World {
             .players
             .iter()
             .flat_map(|p| p.objects.iter().chain(&p.sleeping))
-            .filter(|u| u.life.inside == Some(target))
+            .filter(|target_unit| target_unit.life.inside == Some(target))
             .count();
         let Some(Place::Live(..)) = self.place(target) else {
             return Err(ENTER_SLEEPING);
         };
         let roles = self.model.roles.clone();
-        self.run_on_step(player, idx, |unit, actions, c| {
-            if unit.enter_building(actions, c, target, inside, &roles)? == EnterOutcome::NoRoom {
+        self.run_on_step(player, idx, |unit, actions, step| {
+            if unit.enter_building(actions, step, target, inside, &roles)? == EnterOutcome::NoRoom {
                 return Err(GenieError::unsupported(
                     "an Enter in reach that did not get in",
                 ));
             }
-            unit.entered(actions, c)
+            unit.entered(actions, step)
         })
     }
 
@@ -620,8 +628,8 @@ impl World {
             .master(self.master_tables(), tp)?
             .clone();
         let roles = self.model.roles.clone();
-        self.run_on_step(player, idx, |unit, actions, c| {
-            unit.go_inside(actions, c, target, &me, &bm, &roles)
+        self.run_on_step(player, idx, |unit, actions, step| {
+            unit.go_inside(actions, step, target, &me, &bm, &roles)
         })
     }
 }
@@ -634,7 +642,7 @@ impl World {
 fn placed_object(players: &[Player], place: Option<Place>) -> GenieResult<&Unit> {
     match place {
         Some(Place::Live(p, i)) => players.live(p, i),
-        Some(Place::Sleeping(p, i)) => players.asleep(p, i),
+        Some(Place::Sleeping(player_id, list_index)) => players.asleep(player_id, list_index),
         None => Err(UNPLACED),
     }
 }

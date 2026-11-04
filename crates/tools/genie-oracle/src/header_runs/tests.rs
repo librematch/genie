@@ -22,5 +22,5 @@ fn each_tick_gives_the_players_blocks() {
     let blocks = blocks_per_tick(&rec, &[1, 0], 5, None).unwrap();
     assert_eq!(blocks, [[block(1), block(0)], [block(1), block(0)]]);
     assert_eq!(blocks_per_tick(&rec, &[1], 1, None).unwrap().len(), 1);
-    assert!(blocks_per_tick(&rec, &[2], 1, None).is_err_and(|e| e == no_such_player(2)));
+    assert!(blocks_per_tick(&rec, &[2], 1, None).is_err_and(|error| error == no_such_player(2)));
 }

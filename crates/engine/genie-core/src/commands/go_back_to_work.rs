@@ -20,11 +20,11 @@ pub struct GoBackToWorkCommand {
 impl GoBackToWorkCommand {
     /// `do_command`'s check leaves only the player's own building (or any with the setting
     /// `+0x1074`); the handler (`FUN_141625590`) runs on it ([`World::go_back_to_work`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        if w.players.get(self.player.index()).is_none() {
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        if world.players.get(self.player.index()).is_none() {
             return Ok(());
         }
-        w.go_back_to_work(self.player, &[Some(self.id)])
+        world.go_back_to_work(self.player, &[Some(self.id)])
     }
 }
 
@@ -41,10 +41,10 @@ pub struct GoBackToWork2Command {
 impl GoBackToWork2Command {
     /// `do_command`'s check refuses a count past the packet's ids; the handler reads the first
     /// of them ([`World::read_units`], [`World::go_back_to_work`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
-        w.go_back_to_work(self.player, ids)
+        world.go_back_to_work(self.player, ids)
     }
 }

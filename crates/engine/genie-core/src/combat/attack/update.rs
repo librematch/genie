@@ -95,43 +95,43 @@ impl Attack {
     /// The walk's and the notifies'.
     pub(crate) fn update_gone(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-        r: &AttackReads,
+        attack_reads: &AttackReads,
         master_class: ClassId,
         roles: &Roles,
     ) -> GenieResult<UpdateCode> {
-        self.timer += c.dt.seconds();
+        self.timer += step.dt.seconds();
         let gives_up = GiveUp {
-            patience: if !r.player_kind.is_computer()
+            patience: if !attack_reads.player_kind.is_computer()
                 && roles.of_class(master_class).contains(ClassRoles::VILLAGER)
             {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
-            stance: r.stance,
+            stance: attack_reads.stance,
         };
-        match self.update_list(c, unit, me, r, gives_up)? {
+        match self.update_list(step, unit, me, attack_reads, gives_up)? {
             SubCode::Done => {
-                self.delete_move_to(c.w.parts.mover_mut(unit.id))?;
+                self.delete_move_to(step.w.parts.mover_mut(unit.id))?;
                 if self.voice.is_loud() {
                     unit.post_own(
-                        &mut c.w.parts.unit_ai,
+                        &mut step.w.parts.unit_ai,
                         NotifyKind::ACTION_INVALIDATED,
                         [600, 0, 0x202],
                     )?;
                 }
                 self.finish(
                     unit,
-                    c.w.parts.motion_mut(unit.id),
-                    c.w.streams.get(Stream::Sprite),
-                    c.w.model.tuning.sprite,
+                    step.w.parts.motion_mut(unit.id),
+                    step.w.streams.get(Stream::Sprite),
+                    step.w.model.tuning.sprite,
                 )?;
                 Ok(UpdateCode::Done)
             }
-            SubCode::Failed => self.walk_failed(c, unit),
+            SubCode::Failed => self.walk_failed(step, unit),
             SubCode::UnderWay | SubCode::TargetGone => Ok(UpdateCode::UnderWay),
         }
     }
@@ -170,59 +170,71 @@ impl Attack {
     /// What the update does not model.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         actions: &mut Action,
         me: Me,
-        f: &mut Fight,
-        r: &AttackReads,
+        fight: &mut Fight,
+        attack_reads: &AttackReads,
     ) -> GenieResult<UpdateCode> {
-        let roles = &c.w.model.roles.clone();
-        self.timer += c.dt.seconds();
+        let roles = &step.w.model.roles.clone();
+        self.timer += step.dt.seconds();
         // a dead tree (class 15) up to state 5 keeps a non-villager's attack going: its update
         // goes on, the target not alive (`0x140a8342e`)
-        let target_state = f.victim.state;
+        let target_state = fight.victim.state;
         let alive = target_state <= ObjectState::Alive;
         let gone = !alive
-            && (!roles.of_class(f.victim.class).contains(ClassRoles::TREE)
-                || roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
-                || ObjectState::Dead < f.victim.state);
+            && (!roles
+                .of_class(fight.victim.class)
+                .contains(ClassRoles::TREE)
+                || roles
+                    .of_class(fight.own.class)
+                    .contains(ClassRoles::VILLAGER)
+                || ObjectState::Dead < fight.victim.state);
         if self.state != AttackState::Killed && gone {
-            return self.target_died(c, unit, f, r, roles);
+            return self.target_died(step, unit, fight, attack_reads, roles);
         }
-        let (_, t) = self.held_target(&c.w.spatial)?;
+        let (_, placed) = self.held_target(&step.w.spatial)?;
         if self.state != AttackState::Killed
-            && (t.position.x() != self.seen.x() || t.position.y() != self.seen.y())
-            && let Some(code) = self.target_moved(c, unit, f, r, &t, roles)?
+            && (placed.position.x() != self.seen.x() || placed.position.y() != self.seen.y())
+            && let Some(code) =
+                self.target_moved(step, unit, fight, attack_reads, &placed, roles)?
         {
             return Ok(code);
         }
-        if let Some(code) = self.ends_early(c, unit, f, r, target_state, roles)? {
+        if let Some(code) = self.ends_early(step, unit, fight, attack_reads, target_state, roles)? {
             return Ok(code);
         }
         match self.state {
             // case 0: the unit's animation stops; the list deletes the Attack
             AttackState::Done => {
-                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
+                set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 Ok(UpdateCode::Done)
             }
             // case 3 (state 4) walks the MoveTo to the target, cases 4 and 10 (states 5 and
             // 11) to where it was seen
             AttackState::Move { .. }
             | AttackState::GotoSeen { .. }
-            | AttackState::GotoPoint { .. } => self.walk(c, unit, me, f, r, (t.position, t.radius)),
-            AttackState::Ready => self.ready_step(c, unit, f, r, target_state),
-            AttackState::Swing => self.swing(c, unit, actions, f, r),
-            AttackState::Killed => self.killed_step(c, unit),
+            | AttackState::GotoPoint { .. } => self.walk(
+                step,
+                unit,
+                me,
+                fight,
+                attack_reads,
+                (placed.position, placed.radius),
+            ),
+            AttackState::Ready => self.ready_step(step, unit, fight, attack_reads, target_state),
+            AttackState::Swing => self.swing(step, unit, actions, fight, attack_reads),
+            AttackState::Killed => self.killed_step(step, unit),
             // case 0xc: a failed attack posts 0x1f9 with 600 every update (quiet or not), the
             // unit's animation stops and the update returns 3
             AttackState::Failed => {
                 unit.post_own(
-                    &mut c.w.parts.unit_ai,
+                    &mut step.w.parts.unit_ai,
                     NotifyKind::ACTION_FAILED,
                     [600, 0, 0],
                 )?;
-                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
+                set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 Ok(UpdateCode::Failed)
             }
             // the states without a case (0; 3, 8 to 10, 12, 14 and above, which no step sets)
@@ -235,10 +247,10 @@ impl Attack {
     /// and ends, returning 5 ([`Attack::lost`] for a unit's own Attack).
     pub(super) fn target_died(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         roles: &Roles,
     ) -> GenieResult<UpdateCode> {
         // the target died before the attack ended (the update's start): one of stance 0 that
@@ -248,14 +260,17 @@ impl Attack {
         // count clears, the caller's) and its point, posts no notify as the hunt's
         // sub-action (`+0x60`), ends (set_state 1) and returns 5
         if self.voice.is_loud() {
-            return self.lost(c, unit, f, r, roles);
+            return self.lost(step, unit, fight, attack_reads, roles);
         }
-        if !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER) {
+        if !roles
+            .of_class(fight.own.class)
+            .contains(ClassRoles::VILLAGER)
+        {
             return Err(GenieError::unsupported(
                 "an Attack of a unit other than a villager whose target died",
             ));
         }
-        if f.victim.player != PlayerId::new(0) {
+        if fight.victim.player != PlayerId::new(0) {
             return Err(GenieError::unsupported(
                 "a villager's Attack whose player-owned target died (its unit AI forgets it)",
             ));
@@ -264,22 +279,22 @@ impl Attack {
         self.point = Position::from([NONE; 3]);
         self.finish(
             unit,
-            c.w.parts.motion_mut(unit.id),
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion_mut(unit.id),
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::Code5)
     }
 
-    /// The update on a target `t` that moved from where it was seen; Some with the update's code
-    /// when that ends it.
+    /// The update on a target `placed` that moved from where it was seen; Some with the update's
+    /// code when that ends it.
     pub(super) fn target_moved(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
-        t: &Placed,
+        fight: &Fight,
+        attack_reads: &AttackReads,
+        placed: &Placed,
         roles: &Roles,
     ) -> GenieResult<Option<UpdateCode>> {
         // the target moved: where it was seen follows (`+0xa4`..`+0xac`); one the unit's
@@ -290,21 +305,33 @@ impl Attack {
         // unit AI, or whose unit AI has an order and an empty queue, waits
         // ([`Attack::wait_at_seen`]; one in state 5 keeps going); any other fails
         // ([`Attack::out_of_sight`])
-        self.seen = t.position;
-        let seen = sees(&c.w.spatial, f, t.position)?;
+        self.seen = placed.position;
+        let seen = sees(&step.w.spatial, fight, placed.position)?;
         if seen
             && matches!(
                 self.state,
                 AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
             )
         {
-            let ground =
-                c.w.parts
-                    .mover_of(unit.id)
-                    .map(|m| m.stats.radius.ground())
-                    .ok_or(ATTACKER_UNMOVING)?;
-            let gap = footprint_gap(unit.place.position(), ground, t.position, t.radius);
-            self.follow(unit, &mut c.w.attack_ground(unit.id), r, f, gap)?;
+            let ground = step
+                .w
+                .parts
+                .mover_of(unit.id)
+                .map(|mover| mover.stats.radius.ground())
+                .ok_or(ATTACKER_UNMOVING)?;
+            let gap = footprint_gap(
+                unit.place.position(),
+                ground,
+                placed.position,
+                placed.radius,
+            );
+            self.follow(
+                unit,
+                &mut step.w.attack_ground(unit.id),
+                attack_reads,
+                fight,
+                gap,
+            )?;
             return Ok(Some(UpdateCode::UnderWay));
         }
         if !seen
@@ -313,22 +340,24 @@ impl Attack {
                 AttackState::Move { .. } | AttackState::GotoSeen { .. }
             )
         {
-            let gives_up = match r.ai_order {
+            let gives_up = match attack_reads.ai_order {
                 AiOrder::Absent => false,
                 AiOrder::Idle => true,
-                AiOrder::Order(_) => !r.flags.contains(AttackerFlags::QUEUE_EMPTY),
+                AiOrder::Order(_) => !attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY),
             };
-            if f.own.player == PlayerId::new(0) || gives_up {
-                return self.out_of_sight(c, unit, f, r, roles).map(Some);
+            if fight.own.player == PlayerId::new(0) || gives_up {
+                return self
+                    .out_of_sight(step, unit, fight, attack_reads, roles)
+                    .map(Some);
             }
             if !matches!(self.state, AttackState::GotoSeen { .. }) {
                 self.wait_at_seen(
                     unit,
-                    c.w.parts.motion_mut(unit.id),
-                    f,
-                    r,
-                    &c.w.model.graphics,
-                    &c.w.model.tuning.move_to,
+                    step.w.parts.motion_mut(unit.id),
+                    fight,
+                    attack_reads,
+                    &step.w.model.graphics,
+                    &step.w.model.tuning.move_to,
                 )?;
                 return Ok(Some(UpdateCode::UnderWay));
             }
@@ -341,10 +370,10 @@ impl Attack {
     /// building that cannot attack.
     pub(super) fn ends_early(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         target_state: ObjectState,
         roles: &Roles,
     ) -> GenieResult<Option<UpdateCode>> {
@@ -354,24 +383,24 @@ impl Attack {
         // returns 1, unless the target is livestock (58) or a farm (49) that was its player's when
         // the Attack took it (+0x9f)
         let spared = roles
-            .of_class(f.victim.class)
+            .of_class(fight.victim.class)
             .intersects(ClassRoles::LIVESTOCK | ClassRoles::FARM)
             && self.same_owner;
-        let rng = c.w.streams.get(Stream::Sprite);
+        let rng = step.w.streams.get(Stream::Sprite);
         if target_state <= ObjectState::Alive
-            && f.own.player != PlayerId::new(0)
+            && fight.own.player != PlayerId::new(0)
             && !spared
-            && f.victim.allied.by_attacker
+            && fight.victim.allied.by_attacker
         {
             self.finish(
                 unit,
-                c.w.parts.motion_mut(unit.id),
+                step.w.parts.motion_mut(unit.id),
                 rng,
-                c.w.model.tuning.sprite,
+                step.w.model.tuning.sprite,
             )?;
             if self.voice.is_loud() {
                 unit.post_own(
-                    &mut c.w.parts.unit_ai,
+                    &mut step.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
@@ -381,16 +410,16 @@ impl Attack {
         // a target inside another (+0x2f0): the attack ends (set_state 1) and returns 4, which
         // keeps it in the list; a unit's own Attack (not quiet, +0x60) of a unit whose unit AI's
         // order queue is empty posts 0x1fb with 600 and the target
-        if f.victim.inside {
+        if fight.victim.inside {
             self.finish(
                 unit,
-                c.w.parts.motion_mut(unit.id),
+                step.w.parts.motion_mut(unit.id),
                 rng,
-                c.w.model.tuning.sprite,
+                step.w.model.tuning.sprite,
             )?;
-            if self.voice.is_loud() && r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
+            if self.voice.is_loud() && attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY) {
                 unit.post_own(
-                    &mut c.w.parts.unit_ai,
+                    &mut step.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
@@ -399,16 +428,16 @@ impl Attack {
         }
         // a building that cannot attack (FUN_14120ea30) ends it (set_state 1), its own Attack
         // posting 0x1fb with 600 and the target, and returns 1: the list deletes it
-        if !r.flags.contains(AttackerFlags::ARMED) {
+        if !attack_reads.flags.contains(AttackerFlags::ARMED) {
             self.finish(
                 unit,
-                c.w.parts.motion_mut(unit.id),
+                step.w.parts.motion_mut(unit.id),
                 rng,
-                c.w.model.tuning.sprite,
+                step.w.model.tuning.sprite,
             )?;
             if self.voice.is_loud() {
                 unit.post_own(
-                    &mut c.w.parts.unit_ai,
+                    &mut step.w.parts.unit_ai,
                     NotifyKind::ACTION_INVALIDATED,
                     [600, ObjectId::field(self.target.map(AttackTargetId::id)), 0],
                 )?;
@@ -423,24 +452,29 @@ impl Attack {
     /// (`target_state` past 2, a dead tree) ends the attack with code 5.
     pub(super) fn ready_step(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         target_state: ObjectState,
     ) -> GenieResult<UpdateCode> {
-        let sprite_tuning = c.w.model.tuning.sprite;
-        let mut g = c.w.attack_ground(unit.id);
-        match self.ready_to_attack(unit, &mut g, f, r, AtOnce::Tested)? {
+        let sprite_tuning = step.w.model.tuning.sprite;
+        let mut ground = step.w.attack_ground(unit.id);
+        match self.ready_to_attack(unit, &mut ground, fight, attack_reads, AtOnce::Tested)? {
             // a target no longer alive (a dead tree): set_state(1), code 5
             Readiness::Ready if ObjectState::Alive < target_state => {
-                self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
+                self.finish(
+                    unit,
+                    ground.motion.reborrow(),
+                    ground.sprite_rng,
+                    sprite_tuning,
+                )?;
                 return Ok(UpdateCode::Code5);
             }
-            Readiness::Ready => self.set_swing(unit, &mut g, f, r)?,
+            Readiness::Ready => self.set_swing(unit, &mut ground, fight, attack_reads)?,
             Readiness::Waiting => {}
             Readiness::Away(gap) => {
-                self.follow(unit, &mut g, r, f, gap)?;
+                self.follow(unit, &mut ground, attack_reads, fight, gap)?;
             }
         }
         Ok(UpdateCode::UnderWay)
@@ -450,7 +484,7 @@ impl Attack {
     /// its target go and ends.
     pub(super) fn killed_step(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
     ) -> GenieResult<UpdateCode> {
         // case 1: once the swing's sprite looped (or there is none, or it does not
@@ -468,12 +502,12 @@ impl Attack {
             self.target = None;
             self.finish(
                 unit,
-                c.w.parts.motion_mut(unit.id),
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion_mut(unit.id),
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
             unit.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::ACTION_INVALIDATED,
                 [600, 0, 0x202],
             )?;
@@ -483,17 +517,17 @@ impl Attack {
         // none), it posts 0x1fb with 600 and 0x202, ends (set_state 1) and returns 2,
         // which keeps it in the list
         let target = self.target.take();
-        let_go(c, unit, target)?;
+        let_go(step, unit, target)?;
         unit.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::ACTION_INVALIDATED,
             [600, 0, 0x202],
         )?;
         self.finish(
             unit,
-            c.w.parts.motion_mut(unit.id),
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion_mut(unit.id),
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::Code2)
     }
@@ -505,17 +539,17 @@ impl Attack {
         &mut self,
         unit: &Unit,
         mut motion: MotionMut<'_>,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         graphics: &Graphics,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<()> {
         self.enter(AttackState::GotoSeen { move_to: None }, motion.reborrow())?;
-        self.range = f.own.source.weapon_range;
+        self.range = fight.own.source.weapon_range;
         self.goto_point(
             |move_to| AttackState::GotoSeen { move_to },
             (unit, motion.mover()),
-            r,
+            attack_reads,
             graphics,
             move_to_tuning,
         )
@@ -533,11 +567,15 @@ impl Attack {
         &mut self,
         walk: fn(Option<MoveToAction>) -> AttackState,
         unit: (&Unit, Option<&Mover>),
-        r: &AttackReads,
+        attack_reads: &AttackReads,
         graphics: &Graphics,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<()> {
-        self.walk_to_seen(walk, &move_reads(unit, r, graphics)?, move_to_tuning)
+        self.walk_to_seen(
+            walk,
+            &move_reads(unit, attack_reads, graphics)?,
+            move_to_tuning,
+        )
     }
 
     /// States 5 and 11 once their `MoveTo` arrived (cases 4 and 10, its update 1 or 2): a target
@@ -549,49 +587,54 @@ impl Attack {
     /// (`set_state` 13), a unit's own Attack posting 0x1f9 with 600, and returns 3.
     pub(super) fn arrived_at_seen(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         target: Position,
     ) -> GenieResult<UpdateCode> {
-        if sees(&c.w.spatial, f, target)? {
-            self.ready(unit, &mut c.w.attack_ground(unit.id), f, r)?;
+        if sees(&step.w.spatial, fight, target)? {
+            self.ready(
+                unit,
+                &mut step.w.attack_ground(unit.id),
+                fight,
+                attack_reads,
+            )?;
             return Ok(UpdateCode::UnderWay);
         }
         if matches!(self.state, AttackState::GotoSeen { .. })
-            && f.own.player != PlayerId::new(0)
-            && c.w.model.tuning.attack.seen_range <= self.range.get()
-            && !r.player_kind.is_computer()
+            && fight.own.player != PlayerId::new(0)
+            && step.w.model.tuning.attack.seen_range <= self.range.get()
+            && !attack_reads.player_kind.is_computer()
         {
             self.enter(
                 AttackState::GotoPoint { move_to: None },
-                c.w.parts.motion_mut(unit.id),
+                step.w.parts.motion_mut(unit.id),
             )?;
-            self.range = f.own.source.weapon_range;
+            self.range = fight.own.source.weapon_range;
             self.goto_point(
                 |move_to| AttackState::GotoPoint { move_to },
-                (unit, c.w.parts.mover_of(unit.id)),
-                r,
-                &c.w.model.graphics,
-                &c.w.model.tuning.move_to,
+                (unit, step.w.parts.mover_of(unit.id)),
+                attack_reads,
+                &step.w.model.graphics,
+                &step.w.model.tuning.move_to,
             )?;
             return Ok(UpdateCode::UnderWay);
         }
         let target = self.target.take();
         if self.voice.is_loud() {
-            let_go(c, unit, target)?;
+            let_go(step, unit, target)?;
         }
         self.finish_in(
             AttackState::Failed,
             unit,
-            c.w.parts.motion_mut(unit.id),
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion_mut(unit.id),
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         if self.voice.is_loud() {
             unit.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,
                 [600, 0, 0],
             )?;
@@ -600,17 +643,17 @@ impl Attack {
     }
 }
 
-/// The target's tile at `at` seen by the unit's player (`f.own`), or only explored with its
+/// The target's tile at `at` seen by the unit's player (`fight.own`), or only explored with its
 /// master's fog flag (the target's slot 0x1e0: 0xf, or 0x80 with `+0x605`).
 ///
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
-pub(super) fn sees(map: &Spatial, f: &Fight, at: Position) -> GenieResult<bool> {
+pub(super) fn sees(map: &Spatial, fight: &Fight, at: Position) -> GenieResult<bool> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
-    Ok(map.sees_tile(f.own.player, Tile::new(tx, ty))
-        || (f.victim.fog_visibility != FogVisibility::INVISIBLE
-            && map.explored(f.own.player, Tile::new(tx, ty))?))
+    Ok(map.sees_tile(fight.own.player, Tile::new(tx, ty))
+        || (fight.victim.fog_visibility != FogVisibility::INVISIBLE
+            && map.explored(fight.own.player, Tile::new(tx, ty))?))
 }
 
 /// A unit's own Attack lets its target go (slot 0x68 with none: its slot 0x180) at once
@@ -620,15 +663,15 @@ pub(super) fn sees(map: &Spatial, f: &Fight, at: Position) -> GenieResult<bool> 
 ///
 /// The release's.
 pub(super) fn let_go(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     unit: &mut Unit,
     target: Option<AttackTargetId>,
 ) -> GenieResult<()> {
     let Some(target) = target else {
         return Ok(());
     };
-    let by = unit.releaser(c)?;
-    release(c, unit, target, by)
+    let by = unit.releaser(step)?;
+    release(step, unit, target, by)
 }
 
 /// The squared reach of an attack of `range` (`FUN_140a82ae0` at `0x140a83950`): the range squared,

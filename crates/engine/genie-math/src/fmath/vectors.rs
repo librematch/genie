@@ -100,8 +100,8 @@ impl Neg for BVector {
 }
 
 impl genie_diff::Diff for BVector {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -160,25 +160,25 @@ pub fn length(v: BVector) -> f32 {
 /// `v / |v|` (`FUN_141027d00`).
 #[must_use]
 pub fn normalize(v: BVector) -> BVector {
-    let l = length(v);
+    let length = length(v);
     let [v0, v1, v2] = v.0;
-    BVector([v0 / l, v1 / l, v2 / l])
+    BVector([v0 / length, v1 / length, v2 / length])
 }
 
 /// The angle between two unit vectors (`FUN_14087e650`): π/2 when their dot product is below
 /// 1e-7 in size, 0 from 1 up, π from -1 down, else its arc cosine (a NaN dot included).
 #[must_use]
 pub fn angle_between(a: BVector, b: BVector) -> f32 {
-    let d = dot(a, b);
-    if d.abs() < 1e-7 {
+    let dot = dot(a, b);
+    if dot.abs() < 1e-7 {
         FRAC_PI_2
-    } else if d >= 1.0 {
+    } else if dot >= 1.0 {
         0.0
-    } else if d <= -1.0 {
+    } else if dot <= -1.0 {
         PI
     } else {
         // COMISS -1, d; JC at 0x14087e6ed: an unordered dot goes on to acosf
-        acos(d)
+        acos(dot)
     }
 }
 
@@ -213,10 +213,10 @@ pub fn rotation(angle: f32, axis: BVector) -> Rotation {
     ])
 }
 
-/// `m · v` (`FUN_14087e2c0`), each row's products summed in the game's order.
+/// `rotation · v` (`FUN_14087e2c0`), each row's products summed in the game's order.
 #[must_use]
-pub fn rotate(m: &Rotation, v: BVector) -> BVector {
-    let [r0, r1, r2] = m.0;
+pub fn rotate(rotation: &Rotation, v: BVector) -> BVector {
+    let [r0, r1, r2] = rotation.0;
     let [v0, v1, v2] = v.0;
     BVector([
         v1 * r0[1] + v0 * r0[0] + v2 * r0[2],
@@ -248,13 +248,13 @@ mod tests {
             v.ground().get().map(f32::to_bits),
             [0x8000_0000, 0x7fc0_0001]
         );
-        let p = v.position();
+        let position = v.position();
         assert_eq!(
-            (p.x().to_bits(), p.y().to_bits(), p.z()),
+            (position.x().to_bits(), position.y().to_bits(), position.z()),
             (0x8000_0000, 0x7fc0_0001, 2.0)
         );
         assert_eq!(
-            p.vector().get().map(f32::to_bits),
+            position.vector().get().map(f32::to_bits),
             v.get().map(f32::to_bits)
         );
         assert_eq!(BVector::from([1.0, 2.0, 3.0]), BVector::new(1.0, 2.0, 3.0));

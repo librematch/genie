@@ -30,14 +30,14 @@ impl TradeCommand {
     /// The dispatcher trades food, wood and stone only (the attribute's low byte 0 to 2,
     /// `do_command`'s 0x7a and 0x7b): the purchase ([`World::buy`]) or the sale
     /// ([`World::sell`]); a trade cannot fail.
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
         let Some(commodity) = self.attribute.traded() else {
             return Ok(());
         };
         if self.buy {
-            w.buy(self.player, commodity, self.times)?;
+            world.buy(self.player, commodity, self.times)?;
         } else {
-            w.sell(self.player, commodity, self.times)?;
+            world.sell(self.player, commodity, self.times)?;
         }
         Ok(())
     }

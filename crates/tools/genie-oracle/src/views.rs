@@ -56,83 +56,83 @@ fn groups_of(header: &Header, full: bool) -> String {
                     let _ = writeln!(out, "{u:#?}");
                 }
             }
-            Err(e) => {
-                let _ = writeln!(out, "the groups do not import: {e}");
+            Err(error) => {
+                let _ = writeln!(out, "the groups do not import: {error}");
             }
         }
         return out;
     }
-    for u in &g.unit_group {
-        group_lines(&mut out, u);
+    for group in &g.unit_group {
+        group_lines(&mut out, group);
     }
     out
 }
 
 /// One saved unit group's lines: its state, its units' specific moves, its formations and
 /// its command.
-fn group_lines(out: &mut String, u: &UnitGroup) {
+fn group_lines(out: &mut String, group: &UnitGroup) {
     let _ = writeln!(
         out,
         "group {} owner {} state {} flags {:#x} centroid {:?} hibernating {} idle {}",
-        u.id,
-        u.owner.to_bits(),
-        u.state,
-        u.group_flags_bits,
-        vec3(&u.centroid),
-        u.hibernating,
-        u.idle_timer
+        group.id,
+        group.owner.to_bits(),
+        group.state,
+        group.group_flags_bits,
+        vec3(&group.centroid),
+        group.hibernating,
+        group.idle_timer
     );
-    for e in &u.units {
+    for member in &group.units {
         let _ = writeln!(
             out,
             "  unit {} move active {} path {} reason {} goal {:?} timer {} failures {} distance {} last {:?} since attack {}",
-            e.units,
-            e.specific_moves_active,
-            e.specific_moves_path_id,
-            e.specific_moves_reason,
-            vec3(&e.specific_moves_goal),
-            e.specific_moves_timer,
-            e.specific_moves_consecutive_move_failures,
-            e.specific_moves_distance,
-            vec3(&e.specific_moves_last_position),
-            e.seconds_since_attacking
+            member.units,
+            member.specific_moves_active,
+            member.specific_moves_path_id,
+            member.specific_moves_reason,
+            vec3(&member.specific_moves_goal),
+            member.specific_moves_timer,
+            member.specific_moves_consecutive_move_failures,
+            member.specific_moves_distance,
+            vec3(&member.specific_moves_last_position),
+            member.seconds_since_attacking
         );
     }
     for (name, f) in [
-        ("previous", u.previous_formation.as_deref()),
-        ("current", u.current_formation.as_deref()),
+        ("previous", group.previous_formation.as_deref()),
+        ("current", group.current_formation.as_deref()),
     ] {
-        if let Some(f) = f {
-            formation_lines(out, name, f);
+        if let Some(formation) = f {
+            formation_lines(out, name, formation);
         }
     }
-    let waypoints: Vec<[f32; 3]> = u.waypoints.iter().map(vec3).collect();
+    let waypoints: Vec<[f32; 3]> = group.waypoints.iter().map(vec3).collect();
     let _ = writeln!(
         out,
         "  command {} target {} type {} range {} waypoints {waypoints:?} orders {} commands {} spacing {}",
-        u.current_command,
-        u.current_target.target,
-        u.current_target.kind,
-        u.current_target.range,
-        u.order_queue.len(),
-        u.command_queue.len(),
-        u.desired_spacing
+        group.current_command,
+        group.current_target.target,
+        group.current_target.kind,
+        group.current_target.range,
+        group.order_queue.len(),
+        group.command_queue.len(),
+        group.desired_spacing
     );
 }
 
 /// A group's formation `name` (previous or current): its type, slots and transform, then each
 /// slot.
-fn formation_lines(out: &mut String, name: &str, f: &Formation) {
+fn formation_lines(out: &mut String, name: &str, formation: &Formation) {
     let _ = writeln!(
         out,
         "  {name} formation type {} slots {} lines {} transform {} orientation {:?}",
-        f.kind,
-        f.number_slots,
-        f.number_lines,
-        f.transform_kind,
-        vec3(&f.transform_orientation)
+        formation.kind,
+        formation.number_slots,
+        formation.number_lines,
+        formation.transform_kind,
+        vec3(&formation.transform_orientation)
     );
-    for slot in &f.slots {
+    for slot in &formation.slots {
         let _ = writeln!(
             out,
             "    slot unit {} offset {:?} position {:?} state {} depth {} desired {:?} filled {} category {}/{} active {}",
@@ -170,77 +170,89 @@ fn objects_of(header: &Header, player: usize, actions_of: Option<i32>) -> GenieR
     let mut out =
         String::from("id\tmaster\tstate\thp\tx\ty\tz\taction\taction_state\tretarget\tsprite\n");
     for object in section.live_objects() {
-        let Some(s) = object.static_part() else {
+        let Some(rge_static_object) = object.static_part() else {
             continue;
         };
-        if actions_of == Some(s.id) {
-            let _ = writeln!(out, "{:#?}", action_object(object).map(|a| &a.actions));
+        if actions_of == Some(rge_static_object.id) {
+            let _ = writeln!(
+                out,
+                "{:#?}",
+                action_object(object)
+                    .map(|object_rge_action_object| &object_rge_action_object.actions)
+            );
         }
-        let top = action_object(object).and_then(|a| a.actions.action_kind_list.first());
-        let (action, state) = top.map_or((-1, String::new()), |e| {
-            let debug = format!("{:?}", e.action);
+        let top = action_object(object)
+            .and_then(|rge_action_object| rge_action_object.actions.action_kind_list.first());
+        let (action, state) = top.map_or((-1, String::new()), |entry| {
+            let debug = format!("{:?}", entry.action);
             let state = debug
                 .split("state: ")
                 .nth(1)
-                .and_then(|r| r.split([',', ' ']).next())
+                .and_then(|text| text.split([',', ' ']).next())
                 .unwrap_or("")
                 .to_string();
-            (e.action_kind, state)
+            (entry.action_kind, state)
         });
         let retarget = object
             .combat()
-            .and_then(|c| c.unit_ai())
+            .and_then(|tribe_combat_object| tribe_combat_object.unit_ai())
             .map_or(String::new(), |ai| ai.randomized_retarget_timer.to_string());
         let _ = writeln!(
             out,
             "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
-            s.id,
-            s.master_obj,
-            s.object_state,
-            s.hp,
-            s.tx,
-            s.ty,
-            s.tz,
+            rge_static_object.id,
+            rge_static_object.master_obj,
+            rge_static_object.object_state,
+            rge_static_object.hp,
+            rge_static_object.tx,
+            rge_static_object.ty,
+            rge_static_object.tz,
             action,
             state,
             retarget,
-            sprite_column(s)
+            sprite_column(rge_static_object)
         );
     }
     Ok(out)
 }
 
 /// The current sprite (`+0x140`, the save's `sprite`) and its node in the sprite list: `a` with
-/// the animated node's `animate_flag`, `s` for a static node, `-` without a node.
-fn sprite_column(s: &RgeStaticObject) -> String {
+/// the animated node's `animate_flag`, `rge_static_object` for a static node, `-` without a node.
+fn sprite_column(rge_static_object: &RgeStaticObject) -> String {
     let nodes = || {
-        s.active_sprite_list
+        rge_static_object
+            .active_sprite_list
             .iter()
-            .flat_map(|l| l.sprite_kind_list.iter())
-            .filter_map(|e| e.kind.as_deref())
+            .flat_map(|active_sprite_list| active_sprite_list.sprite_kind_list.iter())
+            .filter_map(|entry| entry.kind.as_deref())
     };
     let node = nodes()
         .filter_map(|n| n.rge_active_animated_sprite.as_deref())
-        .find(|a| a.rge_active_sprite.sprite_id as i16 == s.sprite)
-        .map(|a| format!("a{}", a.animate_flag))
+        .find(|a| a.rge_active_sprite.sprite_id as i16 == rge_static_object.sprite)
+        .map(|rge_active_animated_sprite| format!("a{}", rge_active_animated_sprite.animate_flag))
         .or_else(|| {
             nodes()
-                .filter_map(|n| n.rge_active_sprite.as_deref())
-                .any(|a| a.sprite_id as i16 == s.sprite)
+                .filter_map(|active_sprite| active_sprite.rge_active_sprite.as_deref())
+                .any(|rge_active_sprite| {
+                    rge_active_sprite.sprite_id as i16 == rge_static_object.sprite
+                })
                 .then(|| "s".to_string())
         })
         .unwrap_or_else(|| "-".to_string());
-    format!("{} {node}", s.sprite)
+    format!("{} {node}", rge_static_object.sprite)
 }
 
-fn action_object(o: &Object) -> Option<&RgeActionObject> {
-    if let Some(c) = o.combat() {
-        return Some(&c.rge_combat_object.rge_action_object);
+fn action_object(object: &Object) -> Option<&RgeActionObject> {
+    if let Some(tribe_combat_object) = object.combat() {
+        return Some(&tribe_combat_object.rge_combat_object.rge_action_object);
     }
-    let r = o.rge_object.as_deref()?;
-    r.rge_action_object
-        .as_deref()
-        .or_else(|| r.rge_combat_object.as_deref().map(|c| &c.rge_action_object))
+    let rge_object = object.rge_object.as_deref()?;
+    rge_object.rge_action_object.as_deref().or_else(|| {
+        rge_object
+            .rge_combat_object
+            .as_deref()
+            .map(|rge_combat_object| &rge_combat_object.rge_action_object)
+    })
 }
 
 fn f3(b: &[u8; 12]) -> [f32; 3] {
@@ -265,11 +277,13 @@ fn movement_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<Strin
     let section = players.get(player).ok_or_else(|| no_player(player))?;
     let mut out = String::new();
     for object in section.live_objects() {
-        let (Some(s), Some(m)) = (object.static_part(), object.moving_part()) else {
+        let (Some(rge_static_object), Some(rge_moving_object)) =
+            (object.static_part(), object.moving_part())
+        else {
             continue;
         };
-        if ids.contains(&s.id) {
-            moving_lines(&mut out, s, m, paths);
+        if ids.contains(&rge_static_object.id) {
+            moving_lines(&mut out, rge_static_object, rge_moving_object, paths);
         }
     }
     Ok(out)
@@ -277,45 +291,63 @@ fn movement_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<Strin
 
 /// One moving object's lines: its place, velocity, orientation, speedup and each path level
 /// with the world's paths of its id.
-fn moving_lines(out: &mut String, s: &RgeStaticObject, m: &RgeMovingObject, paths: &[Path]) {
+fn moving_lines(
+    out: &mut String,
+    rge_static_object: &RgeStaticObject,
+    rge_moving_object: &RgeMovingObject,
+    paths: &[Path],
+) {
     let _ = writeln!(
         out,
         "{} master {} at ({}, {}, {}) facet {} sprite {}",
-        s.id, s.master_obj, s.tx, s.ty, s.tz, s.facet, s.sprite
+        rge_static_object.id,
+        rge_static_object.master_obj,
+        rge_static_object.tx,
+        rge_static_object.ty,
+        rge_static_object.tz,
+        rge_static_object.facet,
+        rge_static_object.sprite
     );
     let _ = writeln!(
         out,
         "  velocity ({}, {}, {}) angle {} turn_towards {} waiting {} on_ground {}",
-        m.velocity_x,
-        m.velocity_y,
-        m.velocity_z,
-        m.angle,
-        m.turn_towards_time,
-        m.waiting_to_move_value,
-        m.on_ground
+        rge_moving_object.velocity_x,
+        rge_moving_object.velocity_y,
+        rge_moving_object.velocity_z,
+        rge_moving_object.angle,
+        rge_moving_object.turn_towards_time,
+        rge_moving_object.waiting_to_move_value,
+        rge_moving_object.on_ground
     );
     let _ = writeln!(
         out,
         "  movement {:?} {:?}",
-        m.velocity.as_ref().map(f3),
-        m.acceleration.as_ref().map(f3)
+        rge_moving_object.velocity.as_ref().map(f3),
+        rge_moving_object.acceleration.as_ref().map(f3)
     );
     let _ = writeln!(
         out,
         "  position {:?} forward {:?} right {:?} last_move {}",
-        f3(&m.position_value),
-        f3(&m.orientation_forward_value),
-        f3(&m.orientation_right_value),
-        m.last_move_time_value
+        f3(&rge_moving_object.position_value),
+        f3(&rge_moving_object.orientation_forward_value),
+        f3(&rge_moving_object.orientation_right_value),
+        rge_moving_object.last_move_time_value
     );
     let _ = writeln!(
         out,
         "  speedup building {} value {}",
-        m.speedup_building_id, m.speedup_value
+        rge_moving_object.speedup_building_id, rge_moving_object.speedup_value
     );
-    for d in m.temp_path_data.iter().chain(m.future_path_data.as_deref()) {
-        let _ = writeln!(out, "  path data {d:?}");
-        for p in paths.iter().filter(|p| p.id_value == d.path_id) {
+    for path_data in rge_moving_object
+        .temp_path_data
+        .iter()
+        .chain(rge_moving_object.future_path_data.as_deref())
+    {
+        let _ = writeln!(out, "  path data {path_data:?}");
+        for p in paths
+            .iter()
+            .filter(|path| path.id_value == path_data.path_id)
+        {
             let points: Vec<[f32; 3]> = p.waypoints.iter().map(f3).collect();
             let _ = writeln!(
                 out,
@@ -346,10 +378,10 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<Strin
     let section = players.get(player).ok_or_else(|| no_player(player))?;
     let mut out = String::new();
     for object in section.live_objects() {
-        let Some(s) = object.static_part() else {
+        let Some(rge_static_object) = object.static_part() else {
             continue;
         };
-        if !ids.contains(&s.id) {
+        if !ids.contains(&rge_static_object.id) {
             continue;
         }
         let Some(combat) = object.combat() else {
@@ -358,17 +390,26 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<Strin
         let Some(ai) = combat.unit_ai() else {
             continue;
         };
-        let own = ObjectId::try_from(s.id)?;
+        let own = ObjectId::try_from(rge_static_object.id)?;
         let _ = writeln!(
             out,
             "{} master {} at ({}, {}) state {} unit-AI type {}",
-            s.id, s.master_obj, s.tx, s.ty, s.object_state, combat.need_unit_ai
+            rge_static_object.id,
+            rge_static_object.master_obj,
+            rge_static_object.tx,
+            rge_static_object.ty,
+            rge_static_object.object_state,
+            combat.need_unit_ai
         );
-        if let Some(e) = combat.tribe_elephant_unit_ai_module.as_deref() {
+        if let Some(tribe_elephant_unit_ai_module) = combat.tribe_elephant_unit_ai_module.as_deref()
+        {
             let _ = writeln!(
                 out,
                 "  origin ({}, {}, {}) furious {}",
-                e.origin_x, e.origin_y, e.origin_z, e.furious
+                tribe_elephant_unit_ai_module.origin_x,
+                tribe_elephant_unit_ai_module.origin_y,
+                tribe_elephant_unit_ai_module.origin_z,
+                tribe_elephant_unit_ai_module.furious
             );
         }
         let _ = writeln!(
@@ -401,9 +442,12 @@ fn unit_ais_of(header: &Header, player: usize, ids: &[i32]) -> GenieResult<Strin
         );
         let actions: Vec<_> = object
             .actions()
-            .map(|a| {
-                a.entries()
-                    .map(|(kind, a)| (kind, a.base().map_or(0, |b| b.state)))
+            .map(|action_list| {
+                action_list
+                    .entries()
+                    .map(|(kind, action)| {
+                        (kind, action.base().map_or(0, |rge_action| rge_action.state))
+                    })
                     .collect()
             })
             .unwrap_or_default();
@@ -438,7 +482,7 @@ pub fn tiles(data: &[u8], x: (usize, usize), y: (usize, usize)) -> GenieResult<S
         map.rows
             .get(r)
             .and_then(|row| row.tiles.get(c))
-            .map(|t| t.elevation)
+            .map(|rge_tile| rge_tile.elevation)
     };
     for (name, transposed) in [("rows[y][x]", false), ("rows[x][y]", true)] {
         let _ = writeln!(out, "{name}: y down, x across {}..={}", x.0, x.1);

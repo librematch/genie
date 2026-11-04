@@ -89,34 +89,38 @@ impl Spatial {
 
     /// An object gets its obstruction record (`FUN_141056460` for a started foundation): a static
     /// one marks its tiles.
-    pub fn add_record(&mut self, id: ObjectId, o: Obstruction) {
-        let Some(p) = self.objects.get_mut(id) else {
+    pub fn add_record(&mut self, id: ObjectId, obstruction: Obstruction) {
+        let Some(placed) = self.objects.get_mut(id) else {
             return;
         };
-        p.obstruction = Some(o);
-        if o.kind.marks_tiles() {
-            self.tiles.mark(p, o);
-            self.changed.push(self.tiles.covered_rect(p));
+        placed.obstruction = Some(obstruction);
+        if obstruction.kind.marks_tiles() {
+            self.tiles.mark(placed, obstruction);
+            self.changed.push(self.tiles.covered_rect(placed));
         }
         self.refile(id);
     }
 
     /// Whether an object on `tile` (its centre there) satisfies `pred`.
     pub fn object_on_tile(&self, tile: Tile, pred: impl Fn(&Placed) -> bool) -> bool {
-        self.objects
-            .values()
-            .any(|o| Tile::new(o.position.x() as i32, o.position.y() as i32) == tile && pred(o))
+        self.objects.values().any(|placed| {
+            Tile::new(placed.position.x() as i32, placed.position.y() as i32) == tile
+                && pred(placed)
+        })
     }
 
     /// Object `id`'s place in its tile's object list ([`Spatial::objects_on`]'s order, ghosts
     /// counted); 0 for an object the world does not hold.
     #[must_use]
     pub fn tile_place(&self, id: ObjectId) -> usize {
-        self.objects.get(id).map_or(0, |o| {
-            let list = self
-                .tiles
-                .list(Tile::new(o.position.x() as i32, o.position.y() as i32));
-            list.iter().position(|&t| t == id).unwrap_or(0)
+        self.objects.get(id).map_or(0, |placed| {
+            let list = self.tiles.list(Tile::new(
+                placed.position.x() as i32,
+                placed.position.y() as i32,
+            ));
+            list.iter()
+                .position(|&object_id| object_id == id)
+                .unwrap_or(0)
         })
     }
 
@@ -133,7 +137,7 @@ impl Spatial {
         self.tiles
             .list(tile)
             .iter()
-            .filter_map(|id| self.objects.get(*id).map(|o| (*id, o)))
+            .filter_map(|id| self.objects.get(*id).map(|placed| (*id, placed)))
     }
 
     /// The object's obstruction record goes (`FUN_141055b40`'s record part), by its master's
@@ -157,8 +161,8 @@ impl Spatial {
             }
         }
         match self.objects.get_mut(id) {
-            Some(o) if o.obstruction.is_some() => {
-                o.obstruction = None;
+            Some(placed) if placed.obstruction.is_some() => {
+                placed.obstruction = None;
                 self.refile(id);
                 true
             }
@@ -173,16 +177,16 @@ impl Spatial {
 
     /// `FUN_141055980` for object `id`'s static record ([`Tiles::unmark`]): the planners hear of
     /// the covered tiles unless another object's static record on one of them stopped it.
-    pub(super) fn unmark(&mut self, p: &Placed, id: ObjectId) {
+    pub(super) fn unmark(&mut self, placement: &Placed, id: ObjectId) {
         let objects = &self.objects;
-        let static_record = |o: ObjectId| {
+        let static_record = |object_id: ObjectId| {
             objects
-                .get(o)
-                .and_then(|q| q.obstruction)
-                .is_some_and(|r| r.kind.marks_tiles())
+                .get(object_id)
+                .and_then(|placed| placed.obstruction)
+                .is_some_and(|obstruction| obstruction.kind.marks_tiles())
         };
-        if self.tiles.unmark(p, id, static_record) {
-            self.changed.push(self.tiles.covered_rect(p));
+        if self.tiles.unmark(placement, id, static_record) {
+            self.changed.push(self.tiles.covered_rect(placement));
         }
     }
 
@@ -190,16 +194,16 @@ impl Spatial {
     /// dying unit's own master copy has none, `FUN_14121cc40`); the tiles' counts are not
     /// redone, as the game does not redo them.
     pub fn set_tall(&mut self, id: ObjectId, tall: bool) {
-        if let Some(o) = self.objects.get_mut(id) {
-            o.tall = tall;
+        if let Some(placed) = self.objects.get_mut(id) {
+            placed.tall = tall;
         }
     }
 
     /// The objects whose place lies within `x0`..`x1` and `y0`..`y1`, by id.
     pub fn objects_within(&self, area: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         let (x0, y0, x1, y1) = (area.x0(), area.y0(), area.x1(), area.y1());
-        self.objects.iter().filter(move |(_, o)| {
-            let (x, y) = (o.position.x(), o.position.y());
+        self.objects.iter().filter(move |(_, placed)| {
+            let (x, y) = (placed.position.x(), placed.position.y());
             x0 <= x && x <= x1 && y0 <= y && y <= y1
         })
     }
@@ -214,10 +218,14 @@ impl Spatial {
     /// sight.
     #[must_use]
     pub fn sees_and_explored(&self, player: PlayerId, tile: Tile) -> bool {
-        let Some(v) = self.sight.as_ref() else {
+        let Some(visibility) = self.sight.as_ref() else {
             return false;
         };
-        let Some(&unified) = v.size.index(tile).and_then(|i| v.unified.get(i)) else {
+        let Some(&unified) = visibility
+            .size
+            .index(tile)
+            .and_then(|i| visibility.unified.get(i))
+        else {
             return false;
         };
         let word = unified & VisionBits::OBJECT_MASK;
@@ -236,11 +244,11 @@ impl Spatial {
     /// while it cannot have moved.
     pub fn get_known(&self, id: impl ObjectKey) -> GenieResult<Option<&Placed>> {
         match self.get(id) {
-            Some(p) if p.unknown.is_some_and(|u| 0.0 < u) => Err(GenieError::unsupported(
-                "an object of a stopped player (its place is unknown)",
-            )
-            .with("object", id.key().map_or(-1, ObjectId::get))
-            .with("player", p.player)),
+            Some(placed) if placed.unknown.is_some_and(|u| 0.0 < u) => Err(
+                GenieError::unsupported("an object of a stopped player (its place is unknown)")
+                    .with("object", id.key().map_or(-1, ObjectId::get))
+                    .with("player", placed.player),
+            ),
             found => Ok(found),
         }
     }
@@ -248,8 +256,8 @@ impl Spatial {
     /// The slice stops updating the object: from now on its place is known only within its speed
     /// times the time since.
     pub fn freeze(&mut self, id: ObjectId) {
-        if let Some(p) = self.objects.get_mut(id) {
-            let _ = p.unknown.get_or_insert(0.0);
+        if let Some(placed) = self.objects.get_mut(id) {
+            let _ = placed.unknown.get_or_insert(0.0);
             if !self.frozen_for.contains_key(id) {
                 let _ = self.frozen_for.insert(id, Seconds::ZERO);
             }
@@ -258,8 +266,8 @@ impl Spatial {
 
     /// The object's place is the game's again (the oracle's forced replay): it is known.
     pub fn unfreeze(&mut self, id: ObjectId) {
-        if let Some(p) = self.objects.get_mut(id) {
-            p.unknown = None;
+        if let Some(placed) = self.objects.get_mut(id) {
+            placed.unknown = None;
         }
         let _ = self.frozen_for.remove(id);
     }
@@ -267,15 +275,15 @@ impl Spatial {
     /// A tick of `dt` seconds passed: every frozen object that moves may have moved its master's
     /// speed (`speed` of its player and master) times dt.
     pub fn grow_unknown(&mut self, dt: Seconds, speed: impl Fn(PlayerId, MasterId) -> Speed) {
-        for p in self.objects.values_mut() {
-            if let Some(u) = p.unknown.as_mut()
-                && p.moves
+        for placed in self.objects.values_mut() {
+            if let Some(u) = placed.unknown.as_mut()
+                && placed.moves
             {
-                *u += (speed(p.player, p.master) * dt).get();
+                *u += (speed(placed.player, placed.master) * dt).get();
             }
         }
-        for t in self.frozen_for.values_mut() {
-            *t += dt;
+        for seconds in self.frozen_for.values_mut() {
+            *seconds += dt;
         }
     }
 
@@ -307,8 +315,8 @@ impl Spatial {
             if scope == KnownScope::Records && p.obstruction.is_none() {
                 return false;
             }
-            if let KnownScope::Classes(c) = scope
-                && !c.contains(&p.class)
+            if let KnownScope::Classes(class_ids) = scope
+                && !class_ids.contains(&p.class)
             {
                 return false;
             }
@@ -318,11 +326,11 @@ impl Spatial {
                     && (0.0 < u || self.touchable(id, bounds))
             })
         });
-        if let Some((id, p)) = near {
+        if let Some((id, placed)) = near {
             return Err(
                 GenieError::unsupported("an object of a stopped player may be near")
                     .with("object", id)
-                    .with("player", p.player)
+                    .with("player", placed.player)
                     .with(
                         "query",
                         format_args!(
@@ -340,21 +348,21 @@ impl Spatial {
 
     /// Whether a stopped player's unit may have reached the frozen object `id` within `rect`.
     pub(super) fn touchable(&self, id: ObjectId, rect: Rect) -> bool {
-        self.frozen().any(|(other, q)| {
-            let Some(u) = q.unknown.filter(|_| other != id) else {
+        self.frozen().any(|(other, placed)| {
+            let Some(u) = placed.unknown.filter(|_| other != id) else {
                 return false;
             };
-            if q.player == PlayerId::GAIA {
+            if placed.player == PlayerId::GAIA {
                 // Gaia's units (animals) do not work on objects
                 return false;
             }
-            let moved = if q.moves {
+            let moved = if placed.moves {
                 u
             } else {
                 self.fastest * self.frozen_for.get(other).copied().unwrap_or(Seconds::ZERO)
             };
             let grow = moved + self.reach.get();
-            rect.overlaps(q.bounds().grown(Distance::new(grow)))
+            rect.overlaps(placed.bounds().grown(Distance::new(grow)))
         })
     }
 
@@ -363,7 +371,7 @@ impl Spatial {
         self.frozen_for
             .keys()
             .filter_map(|id| self.objects.get(id).map(|p| (id, p)))
-            .filter(|(_, p)| p.unknown.is_some())
+            .filter(|(_, placed)| placed.unknown.is_some())
     }
 
     /// A new object, in the order the game adds them: a static record marks only the tiles no
@@ -373,7 +381,10 @@ impl Spatial {
         if placed.unknown.is_some() && !self.frozen_for.contains_key(id) {
             let _ = self.frozen_for.insert(id, Seconds::ZERO);
         }
-        if let Some(o) = placed.obstruction.filter(|o| o.kind.marks_tiles()) {
+        if let Some(o) = placed
+            .obstruction
+            .filter(|obstruction| obstruction.kind.marks_tiles())
+        {
             self.tiles.mark(&placed, o);
             self.changed.push(self.tiles.covered_rect(&placed));
         }
@@ -381,7 +392,8 @@ impl Spatial {
         self.refile(id);
         if let Some(i) = self.tiles.tile_of(placed.position) {
             let objects = &self.objects;
-            self.tiles.append(i, id, |o| Self::is_tall(objects, o));
+            self.tiles
+                .append(i, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 
@@ -389,7 +401,7 @@ impl Spatial {
     /// `FUN_140f5f0a0` and `FUN_140f5f560` read): a ghost, whose master the slice does not hold,
     /// counts as not tall.
     pub(super) fn is_tall(objects: &IdTable<Placed>, id: ObjectId) -> bool {
-        objects.get(id).is_some_and(|p| p.tall)
+        objects.get(id).is_some_and(|placed| placed.tall)
     }
 
     /// The object's master changed (`FUN_1411a6a70`): it takes the new master's radii, class,
@@ -405,7 +417,10 @@ impl Spatial {
         if old.obstruction.is_some_and(|o| o.kind.marks_tiles()) {
             self.unmark(&old, id);
         }
-        if let Some(o) = placed.obstruction.filter(|o| o.kind.marks_tiles()) {
+        if let Some(o) = placed
+            .obstruction
+            .filter(|obstruction| obstruction.kind.marks_tiles())
+        {
             self.tiles.mark(&placed, o);
             self.changed.push(self.tiles.covered_rect(&placed));
         }
@@ -416,9 +431,15 @@ impl Spatial {
     /// The object leaves the world: its place, its sight's state and its records in the registry
     /// (its destructor, `FUN_141073060`) go.
     pub fn leave(&mut self, id: ObjectId) -> GenieResult<()> {
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
-            v.registry_leave(id, p.player, p.position, p.radius, p.class)?;
-            v.remove_seer(id);
+        if let (Some(visibility), Some(placed)) = (self.sight.as_mut(), self.objects.get(id)) {
+            visibility.registry_leave(
+                id,
+                placed.player,
+                placed.position,
+                placed.radius,
+                placed.class,
+            )?;
+            visibility.remove_seer(id);
         }
         self.remove(id);
         Ok(())
@@ -428,13 +449,13 @@ impl Spatial {
     /// (`FUN_140f5f560`) and the obstruction manager (`FUN_141055b40`), and takes its container's
     /// x and y (`FUN_14118c890`).
     pub fn go_inside(&mut self, id: ObjectId, at: Position) {
-        let Some(mut p) = self.objects.get(id).copied() else {
+        let Some(mut placed) = self.objects.get(id).copied() else {
             return;
         };
         self.remove(id);
-        p.position = at.with_z(p.position.z());
-        p.obstruction = None;
-        let _ = self.inside.insert(id, p);
+        placed.position = at.with_z(placed.position.z());
+        placed.obstruction = None;
+        let _ = self.inside.insert(id, placed);
     }
 
     /// The record of object `id` inside another ([`Spatial::go_inside`]) becomes `placed` (a master
@@ -448,8 +469,8 @@ impl Spatial {
     /// The record of object `id` inside another takes the place `at` (its object's copy of the
     /// container's place); nothing for an object not inside.
     pub fn set_inside_position(&mut self, id: ObjectId, at: Position) {
-        if let Some(p) = self.inside.get_mut(id) {
-            p.position = at;
+        if let Some(placed) = self.inside.get_mut(id) {
+            placed.position = at;
         }
     }
 
@@ -466,9 +487,13 @@ impl Spatial {
             self.refile(id);
             if let Some(i) = self.tiles.tile_of(gone.position) {
                 let objects = &self.objects;
-                self.tiles.take_off(i, id, |o| Self::is_tall(objects, o));
+                self.tiles
+                    .take_off(i, id, |object_id| Self::is_tall(objects, object_id));
             }
-            if gone.obstruction.is_some_and(|o| o.kind.marks_tiles()) {
+            if gone
+                .obstruction
+                .is_some_and(|obstruction| obstruction.kind.marks_tiles())
+            {
                 self.unmark(&gone, id);
             }
         }
@@ -506,9 +531,11 @@ impl Spatial {
             return true;
         };
         self.tile_records_meet(&test, ignore)
-            || self.records_in(test.query).any(|(id, p)| {
+            || self.records_in(test.query).any(|(id, placed)| {
                 // kind 10 is filed as 2
-                let kind = p.obstruction.map(|o| o.kind.filed());
+                let kind = placed
+                    .obstruction
+                    .map(|obstruction| obstruction.kind.filed());
                 matches!(
                     kind,
                     Some(
@@ -517,8 +544,8 @@ impl Spatial {
                             | ObstructionKind::KIND_13
                     )
                 ) && !ignore.contains(&RecordId::from(id))
-                    && test.meets(p.bounds())
-                    && self.visits(p, kind.unwrap_or(ObstructionKind::NONE), test.query)
+                    && test.meets(placed.bounds())
+                    && self.visits(placed, kind.unwrap_or(ObstructionKind::NONE), test.query)
             })
     }
 
@@ -547,8 +574,8 @@ impl Spatial {
     /// removed again. A walk whose grown box leaves the map counts as blocked.
     pub fn tiles_block(&mut self, a: Point, b: Point, grow: Distance, mask: TerrainMask) -> bool {
         self.put_tile_records(a, b, grow, mask);
-        let blocked =
-            WalkTest::new(a, b, grow, self.map).is_none_or(|t| self.tile_records_meet(&t, &[]));
+        let blocked = WalkTest::new(a, b, grow, self.map)
+            .is_none_or(|walk_test| self.tile_records_meet(&walk_test, &[]));
         self.clear_tile_records();
         blocked
     }

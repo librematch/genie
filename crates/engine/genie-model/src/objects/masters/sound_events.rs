@@ -56,11 +56,14 @@ mod tests {
     /// The gathering event comes first, the deposit's second.
     #[test]
     fn sound_events_hold_the_gathering_then_the_deposit() {
-        let s = SoundEvents::new(19598, -5);
+        let sound_events = SoundEvents::new(19598, -5);
         assert_eq!(
-            (s.gathering, s.deposit),
+            (sound_events.gathering, sound_events.deposit),
             (SoundEventId::new(19598), SoundEventId::new(-5))
         );
-        assert_eq!((s.gathering.get(), s.deposit.get()), (19598, -5));
+        assert_eq!(
+            (sound_events.gathering.get(), sound_events.deposit.get()),
+            (19598, -5)
+        );
     }
 }

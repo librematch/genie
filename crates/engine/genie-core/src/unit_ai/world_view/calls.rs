@@ -52,7 +52,7 @@ impl UnitView<'_, '_> {
     /// [`Unit::run_effect`]: crate::objects::unit::Unit::run_effect
     pub(crate) fn effect_now(
         &mut self,
-        e: Effect,
+        effect: Effect,
         ai: &mut UnitAi,
         rng: &mut Well512,
     ) -> GenieResult<()> {
@@ -60,17 +60,17 @@ impl UnitView<'_, '_> {
         let held = self.c.side_notifies.take().unwrap_or_default();
         let posted = held
             .into_iter()
-            .try_for_each(|(n, state)| ai.post(n, state));
+            .try_for_each(|(notify, state)| ai.post(notify, state));
         self.c.w.return_unit_ai(self.unit.id, take(ai));
         swap(self.c.w.streams.get(Stream::Ai), rng);
         let class = self
             .unit
             .master(self.c.w.master_tables(), self.c.player)
-            .map(|m| m.class);
+            .map(|master| master.class);
         let done = class.and_then(|class| {
             posted.and_then(|()| {
                 self.unit
-                    .run_effect(self.actions, e, Some(class), self.c, roles)
+                    .run_effect(self.actions, effect, Some(class), self.c, roles)
             })
         });
         swap(self.c.w.streams.get(Stream::Ai), rng);
@@ -89,9 +89,9 @@ impl UnitView<'_, '_> {
     /// # Errors
     ///
     /// What the AI's hear logic does not model.
-    pub(crate) fn owner_hears(&mut self, n: Notify) -> GenieResult<()> {
+    pub(crate) fn owner_hears(&mut self, notify: Notify) -> GenieResult<()> {
         let roles = &self.c.w.model.roles.clone();
-        self.hears(n, roles)
+        self.hears(notify, roles)
     }
 
     /// A command of the unit's that the unit AI's order slots give ([`UnitCommand`]): taken when
@@ -111,10 +111,10 @@ impl UnitView<'_, '_> {
                 to,
                 over_wall: false,
             } => {
-                self.c
-                    .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                        w.transport_order(p, i, to)
-                    })?;
+                self.c.lend_at(
+                    (&mut *self.unit, &mut *self.actions),
+                    |world, player_id, list_index| world.transport_order(player_id, list_index, to),
+                )?;
                 Ok(Answer::Taken)
             }
             _ => Err(UNMODELLED_COMMAND),
@@ -150,15 +150,15 @@ impl UnitView<'_, '_> {
     ///
     /// What the stop does not model.
     pub(crate) fn group_attack_stop(&mut self) -> GenieResult<()> {
-        let Some(m) = self.c.w.parts.mover_mut(self.unit.id) else {
+        let Some(mover) = self.c.w.parts.mover_mut(self.unit.id) else {
             return Ok(());
         };
-        let speeding = m
+        let speeding = mover
             .velocity
             .as_ref()
-            .is_some_and(|v| 0.0 < v.acceleration.y());
-        if m.is_moving() || speeding {
-            m.stop()?;
+            .is_some_and(|velocity| 0.0 < velocity.acceleration.y());
+        if mover.is_moving() || speeding {
+            mover.stop()?;
         }
         Ok(())
     }

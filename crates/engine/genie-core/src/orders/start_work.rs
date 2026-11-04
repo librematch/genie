@@ -94,27 +94,27 @@ fn start_of(class: ClassId, kind: MasterKind, cart_task: CartTask, roles: &Roles
 }
 
 impl World {
-    /// The pass for player `p` ([`crate::orders::start_work`]).
+    /// The pass for player `player_id` ([`crate::orders::start_work`]).
     ///
     /// # Errors
     ///
     /// The pass without the game's farm setting (the player's nearest unworked farm), a fishing
     /// ship's own search (its unit AI's slot 0x80), and what the work command does not model.
-    pub(crate) fn start_work(&mut self, p: PlayerId) -> GenieResult<()> {
-        let mut i = ListIndex::FIRST;
-        while self.players.player(p)?.objects.holds(i) {
-            let unit = &self.players.live(p, i)?;
-            let master = unit.master(self.master_tables(), p)?;
+    pub(crate) fn start_work(&mut self, player_id: PlayerId) -> GenieResult<()> {
+        let mut list_index = ListIndex::FIRST;
+        while self.players.player(player_id)?.objects.holds(list_index) {
+            let unit = &self.players.live(player_id, list_index)?;
+            let master = unit.master(self.master_tables(), player_id)?;
             let class = master.class;
             let cart_task = if master.kind == MasterKind::BUILDING
-                && self.has_task(p, unit.life.master_id, CART_TASK)?
+                && self.has_task(player_id, unit.life.master_id, CART_TASK)?
             {
                 CartTask::Held
             } else {
                 CartTask::Lacking
             };
             let Some(start) = start_of(class, master.kind, cart_task, &self.model.roles) else {
-                i = i.next();
+                list_index = list_index.next();
                 continue;
             };
             let idle = self
@@ -128,12 +128,12 @@ impl World {
                     .actions_of(unit.id)
                     .interruptible(self.parts.unread.get(unit.id))?
             {
-                i = i.next();
+                list_index = list_index.next();
                 continue;
             }
             if start == Start::CartSearch {
-                self.cart_work_search(p, i)?;
-                i = i.next();
+                self.cart_work_search(player_id, list_index)?;
+                list_index = list_index.next();
                 continue;
             }
             if self.settings.farm_mode == FarmMode::Fixed {
@@ -141,7 +141,7 @@ impl World {
                     "the Empire Wars start without the farm setting (the nearest unworked farm)",
                 ));
             }
-            let target = match self.farm_under(p, i, class)? {
+            let target = match self.farm_under(player_id, list_index, class)? {
                 Some(farm) => Some(farm),
                 None if self
                     .model
@@ -153,10 +153,10 @@ impl World {
                         "the Empire Wars start of a fishing ship (its unit AI's slot 0x80)",
                     ));
                 }
-                None => self.closest_of_groups(p, i)?,
+                None => self.closest_of_groups(player_id, list_index)?,
             };
-            let own = self.players.live(p, i)?.id;
-            if let Some(target) = target.filter(|&t| t != own) {
+            let own = self.players.live(player_id, list_index)?.id;
+            if let Some(target) = target.filter(|&object_id| object_id != own) {
                 let point = self
                     .spatial
                     .get_known(target)?
@@ -171,9 +171,9 @@ impl World {
                     filter: None,
                     source: OrderSource::Direct,
                 };
-                self.order_work(p, i, &work)?;
+                self.order_work(player_id, list_index, &work)?;
             }
-            i = i.next();
+            list_index = list_index.next();
         }
         Ok(())
     }
@@ -181,23 +181,23 @@ impl World {
     /// The first farm in the object list of the unit's tile (a fish trap for a fishing ship).
     fn farm_under(
         &self,
-        p: PlayerId,
-        i: ListIndex,
+        player_id: PlayerId,
+        list_index: ListIndex,
         class: ClassId,
     ) -> GenieResult<Option<ObjectId>> {
-        let at = self.players.live(p, i)?.position();
+        let at = self.players.live(player_id, list_index)?.position();
         let (x, y) = (at.x() as i32, at.y() as i32);
         self.spatial
             .check_known(Rect::new(at.x(), at.y(), at.x(), at.y()))?;
         for (id, _) in self.spatial.objects_on(Tile::new(x, y)) {
-            let (owner, o) = self.object(id).ok_or(GenieError::unsupported(
+            let (owner, unit) = self.object(id).ok_or(GenieError::unsupported(
                 "an object on a tile the slice does not hold",
             ))?;
-            let m = o.master(self.master_tables(), owner)?;
+            let master = unit.master(self.master_tables(), owner)?;
             if self
                 .model
                 .roles
-                .of_class(m.class)
+                .of_class(master.class)
                 .contains(ClassRoles::FARM)
                 && (!self
                     .model
@@ -207,7 +207,7 @@ impl World {
                     || self
                         .model
                         .roles
-                        .of_master(m.id)
+                        .of_master(master.id)
                         .contains(MasterRoles::FISH_TRAP))
             {
                 return Ok(Some(id));
@@ -218,10 +218,14 @@ impl World {
 
     /// The unit AI's `ClosestResourceObject` for each gather group (no drop site, any workers,
     /// `param_6` 2, no point): the answer at the least distance, the first group at a tie.
-    fn closest_of_groups(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Option<ObjectId>> {
+    fn closest_of_groups(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+    ) -> GenieResult<Option<ObjectId>> {
         let mut best = (NO_DISTANCE, None);
         for kind in GROUPS {
-            let (id, distance) = self.resource_search_from(p, i, kind)?;
+            let (id, distance) = self.resource_search_from(player_id, list_index, kind)?;
             if let Some(d) = distance.filter(|&d| d < best.0) {
                 best = (d, id);
             }
@@ -229,14 +233,18 @@ impl World {
         Ok(best.1)
     }
 
-    /// The seeker and the walk's view of the unit `unit` of player `p` for
+    /// The seeker and the walk's view of the unit `unit` of player `player_id` for
     /// [`World::resource_search_from`].
     ///
     /// # Errors
     ///
     /// A master the world does not hold, or a unit without a unit AI.
-    fn search_seeker(&self, p: PlayerId, unit: &Unit) -> GenieResult<(gather_search::Seeker, Me)> {
-        let master = unit.master(self.master_tables(), p)?;
+    fn search_seeker(
+        &self,
+        player_id: PlayerId,
+        unit: &Unit,
+    ) -> GenieResult<(gather_search::Seeker, Me)> {
+        let master = unit.master(self.master_tables(), player_id)?;
         let ai = self
             .parts
             .unit_ai
@@ -245,7 +253,7 @@ impl World {
                 "a resource search without a unit AI",
             ))?;
         let seeker = gather_search::Seeker {
-            player: p,
+            player: player_id,
             position: unit.position(),
             line_of_sight: master.line_of_sight,
             state: unit.life.state,
@@ -257,21 +265,21 @@ impl World {
         Ok((seeker, me_walk))
     }
 
-    /// [`gather_search::closest_resource_at`] for the unit at `i` of player `p` outside its
-    /// update: the tiles the player explored that its restriction lets it stand on, the objects
-    /// the world holds on them, its reach by the planners (slot 0x3d0 with the range 0).
+    /// [`gather_search::closest_resource_at`] for the unit at `list_index` of player `player_id`
+    /// outside its update: the tiles the player explored that its restriction lets it stand on, the
+    /// objects the world holds on them, its reach by the planners (slot 0x3d0 with the range 0).
     fn resource_search_from(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        player_id: PlayerId,
+        list_index: ListIndex,
         kind: GatherGroup,
     ) -> GenieResult<(Option<ObjectId>, Option<i32>)> {
-        let owner = self.players.player(p)?;
-        let unit = owner.live(i)?;
+        let owner = self.players.player(player_id)?;
+        let unit = owner.live(list_index)?;
         let mover = self.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
             "a resource search without movement state",
         ))?;
-        let (seeker, me_walk) = self.search_seeker(p, unit)?;
+        let (seeker, me_walk) = self.search_seeker(player_id, unit)?;
         let (mask, master_id, at) = (
             mover.stats.restriction_mask,
             unit.life.master_id,

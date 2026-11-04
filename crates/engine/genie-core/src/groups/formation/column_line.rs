@@ -151,8 +151,8 @@ pub(crate) fn column_line_slots(
     let depth: i32 = lines_of.iter().sum();
     formation.resize_slots((depth * max_width).max(0) as usize);
     formation.resize_lines(depth.max(0) as usize);
-    for s in formation.every_slot_mut() {
-        s.active = 0;
+    for slot in formation.every_slot_mut() {
+        slot.active = 0;
     }
     formation.kind = kind.formation_kind();
     formation.transform_kind = TransformKind::ByLines;
@@ -166,15 +166,15 @@ pub(crate) fn column_line_slots(
         group_tuning,
     };
     let mut at = Cursor::default();
-    for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
-        let Some(cat) = category(group, c).filter(|cat| 0 < cat.kinds) else {
+    for (index, formation_category) in FormationCategory::EACH.into_iter().enumerate() {
+        let Some(cat) = category(group, formation_category).filter(|cat| 0 < cat.kinds) else {
             continue;
         };
         lay_category(
             formation,
             &cat,
-            c,
-            (*lines_of.checked(k)?, *columns_of.checked(k)?),
+            formation_category,
+            (*lines_of.checked(index)?, *columns_of.checked(index)?),
             style,
             &mut at,
         )?;
@@ -183,12 +183,13 @@ pub(crate) fn column_line_slots(
     Ok(Layout::Laid)
 }
 
-/// The statistic of the group's sub-formation of formation category `c`, none without one.
-fn category(group: &UnitGroup, c: FormationCategory) -> Option<Category> {
+/// The statistic of the group's sub-formation of formation category `formation_category`, none
+/// without one.
+fn category(group: &UnitGroup, formation_category: FormationCategory) -> Option<Category> {
     let stat = group
         .unit_kinds
         .iter()
-        .find(|s| s.formation_category == c)?;
+        .find(|unit_kind_statistic| unit_kind_statistic.formation_category == formation_category)?;
     Some(Category {
         count: stat.units.len() as i32,
         spacing: stat.desired_spacing,
@@ -225,14 +226,17 @@ fn category_sizes(
         }
     }
     if widest_index != FormationCategory::ANY && 2 <= valid {
-        for (k, c) in FormationCategory::EACH.into_iter().enumerate() {
-            if c == widest_index {
+        for (index, formation_category) in FormationCategory::EACH.into_iter().enumerate() {
+            if formation_category == widest_index {
                 continue;
             }
-            let Some(cat) = category(group, c).filter(|cat| 0 < cat.count) else {
+            let Some(cat) = category(group, formation_category).filter(|cat| 0 < cat.count) else {
                 continue;
             };
-            (*lines_of.checked_mut(k)?, *columns_of.checked_mut(k)?) = fit_to_widest(&cat, widest);
+            (
+                *lines_of.checked_mut(index)?,
+                *columns_of.checked_mut(index)?,
+            ) = fit_to_widest(&cat, widest);
         }
     }
     Ok((lines_of, columns_of))
@@ -316,15 +320,15 @@ impl SubKinds {
     }
 }
 
-/// The lines of category `c` (`lines` of `columns`, the last one the rest of its units): its
-/// single offset is its spacing straight back, doubled when staggered; a wider category after
-/// another grows the distance back by the difference. Each line starts over ([`clear_line`],
-/// [`reset_line`]) at the distance back, takes its slots ([`lay_line`]) and moves the distance
-/// back by its spacing (doubled when staggered).
+/// The lines of category `formation_category` (`lines` of `columns`, the last one the rest of its
+/// units): its single offset is its spacing straight back, doubled when staggered; a wider category
+/// after another grows the distance back by the difference. Each line starts over ([`clear_line`],
+/// [`reset_line`]) at the distance back, takes its slots ([`lay_line`]) and moves the distance back
+/// by its spacing (doubled when staggered).
 fn lay_category(
     formation: &mut Formation,
     cat: &Category,
-    c: FormationCategory,
+    formation_category: FormationCategory,
     (lines, columns): (i32, i32),
     style: Style<'_>,
     at: &mut Cursor,
@@ -361,7 +365,7 @@ fn lay_category(
         lay_line(
             formation,
             cat,
-            c,
+            formation_category,
             (actual, total, single),
             style,
             at,
@@ -425,7 +429,7 @@ fn line_start(
 fn lay_line(
     formation: &mut Formation,
     cat: &Category,
-    c: FormationCategory,
+    formation_category: FormationCategory,
     (actual, mut total, single): (i32, BVector, BVector),
     style: Style<'_>,
     at: &mut Cursor,
@@ -447,7 +451,7 @@ fn lay_line(
             depth: at.line_index,
             transform_position: BVector::ZERO,
             position_filled: 0,
-            desired_category: c,
+            desired_category: formation_category,
             active: 1,
             desired_sub_category,
             transformed: formation.slot_mut(i)?.transformed,
@@ -481,7 +485,7 @@ fn flank_offset(total: BVector, line_index: i32, style: Style<'_>) -> BVector {
 }
 
 impl World {
-    /// createColumnLine (`FUN_141012280`) of `formation` for group `g`: a column or a line of
+    /// createColumnLine (`FUN_141012280`) of `formation` for group `held`: a column or a line of
     /// `kind`; not laid without members. Its slots ([`column_line_slots`]), then the transform and
     /// the units ([`World::lay_units`]) with the column-to-line flag (0x141013d20..0x141013d3a): a
     /// line (2, 7 or 8) whose group's previous formation is a column (1). The game reads that type
@@ -497,10 +501,10 @@ impl World {
         group: GroupId,
         kind: LineKind,
     ) -> GenieResult<Layout> {
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         if column_line_slots(
             formation,
-            g,
+            held,
             kind,
             self.world_time,
             &self.model.tuning.group,
@@ -511,7 +515,7 @@ impl World {
         let after_column = matches!(
             formation.kind,
             FormationKind::Line | FormationKind::Staggered | FormationKind::Flanked
-        ) && g
+        ) && held
             .previous_formation
             .as_ref()
             .is_some_and(|p| p.kind == FormationKind::Column);

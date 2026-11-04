@@ -159,7 +159,10 @@ fn add(args: Add) -> anyhow::Result<()> {
 
     let suffix = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .map_or_else(|_| "temp".to_string(), |d| format!("{}", d.as_secs()));
+        .map_or_else(
+            |_| "temp".to_string(),
+            |duration| format!("{}", duration.as_secs()),
+        );
     let mut temp_out = args.output.as_ref().unwrap_or(&args.archive).clone();
     temp_out.set_file_name(format!(
         "{}.{}",
@@ -173,15 +176,23 @@ fn add(args: Add) -> anyhow::Result<()> {
         ReserveDirectoryStrategy::new(tables + new_tables, files + new_files),
     )?;
 
-    for t in drs_read.tables() {
-        for r in t.resources() {
-            let b = drs_read.get_resource_reader(&mut input, t.resource_kind, r.id)?;
-            drs_write.add(t.resource_kind, r.id, b)?;
+    for drs_table in drs_read.tables() {
+        for drs_resource in drs_table.resources() {
+            let reader = drs_read.get_resource_reader(
+                &mut input,
+                drs_table.resource_kind,
+                drs_resource.id,
+            )?;
+            drs_write.add(drs_table.resource_kind, drs_resource.id, reader)?;
         }
     }
 
-    for (i, path) in args.file.iter().enumerate() {
-        drs_write.add(args.table[i].as_str(), args.id[i], File::open(path)?)?;
+    for (index, path) in args.file.iter().enumerate() {
+        drs_write.add(
+            args.table[index].as_str(),
+            args.id[index],
+            File::open(path)?,
+        )?;
     }
 
     // Close the new archive before it replaces the old one.

@@ -201,8 +201,8 @@ impl Master {
                 }
             }
             MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
-                if let Some(g) = self.damage_graphic_mut() {
-                    g.apply_mode = DamageSpriteMode::of_data(low8(v));
+                if let Some(damage_graphic) = self.damage_graphic_mut() {
+                    damage_graphic.apply_mode = DamageSpriteMode::of_data(low8(v));
                 }
             }
             _ => {}
@@ -320,8 +320,8 @@ impl Master {
                 }
             }
             MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD => {
-                let n = cvttss2si(f32::from(self.damage_graphic_entry.get()) + v);
-                if let Some(n) = select_entry(self.damage_graphics.len(), n) {
+                let entry = cvttss2si(f32::from(self.damage_graphic_entry.get()) + v);
+                if let Some(n) = select_entry(self.damage_graphics.len(), entry) {
                     self.damage_graphic_entry = DamageGraphicEntry::of_selected(n);
                 }
             }
@@ -340,8 +340,8 @@ impl Master {
                 }
             }
             MasterAttribute::DAMAGE_GRAPHIC_APPLY_MODE => {
-                if let Some(g) = self.damage_graphic_mut() {
-                    g.apply_mode = g.apply_mode.plus(low8(v));
+                if let Some(damage_graphic) = self.damage_graphic_mut() {
+                    damage_graphic.apply_mode = damage_graphic.apply_mode.plus(low8(v));
                 }
             }
             _ => {}
@@ -416,11 +416,11 @@ impl Master {
         } else {
             masters_tuning.speed_cap
         };
-        if let Some(p) = self.animated.as_mut()
+        if let Some(animated_part) = self.animated.as_mut()
             && capped
-            && !at_most_or_unordered(p.max_speed.get(), cap)
+            && !at_most_or_unordered(animated_part.max_speed.get(), cap)
         {
-            p.max_speed = Speed::new(cap);
+            animated_part.max_speed = Speed::new(cap);
         }
     }
 
@@ -432,8 +432,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            if let Some(p) = self.animated.as_mut() {
-                p.max_speed = Speed::new(v);
+            if let Some(animated_part) = self.animated.as_mut() {
+                animated_part.max_speed = Speed::new(v);
             }
         } else {
             self.set_static(attribute, v, world);
@@ -448,8 +448,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            if let Some(p) = self.animated.as_mut() {
-                p.max_speed += Speed::new(v);
+            if let Some(animated_part) = self.animated.as_mut() {
+                animated_part.max_speed += Speed::new(v);
             }
             self.cap_speed(world.capped, world.masters_tuning);
         } else {
@@ -465,8 +465,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         if attribute == MasterAttribute::MOVEMENT_SPEED {
-            if let Some(p) = self.animated.as_mut() {
-                p.max_speed *= v;
+            if let Some(animated_part) = self.animated.as_mut() {
+                animated_part.max_speed *= v;
             }
             self.cap_speed(world.capped, world.masters_tuning);
         } else {
@@ -489,8 +489,8 @@ impl Master {
             | MasterAttribute::TRAILING_UNIT
             | MasterAttribute::TRAIL_MODE
             | MasterAttribute::TRAIL_DENSITY => {
-                if let Some(p) = self.moving.as_mut() {
-                    p.set_value(attribute, v, world);
+                if let Some(moving_part) = self.moving.as_mut() {
+                    moving_part.set_value(attribute, v, world);
                 }
             }
             _ => self.set_animated(attribute, v, world),
@@ -512,8 +512,8 @@ impl Master {
             | MasterAttribute::TRAILING_UNIT
             | MasterAttribute::TRAIL_MODE
             | MasterAttribute::TRAIL_DENSITY => {
-                if let Some(p) = self.moving.as_mut() {
-                    p.add_value(attribute, v, world);
+                if let Some(moving_part) = self.moving.as_mut() {
+                    moving_part.add_value(attribute, v, world);
                 }
             }
             _ => self.add_animated(attribute, v, world),
@@ -529,8 +529,8 @@ impl Master {
     ) {
         match attribute {
             MasterAttribute::ROTATION_SPEED | MasterAttribute::TRAIL_DENSITY => {
-                if let Some(p) = self.moving.as_mut() {
-                    p.multiply_value(attribute, v);
+                if let Some(moving_part) = self.moving.as_mut() {
+                    moving_part.multiply_value(attribute, v);
                 }
             }
             _ => self.multiply_animated(attribute, v, world),
@@ -548,8 +548,8 @@ impl Master {
             MasterAttribute::WORK_RATE
             | MasterAttribute::SEARCH_RADIUS
             | MasterAttribute::RUN_PATTERN => {
-                if let Some(p) = self.action.as_mut() {
-                    p.set_value(attribute, v);
+                if let Some(action_part) = self.action.as_mut() {
+                    action_part.set_value(attribute, v);
                 }
             }
             // the command and move sounds (132 to 135) are the interface's
@@ -572,8 +572,8 @@ impl Master {
             MasterAttribute::WORK_RATE
             | MasterAttribute::SEARCH_RADIUS
             | MasterAttribute::RUN_PATTERN => {
-                if let Some(p) = self.action.as_mut() {
-                    p.add_value(attribute, v);
+                if let Some(action_part) = self.action.as_mut() {
+                    action_part.add_value(attribute, v);
                 }
             }
             // the command and move sounds (through slot 0x18) are the interface's
@@ -591,8 +591,8 @@ impl Master {
     ) {
         match attribute {
             MasterAttribute::WORK_RATE | MasterAttribute::SEARCH_RADIUS => {
-                if let Some(p) = self.action.as_mut() {
-                    p.multiply_value(attribute, v);
+                if let Some(action_part) = self.action.as_mut() {
+                    action_part.multiply_value(attribute, v);
                 }
             }
             _ => self.multiply_moving(attribute, v, world),

@@ -90,62 +90,87 @@ use genie_save::generated::world::{
 /// the data file has, all of one count and bit 1 of the sequence flags; None when they differ or
 /// it has none. The dying sprite shows once the object is dead, where nothing turns it.
 pub fn master_facets(
-    m: &Master,
-    s: &RgeMasterStaticObject,
+    master: &Master,
+    rge_master_static_object: &RgeMasterStaticObject,
     table: &MasterTable,
 ) -> Option<SpriteFacets> {
-    let mut sprites = vec![s.idle_sprite_id, s.idle2_sprite_id];
-    if let Some(mv) = moving_master(m) {
+    let mut sprites = vec![
+        rge_master_static_object.idle_sprite_id,
+        rge_master_static_object.idle2_sprite_id,
+    ];
+    if let Some(mv) = moving_master(master) {
         sprites.extend([mv.move_sprite_id, mv.run_sprite_id]);
     }
-    if let Some(c) = combat_master(m) {
-        sprites.push(c.fight_sprite_id);
+    if let Some(rge_master_combat_object) = combat_master(master) {
+        sprites.push(rge_master_combat_object.fight_sprite_id);
     }
-    if let Some(tasks) = action_part(m).and_then(|a| a.tasks.as_deref()) {
-        for e in &tasks.list {
-            let t = &e.task;
-            sprites.extend([t.short_val, t.short_val_2, t.short_val_3, t.short_val_4]);
+    if let Some(tasks) = action_part(master)
+        .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref())
+    {
+        for entry in &tasks.list {
+            let task = &entry.task;
+            sprites.extend([
+                task.short_val,
+                task.short_val_2,
+                task.short_val_3,
+                task.short_val_4,
+            ]);
         }
     }
     let mut seen = sprites
         .into_iter()
         .filter_map(SpriteId::of_data)
         .filter_map(|id| table.graphics.get(id))
-        .map(|g| SpriteFacets {
-            count: g.facets,
-            turns: g.flags.contains(SpriteFlags::TURNS),
+        .map(|graphic| SpriteFacets {
+            count: graphic.facets,
+            turns: graphic.flags.contains(SpriteFlags::TURNS),
         });
     let first = seen.next()?;
-    seen.all(|f| f == first).then_some(first)
+    seen.all(|sprite_facets| sprite_facets == first)
+        .then_some(first)
 }
 
 /// A master's action part, whatever class it is (a missile's under its RGE combat part too):
 /// what holds its work rate, search radius, task list and run pattern.
 #[must_use]
-pub fn action_part(m: &Master) -> Option<&RgeMasterActionObject> {
+pub fn action_part(master: &Master) -> Option<&RgeMasterActionObject> {
     None.or_else(|| {
-        m.tribe_master_combat_object
+        master
+            .tribe_master_combat_object
             .as_deref()
-            .map(|c| &c.rge_master_combat_object.rge_master_action_object)
+            .map(|tribe_master_combat_object| {
+                &tribe_master_combat_object
+                    .rge_master_combat_object
+                    .rge_master_action_object
+            })
     })
     .or_else(|| {
-        m.tribe_master_building_object.as_deref().map(|b| {
-            &b.tribe_master_combat_object
-                .rge_master_combat_object
+        master
+            .tribe_master_building_object
+            .as_deref()
+            .map(|tribe_master_building_object| {
+                &tribe_master_building_object
+                    .tribe_master_combat_object
+                    .rge_master_combat_object
+                    .rge_master_action_object
+            })
+    })
+    .or_else(|| {
+        master.rge_master.as_deref().and_then(|rge_master| {
+            rge_master
                 .rge_master_action_object
-        })
-    })
-    .or_else(|| {
-        m.rge_master.as_deref().and_then(|r| {
-            r.rge_master_action_object
                 .as_deref()
                 .or_else(|| {
-                    r.rge_master_combat_object
+                    rge_master
+                        .rge_master_combat_object
                         .as_deref()
-                        .map(|c| &c.rge_master_action_object)
+                        .map(|rge_master_combat_object| {
+                            &rge_master_combat_object.rge_master_action_object
+                        })
                 })
                 .or_else(|| {
-                    r.rge_master_missile_object
+                    rge_master
+                        .rge_master_missile_object
                         .as_deref()
                         .map(|mm| &mm.rge_master_combat_object.rge_master_action_object)
                 })
@@ -168,7 +193,7 @@ pub fn task_at(
     let saved = objects
         .master(master)
         .and_then(action_part)
-        .and_then(|a| a.tasks.as_deref());
+        .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref());
     if let Some(tasks) = saved {
         let entry = tasks.list.get(i).ok_or(GenieError::unsupported(
             "a saved action's task beyond its master's list",
@@ -176,7 +201,7 @@ pub fn task_at(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, dat_id(objects, master)?))
+        .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
         .and_then(|w| w.action_part().tasks.get(i))
         .copied()
         .ok_or(GenieError::unsupported(
@@ -189,7 +214,7 @@ pub fn task_at(
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-pub fn core_task(t: &WorldTask) -> GenieResult<Task> {
+pub fn core_task(task: &WorldTask) -> GenieResult<Task> {
     let [
         attribute_kind,
         attribute_kind2,
@@ -197,36 +222,41 @@ pub fn core_task(t: &WorldTask) -> GenieResult<Task> {
         attribute_kind4,
         enablement,
     ] = attributes([
-        t.attribute_kind,
-        t.attribute_kind2,
-        t.attribute_kind3,
-        t.attribute_kind4,
-        t.enablement_resource_id,
+        task.attribute_kind,
+        task.attribute_kind2,
+        task.attribute_kind3,
+        task.attribute_kind4,
+        task.enablement_resource_id,
     ])?;
     Ok(Task {
-        id: TaskId::of_task(t.id),
-        action_kind: ActionKind::try_from(t.action_kind)?,
-        object_group: ClassId::of_field(t.object_group)?,
-        object_id: MasterId::of_data(t.object_id),
-        combat_level: t.combat_level,
-        combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
-        terrain: TaskTerrain::of_data(t.terrain_id),
-        owner_kind: TargetOwner::of_data(t.owner_kind),
-        holding_attr: t.holding_attr,
+        id: TaskId::of_task(task.id),
+        action_kind: ActionKind::try_from(task.action_kind)?,
+        object_group: ClassId::of_field(task.object_group)?,
+        object_id: MasterId::of_data(task.object_id),
+        combat_level: task.combat_level,
+        combat_level_flag: TaskFlags::from_bits_retain(task.combat_level_flag),
+        terrain: TaskTerrain::of_data(task.terrain_id),
+        owner_kind: TargetOwner::of_data(task.owner_kind),
+        holding_attr: task.holding_attr,
         attribute_kind,
         attribute_kind2,
         attribute_kind3,
         attribute_kind4,
-        wait_time: Seconds::new(t.search_wait_time),
-        work_val1: WorkValue::new(t.work_val1),
-        work_val2: WorkValue::new(t.work_val2),
-        work_range: Distance::new(t.work_range),
-        work_flag: t.work_flag,
+        wait_time: Seconds::new(task.search_wait_time),
+        work_val1: WorkValue::new(task.work_val1),
+        work_val2: WorkValue::new(task.work_val2),
+        work_range: Distance::new(task.work_range),
+        work_flag: task.work_flag,
         enablement,
-        sprites: TaskSprites::of_data([t.short_val, t.short_val_2, t.short_val_3, t.short_val_4]),
+        sprites: TaskSprites::of_data([
+            task.short_val,
+            task.short_val_2,
+            task.short_val_3,
+            task.short_val_4,
+        ]),
         sound_events: SoundEvents::new(
-            t.gather_sound_event_event_id.cast_signed(),
-            t.deposit_sound_event_event_id.cast_signed(),
+            task.gather_sound_event_event_id.cast_signed(),
+            task.deposit_sound_event_event_id.cast_signed(),
         ),
     })
 }
@@ -240,74 +270,86 @@ pub fn work_masters(
     table: &MasterTable,
 ) -> GenieResult<Masters> {
     let task = core_task;
-    let saved = objects.masters.iter().flatten().map(|m| &m.master);
-    let masters = saved.filter_map(|m| {
-        let s = m.static_part()?;
+    let saved = objects
+        .masters
+        .iter()
+        .flatten()
+        .map(|player_master| &player_master.master);
+    let masters = saved.filter_map(|master| {
+        let rge_master_static_object = master.static_part()?;
         // the `.dat` values of the master it copies (an upgraded one's), under its own id
-        let mut work = table.work(civ, MasterId::of_data(s.copy_id())?)?.clone();
-        work.id = MasterId::of_data(s.id())?;
-        work.class = ClassId::of_master(s.read_temp_5);
-        work.radius = Footprint::new(s.radius_x, s.radius_y);
-        work.height = Distance::new(s.radius_z);
-        work.obstruction_kind = ObstructionKind::from(s.obstruction_kind);
-        work.buildable_on = BuildableOn::of_data(s.can_be_built_on);
-        work.obstruction_class = ObstructionClass::from(s.obstruction_class);
-        work.object_flags = ObjectFlags::from_bits_retain(s.object_flags);
-        work.hit_points = MasterHitPoints::of_data(s.read_temp_6);
-        work.available = Availability::of_data(s.available);
-        work.disabled = DisableMode::of_data(s.disabled);
-        work.line_of_sight = Distance::new(s.los);
-        work.capacity = CarryCapacity::of_data(s.attribute_max_amount);
-        work.blast_defense = BlastDefense::new(s.area_effect_object_level);
+        let mut work = table
+            .work(civ, MasterId::of_data(rge_master_static_object.copy_id())?)?
+            .clone();
+        work.id = MasterId::of_data(rge_master_static_object.id())?;
+        work.class = ClassId::of_master(rge_master_static_object.read_temp_5);
+        work.radius = Footprint::new(
+            rge_master_static_object.radius_x,
+            rge_master_static_object.radius_y,
+        );
+        work.height = Distance::new(rge_master_static_object.radius_z);
+        work.obstruction_kind = ObstructionKind::from(rge_master_static_object.obstruction_kind);
+        work.buildable_on = BuildableOn::of_data(rge_master_static_object.can_be_built_on);
+        work.obstruction_class = ObstructionClass::from(rge_master_static_object.obstruction_class);
+        work.object_flags = ObjectFlags::from_bits_retain(rge_master_static_object.object_flags);
+        work.hit_points = MasterHitPoints::of_data(rge_master_static_object.read_temp_6);
+        work.available = Availability::of_data(rge_master_static_object.available);
+        work.disabled = DisableMode::of_data(rge_master_static_object.disabled);
+        work.line_of_sight = Distance::new(rge_master_static_object.los);
+        work.capacity = CarryCapacity::of_data(rge_master_static_object.attribute_max_amount);
+        work.blast_defense = BlastDefense::new(rge_master_static_object.area_effect_object_level);
         // the action layer is the save's RGE action part (its tasks where it saved them, else
         // the copy's): a master without one has no tasks, whatever its copy's are
-        if let Some(a) = action_part(m) {
-            let p = work.action.get_or_insert_with(Default::default);
-            p.work_rate = WorkRate::new(a.work_rate);
-            p.search_radius = Distance::new(a.search_radius);
-            p.run_pattern = RunPattern::of_data(a.run_pattern);
-            if let Some(tasks) = a.tasks.as_deref() {
-                p.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
+        if let Some(rge_master_action_object) = action_part(master) {
+            let action = work.action.get_or_insert_with(Default::default);
+            action.work_rate = WorkRate::new(rge_master_action_object.work_rate);
+            action.search_radius = Distance::new(rge_master_action_object.search_radius);
+            action.run_pattern = RunPattern::of_data(rge_master_action_object.run_pattern);
+            if let Some(tasks) = rge_master_action_object.tasks.as_deref() {
+                action.tasks = match tasks.list.iter().map(|e| task(&e.task)).collect() {
                     Ok(tasks) => tasks,
-                    Err(e) => return Some(Err(e)),
+                    Err(error) => return Some(Err(error)),
                 };
             }
         } else {
             work.action = None;
         }
-        let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
-            m.tribe_master_building_object
+        let combat = master.tribe_master_combat_object.as_deref().or_else(|| {
+            master
+                .tribe_master_building_object
                 .as_deref()
-                .map(|b| &b.tribe_master_combat_object)
+                .map(|tribe_master_building_object| {
+                    &tribe_master_building_object.tribe_master_combat_object
+                })
         });
         // the creatable layer is the save's TRIBE combat part: a master without one has no
         // costs or train locations, whatever its copy's are
         if let Some(c) = combat {
-            let p = work.creatable.get_or_insert_with(Default::default);
-            p.cost = build_cost(&c.build_inventory);
-            p.build_time = c
+            let creatable_part = work.creatable.get_or_insert_with(Default::default);
+            creatable_part.cost = build_cost(&c.build_inventory);
+            creatable_part.build_time = c
                 .train_location
                 .first()
                 .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
-            p.charge_kind = ChargeKind::of_data(c.charge_kind);
-            p.formation_category = FormationClass::of_data(c.temp_formation_category);
-            p.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
-            p.volley_fire = Firepower::new(c.volley_fire_amount);
-            p.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
-            p.volley_spread = VolleySpread {
+            creatable_part.charge_kind = ChargeKind::of_data(c.charge_kind);
+            creatable_part.formation_category = FormationClass::of_data(c.temp_formation_category);
+            creatable_part.hero_flag = HeroFlags::from_bits_retain(c.hero_flag);
+            creatable_part.volley_fire = Firepower::new(c.volley_fire_amount);
+            creatable_part.max_volley = MissileCount::of_data(c.max_attacks_in_volley);
+            creatable_part.volley_spread = VolleySpread {
                 x: Distance::new(c.volley_xspread),
                 y: Distance::new(c.volley_yspread),
                 start: Distance::new(c.volley_start_spread_adjustment),
             };
             let id = |id: i32| i16::try_from(id).ok().and_then(MasterId::of_data);
-            p.volley_missile = id(c.volley_missile_id);
-            p.charge_projectile = id(c.charge_projectile_unit);
-            p.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
-            p.attack_priority = AttackPriority::of_byte(c.attack_priority);
-            p.special_attack = SpecialAttack::of_data(c.special_attack_flag);
-            p.max_charge = Charge::new(c.max_charge);
-            p.charge_target = ChargeTarget::of_data(c.charge_target);
-            p.train_locations = c
+            creatable_part.volley_missile = id(c.volley_missile_id);
+            creatable_part.charge_projectile = id(c.charge_projectile_unit);
+            creatable_part.invulnerability = InvulnerabilityLevel::new(c.invulnerability_level);
+            creatable_part.attack_priority = AttackPriority::of_byte(c.attack_priority);
+            creatable_part.special_attack = SpecialAttack::of_data(c.special_attack_flag);
+            creatable_part.max_charge = Charge::new(c.max_charge);
+            creatable_part.charge_target = ChargeTarget::of_data(c.charge_target);
+            creatable_part.train_locations = c
                 .train_location
                 .iter()
                 .map(|t| TrainLocation {
@@ -317,59 +359,62 @@ pub fn work_masters(
                     hotkey: HotkeyId::of_data(t.hotkey_id),
                 })
                 .collect();
-            p.trained_at = p
+            creatable_part.trained_at = creatable_part
                 .train_locations
                 .iter()
-                .filter_map(|t| t.location)
+                .filter_map(|train_location| train_location.location)
                 .collect();
         } else {
             work.creatable = None;
         }
         // the combat part a missile master has too (`RGE_Master_Missile_Object`'s base)
-        let rge_combat = combat.map(|c| &c.rge_master_combat_object).or_else(|| {
-            m.rge_master
-                .as_deref()
-                .and_then(|r| r.rge_master_missile_object.as_deref())
-                .map(|mm| &mm.rge_master_combat_object)
-        });
+        let rge_combat = combat
+            .map(|tribe_master_combat_object| &tribe_master_combat_object.rge_master_combat_object)
+            .or_else(|| {
+                master
+                    .rge_master
+                    .as_deref()
+                    .and_then(|r| r.rge_master_missile_object.as_deref())
+                    .map(|mm| &mm.rge_master_combat_object)
+            });
         // the combat layer is the save's RGE combat part: a master without one has no attack,
         // armor or blast, whatever its copy's are
         if let Some(rc) = rge_combat {
-            let p = work.combat.get_or_insert_with(CombatPart::absent);
-            p.weapon_range = Distance::new(rc.weapon_range);
-            p.min_range = Distance::new(rc.minimum_weapon_range);
-            p.missile = MasterField::of_data(rc.missile_id);
-            p.weapon_offset =
+            let combat_part = work.combat.get_or_insert_with(CombatPart::absent);
+            combat_part.weapon_range = Distance::new(rc.weapon_range);
+            combat_part.min_range = Distance::new(rc.minimum_weapon_range);
+            combat_part.missile = MasterField::of_data(rc.missile_id);
+            combat_part.weapon_offset =
                 Offset::new(rc.weapon_offset_x, rc.weapon_offset_y, rc.weapon_offset_z);
-            p.missed_spread = MissSpread::new(rc.missed_missile_spread);
-            p.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
-            p.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
-            p.interrupt_frame = Frame::of_data(rc.interrupt_frame);
-            p.hit_chance = HitChance::of_data(rc.base_hit_chance);
-            p.reload = Seconds::new(rc.speed_of_attack);
-            p.weapons = rc
+            combat_part.missed_spread = MissSpread::new(rc.missed_missile_spread);
+            combat_part.attack_sprite = SpriteId::of_data(rc.fight_sprite_id);
+            combat_part.fire_frame = Frame::of_data(rc.fire_missile_at_frame);
+            combat_part.interrupt_frame = Frame::of_data(rc.interrupt_frame);
+            combat_part.hit_chance = HitChance::of_data(rc.base_hit_chance);
+            combat_part.reload = Seconds::new(rc.speed_of_attack);
+            combat_part.weapons = rc
                 .weapon
                 .iter()
                 .map(|&w| ClassAmount::new((w & 0xffff) as i16, (w >> 16) as i16))
                 .collect();
-            p.base_armor = DamageAmount::new(rc.base_armor);
-            p.armors = rc
+            combat_part.base_armor = DamageAmount::new(rc.base_armor);
+            combat_part.armors = rc
                 .armor
                 .iter()
                 .map(|&a| ClassAmount::new((a & 0xffff) as i16, (a >> 16) as i16))
                 .collect();
-            p.resistance = DamageShare::new(rc.bonus_damage_resistance);
-            p.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
-            p.reflection = DamageShare::new(rc.damage_reflection);
-            p.friendly_fire = DamageShare::new(rc.friendly_fire_damage);
-            p.area_effect = Distance::new(rc.area_effect_range);
-            p.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
-            p.area_damage = DamageShare::new(rc.area_damage);
-            p.garrison_firepower = Firepower::new(rc.garrison_firepower);
+            combat_part.resistance = DamageShare::new(rc.bonus_damage_resistance);
+            combat_part.combat_ability = CombatAbility::from_bits_retain(rc.combat_ability);
+            combat_part.reflection = DamageShare::new(rc.damage_reflection);
+            combat_part.friendly_fire = DamageShare::new(rc.friendly_fire_damage);
+            combat_part.area_effect = Distance::new(rc.area_effect_range);
+            combat_part.blast_level = BlastLevel::from_bits_retain(rc.area_effect_level);
+            combat_part.area_damage = DamageShare::new(rc.area_damage);
+            combat_part.garrison_firepower = Firepower::new(rc.garrison_firepower);
         } else {
             work.combat = None;
         }
-        work.storage = s
+        work.storage = rge_master_static_object
             .attribute
             .iter()
             .map(|e| {
@@ -383,28 +428,28 @@ pub fn work_masters(
         // the save holds the foundation terrain of its own building masters, its garrison's
         // kinds (`garrison_units`, read into `+0x9bc`: a civilisation's bonus, as the Gurjaras'
         // herdables in mills, changes them at the start) and rates, and its facet
-        if let (Some(b), Some(saved)) = (
+        if let (Some(building_master), Some(saved)) = (
             work.building.as_mut(),
-            m.tribe_master_building_object.as_deref(),
+            master.tribe_master_building_object.as_deref(),
         ) {
-            b.facet = saved.building_facet.cast_signed();
-            b.garrison_kind = GarrisonKinds::from_bits_retain(saved.garrison_units);
-            b.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
-            b.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
-            b.foundation_terrain = TerrainId::of_data(saved.on_build_make_tile);
+            building_master.facet = saved.building_facet.cast_signed();
+            building_master.garrison_kind = GarrisonKinds::from_bits_retain(saved.garrison_units);
+            building_master.garrison_heal_rate = HitPoints::new(saved.garrison_heal_rate);
+            building_master.garrison_repair_rate = HitPoints::new(saved.garrison_repair_rate);
+            building_master.foundation_terrain = TerrainId::of_data(saved.on_build_make_tile);
             // `+0x960`, the third of its sprites (`tempId`)
-            b.destruction_sprite = SpriteId::of_data(saved.temp_id_3.cast_signed());
+            building_master.destruction_sprite = SpriteId::of_data(saved.temp_id_3.cast_signed());
             // `+0x950`, the first (`tempId`)
-            b.construction_sprite = SpriteId::of_data(saved.temp_id.cast_signed());
+            building_master.construction_sprite = SpriteId::of_data(saved.temp_id.cast_signed());
         }
         // a missile master's layer: the save's three bytes and arc, the data file's projectile
         // type
-        work.missile = m
+        work.missile = master
             .rge_master
             .as_deref()
-            .and_then(|r| r.rge_master_missile_object.as_deref())
+            .and_then(|rge_master| rge_master.rge_master_missile_object.as_deref())
             .map(|mm| MissilePart {
-                projectile_kind: MasterId::of_data(s.copy_id())
+                projectile_kind: MasterId::of_data(rge_master_static_object.copy_id())
                     .and_then(|m| table.projectile_kind(civ, m))
                     .unwrap_or_default(),
                 smart_mode: SmartMode::from_bits_retain(mm.targetting_kind),
@@ -414,10 +459,10 @@ pub fn work_masters(
             });
         // what the masters' attribute setters change: the top and turn speeds (+0x740,
         // +0x758), the damage sprites (+0x638) and the train locations (+0x898)
-        work.animated = animated_master(m).map(|a| AnimatedPart {
-            max_speed: Speed::new(a.max_speed),
+        work.animated = animated_master(master).map(|rge_master_animated_object| AnimatedPart {
+            max_speed: Speed::new(rge_master_animated_object.max_speed),
         });
-        work.moving = moving_master(m).map(|mv| MovingPart {
+        work.moving = moving_master(master).map(|mv| MovingPart {
             move_sprite: SpriteId::of_data(mv.move_sprite_id),
             run_sprite: SpriteId::of_data(mv.run_sprite_id),
             turn_speed: Seconds::new(mv.turn_speed),
@@ -428,29 +473,31 @@ pub fn work_masters(
                 density: TrailDensity::new(f32::from_bits(mv.obj_trail_spacing)),
             },
         });
-        work.damage_graphics = s
+        work.damage_graphics = rge_master_static_object
             .damage_sprite
             .iter()
-            .map(|d| DamageGraphic {
-                sprite: SpriteId::of_data(d.temp_id),
-                percent: HpPercent::of_data(d.sprite_info_damage_percent),
-                apply_mode: DamageSpriteMode::of_data(d.sprite_info_flag),
+            .map(|entry| DamageGraphic {
+                sprite: SpriteId::of_data(entry.temp_id),
+                percent: HpPercent::of_data(entry.sprite_info_damage_percent),
+                apply_mode: DamageSpriteMode::of_data(entry.sprite_info_flag),
             })
             .collect();
-        work.fly_mode = MasterId::of_data(s.copy_id())
+        work.fly_mode = MasterId::of_data(rge_master_static_object.copy_id())
             .and_then(|m| table.fly_mode(civ, m))
             .unwrap_or_default();
-        work.standing_sprite = SpriteId::of_data(s.idle_sprite_id);
-        work.standing_sprite_2 = SpriteId::of_data(s.idle2_sprite_id);
-        work.death_sprite = SpriteId::of_data(s.death_sprite_id);
-        work.garrison = GarrisonCapacity::of_data(s.obj_max);
+        work.standing_sprite = SpriteId::of_data(rge_master_static_object.idle_sprite_id);
+        work.standing_sprite_2 = SpriteId::of_data(rge_master_static_object.idle2_sprite_id);
+        work.death_sprite = SpriteId::of_data(rge_master_static_object.death_sprite_id);
+        work.garrison = GarrisonCapacity::of_data(rge_master_static_object.obj_max);
         work.death_spawns = [
-            MasterId::of_data(s.death_spawn_obj_id),
-            MasterId::of_data(s.death_spawn_obj_id2),
+            MasterId::of_data(rge_master_static_object.death_spawn_obj_id),
+            MasterId::of_data(rge_master_static_object.death_spawn_obj_id2),
         ];
-        work.terrain_restriction = RestrictionId::of_data(s.terrain_restriction_mask_id);
-        work.life = MasterId::of_data(s.copy_id()).and_then(|m| table.get(civ, m));
-        work.move_stats = moving_stats(m, s, civ, table);
+        work.terrain_restriction =
+            RestrictionId::of_data(rge_master_static_object.terrain_restriction_mask_id);
+        work.life = MasterId::of_data(rge_master_static_object.copy_id())
+            .and_then(|master_id| table.get(civ, master_id));
+        work.move_stats = moving_stats(master, rge_master_static_object, civ, table);
         Some(Ok(work))
     });
     Ok(Masters::new(masters.collect::<GenieResult<Vec<_>>>()?))
@@ -462,41 +509,48 @@ pub fn work_masters(
 /// the terrain restriction with its mask.
 #[must_use]
 pub fn moving_stats(
-    m: &Master,
-    s: &RgeMasterStaticObject,
+    master: &Master,
+    rge_master_static_object: &RgeMasterStaticObject,
     civ: CivId,
     table: &MasterTable,
 ) -> Option<MoveStats> {
-    let moving = moving_master(m)?;
+    let moving = moving_master(master)?;
     let sprite = SpriteId::of_data(moving.run_sprite_id)
         .or_else(|| SpriteId::of_data(moving.move_sprite_id));
     let base = moving.rge_master_animated_object.max_speed;
     let factor = sprite
         .and_then(|sprite| table.sprite_speed(sprite))
         .unwrap_or(SpeedMultiplier::ZERO);
-    let turning = table.turning(civ, MasterId::of_data(s.copy_id())?)?;
-    let restriction = RestrictionId::of_data(s.terrain_restriction_mask_id)?;
+    let turning = table.turning(civ, MasterId::of_data(rge_master_static_object.copy_id())?)?;
+    let restriction = RestrictionId::of_data(rge_master_static_object.terrain_restriction_mask_id)?;
     let facets = SpriteId::of_data(moving.move_sprite_id)
-        .and_then(|w| table.graphics.get(w))
-        .map(|g| g.facets);
+        .and_then(|sprite_id| table.graphics.get(sprite_id))
+        .map(|graphic| graphic.facets);
     Some(MoveStats {
-        fly_mode: MasterId::of_data(s.copy_id())
-            .and_then(|m| table.fly_mode(civ, m))
+        fly_mode: MasterId::of_data(rge_master_static_object.copy_id())
+            .and_then(|master_id| table.fly_mode(civ, master_id))
             .unwrap_or_default(),
         speed: factor.applied_to(Speed::new(base)),
         base: Speed::new(base),
         turn_rate: turn_rate(Seconds::new(moving.turn_speed), facets),
         turn_radius: Distance::ZERO,
         turn_radius_speed: Speed::MAX,
-        radius: Radii::new(s.radius_x, s.radius_y, s.radius_z),
+        radius: Radii::new(
+            rge_master_static_object.radius_x,
+            rge_master_static_object.radius_y,
+            rge_master_static_object.radius_z,
+        ),
         restriction,
         restriction_mask: *table.terrain.masks().get(restriction.index())?,
         turn_time: Seconds::new(moving.turn_speed),
         move_algorithm: turning.move_algorithm,
         min_collision: turning.min_collision_size_multiplier,
-        fast_turn: ObjectFlags::from_bits_retain(s.object_flags).contains(ObjectFlags::SHIP),
-        facets: master_facets(m, s, table),
-        weapon_range: combat_master(m).map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
+        fast_turn: ObjectFlags::from_bits_retain(rge_master_static_object.object_flags)
+            .contains(ObjectFlags::SHIP),
+        facets: master_facets(master, rge_master_static_object, table),
+        weapon_range: combat_master(master).map_or(Distance::ZERO, |rge_master_combat_object| {
+            Distance::new(rge_master_combat_object.weapon_range)
+        }),
     })
 }
 
@@ -534,19 +588,27 @@ pub fn build_entries(inventory: &[[u8; 6]]) -> Vec<(i16, i16, bool)> {
 /// does not move (whether it moves, genie-core's `Placed::moves`, and whether a
 /// combat unit links its tiles); a master the save does not hold, the largest.
 #[must_use]
-pub fn moving_speed(o: &genie_save::Object, s: &RgeStaticObject, objects: &PlayerObjects) -> f32 {
-    if o.moving_part().is_none() {
+pub fn moving_speed(
+    object: &genie_save::Object,
+    rge_static_object: &RgeStaticObject,
+    objects: &PlayerObjects,
+) -> f32 {
+    if object.moving_part().is_none() {
         return 0.0;
     }
-    if s.own_master().is_some() {
-        return s
+    if rge_static_object.own_master().is_some() {
+        return rge_static_object
             .own_animated_master()
-            .map_or(f32::INFINITY, |a| a.max_speed);
+            .map_or(f32::INFINITY, |own_rge_master_animated_object| {
+                own_rge_master_animated_object.max_speed
+            });
     }
     objects
-        .master(s.master_obj)
+        .master(rge_static_object.master_obj)
         .and_then(animated_master)
-        .map_or(f32::INFINITY, |a| a.max_speed)
+        .map_or(f32::INFINITY, |rge_master_animated_object| {
+            rge_master_animated_object.max_speed
+        })
 }
 
 /// What movement and sight read of an object's master (its own or its player's).
@@ -566,11 +628,14 @@ pub struct Placement {
     pub los: Distance,
 }
 
-/// What movement and sight read of the object `s`'s master: its own master's, else its
-/// player's; none for a master the save does not hold.
+/// What movement and sight read of the object `rge_static_object`'s master: its own master's, else
+/// its player's; none for a master the save does not hold.
 #[must_use]
-pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placement> {
-    if let Some(own) = s.own_master() {
+pub fn placement(
+    rge_static_object: &RgeStaticObject,
+    objects: &PlayerObjects,
+) -> Option<Placement> {
+    if let Some(own) = rge_static_object.own_master() {
         // an own master's second readTemp is its class (its first the id, its third the hit
         // points: as the shared masters' of the same id read)
         return Some(Placement {
@@ -582,13 +647,19 @@ pub fn placement(s: &RgeStaticObject, objects: &PlayerObjects) -> Option<Placeme
             los: Distance::new(own.los),
         });
     }
-    let m = objects.master(s.master_obj)?.static_part()?;
+    let rge_master_static_object = objects
+        .master(rge_static_object.master_obj)?
+        .static_part()?;
     Some(Placement {
-        radius: Radii::new(m.radius_x, m.radius_y, m.radius_z),
-        class: ClassId::of_master(m.read_temp_5),
-        obstruction_kind: ObstructionKind::from(m.obstruction_kind),
-        obstruction_class: ObstructionClass::from(m.obstruction_class),
-        buildable_on: BuildableOn::of_data(m.can_be_built_on),
-        los: Distance::new(m.los),
+        radius: Radii::new(
+            rge_master_static_object.radius_x,
+            rge_master_static_object.radius_y,
+            rge_master_static_object.radius_z,
+        ),
+        class: ClassId::of_master(rge_master_static_object.read_temp_5),
+        obstruction_kind: ObstructionKind::from(rge_master_static_object.obstruction_kind),
+        obstruction_class: ObstructionClass::from(rge_master_static_object.obstruction_class),
+        buildable_on: BuildableOn::of_data(rge_master_static_object.can_be_built_on),
+        los: Distance::new(rge_master_static_object.los),
     })
 }

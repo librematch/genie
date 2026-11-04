@@ -76,7 +76,10 @@ pub(crate) fn new_object(tick: Tick, player: PlayerId, object: ObjectId, master:
 
 /// The context of `why` as one text (`key: value, …`), none without any.
 fn context_of(why: &GenieError) -> Option<String> {
-    let parts: Vec<String> = why.context().map(|(k, v)| format!("{k}: {v}")).collect();
+    let parts: Vec<String> = why
+        .context()
+        .map(|(k, text)| format!("{k}: {text}"))
+        .collect();
     (!parts.is_empty()).then(|| parts.join(", "))
 }
 
@@ -170,12 +173,14 @@ pub(crate) struct Watch {
 }
 
 impl Watch {
-    /// The watch of `u`, its action layer `actions` and its unit AI `ai`, taken only while a
+    /// The watch of `unit`, its action layer `actions` and its unit AI `ai`, taken only while a
     /// subscriber listens to the state events.
-    pub(crate) fn of(u: &Unit, actions: &Action, ai: Option<&UnitAi>) -> Option<Self> {
+    pub(crate) fn of(unit: &Unit, actions: &Action, ai: Option<&UnitAi>) -> Option<Self> {
         tracing::enabled!(target: STATE, tracing::Level::DEBUG).then(|| Self {
-            object_state: u.life.state,
-            action: actions.top_action().map(|a| (a.kind.get(), a.state.get())),
+            object_state: unit.life.state,
+            action: actions
+                .top_action()
+                .map(|top_action| (top_action.kind.get(), top_action.state.get())),
             order: ai.map(|ai| {
                 [
                     OrderKind::field(ai.current_order),
@@ -186,18 +191,18 @@ impl Watch {
         })
     }
 
-    /// Tell the subscriber what changed from `self` to `u` (its action layer `actions`, its
+    /// Tell the subscriber what changed from `self` to `unit` (its action layer `actions`, its
     /// unit AI `ai`) in the update `tick` of `player`.
     pub(crate) fn report(
         self,
-        (u, actions, ai): (&Unit, &Action, Option<&UnitAi>),
+        (unit, actions, ai): (&Unit, &Action, Option<&UnitAi>),
         tick: Tick,
         player: PlayerId,
     ) {
-        let Some(now) = Self::of(u, actions, ai) else {
+        let Some(now) = Self::of(unit, actions, ai) else {
             return;
         };
-        let object = u.id.get();
+        let object = unit.id.get();
         if now.object_state != self.object_state {
             tracing::debug!(
                 target: STATE,
@@ -346,7 +351,7 @@ mod tests {
     /// [`heard_with_draws`] without the random generators' steps.
     fn heard(run: impl FnOnce()) -> Vec<String> {
         let mut lines = heard_with_draws(run);
-        lines.retain(|l| !l.contains(DRAWS));
+        lines.retain(|text| !text.contains(DRAWS));
         lines
     }
 
@@ -355,15 +360,15 @@ mod tests {
             objects: objects.into(),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
             vec![Millis::ZERO],
             vec![player],
         );
-        stock_masters(&mut t);
-        t
+        stock_masters(&mut world);
+        world
     }
 
     /// Each step names its stream, the draw count, the raw value and the engine's line that
@@ -396,7 +401,10 @@ mod tests {
         let lines = heard_with_draws(|| {
             let _ = lone.raw64();
         });
-        let lone_draws = lines.iter().filter(|l| l.contains("stream=255")).count();
+        let lone_draws = lines
+            .iter()
+            .filter(|text| text.contains("stream=255"))
+            .count();
         assert_eq!(lone_draws, 2, "{lines:?}");
     }
 
@@ -407,11 +415,11 @@ mod tests {
 
     #[test]
     fn an_update_tells_its_span_its_players_and_its_objects() {
-        let mut t = one(vec![Unit {
+        let mut world = one(vec![Unit {
             id: object_id(7),
             ..Unit::default()
         }]);
-        let lines = heard(|| t.tick(Millis::new(10)));
+        let lines = heard(|| world.tick(Millis::new(10)));
         // each step of the schedule in its span, the player's in the player's
         assert_eq!(
             lines[..10],
@@ -435,13 +443,16 @@ mod tests {
         let why =
             GenieError::unsupported("a default task the slice does not model").with("site", 1);
         let at = why.location();
-        let mut t = one(vec![Unit {
+        let mut world = one(vec![Unit {
             id: object_id(5),
             ..Unit::default()
         }]);
-        t.set_unread(object_id(5), why);
-        let lines = heard(|| t.tick(Millis::new(10)));
-        let warned: Vec<_> = lines.iter().filter(|l| l.starts_with("WARN")).collect();
+        world.set_unread(object_id(5), why);
+        let lines = heard(|| world.tick(Millis::new(10)));
+        let warned: Vec<_> = lines
+            .iter()
+            .filter(|text| text.starts_with("WARN"))
+            .collect();
         assert_eq!(
             warned,
             [&format!(
@@ -456,9 +467,9 @@ mod tests {
     fn an_unmodelled_command_tells_the_command_and_why_its_player_stops() {
         let why = GenieError::unsupported("QUEUE at two buildings");
         let at = why.location();
-        let mut t = one(Vec::new());
+        let mut world = one(Vec::new());
         let lines = heard(|| {
-            t.tick_with(
+            world.tick_with(
                 Millis::new(104),
                 &[Command::Unmodelled(UnmodelledCommand {
                     player: player_id(0),
@@ -477,7 +488,7 @@ mod tests {
 
     #[test]
     fn dying_object_tells_its_state_change() {
-        let mut t = one(vec![Unit {
+        let mut world = one(vec![Unit {
             id: object_id(5),
             life: Lifecycle {
                 class: Class::Animated,
@@ -487,9 +498,9 @@ mod tests {
             },
             ..Unit::default()
         }]);
-        let before = t.players[0].objects[ListIndex::new(0)].life.state;
-        let lines = heard(|| t.tick(Millis::new(10)));
-        let after = t.players[0].objects[ListIndex::new(0)].life.state;
+        let before = world.players[0].objects[ListIndex::new(0)].life.state;
+        let lines = heard(|| world.tick(Millis::new(10)));
+        let after = world.players[0].objects[ListIndex::new(0)].life.state;
         assert_ne!(before, after, "{lines:#?}");
         assert!(lines.contains(&format!(
             "DEBUG genie_core::state object_state tick=1 player=0 object=5 from={before} to={after}"

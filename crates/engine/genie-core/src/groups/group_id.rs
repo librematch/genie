@@ -51,8 +51,8 @@ impl GroupId {
 }
 
 impl genie_diff::Diff for GroupId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -95,7 +95,10 @@ mod tests {
     fn field_minus_one_is_none_and_any_other_value_group() {
         assert_eq!(GroupId::of_field(-1), None);
         for value in [0, 5, -2, i32::MIN, i32::MAX] {
-            assert_eq!(GroupId::of_field(value).map(|g| g.get()), Some(value));
+            assert_eq!(
+                GroupId::of_field(value).map(|group_id| group_id.get()),
+                Some(value)
+            );
             assert_eq!(GroupId::field(GroupId::of_field(value)), value);
         }
         assert_eq!(GroupId::field(None), -1);
@@ -109,10 +112,13 @@ mod tests {
             Err(ErrorKind::InvalidInput)
         );
         assert_eq!(
-            GroupId::try_from(u32::MAX).map_err(|e| e.kind()),
+            GroupId::try_from(u32::MAX).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
-        assert_eq!(GroupId::try_from(7_u32).map(|g| g.get()), Ok(7));
+        assert_eq!(
+            GroupId::try_from(7_u32).map(|group_id| group_id.get()),
+            Ok(7)
+        );
     }
 
     /// The next group's id is one more, wrapping as the game's 32-bit add.

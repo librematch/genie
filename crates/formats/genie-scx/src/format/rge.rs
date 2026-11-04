@@ -465,7 +465,7 @@ mod tests {
             let back = round_trip(
                 version,
                 |o| scen.write_players(o, version),
-                |b, i| b.read_players(i),
+                |rge_scen, i| rge_scen.read_players(i),
             );
             let named = 1.13 < version;
             assert_eq!(back.player_names[3].is_some(), named, "{version}");
@@ -513,9 +513,9 @@ mod tests {
                     scen.write_string_tables(&mut *o, version)?;
                     scen.write_texts(o, version)
                 },
-                |b, i| {
-                    b.read_string_tables(&mut *i)?;
-                    b.read_texts(i)
+                |rge_scen, i| {
+                    rge_scen.read_string_tables(&mut *i)?;
+                    rge_scen.read_texts(i)
                 },
             );
             assert_eq!(back.description.as_deref(), Some("about"));
@@ -538,7 +538,7 @@ mod tests {
             let back = round_trip(
                 version,
                 |o| scen.write_cinematics(o, version),
-                |b, i| b.read_cinematics(i),
+                |rge_scen, i| rge_scen.read_cinematics(i),
             );
             assert_eq!(back.pregame_cinematic.as_deref(), Some("intro"));
             assert_eq!(back.mission_bmp, None);
@@ -554,7 +554,7 @@ mod tests {
             let back = round_trip(
                 version,
                 |o| scen.write_player_files(o, version),
-                |b, i| b.read_player_files(i),
+                |rge_scen, i| rge_scen.read_player_files(i),
             );
             assert_eq!(back.player_build_lists[2].as_deref(), Some("build2"));
             assert_eq!(back.player_files[2].build_list.as_deref(), Some("b2"));

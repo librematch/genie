@@ -41,15 +41,15 @@ impl Unit {
     pub(crate) fn update(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
     ) -> GenieResult<Outcome> {
-        let Some(leaves) = self.update_to_actions(actions, c, roles)? else {
+        let Some(leaves) = self.update_to_actions(actions, step, roles)? else {
             return Ok(Outcome::Sleep);
         };
-        let captured = self.update_actions(actions, c, roles, slots)?;
-        self.ai_part(actions, c, (captured, leaves), roles)
+        let captured = self.update_actions(actions, step, roles, slots)?;
+        self.ai_part(actions, step, (captured, leaves), roles)
     }
 
     /// `RGE_Static_Object::update` and the combat object's steps before the actions: the death
@@ -60,28 +60,30 @@ impl Unit {
     pub(crate) fn update_to_actions(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<Option<Outcome>> {
-        self.death_blast(actions, c, roles)?;
-        if self.go_to_sleep(c.w.parts.mover_of(self.id), c.w.parts.unit_ai.get(self.id))?
-            == SleepCheck::FallsAsleep
+        self.death_blast(actions, step, roles)?;
+        if self.go_to_sleep(
+            step.w.parts.mover_of(self.id),
+            step.w.parts.unit_ai.get(self.id),
+        )? == SleepCheck::FallsAsleep
         {
             return Ok(None);
         }
-        self.take_sprite_facets(c.w.parts.mover_mut(self.id));
-        self.let_removed_links_go(c, roles)?;
-        self.gate_update(actions, c, roles)?;
-        self.complete_on_update(actions, c, roles)?;
-        self.building_seconds(c, roles)?;
+        self.take_sprite_facets(step.w.parts.mover_mut(self.id));
+        self.let_removed_links_go(step, roles)?;
+        self.gate_update(actions, step, roles)?;
+        self.complete_on_update(actions, step, roles)?;
+        self.building_seconds(step, roles)?;
         // a new object's combat layer (none in the table) has no timer to run down
-        if let Some(combat) = c.w.parts.combat.get_mut(self.id) {
-            run_down_attack_timers(combat, c.dt.seconds(), c.w.world_time);
+        if let Some(combat) = step.w.parts.combat.get_mut(self.id) {
+            run_down_attack_timers(combat, step.dt.seconds(), step.w.world_time);
         }
-        self.motion_step(actions, c, roles)?;
-        let leaves = self.life_step(actions, c, roles)?;
-        self.animate(c);
-        self.actions_past_life(actions, c)?;
+        self.motion_step(actions, step, roles)?;
+        let leaves = self.life_step(actions, step, roles)?;
+        self.animate(step);
+        self.actions_past_life(actions, step)?;
         Ok(Some(leaves))
     }
 
@@ -93,20 +95,20 @@ impl Unit {
     pub(crate) fn update_actions(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
     ) -> GenieResult<Option<Captured>> {
-        let started = self.start_default_task(actions, c)?;
+        let started = self.start_default_task(actions, step)?;
         let captured = if started == DefaultStart::Started {
             None
         } else if self.life.inside.is_some() {
-            self.inside_update(actions, c)?;
+            self.inside_update(actions, step)?;
             None
         } else {
-            self.update_head(actions, c, roles, slots)?
+            self.update_head(actions, step, roles, slots)?
         };
-        self.after_actions(c)?;
+        self.after_actions(step)?;
         Ok(captured)
     }
 
@@ -116,14 +118,14 @@ impl Unit {
     fn update_head(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
         slots: Slots,
     ) -> GenieResult<Option<Captured>> {
         let me = self.me(actions);
         let mut captured = None;
-        let code = self.head_part(actions, c, me, &mut captured, roles, slots)?;
-        self.end_head_update(actions, c, code)?;
+        let code = self.head_part(actions, step, me, &mut captured, roles, slots)?;
+        self.end_head_update(actions, step, code)?;
         Ok(captured)
     }
 
@@ -132,7 +134,7 @@ impl Unit {
     fn head_part(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         captured: &mut Option<Captured>,
         roles: &Roles,
@@ -141,40 +143,42 @@ impl Unit {
         match actions.list.head() {
             None => Ok(HeadCode::Keeps),
             Some(Action::Artifact(_)) => {
-                self.artifact_part(actions, c, me, roles, slots)
+                self.artifact_part(actions, step, me, roles, slots)
                     .map(|found| {
                         *captured = found;
                         HeadCode::Keeps
                     })
             }
-            Some(Action::Build(_)) => self.build_part(actions, c, me),
-            Some(Action::Repair(_)) => self.repair_part(actions, c, me, roles),
-            Some(Action::Enter(_)) => self.enter_part(actions, c, me, roles),
-            Some(Action::Transport(t)) => self.transport_update(*t, actions, c, me, roles),
+            Some(Action::Build(_)) => self.build_part(actions, step, me),
+            Some(Action::Repair(_)) => self.repair_part(actions, step, me, roles),
+            Some(Action::Enter(_)) => self.enter_part(actions, step, me, roles),
+            Some(Action::Transport(transport_action)) => {
+                self.transport_update(*transport_action, actions, step, me, roles)
+            }
             Some(Action::WaitSolidify(_)) => Ok(actions.wait_solidify_part(
-                OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-                &c.w.parts.building,
-                c.w.model.tuning.wait_solidify,
+                OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+                &step.w.parts.building,
+                step.w.model.tuning.wait_solidify,
             )),
-            Some(Action::Missile(_)) => self.fly(actions, c, roles).map(|()| HeadCode::Keeps),
-            Some(Action::MoveTo(_)) => self.move_to_part(actions, c, me, roles),
+            Some(Action::Missile(_)) => self.fly(actions, step, roles).map(|()| HeadCode::Keeps),
+            Some(Action::MoveTo(_)) => self.move_to_part(actions, step, me, roles),
             Some(Action::Explore(_)) => self
-                .explore_part(actions, c, me, roles)
+                .explore_part(actions, step, me, roles)
                 .map(|()| HeadCode::Keeps),
-            Some(Action::Fly(_)) => self.fly_part(actions, c, me).map(|()| HeadCode::Keeps),
-            Some(Action::Make(_)) => self.make_part(actions, c, roles),
+            Some(Action::Fly(_)) => self.fly_part(actions, step, me).map(|()| HeadCode::Keeps),
+            Some(Action::Make(_)) => self.make_part(actions, step, roles),
             Some(Action::Gather(gather)) => {
                 let gather = *gather;
-                self.gather_update(gather, actions, c, me, roles)
+                self.gather_update(gather, actions, step, me, roles)
             }
             Some(Action::Hunt(hunt)) => {
                 let hunt = *hunt;
-                self.hunter_update(hunt, actions, c, me, roles)
+                self.hunter_update(hunt, actions, step, me, roles)
             }
             Some(Action::Attack(attack)) => {
                 let attack = *attack;
-                let own = self.own_victim(actions, c, roles)?;
-                self.attack_part(attack, actions, c, me, own, roles)
+                let own = self.own_victim(actions, step, roles)?;
+                self.attack_part(attack, actions, step, me, own, roles)
             }
         }
     }
@@ -189,14 +193,14 @@ impl Unit {
     pub(crate) fn end_head_update(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         code: HeadCode,
     ) -> GenieResult<()> {
         if actions.list.iter().nth(1).is_some() {
             return Err(GenieError::unreachable(BELOW_HEAD));
         }
         if code == HeadCode::Deletes {
-            self.delete_own_head(actions, c)?;
+            self.delete_own_head(actions, step)?;
         }
         Ok(())
     }
@@ -208,17 +212,17 @@ impl Unit {
         &mut self,
         mut hunt: HuntAction,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         // the check reaches no action of the unit's: the copy goes back, before an error too
-        let checked = self.hunt_targets(&mut hunt, c);
+        let checked = self.hunt_targets(&mut hunt, step);
         actions.list.set_hunt(Some(hunt));
         checked?;
-        let mut own = self.own_victim(actions, c, roles)?;
-        let tree_lost = self.tree_lost(&hunt, c, roles);
-        self.hunt_part((&mut hunt, actions), c, me, (&mut own, tree_lost), roles)
+        let mut own = self.own_victim(actions, step, roles)?;
+        let tree_lost = self.tree_lost(&hunt, step, roles);
+        self.hunt_part((&mut hunt, actions), step, me, (&mut own, tree_lost), roles)
     }
 
     /// `RGE_Static_Object::update` (`0x14118ad50`): an object flagged to sleep (`+0x643`) drops the
@@ -246,34 +250,34 @@ impl Unit {
     /// The yaw and the facing read the current sprite's facets: the movement state (`mover`)
     /// takes them.
     pub(crate) const fn take_sprite_facets(&self, mover: Option<&mut Mover>) {
-        if let (Some(m), Some(s)) = (mover, self.sprite) {
-            m.sprite_facets = Some(SpriteFacets {
-                count: s.graphic.facets,
-                turns: s.graphic.flags.contains(SpriteFlags::TURNS),
+        if let (Some(active_sprite_mover), Some(active_sprite)) = (mover, self.sprite) {
+            active_sprite_mover.sprite_facets = Some(SpriteFacets {
+                count: active_sprite.graphic.facets,
+                turns: active_sprite.graphic.flags.contains(SpriteFlags::TURNS),
             });
         }
     }
 
     /// The animated object's update (`0x141071880`): its sprite's clock at its animation speed,
     /// then its idle swap, which reads the loop this update's clock made.
-    pub(crate) fn animate(&mut self, c: &mut Step<'_>) {
+    pub(crate) fn animate(&mut self, step: &mut Step<'_>) {
         if let (Some(sprite), Some(speed)) =
-            (self.sprite.as_mut(), c.w.parts.anim_speed_of(self.id))
+            (self.sprite.as_mut(), step.w.parts.anim_speed_of(self.id))
         {
-            sprite.update(c.dt.seconds(), speed, c.w.model.tuning.sprite);
+            sprite.update(step.dt.seconds(), speed, step.w.model.tuning.sprite);
             if let Ok(master) = object_master(
-                c.w.parts.own_master.get(self.id),
+                step.w.parts.own_master.get(self.id),
                 (self.id, self.life.master_id),
-                c.w.model.masters.of(c.player),
+                step.w.model.masters.of(step.player),
             ) {
                 let (standing, second) = (master.standing_sprite, master.standing_sprite_2);
                 self.idle_swap(
-                    c.w.parts.motion_mut(self.id),
+                    step.w.parts.motion_mut(self.id),
                     standing,
                     second,
-                    &c.w.model.graphics,
-                    c.w.streams.get(Stream::Sprite),
-                    c.w.model.tuning.sprite,
+                    &step.w.model.graphics,
+                    step.w.streams.get(Stream::Sprite),
+                    step.w.model.tuning.sprite,
                 );
             }
         }
@@ -285,28 +289,29 @@ impl Unit {
     pub(crate) fn actions_past_life(
         &mut self,
         actions: &mut LayersAction,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<()> {
-        if let Some(e) =
-            c.w.parts
-                .unread
-                .get(self.id)
-                .map(Unread::error)
-                .filter(|_| self.life.state == ObjectState::Alive)
+        if let Some(error) = step
+            .w
+            .parts
+            .unread
+            .get(self.id)
+            .map(Unread::error)
+            .filter(|_| self.life.state == ObjectState::Alive)
         {
-            return Err(e);
+            return Err(error);
         }
-        if loses_actions(&self.life, &c.w.model.roles) {
-            let by = self.releaser(c)?;
+        if loses_actions(&self.life, &step.w.model.roles) {
+            let by = self.releaser(step)?;
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.clear_own_actions(
                 actions,
-                c.w.parts.motion.layer_mut(self.id),
+                step.w.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,
                 by,
             )?;
-            torn_down(c, self, (leaves, releases))?;
+            torn_down(step, self, (leaves, releases))?;
         }
         Ok(())
     }
@@ -314,23 +319,34 @@ impl Unit {
     /// After the actions: the units its walk met take their pauses (slot 0x5f0: their walked
     /// level's pause; the walk read them from its own list till now, `Mover::pause_of`). A unit
     /// whose walk met others in its way is not modelled.
-    pub(crate) fn after_actions(&self, c: &mut Step<'_>) -> GenieResult<()> {
-        let Some(pauses) = c.w.parts.mover_mut(self.id).map(|m| take(&mut m.pauses)) else {
+    pub(crate) fn after_actions(&self, step: &mut Step<'_>) -> GenieResult<()> {
+        let Some(pauses) = step
+            .w
+            .parts
+            .mover_mut(self.id)
+            .map(|pauses_mover| take(&mut pauses_mover.pauses))
+        else {
             return Ok(());
         };
         for (id, pause) in pauses {
-            if c.w.object(id).is_none() {
+            if step.w.object(id).is_none() {
                 continue;
             }
-            let Some(level) = c.w.parts.mover_mut(id).and_then(|m| m.paths.first_mut()) else {
+            let Some(level) = step
+                .w
+                .parts
+                .mover_mut(id)
+                .and_then(|level_mover| level_mover.paths.first_mut())
+            else {
                 continue;
             };
             level.pause_time = pause;
         }
-        if c.w
+        if step
+            .w
             .parts
             .mover_of(self.id)
-            .is_some_and(|m| !m.in_the_way.is_empty())
+            .is_some_and(|mover| !mover.in_the_way.is_empty())
         {
             return Err(IN_THE_WAY);
         }
@@ -339,13 +355,15 @@ impl Unit {
 
     /// [`Unit::ai_part`]'s first step: the pathing grid takes a unit of a master of kind 40 or
     /// more where it stands, moving or not.
-    pub(crate) fn refresh_pathing(&self, c: &mut Step<'_>) -> GenieResult<()> {
-        let m = self.master(c.w.master_tables(), c.player)?;
-        if MasterKind::ACTION <= m.kind
-            && let Some(p) = c.w.spatial.get(self.id).copied()
+    pub(crate) fn refresh_pathing(&self, step: &mut Step<'_>) -> GenieResult<()> {
+        let master = self.master(step.w.master_tables(), step.player)?;
+        if MasterKind::ACTION <= master.kind
+            && let Some(placed) = step.w.spatial.get(self.id).copied()
         {
-            let moving = MoveState::of_mover(c.w.parts.mover_of(self.id));
-            c.w.pathing.refresh(self.id, &p, moving, m.outline);
+            let moving = MoveState::of_mover(step.w.parts.mover_of(self.id));
+            step.w
+                .pathing
+                .refresh(self.id, &placed, moving, master.outline);
         }
         Ok(())
     }
@@ -360,11 +378,13 @@ impl LayersAction {
         buildings: &PartTable<Building>,
         wait_solidify_tuning: WaitSolidifyTuning,
     ) -> HeadCode {
-        self.list.wait_solidify().map_or(HeadCode::Keeps, |w| {
-            HeadCode::of(w.update(
-                wait_progress(w.target, others, buildings),
-                wait_solidify_tuning,
-            ))
-        })
+        self.list
+            .wait_solidify()
+            .map_or(HeadCode::Keeps, |wait_solidify| {
+                HeadCode::of(wait_solidify.update(
+                    wait_progress(wait_solidify.target, others, buildings),
+                    wait_solidify_tuning,
+                ))
+            })
     }
 }

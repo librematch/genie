@@ -70,8 +70,8 @@ impl ObjectState {
 }
 
 impl genie_diff::Diff for ObjectState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -83,9 +83,14 @@ mod tests {
     #[test]
     fn the_bytes_0_to_8_name_the_states_in_order() {
         let all: Vec<ObjectState> = (0..=8).map(|b| ObjectState::of_byte(b).unwrap()).collect();
-        assert!(all.windows(2).all(|w| w[0] < w[1]));
+        assert!(
+            all.windows(2)
+                .all(|object_states| object_states[0] < object_states[1])
+        );
         assert_eq!(
-            all.iter().map(|s| s.get()).collect::<Vec<_>>(),
+            all.iter()
+                .map(|object_state| object_state.get())
+                .collect::<Vec<_>>(),
             (0..=8).collect::<Vec<_>>()
         );
         assert_eq!(ObjectState::default(), ObjectState::Alive);

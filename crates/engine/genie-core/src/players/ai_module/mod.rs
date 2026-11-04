@@ -83,11 +83,11 @@ pub struct AiModules {
 impl AiModules {
     /// Player `player` holds `module`.
     pub fn set(&mut self, player: PlayerId, module: AiModule) {
-        let i = player.index();
-        if let Some(slot) = self.modules.get_mut(i) {
+        let index = player.index();
+        if let Some(slot) = self.modules.get_mut(index) {
             *slot = Some(module);
         } else {
-            self.modules.resize(i, None);
+            self.modules.resize(index, None);
             self.modules.push(Some(module));
         }
     }

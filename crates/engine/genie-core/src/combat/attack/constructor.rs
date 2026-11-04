@@ -63,28 +63,28 @@ pub(crate) struct BeginLayer<'a> {
 }
 
 impl Attack {
-    /// The constructor (`FUN_140a7c210`) on `target`: the range and least range of `e`, its
-    /// target's place as where it was seen (`+0xa4`..`+0xac`), the point −1 on each axis, the
-    /// sprites and frames of `arms`, whether the target is its unit's player's (`+0x9f`); a
-    /// unit's own Attack (`+0x60` 0), its `MoveTo` not repathing at once (`+0x61` 0) and running
-    /// (slot 0x7d0's sprite).
-    pub(crate) fn own(target: ObjectId, e: &Engagement, arms: Arms) -> Self {
+    /// The constructor (`FUN_140a7c210`) on `target`: the range and least range of `engagement`,
+    /// its target's place as where it was seen (`+0xa4`..`+0xac`), the point −1 on each axis, the
+    /// sprites and frames of `arms`, whether the target is its unit's player's (`+0x9f`); a unit's
+    /// own Attack (`+0x60` 0), its `MoveTo` not repathing at once (`+0x61` 0) and running (slot
+    /// 0x7d0's sprite).
+    pub(crate) fn own(target: ObjectId, engagement: &Engagement, arms: Arms) -> Self {
         Self {
             target: Some(AttackTargetId::new(target)),
             target2: None,
             state: AttackState::New,
             timer: Seconds::ZERO,
-            range: e.range,
-            min_range: e.min_range,
+            range: engagement.range,
+            min_range: engagement.min_range,
             point: Position::from([NONE; 3]),
-            seen: e.target_position,
+            seen: engagement.target_position,
             pending: false,
             swing: Seconds::ZERO,
             rest: Seconds::ZERO,
             arms,
             voice: Voice::Loud,
             on_target_moved: TargetMoved::Follows,
-            same_owner: e.same_owner,
+            same_owner: engagement.same_owner,
         }
     }
 
@@ -104,29 +104,32 @@ impl Attack {
     /// start's `set_state(4)` (the unit's `+0x7b8` at 1, as [`Attack::command`] leaves it).
     pub(crate) fn start(
         target: ObjectId,
-        e: &Engagement,
+        engagement: &Engagement,
         arms: Arms,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         layer: BeginLayer<'_>,
     ) -> GenieResult<(Self, MoveStart)> {
         let roles = layer.roles;
-        let mut a = Self {
+        let mut attack = Self {
             voice: Voice::Quiet,
             on_target_moved: TargetMoved::AsksAgain,
-            ..Self::own(target, e, arms)
+            ..Self::own(target, engagement, arms)
         };
         // The gate class, whose parts' gaps readyToAttack measures.
         // The villagers' class, whose attack ends on any dead target.
         // The trees' class, a dead one of which up to state 5 keeps another unit's attack going.
-        if roles.of_class(e.target_class).contains(ClassRoles::GATE) {
+        if roles
+            .of_class(engagement.target_class)
+            .contains(ClassRoles::GATE)
+        {
             return Err(GenieError::unsupported(
                 "a hunt's Attack on a gate (its parts' gaps)",
             ));
         }
         let mut posted = Vec::new();
-        let begun = a.begin(
-            (e, e.gap),
+        let begun = attack.begin(
+            (engagement, engagement.gap),
             (true, PlayerId::GAIA),
             mover,
             &mut posted,
@@ -148,7 +151,7 @@ impl Attack {
                 "a hunt's Attack readyToAttack failed before its start's state 4 (+0x7b8 at 1)",
             ));
         }
-        Ok((a, begun.start()))
+        Ok((attack, begun.start()))
     }
 
     /// A unit's own Attack (the attack command, `FUN_141081a80`): the constructor
@@ -170,22 +173,22 @@ impl Attack {
         let move_to_tuning = &by_id.tuning().move_to;
         let attack_tuning = &by_id.tuning().attack;
         let roles = by_id.roles();
-        let e = cmd.engagement;
-        let t = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
+        let engagement = cmd.engagement;
+        let placed = *world.get_known(cmd.target)?.ok_or(TARGET_GONE)?;
         let ground = mover.stats.radius.ground();
         let reach_gap = gate_gap(
             world,
-            (e.position, ground),
-            (cmd.target, &t),
-            e.gap,
-            |g| g,
+            (engagement.position, ground),
+            (cmd.target, &placed),
+            engagement.gap,
+            |distance| distance,
             by_id,
             roles,
         );
-        let mut attack = Self::own(cmd.target, e, cmd.arms);
+        let mut attack = Self::own(cmd.target, engagement, cmd.arms);
         let mut posted = Vec::new();
         let begun = attack.begin(
-            (e, reach_gap),
+            (engagement, reach_gap),
             (cmd.visible, cmd.target_owner),
             mover,
             &mut posted,
@@ -215,63 +218,68 @@ impl Attack {
     /// What the start does not model, a target the world does not hold, a unit without its
     /// movement state, and a start that goes ready on a target the world does not hold live.
     pub(crate) fn command(
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         cmd: &AttackCommand<'_>,
         roles: &Roles,
     ) -> GenieResult<(Self, Vec<Posted>)> {
         let reads = unit.move_to_reads(
-            c.w.parts.motion.mover(unit.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.motion.mover(unit.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(unit.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(unit.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(unit.id, (&c.w.players, &c.w.index, &c.w.model));
+        let (mover, by_id) = step
+            .w
+            .parts
+            .lend_mover(unit.id, (&step.w.players, &step.w.index, &step.w.model));
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         let (mut attack, begun, mut posted) =
-            Self::own_start(cmd, (&c.w.spatial, by_id), mover, &reads)?;
+            Self::own_start(cmd, (&step.w.spatial, by_id), mover, &reads)?;
         if begun.failed_first() {
-            c.w.parts.set_anim_speed(unit.id, Speed::new(1.0));
+            step.w.parts.set_anim_speed(unit.id, Speed::new(1.0));
         }
         if begun == Begun::Failed {
             attack.fail_at_start(
                 &mut unit.sprite,
-                c.w.parts.motion_mut(unit.id),
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion_mut(unit.id),
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
         }
         if begun == Begun::Ready {
             let ready = cmd.ready.as_ref().ok_or(GenieError::unsupported(
                 "an attack's target the slice does not hold live",
             ))?;
-            let (motion, by_id) =
-                c.w.parts
-                    .lend_motion(unit.id, (&c.w.players, &c.w.index, &c.w.model));
-            let mut g = Ground {
-                map: &c.w.spatial,
-                sprite_rng: c.w.streams.get(Stream::Sprite),
+            let (motion, by_id) = step
+                .w
+                .parts
+                .lend_motion(unit.id, (&step.w.players, &step.w.index, &step.w.model));
+            let mut ground = Ground {
+                map: &step.w.spatial,
+                sprite_rng: step.w.streams.get(Stream::Sprite),
                 object_rng: None,
                 posts: Posts::Held(&mut posted),
-                graphics: &c.w.model.graphics,
+                graphics: &step.w.model.graphics,
                 by_id,
                 motion,
             };
-            attack.enter_ready(unit, &mut g, &ready.fight, &ready.reads)?;
+            attack.enter_ready(unit, &mut ground, &ready.fight, &ready.reads)?;
         }
         if begun.start() == MoveStart::Arrived {
             unit.shows_standing_sprite(
-                c.w.parts.motion.layer_mut(unit.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion.layer_mut(unit.id),
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
         }
         Ok((attack, posted))
@@ -305,7 +313,7 @@ impl Attack {
     /// [`NO_RANGE`]: crate::combat::attack::NO_RANGE
     pub(super) fn begin(
         &mut self,
-        (e, reach_gap): (&Engagement, Distance),
+        (engagement, reach_gap): (&Engagement, Distance),
         (visible, target_owner): (bool, PlayerId),
         mover: &mut Mover,
         posted: &mut Vec<(NotifyKind, [i32; 3])>,
@@ -317,13 +325,16 @@ impl Attack {
             attack_tuning,
             move_to_tuning,
         } = layer;
-        let movable = e.speed != Speed::ZERO && e.can_move;
+        let movable = engagement.speed != Speed::ZERO && engagement.can_move;
         let mut failed_first = false;
         let mut ready_end = false;
         if target_owner != PlayerId::GAIA && !visible {
-            if e.stance == UnitStance::Aggressive && Speed::ZERO < e.speed && e.can_move {
+            if engagement.stance == UnitStance::Aggressive
+                && Speed::ZERO < engagement.speed
+                && engagement.can_move
+            {
                 self.state = AttackState::GotoSeen { move_to: None };
-                self.range = e.range;
+                self.range = engagement.range;
                 self.walk_to_seen(
                     |move_to| AttackState::GotoSeen { move_to },
                     reads,
@@ -332,7 +343,7 @@ impl Attack {
             } else {
                 failed_first = true;
             }
-        } else if self.min_range > e.gap {
+        } else if self.min_range > engagement.gap {
             if self.voice.is_loud() {
                 posted.push((NotifyKind::TOO_CLOSE, [-1; 3]));
             }
@@ -341,26 +352,35 @@ impl Attack {
             if self.voice.is_loud() {
                 posted.push((NotifyKind::OUT_OF_REACH, [0; 3]));
             }
-            if (e.stance == UnitStance::Defensive
-                && self.off_leash(e.target_position, e.state_position, attack_tuning))
+            if (engagement.stance == UnitStance::Defensive
+                && self.off_leash(
+                    engagement.target_position,
+                    engagement.state_position,
+                    attack_tuning,
+                ))
                 || !movable
             {
                 failed_first = true;
             } else {
-                let _ = self.set_move(e, mover, reads, move_to_tuning)?;
+                let _ = self.set_move(engagement, mover, reads, move_to_tuning)?;
             }
         } else {
-            self.point = e.target_position;
+            self.point = engagement.target_position;
             if !roles
-                .of_master(e.master)
+                .of_master(engagement.master)
                 .contains(MasterRoles::UNTURNED_ATTACKER)
             {
-                let _ = face_target(mover, e.position, e.target_position, e.world_time)?;
+                let _ = face_target(
+                    mover,
+                    engagement.position,
+                    engagement.target_position,
+                    engagement.world_time,
+                )?;
             }
             ready_end = true;
         }
         if movable {
-            let start = self.set_move(e, mover, reads, move_to_tuning)?;
+            let start = self.set_move(engagement, mover, reads, move_to_tuning)?;
             return Ok(Begun::Moves {
                 start,
                 failed_first,
@@ -412,7 +432,7 @@ impl Attack {
     }
 
     /// The start's `set_state(6)` for a unit that cannot move ([`Attack::command`]): the range
-    /// test again, and the swing when it is ready, on the world's parts `g`.
+    /// test again, and the swing when it is ready, on the world's parts `ground`.
     ///
     /// # Errors
     ///
@@ -420,11 +440,11 @@ impl Attack {
     pub(crate) fn enter_ready(
         &mut self,
         unit: &mut Unit,
-        g: &mut Ground<'_>,
-        f: &Fight,
-        r: &AttackReads,
+        ground: &mut Ground<'_>,
+        fight: &Fight,
+        attack_reads: &AttackReads,
     ) -> GenieResult<()> {
-        self.ready(unit, g, f, r)
+        self.ready(unit, ground, fight, attack_reads)
     }
 }
 
@@ -457,7 +477,7 @@ pub fn arms_looking(
     moving: Option<SpriteId>,
     roles: &Roles,
 ) -> Arms {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     Arms {
         move_sprite: g(moving)
             .or_else(|| g(running(master, look)))

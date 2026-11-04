@@ -76,18 +76,21 @@ mod tests {
     /// empty ones left out; a fifth slot is not the building's; the death clears them all.
     #[test]
     fn building_annexes_take_their_master_slots() {
-        let mut a = Annexes::NONE;
-        assert_eq!(a.ids().count(), 0);
-        a.link(2, object_id(12)).unwrap();
-        a.link(0, object_id(10)).unwrap();
-        assert_eq!(a.ids().collect::<Vec<_>>(), [object_id(10), object_id(12)]);
+        let mut annexes = Annexes::NONE;
+        assert_eq!(annexes.ids().count(), 0);
+        annexes.link(2, object_id(12)).unwrap();
+        annexes.link(0, object_id(10)).unwrap();
         assert_eq!(
-            a,
+            annexes.ids().collect::<Vec<_>>(),
+            [object_id(10), object_id(12)]
+        );
+        assert_eq!(
+            annexes,
             Annexes::new([Some(object_id(10)), None, Some(object_id(12)), None])
         );
-        assert!(a.link(Annexes::SLOTS, object_id(14)).is_err());
-        a.clear();
-        assert_eq!(a, Annexes::NONE);
+        assert!(annexes.link(Annexes::SLOTS, object_id(14)).is_err());
+        annexes.clear();
+        assert_eq!(annexes, Annexes::NONE);
     }
 
     /// The update lets go the slots of the gone annexes and keeps the others in their slots; an
@@ -102,8 +105,8 @@ mod tests {
         ]);
         a.let_go(|id| Ok(id != object_id(12))).unwrap();
         assert_eq!(a, Annexes::new([None, None, Some(object_id(12)), None]));
-        let mut b = Annexes::new([Some(object_id(10)), Some(object_id(11)), None, None]);
-        let failed = b.let_go(|id| {
+        let mut annexes = Annexes::new([Some(object_id(10)), Some(object_id(11)), None, None]);
+        let failed = annexes.let_go(|id| {
             if id == object_id(11) {
                 Err(GenieError::unreachable("test"))
             } else {
@@ -111,6 +114,9 @@ mod tests {
             }
         });
         assert!(failed.is_err());
-        assert_eq!(b, Annexes::new([None, Some(object_id(11)), None, None]));
+        assert_eq!(
+            annexes,
+            Annexes::new([None, Some(object_id(11)), None, None])
+        );
     }
 }

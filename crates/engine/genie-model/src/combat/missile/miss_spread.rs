@@ -36,8 +36,8 @@ impl MulAssign<f32> for MissSpread {
 }
 
 impl genie_diff::Diff for MissSpread {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -48,11 +48,14 @@ mod tests {
     /// The effects add and multiply as one `f32` operation each.
     #[test]
     fn the_effects_add_and_multiply_the_spread() {
-        let mut s = MissSpread::new(0.1);
-        s += MissSpread::new(0.2);
-        assert_eq!(s.get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        s *= 3.0;
-        assert_eq!(s.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
+        let mut miss_spread = MissSpread::new(0.1);
+        miss_spread += MissSpread::new(0.2);
+        assert_eq!(miss_spread.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        miss_spread *= 3.0;
+        assert_eq!(
+            miss_spread.get().to_bits(),
+            ((0.1_f32 + 0.2) * 3.0).to_bits()
+        );
         assert_eq!(MissSpread::default(), MissSpread::ZERO);
     }
 }

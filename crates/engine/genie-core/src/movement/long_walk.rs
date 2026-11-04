@@ -105,7 +105,7 @@ pub(crate) fn lowered_units(
                         id != walker.id
                             && Some(id) != target
                             && world.get(id).is_some()
-                            && by_id.gait(id).is_some_and(|g| g.waits || g.moving)
+                            && by_id.gait(id).is_some_and(|gait| gait.waits || gait.moving)
                     })
                     .take(IGNORED),
             )
@@ -166,8 +166,12 @@ pub(crate) fn long_path_for(
             .get(walker.id)
             .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
     };
-    let player = world.get(walker.id).map(|p| p.player);
-    let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
+    let player = world.get(walker.id).map(|placed| placed.player);
+    let gates = |tile| {
+        player.map_or(Ok(false), |player_id| {
+            gate_lets_pass(world, by_id, player_id, tile)
+        })
+    };
     path(
         world.tiles(),
         world.map,
@@ -234,15 +238,17 @@ pub(crate) fn tile_plan_for(
         range,
         target,
     } = ask;
-    let target_box = target.and_then(|t| t.obstruction).is_some_and(|o| {
-        matches!(
-            o.kind,
-            ObstructionKind::KIND_2
-                | ObstructionKind::KIND_10
-                | ObstructionKind::KIND_11
-                | ObstructionKind::KIND_13
-        )
-    });
+    let target_box = target
+        .and_then(|placed| placed.obstruction)
+        .is_some_and(|obstruction| {
+            matches!(
+                obstruction.kind,
+                ObstructionKind::KIND_2
+                    | ObstructionKind::KIND_10
+                    | ObstructionKind::KIND_11
+                    | ObstructionKind::KIND_13
+            )
+        });
     let req = Request {
         from,
         to: to.ground(),
@@ -255,9 +261,10 @@ pub(crate) fn tile_plan_for(
         .filter(|&t| by_id.annex_of(t).is_none())
         .map(|t| by_id.annexes(t).ids().collect::<Vec<_>>())
         .unwrap_or_default();
-    let (slots, ignore) = plan
-        .pathing
-        .smoothing_ignore(walker.id, level_target.map(|t| (t, annexes.as_slice())));
+    let (slots, ignore) = plan.pathing.smoothing_ignore(
+        walker.id,
+        level_target.map(|object_id| (object_id, annexes.as_slice())),
+    );
     let (radius, mask) = (walker.radius, walker.mask);
     let Some(planner) = plan.pathing.planner(walker.restriction, world.tiles()) else {
         return Ok(None);
@@ -284,7 +291,7 @@ pub(super) fn may_plan(
     plans: StepPlans,
 ) -> bool {
     let allowed = !class_roles.contains(ClassRoles::TRADE_CART)
-        || budget.is_none_or(|b| b.allows(wait_delays.count()));
+        || budget.is_none_or(|plan_budget| plan_budget.allows(wait_delays.count()));
     allowed && plans < PLANS
 }
 
@@ -319,15 +326,15 @@ pub(super) fn include_kept(
         }
         include.push(id);
         if pathing.shape(id).is_none() {
-            let p = world
+            let placed = world
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a kept hit without a place"))?;
-            if p.obstruction_kind == ObstructionKind::KIND_11 {
+            if placed.obstruction_kind == ObstructionKind::KIND_11 {
                 return Err(GenieError::unsupported(
                     "a kept hit of obstruction type 11 (its outline)",
                 ));
             }
-            pathing.add_temporary_shape(p);
+            pathing.add_temporary_shape(placed);
         }
     }
     Ok(())
@@ -374,7 +381,7 @@ pub(crate) fn short_path_for(
 /// The owner's number (`+0x718` of the object's player, `+0x138`) the short pather takes for
 /// the gates' passage; none (-1) for an object the world does not place.
 pub(super) fn owner_number(world: &Spatial, id: ObjectId) -> Option<PlayerId> {
-    world.get(id).map(|p| p.player)
+    world.get(id).map(|placed| placed.player)
 }
 
 /// The short pather (`FUN_140f9e540`) for `walker` from `from` (x, y on the map) to `to` within
@@ -412,10 +419,10 @@ pub(crate) fn short_path_including(
     let (x, y) = (from.x(), from.y());
     let target_object = match target {
         None => None,
-        Some(id) => world.get_known(id)?.map(|t| short_path::Target {
+        Some(id) => world.get_known(id)?.map(|placed| short_path::Target {
             id,
-            position: t.position.ground(),
-            half_size: t.radius,
+            position: placed.position.ground(),
+            half_size: placed.radius,
         }),
     };
     let listed = ignore
@@ -460,8 +467,8 @@ pub(crate) fn short_path_including(
             HullPather::for_list((world, by_id), ignore, walker.mask, walker.radius, player)
                 .including(include);
         let (result, path) = pather.find(from, to.ground(), target, range)?;
-        for p in &path.points {
-            let _ = out.push(BVector::new(p.x(), 0.0, p.y()));
+        for point in &path.points {
+            let _ = out.push(BVector::new(point.x(), 0.0, point.y()));
         }
         return Ok(result);
     }

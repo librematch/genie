@@ -248,27 +248,30 @@ pub(crate) const NO_ATTRIBUTE: GenieError =
 
 impl Attributes for Player {
     /// An attribute's value.
-    fn get(&self, i: AttributeId) -> GenieResult<Amount> {
-        self.attribute(i).ok_or(NO_ATTRIBUTE)
+    fn get(&self, attribute_id: AttributeId) -> GenieResult<Amount> {
+        self.attribute(attribute_id).ok_or(NO_ATTRIBUTE)
     }
 
     /// An attribute less `amount`, as a payment takes it (no side effects).
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()> {
-        *self.attributes.get_mut(i.index()).ok_or(NO_ATTRIBUTE)? -= amount;
+    fn subtract(&mut self, attribute_id: AttributeId, amount: Amount) -> GenieResult<()> {
+        *self
+            .attributes
+            .get_mut(attribute_id.index())
+            .ok_or(NO_ATTRIBUTE)? -= amount;
         Ok(())
     }
 }
 
 impl World {
-    /// A command or a pass the slice does not model for player `p`: the player stops
+    /// A command or a pass the slice does not model for player `player_id`: the player stops
     /// ([`Player::stop`]), and a subscriber hears why ([`crate::trace`]).
     /// A player the world does not hold has nothing to stop: the trace's subscriber hears that
     /// instead (every caller steps the players it counts, so it does not happen).
-    pub(crate) fn stop_player(&mut self, p: PlayerId, why: GenieError) {
-        player_stops(self.ticks, p, &why);
-        match self.players.player_mut(p) {
+    pub(crate) fn stop_player(&mut self, player_id: PlayerId, why: GenieError) {
+        player_stops(self.ticks, player_id, &why);
+        match self.players.player_mut(player_id) {
             Ok(player) => player.stop(self.ticks, why),
-            Err(missing) => player_unsupported(self.ticks, p, &missing),
+            Err(missing) => player_unsupported(self.ticks, player_id, &missing),
         }
     }
 }
@@ -288,17 +291,17 @@ impl Player {
         self.attributes.get(attribute.index()).copied()
     }
 
-    /// Attribute `attribute` set to `v`, as a refund and a technology's payment write it (no
+    /// Attribute `attribute` set to `amount`, as a refund and a technology's payment write it (no
     /// side effects).
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    pub fn set_attribute(&mut self, attribute: AttributeId, v: Amount) -> GenieResult<()> {
+    pub fn set_attribute(&mut self, attribute: AttributeId, amount: Amount) -> GenieResult<()> {
         *self
             .attributes
             .get_mut(attribute.index())
-            .ok_or(NO_ATTRIBUTE)? = v;
+            .ok_or(NO_ATTRIBUTE)? = amount;
         Ok(())
     }
 
@@ -323,14 +326,14 @@ impl Player {
     /// `FUN_140c898a0` are not held). The attributes whose change has side effects (50, 183, 196)
     /// are not modelled.
     pub fn add_attribute(&mut self, kind: AttributeId, amount: Amount) -> GenieResult<()> {
-        let i = kind.index();
-        match i {
+        let index = kind.index();
+        match index {
             50 | 183 | 196 => Err(GenieError::unsupported(
                 "an attribute whose change has side effects",
             )),
             _ => {
-                let v = self.attributes.get_mut(i).ok_or(NO_ATTRIBUTE)?;
-                *v += amount;
+                let attribute = self.attributes.get_mut(index).ok_or(NO_ATTRIBUTE)?;
+                *attribute += amount;
                 Ok(())
             }
         }

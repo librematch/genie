@@ -24,13 +24,13 @@ pub fn derive_diff(input: TokenStream) -> TokenStream {
 fn expand(input: &DeriveInput) -> syn::Result<Tokens> {
     let name = &input.ident;
     let mut generics = input.generics.clone();
-    for p in generics.type_params_mut() {
-        p.bounds.push(parse_quote!(::genie_diff::Diff));
+    for parameter in generics.type_params_mut() {
+        parameter.bounds.push(parse_quote!(::genie_diff::Diff));
     }
     let (impl_generics, type_generics, where_clause) = generics.split_for_impl();
     let body = match &input.data {
-        Data::Struct(s) => struct_body(&s.fields)?,
-        Data::Enum(e) => enum_body(&e.variants.iter().collect::<Vec<_>>())?,
+        Data::Struct(data_struct) => struct_body(&data_struct.fields)?,
+        Data::Enum(data_enum) => enum_body(&data_enum.variants.iter().collect::<Vec<_>>())?,
         Data::Union(_) => {
             return Err(syn::Error::new_spanned(
                 input,
@@ -60,7 +60,11 @@ struct How {
 
 fn how(field: &syn::Field) -> syn::Result<How> {
     let mut how = How::default();
-    for attr in field.attrs.iter().filter(|a| a.path().is_ident("diff")) {
+    for attr in field
+        .attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("diff"))
+    {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("unsaved") {
                 how.unsaved = true;
@@ -106,7 +110,7 @@ fn compare(how: &How, name: Option<&str>, left: &Tokens, right: &Tokens) -> Toke
     let name = how.path.as_deref().or(name);
     let call = match (name, how.eq) {
         (Some(n), false) => quote! { d.field(#n, #left, #right); },
-        (Some(n), true) => quote! { d.equal_field(#n, #left, #right); },
+        (Some(text), true) => quote! { d.equal_field(#text, #left, #right); },
         (None, false) => quote! { ::genie_diff::Diff::diff(#left, #right, d); },
         (None, true) => quote! { d.equal(#left, #right); },
     };
@@ -120,13 +124,15 @@ fn compare(how: &How, name: Option<&str>, left: &Tokens, right: &Tokens) -> Toke
 /// The step names of `fields`: their names, their positions, or None for a single unnamed one.
 fn step_names(fields: &Fields) -> Vec<Option<String>> {
     match fields {
-        Fields::Named(f) => f
+        Fields::Named(fields_named) => fields_named
             .named
             .iter()
-            .map(|f| f.ident.as_ref().map(|i| i.unraw().to_string()))
+            .map(|field| field.ident.as_ref().map(|ident| ident.unraw().to_string()))
             .collect(),
         Fields::Unnamed(f) if f.unnamed.len() == 1 => vec![None],
-        Fields::Unnamed(f) => (0..f.unnamed.len()).map(|i| Some(i.to_string())).collect(),
+        Fields::Unnamed(fields_unnamed) => (0..fields_unnamed.unnamed.len())
+            .map(|i| Some(i.to_string()))
+            .collect(),
         Fields::Unit => Vec::new(),
     }
 }
@@ -165,8 +171,8 @@ fn bindings(variant: &syn::Variant, side: &str) -> (Vec<Ident>, Tokens) {
         })
         .collect();
     let pattern = match &variant.fields {
-        Fields::Named(f) => {
-            let members = f.named.iter().map(|f| &f.ident);
+        Fields::Named(fields_named) => {
+            let members = fields_named.named.iter().map(|field| &field.ident);
             quote! { Self::#name { #(#members: #idents),* } }
         }
         Fields::Unnamed(_) => quote! { Self::#name(#(#idents),*) },

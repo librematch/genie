@@ -39,8 +39,8 @@ impl ArtifactState {
 }
 
 impl genie_diff::Diff for ArtifactState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -51,10 +51,10 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match ArtifactState::of_byte(b) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 0..=5 | 7..=9 | 11..=99 | 101..), "{b}"),
+        for index in 0..=255_u8 {
+            match ArtifactState::of_byte(index) {
+                Ok(artifact_state) => assert_eq!(artifact_state.get(), index),
+                Err(_) => assert!(matches!(index, 0..=5 | 7..=9 | 11..=99 | 101..), "{index}"),
             }
         }
         assert_eq!(ArtifactState::ToGaia.to_string(), "100");

@@ -58,13 +58,13 @@ impl World {
         let Some(ids) = self.command_check(player, units)? else {
             return Ok(());
         };
-        let Some((tp, t)) = self.object(target) else {
+        let Some((tp, unit)) = self.object(target) else {
             return Ok(());
         };
-        let tm = t.master(self.master_tables(), tp)?;
+        let tm = unit.master(self.master_tables(), tp)?;
         let followed = Followed {
             id: target,
-            place: t.position().ground(),
+            place: unit.position().ground(),
             class: (0.0 < tm.radius.x() || 0.0 < tm.radius.y()).then_some(tm.class),
         };
         let cap = if self.players.player(player)?.kind.is_computer() {
@@ -96,8 +96,8 @@ impl World {
                 return Ok(());
             }
         }
-        for i in 0..loose.len() {
-            self.follow_unit(&loose, i, followed)?;
+        for index in 0..loose.len() {
+            self.follow_unit(&loose, index, followed)?;
         }
         Ok(())
     }
@@ -117,11 +117,15 @@ impl World {
         units: &[Option<ObjectId>],
         target: ObjectId,
     ) -> GenieResult<()> {
-        let Some((tp, t)) = self.object(target) else {
+        let Some((tp, unit)) = self.object(target) else {
             return Ok(());
         };
-        let tm = t.master(self.master_tables(), tp)?;
-        let (x, y, z) = (t.position().x(), t.position().y(), t.position().z());
+        let tm = unit.master(self.master_tables(), tp)?;
+        let (x, y, z) = (
+            unit.position().x(),
+            unit.position().y(),
+            unit.position().z(),
+        );
         let order = QueuedOrder {
             issuer: None,
             order: OrderKind::Defend,
@@ -148,8 +152,11 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30 without a
                 // unit AI
-                Place::Sleeping(p, i)
-                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                Place::Sleeping(player_id, list_index)
+                    if !self
+                        .parts
+                        .unit_ai
+                        .contains(self.players.asleep(player_id, list_index)?.id) =>
                 {
                     continue;
                 }
@@ -180,7 +187,7 @@ impl World {
         id: ObjectId,
         target: Option<ObjectId>,
     ) -> GenieResult<()> {
-        if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
+        if let Some(link) = self.object(id).and_then(|(_, unit)| unit.group.id) {
             let _ = self.remove_unit(link, id, target, LeavingWalk::Stands)?;
         }
         Ok(())
@@ -190,13 +197,16 @@ impl World {
     /// whose master moves (slot 0xe8 above 0; `COMISS`, `JNC`: a NaN speed moves), gives its
     /// place on the ground.
     pub(super) fn follower(&self, id: ObjectId) -> GenieResult<Option<Point>> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(None);
         };
-        let master = u.master(self.master_tables(), p)?;
-        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let master = unit.master(self.master_tables(), player_id)?;
+        let speed = master
+            .move_stats
+            .as_ref()
+            .map_or(Speed::ZERO, |move_stats| move_stats.speed);
         let moves = MasterKind::MOVING <= master.kind && below_or_unordered(0.0, speed.get());
-        Ok(moves.then_some(u.position().ground()))
+        Ok(moves.then_some(unit.position().ground()))
     }
 
     /// A follower's start (`FUN_14161c920`, both loops): its ignore list empties
@@ -208,25 +218,25 @@ impl World {
         loose: &[ObjectId],
         i: usize,
     ) -> GenieResult<(PlayerId, ListIndex)> {
-        let Some(Place::Live(p, idx)) = self.place(*loose.checked(i)?) else {
+        let Some(Place::Live(player_id, idx)) = self.place(*loose.checked(i)?) else {
             return Err(GenieError::unsupported(
                 "a FOLLOW of a sleeping object of a type of 30 or more",
             ));
         };
-        let mover =
-            self.parts
-                .mover_mut(self.players.live(p, idx)?.id)
-                .ok_or(GenieError::unsupported(
-                    "a followed unit without movement state",
-                ))?;
+        let mover = self
+            .parts
+            .mover_mut(self.players.live(player_id, idx)?.id)
+            .ok_or(GenieError::unsupported(
+                "a followed unit without movement state",
+            ))?;
         mover.ignore_units.clear();
         mover.waiting = 1;
-        for (k, &other) in loose.iter().enumerate() {
-            if k != i {
+        for (index, &other) in loose.iter().enumerate() {
+            if index != i {
                 ignore_unit(&mut mover.ignore_units, other);
             }
         }
-        Ok((p, idx))
+        Ok((player_id, idx))
     }
 
     /// FOLLOW's loose unit `loose[i]` (`FUN_14161c920`'s loop for units that do not move at
@@ -247,25 +257,29 @@ impl World {
         if self.follower(*loose.checked(i)?)?.is_none() {
             return Ok(());
         }
-        let (p, idx) = self.follower_start(loose, i)?;
+        let (player_id, idx) = self.follower_start(loose, i)?;
         let (x, y) = (followed.place.x(), followed.place.y());
         let taken = self.move_to_object_with(
-            p,
+            player_id,
             idx,
             followed.id,
             Position::new(x, y, 0.0),
             OrderSource::Direct,
         )?;
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
+        if let Some(ai) = self
+            .parts
+            .unit_ai
+            .get_mut(self.players.live(player_id, idx)?.id)
+        {
             if taken == Answer::NotTaken {
                 ai.set_order(Some(OrderKind::Follow), rng);
                 ai.set_action(Some(AiAction::Follow));
             }
-            let (t, class) = followed
-                .class
-                .map_or((None, None), |c| (Some(followed.id), c.or_none()));
-            ai.set_target(t, class, Position::new(x, y, 0.0));
+            let (object_id, class) = followed.class.map_or((None, None), |class_id| {
+                (Some(followed.id), class_id.or_none())
+            });
+            ai.set_target(object_id, class, Position::new(x, y, 0.0));
         }
         Ok(())
     }
@@ -288,7 +302,7 @@ impl World {
             return Ok(());
         };
         let (x, y) = (follower.x(), follower.y());
-        let (p, idx) = self.follower_start(loose, i)?;
+        let (player_id, idx) = self.follower_start(loose, i)?;
         let map = self.spatial.map;
         let at = Position::new(
             follow_axis(
@@ -305,18 +319,23 @@ impl World {
         );
         match followed.class {
             Some(_) => {
-                let _ = self.move_to_object_with(p, idx, followed.id, at, OrderSource::Direct)?;
+                let _ =
+                    self.move_to_object_with(player_id, idx, followed.id, at, OrderSource::Direct)?;
             }
-            None => self.move_point_order_with(p, idx, at, OrderSource::Direct)?,
+            None => self.move_point_order_with(player_id, idx, at, OrderSource::Direct)?,
         }
         let rng = self.streams.get(Stream::Ai);
-        if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(p, idx)?.id) {
+        if let Some(ai) = self
+            .parts
+            .unit_ai
+            .get_mut(self.players.live(player_id, idx)?.id)
+        {
             ai.set_order(Some(OrderKind::Move), rng);
             ai.set_action(Some(AiAction::Move));
-            let (t, class) = followed
-                .class
-                .map_or((None, None), |c| (Some(followed.id), c.or_none()));
-            ai.set_target(t, class, at);
+            let (object_id, class) = followed.class.map_or((None, None), |class_id| {
+                (Some(followed.id), class_id.or_none())
+            });
+            ai.set_target(object_id, class, at);
         }
         Ok(())
     }
@@ -418,9 +437,9 @@ impl World {
             .roles
             .of_class(unit.master(self.master_tables(), player)?.class)
             .contains(ClassRoles::LIVESTOCK);
-        let (tp, t) = self.object(target).ok_or(TARGET_LACKING)?;
-        let target_state = t.life.state;
-        let target_master = t.master(self.master_tables(), tp)?.id;
+        let (tp, target_unit) = self.object(target).ok_or(TARGET_LACKING)?;
+        let target_state = target_unit.life.state;
+        let target_master = target_unit.master(self.master_tables(), tp)?.id;
         if holds_object(livestock, target_master, target_state, &self.model.roles) {
             self.take(target, self.releaser(player, idx)?)?;
         }
@@ -559,16 +578,16 @@ impl World {
             PointMove::Declined => return Ok(Answer::NotTaken),
             PointMove::Taken(released) => (released, None),
             PointMove::Repairs(released, left) => (released, left),
-            PointMove::Sails(t) => {
-                self.transport_move((player, idx), t, point)?;
+            PointMove::Sails(transport_action) => {
+                self.transport_move((player, idx), transport_action, point)?;
                 return Ok(Answer::Taken);
             }
         };
         if let Some(t) = left {
             self.leave_builders(Some(t))?;
         }
-        if let Some(t) = released {
-            self.release(t, by)?;
+        if let Some(object_id) = released {
+            self.release(object_id, by)?;
         }
         Ok(Answer::Taken)
     }

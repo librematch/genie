@@ -143,8 +143,8 @@ impl MasterKind {
 }
 
 impl Diff for MasterKind {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.equal(self, other);
     }
 }
 

@@ -104,23 +104,23 @@ impl UnitOrderCommand {
     /// units' last human order time first ([`World::human_order`]); then the action: the
     /// garrison ([`World::garrison_order`]), a cancel ([`World::cancel_order`]) or the others
     /// ([`World::unit_order`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
         if self.human {
-            w.human_order(ids);
+            world.human_order(ids);
         }
         match self.action {
-            UnitOrderAction::Garrison => w.garrison_order(
+            UnitOrderAction::Garrison => world.garrison_order(
                 self.player,
                 ids,
                 self.target,
                 self.shift.dispatch(),
                 self.scope,
             ),
-            UnitOrderAction::Cancel => w.cancel_order(ids, self.param, self.shift.batch()),
-            action => w.unit_order(self.player, ids, action),
+            UnitOrderAction::Cancel => world.cancel_order(ids, self.param, self.shift.batch()),
+            action => world.unit_order(self.player, ids, action),
         }
     }
 }

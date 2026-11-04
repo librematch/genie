@@ -36,11 +36,12 @@ fn same(save: &Header, turns: &World) -> SavedStep {
         objects: turns
             .players
             .iter()
-            .map(|p| {
-                p.objects
+            .map(|player| {
+                player
+                    .objects
                     .iter()
                     .filter(|u| listed(u))
-                    .map(|u| turns.object_of(u))
+                    .map(|unit| turns.object_of(unit))
                     .collect()
             })
             .collect(),
@@ -70,7 +71,7 @@ fn player_the_game_does_not_hold_is_an_error() {
     let _ = after.objects.pop();
     let mut report = TickReport::default();
     let result = compare_players(&turns, &after, None, &mut report);
-    assert!(result.is_err_and(|e| e == no_such_player(1)));
+    assert!(result.is_err_and(|error| error == no_such_player(1)));
 }
 
 /// The game state and a player's status, each where it differs; a frozen object's own
@@ -109,7 +110,9 @@ fn the_state_the_status_and_the_unfrozen_objects_differ() {
         )
     );
     assert!(
-        d[2..].iter().all(|(p, d)| *p == 1 && d.starts_with("8:")),
+        d[2..]
+            .iter()
+            .all(|(p, text)| *p == 1 && text.starts_with("8:")),
         "{d:?}"
     );
     assert_eq!(d.len(), 3, "{d:?}");
@@ -208,7 +211,7 @@ fn stopped_player_stock_is_not_compared() {
         !report
             .differences
             .iter()
-            .any(|(_, d)| d.starts_with("resources ")),
+            .any(|(_, text)| text.starts_with("resources ")),
         "{report:?}"
     );
 }
@@ -299,7 +302,7 @@ fn dump_out_of_shape_is_an_error() {
             pools: Some("101 1\n"),
             ..Dumps::default()
         })
-        .is_err_and(|e| e == bad_pool_dump())
+        .is_err_and(|error| error == bad_pool_dump())
     );
     // no dump: nothing changes
     load_dumps(&mut turns, Dumps::default()).unwrap();

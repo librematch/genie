@@ -67,8 +67,8 @@ impl Mul<Distance> for f32 {
     type Output = Distance;
 
     /// The distance scaled by `self` (one `f32` product, the factor first).
-    fn mul(self, d: Distance) -> Distance {
-        Distance(self * d.0)
+    fn mul(self, distance: Distance) -> Distance {
+        Distance(self * distance.0)
     }
 }
 
@@ -99,8 +99,8 @@ impl Div for Distance {
 }
 
 impl genie_diff::Diff for Distance {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -160,8 +160,8 @@ impl DistanceSquared {
 }
 
 impl genie_diff::Diff for DistanceSquared {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -180,14 +180,14 @@ mod tests {
         assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
         assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
         assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
-        let mut d = Distance::new(1.0);
-        d *= 3.0;
-        assert_eq!(d.get().to_bits(), 3.0_f32.to_bits());
-        d = Distance::new(1.0);
-        d -= a;
-        assert_eq!(d.get().to_bits(), (1.0_f32 - 0.1).to_bits());
-        d += a;
-        assert_eq!(d.get().to_bits(), (1.0_f32 - 0.1 + 0.1).to_bits());
+        let mut distance = Distance::new(1.0);
+        distance *= 3.0;
+        assert_eq!(distance.get().to_bits(), 3.0_f32.to_bits());
+        distance = Distance::new(1.0);
+        distance -= a;
+        assert_eq!(distance.get().to_bits(), (1.0_f32 - 0.1).to_bits());
+        distance += a;
+        assert_eq!(distance.get().to_bits(), (1.0_f32 - 0.1 + 0.1).to_bits());
         assert!(Distance::ZERO < a && a <= a && a < Distance::MAX);
         assert_eq!(Distance::new(f32::NAN).partial_cmp(&Distance::ZERO), None);
         assert_eq!(Distance::new(0.5).to_string(), "0.5");
@@ -211,10 +211,13 @@ mod tests {
     /// A distance squared is its one `f32` product with itself.
     #[test]
     fn distance_squared_is_its_product_with_itself() {
-        let d = Distance::new(1.1);
-        assert_eq!(d.squared(), DistanceSquared::new(1.1 * 1.1));
-        assert_eq!(d.squared().get().to_bits(), (1.1_f32 * 1.1).to_bits());
-        assert!(DistanceSquared::ZERO < d.squared());
+        let distance = Distance::new(1.1);
+        assert_eq!(distance.squared(), DistanceSquared::new(1.1 * 1.1));
+        assert_eq!(
+            distance.squared().get().to_bits(),
+            (1.1_f32 * 1.1).to_bits()
+        );
+        assert!(DistanceSquared::ZERO < distance.squared());
         assert_eq!(DistanceSquared::new(2.25).to_string(), "2.25");
     }
 

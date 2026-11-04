@@ -51,15 +51,15 @@ impl LevelFlags {
 
 impl genie_diff::Diff for PathFlags {
     /// By equality: the flags are one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
 impl genie_diff::Diff for LevelFlags {
     /// By equality: the flags are one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -74,9 +74,9 @@ mod tests {
         assert_eq!((PathFlags::NEW | PathFlags::LOOPS).bits(), 7);
         assert_eq!((PathFlags::NEW & !PathFlags::BACK_AND_FORTH).bits(), 4);
         assert_eq!(LevelFlags::NEAREST.bits(), 8);
-        let mut f = LevelFlags::NONE;
-        f.set(LevelFlags::MET_TARGET, true);
-        assert_eq!(f, LevelFlags::from_bits_retain(4));
+        let mut level_flags = LevelFlags::NONE;
+        level_flags.set(LevelFlags::MET_TARGET, true);
+        assert_eq!(level_flags, LevelFlags::from_bits_retain(4));
         assert_eq!(format!("{:?}", LevelFlags::REACHED), "LevelFlags(REACHED)");
     }
 }

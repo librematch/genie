@@ -68,11 +68,11 @@ impl UnitGroup {
     /// The group's target data forgets its target, place, radius and retargeting byte (the
     /// resets in `FUN_14100f7f0`); its range and certain action stay.
     pub(in crate::groups) const fn forget_target_data(&mut self) {
-        let t = &mut self.current_target;
-        t.target = GroupTarget::None;
-        t.original_position = BVector::ZERO;
-        t.target_radius = Distance::ZERO;
-        t.disable_retargeting = 0;
+        let target_data = &mut self.current_target;
+        target_data.target = GroupTarget::None;
+        target_data.original_position = BVector::ZERO;
+        target_data.target_radius = Distance::ZERO;
+        target_data.disable_retargeting = 0;
     }
 }
 
@@ -100,10 +100,10 @@ impl World {
     ) -> GenieResult<GroupMove> {
         let main = self.main_object(target)?;
         let at = self.moved_place_of(main)?;
-        let g = self.groups.held(group)?;
-        if g.current_target.target == GroupTarget::Object(main)
-            && !g.flags.contains(GroupFlags::JOINED)
-            && self.members_on_target(g, main)
+        let held = self.groups.held(group)?;
+        if held.current_target.target == GroupTarget::Object(main)
+            && !held.flags.contains(GroupFlags::JOINED)
+            && self.members_on_target(held, main)
         {
             self.groups
                 .held_mut(group)?
@@ -113,8 +113,8 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         g.forget_target_data();
-        for m in &mut g.members {
-            m.seconds_since_attacking = Seconds::MAX;
+        for member in &mut g.members {
+            member.seconds_since_attacking = Seconds::MAX;
         }
         let (queued, smallest) = (g.command_queue.len(), g.smallest_unit_range);
         let mut range = NO_RANGE;
@@ -144,14 +144,14 @@ impl World {
                 flags: MoveFlags::KEEP_FLAG | MoveFlags::DIRECT,
             },
         )?;
-        let g = self.groups.held_mut(group)?;
+        let unit_group = self.groups.held_mut(group)?;
         if moved == GroupMove::NotBegun {
-            g.forget_target_data();
+            unit_group.forget_target_data();
             return Ok(GroupMove::NotBegun);
         }
-        g.current_command = GroupCommandKind::ATTACK;
-        g.flags &= !GroupFlags::ARRIVED;
-        g.flags |= GroupFlags::ATTACKING;
+        unit_group.current_command = GroupCommandKind::ATTACK;
+        unit_group.flags &= !GroupFlags::ARRIVED;
+        unit_group.flags |= GroupFlags::ATTACKING;
         Ok(GroupMove::Begun)
     }
 
@@ -170,24 +170,26 @@ impl World {
 
     /// Slot 0x520 (`FUN_14106d530`) of object `id`: where it last moved to ([`moved_place`]).
     pub(super) fn moved_place_of(&self, id: ObjectId) -> GenieResult<BVector> {
-        let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        Ok(moved_place(u, self.parts.mover_of(id)))
+        let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        Ok(moved_place(unit, self.parts.mover_of(id)))
     }
 
     /// The target master's two radii as one length (`+0xb57`, `+0xb5b`: `sqrt(x² + y²)`).
     pub(super) fn target_radius(&self, id: ObjectId) -> GenieResult<Distance> {
-        let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let r = u.master(self.master_tables(), p)?.radius;
-        Ok(Distance::new(sqrt(r.x() * r.x() + r.y() * r.y())))
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let footprint = unit.master(self.master_tables(), player_id)?.radius;
+        Ok(Distance::new(sqrt(
+            footprint.x() * footprint.x() + footprint.y() * footprint.y(),
+        )))
     }
 
-    /// Whether every member of `g` the world holds that has a top action's target (slot 0x190,
+    /// Whether every member of `group` the world holds that has a top action's target (slot 0x190,
     /// `FUN_14106d090`) has `main` for it.
-    fn members_on_target(&self, g: &UnitGroup, main: ObjectId) -> bool {
-        g.members.iter().all(|m| {
-            self.object(m.id).is_none_or(|(_, u)| {
-                let top = self.top_target_object(u.id);
-                top.is_none_or(|t| t == main)
+    fn members_on_target(&self, group: &UnitGroup, main: ObjectId) -> bool {
+        group.members.iter().all(|member| {
+            self.object(member.id).is_none_or(|(_, unit)| {
+                let top = self.top_target_object(unit.id);
+                top.is_none_or(|object_id| object_id == main)
             })
         })
     }
@@ -207,15 +209,15 @@ impl World {
         order: AttackOrder,
         range: &mut f32,
     ) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let Some(player_kind) = g
+        let held = self.groups.held(group)?;
+        let Some(player_kind) = held
             .owner
-            .and_then(|o| self.players.get(o.index()))
-            .map(|p| p.kind)
+            .and_then(|player_id| self.players.get(player_id.index()))
+            .map(|player| player.kind)
         else {
             return Ok(());
         };
-        let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
+        let ids: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
         for id in ids {
             if self.in_reach_of(id, target, order, range)? {
                 self.send_in_reach(group, id, target, (order, player_kind))?;
@@ -235,26 +237,34 @@ impl World {
         order: AttackOrder,
         range: &mut f32,
     ) -> GenieResult<bool> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(false);
         };
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let target_master = self.master(t.player(), t.master_id(self.model.slots))?;
-        let master = u.master(self.master_tables(), p)?;
+        let target_master = self.master(
+            world_object.player(),
+            world_object.master_id(self.model.slots),
+        )?;
+        let master = unit.master(self.master_tables(), player_id)?;
         let gap = footprint_gap_squared(
-            u.position(),
+            unit.position(),
             master.radius,
-            t.position(),
+            world_object.position(),
             target_master.radius,
         );
-        let mut reach = self.task_reach(p, master.id, order.filter)?;
-        if reach < 0.0 && RANGED_MEMBER_KIND <= master.kind && !self.charge_hits(u, master, &t)? {
+        let mut reach = self.task_reach(player_id, master.id, order.filter)?;
+        if reach < 0.0
+            && RANGED_MEMBER_KIND <= master.kind
+            && !self.charge_hits(unit, master, &world_object)?
+        {
             reach = weapon_range(master).get();
         }
-        let against =
-            self.range_against(WorldObject::Unit(p, u, self.parts.mover_of(u.id)), Some(t))?;
+        let against = self.range_against(
+            WorldObject::Unit(player_id, unit, self.parts.mover_of(unit.id)),
+            Some(world_object),
+        )?;
         let reach_squared = if reach < 0.0 {
             against.squared()
         } else {
@@ -279,7 +289,12 @@ impl World {
         let Some(filter) = filter else {
             return Ok(NO_RANGE);
         };
-        let Some(master) = self.model.masters.of(player).and_then(|m| m.get(master)) else {
+        let Some(master) = self
+            .model
+            .masters
+            .of(player)
+            .and_then(|masters| masters.get(master))
+        else {
             return Ok(0.0);
         };
         for task in &master.action_part().tasks {
@@ -318,14 +333,18 @@ impl World {
         group: GroupId,
         target: ObjectId,
     ) -> GenieResult<()> {
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let g = self.groups.held(group)?;
-        let limit = if g.members.len() < 5 { 1 } else { SPECIAL_MOST };
+        let held = self.groups.held(group)?;
+        let limit = if held.members.len() < 5 {
+            1
+        } else {
+            SPECIAL_MOST
+        };
         let (mut by_class, mut by_master) = (Vec::new(), Vec::new());
-        for m in &g.members {
-            let Some(obj) = self.world_object(m.id) else {
+        for member in &held.members {
+            let Some(obj) = self.world_object(member.id) else {
                 continue;
             };
             let master = self.master(obj.player(), obj.master_id(self.model.slots))?;
@@ -336,7 +355,7 @@ impl World {
                     .of_class(master.class)
                     .contains(ClassRoles::PIKEMAN)
             {
-                by_class.push(m.id);
+                by_class.push(member.id);
             }
             if by_master.len() < FIRST_PASS_MOST
                 && self
@@ -345,11 +364,14 @@ impl World {
                     .of_master(master.id)
                     .contains(MasterRoles::REFILL_LISTED)
             {
-                by_master.push(m.id);
+                by_master.push(member.id);
             }
         }
         let target_class = self
-            .master(t.player(), t.master_id(self.model.slots))?
+            .master(
+                world_object.player(),
+                world_object.master_id(self.model.slots),
+            )?
             .class;
         let mut list: Vec<ObjectId> = Vec::new();
         if self
@@ -363,7 +385,7 @@ impl World {
         } else if self
             .model
             .roles
-            .of_master(t.master_id(self.model.slots))
+            .of_master(world_object.master_id(self.model.slots))
             .contains(MasterRoles::CLASS_LIST_ONLY)
         {
             take_into(&mut list, &by_class, limit);
@@ -377,10 +399,10 @@ impl World {
                 if limit <= list.len() {
                     break;
                 }
-                if let Some(stat) = g
+                if let Some(stat) = held
                     .unit_kinds
                     .iter()
-                    .find(|s| s.formation_category == category)
+                    .find(|unit_kind_statistic| unit_kind_statistic.formation_category == category)
                 {
                     take_into(&mut list, &stat.units, limit);
                 }
@@ -398,17 +420,19 @@ impl World {
         group: GroupId,
         target: ObjectId,
     ) -> GenieResult<()> {
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         let mut raised = Vec::new();
         for category in CATEGORIES {
-            let Some((at, stat)) = g
-                .unit_kinds
-                .iter()
-                .enumerate()
-                .find(|(_, s)| s.formation_category == category)
+            let Some((at, stat)) =
+                held.unit_kinds
+                    .iter()
+                    .enumerate()
+                    .find(|(_, unit_kind_statistic)| {
+                        unit_kind_statistic.formation_category == category
+                    })
             else {
                 continue;
             };
@@ -418,7 +442,7 @@ impl World {
             let mut largest = stat.attack_range;
             for &id in &stat.units {
                 if let Some(obj) = self.world_object(id) {
-                    let range = self.range_against(obj, Some(t))?;
+                    let range = self.range_against(obj, Some(world_object))?;
                     if below_or_unordered(largest.get(), range.get()) {
                         largest = range;
                     }
@@ -426,21 +450,21 @@ impl World {
             }
             raised.push((at, largest));
         }
-        let g = self.groups.held_mut(group)?;
+        let unit_group = self.groups.held_mut(group)?;
         for (at, largest) in raised {
-            if let Some(stat) = g.unit_kinds.get_mut(at) {
+            if let Some(stat) = unit_group.unit_kinds.get_mut(at) {
                 stat.attack_range = largest;
             }
         }
         Ok(())
     }
 
-    /// Slot 0x2f8 of the combat object `u` of master `master` against `target`
+    /// Slot 0x2f8 of the combat object `unit` of master `master` against `target`
     /// (`FUN_14120f510`): a charge of type 6 or 7 that works on the target
     /// ([`crate::combat::damage::charge_works`]) and is ready (slot 0x300: at least 1).
     pub(super) fn charge_hits(
         &self,
-        u: &Unit,
+        unit: &Unit,
         master: &Master,
         target: &WorldObject<'_>,
     ) -> GenieResult<bool> {
@@ -455,7 +479,7 @@ impl World {
             tm.kind,
             &self.model.roles,
         );
-        Ok(works && Charge::new(1.0) <= self.parts.combat_of(u.id).charge)
+        Ok(works && Charge::new(1.0) <= self.parts.combat_of(unit.id).charge)
     }
 }
 
@@ -467,6 +491,8 @@ fn take_into(list: &mut Vec<ObjectId>, ids: &[ObjectId], limit: usize) {
 
 /// Slot 0x520 (`FUN_14106d530`): the place the unit with its `mover` last moved to as the
 /// game holds it (x, height, y); an object that does not move holds its own.
-pub(crate) fn moved_place(u: &Unit, mover: Option<&Mover>) -> BVector {
-    mover.map_or_else(|| u.position(), |m| m.moved_at).vector()
+pub(crate) fn moved_place(unit: &Unit, mover: Option<&Mover>) -> BVector {
+    mover
+        .map_or_else(|| unit.position(), |m| m.moved_at)
+        .vector()
 }

@@ -16,14 +16,14 @@ impl From<u16> for SoundId {
 }
 
 impl From<SoundId> for u16 {
-    fn from(n: SoundId) -> Self {
-        n.0
+    fn from(sound_id: SoundId) -> Self {
+        sound_id.0
     }
 }
 
 impl From<SoundId> for usize {
-    fn from(n: SoundId) -> Self {
-        n.0.into()
+    fn from(sound_id: SoundId) -> Self {
+        sound_id.0.into()
     }
 }
 

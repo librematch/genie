@@ -60,7 +60,7 @@ impl World {
                 let from = g.current_target.original_position;
                 let to = self
                     .world_object(target)
-                    .map(|t| (t.moved_vector(), t.position()));
+                    .map(|world_object| (world_object.moved_vector(), world_object.position()));
                 let lead = if to.is_some() {
                     let lead = self.nearest_to_target(group);
                     self.groups.held_mut(group)?.motion.lead = lead;
@@ -99,8 +99,8 @@ impl World {
             }
             ATTACK => {
                 if self.attack_update(group, relayout)? == Progress::Finished {
-                    let g = self.groups.held(group)?;
-                    if g.command_queue.is_empty() && !self.target_pending(group)? {
+                    let held = self.groups.held(group)?;
+                    if held.command_queue.is_empty() && !self.target_pending(group)? {
                         return Ok(GroupFate::Deleted);
                     }
                     self.groups.held_mut(group)?.hibernating = 1;
@@ -142,49 +142,50 @@ impl World {
     ///
     /// When the world does not hold `group`: the group update passes its own.
     pub fn move_update(&mut self, group: GroupId, relayout: &mut bool) -> GenieResult<Progress> {
-        let g = self.groups.held(group)?;
-        if g.motion.flags.contains(MotionFlags::NEW) {
+        let held = self.groups.held(group)?;
+        if held.motion.flags.contains(MotionFlags::NEW) {
             *relayout = true;
             return Ok(Progress::Going);
         }
-        let walks = g
+        let walks = held
             .motion
             .paths
             .first()
             .is_some_and(|l| l.has_path && !l.points.is_empty());
-        let follows = g.flags.contains(GroupFlags::FOLLOWED);
-        if g.motion.moving() {
+        let follows = held.flags.contains(GroupFlags::FOLLOWED);
+        if held.motion.moving() {
             return self.moving_step(group, follows, relayout);
         }
         if follows {
             self.groups.held_mut(group)?.current_command = FOLLOW;
             return Ok(Progress::Going);
         }
-        if g.motion.number_wait_delays != DelayCount::ZERO || g.motion.waits_to_move() {
+        if held.motion.number_wait_delays != DelayCount::ZERO || held.motion.waits_to_move() {
             return Ok(Progress::Going);
         }
-        let patrol =
-            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol = top_path(&held.motion.paths)
+            .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
         let mut patrolling = true;
-        if !patrol && !g.flags.contains(GroupFlags::PATROL) {
+        if !patrol && !held.flags.contains(GroupFlags::PATROL) {
             patrolling = false;
-            let slots = g
+            let slots = held
                 .current_formation
                 .as_ref()
                 .filter(|f| !f.slots.is_empty() || !f.spare_slots.is_empty())
-                .map(|f| {
+                .map(|formation| {
                     (
-                        f.kind,
-                        f.slots
+                        formation.kind,
+                        formation
+                            .slots
                             .iter()
-                            .map(|s| (s.unit_id, s.state))
+                            .map(|slot| (slot.unit_id, slot.state))
                             .collect::<Vec<_>>(),
                     )
                 });
-            if g.command_queue.is_empty()
+            if held.command_queue.is_empty()
                 && let Some((kind, slots)) = slots
             {
-                let target = g.current_target.target.key();
+                let target = held.current_target.target.key();
                 let mut kept = 0;
                 for &(unit, state) in &slots {
                     if state == SlotState::InPlace {
@@ -226,12 +227,12 @@ impl World {
         follows: bool,
         relayout: &mut bool,
     ) -> GenieResult<Progress> {
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         if follows {
-            let Some(target) = self.world_object(g.current_target.target) else {
+            let Some(target) = self.world_object(held.current_target.target) else {
                 return Ok(Progress::Going);
             };
-            if let Some(top) = top_path(&g.motion.paths) {
+            if let Some(top) = top_path(&held.motion.paths) {
                 let end = match top.points.as_slice() {
                     [.., _, last] => *last,
                     // DAT_143f0dc78, zero-initialised (.bss) and written by nothing
@@ -259,8 +260,8 @@ impl World {
         walks: bool,
         patrolling: bool,
     ) -> GenieResult<Progress> {
-        let g = self.groups.held_mut(group)?;
-        g.flags = (g.flags & !GroupFlags::LINE) | GroupFlags::MEMBERS_SENT;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.flags = (unit_group.flags & !GroupFlags::LINE) | GroupFlags::MEMBERS_SENT;
         self.move_to_desired_positions(group, MOVE_COMMAND, None)?;
         Ok(if !walks && !patrolling {
             Progress::Finished
@@ -291,11 +292,11 @@ impl World {
         command: GroupCommandKind,
         target: Option<ObjectId>,
     ) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let Some(f) = g
+        let held = self.groups.held(group)?;
+        let Some(f) = held
             .current_formation
             .as_ref()
-            .filter(|f| !f.slots.is_empty() || !f.spare_slots.is_empty())
+            .filter(|formation| !formation.slots.is_empty() || !formation.spare_slots.is_empty())
         else {
             return Ok(());
         };
@@ -339,21 +340,21 @@ impl World {
     pub(super) fn specific_moves_step(&mut self, group: GroupId) -> GenieResult<()> {
         let mut i = 0;
         loop {
-            let g = self.groups.held(group)?;
-            let Some(m) = g.members.get(i).copied() else {
+            let held = self.groups.held(group)?;
+            let Some(member) = held.members.get(i).copied() else {
                 break;
             };
             i += 1;
-            if m.specific_move.active == 0 || !self.member_idle(m.id)? {
+            if member.specific_move.active == 0 || !self.member_idle(member.id)? {
                 continue;
             }
-            if self.object(m.id).is_none() {
+            if self.object(member.id).is_none() {
                 continue;
             }
-            if m.specific_move.reason != MoveReason::Aside {
+            if member.specific_move.reason != MoveReason::Aside {
                 // slot 0x608 (FUN_1411581e0): the unit's own motion step (FUN_141150f00), then
                 // its facet from its angle (FUN_14114d8b0, not held)
-                if self.member_step(m.id)? == Progress::Finished {
+                if self.member_step(member.id)? == Progress::Finished {
                     self.groups
                         .held_mut(group)?
                         .members
@@ -365,11 +366,11 @@ impl World {
                     };
                     continue;
                 }
-                let _ = self.show_walking(m.id)?;
+                let _ = self.show_walking(member.id)?;
                 let at = self
-                    .object(m.id)
-                    .map(|(_, u)| u.moved_vector(self.parts.mover_of(u.id)))
-                    .ok_or_else(|| member_gone(m.id))?;
+                    .object(member.id)
+                    .map(|(_, unit)| unit.moved_vector(self.parts.mover_of(unit.id)))
+                    .ok_or_else(|| member_gone(member.id))?;
                 let own = &mut self
                     .groups
                     .held_mut(group)?
@@ -382,22 +383,22 @@ impl World {
                 own.last_position = at;
                 continue;
             }
-            if let Some(mover) = self.parts.mover_mut(m.id) {
+            if let Some(mover) = self.parts.mover_mut(member.id) {
                 mover.stop()?;
             }
-            self.show_standing(m.id)?;
+            self.show_standing(member.id)?;
             let dt = self.dt_seconds;
-            let g = self.groups.held_mut(group)?;
-            let timer = &mut g.members.checked_mut(i - 1)?.specific_move.timer;
+            let unit_group = self.groups.held_mut(group)?;
+            let timer = &mut unit_group.members.checked_mut(i - 1)?.specific_move.timer;
             *timer -= dt;
             if !below_or_unordered(0.0, timer.get()) {
-                g.members.checked_mut(i - 1)?.specific_move = SpecificMove {
+                unit_group.members.checked_mut(i - 1)?.specific_move = SpecificMove {
                     path_id: MovePath::NONE,
                     reason: MoveReason::None,
                     ..SpecificMove::default()
                 };
-                if self.object(m.id).is_some()
-                    && let Some(mover) = self.parts.mover_mut(m.id)
+                if self.object(member.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(member.id)
                 {
                     mover.stand()?;
                 }
@@ -422,12 +423,12 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(Progress::Finished);
         };
-        let Place::Live(p, idx) = place else {
+        let Place::Live(player_id, idx) = place else {
             return Err(GenieError::unsupported("a sleeping member's own move"));
         };
-        let player_kind = self.players.player(p)?.kind;
+        let player_kind = self.players.player(player_id)?.kind;
         // the member is out of its slot for its step, as the updating object is
-        let mut unit = self.take_out(p, idx)?;
+        let mut unit = self.take_out(player_id, idx)?;
         let me = unit.me(self.parts.actions_of(unit.id));
         let (mover, by_id) = self
             .parts
@@ -457,7 +458,7 @@ impl World {
             }
             None => Err(WALKER_UNMOVING),
         };
-        let _ = self.put_back_own(p, unit)?;
+        let _ = self.put_back_own(player_id, unit)?;
         let (motion, pauses, clear) = stepped?;
         if !clear {
             return Err(IN_THE_WAY);
@@ -477,7 +478,8 @@ impl World {
     pub fn drop_due_orders(&mut self, group: GroupId) {
         let now = self.world_time;
         if let Some(g) = self.groups.get_mut(group) {
-            g.order_queue.retain(|o| now < o.execute_time);
+            g.order_queue
+                .retain(|group_order| now < group_order.execute_time);
         }
     }
 
@@ -488,9 +490,9 @@ impl World {
     pub(super) fn idle_timer_step(&mut self, group: GroupId) -> GenieResult<()> {
         if self.is_idle(group) {
             let dt = self.dt_ms();
-            let g = self.groups.held_mut(group)?;
-            g.idle_timer = g.idle_timer.wrapping_add(dt);
-            if g.idle_timer <= IDLE_LIMIT {
+            let unit_group = self.groups.held_mut(group)?;
+            unit_group.idle_timer = unit_group.idle_timer.wrapping_add(dt);
+            if unit_group.idle_timer <= IDLE_LIMIT {
                 return Ok(());
             }
         }
@@ -511,9 +513,11 @@ impl World {
     /// hold).
     #[must_use]
     pub fn any_member_held(&self, group: GroupId) -> bool {
-        self.groups
-            .get(group)
-            .is_some_and(|g| g.members.iter().any(|m| self.object(m.id).is_some()))
+        self.groups.get(group).is_some_and(|g| {
+            g.members
+                .iter()
+                .any(|member| self.object(member.id).is_some())
+        })
     }
 
     /// `resetIdleTimer` (`FUN_14102d370`): group `group`'s idle timer (`+0x3e4`) is a draw of the

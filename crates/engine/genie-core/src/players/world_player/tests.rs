@@ -96,57 +96,60 @@ fn master(id: MasterId, kind: MasterKind, class: ClassId) -> Master {
     }
 }
 
-/// An object `id` of master `m` in `state`.
-fn object(id: i32, m: MasterId, state: ObjectState) -> Unit {
-    let mut u = Unit {
+/// An object `id` of master `master_id` in `state`.
+fn object(id: i32, master_id: MasterId, state: ObjectState) -> Unit {
+    let mut unit = Unit {
         id: object_id(id),
         ..Unit::default()
     };
-    u.life.master_id = m;
-    u.life.state = state;
-    u
+    unit.life.master_id = master_id;
+    unit.life.state = state;
+    unit
 }
 
 /// The update time grows by the update's seconds; each whole second runs the loop once (the
 /// history's update counts it) with the time before its step; Gaia's own time grows alone.
 #[test]
 fn each_whole_second_of_update_time_runs_the_loop_once() {
-    let mut t = world();
-    t.dt_seconds = Seconds::new(0.25);
-    t.players[1].update_time = Seconds::new(0.9);
-    t.update_world_player(PlayerId::new(1)).unwrap();
+    let mut world = world();
+    world.dt_seconds = Seconds::new(0.25);
+    world.players[1].update_time = Seconds::new(0.9);
+    world.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(
-        t.players[1].update_time,
+        world.players[1].update_time,
         Seconds::new((0.25f32 + 0.9) - 1.0)
     );
     assert_eq!(
-        t.players[1].history.update_count,
+        world.players[1].history.update_count,
         HistoryUpdates::of_data(1)
     );
-    t.dt_seconds = Seconds::new(2.5);
-    t.players[2].update_time = Seconds::ZERO;
-    t.update_world_player(PlayerId::new(2)).unwrap();
-    assert_eq!(t.players[2].update_time, Seconds::new(0.5));
+    world.dt_seconds = Seconds::new(2.5);
+    world.players[2].update_time = Seconds::ZERO;
+    world.update_world_player(PlayerId::new(2)).unwrap();
+    assert_eq!(world.players[2].update_time, Seconds::new(0.5));
     assert_eq!(
-        t.players[2].history.update_count,
+        world.players[2].history.update_count,
         HistoryUpdates::of_data(2)
     );
     // below a second, or NaN, no loop
-    t.dt_seconds = Seconds::new(0.5);
-    t.players[3].update_time = Seconds::new(f32::NAN);
-    t.update_world_player(PlayerId::new(3)).unwrap();
+    world.dt_seconds = Seconds::new(0.5);
+    world.players[3].update_time = Seconds::new(f32::NAN);
+    world.update_world_player(PlayerId::new(3)).unwrap();
     assert_eq!(
-        t.players[3].history.update_count,
+        world.players[3].history.update_count,
         HistoryUpdates::of_data(0)
     );
     // Gaia: its own update time, no loop
-    t.update_world_player(PlayerId::new(0)).unwrap();
+    world.update_world_player(PlayerId::new(0)).unwrap();
     assert_eq!(
-        (t.players[0].gaia_update_time, t.players[0].update_time),
+        (
+            world.players[0].gaia_update_time,
+            world.players[0].update_time
+        ),
         (Seconds::new(0.5), Seconds::ZERO)
     );
     assert_eq!(
-        t.players[0].history.update_count,
+        world.players[0].history.update_count,
         HistoryUpdates::of_data(0)
     );
 }
@@ -155,15 +158,15 @@ fn each_whole_second_of_update_time_runs_the_loop_once() {
 /// all-visible types; left in a slice without the players' sight.
 #[test]
 fn attribute_22_is_the_explored_share_in_percent() {
-    let mut t = world();
-    t.players[1].attributes[22] = Amount::new(7.0);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[22], Amount::new(7.0));
+    let mut world = world();
+    world.players[1].attributes[22] = Amount::new(7.0);
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].attributes[22], Amount::new(7.0));
     let map = |explored| VisibleMap {
         counts: vec![-1; 100],
         explored,
     };
-    t.spatial.sight = Some(Visibility::new(
+    world.spatial.sight = Some(Visibility::new(
         GridSize::new(10, 10),
         vec![
             map(TileCount::ZERO),
@@ -176,31 +179,32 @@ fn attribute_22_is_the_explored_share_in_percent() {
         0,
         vec![PlayerKind::Human; 4],
     ));
-    t.update_world_player(PlayerId::new(1)).unwrap();
+    world.update_world_player(PlayerId::new(1)).unwrap();
     assert_eq!(
-        t.players[1].attributes[22],
+        world.players[1].attributes[22],
         Amount::new(37.0 / 100.0 * 100.0)
     );
-    t.settings.visibility_kind = WorldVisibility::of_data(2);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[22], Amount::new(100.0));
+    world.settings.visibility_kind = WorldVisibility::of_data(2);
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].attributes[22], Amount::new(100.0));
 }
 
 /// Attribute 44: kills (20) less the units owned (19) less the population (11); below 0 it
 /// is 0, a NaN stays.
 #[test]
 fn attribute_44_is_the_kills_less_the_losses() {
-    let mut t = world();
-    let a = &mut t.players[1].attributes;
-    (a[20], a[19], a[11]) = (Amount::new(5.0), Amount::new(12.0), Amount::new(10.0));
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[44], Amount::new(3.0));
-    t.players[1].attributes[19] = Amount::new(20.0);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[44], Amount::ZERO);
-    t.players[1].attributes[20] = Amount::new(f32::NAN);
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert!(t.players[1].attributes[44].get().is_nan());
+    let mut world = world();
+    let amounts = &mut world.players[1].attributes;
+    (amounts[20], amounts[19], amounts[11]) =
+        (Amount::new(5.0), Amount::new(12.0), Amount::new(10.0));
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].attributes[44], Amount::new(3.0));
+    world.players[1].attributes[19] = Amount::new(20.0);
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].attributes[44], Amount::ZERO);
+    world.players[1].attributes[20] = Amount::new(f32::NAN);
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert!(world.players[1].attributes[44].get().is_nan());
 }
 
 /// The trickles: each of attributes 230 to 233 above 0 gives its sixtieth of the resource
@@ -208,24 +212,24 @@ fn attribute_44_is_the_kills_less_the_losses() {
 /// A lost player's trickles stop.
 #[test]
 fn the_trickles_give_sixtieth_of_their_rate_each_second() {
-    let mut t = world();
-    let a = &mut t.players[1].attributes;
-    (a[230], a[231], a[232], a[233]) = (
+    let mut world = world();
+    let players = &mut world.players[1].attributes;
+    (players[230], players[231], players[232], players[233]) = (
         Amount::new(6.0),
         Amount::new(-1.0),
         Amount::new(f32::NAN),
         Amount::new(60.0),
     );
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    let p = &t.players[1];
-    assert_eq!(p.resources(), amounts([6.0 / 60.0, 0.0, 0.0, 1.0]));
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    let player = &world.players[1];
+    assert_eq!(player.resources(), amounts([6.0 / 60.0, 0.0, 0.0, 1.0]));
     assert_eq!(
-        [166, 167, 168, 169, 49].map(|k| p.attributes[k]),
+        [166, 167, 168, 169, 49].map(|k| player.attributes[k]),
         amounts([6.0 / 60.0, 0.0, 0.0, 1.0, 1.0])
     );
-    t.players[1].game_status = GameStatus::Lost;
-    t.update_world_player(PlayerId::new(1)).unwrap();
-    assert_eq!(t.players[1].attributes[3], Amount::new(1.0));
+    world.players[1].game_status = GameStatus::Lost;
+    world.update_world_player(PlayerId::new(1)).unwrap();
+    assert_eq!(world.players[1].attributes[3], Amount::new(1.0));
 }
 
 /// The mills' food: the livestock of the objects filed under the mill (68) that are
@@ -233,12 +237,12 @@ fn the_trickles_give_sixtieth_of_their_rate_each_second() {
 /// (the update time before the step times logf(sum / 200 + 1)), its gathered total too.
 #[test]
 fn mill_livestock_makes_food() {
-    let mut t = world();
+    let mut world = world();
     let masters = Masters::new([
         master(master_id(68), MasterKind::BUILDING, class::BUILDING),
         master(master_id(5), MasterKind::COMBAT, class::LIVESTOCK),
     ]);
-    t.model.masters = vec![
+    world.model.masters = vec![
         Arc::new(masters.clone()),
         Arc::new(masters.clone()),
         Arc::new(masters.clone()),
@@ -253,25 +257,26 @@ fn mill_livestock_makes_food() {
         pending: false,
         military: false,
     };
-    let p = &mut t.players[1];
-    p.objects = vec![mill, other, sheep].into();
+    let player = &mut world.players[1];
+    player.objects = vec![mill, other, sheep].into();
     for id in [10, 11, 12] {
-        p.tracker.add(object_id(id), key);
+        player.tracker.add(object_id(id), key);
     }
-    p.attributes[254] = Amount::new(15.0);
-    p.update_time = Seconds::new(0.5);
-    t.reindex();
+    player.attributes[254] = Amount::new(15.0);
+    player.update_time = Seconds::new(0.5);
+    world.reindex();
     for (id, sum) in [(10, 100.0), (11, 300.0), (12, 1000.0)] {
-        t.parts
+        world
+            .parts
             .building_mut(object_id(id))
             .unwrap()
             .livestock_summation = Amount::new(sum);
     }
-    t.update_world_player(PlayerId::new(1)).unwrap();
+    world.update_world_player(PlayerId::new(1)).unwrap();
     let grows = log(400.0 / 200.0 + 1.0);
     let food = 15.0 / 60.0 * (1.5 * grows);
-    assert_eq!(t.players[1].attributes[0], Amount::new(food));
-    assert_eq!(t.players[1].attributes[166], Amount::new(food));
+    assert_eq!(world.players[1].attributes[0], Amount::new(food));
+    assert_eq!(world.players[1].attributes[166], Amount::new(food));
 }
 
 /// A computer player's income fills its escrow by the share, held to the resource; with
@@ -370,11 +375,11 @@ fn player_without_an_object_that_keeps_it_loses() {
         t.settings.game_mode = GameMode::of_data(game_mode);
         t.players[1].objects = objects.into();
         t.reindex();
-        let p = &t.players[1];
-        let kept: Vec<bool> = p
+        let player = &t.players[1];
+        let kept: Vec<bool> = player
             .objects
             .iter()
-            .map(|u| t.keeps_alive(PlayerId::new(1), u).unwrap())
+            .map(|unit| t.keeps_alive(PlayerId::new(1), unit).unwrap())
             .collect();
         kept
     };
@@ -437,7 +442,7 @@ fn player_without_an_object_that_keeps_it_loses() {
 #[test]
 fn running_victory_timer_keeps_the_player() {
     assert!(!VictoryTimes::default().running());
-    for t in [
+    for victory_times in [
         VictoryTimes {
             wonder: Seconds::new(0.0),
             ..VictoryTimes::default()
@@ -451,7 +456,7 @@ fn running_victory_timer_keeps_the_player() {
             ..VictoryTimes::default()
         },
     ] {
-        assert!(t.running(), "{t:?}");
+        assert!(victory_times.running(), "{victory_times:?}");
     }
     let nan = VictoryTimes {
         wonder: Seconds::new(f32::NAN),
@@ -470,22 +475,22 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
         pending: false,
         military: false,
     };
-    let mut t = world();
-    t.players[1].objects = vec![
+    let mut world = world();
+    world.players[1].objects = vec![
         object(7, master_id(444), ObjectState::Alive),
         object(5, ids::TOWN_CENTRE, ObjectState::Dying),
         object(6, ids::TOWN_CENTRE, ObjectState::Alive),
     ]
     .into();
-    t.reindex();
+    world.reindex();
     // 9 is filed but gone from the world
     for (id, master) in [(5, 109), (9, 109), (6, 109), (7, 444)] {
-        t.players[1]
+        world.players[1]
             .tracker
             .add(object_id(id), key(master_id(master)));
     }
     let all: Vec<Option<ObjectId>> = (0..4)
-        .map(|n| t.town_centre_at(PlayerId::new(1), n))
+        .map(|n| world.town_centre_at(PlayerId::new(1), n))
         .collect();
     assert_eq!(
         all,
@@ -496,7 +501,7 @@ fn the_nth_town_centre_follows_the_tracker_and_skips_what_the_world_lacks() {
             None
         ]
     );
-    assert_eq!(t.town_centre_at(PlayerId::new(2), 0), None);
+    assert_eq!(world.town_centre_at(PlayerId::new(2), 0), None);
 }
 
 /// Sudden death: the first built town centre found sets the latch; once set, a player
@@ -561,7 +566,7 @@ fn sudden_death_and_regicide_end_player_their_ways() {
 /// when built.
 #[test]
 fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
-    let mut t = world();
+    let mut world = world();
     let site = BuildingMaster {
         disappears_when_built: BuiltMode::DISAPPEARS,
         stack_unit: Some(ids::TOWN_CENTRE),
@@ -621,21 +626,24 @@ fn the_trainable_count_takes_the_had_masters_trained_at_the_building() {
             ..master(ids::TOWN_CENTRE_621, MasterKind::BUILDING, class::BUILDING)
         },
     ]);
-    t.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
-    assert_eq!(t.trainable_count(PlayerId::new(1), ids::TOWN_CENTRE), 1);
-    assert_eq!(t.trainable_count(PlayerId::new(1), master_id(12)), 1);
-    assert_eq!(t.trainable_count(PlayerId::new(1), master_id(101)), 0);
+    world.model.masters = vec![masters.clone(); 4].into_iter().map(Arc::new).collect();
+    assert_eq!(world.trainable_count(PlayerId::new(1), ids::TOWN_CENTRE), 1);
+    assert_eq!(world.trainable_count(PlayerId::new(1), master_id(12)), 1);
+    assert_eq!(world.trainable_count(PlayerId::new(1), master_id(101)), 0);
     // the local player's 621 stands for 109
-    assert_eq!(t.trainable_count(PlayerId::new(1), ids::TOWN_CENTRE_621), 1);
+    assert_eq!(
+        world.trainable_count(PlayerId::new(1), ids::TOWN_CENTRE_621),
+        1
+    );
     // a builder with attribute 48 at 0 and the town centre not had: one more below the
     // town centre limit (218)
     let mut builder = masters;
     builder.get_mut(ids::TOWN_CENTRE_621).unwrap().available = Availability::UNAVAILABLE;
-    t.model.masters[1] = Arc::new(builder);
-    t.players[1].attributes[218] = Amount::new(1.0);
-    assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 1);
-    t.players[1].attributes[48] = Amount::new(1.0);
-    assert_eq!(t.trainable_count(PlayerId::new(1), BUILDER), 0);
+    world.model.masters[1] = Arc::new(builder);
+    world.players[1].attributes[218] = Amount::new(1.0);
+    assert_eq!(world.trainable_count(PlayerId::new(1), BUILDER), 1);
+    world.players[1].attributes[48] = Amount::new(1.0);
+    assert_eq!(world.trainable_count(PlayerId::new(1), BUILDER), 0);
 }
 
 /// The tech tree's lookups: a unit at its building, its link and technology; a later age
@@ -724,7 +732,7 @@ fn the_tech_tree_answers_by_civilisation_building_and_unit() {
 /// its link is had (or none) and its technology researched (or none).
 #[test]
 fn the_upgradable_count_follows_the_tech_tree() {
-    let mut t = world();
+    let mut world = world();
     let masters = Masters::new([
         Master {
             available: Availability::UNAVAILABLE,
@@ -748,10 +756,10 @@ fn the_upgradable_count_follows_the_tech_tree() {
         },
         master(master_id(12), MasterKind::BUILDING, class::BUILDING),
     ]);
-    t.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
-    t.players[1].civ = CivId::new(0);
-    t.players[1].techs = vec![TechState::default(); 200];
-    t.model.tech_tree = Arc::new(TechTree {
+    world.model.masters = vec![masters; 4].into_iter().map(Arc::new).collect();
+    world.players[1].civ = CivId::new(0);
+    world.players[1].techs = vec![TechState::default(); 200];
+    world.model.tech_tree = Arc::new(TechTree {
         civs: vec![vec![TreeBuilding {
             id: TreeMaster::of_data(12),
             units: vec![
@@ -772,25 +780,25 @@ fn the_upgradable_count_follows_the_tech_tree() {
         unique_units: Vec::new(),
     });
     // 74 counts (no link, no technology); 75's link 74 is not had
-    assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
-    Arc::make_mut(&mut t.model.masters[1])
+    assert_eq!(world.upgradable_count(PlayerId::new(1), master_id(12)), 1);
+    Arc::make_mut(&mut world.model.masters[1])
         .get_mut(master_id(74))
         .unwrap()
         .available = Availability::AVAILABLE;
     // 75: its link had, its technology not researched
-    assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
-    t.players[1].techs[150].state = ResearchState::Researched;
-    assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 2);
+    assert_eq!(world.upgradable_count(PlayerId::new(1), master_id(12)), 1);
+    world.players[1].techs[150].state = ResearchState::Researched;
+    assert_eq!(world.upgradable_count(PlayerId::new(1), master_id(12)), 2);
     // the Feudal Age out of reach puts 75 out
-    t.players[1].techs[101].state = ResearchState::Disabled;
-    assert_eq!(t.upgradable_count(PlayerId::new(1), master_id(12)), 1);
+    world.players[1].techs[101].state = ResearchState::Disabled;
+    assert_eq!(world.upgradable_count(PlayerId::new(1), master_id(12)), 1);
 }
 
 /// The scout map takes the tiles of the player's tile list: before 5000 ms only those it
 /// sees, after it all; a player without a scout map, and Gaia, take nothing.
 #[test]
 fn the_scout_map_takes_the_new_tiles() {
-    let mut t = world();
+    let mut world = world();
     let mut unified = vec![VisionBits::NONE; 100];
     unified[0] = VisionBits::from_bits_retain(1 << 1);
     let map = VisibleMap {
@@ -806,23 +814,27 @@ fn the_scout_map_takes_the_new_tiles() {
         vec![PlayerKind::Human; 4],
     );
     sight.new_tiles[1] = vec![Tile::new(0, 0), Tile::new(1, 0)];
-    t.spatial.sight = Some(sight);
-    t.world_player_tail(PlayerId::new(1)).unwrap();
-    t.spatial.set_scout_map(
+    world.spatial.sight = Some(sight);
+    world.world_player_tail(PlayerId::new(1)).unwrap();
+    world.spatial.set_scout_map(
         PlayerId::new(1),
         InfluenceMap::new(GridSize::new(10, 10), 0),
     );
-    t.world_time = WorldTime::from_millis(4999);
-    t.world_player_tail(PlayerId::new(1)).unwrap();
-    let m = t.spatial.scout_map(PlayerId::new(1)).unwrap();
+    world.world_time = WorldTime::from_millis(4999);
+    world.world_player_tail(PlayerId::new(1)).unwrap();
+    let influence_map = world.spatial.scout_map(PlayerId::new(1)).unwrap();
     assert_eq!(
-        (m.get(Tile::new(0, 0)), m.get(Tile::new(1, 0))),
+        (
+            influence_map.get(Tile::new(0, 0)),
+            influence_map.get(Tile::new(1, 0))
+        ),
         (Some(1), Some(0))
     );
-    t.world_time = WorldTime::from_millis(5000);
-    t.world_player_tail(PlayerId::new(1)).unwrap();
+    world.world_time = WorldTime::from_millis(5000);
+    world.world_player_tail(PlayerId::new(1)).unwrap();
     assert_eq!(
-        t.spatial
+        world
+            .spatial
             .scout_map(PlayerId::new(1))
             .unwrap()
             .get(Tile::new(1, 0)),

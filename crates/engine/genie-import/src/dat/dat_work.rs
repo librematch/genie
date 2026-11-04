@@ -82,53 +82,57 @@ pub(super) fn sound_event(event: u32, sound: i16, sounds: &[Sound]) -> i32 {
 /// # Errors
 ///
 /// A negative action type, or an attribute below −1.
-fn dat_task(t: &Task, sounds: &[Sound]) -> GenieResult<work::Task> {
+fn dat_task(task: &Task, sounds: &[Sound]) -> GenieResult<work::Task> {
     let [
         attribute_kind,
         attribute_kind2,
         attribute_kind3,
         attribute_kind4,
     ] = attributes([
-        t.resource_in,
-        t.resource_multiplier,
-        t.resource_out,
-        t.unused_resource,
+        task.resource_in,
+        task.resource_multiplier,
+        task.resource_out,
+        task.unused_resource,
     ])?;
     Ok(work::Task {
-        id: TaskId::of_task(t.id),
-        action_kind: ActionKind::try_from(t.action_kind)?,
-        object_group: ClassId::of_field(t.class_id)?,
-        object_id: MasterId::of_data(t.unit_id),
-        combat_level: t.enable_targeting,
-        combat_level_flag: TaskFlags::from_bits_retain(t.combat_level_flag),
-        terrain: TaskTerrain::of_data(t.terrain_id),
-        owner_kind: TargetOwner::of_data(t.target_diplomacy),
-        holding_attr: t.carry_check,
+        id: TaskId::of_task(task.id),
+        action_kind: ActionKind::try_from(task.action_kind)?,
+        object_group: ClassId::of_field(task.class_id)?,
+        object_id: MasterId::of_data(task.unit_id),
+        combat_level: task.enable_targeting,
+        combat_level_flag: TaskFlags::from_bits_retain(task.combat_level_flag),
+        terrain: TaskTerrain::of_data(task.terrain_id),
+        owner_kind: TargetOwner::of_data(task.target_diplomacy),
+        holding_attr: task.carry_check,
         attribute_kind,
         attribute_kind2,
         attribute_kind3,
         attribute_kind4,
-        wait_time: Seconds::new(t.search_wait_time),
-        work_val1: work::WorkValue::new(t.work_value1),
-        work_val2: work::WorkValue::new(t.work_value2),
-        work_range: Distance::new(t.work_range),
-        work_flag: t.gather_kind,
-        enablement: t.enabled.map(AttributeId::of_field).transpose()?.flatten(),
+        wait_time: Seconds::new(task.search_wait_time),
+        work_val1: work::WorkValue::new(task.work_value1),
+        work_val2: work::WorkValue::new(task.work_value2),
+        work_range: Distance::new(task.work_range),
+        work_flag: task.gather_kind,
+        enablement: task
+            .enabled
+            .map(AttributeId::of_field)
+            .transpose()?
+            .flatten(),
         sprites: TaskSprites::of_data([
-            t.moving_graphic_id,
-            t.proceeding_graphic_id,
-            t.working_graphic_id,
-            t.carrying_graphic_id,
+            task.moving_graphic_id,
+            task.proceeding_graphic_id,
+            task.working_graphic_id,
+            task.carrying_graphic_id,
         ]),
         sound_events: SoundEvents::new(
             sound_event(
-                t.wwise_resource_gathering_sound_id,
-                t.resource_gathering_sound_id,
+                task.wwise_resource_gathering_sound_id,
+                task.resource_gathering_sound_id,
                 sounds,
             ),
             sound_event(
-                t.wwise_resource_deposit_sound_id,
-                t.resource_deposit_sound_id,
+                task.wwise_resource_deposit_sound_id,
+                task.resource_deposit_sound_id,
                 sounds,
             ),
         ),
@@ -172,21 +176,23 @@ pub(super) fn dat_work(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResu
         outline_height: Distance::new(Radii::from(unit.outline_size).z()),
         // the save's facet counts; which `.dat` field the loader reads into `+0x982` is not
         // known (MISSING.md)
-        building: unit.building.as_ref().map(|b| work::BuildingMaster {
-            adjacent_mode: AdjacentMode::of_data(b.adjacent_mode),
-            disappears_when_built: BuiltMode::of_data(b.disappears_when_built),
-            stack_unit: MasterId::of_data(b.stack_unit_id),
-            foundation_terrain: TerrainId::of_data(b.foundation_terrain_id),
-            tech: TechId::of_data(b.tech_id),
-            garrison_kind: GarrisonKinds::from_bits_retain(b.garrison_kind),
-            garrison_heal_rate: HitPoints::new(b.garrison_heal_rate),
-            garrison_repair_rate: HitPoints::new(b.garrison_repair_rate),
-            annexes: b.annexes.map(|a| MasterId::of_data(a.unit_id)),
-            annex_offsets: b.annexes.map(|a| GroundOffset::from(a.misplacement)),
-            head_unit: MasterId::of_data(b.head_unit),
-            transform_unit: MasterId::of_data(b.transform_unit),
-            destruction_sprite: SpriteId::of_data(b.destruction_graphic_id),
-            construction_sprite: SpriteId::of_data(b.construction_graphic_id),
+        building: unit.building.as_ref().map(|building| work::BuildingMaster {
+            adjacent_mode: AdjacentMode::of_data(building.adjacent_mode),
+            disappears_when_built: BuiltMode::of_data(building.disappears_when_built),
+            stack_unit: MasterId::of_data(building.stack_unit_id),
+            foundation_terrain: TerrainId::of_data(building.foundation_terrain_id),
+            tech: TechId::of_data(building.tech_id),
+            garrison_kind: GarrisonKinds::from_bits_retain(building.garrison_kind),
+            garrison_heal_rate: HitPoints::new(building.garrison_heal_rate),
+            garrison_repair_rate: HitPoints::new(building.garrison_repair_rate),
+            annexes: building.annexes.map(|a| MasterId::of_data(a.unit_id)),
+            annex_offsets: building
+                .annexes
+                .map(|building_annex| GroundOffset::from(building_annex.misplacement)),
+            head_unit: MasterId::of_data(building.head_unit),
+            transform_unit: MasterId::of_data(building.transform_unit),
+            destruction_sprite: SpriteId::of_data(building.destruction_graphic_id),
+            construction_sprite: SpriteId::of_data(building.construction_graphic_id),
             ..work::BuildingMaster::default()
         }),
         garrison: GarrisonCapacity::of_data(unit.garrison_capacity),
@@ -216,7 +222,7 @@ pub(super) fn dat_work(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResu
         action: unit
             .bird
             .as_ref()
-            .map(|b| dat_action(b, sounds))
+            .map(|bird| dat_action(bird, sounds))
             .transpose()?,
         ..work::Master::default()
     })
@@ -224,39 +230,41 @@ pub(super) fn dat_work(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResu
 
 /// The moving layer of a `.dat` unit's type-30 section ([`work::MovingPart`], genieutils'
 /// `DeadFish`): its walking and running sprites, its turn speed and its trail.
-const fn dat_moving(d: &DeadFish) -> work::MovingPart {
+const fn dat_moving(dead_fish: &DeadFish) -> work::MovingPart {
     work::MovingPart {
-        move_sprite: SpriteId::of_data(d.walking_graphic),
-        run_sprite: SpriteId::of_data(d.running_graphic),
-        turn_speed: Seconds::new(d.rotation_speed),
+        move_sprite: SpriteId::of_data(dead_fish.walking_graphic),
+        run_sprite: SpriteId::of_data(dead_fish.running_graphic),
+        turn_speed: Seconds::new(dead_fish.rotation_speed),
         trail: work::Trail {
-            unit: work::MasterField::of_data(d.tracking_unit),
-            mode: work::TrailMode::of_data(d.tracking_unit_mode),
-            density: work::TrailDensity::new(d.tracking_unit_density),
+            unit: work::MasterField::of_data(dead_fish.tracking_unit),
+            mode: work::TrailMode::of_data(dead_fish.tracking_unit_mode),
+            density: work::TrailDensity::new(dead_fish.tracking_unit_density),
         },
     }
 }
 
 /// The missile layer of a `.dat` unit's projectile section ([`work::MissilePart`], genieutils'
 /// `Projectile`): its projectile type, smart, hit and vanish modes and its arc.
-const fn dat_missile(p: &Projectile) -> work::MissilePart {
+const fn dat_missile(projectile: &Projectile) -> work::MissilePart {
     work::MissilePart {
-        projectile_kind: ProjectileKind::of_data(p.projectile_kind),
-        smart_mode: SmartMode::from_bits_retain(p.smart_mode),
-        hit_mode: HitMode::of_data(p.hit_mode),
-        vanish_mode: VanishMode::from_bits_retain(p.vanish_mode),
-        arc: ArcRatio::new(p.projectile_arc),
+        projectile_kind: ProjectileKind::of_data(projectile.projectile_kind),
+        smart_mode: SmartMode::from_bits_retain(projectile.smart_mode),
+        hit_mode: HitMode::of_data(projectile.hit_mode),
+        vanish_mode: VanishMode::from_bits_retain(projectile.vanish_mode),
+        arc: ArcRatio::new(projectile.projectile_arc),
     }
 }
 
 /// The combat layer of a `.dat` unit's type-50 section ([`work::CombatPart`]): the values the
 /// import reads of it, its second attack sprite, terrain bonus and garrison firepower (the save
 /// holds the rest, `genie_import::save`).
-fn dat_combat(t: &Type50) -> work::CombatPart {
+fn dat_combat(type50: &Type50) -> work::CombatPart {
     work::CombatPart {
-        attack_sprite2: t.attack_graphic2.and_then(SpriteId::of_data),
-        terrain_bonus: RestrictionField::of_data(t.defense_terrain_bonus),
-        garrison_firepower: t.garrison_firepower.map_or(Firepower::ZERO, Firepower::new),
+        attack_sprite2: type50.attack_graphic2.and_then(SpriteId::of_data),
+        terrain_bonus: RestrictionField::of_data(type50.defense_terrain_bonus),
+        garrison_firepower: type50
+            .garrison_firepower
+            .map_or(Firepower::ZERO, Firepower::new),
         ..work::CombatPart::default()
     }
 }
@@ -267,50 +275,50 @@ fn dat_combat(t: &Type50) -> work::CombatPart {
 /// # Errors
 ///
 /// A cost slot that holds no attribute ([`dat_cost`]).
-fn dat_creatable(c: &Creatable) -> GenieResult<work::CreatablePart> {
+fn dat_creatable(creatable: &Creatable) -> GenieResult<work::CreatablePart> {
     Ok(work::CreatablePart {
-        cost: dat_cost(c)?,
-        build_time: c
+        cost: dat_cost(creatable)?,
+        build_time: creatable
             .train_locations
             .first()
             .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.queue_time)),
-        trained_at: c
+        trained_at: creatable
             .train_locations
             .iter()
             .filter_map(|t| MasterId::of_data(t.location_id))
             .collect(),
         // the whole entries, which the attribute setters change (a .dat before VER 8.7 holds no
         // hotkey: 0)
-        train_locations: c
+        train_locations: creatable
             .train_locations
             .iter()
-            .map(|t| work::TrainLocation {
-                location: MasterId::of_data(t.location_id),
-                time: WholeSeconds::of_data(t.queue_time),
-                button: LocationButton::of_data(t.button_id),
-                hotkey: HotkeyId::of_data(t.hot_key_id.unwrap_or_default()),
+            .map(|train_location| work::TrainLocation {
+                location: MasterId::of_data(train_location.location_id),
+                time: WholeSeconds::of_data(train_location.queue_time),
+                button: LocationButton::of_data(train_location.button_id),
+                hotkey: HotkeyId::of_data(train_location.hot_key_id.unwrap_or_default()),
             })
             .collect(),
-        idle_attack_sprite: c.idle_attack_graphic.and_then(SpriteId::of_data),
-        special_sprite: i16::try_from(c.special_graphic)
+        idle_attack_sprite: creatable.idle_attack_graphic.and_then(SpriteId::of_data),
+        special_sprite: i16::try_from(creatable.special_graphic)
             .ok()
             .and_then(SpriteId::of_data),
-        volley_fire: Firepower::new(c.total_projectiles),
+        volley_fire: Firepower::new(creatable.total_projectiles),
         // the DE master's mSpacingModifier (+0x8b8), the data file's "flank attack modifier"
-        spacing_modifier: work::SpacingModifier::new(c.flank_attack_modifier),
-        max_volley: MissileCount::of_data(c.max_total_projectiles),
+        spacing_modifier: work::SpacingModifier::new(creatable.flank_attack_modifier),
+        max_volley: MissileCount::of_data(creatable.max_total_projectiles),
         volley_spread: {
-            let [x, y, start] = c.projectile_spawning_area;
+            let [x, y, start] = creatable.projectile_spawning_area;
             VolleySpread {
                 x: Distance::new(x),
                 y: Distance::new(y),
                 start: Distance::new(start),
             }
         },
-        volley_missile: i16::try_from(c.secondary_projectile_unit)
+        volley_missile: i16::try_from(creatable.secondary_projectile_unit)
             .ok()
             .and_then(MasterId::of_data),
-        charge_projectile: c
+        charge_projectile: creatable
             .charge_projectile_unit
             .and_then(|id| i16::try_from(id).ok())
             .and_then(MasterId::of_data),
@@ -325,23 +333,23 @@ fn dat_creatable(c: &Creatable) -> GenieResult<work::CreatablePart> {
 /// # Errors
 ///
 /// A task that holds no type or attribute.
-fn dat_action(b: &Bird, sounds: &[Sound]) -> GenieResult<work::ActionPart> {
+fn dat_action(bird: &Bird, sounds: &[Sound]) -> GenieResult<work::ActionPart> {
     Ok(work::ActionPart {
-        task_by_group: TaskGroup::of_data(b.task_swap_group),
-        tasks: b
+        task_by_group: TaskGroup::of_data(bird.task_swap_group),
+        tasks: bird
             .tasks
             .iter()
-            .map(|t| dat_task(t, sounds))
+            .map(|task| dat_task(task, sounds))
             .collect::<Result<_, _>>()?,
-        default_task: TaskIndex::of_data(b.default_task_id),
-        work_rate: WorkRate::new(b.work_rate),
-        search_radius: Distance::new(b.search_radius),
-        drop_sites: b
+        default_task: TaskIndex::of_data(bird.default_task_id),
+        work_rate: WorkRate::new(bird.work_rate),
+        search_radius: Distance::new(bird.search_radius),
+        drop_sites: bird
             .drop_sites
             .iter()
             .filter_map(|&d| MasterId::of_data(d))
             .collect(),
-        run_pattern: RunPattern::of_data(b.run_pattern),
+        run_pattern: RunPattern::of_data(bird.run_pattern),
     })
 }
 
@@ -350,13 +358,13 @@ fn dat_action(b: &Bird, sounds: &[Sound]) -> GenieResult<work::ActionPart> {
 /// # Errors
 ///
 /// A slot whose attribute is below −1.
-fn dat_cost(c: &Creatable) -> GenieResult<[CostSlot; COST_SLOTS]> {
+fn dat_cost(creatable: &Creatable) -> GenieResult<[CostSlot; COST_SLOTS]> {
     let mut cost = [CostSlot::default(); COST_SLOTS];
-    for (slot, r) in cost.iter_mut().zip(&c.resource_costs) {
+    for (slot, resource_cost) in cost.iter_mut().zip(&creatable.resource_costs) {
         *slot = CostSlot {
-            attribute: AttributeId::of_field(r.kind)?,
-            amount: CostAmount::of_data(r.amount),
-            paid: r.flag != 0,
+            attribute: AttributeId::of_field(resource_cost.kind)?,
+            amount: CostAmount::of_data(resource_cost.amount),
+            paid: resource_cost.flag != 0,
         };
     }
     Ok(cost)

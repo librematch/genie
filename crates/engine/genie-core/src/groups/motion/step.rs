@@ -122,15 +122,15 @@ pub(super) fn pass(
     let target_id = level.target;
     // the game tests the sign: a recyclable object's id is no target here
     let target: Option<Placed> = match target_id.filter(|t| !t.is_recyclable()) {
-        Some(t) => spatial.get_known(t)?.copied(),
+        Some(object_id) => spatial.get_known(object_id)?.copied(),
         None => None,
     };
     let at = motion.position[0];
     // `fVar39`: the target's footprint gap to the group's place, squared (FUN_140a847c0)
-    let target_gap2 = target.as_ref().map_or(DistanceSquared::MAX, |t| {
+    let target_gap2 = target.as_ref().map_or(DistanceSquared::MAX, |placed| {
         footprint_gap_squared(
-            t.position,
-            t.radius,
+            placed.position,
+            placed.radius,
             Position::new(at.x(), at.y(), 0.0),
             Footprint::new(0.0, 0.0),
         )
@@ -158,8 +158,8 @@ pub(super) fn pass(
             parent.state = PathState::WantsPath;
             if linked == LinkedPathKind::MovesOn && parent.has_path {
                 if parent.path_flags.contains(PathFlags::LOOPS) {
-                    let w = parent.waypoint;
-                    parent.waypoint = parent.looping_next(w);
+                    let waypoint_index = parent.waypoint;
+                    parent.waypoint = parent.looping_next(waypoint_index);
                 }
                 if patrols {
                     parent.waypoint = parent.waypoint.next();
@@ -196,9 +196,9 @@ pub(super) fn reached(
     let level = motion.paths.checked(0)?;
     if level.flags.contains(LevelFlags::AT_WAYPOINT) {
         if level.waypoint.within(level.points.len()) {
-            let p = *level.points.checked(level.waypoint.get() as usize)?;
-            motion.new_position[0] = p;
-            motion.position[0] = p;
+            let checked = *level.points.checked(level.waypoint.get() as usize)?;
+            motion.new_position[0] = checked;
+            motion.position[0] = checked;
         }
         set_flag(
             &mut motion.paths,
@@ -216,13 +216,13 @@ pub(super) fn reached(
         level.state = PathState::WantsPath;
         return Ok(());
     }
-    let d = length(at - point(level, left));
+    let length = length(at - point(level, left));
     let mut beyond = match target {
-        None => (d - level.range.get()) - group_tuning.near,
-        Some(t) => {
+        None => (length - level.range.get()) - group_tuning.near,
+        Some(placed) => {
             (footprint_gap(
-                t.position,
-                t.radius,
+                placed.position,
+                placed.radius,
                 Position::new(at.x(), at.y(), 0.0),
                 Footprint::new(0.0, 0.0),
             )
@@ -244,7 +244,7 @@ pub(super) fn reached(
         && (target.is_some()
             || group_tuning.close <= beyond
             || level.level == WaypointLevel::Walked)
-        && EPSILON <= d
+        && EPSILON <= length
     {
         level.waypoint = level.waypoint.previous();
         level.state = PathState::WantsPath;

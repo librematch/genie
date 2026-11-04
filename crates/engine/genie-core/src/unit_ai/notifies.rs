@@ -88,8 +88,8 @@ impl UnitAi {
             self.processing = true;
             let mut i = 0;
             while i < self.notifies.len() {
-                let n = *self.notifies.checked(i)?;
-                result = self.handle(n, dt, at, player_kind, ai_rng, side)?;
+                let notify = *self.notifies.checked(i)?;
+                result = self.handle(notify, dt, at, player_kind, ai_rng, side)?;
                 if result == DEAD {
                     // "I'm dead, purging notifyQueue and returning FALSE.": the full update ends
                     self.processing = false;
@@ -133,10 +133,10 @@ impl UnitAi {
     /// A notify of the current action's completion is queued while the AI has no order
     /// ([`UnitAi::end_notifies`] then stops the action).
     fn completes(&self) -> bool {
-        self.notifies.iter().any(|n| {
-            n.kind == NotifyKind::ACTION_COMPLETED
+        self.notifies.iter().any(|notify| {
+            notify.kind == NotifyKind::ACTION_COMPLETED
                 && self.current_order.is_none()
-                && AiAction::field(self.current_action) == n.p[0]
+                && AiAction::field(self.current_action) == notify.p[0]
         })
     }
 
@@ -189,8 +189,8 @@ impl UnitAi {
     /// 0x38 ([`UnitAi::accept`]). A notify the AI does not take (any but 699) goes to the
     /// owner's slot 0x2e8 (`FUN_14162dab0`, the human player's alerts), which the slice does not
     /// hold.
-    pub fn post(&mut self, n: Notify, unit_state: ObjectState) -> GenieResult<()> {
-        let _ = self.accept(n, unit_state);
+    pub fn post(&mut self, notify: Notify, unit_state: ObjectState) -> GenieResult<()> {
+        let _ = self.accept(notify, unit_state);
         Ok(())
     }
 
@@ -200,19 +200,19 @@ impl UnitAi {
     /// (`0x1fa` with `0x262`) while the AI has an action other than a move (`0x262`, `0x268`,
     /// `0x2bf`, `0x2c0`) is ignored, answering 1 without joining the queue; any other joins the
     /// queue (`FUN_140c42470`, whose 0 on a failed allocation cannot happen) and answers 1.
-    pub fn accept(&mut self, n: Notify, unit_state: ObjectState) -> Answer {
+    pub fn accept(&mut self, notify: Notify, unit_state: ObjectState) -> Answer {
         if unit_state != ObjectState::Alive {
             return Answer::NotTaken;
         }
         let action = self.current_action;
-        let taken = match n.kind {
+        let taken = match notify.kind {
             // "That unit is not attacking me, so I'm ignoring it."
-            NotifyKind::NO_LONGER_ON_ME => self.attackers.contains(n.caller),
-            NotifyKind::ACTION_INVALIDATED => n.p[0] == AiAction::field(action),
+            NotifyKind::NO_LONGER_ON_ME => self.attackers.contains(notify.caller),
+            NotifyKind::ACTION_INVALIDATED => notify.p[0] == AiAction::field(action),
             NotifyKind::ACTION_COMPLETED => {
                 // ignored (and handled) for a non-movement action
                 // the game's list also holds 0x268, which no unit AI holds ([`AiAction`])
-                if n.p[0] == AiAction::Move.value()
+                if notify.p[0] == AiAction::Move.value()
                     && !matches!(
                         action,
                         Some(AiAction::Move | AiAction::MoveAside | AiAction::GroupAside)
@@ -225,7 +225,7 @@ impl UnitAi {
             _ => true,
         };
         if taken {
-            self.append(n);
+            self.append(notify);
             Answer::Taken
         } else {
             Answer::NotTaken
@@ -234,21 +234,21 @@ impl UnitAi {
 
     /// `FUN_140c42470`: a notify joins the queue; a full queue doubles its capacity, but while
     /// it is processed the notify goes to the buffer instead.
-    pub(super) fn append(&mut self, n: Notify) {
+    pub(super) fn append(&mut self, notify: Notify) {
         if self.notify_capacity <= self.notifies.len() {
             if self.processing {
-                self.buffered.push(n);
+                self.buffered.push(notify);
                 return;
             }
             self.notify_capacity *= 2;
         }
-        self.notifies.push(n);
+        self.notifies.push(notify);
     }
 
     /// `FUN_140c55270`: the buffered notifies join the queue, in order.
     pub(super) fn flush_buffered(&mut self) {
-        for n in take(&mut self.buffered) {
-            self.append(n);
+        for notify in take(&mut self.buffered) {
+            self.append(notify);
         }
     }
 }

@@ -88,7 +88,8 @@ impl Master {
     /// master's slot 0xe8, [`MoveStats::base`]) is above 0 (`FUN_14123bb20`'s test).
     #[must_use]
     pub fn moves(&self) -> bool {
-        self.move_stats.is_some_and(|m| Speed::ZERO < m.base)
+        self.move_stats
+            .is_some_and(|move_stats| Speed::ZERO < move_stats.base)
     }
 
     /// The facets the facing routines read of a unit of this master ([`MoveStats::facets`]):
@@ -107,19 +108,20 @@ impl Master {
         if MasterKind::RGE_COMBAT <= self.kind {
             sprites.push(self.combat_part().attack_sprite);
         }
-        for t in &self.action_part().tasks {
-            sprites.extend(t.sprites.ids());
+        for task in &self.action_part().tasks {
+            sprites.extend(task.sprites.ids());
         }
         let mut seen = sprites
             .into_iter()
             .flatten()
             .filter_map(|id| graphics.get(id))
-            .map(|g| SpriteFacets {
-                count: g.facets,
-                turns: g.flags.contains(SpriteFlags::TURNS),
+            .map(|graphic| SpriteFacets {
+                count: graphic.facets,
+                turns: graphic.flags.contains(SpriteFlags::TURNS),
             });
         let first = seen.next()?;
-        seen.all(|f| f == first).then_some(first)
+        seen.all(|first_sprite_facets| first_sprite_facets == first)
+            .then_some(first)
     }
 }
 
@@ -369,13 +371,13 @@ impl Masters {
     /// The masters, by their ids.
     pub fn new(masters: impl IntoIterator<Item = Master>) -> Self {
         let mut by_id: Vec<Option<Master>> = Vec::new();
-        for m in masters {
-            let i = m.id.index();
-            if let Some(slot) = by_id.get_mut(i) {
-                *slot = Some(m);
+        for master in masters {
+            let index = master.id.index();
+            if let Some(slot) = by_id.get_mut(index) {
+                *slot = Some(master);
             } else {
-                by_id.resize(i, None);
-                by_id.push(Some(m));
+                by_id.resize(index, None);
+                by_id.push(Some(master));
             }
         }
         Self { by_id }
@@ -459,20 +461,20 @@ mod tests {
     /// changes it with no flag to update; a NaN height is not tall (the import's `0 < z`).
     #[test]
     fn masters_are_tall_while_their_height_is_above_zero() {
-        let mut m = Master::default();
-        assert!(!m.is_tall());
-        m.height = Distance::new(0.5);
-        assert!(m.is_tall());
-        m.height = Distance::new(f32::NAN);
-        assert!(!m.is_tall());
+        let mut master = Master::default();
+        assert!(!master.is_tall());
+        master.height = Distance::new(0.5);
+        assert!(master.is_tall());
+        master.height = Distance::new(f32::NAN);
+        assert!(!master.is_tall());
     }
 
     /// A master has damage sprites while its damage graphics hold one.
     #[test]
     fn masters_have_damage_sprites_while_they_hold_one() {
-        let mut m = Master::default();
-        assert!(!m.has_damage_sprites());
-        m.damage_graphics.push(DamageGraphic::default());
-        assert!(m.has_damage_sprites());
+        let mut master = Master::default();
+        assert!(!master.has_damage_sprites());
+        master.damage_graphics.push(DamageGraphic::default());
+        assert!(master.has_damage_sprites());
     }
 }

@@ -51,12 +51,12 @@ impl World {
         group: GroupId,
         relayout: &mut bool,
     ) -> GenieResult<Progress> {
-        let g = self.groups.held(group)?;
-        let Some(owner) = g
+        let held = self.groups.held(group)?;
+        let Some(owner) = held
             .members
             .first()
-            .and_then(|m| self.world_object(m.id))
-            .map(|o| o.player())
+            .and_then(|member| self.world_object(member.id))
+            .map(|world_object| world_object.player())
         else {
             return Ok(Progress::Going);
         };
@@ -95,7 +95,8 @@ impl World {
         }
         // any other kind names a group, whose first member is the target
         let first = self.groups.get(target.group()?)?.members.first()?.id;
-        self.world_object(first).map(|o| o.id())
+        self.world_object(first)
+            .map(|world_object| world_object.id())
     }
 
     /// The target is not pending (`FUN_14103f4e0`'s first branch): a group with queued
@@ -116,19 +117,19 @@ impl World {
         target: Option<ObjectId>,
         relayout: &mut bool,
     ) -> GenieResult<Progress> {
-        let g = self.groups.held_mut(group)?;
-        if !g.command_queue.is_empty() {
+        let unit_group = self.groups.held_mut(group)?;
+        if !unit_group.command_queue.is_empty() {
             return Ok(Progress::Finished);
         }
-        let to = g.current_target.original_position.ground();
-        let mut range = g.current_target.range;
-        g.motion.stop_walk()?;
-        g.current_command = NO_COMMAND;
-        g.forget_target_data();
-        g.current_target.range = Distance::ZERO;
+        let to = unit_group.current_target.original_position.ground();
+        let mut range = unit_group.current_target.range;
+        unit_group.motion.stop_walk()?;
+        unit_group.current_command = NO_COMMAND;
+        unit_group.forget_target_data();
+        unit_group.current_target.range = Distance::ZERO;
         if let Some(target) = target {
             let (nearest, gap) = self.nearest_member(group, target)?;
-            if let Some(member) = nearest.and_then(|m| self.world_object(m)) {
+            if let Some(member) = nearest.and_then(|object_id| self.world_object(object_id)) {
                 let sight = self
                     .master(member.player(), member.master_id(self.model.slots))?
                     .line_of_sight;
@@ -160,20 +161,20 @@ impl World {
         group: GroupId,
         target: ObjectId,
     ) -> GenieResult<(Option<ObjectId>, f32)> {
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
         let mut best = (None, FARTHEST);
-        for m in &self.groups.held(group)?.members {
-            if m.id == target {
+        for member in &self.groups.held(group)?.members {
+            if member.id == target {
                 continue;
             }
-            let Some(object) = self.world_object(m.id) else {
+            let Some(object) = self.world_object(member.id) else {
                 continue;
             };
-            let gap = self.footprint_gap(object, t)?;
+            let gap = self.footprint_gap(object, world_object)?;
             if gap < Distance::new(best.1) {
-                best = (Some(m.id), gap.get());
+                best = (Some(member.id), gap.get());
             }
         }
         Ok(best)
@@ -204,7 +205,12 @@ impl World {
                 .iter()
                 .find(|s| s.formation_category == category)
                 .filter(|s| !s.units.is_empty())
-                .map(|s: &UnitKindStatistic| (s.units.clone(), s.attack_range))
+                .map(|unit_kind_statistic: &UnitKindStatistic| {
+                    (
+                        unit_kind_statistic.units.clone(),
+                        unit_kind_statistic.attack_range,
+                    )
+                })
             else {
                 continue;
             };
@@ -216,9 +222,9 @@ impl World {
                 in_reach
             };
             if releases {
-                let g = self.groups.held_mut(group)?;
-                g.motion.stop_walk()?;
-                g.flags &= !GroupFlags::ATTACKING;
+                let unit_group = self.groups.held_mut(group)?;
+                unit_group.motion.stop_walk()?;
+                unit_group.flags &= !GroupFlags::ATTACKING;
                 self.release_units(group, &units, target)?;
             }
         }
@@ -237,11 +243,14 @@ impl World {
         listed: Distance,
         target: ObjectId,
     ) -> GenieResult<bool> {
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let master = self.master(t.player(), t.master_id(self.model.slots))?;
-        let moves = match t {
+        let master = self.master(
+            world_object.player(),
+            world_object.master_id(self.model.slots),
+        )?;
+        let moves = match world_object {
             WorldObject::Unit(_, u, _) => self.parts.mover_of(u.id).is_some_and(Mover::is_moving),
             WorldObject::Ghost(..) => false,
         };
@@ -268,7 +277,7 @@ impl World {
             let Some(unit) = self.world_object(id) else {
                 continue;
             };
-            if self.footprint_gap(unit, t)? - Distance::new(slack) <= range {
+            if self.footprint_gap(unit, world_object)? - Distance::new(slack) <= range {
                 return Ok(true);
             }
         }
@@ -295,15 +304,15 @@ impl World {
         target: ObjectId,
         owner: PlayerId,
     ) -> GenieResult<Option<Progress>> {
-        let g = self.groups.held(group)?;
-        if !matches!(g.current_target.target, GroupTarget::Object(_)) {
+        let held = self.groups.held(group)?;
+        if !matches!(held.current_target.target, GroupTarget::Object(_)) {
             return Ok(None);
         }
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
-        let at = t.moved_vector();
-        let from = g.current_target.original_position;
+        let at = world_object.moved_vector();
+        let from = held.current_target.original_position;
         let d = at - from;
         if at_most_or_unordered(
             sqrt(d.y() * d.y() + d.x() * d.x()),
@@ -311,7 +320,7 @@ impl World {
         ) {
             return Ok(None);
         }
-        if !self.sees_object(t, owner)? {
+        if !self.sees_object(world_object, owner)? {
             let _ = self.command_move_to(
                 group,
                 None,
@@ -324,8 +333,8 @@ impl World {
             return Ok(Some(Progress::Going));
         }
         let order = AttackOrder {
-            disable_retargeting: g.current_target.disable_retargeting != 0,
-            filter: g.current_target.certain_action,
+            disable_retargeting: held.current_target.disable_retargeting != 0,
+            filter: held.current_target.certain_action,
         };
         if self.command_attack(group, target, order)? == GroupMove::Begun {
             return Ok(Some(Progress::Going));
@@ -344,10 +353,10 @@ impl World {
                 flags: MoveFlags::DIRECT,
             },
         )?;
-        let g = self.groups.held_mut(group)?;
-        g.current_command = ATTACK;
-        g.flags &= !GroupFlags::ARRIVED;
-        g.flags |= GroupFlags::ATTACKING;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.current_command = ATTACK;
+        unit_group.flags &= !GroupFlags::ARRIVED;
+        unit_group.flags |= GroupFlags::ATTACKING;
         Ok(Some(Progress::Going))
     }
 
@@ -369,24 +378,29 @@ impl World {
         finished: Progress,
         relayout: &mut bool,
     ) -> GenieResult<Progress> {
-        let t = self
+        let world_object = self
             .world_object(target)
             .ok_or_else(|| member_gone(target))?;
         let radius = self
-            .master(t.player(), t.master_id(self.model.slots))?
+            .master(
+                world_object.player(),
+                world_object.master_id(self.model.slots),
+            )?
             .radius;
-        let at = t.position().ground();
-        let g = self.groups.held_mut(group)?;
-        if g.motion.moving() {
+        let at = world_object.position().ground();
+        let unit_group = self.groups.held_mut(group)?;
+        if unit_group.motion.moving() {
             *relayout = true;
-        } else if !g.motion.waits_to_move() {
-            g.flags |= GroupFlags::ARRIVED;
+        } else if !unit_group.motion.waits_to_move() {
+            unit_group.flags |= GroupFlags::ARRIVED;
         }
-        if point_gap(at, radius, g.motion.position[0].ground()) <= g.current_target.range.get() {
-            g.motion.stop_walk()?;
-            g.flags |= GroupFlags::ARRIVED;
+        if point_gap(at, radius, unit_group.motion.position[0].ground())
+            <= unit_group.current_target.range.get()
+        {
+            unit_group.motion.stop_walk()?;
+            unit_group.flags |= GroupFlags::ARRIVED;
         }
-        let flags = g.flags;
+        let flags = unit_group.flags;
         if !flags.contains(GroupFlags::ARRIVED) || !flags.contains(GroupFlags::ATTACKING) {
             return Ok(if self.any_member_held(group) {
                 finished
@@ -394,8 +408,8 @@ impl World {
                 Progress::Finished
             });
         }
-        g.flags &= !GroupFlags::ATTACKING;
-        let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
+        unit_group.flags &= !GroupFlags::ATTACKING;
+        let members: Vec<ObjectId> = unit_group.members.iter().map(|member| member.id).collect();
         self.release_units(group, &members, target)?;
         Ok(Progress::Finished)
     }

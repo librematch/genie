@@ -33,6 +33,6 @@ pub use self::queue_count::QueueCount;
 
 /// Both loads are food (0, or the foods a unit carries, 15 to 17; [`AttributeId::is_food_load`]):
 /// a gatherer or a hunter keeps a load of one for another. None is no food.
-pub(crate) fn both_food(a: Option<AttributeId>, b: Option<AttributeId>) -> bool {
-    a.is_some_and(AttributeId::is_food_load) && b.is_some_and(AttributeId::is_food_load)
+pub(crate) fn both_food(load: Option<AttributeId>, other_load: Option<AttributeId>) -> bool {
+    load.is_some_and(AttributeId::is_food_load) && other_load.is_some_and(AttributeId::is_food_load)
 }

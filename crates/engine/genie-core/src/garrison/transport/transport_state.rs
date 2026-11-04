@@ -93,7 +93,12 @@ impl TransportState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::SailToUnload { move_to: Some(m) } | Self::Sail { move_to: Some(m) } => Some(m),
+            Self::SailToUnload {
+                move_to: Some(move_to_action),
+            }
+            | Self::Sail {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -101,7 +106,7 @@ impl TransportState {
     /// Its sail's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -109,9 +114,9 @@ impl TransportState {
     /// The same state, its sail without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut transport_state = self;
+        let _ = transport_state.take_move_to();
+        transport_state
     }
 }
 
@@ -125,20 +130,23 @@ mod tests {
     /// `MoveTo` of a state that does not sail; the sails give theirs.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match TransportState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 3 | 5 | 7..=10 | 12 | 14..), "{b}"),
+        for index in 0..=255_u8 {
+            match TransportState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(matches!(index, 3 | 5 | 7..=10 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(TransportState::Failed.to_string(), "13");
         let sail = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 11] {
-            let mut s = TransportState::of_byte(b, Some(sail)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&sail)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(sail));
-            assert_eq!(s.move_to(), None);
+            let mut transport_state = TransportState::of_byte(b, Some(sail)).unwrap();
+            assert_eq!(
+                (transport_state.get(), transport_state.move_to()),
+                (b, Some(&sail))
+            );
+            assert_eq!(transport_state.bare().move_to(), None);
+            assert_eq!(transport_state.take_move_to(), Some(sail));
+            assert_eq!(transport_state.move_to(), None);
         }
         assert!(TransportState::of_byte(6, Some(sail)).is_err());
         assert_eq!(TransportState::Unload.bare(), TransportState::Unload);

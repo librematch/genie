@@ -32,15 +32,15 @@ impl GatherAction {
     /// none).
     pub(super) fn set_face(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         target: &Victim,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         self.state = GatherState::Face;
         // another player's farm is the gatherer's to take (FUN_141185360, FUN_1411858f0)
-        if roles.of_class(target.class).contains(ClassRoles::FARM) && target.player != c.player {
+        if roles.of_class(target.class).contains(ClassRoles::FARM) && target.player != step.player {
             return Err(GenieError::unsupported(
                 "a gather's set_state 6 on another player's farm (FUN_141185360)",
             ));
@@ -65,21 +65,26 @@ impl GatherAction {
             ));
         }
         self.timer = Seconds::ZERO;
-        Self::show(c, unit, self.walk_sprite(unit, r).or(r.sprites.standing));
+        Self::show(
+            step,
+            unit,
+            self.walk_sprite(unit, gather_reads)
+                .or(gather_reads.sprites.standing),
+        );
         Ok(Next::Stay)
     }
 
     /// Slot 0x68 with `sprite` (`FUN_141161280`, [`new_sprite`]) on the unit at once: its new
     /// sprite draws from the Sprite stream; none shows nothing new.
-    pub(super) fn show(c: &mut Step<'_>, unit: &mut Unit, sprite: Option<Graphic>) {
-        if let Some(s) = sprite {
-            let rng = c.w.streams.get(Stream::Sprite);
+    pub(super) fn show(step: &mut Step<'_>, unit: &mut Unit, sprite: Option<Graphic>) {
+        if let Some(graphic) = sprite {
+            let rng = step.w.streams.get(Stream::Sprite);
             new_sprite(
                 &mut unit.sprite,
-                c.w.parts.move_stats_mut(unit.id),
-                s,
+                step.w.parts.move_stats_mut(unit.id),
+                graphic,
                 rng,
-                c.w.model.tuning.sprite,
+                step.w.model.tuning.sprite,
             );
         }
     }
@@ -89,11 +94,16 @@ impl GatherAction {
     /// is dropped unless both are food (`FUN_14119d310` with 0; then the unit keeps the kind it
     /// carries). The unit takes the working sprite (slot 0x68; the standing one for none); the
     /// gathering sound (slot 0x4c0) is not held.
-    pub(super) fn set_work(&mut self, c: &mut Step<'_>, unit: &mut Unit, r: &GatherReads) {
+    pub(super) fn set_work(
+        &mut self,
+        step: &mut Step<'_>,
+        unit: &mut Unit,
+        gather_reads: &GatherReads,
+    ) {
         self.state = GatherState::Work;
         self.worked = true;
         self.timer = Seconds::ZERO;
-        if r.farm_mode == FarmMode::Fixed {
+        if gather_reads.farm_mode == FarmMode::Fixed {
             let at = unit.place.position();
             self.gather_at = at.ground();
         }
@@ -103,7 +113,14 @@ impl GatherAction {
             unit.life.attribute_kind = kind;
             unit.life.amount = Amount::ZERO;
         }
-        Self::show(c, unit, r.sprites.working.or(r.sprites.standing));
+        Self::show(
+            step,
+            unit,
+            gather_reads
+                .sprites
+                .working
+                .or(gather_reads.sprites.standing),
+        );
     }
 
     /// State 7 (case 6) with one stop: the work, `(work rate) × work_val1 × dt`, at most what the
@@ -121,21 +138,21 @@ impl GatherAction {
     /// The sale's.
     pub(super) fn gather(
         &self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         target: &mut Victim,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         let held = &mut unit.life.amount;
-        let work = Amount::new((r.work_rate * self.task.work_value) * c.dt.seconds());
+        let work = Amount::new((gather_reads.work_rate * self.task.work_value) * step.dt.seconds());
         let take = if work <= target.amount {
             work
         } else {
             target.amount
         };
-        let capacity = r.capacity;
-        let mut gain = r.productivity.get() * take;
+        let capacity = gather_reads.capacity;
+        let mut gain = gather_reads.productivity.get() * take;
         if capacity < gain + *held {
             return Ok(Next::Drop);
         }
@@ -153,13 +170,13 @@ impl GatherAction {
         }
         // a farm's food sold at once (attribute 96): the load goes to the player as food (slot
         // 0xf8 with 1), the unit holds none, and the gathering goes on
-        if Amount::ZERO < r.food_sold
+        if Amount::ZERO < gather_reads.food_sold
             && roles.of_class(target.class).contains(ClassRoles::FARM)
             // The food kind a farm holds (`+0x308` 16): the food sold at once.
             && roles.of_some_attribute(unit.life.attribute_kind).contains(AttributeRoles::FARM_FOOD)
         {
             let sold = mem_take(&mut unit.life.amount);
-            c.give_load(c.w.model.slots.attribute.food, sold)?;
+            step.give_load(step.w.model.slots.attribute.food, sold)?;
             return Ok(Next::Stay);
         }
         let empty = target.amount <= Amount::ZERO
@@ -189,15 +206,15 @@ impl GatherAction {
     /// What the drop-off does not model.
     pub(crate) fn update_drop(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         site: Option<DropOff>,
         roles: &Roles,
     ) -> GenieResult<Dropped> {
         if self.timer < Seconds::ZERO {
-            self.timer += c.dt.seconds();
+            self.timer += step.dt.seconds();
             if self.timer < Seconds::ZERO {
                 return Ok(Dropped::Going);
             }
@@ -206,28 +223,28 @@ impl GatherAction {
         }
         // the list's code: under way walks or waits, done ends it; failed or its target gone
         // waits at random
-        match self.update_list(c, unit, me, r, roles)? {
+        match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => return Ok(Dropped::Going),
             SubCode::Failed | SubCode::TargetGone => {
-                self.random_wait(c, unit);
+                self.random_wait(step, unit);
                 return Ok(Dropped::Going);
             }
-            SubCode::Done => self.tear_down(c.w.parts.mover_mut(unit.id))?,
+            SubCode::Done => self.tear_down(step.w.parts.mover_mut(unit.id))?,
         }
         // the drop site gone: set_state(8) again
         let Some(site) = site else {
             return Ok(Dropped::Again);
         };
         if !site.takes {
-            self.set_idle(c, unit, r);
+            self.set_idle(step, unit, gather_reads);
             return Ok(Dropped::Idle);
         }
-        if c.w.model.tuning.gather.drop_reach < site.gap_squared.get() {
-            self.random_wait(c, unit);
+        if step.w.model.tuning.gather.drop_reach < site.gap_squared.get() {
+            self.random_wait(step, unit);
             return Ok(Dropped::Going);
         }
-        let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_kind, attributes, c.w.model.slots);
+        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let kind = resource_kind(unit.life.attribute_kind, attributes, step.w.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
@@ -236,10 +253,10 @@ impl GatherAction {
 
     /// `LAB_140a8ef80`: the timer takes a draw of the Action stream (`GetRandFloat0to1`) less a
     /// half, and the unit's animation stops at once (`FUN_141161850`: its `+0x7b8` 0).
-    pub(super) fn random_wait(&mut self, c: &mut Step<'_>, unit: &Unit) {
+    pub(super) fn random_wait(&mut self, step: &mut Step<'_>, unit: &Unit) {
         self.timer = Seconds::new(
-            c.w.streams.get(Stream::Action).float01() - c.w.model.tuning.gather.wait_shift,
+            step.w.streams.get(Stream::Action).float01() - step.w.model.tuning.gather.wait_shift,
         );
-        c.w.parts.set_anim_speed(unit.id, Speed::ZERO);
+        step.w.parts.set_anim_speed(unit.id, Speed::ZERO);
     }
 }

@@ -59,13 +59,13 @@ impl UnitAi {
     /// target and stops; the rest go on.
     pub(super) fn action_failed(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
+        let (order, action, p0) = (self.current_order, self.current_action, notify.p[0]);
         if order.is_some() {
             self.state_position = at.position.ground();
             if order == Some(OrderKind::Scout) {
@@ -89,7 +89,10 @@ impl UnitAi {
             self.stop_current(StopOrder::Keep, at, side, ai)?;
             return Ok(GO_ON);
         }
-        let own = order.map_or_else(|| AiAction::field(action) == p0, |o| o.owns(action));
+        let own = order.map_or_else(
+            || AiAction::field(action) == p0,
+            |order_kind| order_kind.owns(action),
+        );
         if own {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, ai)?;
@@ -128,15 +131,15 @@ impl UnitAi {
     /// other invalidated attack forgets the target and stops; the rest go on.
     pub(super) fn action_invalidated(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let (order, action, p0) = (self.current_order, self.current_action, n.p[0]);
+        let (order, action, p0) = (self.current_order, self.current_action, notify.p[0]);
         let attack = AiAction::Attack.value();
-        if (order == Some(OrderKind::Attack) || n.p[2] == 0x202) && p0 == attack {
+        if (order == Some(OrderKind::Attack) || notify.p[2] == 0x202) && p0 == attack {
             if self.retarget_disabled != 0 {
                 return Err(GenieError::unsupported(
                     "an invalidated attack with retargeting off (+0x1d6)",
@@ -165,7 +168,7 @@ impl UnitAi {
                     "an invalidated action 0x262 on order 0x2d4 or 0x2bd",
                 ));
             }
-            order.is_some_and(|o| o.owns(action))
+            order.is_some_and(|order_kind| order_kind.owns(action))
         };
         if own || p0 == attack {
             self.remove_target();
@@ -184,16 +187,20 @@ impl UnitAi {
     /// and so do an attack's; order 724 and 701 end their move, 712 a heal's.
     pub(super) fn action_completed(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let p1 = n.p[0];
+        let p1 = notify.p[0];
         let order = self.current_order;
         let action = self.current_action;
-        if order.is_some() || at.group.is_some_and(|g| g.contains(GroupState::COMMANDED)) {
+        if order.is_some()
+            || at
+                .group
+                .is_some_and(|group_state| group_state.contains(GroupState::COMMANDED))
+        {
             self.state_position = at.position.ground();
         }
         let attack = AiAction::Attack.value();
@@ -212,7 +219,8 @@ impl UnitAi {
             self.stop_current(StopOrder::End, at, side, ai_rng)?;
             return Ok(GO_ON);
         }
-        if AiAction::field(action) == p1 && order.is_some_and(|o| o.owns(action)) {
+        if AiAction::field(action) == p1 && order.is_some_and(|order_kind| order_kind.owns(action))
+        {
             self.remove_target();
             self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
             return Ok(GO_ON);
@@ -292,7 +300,7 @@ impl UnitAi {
         }
         self.last_action = action;
         if order == StopOrder::End
-            || current.is_some_and(|o| o.owns(action))
+            || current.is_some_and(|order_kind| order_kind.owns(action))
             || matches!(current, Some(OrderKind::Patrol | OrderKind::AttackMove))
         {
             self.cap_patrol_secondary();
@@ -365,7 +373,7 @@ impl UnitAi {
     pub(super) fn reset_ended_action(&mut self, at: &Surroundings) {
         if self
             .current_action
-            .is_some_and(|a| ENDED_ACTIONS.contains(&a))
+            .is_some_and(|ai_action| ENDED_ACTIONS.contains(&ai_action))
         {
             if self.current_action == Some(AiAction::MoveAside)
                 && self.stance == UnitStance::StandGround
@@ -515,7 +523,7 @@ impl UnitAi {
     /// `FUN_140c4dfa0`: an order in the queue is not ready (its `+0x2c` is 0).
     #[must_use]
     pub fn has_unready_order(&self) -> bool {
-        self.orders.iter().any(|o| !o.ready)
+        self.orders.iter().any(|queued_order| !queued_order.ready)
     }
 
     /// The order queue (`FUN_140c5d790`): while the AI has an action, an order below priority 100
@@ -542,7 +550,7 @@ impl UnitAi {
                 return Ok(());
             }
             let order = *self.orders.checked(k)?;
-            let r = self.process_order(
+            let order_outcome = self.process_order(
                 &order,
                 Some((at, player_kind)),
                 None,
@@ -554,7 +562,7 @@ impl UnitAi {
                     unit_ai_tuning,
                 },
             )?;
-            if r == OrderOutcome::NotReady {
+            if order_outcome == OrderOutcome::NotReady {
                 k += 1;
                 continue;
             }
@@ -563,7 +571,7 @@ impl UnitAi {
             if k < self.orders.len() {
                 let _ = self.orders.remove(k);
             }
-            if r == OrderOutcome::Taken {
+            if order_outcome == OrderOutcome::Taken {
                 return Ok(());
             }
         }

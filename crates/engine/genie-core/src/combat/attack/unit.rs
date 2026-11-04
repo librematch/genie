@@ -39,17 +39,17 @@ impl Unit {
         &mut self,
         mut attack: Attack,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         if attack.target.is_some() {
-            return self.attack_strike_part(attack, actions, c, me, own, roles);
+            return self.attack_strike_part(attack, actions, step, me, own, roles);
         }
         // the lost part reaches no action of the unit's: the copy stands for the head until
         // it goes back, before an error too (the stop's context reads the list)
-        let code = self.attack_lost_part(&mut attack, c, me, roles);
+        let code = self.attack_lost_part(&mut attack, step, me, roles);
         actions.list.set_attack(Some(attack));
         code
     }
@@ -60,16 +60,16 @@ impl Unit {
     fn attack_lost_part(
         &mut self,
         attack: &mut Attack,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        let master = self.master(c.w.master_tables(), c.player)?;
+        let master = self.master(step.w.master_tables(), step.player)?;
         let armed = armed(
             master,
-            c.w.parts.combat_of(self.id).firepower,
+            step.w.parts.combat_of(self.id).firepower,
             roles,
-            &c.w.model.tuning.turn,
+            &step.w.model.tuning.turn,
         );
         let master_class = master.class;
         let walking = matches!(
@@ -77,26 +77,26 @@ impl Unit {
             AttackState::GotoSeen { .. } | AttackState::GotoPoint { .. }
         );
         if walking && armed {
-            return self.attack_walks_unseen(attack, c, me, master_class, roles);
+            return self.attack_walks_unseen(attack, step, me, master_class, roles);
         }
         let (code, disarmed) = attack.update_targetless(
-            c.dt.seconds(),
+            step.dt.seconds(),
             if armed {
                 Armament::Armed
             } else {
                 Armament::Unarmed
             },
-            c.w.parts.motion_mut(self.id),
+            step.w.parts.motion_mut(self.id),
         )?;
         if disarmed {
             let posted = attack.disarmed(
                 &mut self.sprite,
-                c.w.parts.motion_mut(self.id),
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion_mut(self.id),
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
             if let Some((kind, p)) = posted {
-                self.post_own(&mut c.w.parts.unit_ai, kind, p)?;
+                self.post_own(&mut step.w.parts.unit_ai, kind, p)?;
             }
         }
         Ok(HeadCode::of(code))
@@ -107,30 +107,34 @@ impl Unit {
     fn attack_walks_unseen(
         &mut self,
         attack: &mut Attack,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         master_class: ClassId,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        let master = self.master(c.w.master_tables(), c.player)?;
-        let player_kind =
-            c.w.players
-                .get(c.player.index())
-                .map_or(PlayerKind::Phantom, |q| q.kind);
-        let r = AttackReads::of(
-            c.w.parts.combat_of(self.id),
+        let master = self.master(step.w.master_tables(), step.player)?;
+        let player_kind = step
+            .w
+            .players
+            .get(step.player.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
+        let attack_reads = AttackReads::of(
+            step.w.parts.combat_of(self.id),
             master,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
             ),
-            c.w.parts.unit_ai.get(self.id),
-            (player_kind, c.w.world_time),
+            step.w.parts.unit_ai.get(self.id),
+            (player_kind, step.w.world_time),
             roles,
-            &c.w.model.tuning.turn,
+            &step.w.model.tuning.turn,
         );
         attack
-            .update_gone(c, self, me, &r, master_class, roles)
+            .update_gone(step, self, me, &attack_reads, master_class, roles)
             .map(HeadCode::of)
     }
 
@@ -142,47 +146,51 @@ impl Unit {
         &mut self,
         mut attack: Attack,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         own: Option<Victim>,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            c.w.parts.own_master.get(self.id),
+            step.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )?;
-        let player_kind =
-            c.w.players
-                .get(c.player.index())
-                .map_or(PlayerKind::Phantom, |q| q.kind);
-        let r = AttackReads::of(
-            c.w.parts.combat_of(self.id),
+        let player_kind = step
+            .w
+            .players
+            .get(step.player.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
+        let attack_reads = AttackReads::of(
+            step.w.parts.combat_of(self.id),
             master,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
             ),
-            c.w.parts.unit_ai.get(self.id),
-            (player_kind, c.w.world_time),
+            step.w.parts.unit_ai.get(self.id),
+            (player_kind, step.w.world_time),
             roles,
-            &c.w.model.tuning.turn,
+            &step.w.model.tuning.turn,
         );
-        let victim = victim(c, attack.target, roles)?.ok_or(GenieError::unsupported(
+        let victim = victim(step, attack.target, roles)?.ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold live",
         ))?;
         let own = own.ok_or(ATTACKER_MASTER)?;
-        let mut f = Fight { victim, own };
+        let mut fight = Fight { victim, own };
         // written back before an error too: the stop's context reads the list
-        let code = attack.update(c, self, actions, me, &mut f, &r);
+        let code = attack.update(step, self, actions, me, &mut fight, &attack_reads);
         if let Some(a) = actions.list.attack_mut() {
             *a = attack;
         }
         let code = code?;
         // the retaliation's kill of the unit itself, which follows its step
-        if let Some(k) = self.hit_back(f.own, c.w.parts.ai_and_combat_mut(self.id)?)? {
-            let own = KillLeft::own(self.id, k);
-            file_kill(c, (self, actions), own, roles)?;
+        if let Some(kill) = self.hit_back(fight.own, step.w.parts.ai_and_combat_mut(self.id)?)? {
+            let own = KillLeft::own(self.id, kill);
+            file_kill(step, (self, actions), own, roles)?;
         }
         Ok(HeadCode::of(code))
     }
@@ -213,28 +221,28 @@ impl Unit {
     pub(crate) fn own_victim(
         &self,
         actions: &Action,
-        c: &Step<'_>,
+        step: &Step<'_>,
         roles: &Roles,
     ) -> GenieResult<Option<Victim>> {
         if actions.list.hunt().is_none() && actions.list.attack().is_none() {
             return Ok(None);
         }
-        let master = self.master(c.w.master_tables(), c.player)?;
-        let terrain = c.w.spatial.terrain.as_ref();
+        let master = self.master(step.w.master_tables(), step.player)?;
+        let terrain = step.w.spatial.terrain.as_ref();
         Ok(Some(victim_of(
             (
                 self,
-                c.w.parts.unit_ai.contains(self.id),
-                c.w.parts.building_of(self.id),
-                c.w.parts.combat_of(self.id),
+                step.w.parts.unit_ai.contains(self.id),
+                step.w.parts.building_of(self.id),
+                step.w.parts.combat_of(self.id),
                 actions,
-                c.w.parts.unread.get(self.id),
+                step.w.parts.unread.get(self.id),
             ),
             master,
-            &c.w.players.player(c.player)?.attributes,
-            c.player,
+            &step.w.players.player(step.player)?.attributes,
+            step.player,
             terrain,
-            c.w.mode_680,
+            step.w.mode_680,
             roles,
         )))
     }

@@ -13,15 +13,15 @@ use crate::world::World;
 use crate::world::index::ObjectsRef;
 use crate::world::slots::PlayerSlots;
 
-/// Runs `f` on the picker of object `me` of player `player` over `w` and on `w`'s spatial
+/// Runs `f` on the picker of object `me` of player `player` over `world` and on `world`'s spatial
 /// index: its unit AI's seeker, the attacker its unit, master, mover and seer make, its owner's
 /// type, attributes, diplomacy and AI settings, its master's terrain restriction.
 ///
 /// # Panics
 ///
-/// An object `w` does not hold in `player`'s list, or one without a unit AI or a master.
+/// An object `world` does not hold in `player`'s list, or one without a unit AI or a master.
 pub(crate) fn with_picker<R>(
-    w: &mut World,
+    world: &mut World,
     (player, me): (PlayerId, ObjectId),
     f: impl FnOnce(&mut WorldPicker<'_>, &mut Spatial) -> R,
 ) -> R {
@@ -35,7 +35,7 @@ pub(crate) fn with_picker<R>(
         world_time,
         mode_680,
         ..
-    } = w;
+    } = world;
     let owner = players.player(player).expect("the unit's player");
     let unit = owner
         .objects
@@ -49,8 +49,8 @@ pub(crate) fn with_picker<R>(
     let capture = spatial
         .sight
         .as_ref()
-        .and_then(|v| v.seer(me))
-        .map_or(CaptureKind::None, |s| s.capture);
+        .and_then(|visibility| visibility.seer(me))
+        .map_or(CaptureKind::None, |seer| seer.capture);
     let attacker = unit.attacker_of(
         actions,
         ai.ai_kind,
@@ -60,7 +60,9 @@ pub(crate) fn with_picker<R>(
         (
             capture,
             parts.combat_of(me).firepower,
-            parts.mover_of(me).map_or(Speed::ZERO, |m| m.stats.speed),
+            parts
+                .mover_of(me)
+                .map_or(Speed::ZERO, |mover| mover.stats.speed),
         ),
     );
     let others = owner_view(players, index, player, None).expect("the owner's view");

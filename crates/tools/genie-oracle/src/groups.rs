@@ -66,9 +66,9 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
             ));
         }
         let words = |g: &UnitGroups| {
-            let mut w = g.unit_kinds_scratch.clone();
-            w.resize(50, UnitKind::CLEARED);
-            w
+            let mut unit_kinds = g.unit_kinds_scratch.clone();
+            unit_kinds.resize(50, UnitKind::CLEARED);
+            unit_kinds
         };
         if words(slice) != words(game) {
             out.push(format!(
@@ -84,7 +84,7 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
             slice.counter, game.counter
         ));
     }
-    let ids = |g: &UnitGroups| g.groups.iter().map(|u| u.id.get()).collect::<Vec<_>>();
+    let ids = |groups: &UnitGroups| groups.groups.iter().map(|u| u.id.get()).collect::<Vec<_>>();
     if ids(slice) != ids(game) {
         out.push(format!(
             "unit groups slice {:?} game {:?}",
@@ -93,7 +93,7 @@ pub fn group_differences(slice: &UnitGroups, game: &UnitGroups, globals: bool) -
         ));
     }
     for g in &game.groups {
-        let Some(s) = slice.groups.iter().find(|s| s.id == g.id) else {
+        let Some(s) = slice.groups.iter().find(|group| group.id == g.id) else {
             continue;
         };
         let (mut a, mut b) = (Vec::new(), Vec::new());
@@ -165,8 +165,8 @@ flat_value!(
 
 impl<T: Flat, const N: usize> Flat for [T; N] {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
-        for (i, v) in self.iter().enumerate() {
-            v.flat(&format!("{path}[{i}]"), out);
+        for (index, v) in self.iter().enumerate() {
+            v.flat(&format!("{path}[{index}]"), out);
         }
     }
 }
@@ -299,8 +299,8 @@ impl Flat for MotionFlags {
 impl<T: Flat> Flat for Vec<T> {
     fn flat(&self, path: &str, out: &mut Vec<(String, String)>) {
         out.push((join(path, "len"), self.len().to_string()));
-        for (i, v) in self.iter().enumerate() {
-            v.flat(&format!("{path}[{i}]"), out);
+        for (index, v) in self.iter().enumerate() {
+            v.flat(&format!("{path}[{index}]"), out);
         }
     }
 }
@@ -397,8 +397,8 @@ mod tests {
 
     #[test]
     fn equal_groups_have_no_differences() {
-        let d = group_differences(&world(vec![group(3)]), &world(vec![group(3)]), false);
-        assert_eq!(d, Vec::<String>::new());
+        let texts = group_differences(&world(vec![group(3)]), &world(vec![group(3)]), false);
+        assert_eq!(texts, Vec::<String>::new());
     }
 
     #[test]
@@ -406,9 +406,9 @@ mod tests {
         let mut theirs = group(3);
         theirs.motion.velocity = theirs.motion.velocity.with_height(0.1);
         theirs.members[0].specific_move.timer = Seconds::new(-0.0);
-        let d = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
+        let texts = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
         assert_eq!(
-            d,
+            texts,
             [
                 "group 3: motion.velocity[1] slice 0.0 game 0.1",
                 "group 3: members[0].specific_move.timer slice 0.0 game -0.0",
@@ -420,9 +420,9 @@ mod tests {
     fn list_of_another_length_shows_its_length_and_the_entries_one_side_holds() {
         let mut theirs = group(3);
         theirs.waypoints.push(BVector::new(1.5, 2.5, 0.0));
-        let d = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
+        let texts = group_differences(&world(vec![group(3)]), &world(vec![theirs]), false);
         assert_eq!(
-            d,
+            texts,
             [
                 "group 3: waypoints.len slice 0 game 1",
                 "group 3: waypoints[0][0] slice none game 1.5",
@@ -454,9 +454,9 @@ mod tests {
     fn groups_only_one_side_holds_and_the_counter_show_in_the_world_lines() {
         let mut theirs = world(vec![group(3), group(4)]);
         theirs.counter = group_id(8);
-        let d = group_differences(&world(vec![group(3)]), &theirs, false);
+        let texts = group_differences(&world(vec![group(3)]), &theirs, false);
         assert_eq!(
-            d,
+            texts,
             [
                 "unit group counter slice 7 game 8",
                 "unit groups slice [3] game [3, 4]",

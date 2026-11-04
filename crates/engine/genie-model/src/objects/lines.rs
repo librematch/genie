@@ -112,8 +112,8 @@ impl UnitLines {
             firsts: vec![None; LINES],
             identifiers: Vec::new(),
         };
-        for l in lines {
-            let (Some(line), Some(chain)) = (l.line, l.chain.as_ref()) else {
+        for unit_line in lines {
+            let (Some(line), Some(chain)) = (unit_line.line, unit_line.chain.as_ref()) else {
                 // "Unit line is incorrectly defined and is missing a key variable"
                 continue;
             };
@@ -122,28 +122,34 @@ impl UnitLines {
                 continue;
             };
             let mut next = None;
-            for (i, &id) in chain.iter().enumerate().rev() {
-                let Some((master, e)) = i16::try_from(id)
+            for (index, &id) in chain.iter().enumerate().rev() {
+                let Some((master, line_entry)) = i16::try_from(id)
                     .ok()
                     .filter(|_| id < master_count)
                     .and_then(MasterId::of_data)
-                    .and_then(|m| Some((m, out.entries.get_mut(m.index())?)))
+                    .and_then(|master_id| {
+                        Some((master_id, out.entries.get_mut(master_id.index())?))
+                    })
                 else {
                     // "Unit type ID is out of bounds (%d)"
                     continue;
                 };
-                if i == 0 {
+                if index == 0 {
                     *first = Some(master);
                 }
-                *e = LineEntry {
+                *line_entry = LineEntry {
                     next,
                     line: Some(line),
-                    building: l.building,
+                    building: unit_line.building,
                 };
                 next = Some(master);
             }
-            out.identifiers
-                .extend(l.identifiers.iter().map(|s| (line, s.clone())));
+            out.identifiers.extend(
+                unit_line
+                    .identifiers
+                    .iter()
+                    .map(|text| (line, text.clone())),
+            );
         }
         out
     }
@@ -152,7 +158,9 @@ impl UnitLines {
     /// table 1 or in no line).
     #[must_use]
     pub fn line_of(&self, master: MasterId) -> Option<LineId> {
-        self.entries.get(master.index()).and_then(|e| e.line)
+        self.entries
+            .get(master.index())
+            .and_then(|line_entry| line_entry.line)
     }
 
     /// `FUN_140fdd6f0`: the first master of line `line` (none, the game's −1, for a line out
@@ -187,7 +195,7 @@ mod tests {
             line: Some(LineId::of_data(id)),
             chain: Some(chain.to_vec()),
             building,
-            identifiers: names.iter().map(|s| (*s).to_owned()).collect(),
+            identifiers: names.iter().map(|text| (*text).to_owned()).collect(),
         }
     }
 

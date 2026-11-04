@@ -77,37 +77,42 @@ fn world(relation: u8) -> FinderWorld {
 /// other or an unknown player not.
 #[test]
 fn allied_follows_the_relation() {
-    let w = world(0);
-    assert!(w.allied(PlayerId::new(1), PlayerId::new(1), AllyTest::AlliesOnly));
-    assert!(!w.allied(PlayerId::new(1), PlayerId::new(0), AllyTest::WithRelation4));
-    assert!(w.allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
+    let finder_world = world(0);
+    assert!(finder_world.allied(PlayerId::new(1), PlayerId::new(1), AllyTest::AlliesOnly));
+    assert!(!finder_world.allied(PlayerId::new(1), PlayerId::new(0), AllyTest::WithRelation4));
+    assert!(finder_world.allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
     assert!(world(4).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::WithRelation4));
     assert!(!world(4).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::AlliesOnly));
     assert!(!world(3).allied(PlayerId::new(1), PlayerId::new(2), AllyTest::WithRelation4));
-    assert!(!w.allied(PlayerId::new(5), PlayerId::new(2), AllyTest::WithRelation4));
+    assert!(!finder_world.allied(PlayerId::new(5), PlayerId::new(2), AllyTest::WithRelation4));
 }
 
 /// An annex stands for its main building, one step for each of `steps`; an object or a
 /// master the world does not hold gives none.
 #[test]
 fn an_annex_stands_for_its_main_building() {
-    let w = world(0);
+    let finder_world = world(0);
     assert_eq!(
-        w.target_up(object_id(12), 0).map(|t| t.id),
+        finder_world.target_up(object_id(12), 0).map(|t| t.id),
         Some(object_id(12))
     );
-    assert_eq!(w.target(object_id(12)).map(|t| t.id), Some(object_id(11)));
     assert_eq!(
-        w.target_up(object_id(12), 5).map(|t| t.id),
+        finder_world.target(object_id(12)).map(|t| t.id),
+        Some(object_id(11))
+    );
+    assert_eq!(
+        finder_world
+            .target_up(object_id(12), 5)
+            .map(|task_target| task_target.id),
         Some(object_id(10))
     );
-    let target = w.target(object_id(10)).unwrap();
+    let target = finder_world.target(object_id(10)).unwrap();
     assert_eq!(
         (target.player, target.state, target.hp),
         (PlayerId::new(1), ObjectState::Alive, HitPoints::new(25.0))
     );
     assert_eq!((target.pasture, target.top_action), (None, Some(GATHER)));
-    assert!(w.target(object_id(99)).is_none());
+    assert!(finder_world.target(object_id(99)).is_none());
     let mut lost = world(0);
     lost.masters.truncate(1);
     assert!(lost.target(object_id(10)).is_none());
@@ -115,14 +120,14 @@ fn an_annex_stands_for_its_main_building() {
 
 #[test]
 fn the_actor_reads_its_player_attribute_95_and_civ() {
-    let w = world(0);
-    let actor = w.actor(object_id(10)).unwrap();
+    let finder_world = world(0);
+    let actor = finder_world.actor(object_id(10)).unwrap();
     assert_eq!(
         (actor.id, actor.player, actor.civ),
         (object_id(10), PlayerId::new(1), CivId::new(4))
     );
     assert_eq!(actor.attribute_95.get().to_bits(), 1.5_f32.to_bits());
-    assert!(w.actor(object_id(99)).is_none());
+    assert!(finder_world.actor(object_id(99)).is_none());
 }
 
 /// Every live object of each player's section is in the finder's view by its id, with its

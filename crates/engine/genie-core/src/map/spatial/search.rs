@@ -7,21 +7,16 @@ use crate::map::Position;
 use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::{
-    ClosestChecks, Filter, Placed, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
+    ClosestChecks, Filter, QUERY_HITS, Reach, RecordId, Spatial, players_seen,
     record_meets_segment, tile_record_id,
 };
 use crate::map::{Rect, Segment};
 use crate::math::conversions::cvttss2si;
 use crate::objects::ObjectId;
-use crate::objects::ObjectState;
-use crate::objects::WorkerCount;
-use crate::objects::masters::ObjectFlags;
 use crate::objects::masters::ObstructionKind;
-use crate::objects::masters::player_master;
-use crate::ownership::artifact::ARTIFACT_KIND;
 use crate::players::PlayerId;
 use crate::players::UnitRelations;
-use crate::players::{ByRelation, QueryRelation, UnitRelation};
+use crate::players::{ByRelation, UnitRelation};
 use crate::unit_ai::best_target::AttackField;
 use crate::unit_ai::best_target::{Choice, best_unit_to_attack as best_target_best_unit_to_attack};
 use crate::unit_ai::world_view::WorldPicker;
@@ -30,10 +25,7 @@ use crate::unit_ai::{Found, Pick, Search};
 use crate::vision::SightTiles;
 use crate::vision::registry::Record;
 use crate::vision::registry::VisibleQuery;
-use crate::vision::visibility::Seer;
 use crate::world::index::ObjectsRef;
-use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
 use crate::world::layer::Roles;
 use crate::world::layer::generated::BestTargetTuning;
 use crate::world::layer::generated::RegistryTuning;
@@ -107,16 +99,16 @@ impl Spatial {
         if tile {
             return Ok(true);
         }
-        Ok(self.records_in(query).any(|(id, p)| {
-            let Some(o) = p.obstruction else {
+        Ok(self.records_in(query).any(|(id, placed)| {
+            let Some(obstruction) = placed.obstruction else {
                 return false;
             };
-            let kind = o.kind.filed();
+            let kind = obstruction.kind.filed();
             kind.tested()
                 && !ignore.contains(&RecordId::from(id))
                 && !by_id.moving(id)
-                && self.visits(p, kind, query)
-                && meets(kind, p.bounds())
+                && self.visits(placed, kind, query)
+                && meets(kind, placed.bounds())
         }))
     }
 
@@ -142,16 +134,17 @@ impl Spatial {
                     self.tiles.take_off(i, id, |o| Self::is_tall(objects, o));
                 }
                 if let Some(i) = new {
-                    self.tiles.append(i, id, |o| Self::is_tall(objects, o));
+                    self.tiles
+                        .append(i, id, |object_id| Self::is_tall(objects, object_id));
                 }
             }
             self.refile(id);
-            let Some(p) = self.objects.get(id) else {
+            let Some(placed) = self.objects.get(id) else {
                 return Ok(());
             };
-            if let Some(v) = self.sight.as_mut() {
-                v.moved(id, from, position, p.radius, roles, visibility_tuning)?;
-                v.registry_moved(id, p.class, from, position);
+            if let Some(visibility) = self.sight.as_mut() {
+                visibility.moved(id, from, position, placed.radius, roles, visibility_tuning)?;
+                visibility.registry_moved(id, placed.class, from, position);
             }
         }
         Ok(())
@@ -161,21 +154,24 @@ impl Spatial {
     /// player's visible map there, and the registry's records the objects' masks keep, may differ
     /// from the game's (its sight, plus a tile, beyond what it may have moved).
     pub fn check_sight(&self, player: PlayerId, rect: Rect) -> GenieResult<()> {
-        let Some(v) = self.sight.as_ref() else {
+        let Some(visibility) = self.sight.as_ref() else {
             return Ok(());
         };
-        let near = self.frozen().any(|(id, p)| {
-            let Some(u) = p.unknown.filter(|&u| 0.0 < u && p.player == player) else {
+        let near = self.frozen().any(|(id, placed)| {
+            let Some(u) = placed
+                .unknown
+                .filter(|&u| 0.0 < u && placed.player == player)
+            else {
                 return false;
             };
-            let los = v
+            let los = visibility
                 .seer(id)
-                .map_or(SightTiles::NONE, |s| SightTiles::of(s.los));
+                .map_or(SightTiles::NONE, |seer| SightTiles::of(seer.los));
             if !los.sees() {
                 return false;
             }
             let grow = u + los.get() as f32 + 1.0;
-            rect.overlaps(p.bounds().grown(Distance::new(grow)))
+            rect.overlaps(placed.bounds().grown(Distance::new(grow)))
         });
         if near {
             return Err(GenieError::unsupported(
@@ -232,7 +228,7 @@ impl Spatial {
 
     /// The lists the last search left, as the cache holds them, or the error of a search that
     /// reads the registry's last answer before any query.
-    fn last_found(&self) -> GenieResult<&ByRelation<Vec<Record>>> {
+    pub(super) fn last_found(&self) -> GenieResult<&ByRelation<Vec<Record>>> {
         self.search_cache
             .last
             .as_ref()
@@ -270,13 +266,13 @@ impl Spatial {
         spatial_tuning: &SpatialTuning,
         registry_tuning: RegistryTuning,
     ) -> GenieResult<SearchLists> {
-        let v = self.sight.as_ref().ok_or(GenieError::unsupported(
+        let visibility = self.sight.as_ref().ok_or(GenieError::unsupported(
             "a search without the players' sight",
         ))?;
-        let r = v.registry.as_ref().ok_or(GenieError::unsupported(
+        let registry = visibility.registry.as_ref().ok_or(GenieError::unsupported(
             "a search without the objects-in-sight registry",
         ))?;
-        let relations = self.query_kinds(player, r.players)?;
+        let relations = self.query_kinds(player, registry.players)?;
         let (x, y) = (search.at.x(), search.at.y());
         let mut answer = SearchLists::Cached;
         let (dx, dy) = (x - self.search_cache.at.x(), y - self.search_cache.at.y());
@@ -292,7 +288,7 @@ impl Spatial {
             );
             self.check_known_classes(rect, search.classes)?;
             self.check_sight(player, rect)?;
-            if let Some(lists) = r.visible_units(
+            if let Some(lists) = registry.visible_units(
                 VisibleQuery {
                     player,
                     position: search.at,
@@ -402,7 +398,9 @@ impl Spatial {
                 Ok(Found {
                     id,
                     enemies: !self.last_found()?[UnitRelation::Enemy].is_empty(),
-                    position: id.and_then(|id| self.objects.get(id)).map(|p| p.position),
+                    position: id
+                        .and_then(|id| self.objects.get(id))
+                        .map(|placed| placed.position),
                     fresh,
                     players: 0,
                     distance: WholeDistance::NONE,
@@ -410,72 +408,6 @@ impl Spatial {
                 })
             }
         }
-    }
-
-    /// `ClosestObject` (`FUN_140c488b0`) for object `me` over what its search `found`, its
-    /// reachability check on (argument 8, every caller's): each record by relation and order:
-    /// itself, an object that is gone and one dying (state 7 and up) are passed, so is one the
-    /// [`Filter`] leaves out; then one the unit reaches within `SpatialTuning::closest_range` (slot 0x3d0,
-    /// `reach`) and nearer than the nearest so far (by the search's distance; a tie goes to the
-    /// lower id) is the nearest. Livestock (class 58) counts when the searcher's player owns it or
-    /// it is not in state 2, and not while its top action is the Artifact with a point
-    /// ([`herded`]: slot 0x288 not −1 and slot 0x530 107, "Sheep is moving"). A searcher of class
-    /// 10 passes the objects [`shuns`] names (of master 440 or a master with object flag 0x10; the
-    /// game's `+0x6b4` of 1, not met, would let it take them). Not modelled: a workers cap
-    /// (argument 6; the objects' `+0x644`), the unbuilt farm test of a search for state 0, the
-    /// pastures and farms (class 49). Nothing found answers −1.
-    pub(super) fn closest_object(
-        &mut self,
-        me: ObjectId,
-        player: PlayerId,
-        filter: Filter,
-        reach: &mut Reach<'_>,
-        checks: ClosestChecks<'_>,
-    ) -> GenieResult<(Option<ObjectId>, f32)> {
-        let (roles, spatial_tuning) = (checks.roles, checks.spatial_tuning);
-        let at = self.objects.get(me);
-        let searcher = Searcher {
-            class_10: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::PREDATOR)),
-            // The villagers' class, which gathers from farms (`FUN_141195750`).
-            farmer: at.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER)),
-            trapper: at.is_some_and(|m| roles.of_master(m.master).contains(MasterRoles::TRAPPER)),
-        };
-        let spared = filter.spared.map(QueryRelation::list);
-        let mut best: Option<(ObjectId, f32)> = None;
-        for relation in UnitRelation::ALL {
-            // no filter (−1) keeps every list
-            let related = filter.relation.is_none_or(|f| f.keeps(relation));
-            // each record is read where it is tested: the reachability check is handed the
-            // spatial index, which it writes
-            let mut next = 0;
-            while let Some(record) = self.last_found()?[relation].get(next).copied() {
-                next += 1;
-                if record.id == me {
-                    continue;
-                }
-                let sight = self.sight.as_ref().ok_or(GenieError::unsupported(
-                    "a search without the players' sight",
-                ))?;
-                let (Some(seer), Some(p)) = (sight.seer(record.id), self.objects.get(record.id))
-                else {
-                    continue;
-                };
-                if ObjectState::Removed <= seer.state || !related || spared == Some(relation) {
-                    continue;
-                }
-                if !closest_kept(record.id, (seer, p), filter, (player, searcher), checks)? {
-                    continue;
-                }
-                if filter.reach
-                    && !reach(self, record.id, Distance::new(spatial_tuning.closest_range))?
-                {
-                    continue;
-                }
-                best = nearer(best, &record);
-            }
-        }
-        // the distance starts at `DAT_14330ec20` (−1) without a find
-        Ok(best.map_or((None, -1.0), |(id, d)| (Some(id), d)))
     }
 
     /// `bestUnitToAttack` (`FUN_140c44680`, [`crate::unit_ai::best_target::best_unit_to_attack`]) over
@@ -496,7 +428,8 @@ impl Spatial {
     ) -> GenieResult<Choice> {
         let me = attack.searcher(memory)?;
         let found = self.last_found()?;
-        let lists: ByRelation<Vec<ObjectId>> = found.map(|v| v.iter().map(|r| r.id).collect());
+        let lists: ByRelation<Vec<ObjectId>> =
+            found.map(|records| records.iter().map(|record| record.id).collect());
         let mut field = AttackField {
             picker: attack,
             reach,
@@ -531,161 +464,20 @@ pub struct SearchQuery<'a> {
     pub(crate) attack: Option<&'a WorldPicker<'a>>,
     /// The reachability of a found object (slot 0x3d0).
     pub(crate) reach: &'a mut Reach<'a>,
-    /// The world's objects by id: whether livestock is herded ([`herded`]), the masters a
-    /// class-10 searcher passes ([`shuns`]), a farm's workers and pasture ([`farm_kept`]).
+    /// The world's objects by id: whether livestock is herded
+    /// ([`herded`](crate::map::spatial::closest::herded)), the masters a class-10 searcher passes
+    /// ([`shuns`](crate::map::spatial::closest::shuns)), a farm's workers and pasture
+    /// ([`farm_kept`](crate::map::spatial::closest::farm_kept)).
     pub(crate) objects: ObjectsRef<'a>,
 }
 
 impl Debug for SearchQuery<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("SearchQuery")
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        formatter
+            .debug_struct("SearchQuery")
             .field("searcher", &self.searcher)
             .field("player", &self.player)
             .field("search", &self.search)
             .finish_non_exhaustive()
-    }
-}
-
-/// What `ClosestObject` reads of its searcher (`FUN_140c488b0`): of class 10 it passes the
-/// objects `shuns` names; a farmer takes farms, a trapper fish traps ([`farm_kept`]).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(super) struct Searcher {
-    pub(super) class_10: bool,
-    pub(super) farmer: bool,
-    pub(super) trapper: bool,
-}
-
-/// `ClosestObject`'s tests of the object `id` it found (its seer and its place `p`) past the
-/// relation: the [`Filter`]'s class, master and state; a farm ([`farm_kept`]); livestock
-/// (class 58) the searcher's player owns or not in state 2, and not [`herded`]; for a searcher of
-/// class 10, not what [`shuns`] names. A workers cap and the unbuilt farm test (a state of 0)
-/// are not modelled.
-pub(super) fn closest_kept(
-    id: ObjectId,
-    (seer, p): (&Seer, &Placed),
-    filter: Filter,
-    (player, searcher): (PlayerId, Searcher),
-    ClosestChecks { objects, roles, .. }: ClosestChecks<'_>,
-) -> GenieResult<bool> {
-    if filter.group.is_some_and(|g| p.class != g) {
-        return Ok(false);
-    }
-    if filter.master.is_some_and(|m| p.master != m) {
-        return Ok(false);
-    }
-    if filter.state.is_some_and(|state| seer.state != state) {
-        return Ok(false);
-    }
-    if filter.workers != WorkerCount::NO_CAP {
-        return Err(GenieError::unsupported(
-            "ClosestObject's workers cap (+0x644)",
-        ));
-    }
-    if filter.state == Some(ObjectState::Foundation) {
-        return Err(GenieError::unsupported("ClosestObject's unbuilt farm test"));
-    }
-    if roles
-        .of_some_class(filter.group)
-        .contains(ClassRoles::CLOSEST_PASTURE)
-        && !farm_kept(id, p, filter, searcher, objects, roles)?
-    {
-        return Ok(false);
-    }
-    if roles
-        .of_some_class(filter.group)
-        .contains(ClassRoles::CLOSEST_LIVESTOCK)
-        && ((p.player != player && seer.state == ObjectState::Alive) || herded(objects, id))
-    {
-        return Ok(false);
-    }
-    if searcher.class_10 && shuns(objects, roles, p)? {
-        return Ok(false);
-    }
-    Ok(true)
-}
-
-/// `ClosestObject`'s "Sheep is moving" (`FUN_140c488b0`): the object's top action is the Artifact
-/// (slot 0x530 107) with a point (slot 0x288, the action's `+0x38`, not −1); `by_id` reads its
-/// action layer.
-pub(crate) fn herded(by_id: ObjectsRef<'_>, id: ObjectId) -> bool {
-    by_id.actions(id).is_some_and(|a| {
-        a.top_action_kind() == Some(ARTIFACT_KIND)
-            && a.list
-                .artifact()
-                .is_some_and(|a| a.goal.is_some_and(|g| g.x() != -1.0))
-    })
-}
-
-/// What a searcher of class 10 passes (`FUN_140c488b0`): the found object's master, read from its
-/// player's table, is the petard (master 440) or holds object flag 0x10.
-///
-/// # Errors
-///
-/// A found object of a master its player's table does not hold.
-pub(super) fn shuns(objects: ObjectsRef<'_>, roles: &Roles, p: &Placed) -> GenieResult<bool> {
-    let m = player_master(objects.masters().players, p.player, p.master).ok_or(
-        GenieError::unsupported("a found object of a master the slice does not have"),
-    )?;
-    Ok(roles.of_master(p.master).contains(MasterRoles::PETARD)
-        || m.object_flags.contains(ObjectFlags::SCOUT))
-}
-
-/// A farm (class 49) `ClosestObject` found, its workers (`+0x644`) and pasture (`+0x790`,
-/// `parent_pasture_id`) read from `objects`: not a pasture's livestock
-/// (`+0x790`); a pasture is not modelled; without a master asked for, one without workers that
-/// the searcher gathers from (a fish trap for a trapper, any other for a farmer).
-pub(super) fn farm_kept(
-    id: ObjectId,
-    p: &Placed,
-    filter: Filter,
-    searcher: Searcher,
-    objects: ObjectsRef<'_>,
-    roles: &Roles,
-) -> GenieResult<bool> {
-    let (workers, parent) =
-        objects
-            .get(id)
-            .map(|u| (u.workers, u.pasture))
-            .ok_or(GenieError::unsupported(
-                "a found farm the slice does not hold",
-            ))?;
-    if parent.is_some() {
-        return Ok(false);
-    }
-    if roles
-        .of_master(p.master)
-        .contains(MasterRoles::COUNTED_PASTURE)
-    {
-        return Err(GenieError::unsupported(
-            "ClosestObject over pastures (their workers and livestock)",
-        ));
-    }
-    if filter.master.is_none() {
-        if WorkerCount::ONE <= workers {
-            return Ok(false);
-        }
-        // The fish trap (raw `0x6163`), which only the fishing ships gather from (`FUN_1411945a0`).
-        if !searcher.trapper && roles.of_master(p.master).contains(MasterRoles::FISH_TRAP) {
-            return Ok(false);
-        }
-        if !searcher.farmer && !roles.of_master(p.master).contains(MasterRoles::FISH_TRAP) {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-/// The nearer of the nearest so far, `best`, and `record`, by the search's distance; a tie
-/// goes to the lower id (a NaN distance so far gives way).
-pub(super) fn nearer(best: Option<(ObjectId, f32)>, record: &Record) -> Option<(ObjectId, f32)> {
-    match best {
-        Some((id, d)) if d <= record.distance.get() => {
-            if record.distance == Distance::new(d) && record.id < id {
-                Some((record.id, d))
-            } else {
-                best
-            }
-        }
-        _ => Some((record.id, record.distance.get())),
     }
 }

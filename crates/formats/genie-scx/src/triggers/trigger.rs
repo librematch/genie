@@ -247,8 +247,8 @@ impl TriggerSystem {
                 trigger_order.push(input.read_i32::<LE>()?);
             }
         } else {
-            for i in 0..num_triggers {
-                trigger_order.push(i);
+            for index in 0..num_triggers {
+                trigger_order.push(index);
             }
         }
 

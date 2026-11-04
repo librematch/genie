@@ -42,17 +42,26 @@ impl TornDown {
     /// # Errors
     ///
     /// [`crate::world::lets::torn_down`]'s.
-    pub(crate) fn let_go(self, c: &mut Step<'_>, me: &mut Unit, by: Releaser) -> GenieResult<()> {
-        let releases = self.releases.into_iter().map(|t| (t, by)).collect();
-        torn_down(c, me, (self.builder_leaves, releases))
+    pub(crate) fn let_go(
+        self,
+        step: &mut Step<'_>,
+        me: &mut Unit,
+        by: Releaser,
+    ) -> GenieResult<()> {
+        let releases = self
+            .releases
+            .into_iter()
+            .map(|object_id| (object_id, by))
+            .collect();
+        torn_down(step, me, (self.builder_leaves, releases))
     }
 }
 
 /// The unit's stop (slot 0x5d0) for a torn-down action's `MoveTo`, when it had one (`moves`)
 /// and the unit moves at all.
 fn stop_if_moving(mut motion: MotionMut<'_>, moves: bool) -> GenieResult<()> {
-    if moves && let Some(m) = motion.mover_mut() {
-        m.stop()?;
+    if moves && let Some(mover) = motion.mover_mut() {
+        mover.stop()?;
     }
     Ok(())
 }
@@ -77,63 +86,71 @@ impl Action {
         let mut torn = TornDown::default();
         match self {
             Self::WaitSolidify(_) | Self::Make(_) => {}
-            Self::Artifact(mut a) => {
-                let (released, gone) = a.tear_down();
+            Self::Artifact(mut artifact) => {
+                let (released, gone) = artifact.tear_down();
                 torn.release(released);
                 torn.release(gone.released);
                 stop_if_moving(motion, gone.stops)?;
             }
-            Self::Fly(f) => {
-                motion.set_anim_speed(motion.mover().map_or(Speed::ZERO, |m| m.stats.speed));
-                stop_if_moving(motion, f.state.move_to().is_some())?;
+            Self::Fly(fly) => {
+                motion.set_anim_speed(
+                    motion
+                        .mover()
+                        .map_or(Speed::ZERO, |mover| mover.stats.speed),
+                );
+                stop_if_moving(motion, fly.state.move_to().is_some())?;
             }
-            Self::Enter(e) => {
-                stop_if_moving(motion, e.state.move_to().is_some())?;
-                torn.release(e.target.map(ContainerId::id));
+            Self::Enter(enter_action) => {
+                stop_if_moving(motion, enter_action.state.move_to().is_some())?;
+                torn.release(enter_action.target.map(ContainerId::id));
             }
-            Self::Transport(t) => stop_if_moving(motion, t.state.move_to().is_some())?,
-            Self::Build(b) => {
-                if b.added
-                    && let Some(target) = b.target
+            Self::Transport(transport_action) => {
+                stop_if_moving(motion, transport_action.state.move_to().is_some())?;
+            }
+            Self::Build(build_action) => {
+                if build_action.added
+                    && let Some(target) = build_action.target
                 {
                     torn.builder_leaves.push(target.id());
                 }
-                torn.release(b.target.map(FoundationId::id));
-                torn.release(b.site.map(DropSiteId::id));
-                stop_if_moving(motion, b.state.move_to().is_some())?;
+                torn.release(build_action.target.map(FoundationId::id));
+                torn.release(build_action.site.map(DropSiteId::id));
+                stop_if_moving(motion, build_action.state.move_to().is_some())?;
             }
-            Self::Repair(r) => {
-                if r.counted
-                    && let Some(target) = r.target
+            Self::Repair(repair_action) => {
+                if repair_action.counted
+                    && let Some(target) = repair_action.target
                 {
                     torn.builder_leaves.push(target.id());
                 }
-                torn.release(r.target);
-                stop_if_moving(motion, r.state.move_to().is_some())?;
+                torn.release(repair_action.target);
+                stop_if_moving(motion, repair_action.state.move_to().is_some())?;
             }
-            Self::Explore(e) => stop_if_moving(motion, e.state.move_to().is_some())?,
-            Self::Hunt(mut h) => {
-                h.tear_down(motion.mover_mut())?;
-                torn.release(h.target);
-                torn.release(h.carry_to.map(DropSiteId::id));
+            Self::Explore(explore_action) => {
+                stop_if_moving(motion, explore_action.state.move_to().is_some())?;
             }
-            Self::Gather(mut g) => {
-                g.tear_down(motion.mover_mut())?;
-                torn.release(g.target);
-                torn.release(g.carry_to.map(DropSiteId::id));
+            Self::Hunt(mut hunt_action) => {
+                hunt_action.tear_down(motion.mover_mut())?;
+                torn.release(hunt_action.target);
+                torn.release(hunt_action.carry_to.map(DropSiteId::id));
             }
-            Self::Attack(mut a) => {
-                a.tear_down(motion.mover_mut())?;
-                torn.release(a.target);
-                torn.release(a.target2);
+            Self::Gather(mut gather_action) => {
+                gather_action.tear_down(motion.mover_mut())?;
+                torn.release(gather_action.target);
+                torn.release(gather_action.carry_to.map(DropSiteId::id));
             }
-            Self::MoveTo(m) => {
+            Self::Attack(mut attack) => {
+                attack.tear_down(motion.mover_mut())?;
+                torn.release(attack.target);
+                torn.release(attack.target2);
+            }
+            Self::MoveTo(move_to_action) => {
                 stop_if_moving(motion, true)?;
-                torn.release(m.target);
+                torn.release(move_to_action.target);
             }
-            Self::Missile(m) => {
-                torn.release(m.target);
-                torn.release(m.fired_from.map(ShooterId::id));
+            Self::Missile(missile_action) => {
+                torn.release(missile_action.target);
+                torn.release(missile_action.fired_from.map(ShooterId::id));
             }
         }
         Ok(torn)
@@ -246,12 +263,12 @@ mod tests {
 
     /// A moving object's motion layer, moving (its velocity and animation speed set).
     fn moving() -> Motion {
-        let mut m = walker();
-        m.velocity = Some(Velocity {
+        let mut mover = walker();
+        mover.velocity = Some(Velocity {
             velocity: BVector::new(0.0, 0.0, 0.7),
             acceleration: BVector::new(0.0, 0.0, 1.0),
         });
-        let mut motion = Motion::Moving(m);
+        let mut motion = Motion::Moving(mover);
         motion.lent().set_anim_speed(Speed::new(0.8));
         motion
     }
@@ -287,9 +304,11 @@ mod tests {
 
     /// Whether `motion` still moves.
     fn moves(motion: &Motion) -> bool {
-        motion
-            .mover()
-            .is_some_and(|m| m.velocity.is_some_and(|v| v.velocity.y() != 0.0))
+        motion.mover().is_some_and(|mover| {
+            mover
+                .velocity
+                .is_some_and(|velocity| velocity.velocity.y() != 0.0)
+        })
     }
 
     /// A Build's destructor (`FUN_140aadbf0`): a counted builder leaves its building's builders,
@@ -298,14 +317,16 @@ mod tests {
     #[test]
     fn build_destructor_leaves_its_building_and_stops_its_walk() {
         let mut motion = moving();
-        let mut b = build();
-        (b.added, b.state) = (
+        let mut build_action = build();
+        (build_action.added, build_action.state) = (
             true,
             BuildState::Move {
                 move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
             },
         );
-        let torn = Action::Build(b).tear_down(motion.lent()).unwrap();
+        let torn = Action::Build(build_action)
+            .tear_down(motion.lent())
+            .unwrap();
         assert_eq!(
             torn,
             TornDown {
@@ -314,12 +335,14 @@ mod tests {
             }
         );
         assert!(!moves(&motion));
-        (b.added, b.state, b.site) = (
+        (build_action.added, build_action.state, build_action.site) = (
             false,
             BuildState::Move { move_to: None },
             Some(DropSiteId::new(object_id(10050))),
         );
-        let torn = Action::Build(b).tear_down(moving().lent()).unwrap();
+        let torn = Action::Build(build_action)
+            .tear_down(moving().lent())
+            .unwrap();
         assert_eq!(
             (torn.releases, torn.builder_leaves),
             (vec![object_id(10028), object_id(10050)], vec![])
@@ -329,10 +352,13 @@ mod tests {
     /// `FUN_140a78430` reads any action's second target (`+0x34`): a Build's is its drop site.
     #[test]
     fn build_second_target_is_its_drop_site() {
-        let mut b = build();
-        assert_eq!(Action::Build(b).second_target(), None);
-        b.site = Some(DropSiteId::new(object_id(10050)));
-        assert_eq!(Action::Build(b).second_target(), Some(object_id(10050)));
+        let mut build_action = build();
+        assert_eq!(Action::Build(build_action).second_target(), None);
+        build_action.site = Some(DropSiteId::new(object_id(10050)));
+        assert_eq!(
+            Action::Build(build_action).second_target(),
+            Some(object_id(10050))
+        );
     }
 
     /// A `MoveTo`'s destructor (`FUN_140aa1f30`) stops the unit and lets its target go; one
@@ -383,7 +409,7 @@ mod tests {
         assert_eq!(
             dying
                 .delete_head(motion.lent(), ObjectState::Dying)
-                .map(|t| t.releases),
+                .map(|torn_down| torn_down.releases),
             Ok(vec![])
         );
         assert_eq!(dying.iter().count(), 1);

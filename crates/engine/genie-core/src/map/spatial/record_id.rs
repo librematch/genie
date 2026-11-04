@@ -34,7 +34,7 @@ impl RecordId {
         match self {
             Self::Object(id) => id.get(),
             Self::Tile(t) => (t.x() << 12) | t.y() | TILE_BITS.cast_signed(),
-            Self::Edge(t) => (t.x() << 12) | t.y() | EDGE_BITS.cast_signed(),
+            Self::Edge(tile) => (tile.x() << 12) | tile.y() | EDGE_BITS.cast_signed(),
         }
     }
 

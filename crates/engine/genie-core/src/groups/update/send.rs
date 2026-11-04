@@ -88,7 +88,10 @@ impl World {
             },
         )?;
         let state = match self.object(id) {
-            Some((p, u)) => self.action_list(p, u, self.parts.actions_of(u.id))?.1,
+            Some((player_id, unit)) => {
+                self.action_list(player_id, unit, self.parts.actions_of(unit.id))?
+                    .1
+            }
             None => ActionState::NO_ACTION,
         };
         if matches!(state.get(), 6 | 7) {
@@ -154,7 +157,7 @@ impl World {
         let slot = self.live_index(player, id);
         let rng = self.streams.get(Stream::Ai);
         if let Some(ai) = slot
-            .and_then(|i| self.players.live_mut(player, i).ok())
+            .and_then(|list_index| self.players.live_mut(player, list_index).ok())
             .and_then(|u| self.parts.unit_ai.get_mut(u.id))
         {
             ai.set_randomized_retarget_timer(span, rng);
@@ -193,12 +196,12 @@ impl World {
         let mut part = t;
         let mut nearest = self.footprint_gap_squared(unit, t)?;
         for annex in self.objects().annexes(t.id()).ids().take(ANNEXES) {
-            let Some(a) = self.world_object(annex) else {
+            let Some(world_object) = self.world_object(annex) else {
                 continue;
             };
-            let gap = self.footprint_gap_squared(unit, a)?;
+            let gap = self.footprint_gap_squared(unit, world_object)?;
             if gap < nearest {
-                part = a;
+                part = world_object;
                 nearest = gap;
             }
         }

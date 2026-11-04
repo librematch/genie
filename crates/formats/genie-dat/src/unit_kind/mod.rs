@@ -154,9 +154,9 @@ mod tests {
     /// A base class the format does not know is invalid input; a known one converts.
     #[test]
     fn unknown_unit_base_class_is_invalid_input() {
-        let e = UnitBaseClass::try_from(9).unwrap_err();
+        let error = UnitBaseClass::try_from(9).unwrap_err();
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (
                 genie_error::ErrorKind::InvalidInput,
                 "a unit base class this reader does not know"

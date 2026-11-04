@@ -76,7 +76,7 @@ pub fn old_pather_paths(
         let Some(unit) = turns
             .players
             .iter()
-            .flat_map(|p| &p.objects)
+            .flat_map(|player| &player.objects)
             .find(|u| u.id == id)
         else {
             out.push(Err(GenieError::unsupported(
@@ -90,16 +90,20 @@ pub fn old_pather_paths(
         };
         let (mask, radius) = (mover.stats.restriction_mask, mover.stats.radius.x());
         let z = turns.spatial.get(id).map_or(0.0, |p| p.position.z());
-        if let Err(e) = turns.spatial.set_position(
+        if let Err(error) = turns.spatial.set_position(
             id,
             from.with_height(z),
             &turns.model.roles,
             turns.model.tuning.visibility,
         ) {
-            out.push(Err(e));
+            out.push(Err(error));
             continue;
         }
-        let Some(to) = turns.spatial.get(target).map(|p| p.position.ground()) else {
+        let Some(to) = turns
+            .spatial
+            .get(target)
+            .map(|placed| placed.position.ground())
+        else {
             out.push(Err(GenieError::unsupported(
                 "a target the save does not hold",
             )));
@@ -125,7 +129,7 @@ pub fn old_pather_paths(
         out.push(
             pather
                 .find(from, to, Some(target), Distance::new(range))
-                .map(|(r, p)| (r, p.points)),
+                .map(|(short_found, waypoints)| (short_found, waypoints.points)),
         );
     }
     Ok(out)
@@ -256,13 +260,13 @@ pub fn forced_run(
         };
         (0..window).for_each(ask);
         let mut run_all = || -> GenieResult<()> {
-            for k in 0..ticks {
-                let Some(frame) = all.get(updates + k) else {
+            for index in 0..ticks {
+                let Some(frame) = all.get(updates + index) else {
                     break;
                 };
                 let clock = Instant::now();
-                let taken = ahead.take(k);
-                ask(k + window);
+                let taken = ahead.take(index);
+                ask(index + window);
                 let Some(after) = taken else {
                     break;
                 };
@@ -273,13 +277,13 @@ pub fn forced_run(
                 times.run += clock.elapsed();
                 let clock = Instant::now();
                 let mut report = TickReport {
-                    start: start + k,
+                    start: start + index,
                     ticks: 1,
                     ..TickReport::default()
                 };
                 let tick = turns.ticks.get();
                 compare_players(&turns, &after, Some(tick), &mut report)?;
-                let tiles = dump_after(start + k + 1, "tiles")
+                let tiles = dump_after(start + index + 1, "tiles")
                     .map(|text| tile_lists_from_dump(&text))
                     .transpose()?;
                 if let Some(t) = tiles.as_ref() {
@@ -290,7 +294,7 @@ pub fn forced_run(
                 report
                     .differences
                     .extend(ghost_differences(&turns, &after.ghosts));
-                let pools_text = dump_after(start + k + 1, "pools");
+                let pools_text = dump_after(start + index + 1, "pools");
                 let pool = pools_text
                     .as_deref()
                     .map(recycle_pools_from_dump)
@@ -334,7 +338,7 @@ pub fn forced_run(
                 // the world's unit groups, by their owners; the process globals the tick
                 // oracle dumped beside the save are the game's
                 let mut after = after;
-                let globals = dump_after(start + k + 1, "globals");
+                let globals = dump_after(start + index + 1, "globals");
                 let group_differences =
                     owned_group_differences(&turns, &mut after.game, globals.as_deref());
                 let groups_differ = !group_differences.is_empty();
@@ -384,8 +388,10 @@ pub fn forced_run(
                 {
                     game.sight = Some((mem_take(&mut seen.maps), mem_take(&mut seen.unified)));
                 }
-                for (p, id, why) in turns.force(&game) {
-                    report.unsupported.push((p.index() as u32, id, tick, why));
+                for (player_id, id, why) in turns.force(&game) {
+                    report
+                        .unsupported
+                        .push((player_id.index() as u32, id, tick, why));
                 }
                 // a parsed save's state is dropped on the pool: its drop costs the run as much as
                 // its forcing
@@ -404,22 +410,25 @@ pub fn forced_run(
 /// Each player's ghosts against the game's (`game`), in the list's order, by what the save holds
 /// of them: one difference per player whose list differs.
 pub(super) fn ghost_differences(turns: &World, game: &[Vec<Ghost>]) -> Vec<(u32, String)> {
-    let key = |g: &Ghost| {
+    let key = |ghost: &Ghost| {
         // the report's line in the game's terms: the ids as the save holds them
         (
-            g.id.get(),
-            ObjectId::field(g.original_id),
-            g.state,
-            g.cant_see,
-            g.position.get().map(f32::to_bits),
+            ghost.id.get(),
+            ObjectId::field(ghost.original_id),
+            ghost.state,
+            ghost.cant_see,
+            ghost.position.get().map(f32::to_bits),
         )
     };
     let only = |x: &Vec<_>, y: &Vec<_>| -> Vec<_> {
         x.iter().filter(|e| !y.contains(*e)).copied().collect()
     };
     let mut out = Vec::new();
-    for (p, game) in game.iter().enumerate() {
-        let slice = turns.players.get(p).map_or(&[][..], |q| &q.ghosts[..]);
+    for (index, game) in game.iter().enumerate() {
+        let slice = turns
+            .players
+            .get(index)
+            .map_or(&[][..], |player| &player.ghosts[..]);
         let (a, b): (Vec<_>, Vec<_>) = (
             slice.iter().map(key).collect(),
             game.iter().map(key).collect(),
@@ -431,7 +440,7 @@ pub(super) fn ghost_differences(turns: &World, game: &[Vec<Ghost>]) -> Vec<(u32,
             } else {
                 format!("ghosts the slice's alone {sl:?}, the game's alone {gm:?}")
             };
-            out.push((p as u32, what));
+            out.push((index as u32, what));
         }
     }
     out
@@ -445,13 +454,13 @@ pub(super) fn owned_group_differences(
     game: &mut GameState,
     globals: Option<&str>,
 ) -> Vec<(u32, String)> {
-    if let (Some(text), Some(g)) = (globals, game.groups.as_mut()) {
-        globals_from_dump(text, g);
+    if let (Some(text), Some(text_groups)) = (globals, game.groups.as_mut()) {
+        globals_from_dump(text, text_groups);
     }
-    let Some(g) = game.groups.as_ref() else {
+    let Some(groups) = game.groups.as_ref() else {
         return Vec::new();
     };
-    group_differences(&turns.groups, g, globals.is_some())
+    group_differences(&turns.groups, groups, globals.is_some())
         .into_iter()
         .map(|d| (group_owner(turns, game, &d), d))
         .collect()
@@ -463,18 +472,18 @@ pub(super) fn group_owner(turns: &World, game: &GameState, difference: &str) -> 
     let id = difference
         .strip_prefix("group ")
         .and_then(|d| d.split(':').next())
-        .and_then(|d| d.parse::<i32>().ok())
+        .and_then(|text| text.parse::<i32>().ok())
         .and_then(GroupId::of_field);
     let owner = id.and_then(|id| {
         game.groups
             .as_ref()
-            .and_then(|g| g.get(id))
+            .and_then(|groups| groups.get(id))
             .or_else(|| turns.groups.get(id))
-            .and_then(|g| g.owner)
+            .and_then(|group| group.owner)
     });
     owner
         .filter(|o| o.index() < turns.players.len())
-        .map_or(0, |o| u32::from(o.get()))
+        .map_or(0, |player_id| u32::from(player_id.get()))
 }
 
 /// The game's saves parsed ahead of a forced run ([`forced_run`]): the pool's tasks put them by
@@ -499,8 +508,8 @@ impl<T> Ahead<T> {
     }
 
     /// A task's parse of index `k`.
-    pub(super) fn put(&self, k: usize, v: T) {
-        let _ = self.locked().insert(k, v);
+    pub(super) fn put(&self, k: usize, value: T) {
+        let _ = self.locked().insert(k, value);
         self.ready.notify_all();
     }
 
@@ -545,14 +554,15 @@ pub(super) fn game_state(header: &Header, masters: Option<&MasterTable>) -> Geni
         groups: unit_groups(world).ok(),
         ..Default::default()
     };
-    for p in header.players() {
-        let civ = CivId::new(p.world_player().base.civ_id);
+    for player_section in header.players() {
+        let civ = CivId::new(player_section.world_player().base.civ_id);
         game.players.push(
-            p.live_objects()
+            player_section
+                .live_objects()
                 .map(|o| {
                     object(
                         o,
-                        p.objects(),
+                        player_section.objects(),
                         &world.path,
                         civ,
                         masters,
@@ -562,18 +572,23 @@ pub(super) fn game_state(header: &Header, masters: Option<&MasterTable>) -> Geni
                 })
                 .collect(),
         );
-        let attributes = &p.world_player().base.attributes;
+        let attributes = &player_section.world_player().base.attributes;
         let r = |i: usize| attributes.get(i).copied().unwrap_or_default();
         game.resources.push([r(0), r(1), r(2), r(3)]);
         game.attributes.push(attributes.clone());
-        game.pending_debit
-            .push(p.world_player().base.pending_debit.map(Amount::new));
-        let base = &p.world_player().base;
+        game.pending_debit.push(
+            player_section
+                .world_player()
+                .base
+                .pending_debit
+                .map(Amount::new),
+        );
+        let base = &player_section.world_player().base;
         game.statuses.push((
             GameStatus::of_data(base.game_status),
             base.resigned & 2 == 0 && base.resigned != 0,
         ));
-        let techs = &p.world_player().tech_tree.tech_player_tree;
+        let techs = &player_section.world_player().tech_tree.tech_player_tree;
         game.techs
             .push(techs.iter().map(tech_state).collect::<Result<_, _>>()?);
     }

@@ -44,47 +44,47 @@ struct Masters<'a> {
 }
 
 impl World {
-    /// Slot 0x1a0 (`FUN_14160e410`) of player `p`: master `from` upgrades to `to` by `mode`
+    /// Slot 0x1a0 (`FUN_14160e410`) of player `player_id`: master `from` upgrades to `to` by `mode`
     /// ([`World::upgrade_objects`]), with the volleys' hooks around it (the abilities, `+0x930`,
     /// are not held).
     pub(super) fn upgrade_master(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         (from, to): (Option<MasterId>, Option<MasterId>),
         mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
-        self.all_garrison_volleys(p, EffectHook::Before)?;
+        self.all_garrison_volleys(player_id, EffectHook::Before)?;
         if let (Some(from), Some(to)) = (from, to) {
-            self.upgrade_objects(p, from, to, mode, object)?;
+            self.upgrade_objects(player_id, from, to, mode, object)?;
         }
-        self.all_garrison_volleys(p, EffectHook::After)
+        self.all_garrison_volleys(player_id, EffectHook::After)
     }
 
-    /// `FUN_141657d10`, the upgrade's own part: of two masters `from` and `to` of player `p`'s
-    /// table, mode 2 with the effect's `object` gives that object a master of its own
+    /// `FUN_141657d10`, the upgrade's own part: of two masters `from` and `to` of player
+    /// `player_id`'s table, mode 2 with the effect's `object` gives that object a master of its own
     /// (`FUN_141186d10`, a copy of the one it reads) where slot 0xa8 lets it
     /// ([`crate::technology::upgrade::upgradable`]), runs its slot 0x98 to `to` keeping its master
     /// ([`World::upgrade_object`]) and copies `to` into its own master (slot 8). Any other mode
     /// goes through the live objects in order: one reading `from` takes its slot 0x98 (its master
-    /// kept in modes −1 and 3), or past its use a master of its own and its old death spawn's
-    /// copy (`FUN_141201d50`); one reading `from`'s dead unit master (`+0x5e4`, when `to`'s
-    /// differs by its copy id) takes a master of its own; in mode 3 one whose own master has
-    /// `from`'s id takes slot 0x98 keeping it and copies `to` into it (a building's research
-    /// buttons, `FUN_1411c78f0`, are the interface's). Then the sleeping objects reading `from`
-    /// take slot 0x98. Upgrades to 0x67f and 0x6a1 move the tracker's list of `from` to `to`'s
-    /// (`FUN_14104fd10`, [`crate::players::tracker::Tracker::move_all`]). In modes −1 and 3 two masters of
-    /// one type end with `from` taking `to`'s values ([`Master::copy_from`]; the masters' slot
-    /// 0xa8, their graphics' loading, is not simulation).
+    /// kept in modes −1 and 3), or past its use a master of its own and its old death spawn's copy
+    /// (`FUN_141201d50`); one reading `from`'s dead unit master (`+0x5e4`, when `to`'s differs by
+    /// its copy id) takes a master of its own; in mode 3 one whose own master has `from`'s id takes
+    /// slot 0x98 keeping it and copies `to` into it (a building's research buttons,
+    /// `FUN_1411c78f0`, are the interface's). Then the sleeping objects reading `from` take slot
+    /// 0x98. Upgrades to 0x67f and 0x6a1 move the tracker's list of `from` to `to`'s
+    /// (`FUN_14104fd10`, [`crate::players::tracker::Tracker::move_all`]). In modes −1 and 3 two
+    /// masters of one type end with `from` taking `to`'s values ([`Master::copy_from`]; the
+    /// masters' slot 0xa8, their graphics' loading, is not simulation).
     pub(crate) fn upgrade_objects(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         from: MasterId,
         to: MasterId,
         mode: UpgradeMode,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
-        let Some(masters) = self.model.masters.of(p) else {
+        let Some(masters) = self.model.masters.of(player_id) else {
             return Ok(());
         };
         let (Some(old), Some(new)) = (masters.get(from), masters.get(to)) else {
@@ -109,22 +109,23 @@ impl World {
         if mode.one_object()
             && let Some(id) = object
         {
-            self.upgrade_named(p, id, &new)?;
+            self.upgrade_named(player_id, id, &new)?;
         } else {
             let masters = Masters {
                 old: &old,
                 new: &new,
                 dead: dead.as_ref(),
             };
-            self.upgrade_walk(p, (from, mode, keep), masters)?;
+            self.upgrade_walk(player_id, (from, mode, keep), masters)?;
         }
         // the upgrades to 0x67f and 0x6a1 move the tracker's list of `from` (FUN_14104fd10)
-        self.track_move_upgraded(p, from, to)?;
+        self.track_move_upgraded(player_id, from, to)?;
         if keep == UpgradeMaster::Kept
             && old.kind == new.kind
-            && let Some(m) = Arc::make_mut(self.model.masters.checked_mut(p.index())?).get_mut(from)
+            && let Some(master) =
+                Arc::make_mut(self.model.masters.checked_mut(player_id.index())?).get_mut(from)
         {
-            m.copy_from(&new);
+            master.copy_from(&new);
         }
         Ok(())
     }
@@ -132,14 +133,19 @@ impl World {
     /// Mode 2's own part of [`World::upgrade_objects`]: the object `id` gets a master of its own
     /// (a copy of the one it reads) where its kind lets it, takes slot 0x98 to `new` and copies
     /// `new` into its own master.
-    fn upgrade_named(&mut self, p: PlayerId, id: ObjectId, new: &Master) -> GenieResult<()> {
+    fn upgrade_named(
+        &mut self,
+        player_id: PlayerId,
+        id: ObjectId,
+        new: &Master,
+    ) -> GenieResult<()> {
         use crate::technology::upgrade::upgradable;
         if let Some(place) = self.place(id) {
-            let u = self.object_at(place)?;
-            let reads = self.master_read(p, u)?;
-            if upgradable(reads.kind, u.life.state) {
+            let unit = self.object_at(place)?;
+            let reads = self.master_read(player_id, unit)?;
+            if upgradable(reads.kind, unit.life.state) {
                 self.set_part(id, Part::OwnMaster(Box::new(reads.clone())))?;
-                self.upgrade_object(p, place, (&reads, new), UpgradeMaster::Kept)?;
+                self.upgrade_object(player_id, place, (&reads, new), UpgradeMaster::Kept)?;
                 if let Some(own) = self.parts.own_master.get_mut(id) {
                     own.copy_from(new);
                 }
@@ -153,42 +159,51 @@ impl World {
     /// `from`'s id); `masters` holds the table's old and new masters and the dead unit master.
     fn upgrade_walk(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         (from, mode, keep): (MasterId, UpgradeMode, UpgradeMaster),
         Masters { old, new, dead }: Masters<'_>,
     ) -> GenieResult<()> {
         use crate::technology::upgrade::upgradable;
         use crate::world::index::Place;
-        for i in self.players.player(p)?.objects.places() {
-            let place = Place::Live(p, i);
+        for i in self.players.player(player_id)?.objects.places() {
+            let place = Place::Live(player_id, i);
             let (id, master_id, state) = {
-                let u = self.players.live(p, i)?;
-                (u.id, u.life.master_id, u.life.state)
+                let live = self.players.live(player_id, i)?;
+                (live.id, live.life.master_id, live.life.state)
             };
             let table = !self.parts.own_master.contains(id);
             if table && master_id == from {
                 if upgradable(old.kind, state) {
-                    self.upgrade_object(p, place, (old, new), keep)?;
+                    self.upgrade_object(player_id, place, (old, new), keep)?;
                 } else {
-                    self.own_and_dead_master(p, i, old)?;
+                    self.own_and_dead_master(player_id, i, old)?;
                 }
             } else if table && let Some(d) = dead.filter(|d| d.id == master_id) {
                 self.set_part(id, Part::OwnMaster(Box::new(d.clone())))?;
             } else if mode.own_masters()
-                && let Some(own) = self.parts.own_master.get(id).filter(|m| m.id == from)
+                && let Some(own) = self
+                    .parts
+                    .own_master
+                    .get(id)
+                    .filter(|own_master| own_master.id == from)
                 && upgradable(own.kind, state)
             {
                 let own = own.clone();
-                self.upgrade_object(p, place, (&own, new), UpgradeMaster::Kept)?;
-                if let Some(m) = self.parts.own_master.get_mut(id) {
-                    m.copy_from(new);
+                self.upgrade_object(player_id, place, (&own, new), UpgradeMaster::Kept)?;
+                if let Some(master) = self.parts.own_master.get_mut(id) {
+                    master.copy_from(new);
                 }
             }
         }
-        for i in self.players.player(p)?.sleeping.places() {
-            let u = &self.players.asleep(p, i)?;
-            if !self.parts.own_master.contains(u.id) && u.life.master_id == from {
-                self.upgrade_object(p, Place::Sleeping(p, i), (old, new), keep)?;
+        for list_index in self.players.player(player_id)?.sleeping.places() {
+            let unit = &self.players.asleep(player_id, list_index)?;
+            if !self.parts.own_master.contains(unit.id) && unit.life.master_id == from {
+                self.upgrade_object(
+                    player_id,
+                    Place::Sleeping(player_id, list_index),
+                    (old, new),
+                    keep,
+                )?;
             }
         }
         Ok(())
@@ -197,7 +212,7 @@ impl World {
     /// The upgrades to 0x67f and 0x6a1 move the tracker's list of `from` (`FUN_14104fd10`).
     fn track_move_upgraded(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         from: MasterId,
         to: MasterId,
     ) -> GenieResult<()> {
@@ -207,14 +222,14 @@ impl World {
             .of_master(to)
             .intersects(MasterRoles::FLEMISH_MILITIA | MasterRoles::FLEMISH_MILITIA_FEMALE)
         {
-            self.track_move_all(p, from, to)?;
+            self.track_move_all(player_id, from, to)?;
         }
         Ok(())
     }
 
-    /// The master object `u` of player `p` reads: its own, else its player's.
-    pub(super) fn master_read(&self, p: PlayerId, u: &Unit) -> GenieResult<Master> {
-        u.master(self.master_tables(), p).cloned()
+    /// The master object `unit` of player `player_id` reads: its own, else its player's.
+    pub(super) fn master_read(&self, player_id: PlayerId, unit: &Unit) -> GenieResult<Master> {
+        unit.master(self.master_tables(), player_id).cloned()
     }
 
     /// An object of master `old` past its use (slot 0xa8 false) in an upgrade: a master of its own
@@ -223,40 +238,40 @@ impl World {
     /// 40, 70 or 80, from its player's table; its slot 0xa8, the graphics, is not simulation).
     pub(super) fn own_and_dead_master(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        player_id: PlayerId,
+        list_index: ListIndex,
         old: &Master,
     ) -> GenieResult<()> {
         let dead = old.death_spawns[0]
-            .and_then(|id| player_master(&self.model.masters, p, id))
+            .and_then(|id| player_master(&self.model.masters, player_id, id))
             .cloned();
-        let id = self.players.live(p, i)?.id;
+        let id = self.players.live(player_id, list_index)?.id;
         if !self.parts.own_master.contains(id) {
             self.set_part(id, Part::OwnMaster(Box::new(old.clone())))?;
         }
         if !self.parts.dead_master.contains(id)
             && old.death_spawns[0].is_some()
-            && let Some(d) = dead.filter(|d| DEAD_COPY_KINDS.contains(&d.kind))
+            && let Some(d) = dead.filter(|master| DEAD_COPY_KINDS.contains(&master.kind))
         {
             self.set_part(id, Part::DeadMaster(Box::new(d)))?;
         }
         Ok(())
     }
 
-    /// Slot 0x1a8 (`FUN_1416136f0`) of player `p`: `count` objects of master `master` (Gaia's when
-    /// the player lacks it) at each of its built objects of building master `at` (state 2, in its
-    /// list's order), up to attribute 234's count of buildings when above 0, in a playback (the
-    /// screen's mode is not 4). Each object: a male villager (0x53) draws its sex from the Player
-    /// stream ("SpawnObject": `r % 100` above 49 a female, 0x125); the owner's slot 0x1c0 makes
-    /// it at the building's place with its flag ([`World::make_new_object`]); its slot 0x1a0 takes
-    /// it into the building where the building has room for one more (slot 0x198,
+    /// Slot 0x1a8 (`FUN_1416136f0`) of player `player_id`: `count` objects of master `master`
+    /// (Gaia's when the player lacks it) at each of its built objects of building master `at`
+    /// (state 2, in its list's order), up to attribute 234's count of buildings when above 0, in a
+    /// playback (the screen's mode is not 4). Each object: a male villager (0x53) draws its sex
+    /// from the Player stream ("SpawnObject": `draw % 100` above 49 a female, 0x125); the owner's
+    /// slot 0x1c0 makes it at the building's place with its flag ([`World::make_new_object`]); its
+    /// slot 0x1a0 takes it into the building where the building has room for one more (slot 0x198,
     /// [`World::has_room`]); unless the player's attribute 283 is above 0 it comes out at once
-    /// toward no point (`FUN_1411e7220`, [`World::let_out`]); a relic (0x11d) counts in the
-    /// world's `+0x844` ([`World::spawned_relics`]). The local player's statistics of effect
-    /// 0x318's spawns are not simulation.
+    /// toward no point (`FUN_1411e7220`, [`World::let_out`]); a relic (0x11d) counts in the world's
+    /// `+0x844` ([`World::spawned_relics`]). The local player's statistics of effect 0x318's spawns
+    /// are not simulation.
     pub(super) fn spawn_at(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         (master, at): (Option<MasterId>, Option<MasterId>),
         count: i16,
     ) -> GenieResult<()> {
@@ -264,34 +279,35 @@ impl World {
             self.model
                 .masters
                 .get(q)
-                .is_some_and(|m| m.get(id).is_some())
+                .is_some_and(|masters| masters.get(id).is_some())
         };
         let building = at
-            .and_then(|at| player_master(&self.model.masters, p, at))
+            .and_then(|at| player_master(&self.model.masters, player_id, at))
             .is_some_and(|m| m.kind == MasterKind::BUILDING);
         let (Some(master), Some(at)) = (master, at) else {
             return Ok(());
         };
-        if !building || !(has(p.index(), master) || has(0, master)) || count <= 0 {
+        if !building || !(has(player_id.index(), master) || has(0, master)) || count <= 0 {
             return Ok(());
         }
-        let owner = if has(p.index(), master) {
-            p
+        let owner = if has(player_id.index(), master) {
+            player_id
         } else {
             PlayerId::GAIA
         };
-        let attribute = |q: &Player, i: usize| q.attributes.get(i).copied().unwrap_or(Amount::ZERO);
-        let limit = attribute(self.players.player(p)?, 234).get() as i32;
+        let attribute =
+            |player: &Player, i: usize| player.attributes.get(i).copied().unwrap_or(Amount::ZERO);
+        let limit = attribute(self.players.player(player_id)?, 234).get() as i32;
         let buildings: Vec<ObjectId> = self
             .players
-            .player(p)?
+            .player(player_id)?
             .objects
             .iter()
             .filter(|u| u.life.master_id == at && u.life.state == ObjectState::Alive)
-            .map(|u| u.id)
+            .map(|unit| unit.id)
             .collect();
-        for (k, &b) in buildings.iter().enumerate() {
-            if 0 < limit && limit <= k as i32 {
+        for (index, &object_id) in buildings.iter().enumerate() {
+            if 0 < limit && limit <= index as i32 {
                 return Ok(());
             }
             for _ in 0..count {
@@ -301,8 +317,8 @@ impl World {
                     .of_master(master)
                     .contains(MasterRoles::VILLAGER_MALE)
                 {
-                    let r = self.streams.get(Stream::Player).rand15() as i32;
-                    if 49 < r % 100 {
+                    let draw = self.streams.get(Stream::Player).rand15() as i32;
+                    if 49 < draw % 100 {
                         // The male and female villagers' masters.
                         // The relic's master, which the world counts.
                         self.model.slots.master.villager_female
@@ -312,7 +328,7 @@ impl World {
                 } else {
                     master
                 };
-                let Some((_, building)) = self.object(b) else {
+                let Some((_, building)) = self.object(object_id) else {
                     break;
                 };
                 let position = building.position();
@@ -320,17 +336,17 @@ impl World {
                 else {
                     continue;
                 };
-                let Some((bp, bu)) = self.object(b) else {
+                let Some((bp, bu)) = self.object(object_id) else {
                     break;
                 };
                 if self.has_room(bp, bu, None)? {
                     let Some(Place::Live(np, ni)) = self.place(new) else {
                         continue;
                     };
-                    self.enter_forced(np, ni, ContainerId::new(b))?;
+                    self.enter_forced(np, ni, ContainerId::new(object_id))?;
                 }
-                if attribute(self.players.player(p)?, 283) <= Amount::ZERO {
-                    let Some(Place::Live(bp, bi)) = self.place(b) else {
+                if attribute(self.players.player(player_id)?, 283) <= Amount::ZERO {
+                    let Some(Place::Live(bp, bi)) = self.place(object_id) else {
                         break;
                     };
                     let _ = self.let_out(bp, bi, new, Point::new(-1.0, -1.0), (None, false))?;
@@ -368,7 +384,7 @@ impl World {
         }
     }
 
-    /// `FUN_1415c1f70` (a multiply of a cost by a negative amount) of player `p`: the cost
+    /// `FUN_1415c1f70` (a multiply of a cost by a negative amount) of player `player_id`: the cost
     /// attribute (103 to 106) names the resource (food, wood, gold 3, stone 2); a removal
     /// (`how` −2) empties its first cost slot of the masters `units` name in its place
     /// (`FUN_141612df0`: −1, 0, unpaid), an addition (−1) fills the first empty slot with it,
@@ -377,7 +393,7 @@ impl World {
     /// (not modelled).
     pub(super) fn cost_entries(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         units: Option<CostUnits>,
         attribute: MasterAttribute,
         edit: Option<CostEdit>,
@@ -388,26 +404,30 @@ impl World {
         let (Some(units), Some(edit)) = (units, edit) else {
             return;
         };
-        let Some(masters) = self.model.masters.of_mut(p) else {
+        let Some(masters) = self.model.masters.of_mut(player_id) else {
             return;
         };
-        for m in masters.iter_mut() {
+        for master in masters.iter_mut() {
             let named = match units {
-                CostUnits::Master(id) => m.id == id,
-                CostUnits::Class(class) => m.class == class,
+                CostUnits::Master(id) => master.id == id,
+                CostUnits::Class(class) => master.class == class,
             };
-            if !named || m.kind < MasterKind::COMBAT {
+            if !named || master.kind < MasterKind::COMBAT {
                 continue;
             }
             // a tree (type 90) has no creatable layer, so no costs to edit
-            let Some(part) = m.creatable.as_mut() else {
+            let Some(part) = master.creatable.as_mut() else {
                 continue;
             };
             let wanted = match edit {
                 CostEdit::Remove => Some(resource),
                 CostEdit::Add => None,
             };
-            if let Some(slot) = part.cost.iter_mut().find(|c| c.attribute == wanted) {
+            if let Some(slot) = part
+                .cost
+                .iter_mut()
+                .find(|cost_slot| cost_slot.attribute == wanted)
+            {
                 *slot = match edit {
                     CostEdit::Remove => CostSlot::default(),
                     CostEdit::Add => CostSlot::new(resource, CostAmount::of_data(-1), true),

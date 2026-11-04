@@ -44,8 +44,8 @@ impl TryFrom<i32> for TransportMode {
 }
 
 impl genie_diff::Diff for TransportMode {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.get().diff(&other.get(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.get().diff(&other.get(), differ);
     }
 }
 
@@ -71,7 +71,7 @@ mod tests {
                 Ok(value)
             );
         }
-        let e = TransportMode::try_from(2).unwrap_err();
-        assert!(e.to_string().contains("no slot writes"), "{e}");
+        let error = TransportMode::try_from(2).unwrap_err();
+        assert!(error.to_string().contains("no slot writes"), "{error}");
     }
 }

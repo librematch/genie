@@ -36,8 +36,8 @@ mod tests {
     /// The pair holds melee first, as the game's two shorts.
     #[test]
     fn an_armor_pair_holds_melee_then_pierce() {
-        let p = ArmorPair::new(3, -4);
-        assert_eq!((p.melee.get(), p.pierce.get()), (3, -4));
+        let armor_pair = ArmorPair::new(3, -4);
+        assert_eq!((armor_pair.melee.get(), armor_pair.pierce.get()), (3, -4));
         assert_eq!(ArmorPair::ZERO, ArmorPair::default());
     }
 }

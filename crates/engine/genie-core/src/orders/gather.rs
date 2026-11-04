@@ -72,11 +72,11 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
     ) -> GenieResult<Answer> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
-        let tm = t.master(self.master_tables(), tp)?;
-        if !self.gatherable_building(player, (tp, t), tm)? {
+        let tm = target_unit.master(self.master_tables(), tp)?;
+        if !self.gatherable_building(player, (tp, target_unit), tm)? {
             return Ok(Answer::NotTaken);
         }
         let owner = self.players.player(player)?;
@@ -84,14 +84,19 @@ impl World {
         let me = unit.master(self.master_tables(), player)?;
         let resource = Resource {
             id: target,
-            position: t.position(),
+            position: target_unit.position(),
             class: tm.class,
             master: tm.id,
             player: tp,
-            workers: t.workers,
+            workers: target_unit.workers,
             drop_site: self.drops_at_main(player, idx, target)?,
-            gap: footprint_gap(unit.position(), me.radius, t.position(), tm.radius),
-            state: t.life.state,
+            gap: footprint_gap(
+                unit.position(),
+                me.radius,
+                target_unit.position(),
+                tm.radius,
+            ),
+            state: target_unit.life.state,
             radius: tm.radius,
         };
         let player_kind = owner.kind;
@@ -104,7 +109,7 @@ impl World {
             .actions_of(unit.id)
             .list
             .gather()
-            .and_then(|g| g.task.productivity);
+            .and_then(|gather_action| gather_action.task.productivity);
         let rate = StopRate {
             work_rate: self.parts.combat_of(unit.id).work_rate_powerup + me.action_part().work_rate,
             capacity: Amount::of_master(me.capacity),
@@ -193,11 +198,11 @@ impl World {
         target: ObjectId,
         point: Position,
     ) -> GenieResult<Answer> {
-        let (tp, o) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a move to an object the slice does not hold",
         ))?;
-        let tm = o.master(self.master_tables(), tp)?;
-        let (at, radius) = (o.position(), tm.radius);
+        let tm = target_unit.master(self.master_tables(), tp)?;
+        let (at, radius) = (target_unit.position(), tm.radius);
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
         let moved_to = Some(MoveTarget {
@@ -249,13 +254,13 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
     ) -> GenieResult<bool> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
-        let tm = t.master(self.master_tables(), tp)?;
+        let tm = target_unit.master(self.master_tables(), tp)?;
         let main = if tm.kind == MasterKind::BUILDING {
             self.parts
-                .building_of(t.id)
+                .building_of(target_unit.id)
                 .annex_of
                 .map_or(target, MainBuildingId::id)
         } else {
@@ -347,24 +352,24 @@ impl World {
 
     /// What a hunt reads of its target.
     pub(super) fn quarry(&self, player: PlayerId, target: ObjectId) -> GenieResult<Quarry> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, unit) = self.object(target).ok_or(GenieError::unsupported(
             "a hunt's target the slice does not hold",
         ))?;
-        let target_master = t.master(self.master_tables(), tp)?;
+        let target_master = unit.master(self.master_tables(), tp)?;
         let world = TaskWorld {
             players: &self.players,
             drop_sites: &self.model.drop_sites,
         };
         Ok(Quarry {
             id: target,
-            position: t.position(),
+            position: unit.position(),
             class: target_master.class,
             kind: target_master.kind,
-            state: t.life.state,
+            state: unit.life.state,
             player: tp,
-            amount: t.life.amount,
+            amount: unit.life.amount,
             allied: world.allied(player, tp, AllyTest::WithRelation4),
-            top_action: self.parts.actions_of(t.id).top_action_kind(),
+            top_action: self.parts.actions_of(unit.id).top_action_kind(),
             drop_site: false,
         })
     }
@@ -384,22 +389,27 @@ impl World {
         task: &Task,
         notify: Option<(Position, Notifies)>,
     ) -> GenieResult<()> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a gather's target the slice does not hold",
         ))?;
-        let tm = t.master(self.master_tables(), tp)?;
+        let tm = target_unit.master(self.master_tables(), tp)?;
         let unit = &self.players.live(player, idx)?;
         let me = unit.master(self.master_tables(), player)?;
         let resource = Resource {
             id: target,
-            position: t.position(),
+            position: target_unit.position(),
             class: tm.class,
             master: tm.id,
             player: tp,
-            workers: t.workers,
+            workers: target_unit.workers,
             drop_site: self.drops_at_main(player, idx, target)?,
-            gap: footprint_gap(unit.position(), me.radius, t.position(), tm.radius),
-            state: t.life.state,
+            gap: footprint_gap(
+                unit.position(),
+                me.radius,
+                target_unit.position(),
+                tm.radius,
+            ),
+            state: target_unit.life.state,
             radius: tm.radius,
         };
         let task = HuntTask {
@@ -551,7 +561,7 @@ impl World {
         let speed = self
             .parts
             .mover_of(unit.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed);
+            .map_or(Speed::ZERO, |mover| mover.stats.speed);
         attack_engagement(
             self.parts.unit_ai.get(unit.id),
             speed,
@@ -572,25 +582,25 @@ impl World {
     fn gatherable_building(
         &self,
         player: PlayerId,
-        (tp, t): (PlayerId, &Unit),
+        (tp, unit): (PlayerId, &Unit),
         tm: &Master,
     ) -> GenieResult<bool> {
         if tm.kind == MasterKind::BUILDING {
             // The action type of a packed siege unit unpacking (an Unpack, 125, `0x7d`), whose target a gather drops
             // (`FUN_140a903a0`).
-            if self.parts.actions_of(t.id).top_action_kind() == Some(ActionKind::UNPACK)
-                || self.parts.unread.contains(t.id)
+            if self.parts.actions_of(unit.id).top_action_kind() == Some(ActionKind::UNPACK)
+                || self.parts.unread.contains(unit.id)
             {
                 return Err(GenieError::unsupported(
                     "a gather retargeted to a building with an action (packing)",
                 ));
             }
             if !tm.object_flags.contains(ObjectFlags::GATHERED_BUILDING) {
-                let (mp, main) = match self.parts.building_of(t.id).annex_of {
-                    Some(m) => self.object(m).ok_or(GenieError::unsupported(
+                let (mp, main) = match self.parts.building_of(unit.id).annex_of {
+                    Some(role_id) => self.object(role_id).ok_or(GenieError::unsupported(
                         "an annex whose main building is gone",
                     ))?,
-                    None => (tp, t),
+                    None => (tp, unit),
                 };
                 let main_master = main.master(self.master_tables(), mp)?.id;
                 if (main.life.state < ObjectState::Alive

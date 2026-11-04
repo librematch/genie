@@ -93,7 +93,7 @@ impl Mover {
         if solid {
             let level = self.paths.walked()?;
             let waypoint = level.point(level.waypoint);
-            let w = Way {
+            let way = Way {
                 goal,
                 include,
                 position,
@@ -105,7 +105,7 @@ impl Mover {
                 target_id: level.target,
                 class_roles,
             };
-            if let Some(step) = self.plan_solid((at, me), world, plan, &w, &mut np, by_id)? {
+            if let Some(step) = self.plan_solid((at, me), world, plan, &way, &mut np, by_id)? {
                 return Ok(step);
             }
         } else {
@@ -114,7 +114,7 @@ impl Mover {
         if np.path.points.len() < 2 || np.path.length.get() < EPSILON {
             return self.no_path(
                 np.flags,
-                goal.target.map(|(_, t)| t),
+                goal.target.map(|(_, placed)| placed),
                 goal.to_end,
                 movement_tuning,
             );
@@ -149,8 +149,8 @@ impl Mover {
         if ground(position, waypoint) != Distance::ZERO {
             return Ok(None);
         }
-        let away = goal.target.is_none_or(|(_, t)| {
-            EPSILON < footprint_gap(here, ground_radius, t.position, t.radius).get()
+        let away = goal.target.is_none_or(|(_, placed)| {
+            EPSILON < footprint_gap(here, ground_radius, placed.position, placed.radius).get()
         });
         if away {
             level.flags |= LevelFlags::AT_WAYPOINT;
@@ -172,15 +172,15 @@ impl Mover {
         class_roles: ClassRoles,
         plans: &mut StepPlans,
     ) -> GenieResult<bool> {
-        let owner = world.get(me.id).map(|p| p.player);
+        let owner = world.get(me.id).map(|placed| placed.player);
         let budget = owner.map(|o| plan.pathing.budget(o));
         if !may_plan(class_roles, budget, self.wait_delays, *plans) {
             self.stop()?;
             self.wait_delays = self.wait_delays.plus_one();
             return Ok(false);
         }
-        if let Some(o) = owner {
-            plan.pathing.count_plan(o);
+        if let Some(player_id) = owner {
+            plan.pathing.count_plan(player_id);
         }
         *plans = plans.plus_one();
         self.wait_delays = WaitDelays::NONE;
@@ -192,10 +192,9 @@ impl Mover {
     /// lower level, or a top without more points, resets and gives up (`FUN_140f9b4b0`:
     /// `FUN_140f98e80`, state 6; the unit stops, slot 0x5d0); else the level takes state 5.
     pub(super) fn spend_try(&mut self) -> GenieResult<Option<AfterRequest>> {
-        let top_loops = self
-            .paths
-            .last()
-            .is_some_and(|t| !t.points.is_empty() && t.path_flags.contains(PathFlags::LOOPS));
+        let top_loops = self.paths.last().is_some_and(|path_data| {
+            !path_data.points.is_empty() && path_data.path_flags.contains(PathFlags::LOOPS)
+        });
         if top_loops || self.attack_moving {
             return Ok(None);
         }
@@ -264,7 +263,7 @@ impl Mover {
             range,
             target,
         } = ask;
-        let master = world.get(me.id).map(|p| p.master);
+        let master = world.get(me.id).map(|placed| placed.master);
         let walker = LongWalker {
             id: me.id,
             position: at,
@@ -335,7 +334,7 @@ impl Mover {
         let ignore = by_id.query_ignore(&[Some(me.id), target_id]);
         let grow = self.stats.radius.x() * movement_tuning.long_path_grow;
         let stretches = path.points.iter().zip(path.points.iter().skip(1));
-        for (i, (&a, &b)) in stretches.enumerate() {
+        for (index, (&a, &b)) in stretches.enumerate() {
             let (from, to) = self.query_ends(a, b, world.map);
             let rect = Rect::spanning(from, to);
             world.check_known_records(rect.grown(Distance::new(grow)))?;
@@ -349,21 +348,22 @@ impl Mover {
                 ignore: &ignore,
                 objects: by_id,
             })?;
-            let walled = hits.iter().any(|&h| {
-                world.get(h).is_some_and(|p| {
+            let walled = hits.iter().any(|&record_id| {
+                world.get(record_id).is_some_and(|placed| {
                     roles
-                        .of_class(p.class)
+                        .of_class(placed.class)
                         .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::TOWER)
-                        || (roles.of_class(p.class).contains(ClassRoles::BUILDING) && !p.moves)
+                        || (roles.of_class(placed.class).contains(ClassRoles::BUILDING)
+                            && !placed.moves)
                 })
             });
             if walled {
-                if i == 0 {
+                if index == 0 {
                     path.points.clear();
                     return Ok(false);
                 }
                 // i + 1 lies inside the path: the cut always happens
-                let _ = cut_path(path, i as i32 + 1);
+                let _ = cut_path(path, index as i32 + 1);
                 return Ok(true);
             }
         }
@@ -389,8 +389,8 @@ impl Mover {
         movement_tuning: &MovementTuning,
     ) -> GenieResult<bool> {
         let level = self.paths.walked()?;
-        let d = if level.target.is_none() { to_end } else { gap };
-        if (d - level.range).get() < EPSILON {
+        let distance = if level.target.is_none() { to_end } else { gap };
+        if (distance - level.range).get() < EPSILON {
             return Ok(true);
         }
         Ok(level.target.is_some()

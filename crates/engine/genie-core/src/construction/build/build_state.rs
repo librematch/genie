@@ -121,10 +121,18 @@ impl BuildState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::Move { move_to: Some(m) }
-            | Self::Drop { move_to: Some(m) }
-            | Self::WalkPoint { move_to: Some(m) }
-            | Self::Clear { move_to: Some(m) } => Some(m),
+            Self::Move {
+                move_to: Some(move_to_action),
+            }
+            | Self::Drop {
+                move_to: Some(move_to_action),
+            }
+            | Self::WalkPoint {
+                move_to: Some(move_to_action),
+            }
+            | Self::Clear {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -132,7 +140,7 @@ impl BuildState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -140,9 +148,9 @@ impl BuildState {
     /// The same state, its walk without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut build_state = self;
+        let _ = build_state.take_move_to();
+        build_state
     }
 }
 
@@ -156,20 +164,23 @@ mod tests {
     /// `MoveTo` of a state that does not walk; the walks give theirs.
     #[test]
     fn build_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match BuildState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 0 | 5 | 9 | 10 | 12 | 14..=221 | 225..), "{b}"),
+        for index in 0..=255_u8 {
+            match BuildState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(
+                    matches!(index, 0 | 5 | 9 | 10 | 12 | 14..=221 | 225..),
+                    "{index}"
+                ),
             }
         }
         assert_eq!(BuildState::Finished.to_string(), "224");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 8, 11, 223] {
-            let mut s = BuildState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut build_state = BuildState::of_byte(b, Some(walk)).unwrap();
+            assert_eq!((build_state.get(), build_state.move_to()), (b, Some(&walk)));
+            assert_eq!(build_state.bare().move_to(), None);
+            assert_eq!(build_state.take_move_to(), Some(walk));
+            assert_eq!(build_state.move_to(), None);
         }
         assert!(BuildState::of_byte(6, Some(walk)).is_err());
         assert_eq!(BuildState::Work.bare(), BuildState::Work);

@@ -91,7 +91,8 @@ impl UnitGroup {
     /// `FUN_141046500`) or its [`GroupFlags::PATROL`] (`FUN_141017c30`).
     #[must_use]
     pub fn patrols(&self) -> bool {
-        top_path(&self.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS))
+        top_path(&self.motion.paths)
+            .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS))
             || self.flags.contains(GroupFlags::PATROL)
     }
 
@@ -101,21 +102,24 @@ impl UnitGroup {
     /// [`MotionFlags::MOVED`], and [`MotionFlags::NEW`] with it when set, which sets the group's
     /// [`GroupFlags::RELAYOUT`] (`FUN_14104a240`).
     pub fn update_end(&mut self) -> GenieResult<()> {
-        let g = self;
-        if g.motion.flags.contains(MotionFlags::MOVED) {
-            let [point, forward, up, right] = g.motion.new_position;
-            g.stored_positions.add_at_front(LinePoint {
+        let group = self;
+        if group.motion.flags.contains(MotionFlags::MOVED) {
+            let [point, forward, up, right] = group.motion.new_position;
+            group.stored_positions.add_at_front(LinePoint {
                 point,
                 forward,
                 up,
                 right,
             })?;
         }
-        let flags = g.motion.flags;
-        g.motion.flags.remove(MotionFlags::MOVED);
+        let flags = group.motion.flags;
+        group.motion.flags.remove(MotionFlags::MOVED);
         if flags.contains(MotionFlags::NEW) {
-            g.motion.flags.remove(MotionFlags::MOVED | MotionFlags::NEW);
-            g.flags |= GroupFlags::RELAYOUT;
+            group
+                .motion
+                .flags
+                .remove(MotionFlags::MOVED | MotionFlags::NEW);
+            group.flags |= GroupFlags::RELAYOUT;
         }
         Ok(())
     }

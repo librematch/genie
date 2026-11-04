@@ -40,11 +40,11 @@ impl Master {
         let resource = cost_resource(attribute);
         self.creatable
             .iter_mut()
-            .flat_map(|p| p.cost.iter_mut())
+            .flat_map(|creatable_part| creatable_part.cost.iter_mut())
             .filter(move |c| {
                 c.attribute.is_some() && ((c.paid && resource.is_none()) || c.attribute == resource)
             })
-            .map(|c| &mut c.amount)
+            .map(|cost_slot| &mut cost_slot.amount)
     }
 
     /// `FUN_1412661d0`, the combat master's slot 0x18.
@@ -99,8 +99,8 @@ impl Master {
             | MasterAttribute::WOOD_COSTS
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
-                for c in self.costs_of(attribute) {
-                    *c = CostAmount::of_data(low16(v));
+                for cost_amount in self.costs_of(attribute) {
+                    *cost_amount = CostAmount::of_data(low16(v));
                 }
             }
             MasterAttribute::POPULATION => {
@@ -110,8 +110,8 @@ impl Master {
                 for c in self
                     .creatable
                     .iter_mut()
-                    .flat_map(|p| p.cost.iter_mut())
-                    .filter(|c| c.attribute.is_some() && !c.paid)
+                    .flat_map(|creatable_part| creatable_part.cost.iter_mut())
+                    .filter(|cost_slot| cost_slot.attribute.is_some() && !cost_slot.paid)
                 {
                     c.amount = CostAmount::of_data(low16(negated));
                 }
@@ -160,8 +160,8 @@ impl Master {
                 }
             }
             MasterAttribute::CHARGE_PROJECTILE_UNIT => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.charge_projectile = id_of(cvttss2si(v));
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.charge_projectile = id_of(cvttss2si(v));
                 }
             }
             _ => {}
@@ -195,13 +195,13 @@ impl Master {
                 }
             }
             MasterAttribute::GARRISON_GRAPHIC => {
-                if let Some(p) = self.creatable.as_mut() {
-                    set_sprite(&mut p.garrison_sprite, cvttss2si(v), world);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    set_sprite(&mut creatable_part.garrison_sprite, cvttss2si(v), world);
                 }
             }
             MasterAttribute::ATTACK_GRAPHIC_2 => {
-                if let Some(p) = self.combat.as_mut() {
-                    set_sprite(&mut p.attack_sprite2, cvttss2si(v), world);
+                if let Some(combat_part) = self.combat.as_mut() {
+                    set_sprite(&mut combat_part.attack_sprite2, cvttss2si(v), world);
                 }
             }
             _ => {}
@@ -230,8 +230,8 @@ impl Master {
                 }
             }
             MasterAttribute::TRAIN_TIME => {
-                if let Some(t) = self.train_location_mut() {
-                    t.time = WholeSeconds::of_data(low16(v));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.time = WholeSeconds::of_data(low16(v));
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
@@ -242,8 +242,12 @@ impl Master {
                 }
             }
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                if let Some(p) = self.creatable.as_mut() {
-                    resize_train_locations(&mut p.train_locations, &mut p.train_location_entry, v);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    resize_train_locations(
+                        &mut creatable_part.train_locations,
+                        &mut creatable_part.train_location_entry,
+                        v,
+                    );
                 }
             }
             _ => {}
@@ -285,8 +289,8 @@ impl Master {
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
                 let hit_points = self.hit_points;
-                if let Some(p) = self.creatable.as_mut() {
-                    p.add_value(attribute, v, hit_points, world);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.add_value(attribute, v, hit_points, world);
                 }
             }
             MasterAttribute::RESOURCE_COSTS
@@ -294,19 +298,19 @@ impl Master {
             | MasterAttribute::WOOD_COSTS
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
-                for c in self.costs_of(attribute) {
-                    *c = c.plus(low16(v));
+                for cost_amount in self.costs_of(attribute) {
+                    *cost_amount = cost_amount.plus(low16(v));
                 }
             }
             MasterAttribute::TRAIN_TIME => {
-                if let Some(t) = self.train_location_mut() {
-                    t.time = t.time.plus(low16(v));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.time = train_location.time.plus(low16(v));
                 }
             }
             // FUN_141533c70 tests the new id; the game takes the sprite from the same table
             MasterAttribute::ATTACK_GRAPHIC_2 => {
-                if let Some(p) = self.combat.as_mut() {
-                    add_sprite(&mut p.attack_sprite2, v, world);
+                if let Some(combat_part) = self.combat.as_mut() {
+                    add_sprite(&mut combat_part.attack_sprite2, v, world);
                 }
             }
             MasterAttribute::ABILITY_BUTTON_ICON_ID
@@ -341,8 +345,8 @@ impl Master {
             | MasterAttribute::SPAWNING_AREA_RANDOMNESS
             | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
             | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-                if let Some(p) = self.creatable.as_mut() {
-                    p.multiply_value(attribute, v);
+                if let Some(creatable_part) = self.creatable.as_mut() {
+                    creatable_part.multiply_value(attribute, v);
                 }
             }
             MasterAttribute::RESOURCE_COSTS
@@ -350,14 +354,16 @@ impl Master {
             | MasterAttribute::WOOD_COSTS
             | MasterAttribute::GOLD_COSTS
             | MasterAttribute::STONE_COSTS => {
-                for c in self.costs_of(attribute) {
-                    *c = CostAmount::of_data(low16(c.as_f32() * v + ROUND));
+                for cost_amount in self.costs_of(attribute) {
+                    *cost_amount = CostAmount::of_data(low16(cost_amount.as_f32() * v + ROUND));
                 }
             }
             MasterAttribute::TRAIN_TIME => {
                 // FUN_140ace5e0 reads 0 past the list; FUN_14126ade0 writes only within it
-                if let Some(t) = self.train_location_mut() {
-                    t.time = WholeSeconds::of_data(low16(f32::from(t.time.get()) * v + ROUND));
+                if let Some(train_location) = self.train_location_mut() {
+                    train_location.time = WholeSeconds::of_data(low16(
+                        f32::from(train_location.time.get()) * v + ROUND,
+                    ));
                 }
             }
             _ => self.multiply_combat(attribute, v, world),
@@ -390,8 +396,8 @@ impl Master {
                 }
             }
             MasterAttribute::GARRISON_HEAL_RATE => {
-                if let Some(b) = self.building.as_mut() {
-                    b.garrison_heal_rate = HitPoints::new(v);
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.garrison_heal_rate = HitPoints::new(v);
                 }
             }
             MasterAttribute::CONSTRUCTION_GRAPHIC
@@ -431,13 +437,15 @@ impl Master {
             }
             MasterAttribute::FOUNDATION_TERRAIN => {
                 if let Some(b) = self.building.as_mut() {
-                    let was = b.foundation_terrain.map_or(-1, |t| i16::from(t.get()));
+                    let was = b
+                        .foundation_terrain
+                        .map_or(-1, |terrain_id| i16::from(terrain_id.get()));
                     b.foundation_terrain = TerrainId::of_data(was.wrapping_add(low16(v)));
                 }
             }
             MasterAttribute::GARRISON_HEAL_RATE => {
-                if let Some(b) = self.building.as_mut() {
-                    b.garrison_heal_rate += HitPoints::new(v);
+                if let Some(building_master) = self.building.as_mut() {
+                    building_master.garrison_heal_rate += HitPoints::new(v);
                 }
             }
             MasterAttribute::CONSTRUCTION_GRAPHIC
@@ -460,8 +468,8 @@ impl Master {
         world: &AttributeWorld<'_>,
     ) {
         match (attribute, self.building.as_mut()) {
-            (MasterAttribute::GARRISON_HEAL_RATE, Some(b)) => {
-                b.garrison_heal_rate *= v;
+            (MasterAttribute::GARRISON_HEAL_RATE, Some(building_master)) => {
+                building_master.garrison_heal_rate *= v;
             }
             (MasterAttribute::GARRISON_HEAL_RATE, None) => {}
             _ => self.multiply_tribe_combat(attribute, v, world),

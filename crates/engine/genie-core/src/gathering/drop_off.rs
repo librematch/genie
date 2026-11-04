@@ -58,17 +58,17 @@ impl Unit {
         &mut self,
         gather: GatherAction,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        let by = self.releaser(c)?;
-        if self.after_drop_orders(c)? == ActionEnd::Ends {
+        let by = self.releaser(step)?;
+        if self.after_drop_orders(step)? == ActionEnd::Ends {
             return Ok(HeadCode::Deletes);
         }
-        let Some(found) = self.after_drop_search(&gather, actions, c)? else {
-            return self.after_drop_nothing((gather, actions), c, by, roles);
+        let Some(found) = self.after_drop_search(&gather, actions, step)? else {
+            return self.after_drop_nothing((gather, actions), step, by, roles);
         };
-        self.after_drop_retarget(actions, c, found, by, roles)
+        self.after_drop_retarget(actions, step, found, by, roles)
             .map(|()| HeadCode::Keeps)
     }
 
@@ -76,24 +76,24 @@ impl Unit {
     /// does not hold, or one its sight sees past state 5) leave (`FUN_140c5de60`); with orders
     /// left the AI ends its order and action and the Gather is done (its deletion lets the drop
     /// site go). [`ActionEnd::Ends`] when it is.
-    fn after_drop_orders(&self, c: &mut Step<'_>) -> GenieResult<ActionEnd> {
-        let spatial: &Spatial = &c.w.spatial;
+    fn after_drop_orders(&self, step: &mut Step<'_>) -> GenieResult<ActionEnd> {
+        let spatial: &Spatial = &step.w.spatial;
         let gone = |id: Option<ObjectId>| match spatial.get(id) {
             None => true,
             Some(_) => spatial
                 .sight
                 .as_ref()
-                .and_then(|v| v.seer(id))
-                .is_some_and(|s| ObjectState::Dead < s.state),
+                .and_then(|visibility| visibility.seer(id))
+                .is_some_and(|seer| ObjectState::Dead < seer.state),
         };
-        let Some(ai) = c.w.parts.unit_ai.get_mut(self.id) else {
+        let Some(ai) = step.w.parts.unit_ai.get_mut(self.id) else {
             return Ok(ActionEnd::GoesOn);
         };
-        ai.orders.retain(|o| {
+        ai.orders.retain(|queued_order| {
             !(matches!(
-                o.order,
+                queued_order.order,
                 OrderKind::Gather | OrderKind::Hunt | OrderKind::OnTarget
-            ) && gone(o.target))
+            ) && gone(queued_order.target))
         });
         if ai.orders.is_empty() {
             return Ok(ActionEnd::GoesOn);
@@ -110,9 +110,9 @@ impl Unit {
         &self,
         gather: &GatherAction,
         actions: &Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<Option<ObjectId>> {
-        let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
+        let Some(ai) = step.w.parts.unit_ai.get(self.id) else {
             return Ok(None);
         };
         let class = ai.target_class.or(gather.target_class);
@@ -121,10 +121,10 @@ impl Unit {
                 "slot 0x1b0 of another unit AI than the civilian's",
             ));
         }
-        let Some(kind) = class.and_then(|class| civilian_kind(class, &c.w.model.roles)) else {
+        let Some(kind) = class.and_then(|class| civilian_kind(class, &step.w.model.roles)) else {
             return Ok(None);
         };
-        self.resource_search(actions, c, kind, WorkerCount::NO_CAP)
+        self.resource_search(actions, step, kind, WorkerCount::NO_CAP)
     }
 
     /// Nothing found after the drop: a Gather with its point walks there to search again
@@ -135,18 +135,18 @@ impl Unit {
     fn after_drop_nothing(
         &mut self,
         (mut gather, actions): (GatherAction, &mut Action),
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         by: Releaser,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let farm_waits = waits_for_farm(self.life.master_id, gather.target_class, roles);
         let walks = self.move_walks(
-            c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.mover_of(self.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -159,20 +159,22 @@ impl Unit {
                 ));
             }
             // set_state(11) without a target: to the point within the task's range
-            let mover =
-                c.w.parts
-                    .mover_mut(self.id)
-                    .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
-            let walked = gather.walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to);
+            let mover = step
+                .w
+                .parts
+                .mover_mut(self.id)
+                .ok_or(GenieError::unsupported("a gatherer without movement state"))?;
+            let walked =
+                gather.walk_back(Distance::ZERO, mover, &walks, &step.w.model.tuning.move_to);
             actions.list.set_gather(Some(gather));
             return walked.map(|()| HeadCode::Keeps);
         }
-        if c.w.players.player(c.player)?.kind.is_computer() {
+        if step.w.players.player(step.player)?.kind.is_computer() {
             return Ok(HeadCode::Deletes);
         }
         let carry_to = gather.carry_to;
-        let shows = self.idle_sprite(&gather, c)?;
-        let torn = gather.tear_down(c.w.parts.mover_mut(self.id));
+        let shows = self.idle_sprite(&gather, step)?;
+        let torn = gather.tear_down(step.w.parts.mover_mut(self.id));
         if torn.is_ok() {
             gather.state = GatherState::Idle;
             gather.timer = Seconds::ZERO;
@@ -182,40 +184,40 @@ impl Unit {
         }
         actions.list.set_gather(Some(gather));
         torn?;
-        if let Some(g) = shows {
+        if let Some(graphic) = shows {
             new_sprite(
                 &mut self.sprite,
-                c.w.parts.move_stats_mut(self.id),
-                g,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.move_stats_mut(self.id),
+                graphic,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             );
         }
         if carry_to.is_some() {
-            release(c, self, carry_to, by)?;
+            release(step, self, carry_to, by)?;
         }
         Ok(HeadCode::Keeps)
     }
 
     /// The sprite an idle gatherer shows: its task's carrying sprite while it holds at least 1 of
     /// the task's resource, else its master's standing sprite (none the data file lacks).
-    fn idle_sprite(&self, gather: &GatherAction, c: &Step<'_>) -> GenieResult<Option<Graphic>> {
-        let master = self.master(c.w.master_tables(), c.player)?;
+    fn idle_sprite(&self, gather: &GatherAction, step: &Step<'_>) -> GenieResult<Option<Graphic>> {
+        let master = self.master(step.w.master_tables(), step.player)?;
         let standing = master
             .standing_sprite
-            .and_then(|s| c.w.model.graphics.get(s).copied());
+            .and_then(|s| step.w.model.graphics.get(s).copied());
         let carrying = gather
             .task
             .sprites
             .carrying
-            .and_then(|s| c.w.model.graphics.get(s).copied());
+            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id).copied());
         Ok(match carrying {
-            Some(g)
+            Some(graphic)
                 if gather.task.resource.is_some()
                     && self.life.attribute_kind == gather.task.resource
                     && 1 <= self.life.amount.get() as i32 =>
             {
-                Some(g)
+                Some(graphic)
             }
             _ => standing,
         })
@@ -227,47 +229,57 @@ impl Unit {
     fn after_drop_retarget(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         found: ObjectId,
         by: Releaser,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let (owner, resource) =
-            self.found_resource(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?, found)?;
-        let master = self.master(c.w.master_tables(), c.player)?;
-        let (player_kind, farm_mode) = (c.w.players.player(c.player)?.kind, c.w.settings.farm_mode);
+        let (owner, resource) = self.found_resource(
+            step,
+            OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+            found,
+        )?;
+        let master = self.master(step.w.master_tables(), step.player)?;
+        let (player_kind, farm_mode) = (
+            step.w.players.player(step.player)?.kind,
+            step.w.settings.farm_mode,
+        );
         let walks = self.move_walks(
-            c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.mover_of(self.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
         let rate = StopRate {
-            work_rate: c.w.parts.combat_of(self.id).work_rate_powerup
+            work_rate: step.w.parts.combat_of(self.id).work_rate_powerup
                 + master.action_part().work_rate,
             capacity: Amount::of_master(master.capacity),
             productivity: productivity_of(
-                actions.list.gather().and_then(|g| g.task.productivity),
-                &c.w.players.player(c.player)?.attributes,
-                &c.w.model.tuning.gather,
+                actions
+                    .list
+                    .gather()
+                    .and_then(|gather_action| gather_action.task.productivity),
+                &step.w.players.player(step.player)?.attributes,
+                &step.w.model.tuning.gather,
             ),
         };
-        let (Some(gather), Some(mover)) = (actions.list.gather_mut(), c.w.parts.mover_mut(self.id))
+        let (Some(gather), Some(mover)) =
+            (actions.list.gather_mut(), step.w.parts.mover_mut(self.id))
         else {
             return Err(GenieError::unsupported(
                 "a gatherer without its gather or movement state",
             ));
         };
         let old = gather.targets();
-        let rng = c.w.streams.get(Stream::Action);
+        let rng = step.w.streams.get(Stream::Action);
         gather.retarget(
             GatherRetarget {
                 target: &resource,
-                player: c.player,
+                player: step.player,
                 player_kind,
                 walks,
                 farm_mode,
@@ -276,7 +288,7 @@ impl Unit {
             mover,
             rng,
             roles,
-            &c.w.model.tuning,
+            &step.w.model.tuning,
         )?;
         let new = gather.targets();
         for (old, new) in old.into_iter().zip(new) {
@@ -284,23 +296,24 @@ impl Unit {
                 continue;
             }
             if old.is_some() {
-                release(c, self, old, by)?;
+                release(step, self, old, by)?;
             }
             if new.is_none() {
                 continue;
             }
-            if owner == c.player.index() && new == Some(found) {
+            if owner == step.player.index() && new == Some(found) {
                 // one of its own player's: allied, never listed
-                let _ = c.w.players.player(c.player)?;
-                let u =
-                    c.w.live_object_mut(c.player, found)
+                let _ = step.w.players.player(step.player)?;
+                let unit =
+                    step.w
+                        .live_object_mut(step.player, found)
                         .ok_or(GenieError::unreachable(
                             "an object found above its player lost",
                         ))?;
-                u.taken(None, by.id);
+                unit.taken(None, by.id);
             } else {
-                let by = self.releaser(c)?;
-                take(c, self, new, by, roles)?;
+                let by = self.releaser(step)?;
+                take(step, self, new, by, roles)?;
             }
         }
         Ok(())
@@ -311,32 +324,35 @@ impl Unit {
     /// the gatherer's drop sites, and the footprint gap to it.
     fn found_resource(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         others: OthersRef<'_>,
         found: ObjectId,
     ) -> GenieResult<(usize, Resource)> {
-        let (owner, t) = others.find(found).ok_or(GenieError::unsupported(
+        let (owner, unit) = others.find(found).ok_or(GenieError::unsupported(
             "a gather's new target the slice does not hold",
         ))?;
-        let master = self.master(c.w.master_tables(), c.player)?;
-        let target_master = t.master(c.w.master_tables(), owner)?;
+        let master = self.master(step.w.master_tables(), step.player)?;
+        let target_master = unit.master(step.w.master_tables(), owner)?;
         Ok((
             owner.index(),
             Resource {
                 id: found,
-                position: t.position(),
+                position: unit.position(),
                 class: target_master.class,
                 master: target_master.id,
                 player: owner,
-                workers: t.workers,
-                drop_site: master.action_part().drop_sites.contains(&t.life.master_id),
+                workers: unit.workers,
+                drop_site: master
+                    .action_part()
+                    .drop_sites
+                    .contains(&unit.life.master_id),
                 gap: footprint_gap(
                     self.position(),
                     master.radius,
-                    t.position(),
+                    unit.position(),
                     target_master.radius,
                 ),
-                state: t.life.state,
+                state: unit.life.state,
                 radius: target_master.radius,
             },
         ))
@@ -351,33 +367,34 @@ impl Unit {
         &mut self,
         gather: &mut GatherAction,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
-        let w = DropWorld {
-            masters: by_id.masters().of(c.player),
-            spatial: &mut c.w.spatial,
-            zones: &mut c.w.zones,
-            pathing: &mut c.w.pathing,
-            object: c.w.streams.get(Stream::Object),
-            world_time: c.w.world_time,
-            player_kind: c.w.players.player(c.player)?.kind,
-            groups: &c.w.groups,
+        let (mover, by_id) = step
+            .w
+            .parts
+            .lend_mover(self.id, (&step.w.players, &step.w.index, &step.w.model));
+        let drop_world = DropWorld {
+            masters: by_id.masters().of(step.player),
+            spatial: &mut step.w.spatial,
+            zones: &mut step.w.zones,
+            pathing: &mut step.w.pathing,
+            object: step.w.streams.get(Stream::Object),
+            world_time: step.w.world_time,
+            player_kind: step.w.players.player(step.player)?.kind,
+            groups: &step.w.groups,
         };
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
+        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
         if let Some(site) = self.gather_drop_off_in(
             (gather, actions),
             mover,
-            w,
+            drop_world,
             others,
-            &c.w.model.graphics,
+            &step.w.model.graphics,
             by_id,
         )? {
-            let by = self.releaser(c)?;
-            take(c, self, site, by, roles)?;
+            let by = self.releaser(step)?;
+            take(step, self, site, by, roles)?;
         }
         Ok(())
     }
@@ -390,7 +407,7 @@ impl Unit {
         &self,
         (gather, actions): (&mut GatherAction, &mut Action),
         mover: Option<&mut Mover>,
-        mut c: DropWorld<'_>,
+        mut drop_world: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
@@ -405,18 +422,18 @@ impl Unit {
         let (carry_to, state) = (gather.carry_to, gather.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
-            &mut c,
+            &mut drop_world,
             others,
             carry_to,
             ActionState::new(state.get()),
             by_id,
         )?;
-        let at = c
+        let at = drop_world
             .spatial
             .get_known(site)?
-            .map_or(Position::ORIGIN, |s| s.position);
+            .map_or(Position::ORIGIN, |placed| placed.position);
         let sprites = SpriteReads::of(
-            self.master_in(c.masters)?,
+            self.master_in(drop_world.masters)?,
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
             roles,
@@ -442,7 +459,7 @@ impl Unit {
         &self,
         (hunt, actions): (&mut HuntAction, &mut Action),
         mover: Option<&mut Mover>,
-        mut c: DropWorld<'_>,
+        mut drop_world: DropWorld<'_>,
         others: OthersRef<'_>,
         graphics: &Graphics,
         by_id: ObjectsRef<'_>,
@@ -457,7 +474,7 @@ impl Unit {
         let (carry_to, state) = (hunt.carry_to, hunt.state);
         let (site, gap) = self.drop_site(
             (actions, mover.as_deref()),
-            &mut c,
+            &mut drop_world,
             others,
             carry_to,
             ActionState::new(state.get()),
@@ -468,12 +485,12 @@ impl Unit {
                 "a hunt without a drop site (notify 0x203, set_state 2)",
             ));
         }
-        let at = c
+        let at = drop_world
             .spatial
             .get_known(site)?
-            .map_or(Position::ORIGIN, |s| s.position);
+            .map_or(Position::ORIGIN, |placed| placed.position);
         let sprites = SpriteReads::of(
-            self.master_in(c.masters)?,
+            self.master_in(drop_world.masters)?,
             by_id.combat_of(self.id).abilities.look.as_ref(),
             graphics,
             roles,
@@ -499,32 +516,32 @@ impl Unit {
     pub(crate) fn drop_site(
         &self,
         (actions, mover): (&Action, Option<&Mover>),
-        c: &mut DropWorld<'_>,
+        drop_world: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         carry_to: Option<DropSiteId>,
         state: ActionState,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<(Option<DropSiteId>, Distance)> {
-        let master = self.master_in(c.masters)?;
+        let master = self.master_in(drop_world.masters)?;
         let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
         let mut site = carry_to;
         if site.is_none() && !master.action_part().drop_sites.is_empty() {
-            let masters = c.masters.table.ok_or(GenieError::unsupported(
+            let masters = drop_world.masters.table.ok_or(GenieError::unsupported(
                 "a drop-off of a player without masters",
             ))?;
             let sites = &master.action_part().drop_sites;
             site = match self.drop_site_from(
                 (actions, Some(mover)),
-                c,
+                drop_world,
                 others,
                 state,
                 SitePlace::Outside,
                 by_id,
             )? {
-                Some(s) => Some(s),
+                Some(role_id) => Some(role_id),
                 None => drop_site_search(
                     others.own_iter(),
-                    OwnerMasters::new(c.masters.own, Some(masters)),
+                    OwnerMasters::new(drop_world.masters.own, Some(masters)),
                     sites,
                     self.position(),
                     None,
@@ -537,13 +554,13 @@ impl Unit {
             return Ok((None, Distance::ZERO));
         };
         let ground = mover.stats.radius.ground();
-        let s = c
+        let placed = drop_world
             .spatial
             .get_known(site)?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         Ok((
             Some(site),
-            footprint_gap(self.position(), ground, s.position, s.radius),
+            footprint_gap(self.position(), ground, placed.position, placed.radius),
         ))
     }
 
@@ -555,20 +572,20 @@ impl Unit {
     pub(crate) fn drop_site_from(
         &self,
         (actions, mover): (&Action, Option<&Mover>),
-        c: &mut DropWorld<'_>,
+        drop_world: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
         place: SitePlace,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<DropSiteId>> {
-        let nearest = if c.player_kind.is_computer() {
+        let nearest = if drop_world.player_kind.is_computer() {
             DropMeasure::ByDistance
         } else {
             DropMeasure::ByPath
         };
         self.drop_site_with(
             (actions, mover),
-            c,
+            drop_world,
             others,
             state,
             SiteSearch {
@@ -584,34 +601,40 @@ impl Unit {
     pub(crate) fn drop_site_with(
         &self,
         (actions, mover): (&Action, Option<&Mover>),
-        c: &mut DropWorld<'_>,
+        drop_world: &mut DropWorld<'_>,
         others: OthersRef<'_>,
         state: ActionState,
         search: SiteSearch,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<DropSiteId>> {
-        let masters = c.masters.table.ok_or(GenieError::unsupported(
+        let masters = drop_world.masters.table.ok_or(GenieError::unsupported(
             "a drop-off of a player without masters",
         ))?;
-        let master = self.master_in(c.masters)?;
+        let master = self.master_in(drop_world.masters)?;
         let mover = mover.ok_or(GenieError::unsupported("a gatherer without movement state"))?;
-        let terrain = c.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
-            "the map's zones without its terrain",
-        ))?;
+        let terrain = drop_world
+            .spatial
+            .terrain
+            .as_ref()
+            .ok_or(GenieError::unsupported(
+                "the map's zones without its terrain",
+            ))?;
         let values = terrain
             .restriction(mover.stats.restriction)
             .ok_or(UNKNOWN_RESTRICTION)?;
-        let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
+        let zones = drop_world
+            .zones
+            .of(drop_world.spatial.map, &terrain.kinds, values)?;
         let me = Me {
             action_state: state,
             ..self.me(actions)
         };
         let mut plan = Planning {
-            pathing: &mut *c.pathing,
-            now: c.world_time,
-            player_kind: c.player_kind,
-            object: &mut *c.object,
-            groups: c.groups,
+            pathing: &mut *drop_world.pathing,
+            now: drop_world.world_time,
+            player_kind: drop_world.player_kind,
+            object: &mut *drop_world.object,
+            groups: drop_world.groups,
         };
         let seeker = Seeker {
             unit: self,
@@ -620,14 +643,14 @@ impl Unit {
             me,
             mover,
             plan: &mut plan,
-            spatial: c.spatial,
+            spatial: drop_world.spatial,
             zones,
             class: master.class,
             nearest: search.nearest,
         };
         drop_site_search(
             others.own_iter(),
-            OwnerMasters::new(c.masters.own, Some(masters)),
+            OwnerMasters::new(drop_world.masters.own, Some(masters)),
             &master.action_part().drop_sites,
             self.position(),
             Some(seeker),

@@ -131,10 +131,10 @@ use genie_core::objects::unit::Unit;
 #[cfg(test)]
 use genie_core::ownership::artifact::ARTIFACT_KIND;
 use genie_core::world::load::object::object;
+pub use genie_core::world::load::world::options::settings;
 pub use genie_core::world::load::world::players::history;
 use genie_core::world::load::world::players::tech_state;
 use genie_core::world::load::world::saved_ghosts;
-pub use genie_core::world::load::world::settings;
 /// The fields a comparison covers ([`object_field_differences_in`]).
 pub use genie_diff::Scope;
 

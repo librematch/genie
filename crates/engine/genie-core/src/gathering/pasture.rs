@@ -37,33 +37,34 @@ pub const fn livestock(masters: MasterSlots) -> [MasterId; 2] {
     [masters.pasture_argali, masters.pasture_ibex]
 }
 
-/// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in
-/// the routine's order: the radius less `PastureTuning::inset` gives the corners (x−r, y−r), (x+r, y−r),
-/// (x+r, y+r) and (x−r, y+r); each edge from its first corner to its second, `(b − a) · t + a`
-/// in f32 (SUBSS, MULSS, ADDSS) with `t` from 0 by `PastureTuning::step` while at most `PastureTuning::end`: the bottom
-/// edge from the first corner to the second, the right one from the third to the second, the
-/// top one from the third to the fourth and the left one from the first to the fourth.
+/// The points along the edges of a pasture at `at` whose ground radius on x is `radius_x`, in the
+/// routine's order: the radius less `PastureTuning::inset` gives the corners (x−r, y−r), (x+r,
+/// y−r), (x+r, y+r) and (x−r, y+r); each edge from its first corner to its second, `(b − a) ·
+/// fraction + a` in f32 (SUBSS, MULSS, ADDSS) with `fraction` from 0 by `PastureTuning::step` while
+/// at most `PastureTuning::end`: the bottom edge from the first corner to the second, the right one
+/// from the third to the second, the top one from the third to the fourth and the left one from the
+/// first to the fourth.
 #[must_use]
 pub fn edge_points(at: Position, radius_x: Distance, pasture_tuning: &PastureTuning) -> Vec<Point> {
-    let r = radius_x - Distance::new(pasture_tuning.inset);
+    let distance = radius_x - Distance::new(pasture_tuning.inset);
     let (x, y) = (at.x(), at.y());
     let c = [
-        Point::new(x - r.get(), y - r.get()),
-        Point::new(x + r.get(), y - r.get()),
-        Point::new(x + r.get(), y + r.get()),
-        Point::new(x - r.get(), y + r.get()),
+        Point::new(x - distance.get(), y - distance.get()),
+        Point::new(x + distance.get(), y - distance.get()),
+        Point::new(x + distance.get(), y + distance.get()),
+        Point::new(x - distance.get(), y + distance.get()),
     ];
     let edges = [(c[0], c[1]), (c[2], c[1]), (c[2], c[3]), (c[0], c[3])];
     let mut points = Vec::new();
     for (a, b) in edges {
-        let mut t = 0.0f32;
+        let mut fraction = 0.0f32;
         // COMISS END, t with JNC: on while END is at least t
-        while t <= pasture_tuning.end {
+        while fraction <= pasture_tuning.end {
             points.push(Point::new(
-                (b.x() - a.x()) * t + a.x(),
-                (b.y() - a.y()) * t + a.y(),
+                (b.x() - a.x()) * fraction + a.x(),
+                (b.y() - a.y()) * fraction + a.y(),
             ));
-            t += pasture_tuning.step;
+            fraction += pasture_tuning.step;
         }
     }
     points
@@ -99,14 +100,14 @@ impl World {
     ///
     /// Its master or attributes the player has not got, a facet draw on a sprite of one facet
     /// (the game divides by zero), and what the object's making does not model.
-    pub(crate) fn setup_pasture(&mut self, p: PlayerId, id: PastureId) -> GenieResult<()> {
+    pub(crate) fn setup_pasture(&mut self, player_id: PlayerId, id: PastureId) -> GenieResult<()> {
         let (at, master) = self
             .object(id)
             .map(|(_, u)| (u.position(), u.life.master_id))
             .ok_or(GenieError::unreachable("a pasture its completion names"))?;
-        let radius_x = self.master(p, master)?.radius.x();
+        let radius_x = self.master(player_id, master)?.radius.x();
         let mut points = edge_points(at, Distance::new(radius_x), &self.model.tuning.pasture);
-        let owner = self.players.player(p)?;
+        let owner = self.players.player(player_id)?;
         let count =
             cvttss2si(Attributes::get(owner, self.model.slots.attribute.pasture_livestock)?.get());
         let food = Attributes::get(owner, self.model.slots.attribute.pasture_food)? / count as f32;
@@ -118,8 +119,8 @@ impl World {
             let mut i = draw_below(self, points.len());
             loop {
                 let (x, y) = {
-                    let p = points.checked(i)?;
-                    (p.x(), p.y())
+                    let checked = points.checked(i)?;
+                    (checked.x(), checked.y())
                 };
                 let (tx, ty) = (cvttss2si(x), cvttss2si(y));
                 let on_map = 0 <= tx && tx < map.width() && 0 <= ty && ty < map.height();
@@ -133,31 +134,34 @@ impl World {
                 i = draw_below(self, points.len());
             }
             let (x, y) = {
-                let p = points.checked(i)?;
-                (p.x(), p.y())
+                let point = points.checked(i)?;
+                (point.x(), point.y())
             };
-            if let Some(new) =
-                self.make_new_object(p, kind, Position::new(x, y, at.z()), MakeMode::Plain)?
-            {
+            if let Some(new) = self.make_new_object(
+                player_id,
+                kind,
+                Position::new(x, y, at.z()),
+                MakeMode::Plain,
+            )? {
                 let _ = points.remove(i);
                 if let Some((_, layer)) = self.object_and_layer_mut(id)? {
                     layer.livestock.push(new);
                 }
                 // `make_new_object` files the object it answers
-                let (_, u) = self
+                let (_, unit) = self
                     .object_mut(new)
                     .ok_or(GenieError::unreachable("the livestock just made"))?;
-                u.flags.set(UnitFlags::UNTARGETABLE, true);
-                u.pasture = Some(id);
-                u.life.amount = food;
-                let graphic = u.sprite.map(|s| s.graphic);
+                unit.flags.set(UnitFlags::UNTARGETABLE, true);
+                unit.pasture = Some(id);
+                unit.life.amount = food;
+                let graphic = unit.sprite.map(|active_sprite| active_sprite.graphic);
                 if let Some(g) =
                     graphic.filter(|g| g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME))
                 {
-                    let d = self.streams.get(Stream::Object).rand15() as i32;
+                    let draw = self.streams.get(Stream::Object).rand15() as i32;
                     // the `.dat` can give the livestock such a sprite: the game's `IDIV` by 0
                     // stops it
-                    let _ = d.checked_rem(g.facets.counted() - 1).ok_or_else(|| {
+                    let _ = draw.checked_rem(g.facets.counted() - 1).ok_or_else(|| {
                         GenieError::invalid_input(
                             "a random first facet of a livestock sprite of one facet",
                         )
@@ -174,15 +178,16 @@ impl World {
     /// ([`crate::objects::layers::Building::livestock`]) the world holds, summed; 0 for an object the world does
     /// not hold.
     pub(crate) fn livestock_workers(&self, pasture: PastureId) -> WorkerCount {
-        self.object(pasture).map_or(WorkerCount::ZERO, |(_, b)| {
-            self.parts
-                .building_of(b.id)
-                .livestock
-                .iter()
-                .filter_map(|&id| self.object(id))
-                .map(|(_, l)| l.workers)
-                .sum()
-        })
+        self.object(pasture)
+            .map_or(WorkerCount::ZERO, |(_, pasture_unit)| {
+                self.parts
+                    .building_of(pasture_unit.id)
+                    .livestock
+                    .iter()
+                    .filter_map(|&id| self.object(id))
+                    .map(|(_, unit)| unit.workers)
+                    .sum()
+            })
     }
 
     /// `FUN_1411c7670`: the livestock of pasture `pasture` that player `p`'s unit at `idx` tends,
@@ -201,26 +206,26 @@ impl World {
         p: PlayerId,
         idx: ListIndex,
     ) -> GenieResult<Option<(ObjectId, Position)>> {
-        let Some((q, b)) = self.object(pasture) else {
+        let Some((pasture_player_id, pasture_unit)) = self.object(pasture) else {
             return Ok(None);
         };
-        if q != p {
+        if pasture_player_id != p {
             return Ok(None);
         }
         let unit = &self.players.live(p, idx)?;
         let reach = unit.master(self.master_tables(), p)?.radius;
         let mut tended = Vec::new();
-        for &id in &self.parts.building_of(b.id).livestock {
-            let Some((r, l)) = self.object(id) else {
+        for &id in &self.parts.building_of(pasture_unit.id).livestock {
+            let Some((player_id, l)) = self.object(id) else {
                 continue;
             };
-            let radius = l.master(self.master_tables(), r)?.radius;
+            let radius = l.master(self.master_tables(), player_id)?.radius;
             let gap = footprint_gap_squared(l.position(), radius, unit.position(), reach);
             tended.push((id, l.workers, gap, l.position()));
         }
         sort(&mut tended, &|a, b| a.2 < b.2)?;
         let room = Attributes::get(
-            self.players.player(q)?,
+            self.players.player(pasture_player_id)?,
             self.model.slots.attribute.pasture_workers,
         )?;
         let mut pick = None;
@@ -254,12 +259,14 @@ impl World {
         let unit = &self.players.live(p, idx)?;
         let (id, named) = (unit.id, pasture.or(unit.my_pasture));
         let building = match self.object(named) {
-            Some((q, b)) => b.master(self.master_tables(), q)?.kind == MasterKind::BUILDING,
+            Some((player_id, b)) => {
+                b.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
+            }
             None => false,
         };
         if building && let Some((_, layer)) = self.object_and_layer_mut(named)? {
             if pasture.is_none() {
-                layer.pasture_workers.retain(|&w| w != id);
+                layer.pasture_workers.retain(|&object_id| object_id != id);
             } else if !layer.pasture_workers.contains(&id) {
                 layer.pasture_workers.push(id);
             }
@@ -272,9 +279,9 @@ impl World {
     /// of the pasture `pasture` (`+0x790`). A ghost on it is not of a pasture.
     fn holds_livestock_of(&self, pasture: PastureId, tile: Tile) -> bool {
         let kinds = livestock(self.model.slots.master);
-        self.spatial.tile_list(tile).iter().any(|&o| {
-            self.object(o).is_some_and(|(_, u)| {
-                u.pasture == Some(pasture) && kinds.contains(&u.life.master_id)
+        self.spatial.tile_list(tile).iter().any(|&object_id| {
+            self.object(object_id).is_some_and(|(_, unit)| {
+                unit.pasture == Some(pasture) && kinds.contains(&unit.life.master_id)
             })
         })
     }

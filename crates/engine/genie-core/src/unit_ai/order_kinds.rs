@@ -50,11 +50,11 @@ impl UnitAi {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        let Some(t) = Self::world_object(target, at, side)? else {
+        let Some(unit_seen) = Self::world_object(target, at, side)? else {
             return Ok(Answer::NotTaken);
         };
         self.set_action(Some(AiAction::Defend));
-        self.target_at(Some(target), Some(t.class), t.position);
+        self.target_at(Some(target), Some(unit_seen.class), unit_seen.position);
         self.desired_distance = range;
         self.defend_target = Some(target);
         Ok(Answer::Taken)
@@ -109,7 +109,11 @@ impl UnitAi {
         side.effect_now(Effect::Command(AiCommand::BuildObject(target)), self, rng)?;
         self.set_action(Some(AiAction::Build));
         match Self::world_object(target, at, side)? {
-            Some(t) => self.set_target(Some(target.id()), t.class.or_none(), t.position),
+            Some(unit_seen) => self.set_target(
+                Some(target.id()),
+                unit_seen.class.or_none(),
+                unit_seen.position,
+            ),
             None => self.set_target(Some(target.id()), None, Position::ORIGIN),
         }
         Ok(Answer::Taken)
@@ -136,7 +140,9 @@ impl UnitAi {
         }
         self.set_action(Some(action));
         match Self::world_object(target, at, side)? {
-            Some(t) => self.set_target(Some(target), t.class.or_none(), t.position),
+            Some(unit_seen) => {
+                self.set_target(Some(target), unit_seen.class.or_none(), unit_seen.position);
+            }
             None => self.set_target(Some(target), None, Position::ORIGIN),
         }
         Ok(Answer::Taken)
@@ -153,14 +159,14 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
-        let Some(t) = Self::world_object(target, at, side)? else {
+        let Some(unit_seen) = Self::world_object(target, at, side)? else {
             return Ok(Answer::NotTaken);
         };
         self.gather_object(
             Gatherable {
                 id: target,
-                position: t.position,
-                class: t.class,
+                position: unit_seen.position,
+                class: unit_seen.class,
             },
             side,
             rng,
@@ -183,11 +189,11 @@ impl UnitAi {
             Some(id) => Self::world_object(id, at, side)?.map(|t| (id, t)),
             None => None,
         };
-        let Some((target, t)) = held else {
+        let Some((target, unit_seen)) = held else {
             self.stop_current(StopOrder::Keep, at, side, rng)?;
             return Ok(Answer::NotTaken);
         };
-        self.hunt_object(target, t.class, t.position, at, side, rng)?;
+        self.hunt_object(target, unit_seen.class, unit_seen.position, at, side, rng)?;
         Ok(Answer::Taken)
     }
 
@@ -209,17 +215,17 @@ impl UnitAi {
         if force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        let Some(t) = Self::world_object(target, at, side)? else {
+        let Some(unit_seen) = Self::world_object(target, at, side)? else {
             return Ok(Answer::NotTaken);
         };
         self.set_action(Some(AiAction::Follow));
-        self.target_at(Some(target), Some(t.class), t.position);
+        self.target_at(Some(target), Some(unit_seen.class), unit_seen.position);
         self.desired_distance = range;
-        if range.squared() < t.gap_squared {
+        if range.squared() < unit_seen.gap_squared {
             let seen = Seen {
-                state: t.state,
-                class: t.class,
-                position: t.position,
+                state: unit_seen.state,
+                class: unit_seen.class,
+                position: unit_seen.position,
                 ..Seen::default()
             };
             self.move_to_object(
@@ -257,7 +263,7 @@ impl UnitAi {
         self.set_action(Some(AiAction::Enter));
         self.target_at(
             Some(target),
-            held.map(|t| t.class),
+            held.map(|unit_seen| unit_seen.class),
             Position::from([-1.0; 3]),
         );
         Ok(Answer::Taken)
@@ -331,7 +337,7 @@ impl UnitAi {
             return Ok(Answer::NotTaken);
         }
         self.set_action(Some(AiAction::SeekAndDestroy));
-        let class = Self::world_object(target, at, side)?.map(|t| t.class);
+        let class = Self::world_object(target, at, side)?.map(|unit_seen| unit_seen.class);
         self.target_at(
             Some(target),
             class,
@@ -376,21 +382,21 @@ impl UnitAi {
     /// way the order is not taken (0).
     pub(super) fn order_on_target(
         &mut self,
-        o: &QueuedOrder,
+        queued_order: &QueuedOrder,
         class: Option<ClassId>,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         ai: &mut Well512,
     ) -> GenieResult<OrderOutcome> {
         let roles = &at.roles;
-        if Self::world_object(o.target, at, side)?.is_some() {
-            side.effect_now(Effect::OrderOnTarget(*o), self, ai)?;
+        if Self::world_object(queued_order.target, at, side)?.is_some() {
+            side.effect_now(Effect::OrderOnTarget(*queued_order), self, ai)?;
             self.ordered_on_target = true;
             return Ok(OrderOutcome::Taken);
         }
-        if let Some(target_kind) = o.target_kind {
+        if let Some(target_kind) = queued_order.target_kind {
             // the class of the target's type: its owner's master's, else the type itself
-            let class = match o.target_owner {
+            let class = match queued_order.target_owner {
                 None => target_kind.class(),
                 Some(owner) => match side.master_class(owner, target_kind.master()) {
                     Some(class) => class,
@@ -411,16 +417,16 @@ impl UnitAi {
                 },
                 site: None,
                 current: self.current_target,
-                point: o.shown,
+                point: queued_order.shown,
                 min_state: ObjectState::Foundation,
             })?;
             // the world holds what the search found: the move after a found object it does not
             // hold cannot run
-            if let Some(g) = found {
+            if let Some(gatherable) = found {
                 side.effect_now(
                     Effect::Command(AiCommand::WorkOn {
-                        target: g.id,
-                        point: g.position,
+                        target: gatherable.id,
+                        point: gatherable.position,
                     }),
                     self,
                     ai,
@@ -428,16 +434,23 @@ impl UnitAi {
             }
             return Ok(OrderOutcome::NotTaken);
         }
-        let Some(m) = self.move_to(AiMove {
-            point: o.point,
-            range: o.range,
+        let Some(ai_move) = self.move_to(AiMove {
+            point: queued_order.point,
+            range: queued_order.range,
             force: OrderForce::Forced,
             pace: Pace::Walk,
         }) else {
             return Ok(OrderOutcome::NotTaken);
         };
-        side.effect_now(Effect::Move(m), self, ai)?;
-        Ok(self.order_tail(Some(o.order), o.priority, class, TakenAs::Order, ai, roles))
+        side.effect_now(Effect::Move(ai_move), self, ai)?;
+        Ok(self.order_tail(
+            Some(queued_order.order),
+            queued_order.priority,
+            class,
+            TakenAs::Order,
+            ai,
+            roles,
+        ))
     }
 
     /// Slot 0x1b0 by the unit AI's type: the kind of resource of a target class. The civilian's

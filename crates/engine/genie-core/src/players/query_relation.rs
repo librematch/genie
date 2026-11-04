@@ -85,11 +85,14 @@ mod tests {
             QueryRelation::Enemies,
             QueryRelation::Itself,
         ];
-        assert_eq!(all.map(|r| r.list().get()), [2, 3, 4, 1]);
+        assert_eq!(
+            all.map(|query_relation| query_relation.list().get()),
+            [2, 3, 4, 1]
+        );
         let kept = |filter: QueryRelation| {
             UnitRelation::ALL
                 .into_iter()
-                .filter(|&r| filter.keeps(r))
+                .filter(|&unit_relation| filter.keeps(unit_relation))
                 .map(UnitRelation::get)
                 .collect::<Vec<_>>()
         };

@@ -17,7 +17,6 @@
 use crate::map::Position;
 use crate::map::Tile;
 use crate::objects::ListFate;
-use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
 use crate::objects::masters::GhostMode;
@@ -27,15 +26,13 @@ use crate::players::PlayerId;
 use crate::players::PlayerSet;
 use crate::vision::VisionBits;
 use crate::world::World;
-use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 use crate::{GenieError, GenieResult};
-use std::collections::HashMap;
 
 /// The type from which an object's entry and its ghost follow its footprint's UMV entry
 /// (`FUN_141090430`, `FUN_14108f9b0`: master type above 0x31).
-const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
+pub(super) const MASKED_KIND: MasterKind = MasterKind::RGE_COMBAT;
 
 /// What an entry of a watched list follows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -114,7 +111,7 @@ pub struct Ghost {
 
 /// Whether a building's annex link is made, or not yet (during a load, before the rehook).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum AnnexLink {
+pub(super) enum AnnexLink {
     /// It is made.
     Made,
     /// Not yet.
@@ -122,230 +119,55 @@ enum AnnexLink {
 }
 
 impl World {
-    /// The vision mask of player `p` (`player+0x2a8`, [`crate::vision`]).
-    fn vision_mask(&self, p: PlayerId) -> VisionBits {
-        self.spatial.vision(p).visible
+    /// The vision mask of player `player_id` (`player+0x2a8`, [`crate::vision`]).
+    fn vision_mask(&self, player_id: PlayerId) -> VisionBits {
+        self.spatial.vision(player_id).visible
     }
 
     /// The unified map's visible and explored bits at `tile` (`map+0x5e30`, masked); 0 off the
     /// map or without the players' sight.
-    fn tile_bits(&self, tile: Tile) -> GenieResult<VisionBits> {
-        let Some(v) = self.spatial.sight.as_ref() else {
+    pub(super) fn tile_bits(&self, tile: Tile) -> GenieResult<VisionBits> {
+        let Some(visibility) = self.spatial.sight.as_ref() else {
             return Ok(VisionBits::NONE);
         };
-        let Some(i) = v.size.index(tile) else {
+        let Some(i) = visibility.size.index(tile) else {
             return Ok(VisionBits::NONE);
         };
-        Ok(*v.unified.checked(i)? & VisionBits::OBJECT_MASK)
+        Ok(*visibility.unified.checked(i)? & VisionBits::OBJECT_MASK)
     }
 
     /// `tile`'s index in the unified map.
-    fn tile_index(&self, tile: Tile) -> Option<usize> {
+    pub(super) fn tile_index(&self, tile: Tile) -> Option<usize> {
         self.spatial.sight.as_ref()?.size.index(tile)
     }
 
     /// What a cell shows now.
-    fn cell_bits(&self, cell: Cell) -> GenieResult<VisionBits> {
+    pub(super) fn cell_bits(&self, cell: Cell) -> GenieResult<VisionBits> {
         match cell {
             Cell::Tile(i) => Ok(self
                 .spatial
                 .sight
                 .as_ref()
                 .and_then(|v| v.unified.get(i))
-                .map_or(VisionBits::NONE, |&b| b & VisionBits::OBJECT_MASK)),
+                .map_or(VisionBits::NONE, |&vision_bits| {
+                    vision_bits & VisionBits::OBJECT_MASK
+                })),
             Cell::Mask(id) => {
                 let registry = self
                     .spatial
                     .sight
                     .as_ref()
-                    .and_then(|v| v.registry.as_ref())
+                    .and_then(|visibility| visibility.registry.as_ref())
                     .ok_or(GenieError::unsupported(
                         "a watched building without the objects-in-sight registry",
                     ))?;
                 Ok(registry
                     .entries
                     .get(id)
-                    .map_or(VisionBits::NONE, |e| e.mask)
+                    .map_or(VisionBits::NONE, |entry| entry.mask)
                     & VisionBits::OBJECT_MASK)
             }
         }
-    }
-
-    /// `FUN_141090430`: player `owner`'s watched list takes object `id` at tile (`x`, `y`) (an
-    /// object of another owner, or one it holds already, is refused: [`GhostWatch::Refused`]). The
-    /// entry keeps the tile's bits; it follows the tile, or for an object of type 50 and up with
-    /// its footprint's UMV entry (`+0x904`) its own visibility mask (`+0x8f8`).
-    pub(crate) fn watch(
-        &mut self,
-        owner: PlayerId,
-        id: ObjectId,
-        at: Tile,
-    ) -> GenieResult<GhostWatch> {
-        let Some((p, u)) = self.object(id) else {
-            return Ok(GhostWatch::Refused);
-        };
-        if p != owner
-            || self
-                .players
-                .player(owner)?
-                .watched
-                .iter()
-                .any(|w| w.id == id)
-        {
-            return Ok(GhostWatch::Refused);
-        }
-        // the game takes the tile's word without a bounds test: every caller passes the
-        // object's own tile, which is on the map
-        let Some(tile) = self.tile_index(at) else {
-            return Ok(GhostWatch::Refused);
-        };
-        let bits = self.tile_bits(at)?;
-        let kind = u.master(self.master_tables(), p)?.kind;
-        let umv = self
-            .spatial
-            .sight
-            .as_ref()
-            .and_then(|v| v.seer(id))
-            .map_or(0, |s| s.umv);
-        let cell = if MASKED_KIND <= kind && umv != 0 {
-            Cell::Mask(id)
-        } else {
-            Cell::Tile(tile)
-        };
-        self.players
-            .player_mut(owner)?
-            .watched
-            .push(Watched { id, cell, bits });
-        Ok(GhostWatch::Watched)
-    }
-
-    /// The tile (`(int)x`, `(int)y`) of a place, as the game's callers truncate it.
-    fn tile_at(position: Position) -> Tile {
-        position.tile()
-    }
-
-    /// `FUN_141091310`: the watched list of player `owner` lets object `id` go (the last entry
-    /// takes its place).
-    pub(crate) fn unwatch(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
-        let list = &mut self.players.player_mut(owner)?.watched;
-        if let Some(k) = list.iter().position(|w| w.id == id) {
-            let _ = list.swap_remove(k);
-        }
-        Ok(())
-    }
-
-    /// `FUN_1411cc980`: a building its owner watches: not of class 51 or 54, not desolid
-    /// (`+0xc60`), not an annex (`+0xbb8`, but a gate's), not master 1808.
-    fn watches_building(&self, p: PlayerId, id: ObjectId) -> GenieResult<bool> {
-        self.watches_building_at(p, id, AnnexLink::Made)
-    }
-
-    /// [`World::watches_building`], with the annex link made or, during a load before the rehook,
-    /// not yet ([`AnnexLink`]): then an annex passes too.
-    fn watches_building_at(&self, p: PlayerId, id: ObjectId, link: AnnexLink) -> GenieResult<bool> {
-        let Some((_, u)) = self.object(id) else {
-            return Ok(false);
-        };
-        let m = u.master(self.master_tables(), p)?;
-        let annex = link == AnnexLink::Made && self.parts.building_of(u.id).annex_of.is_some();
-        Ok(
-            !self.model.roles.of_class(m.class).contains(ClassRoles::UNWATCHED)
-            && !self.parts.building_of(u.id).construction.is_some_and(|c| c.desolid)
-            // The master a building's watch leaves out (`FUN_1411cc980`).
-            && (!annex || self.model.roles.of_class(m.class).contains(ClassRoles::GATE))
-            && !self.model.roles.of_master(m.id).contains(MasterRoles::MULE_CART),
-        )
-    }
-
-    /// A building whose construction started (`FUN_1411e5670`): its owner watches it
-    /// ([`World::watches_building`]).
-    pub(crate) fn watch_started(&mut self, p: PlayerId, id: ObjectId) -> GenieResult<()> {
-        if !self.watches_building(p, id)? {
-            return Ok(());
-        }
-        let Some((_, u)) = self.object(id) else {
-            return Ok(());
-        };
-        let _ = self.watch(p, id, Self::tile_at(u.position()))?;
-        Ok(())
-    }
-
-    /// The watched lists the game's load builds, which no save holds: each player's objects in
-    /// the load's order (its live list, then its sleeping list) join their owner's list, an
-    /// object whose master leaves ghosts once it is dead (`FUN_14119df60`, at its tile) and a
-    /// building its owner watches ([`World::watches_building`]; the load constructor
-    /// `FUN_1411ac170`, at what it follows, an annex's link not known yet); then the rehook lets
-    /// every annex but a gate's go (`TRIBE_Building_Object::rehook`). A building's mask is empty
-    /// at a load.
-    pub fn build_watched(&mut self) -> GenieResult<()> {
-        // each id's object as [`World::object`] finds it (the first player in order, its live list
-        // before its sleeping list), looked up once: the loop changes only the watched lists
-        let mut first: HashMap<ObjectId, (PlayerId, bool, ListIndex)> = HashMap::new();
-        for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            for (sleeping, list) in [(false, &player.objects), (true, &player.sleeping)] {
-                for (k, u) in list.indexed() {
-                    let _ = first.entry(u.id).or_insert((q, sleeping, k));
-                }
-            }
-        }
-        for p in PlayerId::each(self.players.len()) {
-            self.players.player_mut(p)?.watched.clear();
-            let ids: Vec<ObjectId> = self
-                .players
-                .player(p)?
-                .objects
-                .iter()
-                .chain(&self.players.player(p)?.sleeping)
-                .map(|u| u.id)
-                .collect();
-            for id in ids {
-                let Some(&(q, sleeping, k)) = first.get(&id) else {
-                    continue;
-                };
-                let u = if sleeping {
-                    &self.players.asleep(q, k)?
-                } else {
-                    &self.players.live(q, k)?
-                };
-                let m = u.master(self.master_tables(), p)?;
-                let (state, kind, ghosts, position) =
-                    (u.life.state, m.kind, m.ghost_on_death, u.position());
-                let tile = Self::tile_at(position);
-                // the static load's watch of a dead object (FUN_14119df60)
-                if ghosts == GhostMode::LEAVES && ObjectState::Alive < state {
-                    let _ = self.watch(p, id, tile)?;
-                }
-                // a building's load constructor (FUN_1411ac170, type 80 only): FUN_1411cc980
-                // before the rehook links its annexes
-                if kind == MasterKind::BUILDING
-                    && self.watches_building_at(p, id, AnnexLink::Pending)?
-                {
-                    let _ = self.watch(p, id, tile)?;
-                }
-            }
-            for list in [false, true] {
-                let held = self.players.player(p)?;
-                let objects = if list { &held.sleeping } else { &held.objects };
-                let mut annexes: Vec<ObjectId> = Vec::new();
-                for u in objects
-                    .iter()
-                    .filter(|u| self.parts.building_of(u.id).annex_of.is_some())
-                {
-                    if !self
-                        .model
-                        .roles
-                        .of_class(u.master(self.master_tables(), p)?.class)
-                        .contains(ClassRoles::GATE)
-                    {
-                        annexes.push(u.id);
-                    }
-                }
-                for id in annexes {
-                    self.unwatch(p, id)?;
-                }
-            }
-        }
-        Ok(())
     }
 
     /// `FUN_14118e990`, at the death of object `id` (the static `set_state` 3, while the game
@@ -354,28 +176,29 @@ impl World {
     /// ([`World::make_ghost`]), in the players' order; the first bit past the players ends it.
     /// Then its owner's list watches it at its tile ([`World::watch`]).
     pub(crate) fn ghosts_at_death(&mut self, _owner: usize, id: ObjectId) -> GenieResult<()> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((p, unit)) = self.object(id) else {
             return Ok(());
         };
         let original = Original {
             id,
             owner: p,
-            state: u.life.state,
-            master: u.life.master_id,
+            state: unit.life.state,
+            master: unit.life.master_id,
         };
-        let position = u.position();
+        let position = unit.position();
         if id.is_recyclable()
-            || u.master(self.master_tables(), p)?.ghost_on_death != GhostMode::LEAVES
+            || unit.master(self.master_tables(), p)?.ghost_on_death != GhostMode::LEAVES
         {
             return Ok(());
         }
         let tile = Self::tile_at(position);
         let bits = self.tile_bits(tile)?;
         // each player past Gaia that explored the tile and does not see it, in order
-        for i in PlayerId::each(self.players.len()).skip(1) {
-            if bits.intersects(VisionBits::explored(i)) && !bits.intersects(VisionBits::visible(i))
+        for player_id in PlayerId::each(self.players.len()).skip(1) {
+            if bits.intersects(VisionBits::explored(player_id))
+                && !bits.intersects(VisionBits::visible(player_id))
             {
-                self.make_ghost(i, position, original)?;
+                self.make_ghost(player_id, position, original)?;
             }
         }
         let _ = self.watch(p, id, tile)?;
@@ -405,8 +228,8 @@ impl World {
             .spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(original.id))
-            .map_or(0, |s| s.umv);
+            .and_then(|visibility| visibility.seer(original.id))
+            .map_or(0, |seer| seer.umv);
         let pooled = if recyclable.recycled() {
             self.recycling.ghosts.pop()
         } else {
@@ -450,71 +273,74 @@ impl World {
     /// players' lists in their order give the same.
     fn check_twins(&mut self, viewer: PlayerId, ghost: &mut Ghost) -> GenieResult<()> {
         let tile = Self::tile_at(ghost.position);
-        for q in PlayerId::each(self.players.len()) {
-            for k in 0..self.players.player(q)?.ghosts.len() {
-                let g = *self.players.player(q)?.ghosts.checked(k)?;
-                if Self::tile_at(g.position) != tile
-                    || g.id == ghost.id
-                    || g.original_id != ghost.original_id
-                    || g.state != ObjectState::Alive
+        for player_id in PlayerId::each(self.players.len()) {
+            for index in 0..self.players.player(player_id)?.ghosts.len() {
+                let player = *self.players.player(player_id)?.ghosts.checked(index)?;
+                if Self::tile_at(player.position) != tile
+                    || player.id == ghost.id
+                    || player.original_id != ghost.original_id
+                    || player.state != ObjectState::Alive
                 {
                     continue;
                 }
-                if q == viewer {
-                    self.destroy_ghost(q, k)?;
+                if player_id == viewer {
+                    self.destroy_ghost(player_id, index)?;
                 } else {
-                    self.players.player_mut(q)?.ghosts.checked_mut(k)?.cant_see |=
-                        PlayerSet::of(viewer);
-                    ghost.cant_see |= PlayerSet::of(q);
+                    self.players
+                        .player_mut(player_id)?
+                        .ghosts
+                        .checked_mut(index)?
+                        .cant_see |= PlayerSet::of(viewer);
+                    ghost.cant_see |= PlayerSet::of(player_id);
                 }
             }
         }
         Ok(())
     }
 
-    /// The destroy (slot 0xd0, `FUN_14118f1e0`) of ghost `k` of player `p`: below state 7, its
-    /// hit points go and it goes to state 7.
-    fn destroy_ghost(&mut self, p: PlayerId, k: usize) -> GenieResult<()> {
-        let g = self.players.player_mut(p)?.ghosts.checked_mut(k)?;
-        if g.state < ObjectState::Removed {
-            g.state = ObjectState::Removed;
+    /// The destroy (slot 0xd0, `FUN_14118f1e0`) of ghost `k` of player `player_id`: below state 7,
+    /// its hit points go and it goes to state 7.
+    fn destroy_ghost(&mut self, player_id: PlayerId, k: usize) -> GenieResult<()> {
+        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
+        if ghost.state < ObjectState::Removed {
+            ghost.state = ObjectState::Removed;
         }
         Ok(())
     }
 
-    /// The ghosts of player `p` in their list's order (`FUN_141166550` on `+0x40`), each one's
-    /// update (`FUN_141090000`): its static step (state 7 goes to 8, a ghost in state 8 leaves);
-    /// one its viewer saw while the original's mask had not is destroyed; its original past state
-    /// 6 is forgotten; then, its tile's bits (and its footprint's) changed, every player sharing
-    /// the original owner's sight notes itself in the ghost's `cant_see` (`+0x7f0`), and a ghost
-    /// its viewer sees in state 2, unless one of the players sharing the viewer's sight does not, is
-    /// destroyed (or marked seen, for a building's ghost whose original the viewer's mask misses
-    /// and whose tile it does not see). A ghost that leaves (`FUN_141090ad0`) goes off its tile,
-    /// the last ghost taking its place in the list, and to the pool of type 25
+    /// The ghosts of player `player_id` in their list's order (`FUN_141166550` on `+0x40`), each
+    /// one's update (`FUN_141090000`): its static step (state 7 goes to 8, a ghost in state 8
+    /// leaves); one its viewer saw while the original's mask had not is destroyed; its original
+    /// past state 6 is forgotten; then, its tile's bits (and its footprint's) changed, every player
+    /// sharing the original owner's sight notes itself in the ghost's `cant_see` (`+0x7f0`), and a
+    /// ghost its viewer sees in state 2, unless one of the players sharing the viewer's sight does
+    /// not, is destroyed (or marked seen, for a building's ghost whose original the viewer's mask
+    /// misses and whose tile it does not see). A ghost that leaves (`FUN_141090ad0`) goes off its
+    /// tile, the last ghost taking its place in the list, and to the pool of type 25
     /// (`RGE_Static_Object::recycle_out_of_game`), or for a master that is not recyclable it is
     /// deleted. The viewer's `+0x2b0` table is not held (empty).
-    pub(crate) fn update_ghosts(&mut self, p: PlayerId) -> GenieResult<()> {
+    pub(crate) fn update_ghosts(&mut self, player_id: PlayerId) -> GenieResult<()> {
         let mut k = 0;
-        while k < self.players.player(p)?.ghosts.len() {
-            if self.update_ghost(p, k)? == ListFate::Leaves {
-                let g = self.players.player_mut(p)?.ghosts.swap_remove(k);
-                if g.original_master.is_some_and(|m| {
+        while k < self.players.player(player_id)?.ghosts.len() {
+            if self.update_ghost(player_id, k)? == ListFate::Leaves {
+                let ghost = self.players.player_mut(player_id)?.ghosts.swap_remove(k);
+                if ghost.original_master.is_some_and(|master_id| {
                     self.model
                         .roles
-                        .of_master(m)
+                        .of_master(master_id)
                         .contains(MasterRoles::TERRAIN_ORIGINAL)
                 }) {
                     return Err(GenieError::unsupported(
                         "a farm's ghost leaving (the local player's terrain, FUN_141092190)",
                     ));
                 }
-                self.spatial.remove_ghost(g.id, g.position);
+                self.spatial.remove_ghost(ghost.id, ghost.position);
                 if (self
-                    .master(p, self.model.slots.master.doppelganger)?
+                    .master(player_id, self.model.slots.master.doppelganger)?
                     .recyclable)
                     .recycled()
                 {
-                    self.recycling.ghosts.push(g.id);
+                    self.recycling.ghosts.push(ghost.id);
                 }
                 continue;
             }
@@ -526,36 +352,36 @@ impl World {
     /// An original past state 6 is forgotten with its master; without one only the id goes.
     fn forget_original(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         k: usize,
         original: Option<ObjectId>,
     ) -> GenieResult<()> {
-        let live = original.is_some_and(|o| {
-            self.object(o)
-                .is_some_and(|(_, u)| u.life.state < ObjectState::Removed)
+        let live = original.is_some_and(|object_id| {
+            self.object(object_id)
+                .is_some_and(|(_, unit)| unit.life.state < ObjectState::Removed)
         });
-        let g = self.players.player_mut(p)?.ghosts.checked_mut(k)?;
+        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
         if original.is_none() {
-            g.original_id = None;
+            ghost.original_id = None;
         } else if !live {
-            g.original = None;
-            g.original_master = None;
-            g.original_id = None;
+            ghost.original = None;
+            ghost.original_master = None;
+            ghost.original_id = None;
         }
         Ok(())
     }
 
     /// The bits of the ghost's tile and, for a building's ghost, of its footprint's tiles.
-    fn ghost_bits(&self, g: &Ghost) -> GenieResult<VisionBits> {
-        let (px, py) = (g.position.x(), g.position.y());
-        let mut bits = self.tile_bits(g.tile)?;
-        if g.footprint != 0 {
+    fn ghost_bits(&self, ghost: &Ghost) -> GenieResult<VisionBits> {
+        let (px, py) = (ghost.position.x(), ghost.position.y());
+        let mut bits = self.tile_bits(ghost.tile)?;
+        if ghost.footprint != 0 {
             let offsets = self
                 .spatial
                 .sight
                 .as_ref()
-                .and_then(|v| v.extents.get(usize::from(g.footprint) - 1))
-                .map(|e| e.offsets.clone())
+                .and_then(|visibility| visibility.extents.get(usize::from(ghost.footprint) - 1))
+                .map(|extent| extent.offsets.clone())
                 .ok_or(GenieError::unsupported(
                     "a building's ghost without its UMV entry",
                 ))?;
@@ -569,13 +395,13 @@ impl World {
 
     /// Whether the ghost is unseen by a player that sees its original's tile no more, and the
     /// players who cannot see it: those sharing the original owner's sight note themselves.
-    fn ghost_viewers(&self, p: PlayerId, g: &Ghost, bits: VisionBits) -> (bool, PlayerSet) {
+    fn ghost_viewers(&self, p: PlayerId, ghost: &Ghost, bits: VisionBits) -> (bool, PlayerSet) {
         let mut unseen = false;
-        let mut cant_see = g.cant_see;
-        for i in PlayerId::each(self.players.len()).skip(1) {
-            let mask = self.vision_mask(i);
-            if mask.intersects(VisionBits::visible(g.original_owner)) {
-                cant_see |= PlayerSet::of(i);
+        let mut cant_see = ghost.cant_see;
+        for player_id in PlayerId::each(self.players.len()).skip(1) {
+            let mask = self.vision_mask(player_id);
+            if mask.intersects(VisionBits::visible(ghost.original_owner)) {
+                cant_see |= PlayerSet::of(player_id);
             } else if mask.intersects(VisionBits::visible(p)) && !bits.intersects(mask) {
                 unseen = true;
             }
@@ -583,24 +409,25 @@ impl World {
         (unseen, cant_see)
     }
 
-    /// Whether the viewer `p` has now seen the ghost's tile while its original's mask had not,
-    /// and whether the ghost is destroyed for it.
+    /// Whether the viewer `player_id` has now seen the ghost's tile while its original's mask had
+    /// not, and whether the ghost is destroyed for it.
     fn ghost_seen(
         &self,
-        p: PlayerId,
-        g: &Ghost,
+        player_id: PlayerId,
+        ghost: &Ghost,
         bits: VisionBits,
         unseen: bool,
     ) -> GenieResult<(bool, bool)> {
-        let viewer = self.vision_mask(p);
-        let mut seen = g.seen;
+        let viewer = self.vision_mask(player_id);
+        let mut seen = ghost.seen;
         let mut destroy = false;
-        if bits.intersects(viewer) && !unseen && g.state < ObjectState::Dying {
-            if g.footprint != 0
-                && let Some(o) = g.original
+        if bits.intersects(viewer) && !unseen && ghost.state < ObjectState::Dying {
+            if ghost.footprint != 0
+                && let Some(object_id) = ghost.original
             {
-                let original_mask = self.cell_bits(Cell::Mask(o))?;
-                if !original_mask.intersects(viewer) && !self.tile_bits(g.tile)?.intersects(viewer)
+                let original_mask = self.cell_bits(Cell::Mask(object_id))?;
+                if !original_mask.intersects(viewer)
+                    && !self.tile_bits(ghost.tile)?.intersects(viewer)
                 {
                     seen = true;
                 }
@@ -610,82 +437,40 @@ impl World {
         Ok((seen, destroy))
     }
 
-    fn update_ghost(&mut self, p: PlayerId, k: usize) -> GenieResult<ListFate> {
-        let g = *self.players.player(p)?.ghosts.checked(k)?;
+    fn update_ghost(&mut self, player_id: PlayerId, k: usize) -> GenieResult<ListFate> {
+        let g = *self.players.player(player_id)?.ghosts.checked(k)?;
         let leaves = match g.state {
             ObjectState::Removed => {
-                self.players.player_mut(p)?.ghosts.checked_mut(k)?.state = ObjectState::Gone;
+                self.players
+                    .player_mut(player_id)?
+                    .ghosts
+                    .checked_mut(k)?
+                    .state = ObjectState::Gone;
                 ListFate::Stays
             }
             ObjectState::Gone => ListFate::Leaves,
             _ => ListFate::Stays,
         };
         if g.seen && g.state < ObjectState::Dying {
-            self.destroy_ghost(p, k)?;
+            self.destroy_ghost(player_id, k)?;
             return Ok(leaves);
         }
-        self.forget_original(p, k, g.original)?;
-        let g = *self.players.player(p)?.ghosts.checked(k)?;
-        let bits = self.ghost_bits(&g)?;
-        if bits == g.bits {
+        self.forget_original(player_id, k, g.original)?;
+        let player = *self.players.player(player_id)?.ghosts.checked(k)?;
+        let bits = self.ghost_bits(&player)?;
+        if bits == player.bits {
             return Ok(leaves);
         }
-        let (unseen, cant_see) = self.ghost_viewers(p, &g, bits);
-        let (seen, destroy) = self.ghost_seen(p, &g, bits, unseen)?;
-        let g = self.players.player_mut(p)?.ghosts.checked_mut(k)?;
-        g.seen = seen;
-        g.cant_see = cant_see;
-        g.bits = bits;
+        let (unseen, cant_see) = self.ghost_viewers(player_id, &player, bits);
+        let (seen, destroy) = self.ghost_seen(player_id, &player, bits, unseen)?;
+        let ghost = self.players.player_mut(player_id)?.ghosts.checked_mut(k)?;
+        ghost.seen = seen;
+        ghost.cant_see = cant_see;
+        ghost.bits = bits;
         if destroy {
-            self.destroy_ghost(p, k)?;
+            self.destroy_ghost(player_id, k)?;
         }
         Ok(leaves)
-    }
-
-    /// The watched list of player `p` after the player loop (`FUN_1410905e0`): an entry whose
-    /// bits changed, of an object the world still holds, gives a ghost to every player, but its
-    /// owner, who saw the cell and no longer does ([`World::make_ghost`], at the object's place),
-    /// in the players' order, and takes the new bits; the last entry whose object is gone leaves
-    /// the list (the last entry taking its place). A computer player's AI then hears of its ghost
-    /// (its slot 0x2e8 with notify 0x20d), which is not modelled.
-    pub(crate) fn watch_pass(&mut self, p: PlayerId) -> GenieResult<()> {
-        let mut gone = None;
-        for k in 0..self.players.player(p)?.watched.len() {
-            let w = *self.players.player(p)?.watched.checked(k)?;
-            let bits = self.cell_bits(w.cell)?;
-            if bits == w.bits {
-                continue;
-            }
-            match self.object(w.id) {
-                None => gone = Some(w.id),
-                Some((owner, u)) => {
-                    let at = u.position();
-                    let original = Original {
-                        id: w.id,
-                        owner,
-                        state: u.life.state,
-                        master: u.life.master_id,
-                    };
-                    // the visible bits the entry lost, of players 1 to 31 other than its own
-                    let lost = w.bits & !bits;
-                    for i in PlayerId::each(32).skip(1) {
-                        if lost.intersects(VisionBits::visible(i)) && i != p {
-                            self.make_ghost(i, at, original)?;
-                            if self.players.player(i).is_ok_and(|q| q.kind.is_computer()) {
-                                return Err(GenieError::unsupported(
-                                    "a computer player's notify of its ghost (0x20d)",
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-            self.players.player_mut(p)?.watched.checked_mut(k)?.bits = bits;
-        }
-        if let Some(id) = gone {
-            self.unwatch(p, id)?;
-        }
-        Ok(())
     }
 }
 
@@ -704,6 +489,7 @@ mod tests {
     use crate::map::TileOffset;
     #[cfg(test)]
     use crate::map::spatial::Obstruction;
+    use crate::objects::ListIndex;
     use crate::objects::MasterHitPoints;
     #[cfg(test)]
     use crate::objects::layers::Static;
@@ -774,14 +560,14 @@ mod tests {
     }
 
     fn object(id: i32, master: MasterId, state: ObjectState, position: Position) -> Unit {
-        let mut u = Unit {
+        let mut unit = Unit {
             id: object_id(id),
             place: Static::at(position),
             ..Unit::default()
         };
-        u.life.master_id = master;
-        u.life.state = state;
-        u
+        unit.life.master_id = master;
+        unit.life.state = state;
+        unit
     }
 
     /// Gaia and two players on a 4×4 map, each with its masters, Gaia's mine 5 at (1.5, 2.5)
@@ -836,22 +622,23 @@ mod tests {
         t
     }
 
-    fn set_tile(t: &mut World, x: usize, y: usize, bits: u64) {
-        t.spatial.sight.as_mut().unwrap().unified[y * 4 + x] = VisionBits::from_bits_retain(bits);
+    fn set_tile(world: &mut World, x: usize, y: usize, bits: u64) {
+        world.spatial.sight.as_mut().unwrap().unified[y * 4 + x] =
+            VisionBits::from_bits_retain(bits);
     }
 
     #[test]
     fn watched_entry_keeps_the_tiles_bits_and_building_with_umv_entry_follows_its_mask() {
         // FUN_141090430: the tile's word masked, then the cell switched to the mask for an
         // object of type 50 and up with +0x904
-        let mut t = world(RecycleMode::RECYCLED);
-        set_tile(&mut t, 2, 1, 0x0000_0002_0000_0002 | (1 << 30));
+        let mut world = world(RecycleMode::RECYCLED);
+        set_tile(&mut world, 2, 1, 0x0000_0002_0000_0002 | (1 << 30));
         assert_eq!(
-            t.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
+            world.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
             Ok(GhostWatch::Watched)
         );
         assert_eq!(
-            t.players[1].watched,
+            world.players[1].watched,
             [Watched {
                 id: object_id(9),
                 cell: Cell::Mask(object_id(9)),
@@ -860,21 +647,21 @@ mod tests {
         );
         // a second watch and another owner's object are refused
         assert_eq!(
-            t.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
+            world.watch(PlayerId::new(1), object_id(9), Tile::new(2, 1)),
             Ok(GhostWatch::Refused)
         );
         assert_eq!(
-            t.watch(PlayerId::new(1), object_id(5), Tile::new(1, 2)),
+            world.watch(PlayerId::new(1), object_id(5), Tile::new(1, 2)),
             Ok(GhostWatch::Refused)
         );
         // the mine (type 30) follows its tile
-        set_tile(&mut t, 1, 2, 0x0000_0001_0000_0000);
+        set_tile(&mut world, 1, 2, 0x0000_0001_0000_0000);
         assert_eq!(
-            t.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
+            world.watch(PlayerId::new(0), object_id(5), Tile::new(1, 2)),
             Ok(GhostWatch::Watched)
         );
         assert_eq!(
-            t.players[0].watched,
+            world.players[0].watched,
             [Watched {
                 id: object_id(5),
                 cell: Cell::Tile(9),
@@ -895,17 +682,17 @@ mod tests {
         assert_eq!(t.ghosts_at_death(0, object_id(5)), Ok(()));
         assert!(t.players[0].ghosts.is_empty() && t.players[1].ghosts.is_empty());
         // a computer viewer gets its ghost as any other (the notify is the watched list's)
-        let g = t.players[2].ghosts[0];
+        let ghost = t.players[2].ghosts[0];
         assert_eq!(
-            (g.id, g.original, g.original_id),
+            (ghost.id, ghost.original, ghost.original_id),
             (object_id(-3), Some(object_id(5)), Some(object_id(5)))
         );
         assert_eq!(
-            (g.original_owner, g.original_master),
+            (ghost.original_owner, ghost.original_master),
             (PlayerId::GAIA, Some(MINE))
         );
         assert_eq!(
-            (g.tile, g.state, g.cant_see, g.footprint),
+            (ghost.tile, ghost.state, ghost.cant_see, ghost.footprint),
             (Tile::new(1, 2), ObjectState::Alive, PlayerSet::NONE, 0)
         );
         // then the owner watches its tile at the tile's bits
@@ -977,9 +764,9 @@ mod tests {
         };
         t.make_ghost(PlayerId::new(2), Position::new(2.5, 1.5, 0.0), gone)
             .unwrap();
-        let g = t.players[2].ghosts[0];
+        let ghost = t.players[2].ghosts[0];
         assert_eq!(
-            (g.original, g.original_id, g.original_master),
+            (ghost.original, ghost.original_id, ghost.original_master),
             (None, None, Some(HOUSE))
         );
     }
@@ -987,7 +774,7 @@ mod tests {
     #[test]
     fn the_twin_check_destroys_the_viewers_own_twin_and_marks_another_viewers() {
         // FUN_1410928a0: ghosts on the tile, in state 2, of the same original id
-        let mut t = world(RecycleMode::RECYCLED);
+        let mut world = world(RecycleMode::RECYCLED);
         let twin = |id, original_id, position: Position, state| Ghost {
             id,
             original: None,
@@ -1002,13 +789,13 @@ mod tests {
             seen: false,
             state,
         };
-        t.players[1].ghosts = vec![twin(
+        world.players[1].ghosts = vec![twin(
             object_id(-20),
             Some(object_id(9)),
             Position::new(2.1, 1.9, 0.0),
             ObjectState::Alive,
         )];
-        t.players[2].ghosts = vec![
+        world.players[2].ghosts = vec![
             twin(
                 object_id(-21),
                 Some(object_id(9)),
@@ -1050,9 +837,9 @@ mod tests {
             Position::new(2.5, 1.5, 0.0),
             ObjectState::Alive,
         );
-        t.check_twins(PlayerId::new(2), &mut ghost).unwrap();
+        world.check_twins(PlayerId::new(2), &mut ghost).unwrap();
         // the viewer's own twins on the tile are destroyed
-        let states: Vec<ObjectState> = t.players[2].ghosts.iter().map(|g| g.state).collect();
+        let states: Vec<ObjectState> = world.players[2].ghosts.iter().map(|g| g.state).collect();
         assert_eq!(
             states,
             [
@@ -1065,12 +852,12 @@ mod tests {
         );
         // player 1's twin and the new ghost note each other
         assert_eq!(
-            t.players[1].ghosts[0].cant_see,
+            world.players[1].ghosts[0].cant_see,
             PlayerSet::of(PlayerId::new(2))
         );
         assert_eq!(ghost.cant_see, PlayerSet::of(PlayerId::new(1)));
         assert!(
-            t.players[2]
+            world.players[2]
                 .ghosts
                 .iter()
                 .all(|g| g.cant_see == PlayerSet::NONE)
@@ -1097,8 +884,11 @@ mod tests {
         };
         t.players[2].ghosts = vec![ghost];
         t.update_ghosts(PlayerId::new(2)).unwrap();
-        let g = t.players[2].ghosts[0];
-        assert_eq!((g.original_id, g.original_master), (None, Some(HOUSE)));
+        let players = t.players[2].ghosts[0];
+        assert_eq!(
+            (players.original_id, players.original_master),
+            (None, Some(HOUSE))
+        );
         // an original past state 6 takes its master with it
         t.players[2].ghosts[0].original = Some(object_id(9));
         t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Removed;
@@ -1148,9 +938,9 @@ mod tests {
         t.players[2].ghosts = vec![house_ghost(0)];
         set_tile(&mut t, 2, 1, 1 << 1);
         t.update_ghosts(PlayerId::new(2)).unwrap();
-        let g = t.players[2].ghosts[0];
+        let players = t.players[2].ghosts[0];
         assert_eq!(
-            (g.state, g.bits, g.cant_see),
+            (players.state, players.bits, players.cant_see),
             (
                 ObjectState::Alive,
                 VisionBits::from_bits_retain(1 << 1),
@@ -1170,8 +960,11 @@ mod tests {
         }];
         set_tile(&mut t, 2, 1, 1 << 1);
         t.update_ghosts(PlayerId::new(2)).unwrap();
-        let g = t.players[2].ghosts[0];
-        assert_eq!((g.state, g.bits), (ObjectState::Removed, VisionBits::NONE));
+        let ghost = t.players[2].ghosts[0];
+        assert_eq!(
+            (ghost.state, ghost.bits),
+            (ObjectState::Removed, VisionBits::NONE)
+        );
     }
 
     /// A ghost its viewer sees stays while a player sharing the viewer's sight (but not the
@@ -1179,42 +972,43 @@ mod tests {
     /// viewer's; the tile seen by player 4 alone keeps the ghost, by player 3 too destroys it.
     #[test]
     fn ghost_stays_while_player_sharing_the_viewer_sight_does_not_see_it() {
-        let mut t = world(RecycleMode::RECYCLED);
+        let mut world = world(RecycleMode::RECYCLED);
         for _ in 0..2 {
-            t.players.push(Player::default());
-            t.reindex();
-            t.model
+            world.players.push(Player::default());
+            world.reindex();
+            world
+                .model
                 .masters
                 .push(Arc::new(masters(RecycleMode::RECYCLED)));
         }
         let own = |p| own_masks(p, GameStatus::Playing);
-        let with = |p, bits: u64| {
-            let mut masks = own(p);
+        let with = |player_id, bits: u64| {
+            let mut masks = own(player_id);
             masks.visible |= VisionBits::from_bits_retain(bits);
             masks
         };
-        t.spatial.vision = ByPlayer::new(vec![
+        world.spatial.vision = ByPlayer::new(vec![
             own(PlayerId::new(0)),
             own(PlayerId::new(1)),
             with(PlayerId::new(2), (1 << 3) | (1 << 4)),
             with(PlayerId::new(3), 1 << 2),
             own(PlayerId::new(4)),
         ]);
-        t.players[2].ghosts = vec![house_ghost(0)];
-        set_tile(&mut t, 2, 1, 1 << 4);
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        let g = t.players[2].ghosts[0];
+        world.players[2].ghosts = vec![house_ghost(0)];
+        set_tile(&mut world, 2, 1, 1 << 4);
+        world.update_ghosts(PlayerId::new(2)).unwrap();
+        let ghost = world.players[2].ghosts[0];
         assert_eq!(
-            (g.state, g.bits, g.cant_see),
+            (ghost.state, ghost.bits, ghost.cant_see),
             (
                 ObjectState::Alive,
                 VisionBits::from_bits_retain(1 << 4),
                 PlayerSet::of(PlayerId::new(1))
             )
         );
-        set_tile(&mut t, 2, 1, (1 << 3) | (1 << 4));
-        t.update_ghosts(PlayerId::new(2)).unwrap();
-        assert_eq!(t.players[2].ghosts[0].state, ObjectState::Removed);
+        set_tile(&mut world, 2, 1, (1 << 3) | (1 << 4));
+        world.update_ghosts(PlayerId::new(2)).unwrap();
+        assert_eq!(world.players[2].ghosts[0].state, ObjectState::Removed);
     }
 
     /// A building's ghost reads its footprint's tiles too (its UMV entry's offsets): seen there
@@ -1243,9 +1037,9 @@ mod tests {
         set_tile(&mut t, 2, 1, 1 << 1);
         set_tile(&mut t, 3, 1, 1 << 2);
         t.update_ghosts(PlayerId::new(2)).unwrap();
-        let g = t.players[2].ghosts[0];
+        let ghost = t.players[2].ghosts[0];
         assert_eq!(
-            (g.state, g.seen, g.bits),
+            (ghost.state, ghost.seen, ghost.bits),
             (
                 ObjectState::Alive,
                 true,
@@ -1309,7 +1103,7 @@ mod tests {
     fn load_watches_dead_objects_that_leave_ghosts_and_buildings_but_their_annexes() {
         // FUN_14119df60's dead objects, FUN_1411ac170's FUN_1411cc980 with no annex link yet,
         // then the rehook drops every annex but a gate's
-        let mut t = world(RecycleMode::RECYCLED);
+        let mut world = world(RecycleMode::RECYCLED);
         let gate = Master {
             id: master_id(88),
             kind: MasterKind::BUILDING,
@@ -1334,7 +1128,7 @@ mod tests {
             class: class::BUILDING,
             ..Master::default()
         };
-        t.model.masters = (0..3)
+        world.model.masters = (0..3)
             .map(|_| {
                 Masters::new(masters(RecycleMode::RECYCLED).iter().cloned().chain([
                     gate.clone(),
@@ -1347,46 +1141,51 @@ mod tests {
             .collect();
         // Gaia's mine 5 dead (state 3), house 9's annexes 10 (a gate) and 11, a class-51
         // building 12, master 1808's 13, a desolid foundation 14 in the sleeping list
-        t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+        world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
         let g = object(
             10,
             master_id(88),
             ObjectState::Alive,
             Position::new(2.5, 2.5, 0.0),
         );
-        let a = object(
+        let unit = object(
             11,
             master_id(89),
             ObjectState::Alive,
             Position::new(3.5, 2.5, 0.0),
         );
-        t.extend_live(
-            PlayerId::new(1),
-            [
-                g,
-                a,
-                object(
-                    12,
-                    ids::WONDER,
-                    ObjectState::Alive,
-                    Position::new(0.5, 0.5, 0.0),
-                ),
-                object(
-                    13,
-                    MASTER_1808,
-                    ObjectState::Alive,
-                    Position::new(0.5, 1.5, 0.0),
-                ),
-            ],
-        )
-        .unwrap();
+        world
+            .extend_live(
+                PlayerId::new(1),
+                [
+                    g,
+                    unit,
+                    object(
+                        12,
+                        ids::WONDER,
+                        ObjectState::Alive,
+                        Position::new(0.5, 0.5, 0.0),
+                    ),
+                    object(
+                        13,
+                        MASTER_1808,
+                        ObjectState::Alive,
+                        Position::new(0.5, 1.5, 0.0),
+                    ),
+                ],
+            )
+            .unwrap();
         for annex in [10, 11] {
-            t.parts.building_mut(object_id(annex)).unwrap().annex_of =
+            world.parts.building_mut(object_id(annex)).unwrap().annex_of =
                 Some(MainBuildingId::new(object_id(9)));
         }
         let foundation = object(14, HOUSE, ObjectState::Alive, Position::new(0.5, 3.5, 0.0));
-        let _ = t.push_asleep(PlayerId::new(1), foundation).unwrap();
-        t.parts.building_mut(object_id(14)).unwrap().construction = Some(Construction {
+        let _ = world.push_asleep(PlayerId::new(1), foundation).unwrap();
+        world
+            .parts
+            .building_mut(object_id(14))
+            .unwrap()
+            .construction = Some(Construction {
             progress: Seconds::ZERO,
             desolid: true,
             builders: BuilderCount::NONE,
@@ -1399,21 +1198,29 @@ mod tests {
             snow: Snow::None,
             sprite_override: false,
         });
-        t.build_watched().unwrap();
+        world.build_watched().unwrap();
         let ids = |t: &World, p: usize| {
             t.players[p]
                 .watched
                 .iter()
-                .map(|w| w.id)
+                .map(|watched| watched.id)
                 .collect::<Vec<_>>()
         };
-        assert_eq!(ids(&t, 0), [object_id(5)]);
-        assert_eq!(ids(&t, 1), [object_id(9), object_id(10)]);
+        assert_eq!(ids(&world, 0), [object_id(5)]);
+        assert_eq!(ids(&world, 1), [object_id(9), object_id(10)]);
         // the house follows its mask (its UMV entry), the gate its tile
-        assert_eq!(t.players[1].watched[0].cell, Cell::Mask(object_id(9)));
-        assert_eq!(t.players[1].watched[1].cell, Cell::Tile(2 * 4 + 2));
+        assert_eq!(world.players[1].watched[0].cell, Cell::Mask(object_id(9)));
+        assert_eq!(world.players[1].watched[1].cell, Cell::Tile(2 * 4 + 2));
         // a building in the game, its annex linked, is not watched as an annex
-        assert!(!t.watches_building(PlayerId::new(1), object_id(11)).unwrap());
-        assert!(t.watches_building(PlayerId::new(1), object_id(10)).unwrap());
+        assert!(
+            !world
+                .watches_building(PlayerId::new(1), object_id(11))
+                .unwrap()
+        );
+        assert!(
+            world
+                .watches_building(PlayerId::new(1), object_id(10))
+                .unwrap()
+        );
     }
 }

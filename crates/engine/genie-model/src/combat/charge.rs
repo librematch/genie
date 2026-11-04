@@ -59,8 +59,8 @@ impl MulAssign<f32> for Charge {
 }
 
 impl genie_diff::Diff for Charge {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -107,8 +107,8 @@ impl Mul<Seconds> for ChargeRate {
 }
 
 impl genie_diff::Diff for ChargeRate {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -121,28 +121,34 @@ mod tests {
     /// comparison is `f32`'s.
     #[test]
     fn charges_do_the_game_f32_operations() {
-        let mut c = Charge::new(0.1);
-        c += Charge::new(0.2);
-        assert_eq!(c.get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        c *= 3.0;
-        assert_eq!(c.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
-        c -= Charge::new(0.4);
-        assert_eq!(c.get().to_bits(), ((0.1_f32 + 0.2) * 3.0 - 0.4).to_bits());
+        let mut charge = Charge::new(0.1);
+        charge += Charge::new(0.2);
+        assert_eq!(charge.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        charge *= 3.0;
+        assert_eq!(charge.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
+        charge -= Charge::new(0.4);
+        assert_eq!(
+            charge.get().to_bits(),
+            ((0.1_f32 + 0.2) * 3.0 - 0.4).to_bits()
+        );
         let less = Charge::new(1.0) - Charge::new(2.5);
         assert_eq!(less.get().to_bits(), (1.0_f32 - 2.5).to_bits());
         assert_eq!(less.abs(), Charge::new(1.5));
         assert_eq!(Charge::new(-0.0).abs().get().to_bits(), 0);
-        let mut r = ChargeRate::new(0.7);
-        r += ChargeRate::new(0.1);
-        assert_eq!(r.get().to_bits(), (0.7_f32 + 0.1).to_bits());
-        r *= 2.0;
-        assert_eq!(r.get().to_bits(), ((0.7_f32 + 0.1) * 2.0).to_bits());
+        let mut charge_rate = ChargeRate::new(0.7);
+        charge_rate += ChargeRate::new(0.1);
+        assert_eq!(charge_rate.get().to_bits(), (0.7_f32 + 0.1).to_bits());
+        charge_rate *= 2.0;
         assert_eq!(
-            (r * Seconds::new(0.3)).get().to_bits(),
+            charge_rate.get().to_bits(),
+            ((0.7_f32 + 0.1) * 2.0).to_bits()
+        );
+        assert_eq!(
+            (charge_rate * Seconds::new(0.3)).get().to_bits(),
             (((0.7_f32 + 0.1) * 2.0) * 0.3).to_bits()
         );
-        assert!(Charge::ZERO < c && ChargeRate::ZERO < r);
-        assert_eq!(Charge::new(f32::NAN).partial_cmp(&c), None);
+        assert!(Charge::ZERO < charge && ChargeRate::ZERO < charge_rate);
+        assert_eq!(Charge::new(f32::NAN).partial_cmp(&charge), None);
         assert_eq!(
             (
                 Charge::new(1.5).to_string(),

@@ -89,9 +89,9 @@ pub(super) fn hill_fails(
 }
 
 /// `FUN_141123f80`'s placement terrains (`placement`: the master's side terrains `+0x5f2`,
-/// `+0x5f4`, then its terrains `+0x5f6`, `+0x5f8`; −1 for none) for a box of tiles `b` (x0, y0, x1,
-/// y1) around point `p`: false where they refuse it (the test's code 1). With a terrain, the
-/// point's tile must be of one of the two, or share shallow water or shallows
+/// `+0x5f4`, then its terrains `+0x5f6`, `+0x5f8`; −1 for none) for a box of tiles `tile_rect` (x0,
+/// y0, x1, y1) around point `point`: false where they refuse it (the test's code 1). With a
+/// terrain, the point's tile must be of one of the two, or share shallow water or shallows
 /// ([`TerrainFlags::SHALLOW_WATER`], [`TerrainFlags::SHALLOWS`]: the terrains' `.dat` flags,
 /// [`WorldMap::terrain_flags`]) with them, and the box shrinks to that tile. With a side terrain,
 /// one of the tiles beside the box (the row below, the column right, the row above and the column
@@ -105,34 +105,35 @@ pub(super) fn hill_fails(
 pub(crate) fn placement_terrains(
     placement: PlacementTerrains,
     map: &WorldMap<'_>,
-    p: Point,
+    point: Point,
     b: TileRect,
 ) -> GenieResult<bool> {
     let PlacementTerrains {
         beside: [side1, side2],
         on: [t1, t2],
     } = placement;
-    let mut b = b;
+    let mut tile_rect = b;
     if t1.is_some() || t2.is_some() {
-        let at = Tile::new(p.x() as i32, p.y() as i32);
+        let at = Tile::new(point.x() as i32, point.y() as i32);
         if !point_terrain_allows(map, [t1, t2], at)? {
             return Ok(false);
         }
-        b = TileRect::of(at);
+        tile_rect = TileRect::of(at);
     }
     if side1.is_none() && side2.is_none() {
         return Ok(true);
     }
     let sides = side_terrains(map, [side1, side2])?;
-    for t in tiles_beside(b, map.size()) {
-        if sides.contains(&map.terrain(t)?) {
+    for tile in tiles_beside(tile_rect, map.size()) {
+        if sides.contains(&map.terrain(tile)?) {
             return Ok(true);
         }
     }
     Ok(false)
 }
 
-/// [`placement_terrains`]'s flags of terrain `t` (the `.dat`'s, [`WorldMap::terrain_flags`]).
+/// [`placement_terrains`]'s flags of terrain `terrain_id` (the `.dat`'s,
+/// [`WorldMap::terrain_flags`]).
 ///
 /// # Errors
 ///
@@ -141,7 +142,7 @@ pub(super) fn placement_flags(
     map: &WorldMap<'_>,
     t: Option<TerrainId>,
 ) -> GenieResult<TerrainFlags> {
-    t.and_then(|t| map.terrain_flags(t.index()))
+    t.and_then(|terrain_id| map.terrain_flags(terrain_id.index()))
         .ok_or(GenieError::unsupported(
             "placement terrains with one of -1 or beyond the terrains",
         ))
@@ -186,11 +187,11 @@ pub(super) fn side_terrains(
     let mut sides: Vec<TerrainId> = [side1, side2].into_iter().flatten().collect();
     for flag in [TerrainFlags::ICE, TerrainFlags::BEACH] {
         if f1.contains(flag) || f2.contains(flag) {
-            for t in 0..map.terrain_count() {
-                let t = TerrainId::named(u8::try_from(t).unwrap_or(u8::MAX));
-                let other = Some(t) != side1 && Some(t) != side2;
-                if placement_flags(map, Some(t))?.contains(flag) && other {
-                    sides.push(t);
+            for index in 0..map.terrain_count() {
+                let terrain_id = TerrainId::named(u8::try_from(index).unwrap_or(u8::MAX));
+                let other = Some(terrain_id) != side1 && Some(terrain_id) != side2;
+                if placement_flags(map, Some(terrain_id))?.contains(flag) && other {
+                    sides.push(terrain_id);
                 }
             }
         }
@@ -198,12 +199,17 @@ pub(super) fn side_terrains(
     Ok(sides)
 }
 
-/// [`placement_terrains`]'s tiles beside the box `b` (x0, y0, x1, y1) on a map of `size`: the
-/// row below, the column right, the row above (right to left) and the column left (top to
+/// [`placement_terrains`]'s tiles beside the box `tile_rect` (x0, y0, x1, y1) on a map of `size`:
+/// the row below, the column right, the row above (right to left) and the column left (top to
 /// bottom), each where the map holds it.
-pub(super) fn tiles_beside(b: TileRect, map: GridSize) -> Vec<Tile> {
+pub(super) fn tiles_beside(tile_rect: TileRect, map: GridSize) -> Vec<Tile> {
     let (w, h) = (map.width(), map.height());
-    let (x0, y0, x1, y1) = (b.x0(), b.y0(), b.x1(), b.y1());
+    let (x0, y0, x1, y1) = (
+        tile_rect.x0(),
+        tile_rect.y0(),
+        tile_rect.x1(),
+        tile_rect.y1(),
+    );
     let mut beside = Vec::new();
     if 0 < y0 {
         beside.extend((x0..=x1).map(|x| Tile::new(x, y0 - 1)));

@@ -69,64 +69,65 @@ impl BuildAction {
     /// [`task_search`]: crate::unit_ai::task_finder::world::task_search
     pub(crate) fn drop_again(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         by: Releaser,
         slots: Slots,
         roles: &Roles,
     ) -> GenieResult<()> {
         let search = if Amount::ZERO < builder.life.amount {
-            Self::drop_search(c, builder, self.task.range, slots, roles)?
+            Self::drop_search(step, builder, self.task.range, slots, roles)?
         } else {
             DropSearch::Empty
         };
-        self.set_drop(c, builder, search, by, roles)
+        self.set_drop(step, builder, search, by, roles)
     }
 
     /// The drop site the drop-off walks to ([`BuildAction::drop_again`]), with `task_range`
     /// the Build task's range for none found on it.
     fn drop_search(
-        c: &Step<'_>,
+        step: &Step<'_>,
         builder: &Unit,
         task_range: Distance,
         slots: Slots,
         roles: &Roles,
     ) -> GenieResult<DropSearch> {
-        let view = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let masters =
-            c.w.model
-                .masters
-                .get(c.player.index())
-                .ok_or(OBJECT_MASTER)?;
-        let own = builder.master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?;
+        let view = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let masters = step
+            .w
+            .model
+            .masters
+            .get(step.player.index())
+            .ok_or(OBJECT_MASTER)?;
+        let own = builder.master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?;
         let at = builder.position().ground();
-        let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
+        let look = |id: ObjectId| view.own(id).map(|unit| (unit.life.state, unit.position()));
         let found = nearest_table_site(
             (
-                &c.w.model.drop_sites,
-                c.w.players.player(c.player)?.civ,
-                &c.w.players.player(c.player)?.tracker,
+                &step.w.model.drop_sites,
+                step.w.players.player(step.player)?.civ,
+                &step.w.players.player(step.player)?.tracker,
             ),
             (at, builder.life.attribute_kind, own.class),
             look,
-            &c.w.model.tuning.order,
+            &step.w.model.tuning.order,
         );
         let Some((id, _)) = found else {
             return Ok(DropSearch::Nothing);
         };
-        let (player, foreign) = (c.player, view.players());
-        let find = |t: ObjectId| {
-            if t == builder.id {
+        let (player, foreign) = (step.player, view.players());
+        let find = |object_id: ObjectId| {
+            if object_id == builder.id {
                 return Some((player, builder));
             }
-            view.find(t)
+            view.find(object_id)
         };
-        let every = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
+        let every = MasterTables::new(&step.w.model.masters, &step.w.parts.own_master);
         let task = match (
-            task_target_with(id.id(), 1, &find, &c.w.parts, every)?,
-            task_target_with(id.id(), 2, &find, &c.w.parts, every)?,
+            task_target_with(id.id(), 1, &find, &step.w.parts, every)?,
+            task_target_with(id.id(), 2, &find, &step.w.parts, every)?,
         ) {
-            (Some(t), Some(general)) => {
+            (Some(task_target), Some(general)) => {
                 use crate::unit_ai::task_finder::world::SideWorld;
                 use crate::unit_ai::task_finder::world::task_search;
                 let actor = Actor {
@@ -134,25 +135,25 @@ impl BuildAction {
                     master: own,
                     player,
                     held: builder.life.held(),
-                    attribute_95: c
+                    attribute_95: step
                         .w
                         .players
-                        .player(c.player)?
+                        .player(step.player)?
                         .attributes
                         .get(95)
                         .copied()
                         .unwrap_or(Amount::ZERO),
-                    civ: c.w.players.player(c.player)?.civ,
+                    civ: step.w.players.player(step.player)?.civ,
                 };
                 let dip = SideWorld {
                     player,
-                    relations: &c.w.players.player(c.player)?.relations,
+                    relations: &step.w.players.player(step.player)?.relations,
                     foreign,
-                    drop_sites: &c.w.model.drop_sites,
+                    drop_sites: &step.w.model.drop_sites,
                 };
                 // slot 0x820's point: x, y and z −1, no terrain
                 let on = TaskOn {
-                    target: Some(&t),
+                    target: Some(&task_target),
                     general: Some(&general),
                     terrain: None,
                 };
@@ -185,45 +186,45 @@ impl BuildAction {
     /// A builder without movement state, a drop site or foundation without a place.
     pub(crate) fn set_drop(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         search: DropSearch,
         by: Releaser,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         self.state = BuildState::Drop { move_to: None };
         let found = match search {
-            DropSearch::Empty => return self.restart(c, builder, roles),
+            DropSearch::Empty => return self.restart(step, builder, roles),
             DropSearch::Nothing => None,
             DropSearch::Site { id, range, sprite } => Some((id, range, sprite)),
         };
         let new = found.map(|(id, _, _)| id);
         if self.site != new {
             let old = replace(&mut self.site, new);
-            release(c, builder, old, by)?;
-            take(c, builder, new, by, roles)?;
+            release(step, builder, old, by)?;
+            take(step, builder, new, by, roles)?;
         }
         let Some((id, range, sprite)) = found else {
             builder.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::NO_DROP_SITE,
                 [AiAction::Build.value(), 0, 0],
             )?;
-            return self.restart(c, builder, roles);
+            return self.restart(step, builder, roles);
         };
         let move_reads = builder.move_to_reads(
-            c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.motion.mover(builder.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
         let to = move_reads
-            .walk_to(c.w, Some(id.id()))?
+            .walk_to(step.w, Some(id.id()))?
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         let given = sprite.or(self.task.moving);
         self.state = BuildState::Drop {
@@ -232,7 +233,7 @@ impl BuildAction {
                 range,
                 given,
                 TargetMoved::AsksAgain,
-                &c.w.model.tuning.move_to,
+                &step.w.model.tuning.move_to,
             )?,
         };
         Ok(())
@@ -256,7 +257,7 @@ impl BuildAction {
     /// What the walk, the search and the states do not model.
     pub(super) fn update_drop(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
@@ -264,41 +265,41 @@ impl BuildAction {
         slots: Slots,
     ) -> GenieResult<HeadCode> {
         if below_or_unordered(self.timer.get(), 0.0) {
-            self.timer += c.dt.seconds();
+            self.timer += step.dt.seconds();
             if self.timer < Seconds::ZERO {
                 return Ok(HeadCode::Keeps);
             }
             self.timer = Seconds::ZERO;
-            self.drop_again(c, builder, reads.by, slots, roles)?;
+            self.drop_again(step, builder, reads.by, slots, roles)?;
             return Ok(HeadCode::Keeps);
         }
-        match self.step_walk(c, builder, me, reads, roles)? {
+        match self.step_walk(step, builder, me, reads, roles)? {
             SubCode::Done => {}
             SubCode::Failed | SubCode::TargetGone => {
-                self.drop_again(c, builder, reads.by, slots, roles)?;
+                self.drop_again(step, builder, reads.by, slots, roles)?;
                 return Ok(HeadCode::Keeps);
             }
             // it walks or waits: the update returns 0
             SubCode::UnderWay => return Ok(HeadCode::Keeps),
         }
         let Some((ObjectState::Alive, drop)) = reads.deposit.filter(|_| self.site.is_some()) else {
-            self.drop_again(c, builder, reads.by, slots, roles)?;
+            self.drop_again(step, builder, reads.by, slots, roles)?;
             return Ok(HeadCode::Keeps);
         };
         if !drop.takes {
-            self.halt_in(c, builder, reads)?;
+            self.halt_in(step, builder, reads)?;
             return Ok(HeadCode::Keeps);
         }
-        if c.w.model.tuning.build.drop_reach < drop.gap_squared.get() {
+        if step.w.model.tuning.build.drop_reach < drop.gap_squared.get() {
             self.timer = DROP_WAIT;
-            c.w.parts.set_anim_speed(builder.id, Speed::ZERO);
+            step.w.parts.set_anim_speed(builder.id, Speed::ZERO);
             return Ok(HeadCode::Keeps);
         }
-        let attributes = c.w.players.player(c.player)?.attributes.len();
+        let attributes = step.w.players.player(step.player)?.attributes.len();
         let kind = resource_kind(builder.life.attribute_kind, attributes, slots);
         let amount = builder.life.amount;
-        Self::drop_load(c, builder, kind, amount)?;
-        self.after_deposit(c, builder, reads, roles)
+        Self::drop_load(step, builder, kind, amount)?;
+        self.after_deposit(step, builder, reads, roles)
     }
 
     /// State 8 after the load went to the player: a Build with a foundation lets the drop site
@@ -309,7 +310,7 @@ impl BuildAction {
     /// done (a computer player's) or halts; with a point it walks there (`set_state(11)`).
     fn after_deposit(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
@@ -317,34 +318,36 @@ impl BuildAction {
         if self.target.is_some() {
             let site = self.site.take();
             if site.is_some() {
-                release(c, builder, site, reads.by)?;
+                release(step, builder, site, reads.by)?;
             }
-            self.restart(c, builder, roles)?;
+            self.restart(step, builder, roles)?;
             return Ok(HeadCode::Keeps);
         }
-        if let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) {
+        if let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) {
             let gone = &reads.gone_orders;
-            ai.orders
-                .retain(|o| !(DROPPED_ORDERS.contains(&o.order) && gone.contains(&o.target)));
+            ai.orders.retain(|queued_order| {
+                !(DROPPED_ORDERS.contains(&queued_order.order)
+                    && gone.contains(&queued_order.target))
+            });
             if !ai.orders.is_empty() {
                 ai.end_order_and_action()?;
                 // 1: the action is done.
-                self.end(c, builder, BuildState::Done)?;
+                self.end(step, builder, BuildState::Done)?;
                 return Ok(HeadCode::Deletes);
             }
-            self.idle(c, builder, reads)?;
+            self.idle(step, builder, reads)?;
             return Ok(HeadCode::Keeps);
         }
         // UCOMISS against −1 (DAT_14330ec20): a NaN is not
         if self.point.x() == -1.0 || self.point.y() == -1.0 {
-            if c.w.players.player(c.player)?.kind.is_computer() {
-                self.end(c, builder, BuildState::Done)?;
+            if step.w.players.player(step.player)?.kind.is_computer() {
+                self.end(step, builder, BuildState::Done)?;
             } else {
-                self.halt_in(c, builder, reads)?;
+                self.halt_in(step, builder, reads)?;
             }
             return Ok(HeadCode::Keeps);
         }
-        self.walk_to_point(c, builder, roles)?;
+        self.walk_to_point(step, builder, roles)?;
         Ok(HeadCode::Keeps)
     }
 }

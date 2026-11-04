@@ -52,8 +52,8 @@ impl MulAssign<f32> for Firepower {
 }
 
 impl genie_diff::Diff for Firepower {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -96,8 +96,8 @@ impl MissileCount {
 }
 
 impl genie_diff::Diff for MissileCount {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -136,8 +136,8 @@ impl AttackCount {
 }
 
 impl genie_diff::Diff for AttackCount {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -148,13 +148,13 @@ mod tests {
     /// A firepower adds, takes off and scales as `f32`.
     #[test]
     fn firepower_adds_and_scales_as_floats() {
-        let mut f = Firepower::new(1.0) + Firepower::new(0.5);
-        f += Firepower::new(2.0);
-        f -= Firepower::new(1.5);
-        f *= 2.0;
-        assert_eq!(f, Firepower::new(4.0));
-        assert_eq!(f - Firepower::new(1.0), Firepower::new(3.0));
-        assert!(Firepower::ZERO < f);
+        let mut firepower = Firepower::new(1.0) + Firepower::new(0.5);
+        firepower += Firepower::new(2.0);
+        firepower -= Firepower::new(1.5);
+        firepower *= 2.0;
+        assert_eq!(firepower, Firepower::new(4.0));
+        assert_eq!(firepower - Firepower::new(1.0), Firepower::new(3.0));
+        assert!(Firepower::ZERO < firepower);
     }
 
     /// A missile count wraps as a byte; an attack count counts on.

@@ -55,22 +55,27 @@ impl Attack {
     pub(super) fn ready(
         &mut self,
         unit: &mut Unit,
-        g: &mut Ground<'_>,
-        f: &Fight,
-        r: &AttackReads,
+        ground: &mut Ground<'_>,
+        fight: &Fight,
+        attack_reads: &AttackReads,
     ) -> GenieResult<()> {
-        let sprite_tuning = g.by_id.tuning().sprite;
-        self.enter(AttackState::Ready, g.motion.reborrow())?;
+        let sprite_tuning = ground.by_id.tuning().sprite;
+        self.enter(AttackState::Ready, ground.motion.reborrow())?;
         if self.target.is_none() && self.point.x() == NONE {
             if self.voice.is_loud() {
-                g.post(unit, NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
+                ground.post(unit, NotifyKind::ACTION_COMPLETED, [600, 0, 0])?;
             }
-            return self.finish(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
+            return self.finish(
+                unit,
+                ground.motion.reborrow(),
+                ground.sprite_rng,
+                sprite_tuning,
+            );
         }
-        match self.ready_to_attack(unit, g, f, r, AtOnce::Tested)? {
-            Readiness::Ready => self.set_swing(unit, g, f, r),
+        match self.ready_to_attack(unit, ground, fight, attack_reads, AtOnce::Tested)? {
+            Readiness::Ready => self.set_swing(unit, ground, fight, attack_reads),
             Readiness::Waiting => Ok(()),
-            Readiness::Away(gap) => self.follow(unit, g, r, f, gap),
+            Readiness::Away(gap) => self.follow(unit, ground, attack_reads, fight, gap),
         }
     }
 
@@ -80,24 +85,32 @@ impl Attack {
     pub(super) fn follow(
         &mut self,
         unit: &mut Unit,
-        g: &mut Ground<'_>,
-        r: &AttackReads,
-        f: &Fight,
+        ground: &mut Ground<'_>,
+        attack_reads: &AttackReads,
+        fight: &Fight,
         gap: Distance,
     ) -> GenieResult<()> {
-        let move_to_tuning = &g.by_id.tuning().move_to;
-        let sprite_tuning = g.by_id.tuning().sprite;
-        self.enter(AttackState::Move { move_to: None }, g.motion.reborrow())?;
-        let reads = move_reads((unit, g.motion.mover()), r, g.graphics)?;
+        let move_to_tuning = &ground.by_id.tuning().move_to;
+        let sprite_tuning = ground.by_id.tuning().sprite;
+        self.enter(
+            AttackState::Move { move_to: None },
+            ground.motion.reborrow(),
+        )?;
+        let reads = move_reads((unit, ground.motion.mover()), attack_reads, ground.graphics)?;
         if self.moving(
-            f.own.source.weapon_range,
-            f.victim.position,
+            fight.own.source.weapon_range,
+            fight.victim.position,
             gap,
             &reads,
             move_to_tuning,
         )? == MoveStart::Arrived
         {
-            self.arrived_sprite(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning)?;
+            self.arrived_sprite(
+                unit,
+                ground.motion.reborrow(),
+                ground.sprite_rng,
+                sprite_tuning,
+            )?;
         }
         Ok(())
     }
@@ -126,22 +139,29 @@ impl Attack {
         &mut self,
         unit: &mut Unit,
         g: &mut Ground<'_>,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         at_once: AtOnce,
     ) -> GenieResult<Readiness> {
         let move_to_tuning = &g.by_id.tuning().move_to;
         let sprite_tuning = g.by_id.tuning().sprite;
         let roles = g.by_id.roles();
         let attack_tuning = &g.by_id.tuning().attack;
-        let (target, t) = self.held_target(g.map)?;
+        let (target, placed) = self.held_target(g.map)?;
         let speed = g.motion.mover().ok_or(ATTACKER_UNMOVING)?.stats.speed;
-        if target_unseen(g.map, f, &t)? {
-            if r.stance == UnitStance::Aggressive
+        if target_unseen(g.map, fight, &placed)? {
+            if attack_reads.stance == UnitStance::Aggressive
                 && Speed::ZERO < speed
-                && r.flags.contains(AttackerFlags::CAN_MOVE)
+                && attack_reads.flags.contains(AttackerFlags::CAN_MOVE)
             {
-                self.wait_at_seen(unit, g.motion.reborrow(), f, r, g.graphics, move_to_tuning)?;
+                self.wait_at_seen(
+                    unit,
+                    g.motion.reborrow(),
+                    fight,
+                    attack_reads,
+                    g.graphics,
+                    move_to_tuning,
+                )?;
                 return Ok(Readiness::Waiting);
             }
             return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
@@ -150,27 +170,27 @@ impl Attack {
         let ground = g
             .motion
             .mover()
-            .map(|m| m.stats.radius.ground())
+            .map(|mover| mover.stats.radius.ground())
             .ok_or(ATTACKER_UNMOVING)?;
-        let gap = footprint_gap(at, ground, t.position, t.radius);
+        let gap = footprint_gap(at, ground, placed.position, placed.radius);
         let near = if self.range <= Distance::new(NO_RANGE) {
             gap + Distance::new(attack_tuning.short_range_gap)
         } else {
             gap
         };
-        let mobile = MasterKind::MOVING <= f.own.kind && Speed::ZERO < speed;
+        let mobile = MasterKind::MOVING <= fight.own.kind && Speed::ZERO < speed;
         if at_once == AtOnce::Tested
             && self.ready_at_once(
-                t.position,
+                placed.position,
                 near,
-                mobile || r.next_volley != MissileCount::ZERO,
+                mobile || attack_reads.next_volley != MissileCount::ZERO,
             )
         {
             return self.face(
                 (at, g.motion.mover_mut()),
-                (t.position, g.by_id.combat_of(unit.id).attack_timer),
-                f,
-                r,
+                (placed.position, g.by_id.combat_of(unit.id).attack_timer),
+                fight,
+                attack_reads,
                 roles,
             );
         }
@@ -178,7 +198,7 @@ impl Attack {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::TOO_CLOSE, [-1; 3])?;
             }
-            if speed != Speed::ZERO && r.flags.contains(AttackerFlags::CAN_MOVE) {
+            if speed != Speed::ZERO && attack_reads.flags.contains(AttackerFlags::CAN_MOVE) {
                 return Ok(Readiness::Waiting);
             }
             return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
@@ -187,9 +207,9 @@ impl Attack {
         let gap = gate_gap(
             g.map,
             (at, ground),
-            (target, &t),
+            (target, &placed),
             gap,
-            |g| g,
+            |distance| distance,
             g.by_id,
             roles,
         );
@@ -197,21 +217,21 @@ impl Attack {
             if self.voice.is_loud() {
                 g.post(unit, NotifyKind::OUT_OF_REACH, [0; 3])?;
             }
-            if (r.stance == UnitStance::Defensive
-                && self.off_leash(t.position, r.state_position, attack_tuning))
+            if (attack_reads.stance == UnitStance::Defensive
+                && self.off_leash(placed.position, attack_reads.state_position, attack_tuning))
                 || speed == Speed::ZERO
-                || !r.flags.contains(AttackerFlags::CAN_MOVE)
+                || !attack_reads.flags.contains(AttackerFlags::CAN_MOVE)
             {
                 return self.fail(unit, g.motion.reborrow(), g.sprite_rng, sprite_tuning);
             }
             return Ok(Readiness::Away(gap));
         }
-        self.point = t.position;
+        self.point = placed.position;
         self.face(
             (at, g.motion.mover_mut()),
-            (t.position, g.by_id.combat_of(unit.id).attack_timer),
-            f,
-            r,
+            (placed.position, g.by_id.combat_of(unit.id).attack_timer),
+            fight,
+            attack_reads,
             roles,
         )
     }
@@ -223,8 +243,8 @@ impl Attack {
     /// [`TARGET_GONE`] for none or a target the map does not hold.
     pub(super) fn held_target(&self, map: &Spatial) -> GenieResult<(ObjectId, Placed)> {
         let target = self.target.ok_or(TARGET_GONE)?;
-        let t = map.get_known(target)?.ok_or(TARGET_GONE)?;
-        Ok((target.id(), *t))
+        let placed = map.get_known(target)?.ok_or(TARGET_GONE)?;
+        Ok((target.id(), *placed))
     }
 
     /// readyToAttack's ready-at-once test: the target stands on the attack's point
@@ -238,10 +258,14 @@ impl Attack {
         moves_or_volleys: bool,
     ) -> bool {
         let moved = to != self.point;
-        let p = self.point;
-        let far = [to.x() - p.x(), to.y() - p.y(), to.z() - p.z()]
-            .iter()
-            .any(|d| below_or_unordered(HALF, d.abs()));
+        let position = self.point;
+        let far = [
+            to.x() - position.x(),
+            to.y() - position.y(),
+            to.z() - position.z(),
+        ]
+        .iter()
+        .any(|d| below_or_unordered(HALF, d.abs()));
         !moved || (!far && (moves_or_volleys || in_range(near, self.range, self.min_range)))
     }
 
@@ -266,15 +290,15 @@ impl Attack {
         &self,
         (at, mover): (Position, Option<&mut Mover>),
         (to, attack_timer): (Position, Seconds),
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         roles: &Roles,
     ) -> GenieResult<Readiness> {
         let mover = mover.ok_or(ATTACKER_UNMOVING)?;
         if !roles
-            .of_master(f.own.master_id)
+            .of_master(fight.own.master_id)
             .contains(MasterRoles::UNTURNED_ATTACKER)
-            && face_target(mover, at, to, r.world_time)? == Aim::Turning
+            && face_target(mover, at, to, attack_reads.world_time)? == Aim::Turning
         {
             return Ok(Readiness::Waiting);
         }
@@ -303,10 +327,10 @@ pub(super) fn in_range(near: Distance, range: Distance, min_range: Distance) -> 
 /// # Errors
 ///
 /// A tile the map's sight does not hold.
-pub(super) fn target_unseen(world: &Spatial, f: &Fight, t: &Placed) -> GenieResult<bool> {
-    let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
-    Ok(t.player != PlayerId::GAIA
-        && !world.sees_tile(f.own.player, Tile::new(tx, ty))
-        && !(f.victim.fog_visibility != FogVisibility::INVISIBLE
-            && world.explored(f.own.player, Tile::new(tx, ty))?))
+pub(super) fn target_unseen(world: &Spatial, fight: &Fight, placed: &Placed) -> GenieResult<bool> {
+    let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
+    Ok(placed.player != PlayerId::GAIA
+        && !world.sees_tile(fight.own.player, Tile::new(tx, ty))
+        && !(fight.victim.fog_visibility != FogVisibility::INVISIBLE
+            && world.explored(fight.own.player, Tile::new(tx, ty))?))
 }

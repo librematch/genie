@@ -113,7 +113,7 @@ fn coast_of(of: impl Fn(Tile) -> u8) -> Coast {
 /// The coast: [`WATER`] west of x 20, [`LAND`] from x 20. The ship's zone map holds the water as
 /// zone 0, the land as zone 1.
 fn coast() -> Coast {
-    coast_of(|t| if t.x() < 20 { WATER } else { LAND })
+    coast_of(|tile| if tile.x() < 20 { WATER } else { LAND })
 }
 
 /// [`coast`] with a checkerboard of single-tile patches north-east of it (x 22 and up, y below
@@ -121,7 +121,7 @@ fn coast() -> Coast {
 /// land: the ship's zone map numbers them past 256, and zone 256 has the water's low byte (0),
 /// which the near test reads ([`MapShore::near`]).
 fn aliased_coast(sailed: u8, walked: u8) -> Coast {
-    coast_of(move |t| match (t.x(), t.y()) {
+    coast_of(move |tile| match (tile.x(), tile.y()) {
         (x, _) if x < 20 => WATER,
         (x, y) if 22 <= x && y < 16 => {
             if (x + y) % 2 == 0 {
@@ -153,7 +153,7 @@ impl Coast {
         let mut shore = self.shore(Position::ORIGIN);
         let tile = (0..40)
             .flat_map(|y| (0..40).map(move |x| Tile::new(x, y)))
-            .find(|&t| shore.zone(t) == Ok(ZoneId::new(zone)))
+            .find(|&zone_tile| shore.zone(zone_tile) == Ok(ZoneId::new(zone)))
             .unwrap();
         Position::new(tile.x() as f32 + 0.5, tile.y() as f32 + 0.5, 0.0)
     }
@@ -210,9 +210,12 @@ struct Left {
 fn left((unit, motion, ais): (&Unit, &Motion, &PartTable<UnitAi>)) -> Left {
     Left {
         stopped: motion.animated().speed == Speed::new(0.0),
-        stands: unit.sprite.map(|s| s.graphic.id) == Some(STANDING.id),
+        stands: unit.sprite.map(|active_sprite| active_sprite.graphic.id) == Some(STANDING.id),
         posted: ais.get(unit.id).map_or_else(Vec::new, |ai| {
-            ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
+            ai.notifies
+                .iter()
+                .map(|notify| (notify.kind, notify.p))
+                .collect()
         }),
     }
 }
@@ -221,48 +224,64 @@ fn left((unit, motion, ais): (&Unit, &Motion, &PartTable<UnitAi>)) -> Left {
 /// (none or ended: 1; failed: 3), for a human player, or a `computer` one whose AI would hear
 /// the owner's alert (not modelled: an error).
 fn run_on(
-    t: &mut TransportAction,
-    s: &Ship<'_>,
-    c: &mut Coast,
+    transport_action: &mut TransportAction,
+    ship: &Ship<'_>,
+    coast: &mut Coast,
     hull: (&mut Unit, MotionMut<'_>, &mut PartTable<UnitAi>),
     player_kind: PlayerKind,
 ) -> GenieResult<Updated> {
-    let walked = match t.state.move_to().copied().map(|m| m.state) {
+    let walked = match transport_action
+        .state
+        .move_to()
+        .copied()
+        .map(|move_to_action| move_to_action.state)
+    {
         Some(MoveTo::Failed) => SubCode::Failed,
         Some(MoveTo::Start | MoveTo::Moving | MoveTo::Waiting) => SubCode::UnderWay,
         None | Some(MoveTo::Arrived) => SubCode::Done,
     };
     let look = (Some(STANDING), &mut Well512::default());
-    let mut shore = c.shore(s.position);
-    t.state_update(walked, (s, &mut shore), hull, look, player_kind, tuning())
+    let mut shore = coast.shore(ship.position);
+    transport_action.state_update(
+        walked,
+        (ship, &mut shore),
+        hull,
+        look,
+        player_kind,
+        tuning(),
+    )
 }
 
 /// [`run_on`] on a fresh [`hull`] of a human player: the update's answer and what it left.
-fn run(t: &mut TransportAction, s: &Ship<'_>, c: &mut Coast) -> (GenieResult<Updated>, Left) {
+fn run(
+    transport_action: &mut TransportAction,
+    ship: &Ship<'_>,
+    coast: &mut Coast,
+) -> (GenieResult<Updated>, Left) {
     let (mut unit, mut motion, mut ais) = hull();
-    let r = run_on(
-        t,
-        s,
-        c,
+    let updated = run_on(
+        transport_action,
+        ship,
+        coast,
         (&mut unit, motion.lent(), &mut ais),
         PlayerKind::Human,
     );
-    (r, left((&unit, &motion, &ais)))
+    (updated, left((&unit, &motion, &ais)))
 }
 
 /// The owner's alert, which a computer player's AI would hear ([`run_on`]).
-fn alerts(t: &TransportAction, s: &Ship<'_>, c: &mut Coast) -> bool {
-    let mut t = *t;
+fn alerts(t: &TransportAction, ship: &Ship<'_>, coast: &mut Coast) -> bool {
+    let mut transport_action = *t;
     let (mut unit, mut motion, mut ais) = hull();
     run_on(
-        &mut t,
-        s,
-        c,
+        &mut transport_action,
+        ship,
+        coast,
         (&mut unit, motion.lent(), &mut ais),
         PlayerKind::Computer,
     )
-    .is_err_and(|e| {
-        e.reason()
+    .is_err_and(|error| {
+        error.reason()
             == "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)"
     })
 }
@@ -292,38 +311,49 @@ fn ship(loaded: bool) -> Ship<'static> {
 
 #[test]
 fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
-    let s = ship(true);
-    let mut c = coast();
-    let mut t = TransportAction::new(s.position);
+    let ship = ship(true);
+    let mut coast = coast();
+    let mut transport_action = TransportAction::new(ship.position);
     assert_eq!(
-        (t.state.bare(), t.mode, t.retarget),
+        (
+            transport_action.state.bare(),
+            transport_action.mode,
+            transport_action.retarget
+        ),
         (TransportState::New, TransportMode::New, false)
     );
     // the list's add (first_in_stack with 1): set_state(11), its MoveTo to the shore point
     // on the way, none here, so the place itself
-    let changed = t
+    let changed = transport_action
         .start(
             StartCall::Added,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
     assert_eq!(changed, Changed::default());
     assert_eq!(
-        (t.state.bare(), t.state.move_to().copied().map(|m| m.state)),
+        (
+            transport_action.state.bare(),
+            transport_action
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
+        ),
         (TransportState::Sail { move_to: None }, Some(MoveTo::Start))
     );
     // the planner's path from the place to itself crosses no shore: the place stays
-    assert_eq!(t.point, s.position);
+    assert_eq!(transport_action.point, ship.position);
     // a NaN point sails too (COMISS/JA, JBE)
     let mut nan = TransportAction::new(Position::new(f32::NAN, 1.0, 0.0));
     let _ = nan
         .start(
             StartCall::Added,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -334,8 +364,8 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
     assert!(
         off.start(
             StartCall::Added,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to
         )
@@ -346,12 +376,12 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
         (off.state.bare(), off.state.move_to().copied()),
         (TransportState::Idle, None)
     );
-    let mut later = TransportAction::new(s.position);
+    let mut later = TransportAction::new(ship.position);
     let _ = later
         .start(
             StartCall::Other,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -361,91 +391,95 @@ fn new_transport_sails_to_its_own_place_and_start_off_the_map_idles() {
 
 #[test]
 fn sail_takes_the_shore_point_and_drops_its_old_move_to() {
-    let s = ship(true);
-    let mut c = coast();
-    let mut t = TransportAction::new(s.position);
-    let _ = t
+    let ship = ship(true);
+    let mut coast = coast();
+    let mut transport_action = TransportAction::new(ship.position);
+    let _ = transport_action
         .start(
             StartCall::Added,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
-    t.point = Position::new(25.0, 8.0, 0.0);
+    transport_action.point = Position::new(25.0, 8.0, 0.0);
     // set_state(4) again: the old MoveTo's teardown stops the unit, the new one starts toward
     // the shore point, the last water tile on the planner's path to the land
-    let changed = t
+    let changed = transport_action
         .set_state(
             TransportState::SailToUnload { move_to: None },
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
     assert!(changed.stopped && !changed.stands);
-    assert_eq!(t.point, Position::new(19.5, 8.5, 0.0));
+    assert_eq!(transport_action.point, Position::new(19.5, 8.5, 0.0));
     assert_eq!(
-        t.state.move_to().copied().map(|m| m.state),
+        transport_action.state.move_to().copied().map(|m| m.state),
         Some(MoveTo::Start)
     );
     // a unit without speed: its quiet MoveTo fails at its start
     let still = Ship {
         walk: MoveToReads {
             speed: Speed::ZERO,
-            ..s.walk
+            ..ship.walk
         },
-        ..s
+        ..ship
     };
-    let _ = t
+    let _ = transport_action
         .set_state(
             TransportState::Sail { move_to: None },
             &still,
-            &mut c.shore(still.position),
+            &mut coast.shore(still.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
     assert_eq!(
-        t.state.move_to().copied().map(|m| m.state),
+        transport_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Failed)
     );
     // a unit in state 3 or later adds no MoveTo (`FUN_140a977e0`)
     let dying = Ship {
         walk: MoveToReads {
             state: ObjectState::Dying,
-            ..s.walk
+            ..ship.walk
         },
-        ..s
+        ..ship
     };
-    let _ = t
+    let _ = transport_action
         .set_state(
             TransportState::Sail { move_to: None },
             &dying,
-            &mut c.shore(dying.position),
+            &mut coast.shore(dying.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
-    assert_eq!(t.state.move_to().copied(), None);
+    assert_eq!(transport_action.state.move_to().copied(), None);
 }
 
 #[test]
 fn move_sails_to_its_point_and_stop_idles() {
-    let s = ship(true);
-    let mut c = coast();
-    let mut t = TransportAction {
+    let ship = ship(true);
+    let mut coast = coast();
+    let mut transport_action = TransportAction {
         state: TransportState::Unload,
         mode: TransportMode::Work,
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
-    let changed = t
+    let changed = transport_action
         .move_to(
             Position::new(25.0, 8.0, 2.0),
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -453,10 +487,14 @@ fn move_sails_to_its_point_and_stop_idles() {
     assert_eq!(changed, Changed::default());
     assert_eq!(
         (
-            t.state.bare(),
-            t.mode,
-            t.point,
-            t.state.move_to().copied().map(|m| m.state)
+            transport_action.state.bare(),
+            transport_action.mode,
+            transport_action.point,
+            transport_action
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
         ),
         (
             TransportState::Sail { move_to: None },
@@ -465,34 +503,37 @@ fn move_sails_to_its_point_and_stop_idles() {
             Some(MoveTo::Start)
         )
     );
-    let stopped = t
+    let stopped = transport_action
         .stop(
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
     assert!(stopped.stopped && stopped.stands);
     assert_eq!(
-        (t.state.bare(), t.state.move_to().copied()),
+        (
+            transport_action.state.bare(),
+            transport_action.state.move_to().copied()
+        ),
         (TransportState::Idle, None)
     );
 }
 
 #[test]
 fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
-    let s = ship(true);
+    let ship = ship(true);
     // within reach of the point's zone (the water) and 2 from the footprint (squared 4, at most
     // 4)
-    let mut c = coast();
-    let mut t = TransportAction::new(s.position);
+    let mut coast = coast();
+    let mut t = TransportAction::new(ship.position);
     let _ = t
         .work(
             Position::new(15.0, 8.5, 1.0),
             TransportTarget::Ship,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -506,13 +547,13 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         )
     );
     // a bit further: sail there to unload, from the unit itself, else just sail
-    let mut t = TransportAction::new(s.position);
+    let mut t = TransportAction::new(ship.position);
     let _ = t
         .work(
             Position::new(15.1, 8.5, 1.0),
             TransportTarget::Ship,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -524,13 +565,13 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
             Position::new(15.1, 8.5, 1.0)
         )
     );
-    let mut t = TransportAction::new(s.position);
+    let mut t = TransportAction::new(ship.position);
     let _ = t
         .work(
             Position::new(15.1, 8.5, 1.0),
             TransportTarget::Other,
-            &s,
-            &mut c.shore(s.position),
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -541,7 +582,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
     let big = Ship {
         position: Position::new(16.5, 8.5, 0.0),
         radius: Footprint::new(1.5, 1.5),
-        ..s
+        ..ship
     };
     let mut t = TransportAction::new(big.position);
     let _ = t
@@ -549,7 +590,7 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
             Position::new(20.0, 8.5, 0.0),
             TransportTarget::Ship,
             &big,
-            &mut c.shore(big.position),
+            &mut coast.shore(big.position),
             &tuning().transport,
             &tuning().move_to,
         )
@@ -563,13 +604,13 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         Position::new(-1.0, 3.0, 0.0),
         Position::new(3.0, f32::NAN, 0.0),
     ] {
-        let mut t = TransportAction::new(s.position);
+        let mut t = TransportAction::new(ship.position);
         assert_eq!(
             t.work(
                 bad,
                 TransportTarget::Ship,
-                &s,
-                &mut c.shore(s.position),
+                &ship,
+                &mut coast.shore(ship.position),
                 &tuning().transport,
                 &tuning().move_to
             )
@@ -578,52 +619,67 @@ fn work_order_near_its_zone_unloads_at_once_else_sails_there() {
         );
         assert_eq!(
             (t.state.bare(), t.mode, t.point),
-            (TransportState::New, TransportMode::Work, s.position)
+            (TransportState::New, TransportMode::Work, ship.position)
         );
     }
     // a NaN gap stays NaN (MAXSS) and is not within (COMISS/JC): it sails
-    let mut t = TransportAction::new(s.position);
+    let mut transport_action = TransportAction::new(ship.position);
     let nan_ship = Ship {
         radius: Footprint::new(f32::NAN, 0.5),
-        ..s
+        ..ship
     };
-    let _ = t
+    let _ = transport_action
         .work(
             Position::new(12.5, 8.5, 0.0),
             TransportTarget::Ship,
             &nan_ship,
-            &mut c.shore(nan_ship.position),
+            &mut coast.shore(nan_ship.position),
             &tuning().transport,
             &tuning().move_to,
         )
         .unwrap();
     assert_eq!(
-        t.state.bare(),
+        transport_action.state.bare(),
         TransportState::SailToUnload { move_to: None }
     );
 }
 
 #[test]
 fn the_shore_search_looks_about_the_footprint_for_the_point_zone_or_land() {
-    let mut c = coast();
-    let s = ship(true);
+    let mut coast = coast();
+    let sailing_ship = ship(true);
     // the ship at x 12.5 with radius 0.5 and the margin 2: tiles 10 to 15, all water (zone 0)
-    let mut t = TransportAction::new(s.position);
-    t.point = Position::new(17.0, 3.0, 0.0);
+    let mut transport_action = TransportAction::new(sailing_ship.position);
+    transport_action.point = Position::new(17.0, 3.0, 0.0);
     assert!(
-        t.next_to_shore(&s, &mut c.shore(s.position), &tuning().transport)
+        transport_action
+            .next_to_shore(
+                &sailing_ship,
+                &mut coast.shore(sailing_ship.position),
+                &tuning().transport
+            )
             .unwrap()
     );
     // the land (zone 1, x 20 and up) lies past x 15
-    t.point = Position::new(25.0, 3.0, 0.0);
+    transport_action.point = Position::new(25.0, 3.0, 0.0);
     assert!(
-        !t.next_to_shore(&s, &mut c.shore(s.position), &tuning().transport)
+        !transport_action
+            .next_to_shore(
+                &sailing_ship,
+                &mut coast.shore(sailing_ship.position),
+                &tuning().transport
+            )
             .unwrap()
     );
     // without a point: the land's shore bits lie past x 15 too, but not from x 17.5
-    t.point = Position::new(NONE, 0.0, 0.0);
+    transport_action.point = Position::new(NONE, 0.0, 0.0);
     assert!(
-        !t.next_to_shore(&s, &mut c.shore(s.position), &tuning().transport)
+        !transport_action
+            .next_to_shore(
+                &sailing_ship,
+                &mut coast.shore(sailing_ship.position),
+                &tuning().transport
+            )
             .unwrap()
     );
     let east = Ship {
@@ -631,7 +687,8 @@ fn the_shore_search_looks_about_the_footprint_for_the_point_zone_or_land() {
         ..ship(true)
     };
     assert!(
-        t.next_to_shore(&east, &mut c.shore(east.position), &tuning().transport)
+        transport_action
+            .next_to_shore(&east, &mut coast.shore(east.position), &tuning().transport)
             .unwrap()
     );
     // the box stays on the map: a ship at the west edge reads only water, where a tile below 0
@@ -641,7 +698,8 @@ fn the_shore_search_looks_about_the_footprint_for_the_point_zone_or_land() {
         ..ship(true)
     };
     assert!(
-        !t.next_to_shore(&west, &mut c.shore(west.position), &tuning().transport)
+        !transport_action
+            .next_to_shore(&west, &mut coast.shore(west.position), &tuning().transport)
             .unwrap()
     );
 }
@@ -674,72 +732,82 @@ fn an_unload_out_of_reach_or_beside_no_shore_tells_the_owner_unless_over_water()
     let mut wet = aliased_coast(WATER, DEEP);
     assert_eq!(wet.tile_of(256), far);
     assert!(!alerts(&unloading(far), &s, &mut wet));
-    let (r, Left { stands, .. }) = run(&mut unloading(far), &s, &mut wet);
-    assert_eq!((r, stands), (Ok(Updated::Code(UpdateCode::UnderWay)), true));
-    // empty: nothing to unload, the action idles
-    let mut t = unloading(Position::new(17.0, 3.0, 0.0));
-    assert!(!alerts(&t, &ship(false), &mut coast()));
+    let (updated, Left { stands, .. }) = run(&mut unloading(far), &s, &mut wet);
     assert_eq!(
-        run(&mut t, &ship(false), &mut coast()).0,
+        (updated, stands),
+        (Ok(Updated::Code(UpdateCode::UnderWay)), true)
+    );
+    // empty: nothing to unload, the action idles
+    let mut transport_action = unloading(Position::new(17.0, 3.0, 0.0));
+    assert!(!alerts(&transport_action, &ship(false), &mut coast()));
+    assert_eq!(
+        run(&mut transport_action, &ship(false), &mut coast()).0,
         Ok(Updated::Code(UpdateCode::UnderWay))
     );
-    assert_eq!(t.state, TransportState::Idle);
+    assert_eq!(transport_action.state, TransportState::Idle);
 }
 
 #[test]
 fn an_unload_beside_the_shore_is_the_caller_then_idles_unless_it_sails_on() {
-    let s = ship(true);
-    let mut c = coast();
-    let mut t = TransportAction {
+    let ship = ship(true);
+    let mut coast = coast();
+    let mut transport_action = TransportAction {
         state: TransportState::Unload,
         point: Position::new(17.0, 3.0, 0.0),
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
     let (
-        r,
+        updated,
         Left {
             stopped, stands, ..
         },
-    ) = run(&mut t, &s, &mut c);
-    assert_eq!((r, stopped, stands), (Ok(Updated::Unload), false, false));
-    assert_eq!(t.state, TransportState::Unload);
-    assert!(
-        t.unloaded(
-            &s,
-            &mut c.shore(s.position),
-            &tuning().transport,
-            &tuning().move_to
-        )
-        .unwrap()
-        .stands
-    );
-    assert_eq!(t.state, TransportState::Idle);
-    // a retarget's set_state(4) stays
-    t.state = TransportState::SailToUnload { move_to: None };
-    t.retarget = true;
+    ) = run(&mut transport_action, &ship, &mut coast);
     assert_eq!(
-        t.unloaded(
-            &s,
-            &mut c.shore(s.position),
+        (updated, stopped, stands),
+        (Ok(Updated::Unload), false, false)
+    );
+    assert_eq!(transport_action.state, TransportState::Unload);
+    assert!(
+        transport_action
+            .unloaded(
+                &ship,
+                &mut coast.shore(ship.position),
+                &tuning().transport,
+                &tuning().move_to
+            )
+            .unwrap()
+            .stands
+    );
+    assert_eq!(transport_action.state, TransportState::Idle);
+    // a retarget's set_state(4) stays
+    transport_action.state = TransportState::SailToUnload { move_to: None };
+    transport_action.retarget = true;
+    assert_eq!(
+        transport_action.unloaded(
+            &ship,
+            &mut coast.shore(ship.position),
             &tuning().transport,
             &tuning().move_to
         ),
         Ok(Changed::default())
     );
-    assert_eq!(t.state, TransportState::SailToUnload { move_to: None });
+    assert_eq!(
+        transport_action.state,
+        TransportState::SailToUnload { move_to: None }
+    );
 }
 
 #[test]
 fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
-    let s = ship(true);
-    let mut c = coast();
+    let ship = ship(true);
+    let mut coast = coast();
     // state 4 without a MoveTo: the list answers 1, so it unloads
     let mut t = TransportAction {
         state: TransportState::SailToUnload { move_to: None },
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
     assert_eq!(
-        run(&mut t, &s, &mut c).0,
+        run(&mut t, &ship, &mut coast).0,
         Ok(Updated::Code(UpdateCode::UnderWay))
     );
     assert_eq!(t.state, TransportState::Unload);
@@ -748,14 +816,14 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
         state: TransportState::Sail {
             move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
         },
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
     let (
         _,
         Left {
             stopped, stands, ..
         },
-    ) = run(&mut t, &s, &mut c);
+    ) = run(&mut t, &ship, &mut coast);
     assert_eq!(t.state, TransportState::Idle);
     assert!(stopped && stands);
     // a failed MoveTo (code 3) ends a sail to unload too
@@ -763,16 +831,16 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
         state: TransportState::SailToUnload {
             move_to: Some(MoveToAction::sub_in(MoveTo::Failed)),
         },
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
-    let _ = run(&mut t, &s, &mut c);
+    let _ = run(&mut t, &ship, &mut coast);
     assert_eq!(t.state, TransportState::Unload);
     // state 13: the unit's AI hears it failed, the action idles and returns 3
     let mut t = TransportAction {
         state: TransportState::Failed,
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
-    let (r, Left { stands, posted, .. }) = run(&mut t, &s, &mut c);
+    let (r, Left { stands, posted, .. }) = run(&mut t, &ship, &mut coast);
     let failed = (
         NotifyKind::ACTION_FAILED,
         [AiAction::Transport.value(), 0, 0],
@@ -785,37 +853,38 @@ fn sail_ends_with_its_move_to_and_failed_one_returns_3() {
     // state 1 is done; an idle one does nothing
     t.state = TransportState::Done;
     assert_eq!(
-        run(&mut t, &s, &mut c).0,
+        run(&mut t, &ship, &mut coast).0,
         Ok(Updated::Code(UpdateCode::Done))
     );
     t.state = TransportState::Idle;
     let (
-        r,
+        updated,
         Left {
             stopped,
             stands,
             posted,
         },
-    ) = run(&mut t, &s, &mut c);
-    assert_eq!(r, Ok(Updated::Code(UpdateCode::UnderWay)));
+    ) = run(&mut t, &ship, &mut coast);
+    assert_eq!(updated, Ok(Updated::Code(UpdateCode::UnderWay)));
     assert!(!stopped && !stands && posted.is_empty());
     // a hull showing a sprite without its standing one: not modelled
-    let mut t = TransportAction {
+    let mut transport_action = TransportAction {
         state: TransportState::Failed,
-        ..TransportAction::new(s.position)
+        ..TransportAction::new(ship.position)
     };
     let (mut unit, mut motion, mut ais) = hull();
     let look = (None, &mut Well512::default());
     assert!(
-        t.state_update(
-            SubCode::Done,
-            (&s, &mut c.shore(s.position)),
-            (&mut unit, motion.lent(), &mut ais),
-            look,
-            PlayerKind::Human,
-            tuning()
-        )
-        .is_err()
+        transport_action
+            .state_update(
+                SubCode::Done,
+                (&ship, &mut coast.shore(ship.position)),
+                (&mut unit, motion.lent(), &mut ais),
+                look,
+                PlayerKind::Human,
+                tuning()
+            )
+            .is_err()
     );
 }
 
@@ -895,7 +964,13 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         Ok(SubCode::UnderWay)
     );
     assert_eq!(
-        (t.state.move_to().copied().map(|m| m.state), walker.posted()),
+        (
+            t.state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state),
+            walker.posted()
+        ),
         (Some(MoveTo::Waiting), vec![])
     );
     // the ended, the failed and a missing MoveTo walk nothing
@@ -905,8 +980,12 @@ fn sail_move_to_asks_for_its_path_then_walks_on() {
         (None, SubCode::Done),
     ] {
         let mut walker = rig();
-        let mut t = sailing(move_to);
-        assert_eq!(walker.run(100, |c, u, _, _, _| t.walk(c, u, me)), Ok(code));
+        let mut transport_action = sailing(move_to);
+        assert_eq!(
+            walker.run(100, |step, unit, _, _, _| transport_action
+                .walk(step, unit, me)),
+            Ok(code)
+        );
         assert_eq!(walker.posted(), vec![]);
     }
 }
@@ -983,12 +1062,12 @@ fn terrain(size: i32, fill: u8, tiles: &[([i16; 2], u8)]) -> Terrain {
 
 /// The tile of the retry's `n`th draw (from 1) about (20, 20) from [`rng`]'s seed `seed`.
 fn draw_tile(seed: u32, n: usize) -> [i16; 2] {
-    let mut r = Well512::default();
-    r.set_seed(seed);
+    let mut rng = Well512::default();
+    rng.set_seed(seed);
     let mut at = [0; 2];
     for _ in 0..n {
-        let x = (r.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
-        let y = (r.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
+        let x = (rng.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
+        let y = (rng.rand15() / RETRY_STEP) as f32 + 20.0 - tuning().transport.retry_spread;
         at = [x as i32 as i16, y as i32 as i16];
     }
     at
@@ -1053,14 +1132,14 @@ fn the_99th_draw_leaving_the_water_comes_too_late() {
             .find(|&seed| (1..n).all(|k| draw_tile(seed, k) != draw_tile(seed, n)))
             .expect("a seed whose nth draw lands on a new tile");
         let shore = terrain(400, 0x16, &[(draw_tile(seed, n), 0)]);
-        let mut r = Well512::default();
-        r.set_seed(seed);
+        let mut rng = Well512::default();
+        rng.set_seed(seed);
         assert_eq!(
             retry_point(
                 Point::new(20.0, 20.0),
                 GridSize::new(400, 400),
                 &shore,
-                &mut r,
+                &mut rng,
                 &tuning().transport
             )
             .1,
@@ -1130,9 +1209,9 @@ fn drop_location_is_drawn_on_side_past_both_footprints() {
         &mut r,
     );
     let mut on_map = 0;
-    while let Some(p) = draws.next_on_map(&tuning().transport).unwrap() {
+    while let Some(point) = draws.next_on_map(&tuning().transport).unwrap() {
         on_map += 1;
-        assert!(0.0 <= p.x() && 0.0 <= p.y() && p.x() < 4.0 && p.y() < 4.0);
+        assert!(0.0 <= point.x() && 0.0 <= point.y() && point.x() < 4.0 && point.y() < 4.0);
     }
     assert!(on_map < 50);
     // a first draw of side 4 keeps a place no draw left: not modelled

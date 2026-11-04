@@ -20,7 +20,7 @@ use tracing_subscriber::{EnvFilter, Registry, layer::SubscriberExt};
 #[must_use]
 pub fn filter(rust_log: Option<&str>, verbose: bool) -> Option<String> {
     let filter = match rust_log {
-        Some(f) if !f.trim().is_empty() => f.to_owned(),
+        Some(text) if !text.trim().is_empty() => text.to_owned(),
         _ if verbose => "debug".to_owned(),
         _ => return None,
     };
@@ -37,17 +37,18 @@ pub fn install(verbose: bool) -> GenieResult<()> {
     let Some(filter) = filter(rust_log.as_deref(), verbose) else {
         return Ok(());
     };
-    let filter = EnvFilter::try_new(&filter).map_err(|e| {
+    let filter = EnvFilter::try_new(&filter).map_err(|parse_error| {
         GenieError::invalid_input("a RUST_LOG filter that does not parse")
             .with("filter", &filter)
-            .with_source(e)
+            .with_source(parse_error)
     })?;
     let subscriber = Registry::default()
         .with(filter)
         .with(JsonStorageLayer)
         .with(BunyanFormattingLayer::new("gsk".to_owned(), stderr));
-    set_global_default(subscriber).map_err(|e| {
-        GenieError::unreachable("a second global subscriber: gsk installs one, once").with_source(e)
+    set_global_default(subscriber).map_err(|error| {
+        GenieError::unreachable("a second global subscriber: gsk installs one, once")
+            .with_source(error)
     })
 }
 

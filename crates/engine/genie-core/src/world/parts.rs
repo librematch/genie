@@ -281,8 +281,11 @@ pub(in crate::world) fn repairers_in<'a>(
     combats: &'a mut PartTable<Combat>,
     id: ObjectId,
 ) -> GenieResult<&'a mut BuilderCount> {
-    if let Some(k) = buildings.get_mut(id).and_then(|b| b.construction.as_mut()) {
-        return Ok(&mut k.builders);
+    if let Some(construction) = buildings
+        .get_mut(id)
+        .and_then(|building| building.construction.as_mut())
+    {
+        return Ok(&mut construction.builders);
     }
     Ok(&mut combats.get_or_insert_with(id, Combat::default)?.builders)
 }
@@ -319,8 +322,8 @@ impl Parts {
         if let Some(m) = missile {
             let _ = self.missile.insert(id, m);
         }
-        if let Some(m) = own_master {
-            let _ = self.own_master.insert(id, m);
+        if let Some(master) = own_master {
+            let _ = self.own_master.insert(id, master);
         }
         if town_bell != TownBell::default() {
             let _ = self.town_bell.insert(id, town_bell);
@@ -421,9 +424,10 @@ impl Parts {
     /// construction, any other's in its combat layer.
     #[must_use]
     pub fn repairers_of(&self, id: ObjectId) -> BuilderCount {
-        self.building_of(id)
-            .construction
-            .map_or_else(|| self.combat_of(id).builders, |k| k.builders)
+        self.building_of(id).construction.map_or_else(
+            || self.combat_of(id).builders,
+            |construction| construction.builders,
+        )
     }
 
     /// [`Parts::repairers_of`] to change ([`repairers_in`]).
@@ -541,28 +545,28 @@ impl World {
             Part::DeadMaster(m) => {
                 let _ = self.parts.dead_master.insert(id, *m);
             }
-            Part::GatherPoint(Some(g)) => {
-                let _ = self.parts.gather_point.insert(id, g);
+            Part::GatherPoint(Some(gather_point)) => {
+                let _ = self.parts.gather_point.insert(id, gather_point);
             }
             Part::GatherPoint(None) => {
                 let _ = self.parts.gather_point.remove(id);
             }
-            Part::Production(Some(p)) => {
-                let _ = self.parts.production.insert(id, *p);
+            Part::Production(Some(production)) => {
+                let _ = self.parts.production.insert(id, *production);
             }
             Part::Production(None) => {
                 let _ = self.parts.production.remove(id);
             }
-            Part::Missile(Some(m)) => {
-                let _ = self.parts.missile.insert(id, m);
+            Part::Missile(Some(missile)) => {
+                let _ = self.parts.missile.insert(id, missile);
             }
             Part::Missile(None) => {
                 let _ = self.parts.missile.remove(id);
             }
-            Part::OwnMaster(m) => {
-                let _ = self.parts.own_master.insert(id, *m);
+            Part::OwnMaster(master) => {
+                let _ = self.parts.own_master.insert(id, *master);
             }
-            Part::TownBell(b) => self.parts.set_town_bell(id, b),
+            Part::TownBell(town_bell) => self.parts.set_town_bell(id, town_bell),
             Part::UnitAi(Some(ai)) => {
                 let _ = self.parts.unit_ai.insert(id, *ai);
             }
@@ -572,24 +576,24 @@ impl World {
             Part::Building(b) if *b == Building::NONE => {
                 let _ = self.parts.building.remove(id);
             }
-            Part::Building(b) => {
-                let _ = self.parts.building.insert(id, *b);
+            Part::Building(building) => {
+                let _ = self.parts.building.insert(id, *building);
             }
             Part::Combat(b) if *b == Combat::default() => {
                 let _ = self.parts.combat.remove(id);
             }
-            Part::Combat(b) => {
-                let _ = self.parts.combat.insert(id, *b);
+            Part::Combat(combat) => {
+                let _ = self.parts.combat.insert(id, *combat);
             }
-            Part::Motion(Some(m)) => {
-                let _ = self.parts.motion.insert(id, *m);
+            Part::Motion(Some(motion)) => {
+                let _ = self.parts.motion.insert(id, *motion);
             }
             Part::Motion(None) => {
                 let _ = self.parts.motion.remove(id);
             }
-            Part::Actions(a) => self.parts.put_actions(id, *a),
-            Part::Unread(Some(u)) => {
-                let _ = self.parts.unread.insert(id, u);
+            Part::Actions(action) => self.parts.put_actions(id, *action),
+            Part::Unread(Some(unread)) => {
+                let _ = self.parts.unread.insert(id, unread);
             }
             Part::Unread(None) => {
                 let _ = self.parts.unread.remove(id);
@@ -727,10 +731,10 @@ mod tests {
             [(object_id(9), &'d'), (object_id(-3), &'b')]
         );
         *t.get_mut(object_id(-3)).unwrap() = 'e';
-        let mut u = PartTable::default();
-        let _ = u.insert(object_id(-3), 'e');
-        let _ = u.insert(object_id(9), 'd');
-        assert_eq!(t, u);
+        let mut part_table = PartTable::default();
+        let _ = part_table.insert(object_id(-3), 'e');
+        let _ = part_table.insert(object_id(9), 'd');
+        assert_eq!(t, part_table);
         assert!(!t.contains(object_id(5)) && !t.is_empty());
     }
 
@@ -745,7 +749,7 @@ mod tests {
         use crate::players::PlayerId;
         use genie_diff::{Scope, differences};
         let id = object_id(5);
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -761,33 +765,35 @@ mod tests {
         );
         let dead = Master::default();
         assert!(
-            t.set_part(object_id(6), Part::DeadMaster(Box::new(dead.clone())))
+            world
+                .set_part(object_id(6), Part::DeadMaster(Box::new(dead.clone())))
                 .is_err()
         );
-        t.set_part(id, Part::DeadMaster(Box::new(dead.clone())))
+        world
+            .set_part(id, Part::DeadMaster(Box::new(dead.clone())))
             .unwrap();
-        t.check_parts().unwrap();
-        let unit = t.players[0].objects.by_id(id).unwrap();
-        let view = t.object_view(unit);
+        world.check_parts().unwrap();
+        let unit = world.players[0].objects.by_id(id).unwrap();
+        let view = world.object_view(unit);
         assert_eq!(view.parts.dead_master.as_ref(), Some(&dead));
-        let whole = t.object_of(unit);
+        let whole = world.object_of(unit);
         assert_eq!(differences(&view, &whole.view(), Scope::All), []);
         let bare = Object::from(unit.clone());
         let paths: Vec<String> = differences(&view, &bare.view(), Scope::SavedWithGaps)
             .into_iter()
-            .map(|d| d.path)
+            .map(|difference| difference.path)
             .collect();
         assert_eq!(paths, ["dead_master"]);
-        let gone = t
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
         assert_eq!(gone.parts.dead_master.as_ref(), Some(&dead));
-        assert!(t.parts.dead_master.is_empty());
-        t.check_parts().unwrap();
-        let _ = t.push_live(PlayerId::new(0), gone).unwrap();
-        assert!(t.parts.dead_master.contains(id));
-        let _ = t.parts.dead_master.insert(object_id(9), dead);
-        assert!(t.check_parts().is_err());
+        assert!(world.parts.dead_master.is_empty());
+        world.check_parts().unwrap();
+        let _ = world.push_live(PlayerId::new(0), gone).unwrap();
+        assert!(world.parts.dead_master.contains(id));
+        let _ = world.parts.dead_master.insert(object_id(9), dead);
+        assert!(world.check_parts().is_err());
     }
 
     /// A loaded object's parts go into the tables only for an object the world holds; the
@@ -798,7 +804,7 @@ mod tests {
         use crate::objects::ListIndex;
         use crate::players::PlayerId;
         let id = object_id(5);
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -825,26 +831,26 @@ mod tests {
             missile: Some(missile),
             ..ObjectParts::default()
         };
-        assert!(t.load_parts(object_id(6), parts.clone()).is_err());
-        assert!(t.parts.gather_point.is_empty());
-        t.load_parts(id, parts).unwrap();
-        assert_eq!(t.parts.gather_point.get(id), Some(&gather));
-        assert_eq!(t.parts.missile.get(id), Some(&missile));
-        t.set_part(id, Part::Missile(None)).unwrap();
-        assert!(t.parts.missile.is_empty());
-        t.set_part(id, Part::Missile(Some(missile))).unwrap();
-        t.check_parts().unwrap();
-        t.set_part(id, Part::GatherPoint(None)).unwrap();
-        assert!(t.parts.gather_point.is_empty());
-        t.set_part(id, Part::GatherPoint(Some(gather))).unwrap();
-        let gone = t
+        assert!(world.load_parts(object_id(6), parts.clone()).is_err());
+        assert!(world.parts.gather_point.is_empty());
+        world.load_parts(id, parts).unwrap();
+        assert_eq!(world.parts.gather_point.get(id), Some(&gather));
+        assert_eq!(world.parts.missile.get(id), Some(&missile));
+        world.set_part(id, Part::Missile(None)).unwrap();
+        assert!(world.parts.missile.is_empty());
+        world.set_part(id, Part::Missile(Some(missile))).unwrap();
+        world.check_parts().unwrap();
+        world.set_part(id, Part::GatherPoint(None)).unwrap();
+        assert!(world.parts.gather_point.is_empty());
+        world.set_part(id, Part::GatherPoint(Some(gather))).unwrap();
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
         assert_eq!(
             (gone.parts.gather_point, gone.parts.missile),
             (Some(gather), Some(missile))
         );
-        assert!(t.parts.gather_point.is_empty() && t.parts.missile.is_empty());
+        assert!(world.parts.gather_point.is_empty() && world.parts.missile.is_empty());
     }
 
     /// The unit AI goes into the table with its object and leaves with it. Its unit's notifies
@@ -878,7 +884,7 @@ mod tests {
                 .post(NotifyKind::DAMAGED, [1, 2, 3])
                 .unwrap();
         };
-        let heard = |t: &World| t.parts.unit_ai.get(id).map(|ai| ai.notifies.len());
+        let heard = |world: &World| world.parts.unit_ai.get(id).map(|ai| ai.notifies.len());
         post(&mut t);
         assert_eq!(heard(&t), Some(1));
         let ai = t.lend_unit_ai(id).unwrap();
@@ -899,7 +905,7 @@ mod tests {
     fn production_is_made_empty_once_and_found_again() {
         use crate::players::PlayerId;
         let id = object_id(5);
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -913,17 +919,17 @@ mod tests {
                 ..Default::default()
             }],
         );
-        assert!(t.production_or_new(object_id(6)).is_err());
-        assert!(t.parts.production.is_empty());
-        let made = t.production_or_new(id).unwrap();
+        assert!(world.production_or_new(object_id(6)).is_err());
+        assert!(world.parts.production.is_empty());
+        let made = world.production_or_new(id).unwrap();
         assert_eq!(*made, Production::default());
         made.disabled_techs.push(tech_id(3));
-        let again = t.production_or_new(id).unwrap();
+        let again = world.production_or_new(id).unwrap();
         assert_eq!(again.disabled_techs, [tech_id(3)]);
-        assert_eq!(t.parts.production.len(), 1);
-        t.set_part(id, Part::Production(None)).unwrap();
-        assert!(t.parts.production.is_empty());
-        t.check_parts().unwrap();
+        assert_eq!(world.parts.production.len(), 1);
+        world.set_part(id, Part::Production(None)).unwrap();
+        assert!(world.parts.production.is_empty());
+        world.check_parts().unwrap();
     }
 
     /// A town bell that differs from a new unit's is in the table, a new unit's is not: the
@@ -934,7 +940,7 @@ mod tests {
         use crate::objects::ListIndex;
         use crate::players::PlayerId;
         let id = object_id(5);
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -948,26 +954,28 @@ mod tests {
                 ..Default::default()
             }],
         );
-        t.load_parts(id, ObjectParts::default()).unwrap();
-        assert!(t.parts.town_bell.is_empty());
-        t.parts.set_town_bell_flag(id, BellShelter::Sheltered);
-        assert!(t.parts.town_bell_of(id).flag.is_sheltered() && t.parts.town_bell.contains(id));
-        t.parts.set_town_bell_flag(id, BellShelter::Free);
-        assert!(t.parts.town_bell.is_empty());
-        let mut bell = t.parts.town_bell_of(id);
+        world.load_parts(id, ObjectParts::default()).unwrap();
+        assert!(world.parts.town_bell.is_empty());
+        world.parts.set_town_bell_flag(id, BellShelter::Sheltered);
+        assert!(
+            world.parts.town_bell_of(id).flag.is_sheltered() && world.parts.town_bell.contains(id)
+        );
+        world.parts.set_town_bell_flag(id, BellShelter::Free);
+        assert!(world.parts.town_bell.is_empty());
+        let mut bell = world.parts.town_bell_of(id);
         bell.record(BackToWork {
             point: Point::new(2.0, 3.0),
             ..BackToWork::NONE
         });
-        t.set_part(id, Part::TownBell(bell)).unwrap();
-        assert_eq!(t.parts.town_bell_of(id), bell);
-        t.check_parts().unwrap();
-        let gone = t
+        world.set_part(id, Part::TownBell(bell)).unwrap();
+        assert_eq!(world.parts.town_bell_of(id), bell);
+        world.check_parts().unwrap();
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
         assert_eq!(gone.parts.town_bell, bell);
-        assert!(t.parts.town_bell.is_empty());
-        assert_eq!(t.parts.town_bell_of(id), TownBell::default());
+        assert!(world.parts.town_bell.is_empty());
+        assert_eq!(world.parts.town_bell_of(id), TownBell::default());
     }
 
     /// An object the load could not read whole holds its reason in the table: the load files
@@ -978,7 +986,7 @@ mod tests {
         use crate::players::PlayerId;
         let id = object_id(5);
         let why = Unread::new(GenieError::unsupported("a saved production list"));
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -992,35 +1000,36 @@ mod tests {
                 ..Default::default()
             }],
         );
-        t.load_parts(
-            id,
-            ObjectParts {
-                unread: Some(why.clone()),
-                ..ObjectParts::default()
-            },
-        )
-        .unwrap();
-        assert_eq!(t.parts.unread.get(id), Some(&why));
-        assert_eq!(t.parts.of(id).unread, Some(why.clone()));
+        world
+            .load_parts(
+                id,
+                ObjectParts {
+                    unread: Some(why.clone()),
+                    ..ObjectParts::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(world.parts.unread.get(id), Some(&why));
+        assert_eq!(world.parts.of(id).unread, Some(why.clone()));
         let by_id = ObjectsRef::new(
-            &t.players,
-            &t.index,
-            &t.model.masters,
-            &t.parts,
-            &t.model.roles,
-            &t.model.tuning,
+            &world.players,
+            &world.index,
+            &world.model.masters,
+            &world.parts,
+            &world.model.roles,
+            &world.model.tuning,
         );
         assert_eq!(by_id.unread(id), Some(&why));
-        t.check_parts().unwrap();
-        let gone = t
+        world.check_parts().unwrap();
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::FIRST)
             .unwrap();
         assert_eq!(gone.parts.unread.as_ref(), Some(&why));
-        assert!(t.parts.unread.is_empty());
-        let _ = t.push_live(PlayerId::new(0), gone).unwrap();
-        assert!(t.parts.unread.contains(id));
-        t.set_part(id, Part::Unread(None)).unwrap();
-        assert!(t.parts.unread.is_empty());
+        assert!(world.parts.unread.is_empty());
+        let _ = world.push_live(PlayerId::new(0), gone).unwrap();
+        assert!(world.parts.unread.contains(id));
+        world.set_part(id, Part::Unread(None)).unwrap();
+        assert!(world.parts.unread.is_empty());
     }
 
     /// An object's own master is a part the world's master lookups read before its player's
@@ -1060,10 +1069,14 @@ mod tests {
         t.model.masters = vec![Arc::new(Masters::new([master(25)]))];
         t.set_part(id, Part::OwnMaster(Box::new(master(40))))
             .unwrap();
-        let hp = |t: &World, i: usize| {
-            let u = &t.players[0].objects[ListIndex::new(i)];
-            let own = u.master(t.master_tables(), PlayerId::new(0)).unwrap();
-            let in_owner = u.master_in(t.master_tables().of(PlayerId::new(0))).unwrap();
+        let hp = |world: &World, i: usize| {
+            let players = &world.players[0].objects[ListIndex::new(i)];
+            let own = players
+                .master(world.master_tables(), PlayerId::new(0))
+                .unwrap();
+            let in_owner = players
+                .master_in(world.master_tables().of(PlayerId::new(0)))
+                .unwrap();
             assert_eq!(own, in_owner);
             own.hit_points.get()
         };
@@ -1097,27 +1110,27 @@ mod tests {
             id: object_id(1),
             ..Unit::default()
         });
-        let mut b = a.clone();
-        b.parts.dead_master = Some(Master::default());
-        b.unit.life.hp = HitPoints::new(7.0);
-        b.parts.gather_point = Some(gather_point(2.0));
-        b.parts.production = Some(Production::default());
-        b.parts.own_master = Some(Master::default());
-        b.parts.town_bell.flag = BellShelter::Sheltered;
-        b.parts.unit_ai = Some(UnitAi::default());
-        b.parts.missile = Some(Missile {
+        let mut object = a.clone();
+        object.parts.dead_master = Some(Master::default());
+        object.unit.life.hp = HitPoints::new(7.0);
+        object.parts.gather_point = Some(gather_point(2.0));
+        object.parts.production = Some(Production::default());
+        object.parts.own_master = Some(Master::default());
+        object.parts.town_bell.flag = BellShelter::Sheltered;
+        object.parts.unit_ai = Some(UnitAi::default());
+        object.parts.missile = Some(Missile {
             max_range: Distance::ZERO,
             fired_from: None,
             charge: false,
             flying: true,
             step: Offset::ZERO,
         });
-        b.parts.building.garrison_time = WorldTime::from_millis(5);
-        b.parts.combat.armor_removed = ArmorPair::new(1, 0);
+        object.parts.building.garrison_time = WorldTime::from_millis(5);
+        object.parts.combat.armor_removed = ArmorPair::new(1, 0);
         let paths = |scope| {
-            differences(&a, &b, scope)
+            differences(&a, &object, scope)
                 .into_iter()
-                .map(|d| d.path)
+                .map(|difference| difference.path)
                 .collect::<Vec<_>>()
         };
         assert_eq!(

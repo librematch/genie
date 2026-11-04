@@ -63,20 +63,21 @@ impl World {
     ) -> GenieResult<()> {
         let mut i = 0;
         loop {
-            let g = self.groups.held(group)?;
-            let Some(m) = g.members.get(i).copied() else {
+            let held = self.groups.held(group)?;
+            let Some(m) = held.members.get(i).copied() else {
                 break;
             };
             let index = i;
             i += 1;
             // members are units: the world's table holds ghosts only at negative ids
-            let Some((_, u)) = self.object(m.id) else {
+            let Some((_, unit)) = self.object(m.id) else {
                 continue;
             };
             // the member's slot, by its unit's id (the first); no routine of the steer changes
             // the formation, so the slot found is the one each step reads
-            let found = g.current_formation.as_ref().and_then(|f| {
-                f.slots
+            let found = held.current_formation.as_ref().and_then(|formation| {
+                formation
+                    .slots
                     .iter()
                     .enumerate()
                     .find(|(_, s)| s.unit_id == Some(m.id))
@@ -88,8 +89,8 @@ impl World {
             };
             if m.specific_move.active == 1 {
                 let to = slot.1.transform_position;
-                let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
-                let from = u.moved_vector(self.parts.mover_of(u.id));
+                let members: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
+                let from = unit.moved_vector(self.parts.mover_of(unit.id));
                 let clear = self.line_clear(
                     m.id,
                     from,
@@ -98,8 +99,8 @@ impl World {
                     &members,
                 )?;
                 let dt = self.dt_seconds;
-                let g = self.groups.held_mut(group)?;
-                let own = &mut g.members.checked_mut(index)?.specific_move;
+                let unit_group = self.groups.held_mut(group)?;
+                let own = &mut unit_group.members.checked_mut(index)?.specific_move;
                 let ends = if clear {
                     true
                 } else {
@@ -134,11 +135,12 @@ impl World {
     /// `MoveTo` (slot 0x538 with 1), its top action is not in state 4, 5 or 11 (slot 0x2b0) and
     /// it moves (slot 0x5c8).
     pub(super) fn stop_free_member(&mut self, id: ObjectId) -> GenieResult<()> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(());
         };
-        let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
-        if keeps_moving || !self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {
+        let (keeps_moving, _) =
+            self.action_list(player_id, unit, self.parts.actions_of(unit.id))?;
+        if keeps_moving || !self.parts.mover_of(unit.id).is_some_and(Mover::is_moving) {
             return Ok(());
         }
         if self.object(id).is_some()
@@ -159,23 +161,23 @@ impl World {
     /// An action the slice does not model, and an object of a master the slice does not have.
     pub(in crate::groups) fn action_list(
         &self,
-        p: PlayerId,
-        u: &Unit,
+        player_id: PlayerId,
+        unit: &Unit,
         actions: &Action,
     ) -> GenieResult<(bool, ActionState)> {
-        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
+        if unit.master(self.master_tables(), player_id)?.kind < MasterKind::ACTION {
             return Ok((false, ActionState::NO_ACTION));
         }
-        if let Some(e) = self.parts.unread.get(u.id) {
-            return Err(e.error());
+        if let Some(unread) = self.parts.unread.get(unit.id) {
+            return Err(unread.error());
         }
         let top = actions.top_action();
         let state = top.map_or(ActionState::NO_ACTION, |a| a.state);
-        let move_to = top.is_some_and(|a| a.kind == MOVE_TO);
+        let move_to = top.is_some_and(|top_action| top_action.kind == MOVE_TO);
         Ok((move_to || KEEPS_MOVING.contains(&state.get()), state))
     }
 
-    /// `FUN_1411570c0` for unit `u` on the line `from` -> `to` (x, height, y; held inside the
+    /// `FUN_1411570c0` for unit `unit` on the line `from` -> `to` (x, height, y; held inside the
     /// map, [`hold`]): no record of its terrain mask's tiles (`FUN_141052b90` with its
     /// restriction's mask) or of an object but the `ignore`d ones (itself alone for none) meets
     /// it, each grown by `grow` times its master's radius on x.
@@ -194,15 +196,15 @@ impl World {
         ignore: &[ObjectId],
     ) -> GenieResult<bool> {
         // the steer tests each member before it walks its line (`World::members_to_slots`)
-        let (_, u) = self.object(id).ok_or(GenieError::unreachable(
+        let (_, unit) = self.object(id).ok_or(GenieError::unreachable(
             "a steered member the world does not hold",
         ))?;
-        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
         let (radius, mask) = (mover.stats.radius.x(), mover.stats.restriction_mask);
         let own = [id];
         let ignore: Vec<RecordId> = if ignore.is_empty() { &own[..] } else { ignore }
             .iter()
-            .map(|&i| RecordId::from(i))
+            .map(|&object_id| RecordId::from(object_id))
             .collect();
         // FUN_1411570c0 sets the manager's ignore list to it (FUN_1410562e0)
         let map = self.spatial.map;
@@ -323,8 +325,8 @@ impl World {
         if !self.member_idle(id)? {
             return self.steer_busy_member(group, (index, slot, s.state), id);
         }
-        let g = self.groups.held(group)?;
-        let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
+        let held = self.groups.held(group)?;
+        let (moving, waits) = (held.motion.moving(), held.motion.waits_to_move());
         let mut state = s.state;
         if state == SlotState::InPlace && (moving || waits) {
             state = SlotState::Steering;
@@ -333,10 +335,10 @@ impl World {
         if late && self.slot_due(group, index, (slot, to, state))? {
             return Ok(());
         }
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        let from = u.moved_vector(self.parts.mover_of(u.id));
+        let from = unit.moved_vector(self.parts.mover_of(unit.id));
         if !self.line_clear(
             id,
             from,
@@ -366,9 +368,10 @@ impl World {
         (index, slot, state): (usize, usize, SlotState),
         id: ObjectId,
     ) -> GenieResult<()> {
-        let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let (keeps_moving, _) = self.action_list(p, u, self.parts.actions_of(u.id))?;
-        if !keeps_moving && self.parts.mover_of(u.id).is_some_and(Mover::is_moving) {
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let (keeps_moving, _) =
+            self.action_list(player_id, unit, self.parts.actions_of(unit.id))?;
+        if !keeps_moving && self.parts.mover_of(unit.id).is_some_and(Mover::is_moving) {
             self.stop_member(id)?;
         }
         self.groups

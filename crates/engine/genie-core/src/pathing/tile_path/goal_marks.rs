@@ -76,13 +76,17 @@ impl Planner {
         if !self.region.holds_at(level, cell) {
             return false;
         }
-        let r = range + Distance::new(HALF);
+        let distance = range + Distance::new(HALF);
         let step = 1i16 << level.get();
         let off = |v: f32, centre: f32| {
             let d = (v - (centre + -HALF)).abs();
             let d = if d <= radii { 0.0 } else { d - radii };
             if d == radii {
-                if 0.0 <= d - r.get() { d - r.get() } else { 0.0 }
+                if 0.0 <= d - distance.get() {
+                    d - distance.get()
+                } else {
+                    0.0
+                }
             } else {
                 d
             }
@@ -96,11 +100,11 @@ impl Planner {
                     continue;
                 }
                 let ex = off(f32::from(tx), x);
-                if r < Distance::new(ex) {
+                if distance < Distance::new(ex) {
                     continue;
                 }
                 let ey = off(f32::from(ty), y);
-                if ey <= r.get() && ey * ey + ex * ex <= r.squared().get() {
+                if ey <= distance.get() && ey * ey + ex * ex <= distance.squared().get() {
                     return true;
                 }
             }
@@ -133,12 +137,12 @@ impl Planner {
     }
 
     /// Toggle a cell's goal mark; true when it changed.
-    pub(super) fn toggle_goal(&mut self, i: CellIndex, mark: Mark) -> bool {
-        let b1 = self.cells[i].kind;
+    pub(super) fn toggle_goal(&mut self, cell_index: CellIndex, mark: Mark) -> bool {
+        let b1 = self.cells[cell_index].kind;
         if mark.is_set() == b1.contains(CellKind::GOAL) {
             return false;
         }
-        self.cells[i].kind = if mark.is_set() {
+        self.cells[cell_index].kind = if mark.is_set() {
             b1.plus(CellKind::GOAL)
         } else {
             b1.minus(CellKind::GOAL)
@@ -162,9 +166,12 @@ impl Planner {
             self.goal_marked = true;
             return;
         }
-        let Some(i) = GridLevel::ALL.into_iter().rev().find_map(|l| {
-            let i = self.index(l, self.goal.at_level(l));
-            self.cells[i].kind.contains(CellKind::NODE).then_some(i)
+        let Some(i) = GridLevel::ALL.into_iter().rev().find_map(|grid_level| {
+            let cell_index = self.index(grid_level, self.goal.at_level(grid_level));
+            self.cells[cell_index]
+                .kind
+                .contains(CellKind::NODE)
+                .then_some(cell_index)
         }) else {
             return;
         };
@@ -185,18 +192,18 @@ impl Planner {
         if !self.region.holds_at(level, cell) {
             return 0;
         }
-        let i = self.index(level, cell);
-        if !self.cells[i].kind.contains(CellKind::NODE) {
+        let cell_index = self.index(level, cell);
+        if !self.cells[cell_index].kind.contains(CellKind::NODE) {
             if level == GridLevel::TILES {
                 return 0;
             }
             return cell
                 .children()
                 .into_iter()
-                .map(|c| self.mark_cells(level.down(), c, goal, mark))
+                .map(|plan_tile| self.mark_cells(level.down(), plan_tile, goal, mark))
                 .sum();
         }
-        i32::from(self.in_range(level, cell, goal) && self.toggle_goal(i, mark))
+        i32::from(self.in_range(level, cell, goal) && self.toggle_goal(cell_index, mark))
     }
 
     /// `FUN_140f7a990`: mark (or clear) the tiles within the goal's ranges; when none is, the
@@ -207,16 +214,16 @@ impl Planner {
         let mut changed = false;
         for ty in y0..=y1 {
             for tx in x0..=x1 {
-                let t = PlanTile::new(tx, ty);
-                if self.in_range(GridLevel::TILES, t, goal) {
-                    let i = self.index(GridLevel::TILES, t);
-                    changed |= self.toggle_goal(i, mark);
+                let plan_tile = PlanTile::new(tx, ty);
+                if self.in_range(GridLevel::TILES, plan_tile, goal) {
+                    let index = self.index(GridLevel::TILES, plan_tile);
+                    changed |= self.toggle_goal(index, mark);
                 }
             }
         }
         if !changed {
-            let i = self.index(GridLevel::TILES, self.goal);
-            let _ = self.toggle_goal(i, mark);
+            let cell_index = self.index(GridLevel::TILES, self.goal);
+            let _ = self.toggle_goal(cell_index, mark);
         }
     }
 
@@ -254,10 +261,10 @@ impl Planner {
             cell = c2;
         }
         if self.region.holds_at(level, cell) {
-            let i = self.index(level, cell);
-            let b0 = self.cells[i].edges;
+            let cell_index = self.index(level, cell);
+            let b0 = self.cells[cell_index].edges;
             if mark.is_set() != b0.contains(CellEdges::CLOSED) {
-                self.cells[i].edges = if mark.is_set() {
+                self.cells[cell_index].edges = if mark.is_set() {
                     b0.plus(CellEdges::CLOSED)
                 } else {
                     b0.minus(CellEdges::CLOSED)

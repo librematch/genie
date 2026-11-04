@@ -95,7 +95,7 @@ impl LangFile {
         self.0.drain()
     }
 
-    /// Returns `true` if the map contains a value for key `k`, `false` if not.
+    /// Returns `true` if the map contains a value for key `string_key`, `false` if not.
     ///
     /// # Examples
     ///
@@ -108,8 +108,8 @@ impl LangFile {
     /// assert!(!lang_file.contains_key(&StringKey::from(1u32)));
     /// ```
     #[must_use]
-    pub fn contains_key(&self, k: &StringKey) -> bool {
-        self.0.contains_key(k)
+    pub fn contains_key(&self, string_key: &StringKey) -> bool {
+        self.0.contains_key(string_key)
     }
 
     /// Returns a reference to the value corresponding to the key.
@@ -125,8 +125,8 @@ impl LangFile {
     /// assert_eq!(None, lang_file.get(&StringKey::from(1u32)));
     /// ```
     #[must_use]
-    pub fn get(&self, k: &StringKey) -> Option<&String> {
-        self.0.get(k)
+    pub fn get(&self, string_key: &StringKey) -> Option<&String> {
+        self.0.get(string_key)
     }
 
     /// Returns a mutable reference to the value corresponding to the key.
@@ -141,8 +141,8 @@ impl LangFile {
     /// if let Some(s) = lang_file.get_mut(&StringKey::from(0u32)) { s.push('A'); }
     /// assert_eq!(lang_file.get(&StringKey::from(0u32)).map(String::as_str), Some("aA"));
     /// ```
-    pub fn get_mut(&mut self, k: &StringKey) -> Option<&mut String> {
-        self.0.get_mut(k)
+    pub fn get_mut(&mut self, string_key: &StringKey) -> Option<&mut String> {
+        self.0.get_mut(string_key)
     }
 
     /// Returns the given key's corresponding entry in the language file.
@@ -187,8 +187,8 @@ impl LangFile {
     /// assert_eq!(Some(String::from("b")),
     ///            lang_file.insert(StringKey::from(0u32), String::from("c")));
     /// ```
-    pub fn insert(&mut self, k: StringKey, v: String) -> Option<String> {
-        self.0.insert(k, v)
+    pub fn insert(&mut self, string_key: StringKey, text: String) -> Option<String> {
+        self.0.insert(string_key, text)
     }
 
     /// Removes a key-value pair from the map, returning the value at the key
@@ -206,8 +206,8 @@ impl LangFile {
     ///            lang_file.remove(&StringKey::from(0u32)));
     /// assert_eq!(None, lang_file.remove(&StringKey::from(0u32)));
     /// ```
-    pub fn remove(&mut self, k: &StringKey) -> Option<String> {
-        self.0.remove(k)
+    pub fn remove(&mut self, string_key: &StringKey) -> Option<String> {
+        self.0.remove(string_key)
     }
 
     /// Retains only the elements specified by the predicate.
@@ -367,9 +367,13 @@ impl<'a> IntoIterator for &'a mut LangFile {
 }
 
 impl fmt::Display for LangFile {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let strs: Vec<String> = self.0.iter().map(|(k, v)| format!("{k}: {v}")).collect();
-        write!(f, "{}", strs.join("\n"))
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let strs: Vec<String> = self
+            .0
+            .iter()
+            .map(|(string_key, text)| format!("{string_key}: {text}"))
+            .collect();
+        write!(formatter, "{}", strs.join("\n"))
     }
 }
 

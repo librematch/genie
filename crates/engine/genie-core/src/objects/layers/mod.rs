@@ -71,8 +71,8 @@ impl Static {
     ) -> GenieResult<()> {
         self.position = at;
         world.set_position(id, at, roles, visibility_tuning)?;
-        if let (Some(pathing), Some(p)) = (pathing, world.get(id)) {
-            pathing.moved(id, p, moving);
+        if let (Some(pathing), Some(placed)) = (pathing, world.get(id)) {
+            pathing.moved(id, placed, moving);
         }
         Ok(())
     }
@@ -173,7 +173,7 @@ mod tests {
             .unwrap();
         assert_eq!(place.position(), Position::new(2.5, 1.25, 0.0));
         assert_eq!(
-            world.get(object_id(7)).map(|p| p.position),
+            world.get(object_id(7)).map(|placed| placed.position),
             Some(Position::new(2.5, 1.25, 0.0))
         );
         assert_eq!(
@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(base.position(), Position::new(2.5, 2.5, 0.0));
         assert_eq!(filed.position, Position::new(2.5, 2.5, 0.0));
         assert_eq!(
-            world.get(object_id(7)).map(|p| p.position),
+            world.get(object_id(7)).map(|placed| placed.position),
             Some(Position::new(2.5, 2.5, 0.0))
         );
         assert_eq!(

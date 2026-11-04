@@ -13,8 +13,8 @@ use pelite::resources::Name;
 use std::io::{BufRead, BufReader, Read, Write};
 
 /// A DLL whose strings do not read.
-fn unreadable_dll(e: pelite::Error) -> GenieError {
-    GenieError::invalid_input("a language DLL that does not read").with_source(e)
+fn unreadable_dll(error: pelite::Error) -> GenieError {
+    GenieError::invalid_input("a language DLL that does not read").with_source(error)
 }
 
 impl LangFile {
@@ -125,10 +125,10 @@ impl LangFile {
             return Ok(());
         };
 
-        let id: u32 = id.parse().map_err(|e| {
+        let id: u32 = id.parse().map_err(|parse_int_error| {
             GenieError::invalid_input("a string id that is no number")
                 .with("id", id)
-                .with_source(e)
+                .with_source(parse_int_error)
         })?;
         let value = unescape(value.chars(), false);
         // A later line with the same ID replaces the earlier one.
@@ -260,8 +260,8 @@ mod tests {
     /// The game's DLL's string tables: block n's strings take the ids from (n - 1) × 16 on.
     #[test]
     fn dll_string_tables_give_their_strings_by_id() {
-        let f = File::open("test/dlls/language_x1_p1.dll").unwrap();
-        let lang = LangFileKind::Dll.read_from(f).unwrap();
+        let file = File::open("test/dlls/language_x1_p1.dll").unwrap();
+        let lang = LangFileKind::Dll.read_from(file).unwrap();
         assert_eq!(
             lang.get(&StringKey::from(30177u32)).map(String::as_str),
             Some(

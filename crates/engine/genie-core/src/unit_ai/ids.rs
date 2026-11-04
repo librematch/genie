@@ -121,10 +121,10 @@ pub(super) const OUTSIDE_ORDER: GenieError =
 /// order's point and range, forced and walking.
 ///
 /// [`UnitAi::process_order`]: crate::unit_ai::UnitAi::process_order
-pub(super) const fn order_move(o: &QueuedOrder) -> AiMove {
+pub(super) const fn order_move(queued_order: &QueuedOrder) -> AiMove {
     AiMove {
-        point: o.point,
-        range: o.range,
+        point: queued_order.point,
+        range: queued_order.range,
         force: OrderForce::Forced,
         pace: Pace::Walk,
     }
@@ -344,7 +344,7 @@ impl NewObject {
                 .iter()
                 .rev()
                 .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
-                .map_or(Distance::ZERO, |t| t.work_range),
+                .map_or(Distance::ZERO, |task| task.work_range),
             player_kind: PlayerKind::Human,
             posture: Posture::Aggressive,
             age: Amount::ZERO,
@@ -460,7 +460,7 @@ pub(super) const fn closest_undiscovered_tile() -> GenieResult<()> {
 /// for an action the slice holds.
 pub(super) const fn held_action_state(state: Option<ActionState>) -> GenieResult<ActionState> {
     match state {
-        Some(s) => Ok(s),
+        Some(action_state) => Ok(action_state),
         None => Err(GenieError::unsupported(
             "an action the slice does not hold (its state, slot 0x2b0)",
         )),

@@ -79,8 +79,8 @@ impl From<[f32; 3]> for Offset {
 }
 
 impl genie_diff::Diff for Offset {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -89,8 +89,8 @@ impl Mul<Offset> for f32 {
 
     /// The factor times each component, the factor first (`s * x`, as the game multiplies a
     /// step).
-    fn mul(self, o: Offset) -> Offset {
-        let [x, y, z] = o.0;
+    fn mul(self, offset: Offset) -> Offset {
+        let [x, y, z] = offset.0;
         Offset([self * x, self * y, self * z])
     }
 }
@@ -177,8 +177,8 @@ impl From<[f32; 2]> for GroundOffset {
 }
 
 impl genie_diff::Diff for GroundOffset {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -207,13 +207,13 @@ mod tests {
     /// first (`*`) and moves a place by its components (`+`, `+=`).
     #[test]
     fn an_offset_keeps_its_bits_scales_and_moves_place() {
-        let o = Offset::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
+        let offset = Offset::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
-            o.get().map(f32::to_bits),
+            offset.get().map(f32::to_bits),
             [0x8000_0000, 2.0f32.to_bits(), 0x7fc0_0001]
         );
         assert_eq!(
-            (o.x().to_bits(), o.y(), o.z().to_bits()),
+            (offset.x().to_bits(), offset.y(), offset.z().to_bits()),
             (0x8000_0000, 2.0, 0x7fc0_0001)
         );
         assert_eq!(Offset::from([1.0, 2.0, 3.0]), Offset::new(1.0, 2.0, 3.0));
@@ -236,10 +236,13 @@ mod tests {
     /// order, takes a height and moves a point by its components (`+`, `+=`).
     #[test]
     fn ground_offset_keeps_its_bits_takes_height_and_moves_point() {
-        let o = GroundOffset::new(-0.0, f32::from_bits(0x7fc0_0001));
-        assert_eq!(o.get().map(f32::to_bits), [0x8000_0000, 0x7fc0_0001]);
+        let ground_offset = GroundOffset::new(-0.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
-            (o.x().to_bits(), o.y().to_bits()),
+            ground_offset.get().map(f32::to_bits),
+            [0x8000_0000, 0x7fc0_0001]
+        );
+        assert_eq!(
+            (ground_offset.x().to_bits(), ground_offset.y().to_bits()),
             (0x8000_0000, 0x7fc0_0001)
         );
         assert_eq!(GroundOffset::from([1.0, 2.0]), GroundOffset::new(1.0, 2.0));

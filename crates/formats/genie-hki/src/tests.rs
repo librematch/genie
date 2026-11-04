@@ -12,56 +12,56 @@ fn hotkeys_past_the_file_fail_at_its_end() {
 
 #[test]
 fn aoc1() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn aoc2() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc2.hki")?;
+    let mut file = File::open("test/files/aoc2.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn aoc3() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc3.hki")?;
+    let mut file = File::open("test/files/aoc3.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn hd0() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/hd0.hki")?;
+    let mut file = File::open("test/files/hd0.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn hd1() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/hd1.hki")?;
+    let mut file = File::open("test/files/hd1.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn wk() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/wk.hki")?;
+    let mut file = File::open("test/files/wk.hki")?;
     // The test only checks that the file reads.
-    let _ = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let _ = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     Ok(())
 }
 
 #[test]
 fn hk_group_iter() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let group = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
     let mut hotkey_iter = group.iter();
     assert_eq!(19214, hotkey_iter.next().unwrap().string_id);
@@ -85,8 +85,8 @@ fn hk_group_iter() -> anyhow::Result<()> {
 
 #[test]
 fn hk_info_iter() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let mut iter = info.iter();
     assert_eq!(
         info.group(HotkeyGroupId::UnitCommands as usize),
@@ -123,8 +123,8 @@ fn hk_info_iter() -> anyhow::Result<()> {
 
 #[test]
 fn hk_group_unbind() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let group0 = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
     let group1 = group0.unbind(UnitCommandHotkeys::BuildEconomic as usize)?;
     assert_eq!(66, group0.hotkey(0).unwrap().key);
@@ -134,8 +134,8 @@ fn hk_group_unbind() -> anyhow::Result<()> {
 
 #[test]
 fn hk_group_bind() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let group0 = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
     let group1 = group0.bind(
         UnitCommandHotkeys::BuildEconomic as usize,
@@ -151,8 +151,8 @@ fn hk_group_bind() -> anyhow::Result<()> {
 
 #[test]
 fn hk_group_bad_index() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let group = info.group(HotkeyGroupId::UnitCommands as usize).unwrap();
     let result = group.unbind(99999);
     assert!(result.is_err());
@@ -161,8 +161,8 @@ fn hk_group_bad_index() -> anyhow::Result<()> {
 
 #[test]
 fn hk_info_unbind() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info0 = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info0 = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let info1 = info0.unbind_key(0, 0)?;
     assert_eq!(
         66,
@@ -187,8 +187,8 @@ fn hk_info_unbind() -> anyhow::Result<()> {
 
 #[test]
 fn hk_info_bind() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info0 = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info0 = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let info1 = info0.bind_key(0, 0, 65, false, false, false)?;
     assert_eq!(
         66,
@@ -213,8 +213,8 @@ fn hk_info_bind() -> anyhow::Result<()> {
 
 #[test]
 fn hk_info_bad_index_group() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let result = info.unbind_key(999_999, 0);
     assert!(result.is_err());
     Ok(())
@@ -222,8 +222,8 @@ fn hk_info_bad_index_group() -> anyhow::Result<()> {
 
 #[test]
 fn hk_info_bad_index_hk() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let result = info.unbind_key(0, 999_999);
     assert!(result.is_err());
     Ok(())
@@ -231,8 +231,8 @@ fn hk_info_bad_index_hk() -> anyhow::Result<()> {
 
 #[test]
 fn test_keycode_to_bindings_map() -> anyhow::Result<()> {
-    let mut f = File::open("test/files/aoc1.hki")?;
-    let info = HotkeyInfo::read_from(&mut f).context("failed to read file")?;
+    let mut file = File::open("test/files/aoc1.hki")?;
+    let info = HotkeyInfo::read_from(&mut file).context("failed to read file")?;
     let map = info.bindings_per_keycode();
     // 19270: Ctrl-65
     let h0 = Hotkey::default().string_id(19270).key(65).ctrl(true);
@@ -256,8 +256,8 @@ fn test_keycode_to_bindings_map() -> anyhow::Result<()> {
 #[test]
 fn hotkey_file_writes_back_what_it_read() -> anyhow::Result<()> {
     for name in ["aoc1", "aoc2", "aoc3", "hd0", "hd1", "wk"] {
-        let mut f = File::open(format!("test/files/{name}.hki"))?;
-        let info = HotkeyInfo::read_from(&mut f)?;
+        let mut file = File::open(format!("test/files/{name}.hki"))?;
+        let info = HotkeyInfo::read_from(&mut file)?;
         let mut out = vec![];
         info.write_to(&mut out)?;
         let again = HotkeyInfo::read_from(&mut out.as_slice())?;

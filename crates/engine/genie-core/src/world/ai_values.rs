@@ -121,26 +121,26 @@ impl VillagerGarrison {
 }
 
 impl genie_diff::Diff for Percent {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
 impl genie_diff::Diff for TargetingMode {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.raw().diff(&other.raw(), differ);
     }
 }
 
 impl genie_diff::Diff for LureDestination {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
 impl genie_diff::Diff for VillagerGarrison {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

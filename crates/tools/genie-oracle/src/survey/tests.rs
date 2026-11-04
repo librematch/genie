@@ -58,7 +58,7 @@ fn survey_counts_each_field_over_the_window_saves() {
         (3, 3, 1)
     );
     let missing = header_survey(&rec, None, &[2], (1, 5), every(1), Scope::Saved, &mut games);
-    assert!(missing.is_err_and(|e| e == no_such_player(2)));
+    assert!(missing.is_err_and(|error| error == no_such_player(2)));
 }
 
 /// A player that stops is listed with its stop and compared no more; the survey ends once
@@ -99,7 +99,7 @@ fn the_scope_widens_the_compared_fields() {
     let fields = |scope| -> Vec<String> {
         object_field_differences_in(&slice, &game, scope)
             .into_iter()
-            .map(|d| d.field)
+            .map(|difference| difference.field)
             .collect()
     };
     assert_eq!(fields(Scope::Saved), Vec::<String>::new());

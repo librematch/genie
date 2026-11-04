@@ -62,10 +62,10 @@ impl FixedDistanceSquared {
         Self(value)
     }
 
-    /// `d` squared in 64 bits, `(d * d) >> 22`.
+    /// `fixed_distance` squared in 64 bits, `(fixed_distance * fixed_distance) >> 22`.
     #[must_use]
-    pub fn of(d: FixedDistance) -> Self {
-        let v = i64::from(d.0);
+    pub fn of(fixed_distance: FixedDistance) -> Self {
+        let v = i64::from(fixed_distance.0);
         Self((v * v) >> 22)
     }
 

@@ -47,56 +47,59 @@ impl Unit {
     pub(crate) fn motion_step(
         &mut self,
         actions: &Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
         // RGE_Moving_Object::update counts the last human order time down before its velocity
         // step
-        if c.w.parts.mover_of(self.id).is_some() {
-            self.count_down_human_order(c.dt);
+        if step.w.parts.mover_of(self.id).is_some() {
+            self.count_down_human_order(step.dt);
         }
         // the velocity step (FUN_140f9ba80) runs for a unit with velocity data (+0x868)
-        let group = match c
+        let group = match step
             .w
             .parts
             .mover_of(self.id)
             .and_then(|m| m.velocity.as_ref())
         {
             Some(_) => self.group_speed(
-                (actions, c.w.parts.unread.get(self.id)),
-                &c.w.groups,
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                c.w.parts.unit_ai.get(self.id),
+                (actions, step.w.parts.unread.get(self.id)),
+                &step.w.groups,
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                step.w.parts.unit_ai.get(self.id),
                 roles,
             )?,
             None => None,
         };
-        if let Some(mover) = c.w.parts.mover_mut(self.id) {
+        if let Some(mover) = step.w.parts.mover_mut(self.id) {
             let here = self.place.position();
             let at = mover.step_velocity(
                 here,
-                c.dt.seconds(),
-                c.w.spatial.map,
-                c.w.spatial.terrain.as_ref(),
-                (c.w.world_time, group),
-                &c.w.model.tuning.movement,
+                step.dt.seconds(),
+                step.w.spatial.map,
+                step.w.spatial.terrain.as_ref(),
+                (step.w.world_time, group),
+                &step.w.model.tuning.movement,
             );
             if at != here {
                 mover.new_position(
                     &mut self.place,
                     self.id,
                     at,
-                    (&mut c.w.spatial, Some(&mut c.w.pathing)),
+                    (&mut step.w.spatial, Some(&mut step.w.pathing)),
                     roles,
-                    c.w.model.tuning.visibility,
+                    step.w.model.tuning.visibility,
                 )?;
             }
             // RGE_Moving_Object::update: a unit that moves animates at its speed (+0x7b8)
-            if let Some(v) = mover.velocity.as_ref() {
-                let [x, y, z] = v.velocity.get();
+            if let Some(velocity) = mover.velocity.as_ref() {
+                let [x, y, z] = velocity.velocity.get();
                 let speed = sqrt(x * x + y * y + z * z);
                 if SPEED_EPSILON < speed {
-                    c.w.parts.set_anim_speed(self.id, Speed::new(speed));
+                    step.w.parts.set_anim_speed(self.id, Speed::new(speed));
                 }
             }
         }
@@ -126,22 +129,22 @@ impl Unit {
         ai: Option<&UnitAi>,
         roles: &Roles,
     ) -> GenieResult<Option<GroupSpeed>> {
-        let Some(g) = self.group.id.and_then(|id| groups.get(id)) else {
+        let Some(group) = self.group.id.and_then(|id| groups.get(id)) else {
             return Ok(None);
         };
-        if !g.motion.moving() && g.slot_in_place(self.id) {
+        if !group.motion.moving() && group.slot_in_place(self.id) {
             return Ok(None);
         }
         let master = self.master_in(masters)?;
         if !actions.free_for_group(unread, master, ai, roles)? {
             return Ok(None);
         }
-        Ok(Some(match g.member_reason(self.id) {
+        Ok(Some(match group.member_reason(self.id) {
             // A group member's own move's reasons slot 0x5e0 tells apart (`FUN_141017590`): moved aside,
             // and none.
             MoveReason::Aside => GroupSpeed::Aside,
             MoveReason::None => GroupSpeed::Free,
-            _ => GroupSpeed::OwnMove(g.motion.maximum_velocity_forward),
+            _ => GroupSpeed::OwnMove(group.motion.maximum_velocity_forward),
         }))
     }
 
@@ -177,32 +180,36 @@ impl Unit {
     fn own_move_give_up(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
         let villager = roles
-            .of_class(self.master(c.w.master_tables(), c.player)?.class)
+            .of_class(self.master(step.w.master_tables(), step.player)?.class)
             .contains(ClassRoles::VILLAGER);
-        let stance =
-            c.w.parts
-                .unit_ai
-                .get(self.id)
-                .map_or(UnitStance::Aggressive, |ai| ai.stance);
+        let stance = step
+            .w
+            .parts
+            .unit_ai
+            .get(self.id)
+            .map_or(UnitStance::Aggressive, |ai| ai.stance);
         self.own_move_gave_up(
             actions,
-            c.w.parts.motion.layer_mut(self.id),
-            if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+            step.w.parts.motion.layer_mut(self.id),
+            if villager && !step.w.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
             stance,
             (
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
-                c.w.streams.get(Stream::Sprite),
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
+                step.w.streams.get(Stream::Sprite),
             ),
-            c.w.model.tuning.sprite,
+            step.w.model.tuning.sprite,
         )
     }
 
@@ -215,19 +222,19 @@ impl Unit {
     fn own_move_held(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<Option<UpdateCode>> {
         let Some(move_to) = actions.list.move_to_mut() else {
             return Ok(None);
         };
         let target = move_to.target;
-        let state = c.w.object_state(target);
-        let mut inbox = c.w.parts.unit_ai.inbox(self.id, self.life.state);
+        let state = step.w.object_state(target);
+        let mut inbox = step.w.parts.unit_ai.inbox(self.id, self.life.state);
         let code = move_to.check_held(state, &mut inbox)?;
         let releases = code.is_some() && move_to.voice.is_loud();
         if releases && let Some(target) = target {
-            let by = self.releaser(c)?;
-            release(c, self, target, by)?;
+            let by = self.releaser(step)?;
+            release(step, self, target, by)?;
         }
         Ok(code)
     }
@@ -237,7 +244,7 @@ impl Unit {
     fn own_move_step(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<MoveStep> {
@@ -247,31 +254,35 @@ impl Unit {
                 // point: its own, or the target's place (a target gone fails the update first)
                 let point = match move_to.target {
                     None => Some(move_to.point.ground()),
-                    Some(id) => c.w.spatial.get(id).map(|t| t.position.ground()),
+                    Some(id) => step
+                        .w
+                        .spatial
+                        .get(id)
+                        .map(|placed| placed.position.ground()),
                 };
                 let ask = match point {
                     Some(p) if move_to.state == MoveTo::Start => UnitAi::path_ask(
-                        c.w.parts.unit_ai.get_mut(self.id),
+                        step.w.parts.unit_ai.get_mut(self.id),
                         self.place.position().ground(),
                         p,
-                        &c.w.model.tuning.unit_ai,
+                        &step.w.model.tuning.unit_ai,
                     ),
                     _ => PathAsk::default(),
                 };
                 // its set_state 1 and 13 show slot 0x798's sprite; slot 0x68 takes the master's
                 // standing sprite for a null one
                 let master = object_master(
-                    c.w.parts.own_master.get(self.id),
+                    step.w.parts.own_master.get(self.id),
                     (self.id, self.life.master_id),
-                    c.w.model.masters.of(c.player),
+                    step.w.model.masters.of(step.player),
                 )
                 .ok();
                 let graphic =
-                    |id: Option<SpriteId>| id.and_then(|id| c.w.model.graphics.get(id).copied());
-                let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
+                    |id: Option<SpriteId>| id.and_then(|id| step.w.model.graphics.get(id).copied());
+                let look = step.w.parts.combat_of(self.id).abilities.look.as_ref();
                 let standing = graphic(master.and_then(|m| standing(m, look, Cargo::Empty, roles)));
                 let master_standing = graphic(master.and_then(|m| m.standing_sprite));
-                let (walk, rng) = c.walk_and_sprites(&mut self.place, me)?;
+                let (walk, rng) = step.walk_and_sprites(&mut self.place, me)?;
                 let shows = Shows {
                     sprite: &mut self.sprite,
                     rng,
@@ -287,14 +298,14 @@ impl Unit {
     /// The own `MoveTo`'s end, done or `failed`: its update in state 1 posts its completion
     /// (0x1fa with the move action value; an own `MoveTo` is never quiet), in state 13 its
     /// failure (0x1f9) and returns 3.
-    fn own_move_end(&self, c: &mut Step<'_>, end: StepEnd) -> GenieResult<()> {
+    fn own_move_end(&self, step: &mut Step<'_>, end: StepEnd) -> GenieResult<()> {
         let notify = if end == StepEnd::Failed {
             NotifyKind::ACTION_FAILED
         } else {
             NotifyKind::ACTION_COMPLETED
         };
         self.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             notify,
             [AiAction::Move.value(), 0, 0],
         )
@@ -304,16 +315,16 @@ impl Unit {
     pub(crate) fn explore_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<()> {
         let Some(mut explore) = actions.list.explore().copied() else {
             return Ok(());
         };
-        let explored = explore.update(c, self, me, roles);
-        if let Some(e) = actions.list.explore_mut() {
-            *e = explore;
+        let explored = explore.update(step, self, me, roles);
+        if let Some(explore_action) = actions.list.explore_mut() {
+            *explore_action = explore;
         }
         explored
     }
@@ -322,13 +333,13 @@ impl Unit {
     pub(crate) fn fly_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
     ) -> GenieResult<()> {
         let Some(mut fly) = actions.list.fly().copied() else {
             return Ok(());
         };
-        let flown = fly.update(c, self, me);
+        let flown = fly.update(step, self, me);
         if let Some(f) = actions.list.fly_mut() {
             *f = fly;
         }

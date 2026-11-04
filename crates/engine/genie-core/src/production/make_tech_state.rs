@@ -39,8 +39,8 @@ impl MakeTechState {
 }
 
 impl genie_diff::Diff for MakeTechState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -51,10 +51,10 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match MakeTechState::of_byte(b) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 2..=5 | 7..), "{b}"),
+        for index in 0..=255_u8 {
+            match MakeTechState::of_byte(index) {
+                Ok(make_tech_state) => assert_eq!(make_tech_state.get(), index),
+                Err(_) => assert!(matches!(index, 2..=5 | 7..), "{index}"),
             }
         }
         assert_eq!(MakeTechState::Researching.to_string(), "6");

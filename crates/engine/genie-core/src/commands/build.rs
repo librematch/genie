@@ -54,36 +54,36 @@ impl BuildCommand {
     /// refused BUILD places nothing. The foundation takes its sprite override
     /// ([`BuildCommand::sprite_override_of`]) and the command's frame (`+0xc54`) before its
     /// builders get their tasks.
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(listed) = w.read_units(self.player, &self.builders) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(listed) = world.read_units(self.player, &self.builders) else {
             return Ok(());
         };
         let player = self.player;
-        let Some(builders) = w.command_check(player, listed)? else {
+        let Some(builders) = world.command_check(player, listed)? else {
             return Ok(());
         };
-        if self.queue_id.is_queued() && !w.players.player(player)?.kind.is_computer() {
+        if self.queue_id.is_queued() && !world.players.player(player)?.kind.is_computer() {
             return Ok(());
         }
         let (x, y) = (self.position.x(), self.position.y());
-        let master = w.farm_on_rice_terrain(self.master, Position::new(x, y, 0.0));
-        w.debit_listed(player, master)?;
-        if !w.build_has_builder(player, master, &builders)? {
+        let master = world.farm_on_rice_terrain(self.master, Position::new(x, y, 0.0));
+        world.debit_listed(player, master)?;
+        if !world.build_has_builder(player, master, &builders)? {
             return Ok(());
         }
-        if !w.build_allowed(player, master, self.position)? {
+        if !world.build_allowed(player, master, self.position)? {
             return Ok(());
         }
-        let (id, position) = w.found(player, master, Position::new(x, y, 0.0))?;
+        let (id, position) = world.found(player, master, Position::new(x, y, 0.0))?;
         let sprite_override =
-            self.sprite_override_of(w.players.player(player)?.civ, &w.model.roles);
-        if let Some((_, layer)) = w.object_and_layer_mut(id)? {
-            if let Some(c) = layer.construction.as_mut() {
-                c.sprite_override = sprite_override != SpriteOverride::NONE;
+            self.sprite_override_of(world.players.player(player)?.civ, &world.model.roles);
+        if let Some((_, layer)) = world.object_and_layer_mut(id)? {
+            if let Some(construction) = layer.construction.as_mut() {
+                construction.sprite_override = sprite_override != SpriteOverride::NONE;
             }
             layer.build_frame = self.frame;
         }
-        w.task_builders(
+        world.task_builders(
             player,
             id,
             master,

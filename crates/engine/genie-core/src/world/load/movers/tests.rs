@@ -21,15 +21,17 @@ use genie_save::generated::world::{Master, PathData, PlayerObjects};
 /// Master 83: restriction 1, top speed 1, turning 0.5, walking as sprite 11 and running as 12.
 fn master() -> Master {
     let mut master = combat_master(83);
-    let s = master_static_mut(&mut master);
-    s.terrain_restriction_mask_id = 1;
-    s.radius_x = 0.2;
-    s.idle_sprite_id = 10;
-    let m = master_moving_mut(&mut master);
-    m.move_sprite_id = 11;
-    m.run_sprite_id = 12;
-    m.turn_speed = 0.5;
-    m.rge_master_animated_object.max_speed = 1.0;
+    let rge_master_static_object = master_static_mut(&mut master);
+    rge_master_static_object.terrain_restriction_mask_id = 1;
+    rge_master_static_object.radius_x = 0.2;
+    rge_master_static_object.idle_sprite_id = 10;
+    let rge_master_moving_object = master_moving_mut(&mut master);
+    rge_master_moving_object.move_sprite_id = 11;
+    rge_master_moving_object.run_sprite_id = 12;
+    rge_master_moving_object.turn_speed = 0.5;
+    rge_master_moving_object
+        .rge_master_animated_object
+        .max_speed = 1.0;
     master
 }
 
@@ -78,8 +80,8 @@ fn run(
     objects: &PlayerObjects,
     table: Option<&MasterTable>,
 ) -> GenieResult<Option<Mover>> {
-    let s = object.static_part().unwrap().clone();
-    mover(object, &s, objects, &[], CivId::GAIA, table)
+    let rge_static_object = object.static_part().unwrap().clone();
+    mover(object, &rge_static_object, objects, &[], CivId::GAIA, table)
 }
 
 /// The speed is the master's times the shown sprite's factor; walking and running by their
@@ -98,10 +100,10 @@ fn walker_moves_by_its_master_and_sprites() {
     // without a sprite, no factor; without a run sprite, running is walking
     let mut no_run = master();
     master_moving_mut(&mut no_run).run_sprite_id = -1;
-    let m = run(&walker(-1), &with_masters(vec![no_run]), Some(&table()))
+    let mover = run(&walker(-1), &with_masters(vec![no_run]), Some(&table()))
         .unwrap()
         .unwrap();
-    assert_eq!(m.stats.speed.get().to_bits(), 1.0_f32.to_bits());
+    assert_eq!(mover.stats.speed.get().to_bits(), 1.0_f32.to_bits());
 }
 
 /// An object below type 30 does not move.
@@ -153,13 +155,13 @@ fn what_the_mover_cannot_read_is_unsupported() {
     assert!(run(&lost_path, &objects, Some(&table())).is_err());
     // a level's state 1, which no routine stores, is no state; 2 is one
     let level = |state| {
-        let mut w = walker(11);
-        moving_mut(&mut w).temp_path_data = vec![PathData {
+        let mut object = walker(11);
+        moving_mut(&mut object).temp_path_data = vec![PathData {
             path_id: -1,
             state,
             ..PathData::default()
         }];
-        w
+        object
     };
     assert!(run(&level(2), &objects, Some(&table())).is_ok());
     assert!(run(&level(1), &objects, Some(&table())).is_err());

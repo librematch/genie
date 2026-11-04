@@ -24,8 +24,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 ///
 /// A value postcard cannot write (none of the tables' types holds one).
 pub fn encode(table: &MasterTable) -> GenieResult<Vec<u8>> {
-    postcard::to_allocvec(table)
-        .map_err(|e| GenieError::invalid_input("a table postcard cannot write").with_source(e))
+    postcard::to_allocvec(table).map_err(|error| {
+        GenieError::invalid_input("a table postcard cannot write").with_source(error)
+    })
 }
 
 /// The tables of the cache's form `bytes`.
@@ -34,8 +35,9 @@ pub fn encode(table: &MasterTable) -> GenieResult<Vec<u8>> {
 ///
 /// Bytes that are not a table's form: cut off, of another layout, or a value a type refuses.
 pub fn decode(bytes: &[u8]) -> GenieResult<MasterTable> {
-    postcard::from_bytes(bytes)
-        .map_err(|e| GenieError::invalid_input("cached tables that do not read").with_source(e))
+    postcard::from_bytes(bytes).map_err(|error| {
+        GenieError::invalid_input("cached tables that do not read").with_source(error)
+    })
 }
 
 /// The tables cached in `dir` under `key`; None when the directory holds none for it.
@@ -51,9 +53,9 @@ pub fn read_cached(dir: &Path, key: &Key) -> GenieResult<Option<MasterTable>> {
             .map(Some)
             .map_err(|e| e.with("path", path.display())),
         Err(e) if e.kind() == ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(GenieError::io("a cache file that does not read")
+        Err(error) => Err(GenieError::io("a cache file that does not read")
             .with("path", path.display())
-            .with_source(e)),
+            .with_source(error)),
     }
 }
 
@@ -61,7 +63,7 @@ pub fn read_cached(dir: &Path, key: &Key) -> GenieResult<Option<MasterTable>> {
 #[cfg(feature = "fs")]
 static WRITES: AtomicU64 = AtomicU64::new(0);
 
-/// Caches `table` in `dir` under `key`: written to `<key>.tmp-<pid>-<n>`, then renamed to
+/// Caches `table` in `dir` under `key`: written to `<key>.tmp-<pid>-<written>`, then renamed to
 /// `<key>`, so a reader finds the whole file or none. The directory is made when missing.
 ///
 /// # Errors
@@ -75,15 +77,16 @@ pub fn write_cached(dir: &Path, key: &Key, table: &MasterTable) -> GenieResult<(
             .with("path", path.display())
             .with_source(e)
     };
-    create_dir_all(dir).map_err(|e| io("a cache directory that cannot be made", dir, e))?;
-    let n = WRITES.fetch_add(1, Ordering::Relaxed);
-    let tmp = dir.join(format!("{}.tmp-{}-{n}", key.hex(), process::id()));
+    create_dir_all(dir)
+        .map_err(|dir_error| io("a cache directory that cannot be made", dir, dir_error))?;
+    let written = WRITES.fetch_add(1, Ordering::Relaxed);
+    let tmp = dir.join(format!("{}.tmp-{}-{written}", key.hex(), process::id()));
     write(&tmp, &bytes).map_err(|e| io("a cache file that cannot be written", &tmp, e))?;
     let path = dir.join(key.hex());
-    rename(&tmp, &path).map_err(|e| {
+    rename(&tmp, &path).map_err(|error| {
         // the temporary file goes too; a failed removal leaves only a stray file
         let _ = remove_file(&tmp);
-        io("a cache file that cannot be put in place", &path, e)
+        io("a cache file that cannot be put in place", &path, error)
     })
 }
 

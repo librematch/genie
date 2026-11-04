@@ -54,18 +54,18 @@ impl World {
         if self.attribute_204() {
             return Err(REVEAL_UNITS);
         }
-        let (p, u) = self.object(id).ok_or(NOT_HELD)?;
-        let master = u.master(self.master_tables(), p)?.clone();
+        let (player_id, u) = self.object(id).ok_or(NOT_HELD)?;
+        let master = u.master(self.master_tables(), player_id)?.clone();
         let building = master.building.ok_or(GenieError::unsupported(
             "a completion of a master that is no building",
         ))?;
-        self.completion_part(p, id, &master)?;
+        self.completion_part(player_id, id, &master)?;
         // FUN_1411e5670 while still in state 0 (2 lies within 1 to 6)
         if self
             .object(id)
             .is_some_and(|(_, u)| u.life.state == ObjectState::Foundation)
         {
-            self.construction_starts(p, id)?;
+            self.construction_starts(player_id, id)?;
         }
         if building.foundation_terrain.is_some()
             && master.object_flags.contains(ObjectFlags::TILE_CLASSES)
@@ -74,17 +74,17 @@ impl World {
                 "a completion of a master of object flag 0x40 (its tiles' classes, FUN_141055790)",
             ));
         }
-        self.completion_storage(p, id, &master)?;
+        self.completion_storage(player_id, id, &master)?;
         let placed = *self.spatial.get(id).ok_or(GenieError::unsupported(
             "a completed building without a place",
         ))?;
         self.completion_shown(id, &master, &placed)?;
-        self.completion_stack(p, id, &master, &building, &placed)?;
-        self.completion_ground(p, id, &master, &building, &placed)?;
-        let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        u.life.state = ObjectState::Alive;
+        self.completion_stack(player_id, id, &master, &building, &placed)?;
+        self.completion_ground(player_id, id, &master, &building, &placed)?;
+        let (_, unit) = self.object_mut(id).ok_or(NOT_HELD)?;
+        unit.life.state = ObjectState::Alive;
         if building.disappears_when_built.disappears() {
-            u.life.hp = HitPoints::ZERO;
+            unit.life.hp = HitPoints::ZERO;
         }
         self.spatial.sight_state(
             id,
@@ -93,17 +93,17 @@ impl World {
             self.model.tuning.visibility,
         )?;
         if let Some(tech) = building.tech {
-            self.research_built(p, tech)?;
+            self.research_built(player_id, tech)?;
         }
         if building.disappears_when_built.disappears() {
-            self.destroy(p, id)?;
+            self.destroy(player_id, id)?;
         }
         Ok(())
     }
 
-    /// The block for state 2's start: the building `id`'s build points hold its build time, and
-    /// its master's storage ([`hand_storage`]) goes to its owner `p` (modes 4, 8 and 64: slot 0xf8
-    /// at once) and to its own store (mode 16).
+    /// The block for state 2's start: the building `id`'s build points hold its build time, and its
+    /// master's storage ([`hand_storage`]) goes to its owner `player_id` (modes 4, 8 and 64: slot
+    /// 0xf8 at once) and to its own store (mode 16).
     ///
     /// # Errors
     ///
@@ -111,20 +111,20 @@ impl World {
     /// owner lacks.
     fn completion_storage(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
     ) -> GenieResult<()> {
         let (_, layer) = self.object_and_layer_mut(id)?.ok_or(NOT_HELD)?;
-        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        c.progress = Seconds::of_master(c.build_time);
+        let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        construction.progress = Seconds::of_master(construction.build_time);
         let mut gains = Vec::new();
         hand_storage(
             master,
             &mut gains,
             Some(&mut self.parts.combat_mut(id)?.store),
         );
-        self.players.player_mut(p)?.add_attributes(gains)
+        self.players.player_mut(player_id)?.add_attributes(gains)
     }
 
     /// The block for state 2's sight and sprite: the building `id` at `placed` swaps its sight
@@ -146,9 +146,9 @@ impl World {
             .roles
             .of_class(master.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-            && let Some(v) = self.spatial.sight.as_mut()
+            && let Some(visibility) = self.spatial.sight.as_mut()
         {
-            v.construction_completed(
+            visibility.construction_completed(
                 id,
                 placed.position,
                 placed.radius,
@@ -164,10 +164,10 @@ impl World {
             model: Model { graphics, .. },
             ..
         } = self;
-        let u = held(players, place)?;
+        let unit = held(players, place)?;
         show_built(
-            &mut u.sprite,
-            parts.motion.move_stats_mut(u.id),
+            &mut unit.sprite,
+            parts.motion.move_stats_mut(unit.id),
             master,
             parts.building.of(id).build_frame,
             graphics,
@@ -181,16 +181,16 @@ impl World {
     /// `+0xcd0`, makes
     /// [`MasterSlots::pasture_mangrove`](crate::world::layer::MasterSlots::pasture_mangrove)): the
     /// building `id` at `placed` drops its record and mesh shape (`FUN_141055b40`), lets its tiles
-    /// go (`FUN_140f65580`, a building that is no annex) and sets `+0x686`; then its owner `p`
-    /// makes the stack unit at its place, which loses the hit points the building lacked (slot
-    /// 0x1c0, [`crate::world::World::stack_unit`]).
+    /// go (`FUN_140f65580`, a building that is no annex) and sets `+0x686`; then its owner
+    /// `player_id` makes the stack unit at its place, which loses the hit points the building
+    /// lacked (slot 0x1c0, [`crate::world::World::stack_unit`]).
     ///
     /// # Errors
     ///
     /// A building the world does not hold, and what the stack unit's making does not model.
     fn completion_stack(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         building: &BuildingMaster,
@@ -204,11 +204,15 @@ impl World {
         self.pathing.tiles_changed(self.spatial.take_changes());
         let layer = self.parts.building_of(id);
         let (main, rice) = (layer.annex_of.is_some(), layer.rice);
-        let (_, u) = self.object_mut(id).ok_or(NOT_HELD)?;
-        let hp = u.life.hp;
-        u.flags.set(UnitFlags::ROO_CALLED, true);
-        if !main && let Some(v) = self.spatial.sight.as_mut() {
-            v.unlink_building(placed.position, master.radius, self.model.tuning.visibility)?;
+        let (_, unit) = self.object_mut(id).ok_or(NOT_HELD)?;
+        let hp = unit.life.hp;
+        unit.flags.set(UnitFlags::ROO_CALLED, true);
+        if !main && let Some(visibility) = self.spatial.sight.as_mut() {
+            visibility.unlink_building(
+                placed.position,
+                master.radius,
+                self.model.tuning.visibility,
+            )?;
         }
         let stack = StackUnit {
             master: stack_master(
@@ -221,12 +225,12 @@ impl World {
             at: placed.position,
             hp_lost: HitPoints::of_master(master.hit_points) - hp,
         };
-        self.stack_unit(p, id, stack)
+        self.stack_unit(player_id, id, stack)
     }
 
     /// The block for state 2's ground and counts: the building `id` at `placed` lays its
     /// foundation ([`lay_foundation`]: its snow flag, its foundation terrain over its clearance);
-    /// then its owner `p` records the castle's or the wonder's event in its history
+    /// then its owner `player_id` records the castle's or the wonder's event in its history
     /// (`FUN_141560ae0` with its own id, `+0x718`, as `data1`) and gains its counts
     /// ([`completion_counts`], slot 0xf8 at once).
     ///
@@ -236,7 +240,7 @@ impl World {
     /// terrain, and an attribute its owner lacks.
     fn completion_ground(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         building: &BuildingMaster,
@@ -250,18 +254,26 @@ impl World {
             parts,
             ..
         } = self;
-        let u = held(players, place)?;
-        let layer = parts.building_mut(u.id)?;
+        let unit = held(players, place)?;
+        let layer = parts.building_mut(unit.id)?;
         let (main, rice) = (layer.annex_of.is_some(), layer.rice);
-        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let laid = foundation_laid(
             building,
-            building
-                .stack_unit
-                .map(|s| stack_master(master, s, rice, &self.model.roles, self.model.slots)),
+            building.stack_unit.map(|master_id| {
+                stack_master(master, master_id, rice, &self.model.roles, self.model.slots)
+            }),
             &self.model.roles,
         );
-        lay_foundation(c, spatial, placed, master, laid, mode_680, &self.model)?;
+        lay_foundation(
+            construction,
+            spatial,
+            placed,
+            master,
+            laid,
+            mode_680,
+            &self.model,
+        )?;
         let mut counts = Vec::new();
         let history = completion_counts(
             master,
@@ -273,12 +285,15 @@ impl World {
         );
         if let Some(kind) = history {
             let now = self.world_time;
-            self.players
-                .player_mut(p)?
-                .history
-                .add_event(kind, p.index() as f32, 0.0, 0, now);
+            self.players.player_mut(player_id)?.history.add_event(
+                kind,
+                player_id.index() as f32,
+                0.0,
+                0,
+                now,
+            );
         }
-        self.players.player_mut(p)?.add_attributes(counts)
+        self.players.player_mut(player_id)?.add_attributes(counts)
     }
 }
 

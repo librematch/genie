@@ -14,6 +14,7 @@ tiles test which points see each other. The files follow the search:
 - `main_loop.rs`: the main loop and a node's expansion.
 - `nodes.rs`: the open list and the node tests.
 - `outline.rs`: the polygons' outlines.
+- `walk.rs`: a new polygon's walk along its outline.
 - `raycast.rs`: the raycasts and the sight test.
 - `geometry.rs`: the fixed-point geometry.
 
@@ -37,6 +38,7 @@ tiles test which points see each other. The files follow the search:
 | [`start.rs`](start.rs) | The start's node, the hits' points and the two legs of an L. |
 | [`tests.rs`](tests.rs) | Tests. |
 | [`token.rs`](token.rs) | Callback A's token: what a ray from a polygon corner ignores. |
+| [`walk.rs`](walk.rs) | A new polygon's walk (`FUN_140fa7b50`): from a point on its closing edge along the outline both ways at once, its corners nodes toward the goal. |
 <!-- /files -->
 
 ## How it connects

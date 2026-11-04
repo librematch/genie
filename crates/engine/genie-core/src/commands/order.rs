@@ -55,43 +55,43 @@ impl OrderCommand {
     /// the order (WORK's not), a human's take the world time as their last human order time
     /// (`+0x15`, `FUN_140e5e780`; FOLLOW's when a unit the world holds belongs to a player who
     /// is not a computer, `FUN_141659cf0`), then the order runs.
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
         let (player, order) = (self.player, self.order);
-        let Some(units) = self.units(w)? else {
+        let Some(units) = self.units(world)? else {
             return Ok(());
         };
         if let Order::Work(_) = order {
             return Err(ORDER_UNMODELLED);
         }
         if let Order::Follow(target) | Order::Guard(target) = order
-            && w.object(target).is_none()
+            && world.object(target).is_none()
         {
             return Ok(());
         }
         let human = match order {
             Order::Interact(o) => o.flags.contains(OrderFlags::HUMAN),
             Order::Move(o) => o.flags.contains(OrderFlags::HUMAN),
-            Order::Follow(_) | Order::Guard(_) => Self::any_human_unit(w, &units)?,
+            Order::Follow(_) | Order::Guard(_) => Self::any_human_unit(world, &units)?,
             Order::Work(_) | Order::Retreat(_) => false,
         };
-        w.reset_order_units(&units)?;
+        world.reset_order_units(&units)?;
         if human {
-            w.human_order(&units);
+            world.human_order(&units);
         }
         match order {
-            Order::Interact(o) => w.interact(player, &units, &o),
-            Order::Move(o) => w.move_order(player, &units, &o),
-            Order::Follow(target) => w.follow(player, &units, target),
-            Order::Guard(target) => w.guard(player, &units, target),
+            Order::Interact(interact) => world.interact(player, &units, &interact),
+            Order::Move(move_order) => world.move_order(player, &units, &move_order),
+            Order::Follow(target) => world.follow(player, &units, target),
+            Order::Guard(target) => world.guard(player, &units, target),
             Order::Work(_) | Order::Retreat(_) => Err(ORDER_UNMODELLED),
         }
     }
 
     /// Whether a unit of `units` the world holds belongs to a player who is not a computer.
-    fn any_human_unit(w: &World, units: &[Option<ObjectId>]) -> GenieResult<bool> {
+    fn any_human_unit(world: &World, units: &[Option<ObjectId>]) -> GenieResult<bool> {
         for &id in units {
-            if let Some((p, _)) = w.object(id)
-                && !w.players.player(p)?.kind.is_computer()
+            if let Some((player_id, _)) = world.object(id)
+                && !world.players.player(player_id)?.kind.is_computer()
             {
                 return Ok(true);
             }
@@ -115,14 +115,14 @@ impl OrderCommand {
     /// # Errors
     ///
     /// A player the world does not hold.
-    fn units(&self, w: &mut World) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
+    fn units(&self, world: &mut World) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
         let (source, order) = (&self.units, self.order);
         if let Order::Follow(_) | Order::Guard(_) = order {
-            let Some(read) = w.read_units(self.player, source) else {
+            let Some(read) = world.read_units(self.player, source) else {
                 return Ok(None);
             };
             return match order {
-                Order::Guard(_) => w.command_check(self.player, read),
+                Order::Guard(_) => world.command_check(self.player, read),
                 _ => Ok(Some(read.to_vec())),
             };
         }
@@ -131,18 +131,22 @@ impl OrderCommand {
         if source.overruns() && !last {
             return Ok(None);
         }
-        let Some(player_kind) = w.players.get(player.index()).map(|p| p.kind) else {
+        let Some(player_kind) = world
+            .players
+            .get(player.index())
+            .map(|player_kind_player| player_kind_player.kind)
+        else {
             return Ok(None);
         };
-        let checked = w.checked_units(player, &w.command_units(player, source));
+        let checked = world.checked_units(player, &world.command_units(player, source));
         if last {
-            w.set_last_commanded(player, checked.clone());
+            world.set_last_commanded(player, checked.clone());
         }
         if !player_kind.is_computer() && checked.iter().all(Option::is_none) {
             return Ok(None);
         }
         if !last {
-            w.set_last_commanded(player, checked.clone());
+            world.set_last_commanded(player, checked.clone());
         }
         Ok(Some(checked))
     }

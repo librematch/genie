@@ -28,7 +28,7 @@ const PLAYERS: usize = 3;
 /// An object without a static part is no unit the slice can run.
 #[test]
 fn an_object_without_its_static_part_is_unmodelled() {
-    let u = object(
+    let object = object(
         &genie_save::Object::default(),
         &PlayerObjects::default(),
         &[],
@@ -37,8 +37,8 @@ fn an_object_without_its_static_part_is_unmodelled() {
         PLAYERS,
         &missile_tuning(),
     );
-    assert_eq!(u.unit.id, ObjectId::UNSAVED);
-    assert!(u.parts.unread.is_some());
+    assert_eq!(object.unit.id, ObjectId::UNSAVED);
+    assert!(object.parts.unread.is_some());
 }
 
 /// A saved building's gather point and production lists are its object's parts, not its
@@ -49,11 +49,11 @@ fn saved_building_parts_are_its_object_s() {
     use crate::commands::GatherPointState;
     let whole = |state: i32| {
         let mut barracks = building_object(11, 12);
-        let b = building_mut(&mut barracks);
-        b.gather_point_exists = state;
-        b.gather_point_x = 3.5;
-        b.gather_point_target = -1;
-        b.value = vec![3];
+        let tribe_building_object = building_mut(&mut barracks);
+        tribe_building_object.gather_point_exists = state;
+        tribe_building_object.gather_point_x = 3.5;
+        tribe_building_object.gather_point_target = -1;
+        tribe_building_object.value = vec![3];
         object(
             &barracks,
             &PlayerObjects::default(),
@@ -65,13 +65,20 @@ fn saved_building_parts_are_its_object_s() {
         )
     };
     let o = whole(1);
-    let g = o.parts.gather_point.unwrap();
+    let gather_point = o.parts.gather_point.unwrap();
     assert_eq!(
-        (g.state, g.point.x(), g.target),
+        (
+            gather_point.state,
+            gather_point.point.x(),
+            gather_point.target
+        ),
         (GatherPointState::Point, 3.5, None)
     );
     assert!(o.parts.dead_master.is_none());
-    let disabled = o.parts.production.map(|p| p.disabled_techs);
+    let disabled = o
+        .parts
+        .production
+        .map(|production| production.disabled_techs);
     assert_eq!(disabled, Some(vec![TechId::try_from(3).unwrap()]));
     let o = whole(0x100);
     assert!(o.parts.gather_point.is_none());
@@ -95,7 +102,7 @@ fn livestock_starts_with_its_artifact() {
     )
     .unwrap();
     let sheep = combat_object(5, 83);
-    let u = object(
+    let object = object(
         &sheep,
         &PlayerObjects::default(),
         &[],
@@ -104,17 +111,17 @@ fn livestock_starts_with_its_artifact() {
         PLAYERS,
         &missile_tuning(),
     );
-    assert_eq!(u.unit.id, object_id(5));
-    assert!(u.parts.actions.list.artifact().is_some());
-    assert_eq!(u.parts.actions.default_task, DefaultTask::Artifact);
+    assert_eq!(object.unit.id, object_id(5));
+    assert!(object.parts.actions.list.artifact().is_some());
+    assert_eq!(object.parts.actions.default_task, DefaultTask::Artifact);
     // a combat object's mover needs its master, which this save does not hold
-    assert!(u.parts.unread.is_some());
+    assert!(object.parts.unread.is_some());
 }
 
 /// Without a table the default task is unknown: reported, as the object's.
 #[test]
 fn without_table_the_default_task_is_reported() {
-    let u = object(
+    let object = object(
         &combat_object(5, 83),
         &PlayerObjects::default(),
         &[],
@@ -124,10 +131,10 @@ fn without_table_the_default_task_is_reported() {
         &missile_tuning(),
     );
     assert_eq!(
-        u.parts.actions.default_task,
+        object.parts.actions.default_task,
         DefaultTask::Fails(Unstartable::Unread(UnreadDefault::NoMasterTable))
     );
-    assert!(u.parts.actions.list.artifact().is_none());
+    assert!(object.parts.actions.list.artifact().is_none());
 }
 
 /// A saved action the slice does not model stops the object.
@@ -145,7 +152,7 @@ fn saved_action_the_slice_does_not_model_is_reported() {
         .rge_combat_object
         .rge_action_object
         .actions = action_list(vec![(EXPLORE, explore)]);
-    let u = object(
+    let object = object(
         &scout,
         &PlayerObjects::default(),
         &[],
@@ -154,8 +161,8 @@ fn saved_action_the_slice_does_not_model_is_reported() {
         PLAYERS,
         &missile_tuning(),
     );
-    assert!(u.parts.unread.is_some());
-    assert_ne!(u.parts.actions.default_task, DefaultTask::Fly);
+    assert!(object.parts.unread.is_some());
+    assert_ne!(object.parts.actions.default_task, DefaultTask::Fly);
 }
 
 /// A missile without its action (it met its target) flies on with its own fields.
@@ -186,7 +193,7 @@ fn missile_without_its_action_keeps_flying() {
         })),
         ..genie_save::Object::default()
     };
-    let o = object(
+    let object = object(
         &arrow,
         &PlayerObjects::default(),
         &[],
@@ -195,12 +202,12 @@ fn missile_without_its_action_keeps_flying() {
         PLAYERS,
         &missile_tuning(),
     );
-    let (u, flying) = (o.unit, o.parts.missile.unwrap());
+    let (unit, flying) = (object.unit, object.parts.missile.unwrap());
     assert_eq!(flying.fired_from, Some(ShooterId::new(object_id(900))));
     assert!(flying.flying);
     assert_eq!(flying.step.x().to_bits(), 0.5_f32.to_bits());
-    assert_eq!(o.parts.combat.attack_count, AttackCount::of_data(2));
-    assert_eq!(u.id, object_id(6));
+    assert_eq!(object.parts.combat.attack_count, AttackCount::of_data(2));
+    assert_eq!(unit.id, object_id(6));
 }
 
 /// A builder's Build takes its master's Build task with the builder's work-rate powerup (its
@@ -244,7 +251,7 @@ fn build_work_rate_takes_the_builder_powerup() {
     };
     combat.rge_combat_object.rge_action_object.actions =
         action_list(vec![(ActionKind::BUILD, build)]);
-    let o = object(
+    let object = object(
         &builder,
         &with_masters(vec![master]),
         &[],
@@ -253,10 +260,13 @@ fn build_work_rate_takes_the_builder_powerup() {
         PLAYERS,
         &missile_tuning(),
     );
-    let b = o.parts.actions.list.build().copied().unwrap();
-    assert_eq!(b.task.work_rate.get().to_bits(), 2.5_f32.to_bits());
+    let build_action = object.parts.actions.list.build().copied().unwrap();
     assert_eq!(
-        o.parts.combat.work_rate_powerup.get().to_bits(),
+        build_action.task.work_rate.get().to_bits(),
+        2.5_f32.to_bits()
+    );
+    assert_eq!(
+        object.parts.combat.work_rate_powerup.get().to_bits(),
         0.5_f32.to_bits()
     );
 }
@@ -268,9 +278,9 @@ fn build_work_rate_takes_the_builder_powerup() {
 fn the_back_to_work_actions_import_as_their_kinds() {
     use crate::unit_ai::AiAction;
     let mut object = combat_object(5, 4);
-    let c = combat_mut(&mut object);
-    c.town_bell_flag = 1;
-    c.back_to_work1_town_bell_action = 0x261;
+    let tribe_combat_object = combat_mut(&mut object);
+    tribe_combat_object.town_bell_flag = 1;
+    tribe_combat_object.back_to_work1_town_bell_action = 0x261;
     let whole = |object: &genie_save::Object| {
         saved_unit_object(
             object,
@@ -291,7 +301,7 @@ fn the_back_to_work_actions_import_as_their_kinds() {
     combat_mut(&mut object).back_to_work2_town_bell_action = 0x2c6;
     let o = whole(&object);
     assert_eq!(
-        o.parts.unread.map(|e| e.error().kind()),
+        o.parts.unread.map(|unread| unread.error().kind()),
         Some(crate::ErrorKind::InvalidInput)
     );
     assert_eq!(o.parts.town_bell, TownBell::default());

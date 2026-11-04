@@ -81,7 +81,7 @@ impl ClassId {
     #[must_use]
     pub const fn field(class: Option<Self>) -> i16 {
         match class {
-            Some(c) => c.0,
+            Some(class_id) => class_id.0,
             None => Self::NONE,
         }
     }
@@ -139,8 +139,8 @@ pub mod master_class {
 }
 
 impl Diff for ClassId {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -181,7 +181,7 @@ mod tests {
         assert_eq!(ClassId::try_from(0).map(ClassId::get), Ok(0));
         assert_eq!(ClassId::try_from(99).map(ClassId::get), Ok(99));
         assert_eq!(
-            ClassId::try_from(-1).map_err(|e| e.kind()),
+            ClassId::try_from(-1).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }
@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(ClassId::field(None), -1);
         assert_eq!(ClassId::field(Some(ClassId::named(4))), 4);
         assert_eq!(
-            ClassId::of_field(-2).map_err(|e| e.kind()),
+            ClassId::of_field(-2).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }

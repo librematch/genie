@@ -21,7 +21,7 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
         range: FixedDistance::new(range),
         range2: FixedDistanceSquared::of(FixedDistance::new(range)),
     };
-    let mut s = Search {
+    let mut search = Search {
         ctx: Ctx {
             mesh,
             ignore: &[],
@@ -36,15 +36,15 @@ fn search_toward(mesh: &Mesh, at: FixedPoint, range: i32) -> Search<'_> {
         best: NodeIndex::START,
     };
     let origin = FixedPoint::new(0, 0);
-    s.arena.push(Node {
+    search.arena.push(Node {
         g: FixedDistance::ZERO,
-        f: s.goal.heuristic(origin),
+        f: search.goal.heuristic(origin),
         idx: NodeIndex::START,
         parent: None,
         at: origin,
         kind: Kind::Start,
     });
-    s
+    search
 }
 
 /// A forward run of polygon 0 over its vertex 0, for the goal and foot tests.
@@ -60,28 +60,28 @@ const RUN_0: Run = Run {
 #[test]
 fn node_index_is_its_arena_place_and_any_cost_beats_no_goal() {
     let mesh = Mesh::new(64);
-    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
-    assert_eq!(NodeIndex::next_of(&s.arena), NodeIndex::new(1));
+    let mut search = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    assert_eq!(NodeIndex::next_of(&search.arena), NodeIndex::new(1));
     assert_eq!(NodeIndex::START.get(), 0);
-    assert!(s.beats_goal(FixedDistance::new(i32::MAX)).unwrap());
-    let n = s.add(
+    assert!(search.beats_goal(FixedDistance::new(i32::MAX)).unwrap());
+    let node = search.add(
         FixedDistance::TILE,
         NodeIndex::START,
         FixedPoint::new(ONE, 0),
         Kind::Waypoint,
     );
     assert_eq!(
-        (n.idx, n.parent),
+        (node.idx, node.parent),
         (NodeIndex::new(1), Some(NodeIndex::START))
     );
-    s.goal_node = Some(n.idx);
-    assert!(s.beats_goal(FixedDistance::new(ONE - 1)).unwrap());
-    assert!(!s.beats_goal(FixedDistance::TILE).unwrap());
-    s.node_mut(n.idx).unwrap().g = FixedDistance::ZERO;
-    assert!(!s.beats_goal(FixedDistance::ZERO).unwrap());
+    search.goal_node = Some(node.idx);
+    assert!(search.beats_goal(FixedDistance::new(ONE - 1)).unwrap());
+    assert!(!search.beats_goal(FixedDistance::TILE).unwrap());
+    search.node_mut(node.idx).unwrap().g = FixedDistance::ZERO;
+    assert!(!search.beats_goal(FixedDistance::ZERO).unwrap());
     // a goal node the arena does not hold fails
-    s.goal_node = Some(NodeIndex::new(7));
-    assert!(s.beats_goal(FixedDistance::ZERO).is_err());
+    search.goal_node = Some(NodeIndex::new(7));
+    assert!(search.beats_goal(FixedDistance::ZERO).is_err());
 }
 
 /// A vertex index steps round its polygon (`next_in`, `prev_in`) or along its list (`succ`,
@@ -114,14 +114,14 @@ fn vertex_index_steps_round_its_polygon_and_reads_its_columns() {
 #[test]
 fn polygon_index_reads_the_search_list() {
     let mesh = Mesh::new(64);
-    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
-    assert!(s.poly(PolyIndex::of(0)).is_err());
-    s.polys.push(Poly::default());
-    s.polys.push(Poly::default());
+    let mut search = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    assert!(search.poly(PolyIndex::of(0)).is_err());
+    search.polys.push(Poly::default());
+    search.polys.push(Poly::default());
     assert_eq!(PolyIndex::of(1).get(), 1);
-    s.poly_mut(PolyIndex::of(1)).unwrap().flag = true;
-    assert!(s.poly(PolyIndex::of(1)).unwrap().flag);
-    assert!(!s.poly(PolyIndex::of(0)).unwrap().flag);
+    search.poly_mut(PolyIndex::of(1)).unwrap().flag = true;
+    assert!(search.poly(PolyIndex::of(1)).unwrap().flag);
+    assert!(!search.poly(PolyIndex::of(0)).unwrap().flag);
 }
 
 /// `FUN_140fa3860`: a node within range becomes the goal while it is cheaper than the goal so
@@ -130,42 +130,45 @@ fn polygon_index_reads_the_search_list() {
 #[test]
 fn goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() {
     let mesh = Mesh::new(64);
-    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    let mut search = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
     assert!(
-        s.goal_test(Corner {
-            cost: FixedDistance::new(5 * ONE),
-            parent: NodeIndex::START,
-            run: RUN_0,
-            point: FixedPoint::new(11 * ONE, 10 * ONE)
-        })
-        .unwrap()
+        search
+            .goal_test(Corner {
+                cost: FixedDistance::new(5 * ONE),
+                parent: NodeIndex::START,
+                run: RUN_0,
+                point: FixedPoint::new(11 * ONE, 10 * ONE)
+            })
+            .unwrap()
     );
-    assert_eq!(s.goal_node, Some(NodeIndex::new(1)));
+    assert_eq!(search.goal_node, Some(NodeIndex::new(1)));
     // in range but dearer: the best instead, as it lies nearer than the start's estimate
     assert!(
-        !s.goal_test(Corner {
-            cost: FixedDistance::new(6 * ONE),
-            parent: NodeIndex::START,
-            run: RUN_0,
-            point: FixedPoint::new(11 * ONE, 10 * ONE)
-        })
-        .unwrap()
+        !search
+            .goal_test(Corner {
+                cost: FixedDistance::new(6 * ONE),
+                parent: NodeIndex::START,
+                run: RUN_0,
+                point: FixedPoint::new(11 * ONE, 10 * ONE)
+            })
+            .unwrap()
     );
     assert_eq!(
-        (s.goal_node, s.best),
+        (search.goal_node, search.best),
         (Some(NodeIndex::new(1)), NodeIndex::new(2))
     );
     // out of range and farther than the best's estimate (one tile): nothing
     assert!(
-        !s.goal_test(Corner {
-            cost: FixedDistance::TILE,
-            parent: NodeIndex::START,
-            run: RUN_0,
-            point: FixedPoint::new(30 * ONE, 30 * ONE)
-        })
-        .unwrap()
+        !search
+            .goal_test(Corner {
+                cost: FixedDistance::TILE,
+                parent: NodeIndex::START,
+                run: RUN_0,
+                point: FixedPoint::new(30 * ONE, 30 * ONE)
+            })
+            .unwrap()
     );
-    assert_eq!((s.arena.len(), s.best), (3, NodeIndex::new(2)));
+    assert_eq!((search.arena.len(), search.best), (3, NodeIndex::new(2)));
 }
 
 /// `FUN_140fa8210`: the goal's foot on an axis edge that spans it, reached at the edge's
@@ -174,27 +177,29 @@ fn goal_candidate_in_range_and_cheaper_becomes_the_goal_else_maybe_the_best() {
 #[test]
 fn the_goal_foot_on_spanning_edge_is_goal_candidate() {
     let mesh = Mesh::new(64);
-    let mut s = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
-    s.foot_test(Foot {
-        start: FixedPoint::new(9 * ONE, 12 * ONE),
-        end: FixedPoint::new(9 * ONE, 20 * ONE),
-        extent_x: 0,
-        run: RUN_0,
-        start_cost: FixedDistance::TILE,
-        parent: NodeIndex::START,
-    })
-    .unwrap();
-    assert_eq!(s.arena.len(), 1);
-    s.foot_test(Foot {
-        start: FixedPoint::new(15 * ONE, 9 * ONE),
-        end: FixedPoint::new(5 * ONE, 9 * ONE),
-        extent_x: 1,
-        run: RUN_0,
-        start_cost: FixedDistance::TILE,
-        parent: NodeIndex::START,
-    })
-    .unwrap();
-    let goal = *s.node(s.goal_node.unwrap()).unwrap();
+    let mut search = search_toward(&mesh, FixedPoint::new(10 * ONE, 10 * ONE), 2 * ONE);
+    search
+        .foot_test(Foot {
+            start: FixedPoint::new(9 * ONE, 12 * ONE),
+            end: FixedPoint::new(9 * ONE, 20 * ONE),
+            extent_x: 0,
+            run: RUN_0,
+            start_cost: FixedDistance::TILE,
+            parent: NodeIndex::START,
+        })
+        .unwrap();
+    assert_eq!(search.arena.len(), 1);
+    search
+        .foot_test(Foot {
+            start: FixedPoint::new(15 * ONE, 9 * ONE),
+            end: FixedPoint::new(5 * ONE, 9 * ONE),
+            extent_x: 1,
+            run: RUN_0,
+            start_cost: FixedDistance::TILE,
+            parent: NodeIndex::START,
+        })
+        .unwrap();
+    let goal = *search.node(search.goal_node.unwrap()).unwrap();
     assert_eq!(
         (goal.at, goal.g),
         (
@@ -208,11 +213,12 @@ fn the_goal_foot_on_spanning_edge_is_goal_candidate() {
 /// side's start turning it along the side.
 #[test]
 fn contact_point_moves_off_its_side() {
-    let p = FixedPoint::new(100, 200);
+    let fixed_point = FixedPoint::new(100, 200);
     let moved: Vec<FixedPoint> = ShapeSide::ALL
         .into_iter()
         .flat_map(|side| {
-            [false, true].map(|start| contact_point(p, side, FixedDistance::new(3), start))
+            [false, true]
+                .map(|start| contact_point(fixed_point, side, FixedDistance::new(3), start))
         })
         .collect();
     assert_eq!(
@@ -234,11 +240,16 @@ fn contact_point_moves_off_its_side() {
 /// coordinate set, the other held between the shrunk corners).
 #[test]
 fn point_snaps_onto_side_within_its_corners() {
-    let r = FixedRect::new(0, 0, 100, 50);
+    let fixed_rect = FixedRect::new(0, 0, 100, 50);
     let snap = |p: FixedPoint, side: usize| {
-        let mut q = p;
-        snap_to_side(&mut q, r, ShapeSide::ALL[side], FixedDistance::new(5));
-        q
+        let mut fixed_point = p;
+        snap_to_side(
+            &mut fixed_point,
+            fixed_rect,
+            ShapeSide::ALL[side],
+            FixedDistance::new(5),
+        );
+        fixed_point
     };
     assert_eq!(snap(FixedPoint::new(-20, 30), 0), FixedPoint::new(5, 5));
     assert_eq!(snap(FixedPoint::new(200, 30), 0), FixedPoint::new(95, 5));
@@ -263,12 +274,12 @@ fn the_integer_square_root_is_exact_below_and_truncates_between_squares() {
 #[test]
 fn ray_crosses_the_side_it_faces_and_reports_how_far() {
     // a ray from (0, 1) to (4, 1) against the box (2, 0)-(3, 2): its left side at x = 2
-    let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
+    let fixed_rect = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let mut t = RayFraction::START;
     let hit = ray_rect(
         FixedPoint::new(0, ONE),
         FixedPoint::new(4 * ONE, ONE),
-        r,
+        fixed_rect,
         &mut t,
     );
     assert_eq!(
@@ -283,7 +294,7 @@ fn ray_crosses_the_side_it_faces_and_reports_how_far() {
     let hit = ray_rect(
         FixedPoint::new(4 * ONE, ONE),
         FixedPoint::new(0, ONE),
-        r,
+        fixed_rect,
         &mut t,
     );
     assert_eq!(
@@ -294,28 +305,28 @@ fn ray_crosses_the_side_it_faces_and_reports_how_far() {
         )
     );
     // a ray beside the box meets nothing
-    let mut t = RayFraction::START;
+    let mut ray_fraction = RayFraction::START;
     assert_eq!(
         ray_rect(
             FixedPoint::new(0, 3 * ONE),
             FixedPoint::new(4 * ONE, 3 * ONE),
-            r,
-            &mut t
+            fixed_rect,
+            &mut ray_fraction
         ),
         None
     );
 }
 
-/// `FUN_140faa4e0` on the y sides: a ray along y within the box's open x span meets the
-/// bottom going up and the top going down, nearer than `t` and from at or outside the side;
-/// a slanted ray meets them as `FUN_140fa9f10` does.
+/// `FUN_140faa4e0` on the y sides: a ray along y within the box's open x span meets the bottom
+/// going up and the top going down, nearer than `ray_fraction` and from at or outside the side; a
+/// slanted ray meets them as `FUN_140fa9f10` does.
 #[test]
 fn ray_crosses_the_bottom_or_the_top_along_y() {
-    let r = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
+    let fixed_rect = FixedRect::new(2 * ONE, 0, 3 * ONE, 2 * ONE);
     let x = 2 * ONE + ONE / 2;
     let cast = |a: FixedPoint, b: FixedPoint, t: RayFraction| {
         let mut t = t;
-        let hit = ray_rect(a, b, r, &mut t);
+        let hit = ray_rect(a, b, fixed_rect, &mut t);
         (hit, t)
     };
     // up from y = -1 to 3: the bottom at a quarter of the way
@@ -396,25 +407,25 @@ fn ray_crosses_the_bottom_or_the_top_along_y() {
         (Some((k, ShapeSide::LowY)), t)
     );
     // and down through the top
-    let mut t = RayFraction::START;
-    let Some(k) = segment_hit(
+    let mut ray_fraction = RayFraction::START;
+    let Some(meet) = segment_hit(
         b,
         a,
         FixedPoint::new(2 * ONE, 2 * ONE),
         FixedPoint::new(3 * ONE, 2 * ONE),
-        &mut t,
+        &mut ray_fraction,
     ) else {
         panic!("the ray meets the top");
     };
     assert_eq!(
         cast(b, a, RayFraction::START),
-        (Some((k, ShapeSide::HighY)), t)
+        (Some((meet, ShapeSide::HighY)), ray_fraction)
     );
 }
 
-/// `FUN_140faa380`'s four outcomes: a proper crossing (its parameter into `t`), a touch at the
-/// ray's end, a touch at the ray's start on the segment's end (`t` 0), and none for a parallel
-/// segment or one beyond `t`.
+/// `FUN_140faa380`'s four outcomes: a proper crossing (its parameter into `ray_fraction`), a touch
+/// at the ray's end, a touch at the ray's start on the segment's end (`ray_fraction` 0), and none
+/// for a parallel segment or one beyond `ray_fraction`.
 #[test]
 fn segment_meets_ray_by_crossing_or_touching() {
     let p = |x: i32, y: i32| FixedPoint::new(x * ONE, y * ONE);
@@ -442,9 +453,9 @@ fn segment_meets_ray_by_crossing_or_touching() {
         segment_hit(p(0, 1), p(4, 1), p(0, 2), p(4, 2), &mut t),
         None
     );
-    let mut t = RayFraction::new(ONE / 4);
-    assert_eq!(segment_hit(p(0, 1), p(4, 1), c, e, &mut t), None);
-    assert_eq!(t, RayFraction::new(ONE / 4));
+    let mut ray_fraction = RayFraction::new(ONE / 4);
+    assert_eq!(segment_hit(p(0, 1), p(4, 1), c, e, &mut ray_fraction), None);
+    assert_eq!(ray_fraction, RayFraction::new(ONE / 4));
 }
 
 /// `FUN_140fa16d0`: a segment through the box keeps the part inside, each end moved to the
@@ -452,9 +463,13 @@ fn segment_meets_ray_by_crossing_or_touching() {
 /// box is none, one inside it stays; the box's corners may come in any order.
 #[test]
 fn segment_clipped_to_the_box_keeps_its_part_inside() {
-    let b = FixedRect::new(0, 0, 2 * ONE, 2 * ONE);
+    let fixed_rect = FixedRect::new(0, 0, 2 * ONE, 2 * ONE);
     assert_eq!(
-        clip(FixedPoint::new(-ONE, ONE), FixedPoint::new(3 * ONE, ONE), b),
+        clip(
+            FixedPoint::new(-ONE, ONE),
+            FixedPoint::new(3 * ONE, ONE),
+            fixed_rect
+        ),
         Some((FixedPoint::new(0, ONE), FixedPoint::new(2 * ONE, ONE)))
     );
     // first the left edge, then the bottom, then the right edge for the far end
@@ -462,7 +477,7 @@ fn segment_clipped_to_the_box_keeps_its_part_inside() {
         clip(
             FixedPoint::new(-ONE, -ONE),
             FixedPoint::new(3 * ONE, 2 * ONE),
-            b
+            fixed_rect
         ),
         Some((
             FixedPoint::new(1_398_101, 0),
@@ -473,12 +488,12 @@ fn segment_clipped_to_the_box_keeps_its_part_inside() {
         clip(
             FixedPoint::new(3 * ONE, 0),
             FixedPoint::new(4 * ONE, ONE),
-            b
+            fixed_rect
         ),
         None
     );
     let inside = (FixedPoint::new(ONE / 2, ONE), FixedPoint::new(ONE, ONE / 2));
-    assert_eq!(clip(inside.0, inside.1, b), Some(inside));
+    assert_eq!(clip(inside.0, inside.1, fixed_rect), Some(inside));
     assert_eq!(
         clip(
             FixedPoint::new(-ONE, ONE),
@@ -496,7 +511,7 @@ fn segment_clipped_to_the_box_keeps_its_part_inside() {
 fn start_deep_in_blocked_terrain_is_blocked_unless_in_range() {
     let blocked = |_: u32, _: u32| 1;
     let free = |_: u32, _: u32| 0;
-    let mut q = Query {
+    let mut query = Query {
         from: FixedPoint::new(5 * ONE + ONE / 2, 5 * ONE + ONE / 2),
         to: FixedPoint::new(8 * ONE + ONE / 2, 5 * ONE + ONE / 2),
         radius: Distance::new(0.25),
@@ -508,12 +523,12 @@ fn start_deep_in_blocked_terrain_is_blocked_unless_in_range() {
     let mut pather = Pather::default();
     // each row of blocked tiles is a shape half a tile wider all round: the start sits 0.75
     // tiles inside row 5's, beyond twice the radius from its sides
-    assert!(pather.start_blocked(&mut mesh, &blocked, &q).unwrap());
-    let n = mesh.shapes.len() as u32;
-    assert!(0 < n && (0..n).all(|id| !mesh.is_shape(ShapeId::new(id))));
-    assert!(!pather.start_blocked(&mut mesh, &free, &q).unwrap());
-    q.range = Distance::new(3.0);
-    assert!(!pather.start_blocked(&mut mesh, &blocked, &q).unwrap());
+    assert!(pather.start_blocked(&mut mesh, &blocked, &query).unwrap());
+    let count = mesh.shapes.len() as u32;
+    assert!(0 < count && (0..count).all(|id| !mesh.is_shape(ShapeId::new(id))));
+    assert!(!pather.start_blocked(&mut mesh, &free, &query).unwrap());
+    query.range = Distance::new(3.0);
+    assert!(!pather.start_blocked(&mut mesh, &blocked, &query).unwrap());
 }
 
 /// `FUN_140f9e540`'s entry tests as compiled: the target's gap clamps each axis by `MAXSS`
@@ -571,7 +586,7 @@ fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (ShortFo
             ))
         })
         .collect();
-    let q = Query {
+    let query = Query {
         from: FixedPoint::new(fixed(from.x()), fixed(from.y())),
         to: FixedPoint::new(fixed(to.x()), fixed(to.y())),
         radius: Distance::new(0.25),
@@ -581,13 +596,13 @@ fn around(walls: &[[f32; 4]], from: Point, to: Point, ignored: bool) -> (ShortFo
     };
     let ignore = if ignored { ids } else { Vec::new() };
     let found = Pather::default()
-        .search(&mut mesh, &|_, _| 0, &q, &ignore)
+        .search(&mut mesh, &|_, _| 0, &query, &ignore)
         .unwrap();
     let tiles = |v: i32| v as f32 / ONE as f32;
     let points = found
         .points
         .iter()
-        .map(|p| Point::new(tiles(p.x()), tiles(p.y())))
+        .map(|fixed_point| Point::new(tiles(fixed_point.x()), tiles(fixed_point.y())))
         .collect();
     (found.result, points)
 }
@@ -689,7 +704,10 @@ fn path_past_staggered_walls_bends_only_at_their_corners() {
     ];
     let between = &points[1..points.len() - 1];
     assert!(2 < points.len(), "{points:?}");
-    assert!(between.iter().all(|p| corners.contains(p)), "{points:?}");
+    assert!(
+        between.iter().all(|point| corners.contains(point)),
+        "{points:?}"
+    );
 }
 
 /// A query from (5, 5) to (7, 5) with a radius of a quarter tile and range `range`.
@@ -716,7 +734,10 @@ fn the_search_truncates_its_radius_and_range_to_fixed_point() {
     let found = pather.search(&mut mesh, &words, &range_query(Distance::new(1.75)), &[]);
     assert_eq!(found.map(|f| f.result), Ok(ShortFound::InRange));
     let found = pather.search(&mut mesh, &words, &range_query(Distance::new(below)), &[]);
-    assert_eq!(found.map(|f| f.result), Ok(ShortFound::Reached));
+    assert_eq!(
+        found.map(|short_path| short_path.result),
+        Ok(ShortFound::Reached)
+    );
 }
 
 /// A square outline of four tiles' side at the origin, its sides 0 to 3 in turn (with `run`,
@@ -733,12 +754,12 @@ fn square(run: bool) -> Poly {
         vertices.insert(1, FixedPoint::new(2 * ONE, 0));
         sides.insert(1, ShapeSide::LowY);
     }
-    let n = vertices.len();
+    let count = vertices.len();
     Poly {
         vertices,
         sides,
-        shapes: vec![None; n],
-        costs: vec![FixedDistance::ZERO; n],
+        shapes: vec![None; count],
+        costs: vec![FixedDistance::ZERO; count],
         flag: false,
     }
 }
@@ -754,10 +775,10 @@ fn the_edge_holding_point_is_the_first_vertex_of_its_side_run() {
         FixedRect::new(0, 0, 4 * ONE, 4 * ONE),
         FixedRect::new(3 * ONE, 3 * ONE, 6 * ONE, 6 * ONE),
     ];
-    let edge = |poly: &Poly, p: FixedPoint, side: usize| {
+    let edge = |poly: &Poly, fixed_point: FixedPoint, side: usize| {
         Search::edge_holding(
             poly,
-            p,
+            fixed_point,
             ShapeSide::ALL[side],
             &mesh,
             Some(ShapeId::new(0)),
@@ -819,8 +840,8 @@ fn the_edge_holding_point_is_the_first_vertex_of_its_side_run() {
     );
 }
 
-/// `FUN_140fa77b0`'s vertex test: the vertex at the point, of a shape whose overlap with the
-/// shape asked (shrunk by `d`) holds it; not another vertex, a vertex of no shape, an empty
+/// `FUN_140fa77b0`'s vertex test: the vertex at the point, of a shape whose overlap with the shape
+/// asked (shrunk by `fixed_distance`) holds it; not another vertex, a vertex of no shape, an empty
 /// overlap or one shrunk past the point.
 #[test]
 fn vertex_holds_point_in_its_shape_overlap_with_the_other() {
@@ -830,20 +851,25 @@ fn vertex_holds_point_in_its_shape_overlap_with_the_other() {
         FixedRect::new(2 * ONE, 2 * ONE, 6 * ONE, 6 * ONE),
         FixedRect::new(5 * ONE, 5 * ONE, 8 * ONE, 8 * ONE),
     ];
-    let p = FixedPoint::new(3 * ONE, 3 * ONE);
-    let held = |vc: FixedPoint, vs: Option<u32>, d| {
-        Search::vertex_in_overlap(&mesh, (p, vc, vs.map(ShapeId::new)), ShapeId::new(0), d)
+    let fixed_point = FixedPoint::new(3 * ONE, 3 * ONE);
+    let held = |vc: FixedPoint, vs: Option<u32>, fixed_distance| {
+        Search::vertex_in_overlap(
+            &mesh,
+            (fixed_point, vc, vs.map(ShapeId::new)),
+            ShapeId::new(0),
+            fixed_distance,
+        )
     };
-    assert!(held(p, Some(1), FixedDistance::ZERO));
-    assert!(held(p, Some(1), FixedDistance::new(ONE / 2)));
+    assert!(held(fixed_point, Some(1), FixedDistance::ZERO));
+    assert!(held(fixed_point, Some(1), FixedDistance::new(ONE / 2)));
     assert!(!held(
         FixedPoint::new(3 * ONE, 2 * ONE),
         Some(1),
         FixedDistance::ZERO
     ));
-    assert!(!held(p, None, FixedDistance::ZERO));
-    assert!(!held(p, Some(2), FixedDistance::ZERO));
-    assert!(!held(p, Some(1), FixedDistance::TILE));
+    assert!(!held(fixed_point, None, FixedDistance::ZERO));
+    assert!(!held(fixed_point, Some(2), FixedDistance::ZERO));
+    assert!(!held(fixed_point, Some(1), FixedDistance::TILE));
 }
 
 /// `FUN_140fa77b0`'s edge test on each side: the point on the edge's line between its ends;
@@ -1034,18 +1060,27 @@ fn point_lies_on_an_edge_between_ends_its_neighbour_sides_open_or_close() {
         ),
     ];
     let sides = ShapeSide::ALL;
-    for (side, from, to, p, prev, next, on) in cases {
+    for (side, from, to, fixed_point, prev, next, on) in cases {
         assert_eq!(
-            Search::on_edge(sides[side], (from, to), p, (sides[prev], sides[next])),
+            Search::on_edge(
+                sides[side],
+                (from, to),
+                fixed_point,
+                (sides[prev], sides[next])
+            ),
             on,
-            "side {side} at {p:?}, sides {prev} and {next}"
+            "side {side} at {fixed_point:?}, sides {prev} and {next}"
         );
     }
 }
 
 /// The escape candidates a search holds open: each one's place, cost and shape side.
-fn opened(s: &Search<'_>) -> Vec<(FixedPoint, i32, Kind)> {
-    s.open.iter().map(|n| (n.at, n.g.get(), n.kind)).collect()
+fn opened(search: &Search<'_>) -> Vec<(FixedPoint, i32, Kind)> {
+    search
+        .open
+        .iter()
+        .map(|node| (node.at, node.g.get(), node.kind))
+        .collect()
 }
 
 /// Shape 0 over tiles (2, 2) to (6, 6), and a search of doubled radius two tiles (`r` one
@@ -1084,21 +1119,21 @@ fn start_in_range_free_or_held_answers_by_its_escape_candidates() {
         Started::Escaped
     );
     assert_eq!(s.open.len(), 1);
-    let n = s.open[0];
+    let node = s.open[0];
     // the touching point on side 1 has the lowest estimate toward (12, 12)
     assert_eq!(
-        (n.at, n.g),
+        (node.at, node.g),
         (
             FixedPoint::new(6 * ONE, 3 * ONE),
             FixedDistance::new(2 * ONE)
         )
     );
-    assert_eq!(n.f, s.goal.heuristic(n.at).wrapping_add(n.g));
-    assert_eq!(s.node(n.idx).unwrap().f, n.f);
-    let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.goal.r = FixedDistance::new(ONE / 8);
+    assert_eq!(node.f, s.goal.heuristic(node.at).wrapping_add(node.g));
+    assert_eq!(s.node(node.idx).unwrap().f, node.f);
+    let mut search = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
+    search.goal.r = FixedDistance::new(ONE / 8);
     assert_eq!(
-        s.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(),
+        search.start(FixedPoint::new(4 * ONE, 4 * ONE)).unwrap(),
         Started::Stuck
     );
 }
@@ -1109,17 +1144,17 @@ fn start_in_range_free_or_held_answers_by_its_escape_candidates() {
 #[test]
 fn the_start_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     let mesh = shape_at_2_2();
-    let p = FixedPoint::new(4 * ONE, 3 * ONE);
+    let fixed_point = FixedPoint::new(4 * ONE, 3 * ONE);
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     s.goal.r = FixedDistance::TILE;
-    s.escape_candidates(p, NodeIndex::START).unwrap();
+    s.escape_candidates(fixed_point, NodeIndex::START).unwrap();
     let mut one = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
     one.goal.r = FixedDistance::TILE;
-    for k in 0..4 {
+    for index in 0..4 {
         one.escape_side(
-            p,
+            fixed_point,
             NodeIndex::START,
-            (ShapeId::new(0), ShapeSide::ALL[k]),
+            (ShapeId::new(0), ShapeSide::ALL[index]),
             FixedDistanceSquared::of(FixedDistance::new(2 * ONE)),
         )
         .unwrap();
@@ -1132,11 +1167,13 @@ fn the_start_scan_reads_each_corner_tile_once_and_skips_ignored_shapes() {
     assert!(0 < holding);
     assert_eq!(s.open.len(), holding * one.open.len());
     let ignore = [true];
-    let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.ctx.ignore = &ignore;
-    s.goal.r = FixedDistance::TILE;
-    s.escape_candidates(p, NodeIndex::START).unwrap();
-    assert_eq!(s.open.len(), 0);
+    let mut search = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
+    search.ctx.ignore = &ignore;
+    search.goal.r = FixedDistance::TILE;
+    search
+        .escape_candidates(fixed_point, NodeIndex::START)
+        .unwrap();
+    assert_eq!(search.open.len(), 0);
 }
 
 /// One side of shape 0 seen from (4, 3) with a circle of two tiles: side 0, one tile away,
@@ -1210,15 +1247,16 @@ fn shape_side_gives_the_circle_crossings_the_foot_and_near_corner() {
     // shape 1 holds the crossing right of the foot; its contact at (5, 2) is a candidate
     let mut mesh = shape_at_2_2();
     let _ = mesh.add(FixedRect::new(5 * ONE, 0, 9 * ONE, 3 * ONE));
-    let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.escape_side(
-        FixedPoint::new(4 * ONE, 3 * ONE),
-        NodeIndex::START,
-        (ShapeId::new(0), ShapeSide::ALL[0]),
-        rr2,
-    )
-    .unwrap();
-    let got = opened(&s);
+    let mut search = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
+    search
+        .escape_side(
+            FixedPoint::new(4 * ONE, 3 * ONE),
+            NodeIndex::START,
+            (ShapeId::new(0), ShapeSide::ALL[0]),
+            rr2,
+        )
+        .unwrap();
+    let got = opened(&search);
     assert_eq!(got.len(), 3);
     assert!(got.iter().all(|&(at, _, _)| at.x() <= 5 * ONE));
     assert!(
@@ -1233,10 +1271,10 @@ fn shape_side_gives_the_circle_crossings_the_foot_and_near_corner() {
 fn the_start_foot_on_side_lies_between_its_corners_in_the_box_and_free() {
     let mesh = shape_at_2_2();
     let corners = |k: usize| {
-        let r = mesh.shapes[0];
+        let fixed_rect = mesh.shapes[0];
         (
-            shrunk_corner(r, [0, 1, 3, 0][k], FixedDistance::ZERO),
-            shrunk_corner(r, [1, 2, 2, 3][k], FixedDistance::ZERO),
+            shrunk_corner(fixed_rect, [0, 1, 3, 0][k], FixedDistance::ZERO),
+            shrunk_corner(fixed_rect, [1, 2, 2, 3][k], FixedDistance::ZERO),
         )
     };
     let side = |side: usize| Kind::Side {
@@ -1244,13 +1282,13 @@ fn the_start_foot_on_side_lies_between_its_corners_in_the_box_and_free() {
         side: ShapeSide::ALL[side],
     };
     let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    let p = FixedPoint::new(3 * ONE, 5 * ONE / 2);
-    for k in 0..4 {
+    let fixed_point = FixedPoint::new(3 * ONE, 5 * ONE / 2);
+    for index in 0..4 {
         s.escape_foot(
-            p,
+            fixed_point,
             NodeIndex::START,
-            (ShapeId::new(0), ShapeSide::ALL[k]),
-            corners(k),
+            (ShapeId::new(0), ShapeSide::ALL[index]),
+            corners(index),
         )
         .unwrap();
     }
@@ -1283,7 +1321,7 @@ fn the_start_foot_on_side_lies_between_its_corners_in_the_box_and_free() {
     assert_eq!(opened(&s), vec![]);
     s.bounds = FixedRect::new(0, 0, 64 * ONE, ONE);
     s.escape_foot(
-        p,
+        fixed_point,
         NodeIndex::START,
         (ShapeId::new(0), ShapeSide::ALL[0]),
         corners(0),
@@ -1291,15 +1329,16 @@ fn the_start_foot_on_side_lies_between_its_corners_in_the_box_and_free() {
     .unwrap();
     let mut held = shape_at_2_2();
     let _ = held.add(FixedRect::new(0, 0, 4 * ONE, 4 * ONE));
-    let mut t = search_toward(&held, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    t.escape_foot(
-        p,
-        NodeIndex::START,
-        (ShapeId::new(0), ShapeSide::ALL[0]),
-        corners(0),
-    )
-    .unwrap();
-    assert_eq!((opened(&s), opened(&t)), (vec![], vec![]));
+    let mut search = search_toward(&held, FixedPoint::new(12 * ONE, 12 * ONE), 0);
+    search
+        .escape_foot(
+            fixed_point,
+            NodeIndex::START,
+            (ShapeId::new(0), ShapeSide::ALL[0]),
+            corners(0),
+        )
+        .unwrap();
+    assert_eq!((opened(&s), opened(&search)), (vec![], vec![]));
 }
 
 /// A side's contacts: one wider than the search's shrink, with a shape not ignored, at a free
@@ -1331,21 +1370,22 @@ fn side_contacts_become_candidates_when_wide_free_and_near() {
         contact(1, 3, FixedPoint::new(ONE / 2, 2 * ONE), ONE),
     ];
     let ignore = [false, false, false, true];
-    let mut s = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
-    s.ctx.ignore = &ignore;
-    s.escape_contacts(
-        FixedPoint::new(4 * ONE, 3 * ONE),
-        NodeIndex::START,
-        (ShapeId::new(0), ShapeSide::ALL[0]),
-        FixedDistanceSquared::of(FixedDistance::new(2 * ONE)),
-    )
-    .unwrap();
+    let mut search = search_toward(&mesh, FixedPoint::new(12 * ONE, 12 * ONE), 0);
+    search.ctx.ignore = &ignore;
+    search
+        .escape_contacts(
+            FixedPoint::new(4 * ONE, 3 * ONE),
+            NodeIndex::START,
+            (ShapeId::new(0), ShapeSide::ALL[0]),
+            FixedDistanceSquared::of(FixedDistance::new(2 * ONE)),
+        )
+        .unwrap();
     let side = Kind::Side {
         shape: ShapeId::new(0),
         side: ShapeSide::LowY,
     };
     // 3/4 and 1 tile off: 5/4 tiles
-    let mut got = opened(&s);
+    let mut got = opened(&search);
     got.sort_by_key(|&(_, g, _)| g);
     assert_eq!(
         got,

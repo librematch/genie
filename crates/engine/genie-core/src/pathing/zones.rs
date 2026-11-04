@@ -151,7 +151,7 @@ impl ZoneMap {
     fn open(&self, kinds: &[TerrainId], i: usize) -> bool {
         kinds
             .get(i)
-            .and_then(|&k| self.passable.get(k.index()))
+            .and_then(|&terrain_id| self.passable.get(terrain_id.index()))
             .copied()
             .unwrap_or(false)
     }
@@ -168,8 +168,8 @@ impl ZoneMap {
     fn label(&mut self, kinds: &[TerrainId]) {
         let (w, h) = (self.size.width(), self.size.height());
         for i in 0..w {
-            for j in 0..h {
-                if let Some(z) = self.zones.get_mut((i * w + j) as usize) {
+            for index in 0..h {
+                if let Some(z) = self.zones.get_mut((i * w + index) as usize) {
                     *z = UNREACHED;
                 }
             }
@@ -209,8 +209,8 @@ impl ZoneMap {
         let mut stack = vec![from];
         while let Some(t) = stack.pop() {
             for step in FLOOD_STEPS {
-                let n = t + step;
-                let Some(j) = self.size.index(n) else {
+                let tile = t + step;
+                let Some(j) = self.size.index(tile) else {
                     continue;
                 };
                 let open = self.open(kinds, j) == kind;
@@ -219,7 +219,7 @@ impl ZoneMap {
                     && open
                 {
                     *cell = zone;
-                    stack.push(n);
+                    stack.push(tile);
                 }
             }
         }
@@ -283,12 +283,12 @@ impl ZoneMap {
         let n = n as usize;
         let touches = |a: usize, b: usize| self.touching.get(a * n + b).copied().unwrap_or(false);
         for a in 0..n {
-            for b in 0..n {
-                if touches(a, b) {
+            for index in 0..n {
+                if touches(a, index) {
                     continue;
                 }
-                if let Some(c) = (0..n).find(|&c| touches(a, c) && touches(b, c))
-                    && let Some(slot) = self.through.get_mut(a * n + b)
+                if let Some(c) = (0..n).find(|&c| touches(a, c) && touches(index, c))
+                    && let Some(slot) = self.through.get_mut(a * n + index)
                 {
                     *slot = Some(ZoneId::new(c as u16));
                 }
@@ -315,11 +315,14 @@ impl ZoneMap {
     pub fn near(&self, zone: ZoneId, at: Tile, reach: Distance) -> Option<Tile> {
         use crate::math::conversions::cvttss2si;
         let (x, y) = (at.x(), at.y());
-        let r = cvttss2si(reach.get());
+        let whole_reach = cvttss2si(reach.get());
         // CMOVNS and CMOVLE on the wrapped sums
-        let (x0, y0) = (x.wrapping_sub(r).max(0), y.wrapping_sub(r).max(0));
-        let x1 = x.wrapping_add(r).min(self.size.width() - 1);
-        let y1 = y.wrapping_add(r).min(self.size.height() - 1);
+        let (x0, y0) = (
+            x.wrapping_sub(whole_reach).max(0),
+            y.wrapping_sub(whole_reach).max(0),
+        );
+        let x1 = x.wrapping_add(whole_reach).min(self.size.width() - 1);
+        let y1 = y.wrapping_add(whole_reach).min(self.size.height() - 1);
         for tx in x0..=x1 {
             let dx = x.wrapping_sub(tx);
             for ty in y0..=y1 {
@@ -412,9 +415,13 @@ impl Zones {
         relabel: Relabel,
     ) -> usize {
         let query = values.values();
-        let found = self.maps.iter().position(|m| {
-            m.passable.len() <= query.len()
-                && m.passable.iter().zip(query).all(|(&p, &v)| p == (0.0 < v))
+        let found = self.maps.iter().position(|zone_map| {
+            zone_map.passable.len() <= query.len()
+                && zone_map
+                    .passable
+                    .iter()
+                    .zip(query)
+                    .all(|(&p, &v)| p == (0.0 < v))
         });
         if let Some(i) = found {
             if relabel == Relabel::Again
@@ -835,12 +842,15 @@ mod tests {
         // the 3 x 3 table stays: at the new count 1, (0, 1) reads its entry 1, (0, 1) of before
         assert_eq!(after.adjacent(ZoneId::new(0), ZoneId::new(1)), Some(true));
         // without the relabel flag the map is not numbered again
-        let i = zones.find(
+        let zone = zones.find(
             GridSize::new(3, 3),
             &ids(&WALL),
             &Restriction::new(vec![1.0, 0.0]),
             Relabel::Kept,
         );
-        assert_eq!(zones.map(i).unwrap().zone(Tile::new(1, 0)), ZoneId::OFF_MAP);
+        assert_eq!(
+            zones.map(zone).unwrap().zone(Tile::new(1, 0)),
+            ZoneId::OFF_MAP
+        );
     }
 }

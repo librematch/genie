@@ -94,16 +94,21 @@ pub enum Tested {
 }
 
 impl World {
-    /// A new object of player `p`'s `master` placed at `at` (the static `new_position`,
+    /// A new object of player `player_id`'s `master` placed at `at` (the static `new_position`,
     /// `0x1411a58b0`, slot 0x60's `FUN_141193a10`): its height the ground's by the master's fly
     /// mode; without the map's elevations the height stays.
-    pub(crate) fn on_ground(&self, p: PlayerId, master: MasterId, at: Position) -> Position {
-        let fly_mode =
-            player_master(&self.model.masters, p, master).map_or(FlyMode::GROUND, |m| m.fly_mode);
+    pub(crate) fn on_ground(
+        &self,
+        player_id: PlayerId,
+        master: MasterId,
+        at: Position,
+    ) -> Position {
+        let fly_mode = player_master(&self.model.masters, player_id, master)
+            .map_or(FlyMode::GROUND, |m| m.fly_mode);
         self.spatial
             .terrain
             .as_ref()
-            .and_then(|t| t.ground(at.ground()).ok())
+            .and_then(|terrain| terrain.ground(at.ground()).ok())
             .map_or(at, |g| {
                 Position::new(at.x(), at.y(), grounded(at.z(), g, fly_mode))
             })

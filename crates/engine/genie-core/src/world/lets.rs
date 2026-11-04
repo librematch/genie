@@ -63,8 +63,8 @@ fn leave_site(
     combats: &mut PartTable<Combat>,
     site: ObjectId,
 ) -> GenieResult<()> {
-    let n = repairers_in(buildings, combats, site)?;
-    *n = n.left();
+    let builder_count = repairers_in(buildings, combats, site)?;
+    *builder_count = builder_count.left();
     Ok(())
 }
 
@@ -131,12 +131,12 @@ impl World {
 /// `f` with the updating player's [`Lets`] for a call on the updating object itself: its unit
 /// AI's notifies go to the side's buffer while its side runs ([`Step::side_notifies`]).
 fn own_lets<R>(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     f: impl FnOnce(&mut Lets<'_>, &mut Others<'_>) -> R,
 ) -> GenieResult<R> {
-    match c.side_notifies.as_mut() {
-        Some(own) => c.w.with_lets_for(c.player, own, f),
-        None => c.w.with_lets(c.player, f),
+    match step.side_notifies.as_mut() {
+        Some(own) => step.w.with_lets_for(step.player, own, f),
+        None => step.w.with_lets(step.player, f),
     }
 }
 
@@ -148,7 +148,7 @@ fn own_lets<R>(
 ///
 /// [`World::take`]'s and [`Lets::take`]'s.
 pub(crate) fn take(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     me: &mut Unit,
     id: impl ObjectKey,
     by: Releaser,
@@ -157,10 +157,12 @@ pub(crate) fn take(
     let Some(id) = id.key() else {
         return Ok(());
     };
-    if id == c.me {
-        own_lets(c, |lets, others| lets.take(others, Some(me), id, by, roles))?
+    if id == step.me {
+        own_lets(step, |lets, others| {
+            lets.take(others, Some(me), id, by, roles)
+        })?
     } else {
-        c.w.take(id, by)
+        step.w.take(id, by)
     }
 }
 
@@ -172,7 +174,7 @@ pub(crate) fn take(
 ///
 /// [`World::release`]'s and [`Lets::release`]'s.
 pub(crate) fn release(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     me: &mut Unit,
     id: impl ObjectKey,
     by: Releaser,
@@ -180,10 +182,10 @@ pub(crate) fn release(
     let Some(id) = id.key() else {
         return Ok(());
     };
-    if id == c.me {
-        return own_lets(c, |lets, others| lets.release(others, Some(me), id, by))?;
+    if id == step.me {
+        return own_lets(step, |lets, others| lets.release(others, Some(me), id, by))?;
     }
-    c.w.release(id, by)
+    step.w.release(id, by)
 }
 
 /// A counted builder's leave of the building a Build on `id` counted it in, from an update
@@ -195,7 +197,7 @@ pub(crate) fn release(
 ///
 /// An object of a master its owner lacks.
 pub(crate) fn leave_builders(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     me: &mut Unit,
     id: impl ObjectKey,
 ) -> GenieResult<()> {
@@ -203,7 +205,9 @@ pub(crate) fn leave_builders(
         return Ok(());
     };
     // the updating player's lets: the updating object's own site is reckoned by its owner
-    own_lets(c, |lets, others| lets.leave_builders(others, Some(me), id))?
+    own_lets(step, |lets, others| {
+        lets.leave_builders(others, Some(me), id)
+    })?
 }
 
 /// What an action list's teardown left the world, applied at once from an update: the buildings
@@ -214,15 +218,15 @@ pub(crate) fn leave_builders(
 ///
 /// [`leave_builders`]' and [`release`]'s.
 pub(crate) fn torn_down(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     me: &mut Unit,
     (builder_leaves, releases): (Vec<ObjectId>, Vec<(ObjectId, Releaser)>),
 ) -> GenieResult<()> {
     for id in builder_leaves {
-        leave_builders(c, me, id)?;
+        leave_builders(step, me, id)?;
     }
     for (id, by) in releases {
-        release(c, me, id, by)?;
+        release(step, me, id, by)?;
     }
     Ok(())
 }
@@ -254,7 +258,7 @@ impl Lets<'_> {
             self.taken_live(u, (self.player, allied), by)?;
             return Ok(());
         }
-        let Some((p, _, sleeps)) = others.locate(id) else {
+        let Some((player_id, _, sleeps)) = others.locate(id) else {
             return Ok(());
         };
         if sleeps {
@@ -265,26 +269,29 @@ impl Lets<'_> {
             let _ = others.wake(id, self.tracker, (self.masters.players, self.lines), roles);
             return Ok(());
         }
-        let allied = self.allied(others.view(), by.player, p);
-        let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-        self.taken_live(u, (p, allied), by)
+        let allied = self.allied(others.view(), by.player, player_id);
+        let (_, unit) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
+        self.taken_live(unit, (player_id, allied), by)
     }
 
-    /// Slot 0x178 on the live object `u` of player `p`, `allied` to the taker's player: it counts
-    /// its worker ([`crate::objects::unit::Unit::taken`]; a building first lists an unallied
-    /// taker of a foundation with a stack unit).
+    /// Slot 0x178 on the live object `unit` of player `player_id`, `allied` to the taker's player:
+    /// it counts its worker ([`crate::objects::unit::Unit::taken`]; a building first lists an
+    /// unallied taker of a foundation with a stack unit).
     fn taken_live(
         &mut self,
-        u: &mut Unit,
-        (p, allied): (PlayerId, bool),
+        unit: &mut Unit,
+        (player_id, allied): (PlayerId, bool),
         by: Releaser,
     ) -> GenieResult<()> {
-        let listed = if u.lists_taker(u.master(self.masters, p)?, allied) {
-            Some(self.buildings.get_or_insert_with(u.id, || Building::NONE)?)
+        let listed = if unit.lists_taker(unit.master(self.masters, player_id)?, allied) {
+            Some(
+                self.buildings
+                    .get_or_insert_with(unit.id, || Building::NONE)?,
+            )
         } else {
             None
         };
-        u.taken(listed, by.id);
+        unit.taken(listed, by.id);
         Ok(())
     }
 
@@ -310,7 +317,7 @@ impl Lets<'_> {
         if let Some(u) = me.filter(|u| u.id == id) {
             return self.release_own(others, u, by);
         }
-        let Some((p, _, sleeps)) = others.locate(id) else {
+        let Some((player_id, _, sleeps)) = others.locate(id) else {
             return Ok(());
         };
         if sleeps {
@@ -322,12 +329,12 @@ impl Lets<'_> {
             }
             return Ok(());
         }
-        let allied = self.allied(others.view(), by.player, p);
-        let (_, u) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
-        let m = u.master(self.masters, p)?;
-        let (kind, listed) = (m.kind, u.lists_taker(m, allied));
+        let allied = self.allied(others.view(), by.player, player_id);
+        let (_, unit) = others.get_mut(id).ok_or_else(|| object_gone(id))?;
+        let master = unit.master(self.masters, player_id)?;
+        let (kind, listed) = (master.kind, unit.lists_taker(master, allied));
         released(
-            u,
+            unit,
             (self.ais.get_mut(id), self.buildings.get_mut(id)),
             (kind, listed),
             by,
@@ -344,16 +351,17 @@ impl Lets<'_> {
     fn release_own(&mut self, others: &Others<'_>, me: &mut Unit, by: Releaser) -> GenieResult<()> {
         let owner = self.player;
         let allied = self.allied(others.view(), by.player, owner);
-        let m = me.master(self.masters, owner)?;
-        let (kind, listed) = (m.kind, me.lists_taker(m, allied));
-        let Some(n) = released_fields(me, self.buildings.get_mut(me.id), (kind, listed), by) else {
+        let master = me.master(self.masters, owner)?;
+        let (kind, listed) = (master.kind, me.lists_taker(master, allied));
+        let Some(notify) = released_fields(me, self.buildings.get_mut(me.id), (kind, listed), by)
+        else {
             return Ok(());
         };
         let state = me.life.state;
         if let Some(ai) = self.ais.get_mut(me.id) {
-            return ai.post(n, state);
+            return ai.post(notify, state);
         }
-        self.own_notifies.push((n, state));
+        self.own_notifies.push((notify, state));
         Ok(())
     }
 
@@ -377,30 +385,32 @@ impl Lets<'_> {
         let site = if let Some(u) = me.as_deref().filter(|u| u.id == id) {
             self.site_of(u, self.player, id)?
         } else {
-            let Some((p, f, _)) = others.locate(id) else {
+            let Some((player_id, f, _)) = others.locate(id) else {
                 return Ok(());
             };
-            self.site_of(f, p, id)?
+            self.site_of(f, player_id, id)?
         };
-        let held = me.is_some_and(|u| u.id == site) || others.get_mut(site).is_some();
+        let held = me.is_some_and(|unit| unit.id == site) || others.get_mut(site).is_some();
         if held {
             leave_site(self.buildings, self.combats, site)?;
         }
         Ok(())
     }
 
-    /// The building whose builders object `f` (`id`, of player `p`) counts in: an annex's main
-    /// building, else the object itself.
-    fn site_of(&self, f: &Unit, p: PlayerId, id: ObjectId) -> GenieResult<ObjectId> {
+    /// The building whose builders object `unit` (`id`, of player `player_id`) counts in: an
+    /// annex's main building, else the object itself.
+    fn site_of(&self, unit: &Unit, player_id: PlayerId, id: ObjectId) -> GenieResult<ObjectId> {
         // The building master type RESEARCH asks for (`'P'`, 80).
-        Ok(if f.master(self.masters, p)?.kind == MasterKind::BUILDING {
-            self.buildings
-                .get(f.id)
-                .and_then(|b| b.annex_of)
-                .map_or(id, MainBuildingId::id)
-        } else {
-            id
-        })
+        Ok(
+            if unit.master(self.masters, player_id)?.kind == MasterKind::BUILDING {
+                self.buildings
+                    .get(unit.id)
+                    .and_then(|building| building.annex_of)
+                    .map_or(id, MainBuildingId::id)
+            } else {
+                id
+            },
+        )
     }
 
     /// Player `from` counts player `to` as its own or allied, with its allies (`FUN_141663dc0`
@@ -410,7 +420,7 @@ impl Lets<'_> {
             self.relations
         } else {
             let other = view.players().player(from);
-            other.map_or(&NO_RELATIONS, |p| &p.relations)
+            other.map_or(&NO_RELATIONS, |player| &player.relations)
         };
         task_finder_allied(relations, from, to, AllyTest::WithRelation4)
     }

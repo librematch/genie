@@ -163,20 +163,20 @@ impl Action {
     #[must_use]
     pub const fn state(&self) -> ActionState {
         ActionState::new(match self {
-            Self::Artifact(a) => a.state.get(),
-            Self::Build(a) => a.state.get(),
-            Self::Repair(a) => a.state.get(),
-            Self::MoveTo(a) => a.state.number(),
-            Self::Fly(a) => a.state.get(),
-            Self::Hunt(a) => a.state.get(),
-            Self::Gather(a) => a.state.get(),
-            Self::Attack(a) => a.state.get(),
-            Self::Explore(a) => a.state.get(),
-            Self::Enter(a) => a.state.get(),
-            Self::Transport(a) => a.state.get(),
-            Self::Missile(a) => a.state.get(),
-            Self::Make(a) => a.state.get(),
-            Self::WaitSolidify(a) => a.state.get(),
+            Self::Artifact(artifact) => artifact.state.get(),
+            Self::Build(build_action) => build_action.state.get(),
+            Self::Repair(repair_action) => repair_action.state.get(),
+            Self::MoveTo(move_to_action) => move_to_action.state.number(),
+            Self::Fly(fly) => fly.state.get(),
+            Self::Hunt(hunt_action) => hunt_action.state.get(),
+            Self::Gather(gather_action) => gather_action.state.get(),
+            Self::Attack(attack) => attack.state.get(),
+            Self::Explore(explore_action) => explore_action.state.get(),
+            Self::Enter(enter_action) => enter_action.state.get(),
+            Self::Transport(transport_action) => transport_action.state.get(),
+            Self::Missile(missile_action) => missile_action.state.get(),
+            Self::Make(make_action) => make_action.state.get(),
+            Self::WaitSolidify(wait_solidify) => wait_solidify.state.get(),
         })
     }
 }
@@ -188,15 +188,15 @@ impl Action {
     #[must_use]
     pub fn target(&self) -> Option<ObjectId> {
         match self {
-            Self::Artifact(a) => a.target,
-            Self::Build(a) => a.target.map(RoleId::id),
-            Self::Repair(a) => a.target.map(RoleId::id),
-            Self::MoveTo(a) => a.target,
-            Self::Hunt(a) => a.target.map(RoleId::id),
-            Self::Gather(a) => a.target.map(RoleId::id),
-            Self::Attack(a) => a.target.map(RoleId::id),
-            Self::Enter(a) => a.target.map(RoleId::id),
-            Self::Missile(a) => a.target.map(RoleId::id),
+            Self::Artifact(artifact) => artifact.target,
+            Self::Build(build_action) => build_action.target.map(RoleId::id),
+            Self::Repair(repair_action) => repair_action.target.map(RoleId::id),
+            Self::MoveTo(move_to_action) => move_to_action.target,
+            Self::Hunt(hunt_action) => hunt_action.target.map(RoleId::id),
+            Self::Gather(gather_action) => gather_action.target.map(RoleId::id),
+            Self::Attack(attack) => attack.target.map(RoleId::id),
+            Self::Enter(enter_action) => enter_action.target.map(RoleId::id),
+            Self::Missile(missile_action) => missile_action.target.map(RoleId::id),
             Self::Fly(_)
             | Self::Explore(_)
             | Self::Transport(_)
@@ -211,11 +211,11 @@ impl Action {
     #[must_use]
     pub fn second_target(&self) -> Option<ObjectId> {
         match self {
-            Self::Hunt(h) => h.carry_to.map(RoleId::id),
-            Self::Gather(g) => g.carry_to.map(RoleId::id),
-            Self::Build(b) => b.site.map(RoleId::id),
-            Self::Missile(m) => m.fired_from.map(RoleId::id),
-            Self::Attack(a) => a.target2.map(RoleId::id),
+            Self::Hunt(hunt_action) => hunt_action.carry_to.map(RoleId::id),
+            Self::Gather(gather_action) => gather_action.carry_to.map(RoleId::id),
+            Self::Build(build_action) => build_action.site.map(RoleId::id),
+            Self::Missile(missile_action) => missile_action.fired_from.map(RoleId::id),
+            Self::Attack(attack) => attack.target2.map(RoleId::id),
             _ => None,
         }
     }
@@ -244,7 +244,7 @@ impl ActionList {
     /// `get_action` (`FUN_140a986a0`): the first action of type `kind`, if the list holds one.
     #[must_use]
     pub fn of_kind(&self, kind: ActionKind) -> Option<&Action> {
-        self.0.iter().find(|a| a.kind() == kind)
+        self.0.iter().find(|action| action.kind() == kind)
     }
 
     /// `have_action` (`FUN_140a98740`): whether the list holds an action of type `kind`.
@@ -339,10 +339,13 @@ mod tests {
 
     #[test]
     fn an_action_reads_its_kind_and_state() {
-        let a = Action::Artifact(artifact(ArtifactState::Check));
-        assert_eq!((a.kind(), a.state()), (ARTIFACT_KIND, ActionState::new(6)));
+        let action = Action::Artifact(artifact(ArtifactState::Check));
+        assert_eq!(
+            (action.kind(), action.state()),
+            (ARTIFACT_KIND, ActionState::new(6))
+        );
         let list = ActionList::default().with_artifact(Some(artifact(ArtifactState::Check)));
-        assert_eq!(list.of_kind(ARTIFACT_KIND), Some(&a));
+        assert_eq!(list.of_kind(ARTIFACT_KIND), Some(&action));
         assert!(list.holds(ARTIFACT_KIND));
         assert_eq!(list.of_kind(ATTACK), None);
         assert!(!list.holds(ATTACK));

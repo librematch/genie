@@ -22,6 +22,7 @@ mod outline;
 mod raycast;
 mod start;
 mod token;
+mod walk;
 
 use self::call::Fixed;
 pub use self::call::{Call, Entry, Listed, Pather, Query, ShortPath, Target, to_path};
@@ -84,18 +85,32 @@ fn float_distance(a: FixedPoint, b: FixedPoint) -> FixedDistance {
     FixedDistance::new((sqrt(dx * dx + dy * dy) * TO_FIXED) as i32)
 }
 
-/// `FUN_14087c610`: `p` strictly inside `r` shrunk by `k`.
-const fn strictly_inside(r: FixedRect, p: FixedPoint, k: FixedDistance) -> bool {
-    let [x, y] = p.get();
-    let k = k.get();
-    r.x0() + k < x && r.y0() + k < y && x < r.x1() - k && y < r.y1() - k
+/// `FUN_14087c610`: `fixed_point` strictly inside `fixed_rect` shrunk by `fixed_distance`.
+const fn strictly_inside(
+    fixed_rect: FixedRect,
+    fixed_point: FixedPoint,
+    fixed_distance: FixedDistance,
+) -> bool {
+    let [x, y] = fixed_point.get();
+    let k = fixed_distance.get();
+    fixed_rect.x0() + k < x
+        && fixed_rect.y0() + k < y
+        && x < fixed_rect.x1() - k
+        && y < fixed_rect.y1() - k
 }
 
-/// `FUN_14087c650`: `p` inside `r` shrunk by `k`, edges included.
-const fn inside(r: FixedRect, p: FixedPoint, k: FixedDistance) -> bool {
-    let [x, y] = p.get();
-    let k = k.get();
-    r.x0() + k <= x && r.y0() + k <= y && x <= r.x1() - k && y <= r.y1() - k
+/// `FUN_14087c650`: `fixed_point` inside `fixed_rect` shrunk by `fixed_distance`, edges included.
+const fn inside(
+    fixed_rect: FixedRect,
+    fixed_point: FixedPoint,
+    fixed_distance: FixedDistance,
+) -> bool {
+    let [x, y] = fixed_point.get();
+    let k = fixed_distance.get();
+    fixed_rect.x0() + k <= x
+        && fixed_rect.y0() + k <= y
+        && x <= fixed_rect.x1() - k
+        && y <= fixed_rect.y1() - k
 }
 
 /// A hit of the raycast or a sweep: the shape and its side.
@@ -193,44 +208,45 @@ struct Goal {
 }
 
 impl Goal {
-    /// The goal at `at` of the query `q`: the target's half sizes, their sums with the radius
+    /// The goal at `at` of the query `fixed`: the target's half sizes, their sums with the radius
     /// (32-bit adds) and the range, squared in 64 bits.
-    fn toward(at: FixedPoint, q: &Fixed) -> Self {
-        let r = q.radius;
+    fn toward(at: FixedPoint, fixed: &Fixed) -> Self {
+        let fixed_distance = fixed.radius;
         Self {
             at,
-            r,
-            rx: q.half_x,
-            ry: q.half_y,
-            rrx: r.wrapping_add(q.half_x),
-            rry: r.wrapping_add(q.half_y),
-            range: q.range,
-            range2: FixedDistanceSquared::of(q.range),
+            r: fixed_distance,
+            rx: fixed.half_x,
+            ry: fixed.half_y,
+            rrx: fixed_distance.wrapping_add(fixed.half_x),
+            rry: fixed_distance.wrapping_add(fixed.half_y),
+            range: fixed.range,
+            range2: FixedDistanceSquared::of(fixed.range),
         }
     }
 
-    /// The squared distance from `p` to the target's box grown by the radius (`>> 22` each).
-    fn rect_distance2(&self, p: FixedPoint) -> FixedDistanceSquared {
-        let lx =
-            i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - i64::from(self.rrx.get());
-        let ly =
-            i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - i64::from(self.rry.get());
+    /// The squared distance from `fixed_point` to the target's box grown by the radius (`>> 22`
+    /// each).
+    fn rect_distance2(&self, fixed_point: FixedPoint) -> FixedDistanceSquared {
+        let lx = i64::from((fixed_point.x().wrapping_sub(self.at.x())).wrapping_abs())
+            - i64::from(self.rrx.get());
+        let ly = i64::from((fixed_point.y().wrapping_sub(self.at.y())).wrapping_abs())
+            - i64::from(self.rry.get());
         let a = if lx < 0 { 0 } else { lx * lx };
         let b = if ly < 0 { 0 } else { ly * ly };
         FixedDistanceSquared::new((b >> 22) + (a >> 22))
     }
 
-    /// `FUN_140fa3f10`: the estimate from `p` to the goal.
-    fn heuristic(&self, p: FixedPoint) -> FixedDistance {
+    /// `FUN_140fa3f10`: the estimate from `fixed_point` to the goal.
+    fn heuristic(&self, fixed_point: FixedPoint) -> FixedDistance {
         if !RECT_HEURISTIC {
-            let fy = (self.at.y().wrapping_sub(p.y())) as f32 * TO_FLOAT;
-            let fx = (self.at.x().wrapping_sub(p.x())) as f32 * TO_FLOAT;
+            let fy = (self.at.y().wrapping_sub(fixed_point.y())) as f32 * TO_FLOAT;
+            let fx = (self.at.x().wrapping_sub(fixed_point.x())) as f32 * TO_FLOAT;
             return FixedDistance::new((sqrt(fx * fx + fy * fy) * TO_FIXED) as i32);
         }
-        let lx =
-            i64::from((p.x().wrapping_sub(self.at.x())).wrapping_abs()) - i64::from(self.rrx.get());
-        let ly =
-            i64::from((p.y().wrapping_sub(self.at.y())).wrapping_abs()) - i64::from(self.rry.get());
+        let lx = i64::from((fixed_point.x().wrapping_sub(self.at.x())).wrapping_abs())
+            - i64::from(self.rrx.get());
+        let ly = i64::from((fixed_point.y().wrapping_sub(self.at.y())).wrapping_abs())
+            - i64::from(self.rry.get());
         let a = if lx < 0 { 0 } else { (lx * lx) as u64 };
         let b = if ly < 0 { 0 } else { (ly * ly) as u64 };
         FixedDistance::new(isqrt((b & !0x3f_ffff).wrapping_add(a & !0x3f_ffff)) as i32)
@@ -397,29 +413,29 @@ impl Poly {
         self.vertices.len() as u32
     }
 
-    /// Vertex `i`'s point.
-    fn vertex(&self, i: VertexIndex) -> GenieResult<FixedPoint> {
-        self.vertices.checked(i.get()).copied()
+    /// Vertex `vertex_index`'s point.
+    fn vertex(&self, vertex_index: VertexIndex) -> GenieResult<FixedPoint> {
+        self.vertices.checked(vertex_index.get()).copied()
     }
 
-    /// The side from vertex `i` to the next.
-    fn side(&self, i: VertexIndex) -> GenieResult<ShapeSide> {
-        self.sides.checked(i.get()).copied()
+    /// The side from vertex `vertex_index` to the next.
+    fn side(&self, vertex_index: VertexIndex) -> GenieResult<ShapeSide> {
+        self.sides.checked(vertex_index.get()).copied()
     }
 
-    /// Vertex `i`'s shape, none on the bounds' border.
-    fn shape(&self, i: VertexIndex) -> GenieResult<Option<ShapeId>> {
-        self.shapes.checked(i.get()).copied()
+    /// Vertex `vertex_index`'s shape, none on the bounds' border.
+    fn shape(&self, vertex_index: VertexIndex) -> GenieResult<Option<ShapeId>> {
+        self.shapes.checked(vertex_index.get()).copied()
     }
 
-    /// The best cost a corner node reached vertex `i` with, [`UNSET`] for none yet.
-    fn cost(&self, i: VertexIndex) -> GenieResult<FixedDistance> {
-        self.costs.checked(i.get()).copied()
+    /// The best cost a corner node reached vertex `vertex_index` with, [`UNSET`] for none yet.
+    fn cost(&self, vertex_index: VertexIndex) -> GenieResult<FixedDistance> {
+        self.costs.checked(vertex_index.get()).copied()
     }
 
-    /// The best cost at vertex `i`, to change.
-    fn cost_mut(&mut self, i: VertexIndex) -> GenieResult<&mut FixedDistance> {
-        self.costs.checked_mut(i.get())
+    /// The best cost at vertex `vertex_index`, to change.
+    fn cost_mut(&mut self, vertex_index: VertexIndex) -> GenieResult<&mut FixedDistance> {
+        self.costs.checked_mut(vertex_index.get())
     }
 }
 

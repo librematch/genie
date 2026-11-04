@@ -82,7 +82,7 @@ pub trait PlayersMasters {
 
 impl PlayersMasters for [Arc<Masters>] {
     fn of(&self, player: PlayerId) -> Option<&Masters> {
-        self.get(player.index()).map(|m| &**m)
+        self.get(player.index()).map(|masters| &**masters)
     }
 
     fn of_mut(&mut self, player: PlayerId) -> Option<&mut Masters> {
@@ -143,10 +143,10 @@ pub fn work_master<'m>(
                         | MasterRoles::DEAD_PASTURE,
                 )
             });
-            let Some(target) = listed.filter(|t| {
+            let Some(target) = listed.filter(|task_target| {
                 task.action_kind == REPAIR
                     && (filter.is_none() || filter == Some(REPAIR))
-                    && task.object_id != Some(t.master.id)
+                    && task.object_id != Some(task_target.master.id)
             }) else {
                 return Ok(Some((candidate, task)));
             };

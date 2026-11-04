@@ -264,13 +264,13 @@ impl PointLine {
         self.points.clear();
     }
 
-    /// `AddPointAtFront` (`FUN_141008040`): `p` with its height 0 goes before the newest point;
-    /// the first point's length is 0, any other adds its distance to the point after it. A line
-    /// of two points or more longer than its desired length then drops its oldest points while
+    /// `AddPointAtFront` (`FUN_141008040`): `line_point` with its height 0 goes before the newest
+    /// point; the first point's length is 0, any other adds its distance to the point after it. A
+    /// line of two points or more longer than its desired length then drops its oldest points while
     /// it stays longer without the last stretch.
-    pub fn add_at_front(&mut self, mut p: LinePoint) -> GenieResult<()> {
-        p.point = p.point.with_height(0.0);
-        self.points.insert(0, p);
+    pub fn add_at_front(&mut self, mut line_point: LinePoint) -> GenieResult<()> {
+        line_point.point = line_point.point.with_height(0.0);
+        self.points.insert(0, line_point);
         if self.points.len() == 1 {
             self.length = Distance::ZERO;
         } else {
@@ -278,19 +278,22 @@ impl PointLine {
         }
         if self.desired_length < self.length && 1 < self.points.len() {
             let n = self.points.len();
-            let mut d = stretch(self.points.checked(n - 1)?, self.points.checked(n - 2)?);
-            while self.desired_length < self.length - d {
+            let mut distance = stretch(self.points.checked(n - 1)?, self.points.checked(n - 2)?);
+            while self.desired_length < self.length - distance {
                 if self.points.len() < 2 {
                     break;
                 }
                 let _ = self.points.pop();
-                self.length -= d;
+                self.length -= distance;
                 // one point left: the game's next pass breaks at once
-                let n = self.points.len();
-                if n < 2 {
+                let count = self.points.len();
+                if count < 2 {
                     break;
                 }
-                d = stretch(self.points.checked(n - 1)?, self.points.checked(n - 2)?);
+                distance = stretch(
+                    self.points.checked(count - 1)?,
+                    self.points.checked(count - 2)?,
+                );
             }
         }
         Ok(())
@@ -560,14 +563,14 @@ impl UnitGroup {
     #[must_use]
     pub fn has(&self, id: impl ObjectKey) -> bool {
         let id = id.key();
-        self.members.iter().any(|m| m.id.key() == id)
+        self.members.iter().any(|member| member.id.key() == id)
     }
 
     /// Unit `id`'s place among the members (`FUN_1410175f0`: its index in `+0xf0`); none (the
     /// game's −1, which orders before every member) when it is not one.
     #[must_use]
     pub fn index_of(&self, id: ObjectId) -> Option<usize> {
-        self.members.iter().position(|m| m.id == id)
+        self.members.iter().position(|member| member.id == id)
     }
 
     /// `FUN_141017590`: unit `id`'s own move's reason (`mReason`, the `+8` of its record in
@@ -577,7 +580,7 @@ impl UnitGroup {
         self.members
             .iter()
             .find(|m| m.id == id)
-            .map_or(MoveReason::None, |m| m.specific_move.reason)
+            .map_or(MoveReason::None, |member| member.specific_move.reason)
     }
 
     /// `FUN_1410177f0`: unit `id` is in its place, its first slot (`mUnitID`) in the current
@@ -586,8 +589,8 @@ impl UnitGroup {
     pub fn slot_in_place(&self, id: ObjectId) -> bool {
         self.current_formation
             .as_ref()
-            .and_then(|f| f.slots.iter().find(|s| s.unit_id == Some(id)))
-            .is_some_and(|s| s.state == SlotState::InPlace)
+            .and_then(|formation| formation.slots.iter().find(|s| s.unit_id == Some(id)))
+            .is_some_and(|slot| slot.state == SlotState::InPlace)
     }
 }
 

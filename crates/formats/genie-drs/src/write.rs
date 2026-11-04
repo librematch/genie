@@ -90,7 +90,10 @@ where
         }
 
         let num_tables = drs.tables.len();
-        let num_resources = drs.tables.iter().fold(0, |acc, t| acc + t.len());
+        let num_resources = drs
+            .tables
+            .iter()
+            .fold(0, |acc, drs_table| acc + drs_table.len());
         drs.header.directory_size = 64 + 12 * (num_tables + num_resources) as u32;
         drs.write_header()?;
 
@@ -112,8 +115,8 @@ where
         drs.write_tables()?;
 
         for table in &drs.tables {
-            let mut data = self.resources.iter().filter_map(|(t, bytes)| {
-                if table.resource_kind == *t {
+            let mut data = self.resources.iter().filter_map(|(resource_kind, bytes)| {
+                if table.resource_kind == *resource_kind {
                     Some(bytes)
                 } else {
                     None
@@ -294,9 +297,10 @@ impl<W> Debug for DrsWriter<W>
 where
     W: Write + Seek + Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
         // The strategy is a trait object without `Debug`.
-        f.debug_struct("DRSWriter")
+        formatter
+            .debug_struct("DRSWriter")
             .field("inner", &self.inner)
             .finish_non_exhaustive()
     }
@@ -342,7 +346,12 @@ where
         self.add_inner(t.into_resource_kind()?, id, data)
     }
 
-    fn add_inner(&mut self, t: ResourceKind, id: u32, mut data: impl Read) -> GenieResult<()> {
+    fn add_inner(
+        &mut self,
+        resource_kind: ResourceKind,
+        id: u32,
+        mut data: impl Read,
+    ) -> GenieResult<()> {
         let res = DrsResource {
             id,
             offset: 0, // TBD
@@ -351,17 +360,17 @@ where
 
         let res = self
             .strategy
-            .add_resource(&mut self.inner, t, res, &mut data)?;
+            .add_resource(&mut self.inner, resource_kind, res, &mut data)?;
 
         if let Some(table) = self
             .inner
             .tables
             .iter_mut()
-            .find(|table| table.resource_kind == t)
+            .find(|table| table.resource_kind == resource_kind)
         {
             table.add(res);
         } else {
-            let mut table = DrsTable::new(t, 0, 0);
+            let mut table = DrsTable::new(resource_kind, 0, 0);
             table.add(res);
             self.inner.tables.push(table);
         }
@@ -405,8 +414,8 @@ mod test {
     /// File 1, offset 88, size 17
     static ONE_FILE: &[u8] = b"Copyright (c) 1997 Ensemble Studios.\x1a\x00\x00\x001.00tribe\x00\x00\x00\x00\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00 txt\x4C\x00\x00\x00\x01\x00\x00\x00\x01\x00\x00\x00\x58\x00\x00\x00\x11\x00\x00\x00example test file";
 
-    fn invalid(e: &GenieError) -> bool {
-        e.kind() == ErrorKind::InvalidInput
+    fn invalid(error: &GenieError) -> bool {
+        error.kind() == ErrorKind::InvalidInput
     }
 
     /// More files than a reserved directory holds fail to add.

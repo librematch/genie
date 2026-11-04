@@ -54,10 +54,11 @@ fn with_beside(mut table: MasterTable, beside: Beside<'_>) -> GenieResult<Master
         table.drop_sites = drop_sites(json).map_err(|e| e.with("file", BESIDE[0]))?;
     }
     if let Some(json) = beside.linked_techs {
-        table.linked_techs = linked_techs(json).map_err(|e| e.with("file", BESIDE[1]))?;
+        table.linked_techs =
+            linked_techs(json).map_err(|json_error| json_error.with("file", BESIDE[1]))?;
     }
     if let Some(json) = beside.unit_lines {
-        table.unit_lines = unit_lines(json).map_err(|e| e.with("file", BESIDE[2]))?;
+        table.unit_lines = unit_lines(json).map_err(|error| error.with("file", BESIDE[2]))?;
     }
     Ok(table)
 }
@@ -100,27 +101,27 @@ struct Files {
 impl Files {
     /// The `.dat` at `dat` and the tables beside it.
     fn read(dat: &Path) -> GenieResult<Self> {
-        let bytes = read_file(dat).map_err(|e| {
+        let bytes = read_file(dat).map_err(|dat_error| {
             GenieError::io("a .dat that does not read")
                 .with("path", dat.display())
-                .with_source(e)
+                .with_source(dat_error)
         })?;
         let mut beside = [None, None, None];
         for (text, name) in beside.iter_mut().zip(BESIDE) {
             let path = dat.with_file_name(name);
             match read_file(&path) {
                 Ok(b) => {
-                    *text = Some(String::from_utf8(b).map_err(|e| {
+                    *text = Some(String::from_utf8(b).map_err(|from_utf8_error| {
                         GenieError::invalid_input("a table beside the .dat that is not UTF-8")
                             .with("file", name)
-                            .with_source(e)
+                            .with_source(from_utf8_error)
                     })?);
                 }
                 Err(e) if e.kind() == ErrorKind::NotFound => {}
-                Err(e) => {
+                Err(error) => {
                     return Err(GenieError::io("a table beside the .dat that does not read")
                         .with("path", path.display())
-                        .with_source(e));
+                        .with_source(error));
                 }
             }
         }
@@ -183,12 +184,12 @@ fn cached(
     dir: &Path,
     import: impl FnOnce(&Files) -> GenieResult<MasterTable>,
 ) -> GenieResult<MasterTable> {
-    let k = files.key();
-    if let Some(table) = read_cached(dir, &k)? {
+    let key = files.key();
+    if let Some(table) = read_cached(dir, &key)? {
         return Ok(table);
     }
     let table = import(files)?;
-    write_cached(dir, &k, &table)?;
+    write_cached(dir, &key, &table)?;
     Ok(table)
 }
 

@@ -432,8 +432,8 @@ impl GatherAction {
         self.point = position;
         let walk = if self.stops.several() {
             let (x, y) = {
-                let p = stop_point(position, radius, self.last_stop, rng, gather_tuning);
-                (p.x(), p.y())
+                let point = stop_point(position, radius, self.last_stop, rng, gather_tuning);
+                (point.x(), point.y())
             };
             self.last_stop = Point::new(x, y);
             let to = Position::new(x, y, position.z());
@@ -515,11 +515,17 @@ impl GatherAction {
             {
                 Ok(())
             }
-            Some(t) => {
+            Some(move_target) => {
                 self.target = None;
                 self.point = Position::from([-1.0; 3]);
-                self.carry_to = Some(DropSiteId::new(t.id));
-                self.set_drop(t.position, t.gap, mover, walks, move_to_tuning)
+                self.carry_to = Some(DropSiteId::new(move_target.id));
+                self.set_drop(
+                    move_target.position,
+                    move_target.gap,
+                    mover,
+                    walks,
+                    move_to_tuning,
+                )
             }
             None => {
                 self.point = point;
@@ -566,10 +572,15 @@ impl GatherAction {
     /// `set_state(2)` (case 2): the timer clears, the unit stands ([`GatherAction::stand_sprite`]),
     /// the target and the second target go (slot 0x68, `FUN_140a7a190` with none; the caller
     /// lets them go) and the point is −1.
-    pub(super) fn set_idle(&mut self, c: &mut Step<'_>, unit: &mut Unit, r: &GatherReads) {
+    pub(super) fn set_idle(
+        &mut self,
+        step: &mut Step<'_>,
+        unit: &mut Unit,
+        gather_reads: &GatherReads,
+    ) {
         self.state = GatherState::Idle;
         self.timer = Seconds::ZERO;
-        Self::show(c, unit, self.stand_sprite(unit, r));
+        Self::show(step, unit, self.stand_sprite(unit, gather_reads));
         self.target = None;
         self.carry_to = None;
         self.point = Position::from([-1.0; 3]);

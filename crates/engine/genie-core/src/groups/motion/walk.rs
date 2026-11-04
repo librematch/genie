@@ -104,7 +104,9 @@ fn way_blocked(
 ) -> GenieResult<Option<Pass>> {
     let group_tuning = &by_id.tuning().group;
     let ignore: Vec<RecordId> = match lead.group.as_ref() {
-        Some(g) if !g.differentiator_units.is_empty() => g.differentiator_units.clone(),
+        Some(lead_group) if !lead_group.differentiator_units.is_empty() => {
+            lead_group.differentiator_units.clone()
+        }
         _ => vec![lead.walker.id],
     }
     .into_iter()
@@ -145,7 +147,7 @@ fn weigh_hits(
     let top_ignore = motion
         .paths
         .last()
-        .map(|t| t.ignore.as_slice())
+        .map(|path_data| path_data.ignore.as_slice())
         .unwrap_or_default();
     let mut on_target = false;
     let mut newer = 0;
@@ -159,7 +161,9 @@ fn weigh_hits(
         if level.targets(id) {
             on_target = true;
         }
-        let last_move = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
+        let last_move = by_id
+            .gait(id)
+            .map_or(WorldTime::ZERO, |gait| gait.last_move);
         if level.created < last_move {
             newer += 1;
         }
@@ -183,8 +187,11 @@ fn back_to_parent(motion: &mut Motion, lead: &Lead, spatial: &Spatial) -> GenieR
         if !parent.has_path {
             break;
         }
-        let p = point(parent, parent.waypoint);
-        if spatial.standable(Tile::new(p.x() as i32, p.y() as i32), lead.walker.mask) {
+        let point = point(parent, parent.waypoint);
+        if spatial.standable(
+            Tile::new(point.x() as i32, point.y() as i32),
+            lead.walker.mask,
+        ) {
             break;
         }
     }
@@ -205,7 +212,7 @@ fn walk_ends(
     let level = motion.paths.checked(0)?;
     match target {
         None => {
-            let top = motion.paths.last().filter(|t| t.has_path);
+            let top = motion.paths.last().filter(|path_data| path_data.has_path);
             if !level.path_flags.contains(PathFlags::LOOPS)
                 && group_tuning.near < level.range.get()
                 && let Some(top) = top
@@ -220,10 +227,10 @@ fn walk_ends(
                 }
             }
         }
-        Some(t) => {
+        Some(placed) => {
             let gap = footprint_gap(
-                t.position,
-                t.radius,
+                placed.position,
+                placed.radius,
                 Position::new(at.x(), at.y(), 0.0),
                 Footprint::new(0.0, 0.0),
             );
@@ -257,9 +264,9 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupT
     if !all_acting {
         return;
     }
-    let n = group.members.len();
+    let count = group.members.len();
     let mut centre = BVector::ZERO;
-    if n != 0 {
+    if count != 0 {
         for &(_, p) in group.members.iter().flatten() {
             centre = BVector::new(
                 centre.x() + p.x(),
@@ -267,15 +274,15 @@ fn pull_to_members(motion: &mut Motion, group: &GroupView, group_tuning: &GroupT
                 p.y() + centre.y(),
             );
         }
-        let n = n as f32;
+        let n = count as f32;
         centre = BVector::new(centre.x() / n, centre.height() / n, centre.y() / n);
     }
-    let c = centre.with_height(0.0);
+    let ground_centre = centre.with_height(0.0);
     let here = motion.position[0].with_height(0.0);
-    let d = here - c;
+    let d = here - ground_centre;
     if group_tuning.pull_distance <= d.x() * d.x() + d.height() * d.height() + d.y() * d.y() {
-        motion.new_position[0] =
-            group_tuning.pull_share * c + group_tuning.pull_keep * motion.new_position[0];
+        motion.new_position[0] = group_tuning.pull_share * ground_centre
+            + group_tuning.pull_keep * motion.new_position[0];
     }
 }
 
@@ -301,23 +308,23 @@ impl World {
         let view = GroupView {
             player_kind: g
                 .owner
-                .and_then(|o| self.players.get(o.index()))
-                .map_or(PlayerKind::Phantom, |p| p.kind),
+                .and_then(|player_id| self.players.get(player_id.index()))
+                .map_or(PlayerKind::Phantom, |player| player.kind),
             members: g
                 .members
                 .iter()
-                .map(|m| {
-                    self.object(m.id).map(|(_, u)| {
+                .map(|member| {
+                    self.object(member.id).map(|(_, unit)| {
                         (
-                            self.top_target_object(u.id),
-                            u.moved_vector(self.parts.mover_of(u.id)),
+                            self.top_target_object(unit.id),
+                            unit.moved_vector(self.parts.mover_of(unit.id)),
                         )
                     })
                 })
                 .collect(),
         };
-        let g = self.groups.held_mut(group)?;
-        let mut motion = take(&mut g.motion);
+        let unit_group = self.groups.held_mut(group)?;
+        let mut motion = take(&mut unit_group.motion);
         let result = {
             let mut plan = Planning {
                 pathing: &mut self.pathing,

@@ -34,8 +34,8 @@ mod tests {
     /// The counts keep their order: the relic count, then the specific one.
     #[test]
     fn relics_hold_the_count_then_the_specific_count() {
-        let r = Relics::new(RelicCount::of_data(2), RelicCount::of_data(-1));
-        assert_eq!((r.count.get(), r.specific.get()), (2, -1));
+        let relics = Relics::new(RelicCount::of_data(2), RelicCount::of_data(-1));
+        assert_eq!((relics.count.get(), relics.specific.get()), (2, -1));
         assert_eq!(Relics::NONE, Relics::default());
     }
 }

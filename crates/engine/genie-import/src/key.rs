@@ -28,15 +28,15 @@ impl Key {
 /// inputs run together.
 #[must_use]
 pub fn key(files: &[(&str, &[u8])], layout: &[u8; 32]) -> Key {
-    let mut h = Sha256::new();
-    h.update((files.len() as u64).to_le_bytes());
+    let mut hasher = Sha256::new();
+    hasher.update((files.len() as u64).to_le_bytes());
     for (name, content) in files {
-        h.update((name.len() as u64).to_le_bytes());
-        h.update(name.as_bytes());
-        h.update(Sha256::digest(content));
+        hasher.update((name.len() as u64).to_le_bytes());
+        hasher.update(name.as_bytes());
+        hasher.update(Sha256::digest(content));
     }
-    h.update(layout);
-    Key(h.finalize().into())
+    hasher.update(layout);
+    Key(hasher.finalize().into())
 }
 
 #[cfg(test)]

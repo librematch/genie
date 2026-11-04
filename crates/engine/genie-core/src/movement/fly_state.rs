@@ -73,8 +73,9 @@ impl FlyState {
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
             Self::Flying {
-                move_to: Some(m), ..
-            } => Some(m),
+                move_to: Some(move_to_action),
+                ..
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -83,8 +84,9 @@ impl FlyState {
     pub const fn move_to_mut(&mut self) -> Option<&mut MoveToAction> {
         match self {
             Self::Flying {
-                move_to: Some(m), ..
-            } => Some(m),
+                move_to: Some(move_to_action),
+                ..
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -103,10 +105,10 @@ mod tests {
     /// `MoveTo` of a state that does not fly.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match FlyState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 5..), "{b}"),
+        for index in 0..=255_u8 {
+            match FlyState::of_byte(index, None) {
+                Ok(fly_state) => assert_eq!(fly_state.get(), index),
+                Err(_) => assert!(matches!(index, 5..), "{index}"),
             }
         }
         assert_eq!(FlyState::Flying { move_to: None }.to_string(), "4");
@@ -115,7 +117,10 @@ mod tests {
         let mut flying = FlyState::of_byte(4, Some(flight)).unwrap();
         assert_eq!(flying.move_to(), Some(&flight));
         flying.move_to_mut().unwrap().range = Distance::new(2.0);
-        assert_eq!(flying.move_to().map(|m| m.range), Some(Distance::new(2.0)));
+        assert_eq!(
+            flying.move_to().map(|move_to_action| move_to_action.range),
+            Some(Distance::new(2.0))
+        );
         assert!(FlyState::of_byte(2, Some(flight)).is_err());
         assert_eq!(FlyState::Resting.move_to(), None);
     }

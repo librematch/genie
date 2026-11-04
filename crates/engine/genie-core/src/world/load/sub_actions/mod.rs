@@ -53,21 +53,27 @@ use genie_save::generated::world::{Master, PlayerObjects, RgeStaticObject};
 #[must_use]
 pub fn saved_reload(
     object: &genie_save::Object,
-    s: &RgeStaticObject,
+    rge_static_object: &RgeStaticObject,
     objects: &PlayerObjects,
 ) -> Option<f32> {
-    let c = object.combat()?;
+    let tribe_combat_object = object.combat()?;
     let master = objects
         .masters
         .iter()
         .flatten()
-        .map(|m| &m.master)
-        .find(|m| m.static_part().is_some_and(|ms| ms.id() == s.master_obj))?;
+        .map(|player_master| &player_master.master)
+        .find(|m| {
+            m.static_part()
+                .is_some_and(|ms| ms.id() == rge_static_object.master_obj)
+        })?;
     let rc = &master
         .tribe_master_combat_object
         .as_deref()?
         .rge_master_combat_object;
-    Some(c.reload_stinger + (rc.speed_of_attack - c.reload_powerup))
+    Some(
+        tribe_combat_object.reload_stinger
+            + (rc.speed_of_attack - tribe_combat_object.reload_powerup),
+    )
 }
 
 /// The unit's current sprite as the save holds it: the node of its sprite list
@@ -75,23 +81,31 @@ pub fn saved_reload(
 /// (type 2) with its frame and clock, a static one (type 1) with its frame; None without one or
 /// for a graphic the table lacks.
 #[must_use]
-pub fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<ActiveSprite> {
-    let list = s.active_sprite_list.as_deref()?;
-    let graphic = SpriteId::of_data(s.sprite)
+pub fn saved_sprite(
+    rge_static_object: &RgeStaticObject,
+    graphics: &Graphics,
+) -> Option<ActiveSprite> {
+    let list = rge_static_object.active_sprite_list.as_deref()?;
+    let graphic = SpriteId::of_data(rge_static_object.sprite)
         .and_then(|id| graphics.get(id))
         .copied()?;
     let nodes = || {
         list.sprite_kind_list
             .iter()
-            .filter_map(|e| e.kind.as_deref())
+            .filter_map(|entry| entry.kind.as_deref())
     };
     let Some(node) = nodes()
         .filter_map(|n| n.rge_active_animated_sprite.as_deref())
-        .find(|a| a.rge_active_sprite.sprite_id as i16 == s.sprite)
+        .find(|rge_active_animated_sprite| {
+            rge_active_animated_sprite.rge_active_sprite.sprite_id as i16
+                == rge_static_object.sprite
+        })
     else {
         let node = nodes()
-            .filter_map(|n| n.rge_active_sprite.as_deref())
-            .find(|a| a.sprite_id as i16 == s.sprite)?;
+            .filter_map(|active_sprite| active_sprite.rge_active_sprite.as_deref())
+            .find(|rge_active_sprite| {
+                rge_active_sprite.sprite_id as i16 == rge_static_object.sprite
+            })?;
         return Some(ActiveSprite::at_rest(graphic, Frame::of_data(node.frame)));
     };
     Some(ActiveSprite {
@@ -116,13 +130,13 @@ pub fn saved_sprite(s: &RgeStaticObject, graphics: &Graphics) -> Option<ActiveSp
 /// swing's times (`+0xb0`, `+0xb4`) are not saved, and a loaded Attack starts without them.
 pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<Attack> {
     use crate::movement::move_to::MOVE_TO;
-    let b = sub
+    let rge_action = sub
         .base()
         .ok_or(GenieError::unsupported("a saved Attack without its base"))?;
-    let a = sub
+    let rge_action_attack = sub
         .rge_action_by_kind
         .as_deref()
-        .and_then(|t| t.rge_action_attack.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_attack.as_deref())
         .ok_or(GenieError::unsupported(
             "a saved Attack without its own part",
         ))?;
@@ -131,7 +145,7 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<At
     ))?;
     let g = |id: u16| SpriteId::of_data(id as i16).and_then(|id| graphics.get(id).copied());
     // every MoveTo of the Attack is quiet (`FUN_140a7a170` with 1)
-    let move_to = match first_action(&b.sub_actions)? {
+    let move_to = match first_action(&rge_action.sub_actions)? {
         None => None,
         Some((MOVE_TO, s2)) => Some(saved_sub_move_to(s2, Some(graphics))?),
         Some(_) => {
@@ -141,34 +155,38 @@ pub fn saved_attack(sub: &Action, graphics: Option<&Graphics>) -> GenieResult<At
         }
     };
     Ok(Attack {
-        target: AttackTargetId::of_field(b.target_id),
-        target2: AttackTargetId::of_field(b.target2_id),
-        state: AttackState::of_byte(b.state, move_to)?,
-        timer: Seconds::new(b.timer),
-        range: Distance::new(a.range),
-        min_range: Distance::new(a.min_range),
-        point: Position::new(b.target_x, b.target_y, b.target_z),
-        seen: Position::new(
-            a.last_target_position_x,
-            a.last_target_position_y,
-            a.last_target_position_z,
+        target: AttackTargetId::of_field(rge_action.target_id),
+        target2: AttackTargetId::of_field(rge_action.target2_id),
+        state: AttackState::of_byte(rge_action.state, move_to)?,
+        timer: Seconds::new(rge_action.timer),
+        range: Distance::new(rge_action_attack.range),
+        min_range: Distance::new(rge_action_attack.min_range),
+        point: Position::new(
+            rge_action.target_x,
+            rge_action.target_y,
+            rge_action.target_z,
         ),
-        pending: a.need_to_attack != 0,
+        seen: Position::new(
+            rge_action_attack.last_target_position_x,
+            rge_action_attack.last_target_position_y,
+            rge_action_attack.last_target_position_z,
+        ),
+        pending: rge_action_attack.need_to_attack != 0,
         swing: Seconds::ZERO,
         rest: Seconds::ZERO,
         arms: Arms {
-            move_sprite: g(a.short_val),
-            sprite: g(a.short_val_2),
+            move_sprite: g(rge_action_attack.short_val),
+            sprite: g(rge_action_attack.short_val_2),
             second_sprite: None,
-            idle_sprite: g(a.short_val_3),
-            idle_attack_sprite: g(a.short_val_4),
-            missile: MasterId::of_data(a.missile_id),
-            fire_frame: Frame::of_data(a.frame_delay),
-            interrupt_frame: Frame::of_data(a.interrupt_animation_at_frame),
+            idle_sprite: g(rge_action_attack.short_val_3),
+            idle_attack_sprite: g(rge_action_attack.short_val_4),
+            missile: MasterId::of_data(rge_action_attack.missile_id),
+            fire_frame: Frame::of_data(rge_action_attack.frame_delay),
+            interrupt_frame: Frame::of_data(rge_action_attack.interrupt_animation_at_frame),
         },
-        voice: Voice::of_byte(b.sub_action_value),
-        on_target_moved: TargetMoved::try_from(b.target_moved_state)?,
-        same_owner: a.was_same_owner != 0,
+        voice: Voice::of_byte(rge_action.sub_action_value),
+        on_target_moved: TargetMoved::try_from(rge_action.target_moved_state)?,
+        same_owner: rge_action_attack.was_same_owner != 0,
     })
 }
 
@@ -185,7 +203,7 @@ pub fn build_task(
         "a builder whose master is not saved",
     ))?;
     let work_rate = combat_master(m)
-        .map(|c| c.rge_master_action_object.work_rate)
+        .map(|rge_master_combat_object| rge_master_combat_object.rge_master_action_object.work_rate)
         .ok_or(GenieError::unsupported(
             "a builder master without an action part",
         ))?;
@@ -204,8 +222,8 @@ pub fn fly_task(
     let saved = objects
         .master(master)
         .and_then(|m| m.rge_master.as_deref())
-        .and_then(|r| r.rge_master_action_object.as_deref())
-        .and_then(|a| a.tasks.as_deref());
+        .and_then(|rge_master| rge_master.rge_master_action_object.as_deref())
+        .and_then(|rge_master_action_object| rge_master_action_object.tasks.as_deref());
     if let Some(tasks) = saved {
         let entry = tasks
             .list
@@ -217,8 +235,13 @@ pub fn fly_task(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, dat_id(objects, master)?))
-        .and_then(|w| w.action_part().tasks.iter().find(|t| t.action_kind == fly))
+        .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
+        .and_then(|w| {
+            w.action_part()
+                .tasks
+                .iter()
+                .find(|task| task.action_kind == fly)
+        })
         .copied()
         .ok_or(GenieError::unsupported(
             "a bird whose Fly task is not in the data file",
@@ -233,12 +256,16 @@ pub fn master_build_task(
     m: &Master,
     master: i16,
 ) -> GenieResult<Task> {
-    let saved = m.tribe_master_combat_object.as_deref().and_then(|c| {
-        c.rge_master_combat_object
-            .rge_master_action_object
-            .tasks
-            .as_deref()
-    });
+    let saved = m
+        .tribe_master_combat_object
+        .as_deref()
+        .and_then(|tribe_master_combat_object| {
+            tribe_master_combat_object
+                .rge_master_combat_object
+                .rge_master_action_object
+                .tasks
+                .as_deref()
+        });
     let build = ActionKind::BUILD;
     if let Some(tasks) = saved {
         let entry = tasks
@@ -251,12 +278,12 @@ pub fn master_build_task(
         return core_task(&entry.task);
     }
     masters
-        .and_then(|t| t.work(civ, dat_id(objects, master)?))
+        .and_then(|master_table| master_table.work(civ, dat_id(objects, master)?))
         .and_then(|w| {
             w.action_part()
                 .tasks
                 .iter()
-                .find(|t| t.action_kind == build)
+                .find(|task| task.action_kind == build)
         })
         .copied()
         .ok_or(GenieError::unsupported(
@@ -282,9 +309,16 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
         .production_queue
         .iter()
         .enumerate()
-        .map(|(k, e)| {
-            let c = &e.production_queue_costs;
-            let word = |k: usize| [c[k], c[k + 1], c[k + 2], c[k + 3]];
+        .map(|(k, entry)| {
+            let production_queue_costs = &entry.production_queue_costs;
+            let word = |k: usize| {
+                [
+                    production_queue_costs[k],
+                    production_queue_costs[k + 1],
+                    production_queue_costs[k + 2],
+                    production_queue_costs[k + 3],
+                ]
+            };
             // an entry's attribute (an `int`, −1 for none) and amount
             let cost = |j: usize| -> GenieResult<(Option<AttributeId>, Amount)> {
                 let kind = i32::from_le_bytes(word(8 * j));
@@ -298,13 +332,13 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
                 ))
             };
             Ok(Entry {
-                master: MasterId::of_data(e.production_queue_master_unit_id),
-                count: QueuedUnits::of_data(e.production_queue_unit_count),
-                tech: TechId::of_data(e.production_queue_tech_id),
+                master: MasterId::of_data(entry.production_queue_master_unit_id),
+                count: QueuedUnits::of_data(entry.production_queue_unit_count),
+                tech: TechId::of_data(entry.production_queue_tech_id),
                 costs: [cost(0)?, cost(1)?, cost(2)?],
                 serial: EntrySerial::new(k as i64),
-                button: QueueButton::of_data(e.production_queue_button_location_id),
-                train_time: WholeSeconds::of_data(e.production_queue_train_time),
+                button: QueueButton::of_data(entry.production_queue_button_location_id),
+                train_time: WholeSeconds::of_data(entry.production_queue_train_time),
             })
         })
         .collect::<GenieResult<Vec<Entry>>>()?;
@@ -406,17 +440,21 @@ pub fn production(object: &genie_save::Object) -> GenieResult<Option<Production>
 ///
 /// A saved state past a byte.
 pub fn gather_point(object: &genie_save::Object) -> GenieResult<Option<GatherPoint>> {
-    let Some(b) = object.tribe_building_object.as_deref() else {
+    let Some(tribe_building_object) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };
-    let Some(state) = GatherPointState::of_saved(b.gather_point_exists)? else {
+    let Some(state) = GatherPointState::of_saved(tribe_building_object.gather_point_exists)? else {
         return Ok(None);
     };
     Ok(Some(GatherPoint {
         state,
-        point: Position::new(b.gather_point_x, b.gather_point_y, b.gather_point_z),
-        target: ObjectId::of_field(b.gather_point_target),
-        target_master: MasterId::of_data(b.gather_point_target_master),
+        point: Position::new(
+            tribe_building_object.gather_point_x,
+            tribe_building_object.gather_point_y,
+            tribe_building_object.gather_point_z,
+        ),
+        target: ObjectId::of_field(tribe_building_object.gather_point_target),
+        target_master: MasterId::of_data(tribe_building_object.gather_point_target_master),
     }))
 }
 
@@ -438,7 +476,7 @@ pub enum DefaultStart {
 /// a start the slice cannot make ([`Unstartable`]).
 pub fn default_task(
     object: &genie_save::Object,
-    s: &RgeStaticObject,
+    rge_static_object: &RgeStaticObject,
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -447,14 +485,17 @@ pub fn default_task(
         return Ok(None);
     }
     let not_in_table = Unstartable::Unread(UnreadDefault::NotInTable);
-    let action = match s.own_master() {
-        Some(_) => match own_default_task(s) {
+    let action = match rge_static_object.own_master() {
+        Some(_) => match own_default_task(rge_static_object) {
             Some(-1) | None => DefaultAction::None,
             Some(_) => return Err(Unstartable::Unread(UnreadDefault::OwnMaster)),
         },
         None => masters
             .ok_or(Unstartable::Unread(UnreadDefault::NoMasterTable))?
-            .default_action(civ, dat_id(objects, s.master_obj).ok_or(not_in_table)?)
+            .default_action(
+                civ,
+                dat_id(objects, rge_static_object.master_obj).ok_or(not_in_table)?,
+            )
             .ok_or(not_in_table)?,
     };
     match action {
@@ -462,11 +503,13 @@ pub fn default_task(
         DefaultAction::Kind(ARTIFACT_KIND) => {
             // the factory gives the action the default task, whose moving sprite its MoveTos take
             let moving = masters
-                .and_then(|t| t.work(civ, dat_id(objects, s.master_obj)?))
+                .and_then(|master_table| {
+                    master_table.work(civ, dat_id(objects, rge_static_object.master_obj)?)
+                })
                 .and_then(MastersMaster::default_task)
-                .and_then(|t| t.sprites.moving);
+                .and_then(|task| task.sprites.moving);
             Ok(Some(DefaultStart::Artifact(Box::new(Artifact::new(
-                PlayerId::new(s.owner),
+                PlayerId::new(rge_static_object.owner),
                 moving,
             )))))
         }
@@ -476,7 +519,7 @@ pub fn default_task(
         // no action of the other types: the default task starts nothing (wild animals' Explore,
         // type 6)
         DefaultAction::Kind(t) if !ACTION_FACTORY_KINDS.contains(&t) => Ok(None),
-        DefaultAction::Kind(t) => Err(Unstartable::Unported(t)),
+        DefaultAction::Kind(action_kind) => Err(Unstartable::Unported(action_kind)),
         DefaultAction::NoSuchTask => Err(Unstartable::Unread(UnreadDefault::NoSuchTask)),
     }
 }
@@ -486,38 +529,51 @@ pub fn default_task(
 #[must_use]
 pub fn is_action_object(object: &genie_save::Object) -> bool {
     object.combat().is_some()
-        || object.rge_object.as_deref().is_some_and(|r| {
-            r.rge_action_object.is_some()
-                || r.rge_combat_object.is_some()
-                || r.rge_missile_object.is_some()
+        || object.rge_object.as_deref().is_some_and(|rge_object| {
+            rge_object.rge_action_object.is_some()
+                || rge_object.rge_combat_object.is_some()
+                || rge_object.rge_missile_object.is_some()
         })
 }
 
 /// The default task id of an object's own action master, if it has one.
 #[must_use]
-pub fn own_default_task(s: &RgeStaticObject) -> Option<i16> {
-    let tribe = |c: &OwnTribeMasterCombatObject| {
-        c.own_rge_master_combat_object
+pub fn own_default_task(rge_static_object: &RgeStaticObject) -> Option<i16> {
+    let tribe = |own_tribe_master_combat_object: &OwnTribeMasterCombatObject| {
+        own_tribe_master_combat_object
+            .own_rge_master_combat_object
             .own_rge_master_action_object
             .default_task
     };
     None.or_else(|| {
-        s.rge_master_action_object
+        rge_static_object
+            .rge_master_action_object
             .as_deref()
-            .map(|a| a.default_task)
+            .map(|own_rge_master_action_object| own_rge_master_action_object.default_task)
     })
     .or_else(|| {
-        s.rge_master_missile_object.as_deref().map(|m| {
-            m.own_rge_master_combat_object
-                .own_rge_master_action_object
-                .default_task
-        })
+        rge_static_object.rge_master_missile_object.as_deref().map(
+            |own_rge_master_missile_object| {
+                own_rge_master_missile_object
+                    .own_rge_master_combat_object
+                    .own_rge_master_action_object
+                    .default_task
+            },
+        )
     })
-    .or_else(|| s.tribe_master_combat_object.as_deref().map(tribe))
     .or_else(|| {
-        s.tribe_master_building_object
+        rge_static_object
+            .tribe_master_combat_object
             .as_deref()
-            .map(|b| tribe(&b.own_tribe_master_combat_object))
+            .map(tribe)
+    })
+    .or_else(|| {
+        rge_static_object
+            .tribe_master_building_object
+            .as_deref()
+            .map(|own_tribe_master_building_object| {
+                tribe(&own_tribe_master_building_object.own_tribe_master_combat_object)
+            })
     })
 }
 

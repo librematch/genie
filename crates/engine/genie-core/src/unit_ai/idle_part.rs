@@ -89,7 +89,9 @@ impl UnitAi {
         if self.adjusted_idle_timeout == Millis::new(750) {
             self.update_adjusted_idle_timeout(ai);
         }
-        if Self::top_target_live(at, side)?.is_some_and(|t| t.kind == MasterKind::BUILDING) {
+        if Self::top_target_live(at, side)?
+            .is_some_and(|live_top| live_top.kind == MasterKind::BUILDING)
+        {
             return Ok(());
         }
         let _ = self.process_idle(at, player_kind, ai, side)?;
@@ -102,8 +104,9 @@ impl UnitAi {
         matches!(
             self.current_order,
             Some(OrderKind::Patrol | OrderKind::AttackMove)
-        ) || group.is_some_and(|g| {
-            g.contains(GroupState::PATROL) && self.current_order != Some(OrderKind::HeroPower)
+        ) || group.is_some_and(|group_state| {
+            group_state.contains(GroupState::PATROL)
+                && self.current_order != Some(OrderKind::HeroPower)
         })
     }
 
@@ -163,7 +166,7 @@ impl UnitAi {
             ));
         }
         if self.current_action == Some(AiAction::GroupAside) {
-            if group.is_none_or(|g| !g.contains(GroupState::MOVING)) {
+            if group.is_none_or(|group_state| !group_state.contains(GroupState::MOVING)) {
                 self.last_action = Some(AiAction::GroupAside);
                 self.current_action = None;
             }

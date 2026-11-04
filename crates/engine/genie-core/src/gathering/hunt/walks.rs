@@ -73,9 +73,9 @@ impl HuntAction {
             walks
                 .live(mover)
                 .to_point(self.point, self.task.range, given, move_to_tuning)?;
-        Ok(walk.map(|m| MoveToAction {
+        Ok(walk.map(|move_to_action| MoveToAction {
             on_target_moved: TargetMoved::AsksAgain,
-            ..m
+            ..move_to_action
         }))
     }
 
@@ -91,24 +91,30 @@ impl HuntAction {
     /// The walk's and the notifies'.
     pub(super) fn update_list(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         mut me: Me,
         gives_up: GiveUp,
     ) -> GenieResult<SubCode> {
         me.action_state = ActionState::new(self.state.get());
-        let state = self.state.move_to().map(|m| m.state);
+        let state = self
+            .state
+            .move_to()
+            .map(|move_to_action| move_to_action.state);
         let how = ListUpdate {
             gives_up,
             ..ListUpdate::default()
         };
         let code = match self.state.walk_mut() {
-            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            Some(move_to) => update_sub_actions(move_to, step, unit, me, how)?,
             // a state that does not walk has no sub-action: its list's update is the empty one's
-            None => update_sub_actions(&mut None, c, unit, me, how)?,
+            None => update_sub_actions(&mut None, step, unit, me, how)?,
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(
+                step.w.parts.motion.mover_mut(unit.id),
+                &mut step.w.parts.unit_ai,
+            )?;
         }
         Ok(code)
     }

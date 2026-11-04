@@ -97,16 +97,16 @@ impl World {
     /// Gaia's entries `+0x298` and `+0x10b8`), each unless one of the same values has one; any
     /// other restriction finds none (its units walk without the tile pathfinder).
     pub fn register_planners(&mut self) {
-        let s = self.model.slots.master;
-        for master in [s.villager_male, s.boarding_galley] {
-            if let Some(r) = self
+        let master_slots = self.model.slots.master;
+        for master in [master_slots.villager_male, master_slots.boarding_galley] {
+            if let Some(restriction_id) = self
                 .model
                 .masters
                 .first()
-                .and_then(|m| m.get(master))
+                .and_then(|masters| masters.get(master))
                 .and_then(|m| m.terrain_restriction)
             {
-                self.pathing.register(r);
+                self.pathing.register(restriction_id);
             }
         }
     }
@@ -128,34 +128,35 @@ impl World {
     pub fn build_mesh(&mut self) -> GenieResult<()> {
         let width = u32::try_from(self.spatial.map.width()).unwrap_or(0);
         self.pathing.start_mesh(width);
-        for (q, p) in PlayerId::each(self.players.len()).zip(&self.players) {
-            for u in p.objects.iter().chain(&p.sleeping) {
-                if u.life.inside.is_some() || ObjectState::Removed <= u.life.state {
+        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
+            for unit in player.objects.iter().chain(&player.sleeping) {
+                if unit.life.inside.is_some() || ObjectState::Removed <= unit.life.state {
                     continue;
                 }
-                let m = u.master(
+                let master = unit.master(
                     MasterTables::new(&self.model.masters, &self.parts.own_master),
-                    q,
+                    player_id,
                 )?;
-                let Some(placed) = self.spatial.get(u.id) else {
+                let Some(placed) = self.spatial.get(unit.id) else {
                     continue;
                 };
-                let moving = MoveState::of_mover(self.parts.mover_of(u.id));
+                let moving = MoveState::of_mover(self.parts.mover_of(unit.id));
                 let desolid = self
                     .parts
-                    .building_of(u.id)
+                    .building_of(unit.id)
                     .construction
-                    .is_some_and(|c| c.desolid);
-                let kind = m.obstruction_kind;
+                    .is_some_and(|construction| construction.desolid);
+                let kind = master.obstruction_kind;
                 if placed.tall
                     && kind.recorded()
-                    && m.obstruction_class != ObstructionClass::NONE
+                    && master.obstruction_class != ObstructionClass::NONE
                     && moving == MoveState::Standing
                     && !desolid
                 {
-                    self.pathing.place_shape(u.id, placed);
+                    self.pathing.place_shape(unit.id, placed);
                 }
-                self.pathing.refresh(u.id, placed, moving, m.outline);
+                self.pathing
+                    .refresh(unit.id, placed, moving, master.outline);
             }
         }
         Ok(())

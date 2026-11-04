@@ -19,10 +19,10 @@ fn expected(section: &str) -> usize {
     FIXTURE
         .lines()
         .filter(|l| !l.starts_with('#'))
-        .find_map(|l| {
-            let mut f = l.split_whitespace();
-            (f.next() == Some(section)).then(|| {
-                usize::from_str_radix(f.nth(1).unwrap().trim_start_matches("0x"), 16).unwrap()
+        .find_map(|text| {
+            let mut fields = text.split_whitespace();
+            (fields.next() == Some(section)).then(|| {
+                usize::from_str_radix(fields.nth(1).unwrap().trim_start_matches("0x"), 16).unwrap()
             })
         })
         .unwrap_or_else(|| panic!("no {section} in the fixture"))
@@ -33,10 +33,10 @@ fn expected_start(section: &str) -> usize {
     FIXTURE
         .lines()
         .filter(|l| !l.starts_with('#'))
-        .find_map(|l| {
-            let mut f = l.split_whitespace();
-            (f.next() == Some(section)).then(|| {
-                usize::from_str_radix(f.next().unwrap().trim_start_matches("0x"), 16).unwrap()
+        .find_map(|text| {
+            let mut fields = text.split_whitespace();
+            (fields.next() == Some(section)).then(|| {
+                usize::from_str_radix(fields.next().unwrap().trim_start_matches("0x"), 16).unwrap()
             })
         })
         .unwrap_or_else(|| panic!("no {section} in the fixture"))
@@ -47,9 +47,9 @@ fn expected_count(section: &str) -> usize {
     FIXTURE
         .lines()
         .filter(|l| !l.starts_with('#'))
-        .find_map(|l| {
-            let mut f = l.split_whitespace();
-            (f.next() == Some(section)).then(|| f.nth(2).unwrap().parse().unwrap())
+        .find_map(|text| {
+            let mut fields = text.split_whitespace();
+            (fields.next() == Some(section)).then(|| fields.nth(2).unwrap().parse().unwrap())
         })
         .unwrap_or_else(|| panic!("no count for {section} in the fixture"))
 }
@@ -107,19 +107,23 @@ fn marvinblue_sections_end_where_imhex_says() {
     // Every section, Gaia's included, is read to its end, and the next one starts right there. The
     // pattern skips Gaia's tail by searching for player 1; ImHex's offset for player 1 is the check.
     assert_eq!(players[0].ends().unwrap().end, expected_start("player1"));
-    for (i, p) in players.iter().enumerate().skip(1) {
+    for (index, player_section) in players.iter().enumerate().skip(1) {
         assert_eq!(
             (
-                p.sleeping_objects().count(),
-                p.objects().doppleganger_objects.objects().count()
+                player_section.sleeping_objects().count(),
+                player_section
+                    .objects()
+                    .doppleganger_objects
+                    .objects()
+                    .count()
             ),
             (0, 0),
-            "player {i}"
+            "player {index}"
         );
         assert_eq!(
-            p.ends().unwrap().end,
-            expected(&format!("player{i}")),
-            "player {i}"
+            player_section.ends().unwrap().end,
+            expected(&format!("player{index}")),
+            "player {index}"
         );
     }
 }
@@ -134,7 +138,7 @@ fn marvinblue_player_masters_are_found_by_id() {
         genie_save::parse(&header_of(&dir.join("MarvinBlue/426048731.aoe2record"))).unwrap();
     let players = header.players();
     let objects = players[2].objects();
-    let static_part = |id| objects.master(id).and_then(|m| m.static_part());
+    let static_part = |id| objects.master(id).and_then(|master| master.static_part());
     // FLARE3, a static object with a death sprite and no death spawn
     let flare = static_part(332).unwrap();
     assert_eq!(
@@ -168,7 +172,7 @@ fn an_objects_own_master_is_its_static_master() {
     let without = players[0]
         .live_objects()
         .filter_map(|o| o.static_part())
-        .find(|s| s.has_own_master_object == 0)
+        .find(|rge_static_object| rge_static_object.has_own_master_object == 0)
         .unwrap();
     assert!(without.own_master().is_none());
 }
@@ -178,7 +182,10 @@ fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aoe2record") {
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "aoe2record")
+        {
             out.push(path);
         }
     }
@@ -204,15 +211,15 @@ fn every_corpus_header_parses() {
         let is_tier1 = (version.hundredths(), version.build) == (6660, 158_041);
         let outcome = match genie_save::parse(&chapter.inflate_header().unwrap()) {
             Ok(_) => "parsed".to_string(),
-            Err(e) => {
+            Err(error) => {
                 if is_tier1 {
                     tier1_failures.push(format!(
-                        "{}: {e}",
+                        "{}: {error}",
                         path.strip_prefix(&dir).unwrap().display()
                     ));
                 }
-                if e.kind() == genie_save::ErrorKind::Unsupported {
-                    format!("unsupported: {}", e.reason())
+                if error.kind() == genie_save::ErrorKind::Unsupported {
+                    format!("unsupported: {}", error.reason())
                 } else {
                     "failed".to_string()
                 }

@@ -62,55 +62,59 @@ pub(super) const NO_TIME: f32 = EFFECT_NO_TIME;
 type LocationAt = (Option<usize>, Option<MasterId>);
 
 impl World {
-    /// `FUN_1415c3f20`'s technology change (kind 8, its `0x6f` case) for player `p`'s technology
-    /// `tech` by `mode` and `v` at location `location` (below 1: every location; past the
-    /// technology's locations a new one is added, a copy of the last with no building): a cost
+    /// `FUN_1415c3f20`'s technology change (kind 8, its `0x6f` case) for player `player_id`'s
+    /// technology `tech` by `mode` and `v` at location `location` (below 1: every location; past
+    /// the technology's locations a new one is added, a copy of the last with no building): a cost
     /// mode changes a cost ([`World::tech_cost`]); 4 sets the location's building to a master the
-    /// player has, 5 its button; 9 the stacking, 10 the research cap; 12 the state; 18 the
-    /// effect override (an already researched technology gives its new effect at once,
-    /// `FUN_1413d4320`); the research time modes ([`tech_time_mode`]) change
-    /// the time ([`World::research_time`]) and update the dependents. The icon (6), name (7),
-    /// description (8) and hotkey (11) overrides are the interface's. A technology past the
-    /// player's tree changes nothing (the game also reads its one past the end, not modelled).
+    /// player has, 5 its button; 9 the stacking, 10 the research cap; 12 the state; 18 the effect
+    /// override (an already researched technology gives its new effect at once, `FUN_1413d4320`);
+    /// the research time modes ([`tech_time_mode`]) change the time ([`World::research_time`]) and
+    /// update the dependents. The icon (6), name (7), description (8) and hotkey (11) overrides are
+    /// the interface's. A technology past the player's tree changes nothing (the game also reads
+    /// its one past the end, not modelled).
     pub(super) fn modify_tech(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         tech: TechId,
         mode: ModifyMode,
         v: f32,
         location: ModifyLocation,
     ) -> GenieResult<()> {
-        let tree = self.players.player(p)?.techs.len();
-        let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
+        let tree = self.players.player(player_id)?.techs.len();
+        let Some(tech_id) = Some(tech).filter(|known_tech| known_tech.index() < tree) else {
             return Ok(());
         };
-        let Some((at, building)) = self.tech_location(p, tech_id, location)? else {
+        let Some((at, building)) = self.tech_location(player_id, tech_id, location)? else {
             return Ok(());
         };
         if let Some((resource, cost_mode)) = tech_cost_mode(mode) {
-            self.tech_cost(p, tech, resource, v, cost_mode)?;
+            self.tech_cost(player_id, tech, resource, v, cost_mode)?;
             return Ok(());
         }
         if let Some(time_mode) = tech_time_mode(mode) {
-            self.research_time(p, tech, v, time_mode, building)?;
-            return self.update_dependents(p, tech_id);
+            self.research_time(player_id, tech, v, time_mode, building)?;
+            return self.update_dependents(player_id, tech_id);
         }
-        self.set_tech_field(p, tech_id, (mode, v), at)
+        self.set_tech_field(player_id, tech_id, (mode, v), at)
     }
 
-    /// The location a modify command names of player `p`'s technology `t` (`location` above 0:
-    /// the entry at that index, or a copy of the last one with no building): its index and its
+    /// The location a modify command names of player `player_id`'s technology `t` (`location` above
+    /// 0: the entry at that index, or a copy of the last one with no building): its index and its
     /// building. `None` for a technology without locations to copy.
     fn tech_location(
         &mut self,
-        p: PlayerId,
-        t: TechId,
+        player_id: PlayerId,
+        tech_id: TechId,
         location: ModifyLocation,
     ) -> GenieResult<Option<LocationAt>> {
-        let t = t.index();
+        let index = tech_id.index();
         let (mut at, mut building) = (None, None);
         if let Some(i) = location.entry() {
-            let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
+            let state = self
+                .players
+                .player_mut(player_id)?
+                .techs
+                .checked_mut(index)?;
             if i < state.locations.len() {
                 building = state.locations.checked(i)?.building;
                 at = Some(i);
@@ -130,48 +134,51 @@ impl World {
         Ok(Some((at, building)))
     }
 
-    /// The modify command's plain fields of player `p`'s technology `t` (`mode` 4 the building, 5
-    /// the button, 9 the stacking, 10 the research cap, 12 the state, 18 the effect override,
-    /// `FUN_1413d4320`),
-    /// those of a location at `at` only (all without one).
+    /// The modify command's plain fields of player `player_id`'s technology `tech_id` (`mode` 4 the
+    /// building, 5 the button, 9 the stacking, 10 the research cap, 12 the state, 18 the effect
+    /// override, `FUN_1413d4320`), those of a location at `at` only (all without one).
     fn set_tech_field(
         &mut self,
-        p: PlayerId,
-        t: TechId,
+        player_id: PlayerId,
+        tech_id: TechId,
         (mode, v): (ModifyMode, f32),
         at: Option<usize>,
     ) -> GenieResult<()> {
-        let (tech, t) = (t, t.index());
+        let (tech, t) = (tech_id, tech_id.index());
         let short = cvttss2si(v) as i16;
         match mode {
-            ModifyMode::Building => self.set_tech_building(p, tech, v, at)?,
+            ModifyMode::Building => self.set_tech_building(player_id, tech, v, at)?,
             ModifyMode::Button => {
-                let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
-                for (i, l) in state.locations.iter_mut().enumerate() {
-                    if at.is_none_or(|a| a == i) {
-                        l.button = LocationButton::of_data(cvttss2si(v) as u8);
+                let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+                for (index, location) in state.locations.iter_mut().enumerate() {
+                    if at.is_none_or(|a| a == index) {
+                        location.button = LocationButton::of_data(cvttss2si(v) as u8);
                     }
                 }
             }
             ModifyMode::Stacking => {
-                self.players.player_mut(p)?.techs.checked_mut(t)?.stack = v != 0.0;
+                self.players
+                    .player_mut(player_id)?
+                    .techs
+                    .checked_mut(t)?
+                    .stack = v != 0.0;
             }
             ModifyMode::ResearchCap => {
                 self.players
-                    .player_mut(p)?
+                    .player_mut(player_id)?
                     .techs
                     .checked_mut(t)?
                     .research_cap = ResearchCap::of_data(short);
             }
-            ModifyMode::State => self.set_tech_state(p, tech, v)?,
+            ModifyMode::State => self.set_tech_state(player_id, tech, v)?,
             ModifyMode::EffectOverride => {
                 // `FUN_1413d4320`: a researched technology gives its new effect at once, with no
                 // object
-                let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
+                let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
                 state.effect_override = EffectId::of_data(short);
                 if state.state == ResearchState::Researched {
                     let effect = state.effect_override;
-                    self.do_table_effect(p, effect, None)?;
+                    self.do_table_effect(player_id, effect, None)?;
                 }
             }
             ModifyMode::Other(_) => {}
@@ -179,39 +186,39 @@ impl World {
         Ok(())
     }
 
-    /// Mode 4: the building of player `p`'s technology `t`'s locations (those of `at`, all
-    /// without one), when `v` names a master.
+    /// Mode 4: the building of player `player_id`'s technology `tech_id`'s locations (those of
+    /// `at`, all without one), when `v` names a master.
     fn set_tech_building(
         &mut self,
-        p: PlayerId,
-        t: TechId,
+        player_id: PlayerId,
+        tech_id: TechId,
         v: f32,
         at: Option<usize>,
     ) -> GenieResult<()> {
-        let t = t.index();
+        let t = tech_id.index();
         let short = MasterId::of_data(cvttss2si(v) as i16);
         if let Some(short) = short
             && self
                 .model
                 .masters
-                .get(p.index())
-                .is_some_and(|m| m.get(short).is_some())
+                .get(player_id.index())
+                .is_some_and(|masters| masters.get(short).is_some())
         {
-            let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
-            for (i, l) in state.locations.iter_mut().enumerate() {
-                if at.is_none_or(|a| a == i) {
-                    l.building = Some(short);
+            let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+            for (index, location) in state.locations.iter_mut().enumerate() {
+                if at.is_none_or(|a| a == index) {
+                    location.building = Some(short);
                 }
             }
         }
         Ok(())
     }
 
-    /// Mode 12: the state of player `p`'s technology `t` (`v` 0 none, then unavailable,
-    /// available, or researched, which researches it).
-    fn set_tech_state(&mut self, p: PlayerId, t: TechId, v: f32) -> GenieResult<()> {
-        let (tech, t) = (t, t.index());
-        let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
+    /// Mode 12: the state of player `player_id`'s technology `tech_id` (`v` 0 none, then
+    /// unavailable, available, or researched, which researches it).
+    fn set_tech_state(&mut self, player_id: PlayerId, tech_id: TechId, v: f32) -> GenieResult<()> {
+        let (tech, t) = (tech_id, tech_id.index());
+        let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
         if v == 0.0 {
             state.state = ResearchState::Disabled;
         } else if v == STATE_UNAVAILABLE {
@@ -220,31 +227,43 @@ impl World {
             state.state = ResearchState::Available;
             state.enabled = true;
         } else if v == STATE_RESEARCHED {
-            let _ = self.force_research(p, tech)?;
+            let _ = self.force_research(player_id, tech)?;
         }
         Ok(())
     }
 
-    /// `FUN_1413cdcd0` with `param_3` 1 (kind 8's state 3) for player `p`'s technology `t`: one in
-    /// state 0 to 2 completes as [`World::complete_research`] (the civ's disabled technologies are
-    /// not asked); any other gives its effect again and counts in attributes 0x15 and 0x63 (its
-    /// listed costs) whatever its location, its state left.
-    pub(super) fn force_research(&mut self, p: PlayerId, t: TechId) -> GenieResult<Research> {
-        let (tech, t) = (t, t.index());
+    /// `FUN_1413cdcd0` with `param_3` 1 (kind 8's state 3) for player `player_id`'s technology
+    /// `tech_id`: one in state 0 to 2 completes as [`World::complete_research`] (the civ's disabled
+    /// technologies are not asked); any other gives its effect again and counts in attributes 0x15
+    /// and 0x63 (its listed costs) whatever its location, its state left.
+    pub(super) fn force_research(
+        &mut self,
+        player_id: PlayerId,
+        tech_id: TechId,
+    ) -> GenieResult<Research> {
+        let (tech, t) = (tech_id, tech_id.index());
         if (ResearchState::Unavailable..=ResearchState::Researching)
-            .contains(&self.players.player(p)?.techs.checked(t)?.state)
+            .contains(&self.players.player(player_id)?.techs.checked(t)?.state)
         {
-            return self.complete_research(p, tech, None);
+            return self.complete_research(player_id, tech, None);
         }
         let def = self.model.techs.checked(t)?.clone();
-        self.research_effect_known(p, tech)?;
-        let effect = self.players.player(p)?.techs.checked(t)?.effect(&def);
-        self.do_table_effect(p, effect, None)?;
-        let owner = self.players.player(p)?;
+        self.research_effect_known(player_id, tech)?;
+        let effect = self
+            .players
+            .player(player_id)?
+            .techs
+            .checked(t)?
+            .effect(&def);
+        self.do_table_effect(player_id, effect, None)?;
+        let owner = self.players.player(player_id)?;
         let factors = factors(tech, owner, self.model.slots)?;
         let listed = owner.techs.checked(t)?.listed_costs(&def, factors)?;
-        let spent = listed.iter().map(|&(_, a)| i32::from(a.get())).sum::<i32>() as f32;
-        let owner = self.players.player_mut(p)?;
+        let spent = listed
+            .iter()
+            .map(|&(_, cost_amount)| i32::from(cost_amount.get()))
+            .sum::<i32>() as f32;
+        let owner = self.players.player_mut(player_id)?;
         owner.add_attribute(
             self.model.slots.attribute.techs_researched,
             Amount::new(1.0),
@@ -256,32 +275,31 @@ impl World {
         Ok(Research::Completed)
     }
 
-    /// The research time modifier (`'g'`, `FUN_1413d1210`) of player `p`'s technology `tech` by
-    /// `v` in `mode`: each location (`location` −1; else its location of that building,
-    /// `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there (−1
-    /// without one): mode 2 adds `(v − 1) × time` rounded half away from 1 (in 16 bits), mode 0
-    /// sets it so the time is `v` (none for −1, which leaves 0), any other adds `v` (in 16 bits).
-    /// A technology in state 1 whose work done reaches its new time completes
-    /// ([`World::complete_research`]), but for a set to −1. The game walks a copy of the
-    /// locations.
+    /// The research time modifier (`'g'`, `FUN_1413d1210`) of player `player_id`'s technology
+    /// `tech` by `v` in `mode`: each location (`location` −1; else its location of that building,
+    /// `FUN_1413c8930`) changes its adjustment (`+0xc`) against the `.dat`'s time there (−1 without
+    /// one): mode 2 adds `(v − 1) × time` rounded half away from 1 (in 16 bits), mode 0 sets it so
+    /// the time is `v` (none for −1, which leaves 0), any other adds `v` (in 16 bits). A technology
+    /// in state 1 whose work done reaches its new time completes ([`World::complete_research`]),
+    /// but for a set to −1. The game walks a copy of the locations.
     pub(super) fn research_time(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         tech: TechId,
         v: f32,
         mode: ChangeMode,
         location: Option<MasterId>,
     ) -> GenieResult<()> {
-        let tree = self.players.player(p)?.techs.len();
-        let Some(tech_id) = Some(tech).filter(|t| t.index() < tree) else {
+        let tree = self.players.player(player_id)?.techs.len();
+        let Some(tech_id) = Some(tech).filter(|known_tech| known_tech.index() < tree) else {
             return Ok(());
         };
-        let t = tech_id.index();
+        let index = tech_id.index();
         let buildings: Vec<Option<MasterId>> = if location.is_none() {
             self.players
-                .player(p)?
+                .player(player_id)?
                 .techs
-                .checked(t)?
+                .checked(index)?
                 .locations
                 .iter()
                 .map(|l| l.building)
@@ -293,10 +311,19 @@ impl World {
             let time = self
                 .model
                 .techs
-                .get(t)
-                .and_then(|d| d.locations.iter().find(|&&(b, _)| b == building))
+                .get(index)
+                .and_then(|tech_def| {
+                    tech_def
+                        .locations
+                        .iter()
+                        .find(|&&(master_id, _)| master_id == building)
+                })
                 .map_or(NO_TIME, |&(_, time)| Seconds::of_master(time).get());
-            let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
+            let state = self
+                .players
+                .player_mut(player_id)?
+                .techs
+                .checked_mut(index)?;
             let i = state
                 .locations
                 .iter()
@@ -328,7 +355,7 @@ impl World {
                 && adjustment + Seconds::new(time) <= state.research_done
                 && (mode != ChangeMode::Set || v != NO_TIME);
             if done {
-                let _ = self.complete_research(p, tech_id, None)?;
+                let _ = self.complete_research(player_id, tech_id, None)?;
             }
         }
         Ok(())

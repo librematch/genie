@@ -41,9 +41,9 @@ pub(crate) enum TakenAs {
 }
 
 impl UnitAi {
-    /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `o`: one not ready returns 0xe.
-    /// Each case runs its slot, forced (its force argument 1); a slot that does not take the
-    /// order returns 0 (the queue drops it), one that does goes to the tail
+    /// Slot 0x230 (`FUN_140c5c170`, every type's) on the order `queued_order`: one not ready
+    /// returns 0xe. Each case runs its slot, forced (its force argument 1); a slot that does not
+    /// take the order returns 0 (the queue drops it), one that does goes to the tail
     /// ([`UnitAi::order_tail`]), which makes it the AI's order with its priority, and 1:
     /// - 700, the attack: `AttackObject` by the type ([`UnitAi::attack_slot`], any target, the
     ///   group flag set).
@@ -97,7 +97,7 @@ impl UnitAi {
     /// auto scout order) is the one that runs.
     pub(crate) fn process_order(
         &mut self,
-        o: &QueuedOrder,
+        queued_order: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         place: Option<(Point, Option<ClassId>)>,
         ai: &mut Well512,
@@ -109,7 +109,7 @@ impl UnitAi {
             unit_ai_tuning,
             ..
         } = layer;
-        if !o.ready {
+        if !queued_order.ready {
             return Ok(OrderOutcome::NotReady);
         }
         let place = world
@@ -119,14 +119,14 @@ impl UnitAi {
         let class = place.and_then(|(_, class)| class);
         // `bVar2`: the attack move's attack, whose tail makes the order 700
         let mut taken_as = TakenAs::Order;
-        let taken = match o.order {
+        let taken = match queued_order.order {
             OrderKind::Attack
             | OrderKind::Defend
             | OrderKind::RunAway
             | OrderKind::SeekAndDestroy
             | OrderKind::AttackRoundup
             | OrderKind::AttackMove => {
-                self.combat_order(o, world, ai, side, &mut taken_as, roles)?
+                self.combat_order(queued_order, world, ai, side, &mut taken_as, roles)?
             }
             OrderKind::Build
             | OrderKind::Heal
@@ -135,29 +135,35 @@ impl UnitAi {
             | OrderKind::Gather
             | OrderKind::Hunt
             | OrderKind::AutoBoarLuring
-            | OrderKind::Foundation => self.work_order(o, world, side, ai)?,
+            | OrderKind::Foundation => self.work_order(queued_order, world, side, ai)?,
             OrderKind::Follow
             | OrderKind::Transport
             | OrderKind::Enter
             | OrderKind::Unload
-            | OrderKind::UnloadOverWall => self.object_move_order(o, world, side, ai)?,
-            OrderKind::Explore => {
-                self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?
-            }
+            | OrderKind::UnloadOverWall => self.object_move_order(queued_order, world, side, ai)?,
+            OrderKind::Explore => self.explore_at(
+                queued_order.point.tile(),
+                OrderForce::Forced,
+                side,
+                ai,
+                unit_ai_tuning,
+            )?,
             OrderKind::Stop => {
                 self.remove_target();
                 self.stop_with(StopOrder::Keep, place, side, ai, roles)?;
                 Answer::Taken
             }
-            OrderKind::Move | OrderKind::GroupGather => match self.move_to(order_move(o)) {
-                Some(m) => {
-                    side.effect_now(Effect::Move(m), self, ai)?;
-                    Answer::Taken
+            OrderKind::Move | OrderKind::GroupGather => {
+                match self.move_to(order_move(queued_order)) {
+                    Some(ai_move) => {
+                        side.effect_now(Effect::Move(ai_move), self, ai)?;
+                        Answer::Taken
+                    }
+                    None => Answer::NotTaken,
                 }
-                None => Answer::NotTaken,
-            },
+            }
             OrderKind::ExploreAndDestroy => self.explore_and_destroy(
-                o.point.tile(),
+                queued_order.point.tile(),
                 OrderForce::Forced,
                 side,
                 ai,
@@ -172,18 +178,28 @@ impl UnitAi {
                 Answer::Taken
             }
             OrderKind::Scout => {
-                let explored =
-                    self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?;
+                let explored = self.explore_at(
+                    queued_order.point.tile(),
+                    OrderForce::Forced,
+                    side,
+                    ai,
+                    unit_ai_tuning,
+                )?;
                 self.set_action(Some(AiAction::Scout));
                 explored
             }
             OrderKind::OnTarget | OrderKind::OnTarget2 => {
                 let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
-                return self.order_on_target(o, class, at, side, ai);
+                return self.order_on_target(queued_order, class, at, side, ai);
             }
             OrderKind::AutoScout => {
-                let explored =
-                    self.explore_at(o.point.tile(), OrderForce::Forced, side, ai, unit_ai_tuning)?;
+                let explored = self.explore_at(
+                    queued_order.point.tile(),
+                    OrderForce::Forced,
+                    side,
+                    ai,
+                    unit_ai_tuning,
+                )?;
                 self.set_action(Some(AiAction::AutoScout));
                 explored
             }
@@ -193,7 +209,14 @@ impl UnitAi {
         if taken == Answer::NotTaken {
             return Ok(OrderOutcome::NotTaken);
         }
-        Ok(self.order_tail(Some(o.order), o.priority, class, taken_as, ai, roles))
+        Ok(self.order_tail(
+            Some(queued_order.order),
+            queued_order.priority,
+            class,
+            taken_as,
+            ai,
+            roles,
+        ))
     }
 
     /// [`UnitAi::process_order`]'s combat cases: the attack, the defence (a master that cannot
@@ -201,7 +224,7 @@ impl UnitAi {
     /// seek and destroy, the attack roundup and the attack move (its attack [`TakenAs::Attack`]).
     pub(super) fn combat_order(
         &mut self,
-        o: &QueuedOrder,
+        queued_order: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
@@ -210,37 +233,44 @@ impl UnitAi {
     ) -> GenieResult<Answer> {
         let (at, player_kind) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order
-        Ok(match (o.order, o.target) {
+        Ok(match (queued_order.order, queued_order.target) {
             (OrderKind::Attack, Some(t)) => self.attack_slot(t, TargetRules::Any, at, side, ai)?,
             (OrderKind::Defend, target) => {
                 if roles.of_master(at.master).contains(MasterRoles::DEFENDLESS) {
                     return Ok(Answer::NotTaken);
                 }
                 match target {
-                    None => self.defend_point(o.point.ground(), o.range, OrderForce::Forced, at),
-                    Some(t) => self.defend_object(t, o.range, OrderForce::Forced, at, side)?,
+                    None => self.defend_point(
+                        queued_order.point.ground(),
+                        queued_order.range,
+                        OrderForce::Forced,
+                        at,
+                    ),
+                    Some(t) => {
+                        self.defend_object(t, queued_order.range, OrderForce::Forced, at, side)?
+                    }
                 }
             }
             (OrderKind::RunAway, _) => {
                 self.run_away(OrderForce::Forced, at, player_kind, ai, side)?
             }
             (OrderKind::SeekAndDestroy, Some(t)) => {
-                let tiles = o.point.tile();
+                let tiles = queued_order.point.tile();
                 self.seek_and_destroy(t, tiles, OrderForce::Forced, at, side)?
             }
             (OrderKind::AttackRoundup, Some(t)) => self.attack_roundup(t, at, side)?,
             (OrderKind::AttackMove, target) => {
-                if let Some(t) = target
+                if let Some(object_id) = target
                     && roles
                         .of_some_class(at.class)
                         .contains(ClassRoles::ATTACK_MOVE_ATTACKS)
                 {
                     *taken_as = TakenAs::Attack;
-                    self.attack_slot(t, TargetRules::Any, at, side, ai)?
+                    self.attack_slot(object_id, TargetRules::Any, at, side, ai)?
                 } else {
-                    match self.move_to(order_move(o)) {
-                        Some(m) => {
-                            side.effect_now(Effect::Move(m), self, ai)?;
+                    match self.move_to(order_move(queued_order)) {
+                        Some(ai_move) => {
+                            side.effect_now(Effect::Move(ai_move), self, ai)?;
                             Answer::Taken
                         }
                         None => Answer::NotTaken,
@@ -257,7 +287,7 @@ impl UnitAi {
     /// `0x2be`) and the foundation's wait (then the action value `0x27a`).
     pub(super) fn work_order(
         &mut self,
-        o: &QueuedOrder,
+        queued_order: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
@@ -265,12 +295,12 @@ impl UnitAi {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): each case's lookup finds nothing, so it takes no order;
         // the hunt's stops the unit (`hunt_order`)
-        Ok(match (o.order, o.target) {
+        Ok(match (queued_order.order, queued_order.target) {
             (OrderKind::Build, Some(t)) => {
                 self.build_object(FoundationId::new(t), OrderForce::Forced, at, side, rng)?
             }
             (OrderKind::Heal | OrderKind::Convert | OrderKind::Repair, Some(t)) => {
-                let (action, command) = match o.order {
+                let (action, command) = match queued_order.order {
                     OrderKind::Heal => (AiAction::Heal, UnitCommand::Heal(t)),
                     OrderKind::Convert => (AiAction::Convert, UnitCommand::Convert(t)),
                     _ => (AiAction::Repair, UnitCommand::Repair(t)),
@@ -280,14 +310,16 @@ impl UnitAi {
             (OrderKind::Gather, Some(t)) => self.gather_order(t, at, side, rng)?,
             (OrderKind::Hunt | OrderKind::AutoBoarLuring, target) => {
                 let hunts = self.hunt_order(target, at, side, rng)?;
-                if o.order == OrderKind::AutoBoarLuring {
+                if queued_order.order == OrderKind::AutoBoarLuring {
                     self.set_action(Some(AiAction::BoarLuring));
                 }
                 hunts
             }
             (OrderKind::Foundation, target) => {
                 let waits = match target {
-                    Some(t) => self.wait_for_foundation(t, OrderForce::Forced, side)?,
+                    Some(object_id) => {
+                        self.wait_for_foundation(object_id, OrderForce::Forced, side)?
+                    }
                     None => Answer::NotTaken,
                 };
                 self.set_action(Some(AiAction::WaitSolidify));
@@ -301,23 +333,27 @@ impl UnitAi {
     /// transport, the enter and the two unloads.
     pub(super) fn object_move_order(
         &mut self,
-        o: &QueuedOrder,
+        queued_order: &QueuedOrder,
         world: Option<(&Surroundings, PlayerKind)>,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
         let (at, _) = world.ok_or(OUTSIDE_ORDER)?;
         // an order on no target (−1): its lookup finds nothing, so it takes no order
-        Ok(match (o.order, o.target) {
+        Ok(match (queued_order.order, queued_order.target) {
             (OrderKind::Follow, Some(t)) => {
-                self.follow_object(t, o.range, OrderForce::Forced, at, side, rng)?
+                self.follow_object(t, queued_order.range, OrderForce::Forced, at, side, rng)?
             }
-            (OrderKind::Transport, _) => self.transport_to(o.point, OrderForce::Forced, side)?,
-            (OrderKind::Enter, Some(t)) => self.enter_object(t, OrderForce::Forced, (at, side))?,
+            (OrderKind::Transport, _) => {
+                self.transport_to(queued_order.point, OrderForce::Forced, side)?
+            }
+            (OrderKind::Enter, Some(object_id)) => {
+                self.enter_object(object_id, OrderForce::Forced, (at, side))?
+            }
             (OrderKind::Unload | OrderKind::UnloadOverWall, _) => {
-                let over_wall = o.order == OrderKind::UnloadOverWall;
+                let over_wall = queued_order.order == OrderKind::UnloadOverWall;
                 self.unload_at(
-                    o.point.ground(),
+                    queued_order.point.ground(),
                     (OrderForce::Forced, over_wall),
                     (at, side),
                 )?
@@ -385,17 +421,17 @@ impl UnitAi {
         let Some(id) = side.top_target_now() else {
             return Ok(None);
         };
-        if let Some(t) = at.top_target.filter(|t| t.id == id) {
+        if let Some(t) = at.top_target.filter(|top_target| top_target.id == id) {
             return Ok(Some(LiveTop {
                 id,
                 kind: t.kind,
                 gap_squared: footprint_gap_squared(at.position, at.size, t.position, t.radius),
             }));
         }
-        Ok(Self::world_object(id, at, side)?.map(|s| LiveTop {
+        Ok(Self::world_object(id, at, side)?.map(|unit_seen| LiveTop {
             id,
-            kind: s.kind,
-            gap_squared: s.gap_squared,
+            kind: unit_seen.kind,
+            gap_squared: unit_seen.gap_squared,
         }))
     }
 
@@ -411,12 +447,12 @@ impl UnitAi {
         at: &Surroundings,
         side: &UnitView<'_, '_>,
     ) -> GenieResult<Option<ObjectId>> {
-        let Some(t) = Self::top_target_live(at, side)? else {
+        let Some(live_top) = Self::top_target_live(at, side)? else {
             return Ok(None);
         };
-        let gap = t.gap_squared;
+        let gap = live_top.gap_squared;
         let in_range = gap <= at.weapon_range.squared() && at.min_range.squared() <= gap;
-        Ok(in_range.then_some(t.id))
+        Ok(in_range.then_some(live_top.id))
     }
 
     /// The object `id` as the world holds it (`FUN_1415417a0`): the unit itself (`at`, its own
@@ -449,7 +485,7 @@ impl UnitAi {
             }));
         }
         at.unit(id)
-            .map_or_else(|| side.seen_unit(id), |u| Ok(Some(*u)))
+            .map_or_else(|| side.seen_unit(id), |unit_seen| Ok(Some(*unit_seen)))
     }
 
     /// `AttackObject` (slot 0xb8) forced, by the unit AI's type, on `target` by `rules`: the

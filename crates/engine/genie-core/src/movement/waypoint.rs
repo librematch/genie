@@ -93,10 +93,9 @@ impl Mover {
             });
         }
         self.drop_held_waypoint(place.position(), world, by_id)?;
-        let parent_is_level_1 = self
-            .paths
-            .get(1)
-            .is_some_and(|p| p.level == WaypointLevel::Planned && !p.points.is_empty());
+        let parent_is_level_1 = self.paths.get(1).is_some_and(|path_data| {
+            path_data.level == WaypointLevel::Planned && !path_data.points.is_empty()
+        });
         if self.paths.walked()?.level == WaypointLevel::Walked
             && parent_is_level_1
             && self.look_ahead(me, world, by_id)? == LookAhead::MovedAhead
@@ -115,17 +114,21 @@ impl Mover {
         let range = level.range;
         let mut beyond = goal.target.map_or_else(
             || (back - range) - Distance::new(movement_tuning.range_floor),
-            |(id, t)| {
-                let own = (footprint_gap(place.position(), ground_radius, t.position, t.radius)
-                    - range)
+            |(id, placed)| {
+                let own = (footprint_gap(
+                    place.position(),
+                    ground_radius,
+                    placed.position,
+                    placed.radius,
+                ) - range)
                     - Distance::new(movement_tuning.range_floor);
                 let near = (place.position(), ground_radius);
                 gate_gap(
                     world,
                     near,
-                    (id, t),
+                    (id, placed),
                     own,
-                    |g| (g - range) - Distance::new(movement_tuning.range_floor),
+                    |distance| (distance - range) - Distance::new(movement_tuning.range_floor),
                     by_id,
                     roles,
                 )
@@ -178,8 +181,8 @@ impl Mover {
         let roles = by_id.roles();
         let level = self.paths.walked()?;
         if level.waypoint.within(level.points.len()) {
-            let p = level.point(level.waypoint);
-            let at = self.set_position(p.position(), world.map, movement_tuning);
+            let point = level.point(level.waypoint);
+            let at = self.set_position(point.position(), world.map, movement_tuning);
             let at = self.grounded(at, world.terrain.as_ref());
             self.moved_to(
                 place,
@@ -219,9 +222,9 @@ impl Mover {
         if level.level == WaypointLevel::Walked || !next.within(level.points.len()) {
             return Ok(());
         }
-        let d = at.vector() - *level.points.checked(next.get() as usize)?;
+        let vector = at.vector() - *level.points.checked(next.get() as usize)?;
         // a NaN distance is not within
-        if d.x() * d.x() + d.height() * d.height() + d.y() * d.y()
+        if vector.x() * vector.x() + vector.height() * vector.height() + vector.y() * vector.y()
             < movement_tuning.target_short_reach
         {
             let [x, _, y] = level.points.checked(level.waypoint.get() as usize)?.get();
@@ -261,10 +264,14 @@ impl Mover {
         let created = level.created;
         let own = world.get(me.id).map(|p| p.player);
         let yields = self.stats.weapon_range == Distance::ZERO
-            && goal.target.is_some_and(|(target, t)| {
-                let moved = by_id.gait(target).map_or(WorldTime::ZERO, |g| g.last_move);
+            && goal.target.is_some_and(|(target, placed)| {
+                let moved = by_id
+                    .gait(target)
+                    .map_or(WorldTime::ZERO, |gait| gait.last_move);
                 moved > created
-                    || (moved == created && (own.is_some_and(|o| o < t.player) || me.id < target))
+                    || (moved == created
+                        && (own.is_some_and(|player_id| player_id < placed.player)
+                            || me.id < target))
             });
         if yields {
             self.reset_level()?;
@@ -294,23 +301,23 @@ impl Mover {
         let at = self.moved_at.vector();
         let last = WaypointIndex::last_of(parent.points.len());
         let from = parent.waypoint;
-        let mut k = from.ahead(5).min(last);
-        while from < k {
-            let p = *parent.points.checked(k.get() as usize)?;
-            let d = p - at;
+        let mut waypoint_index = from.ahead(5).min(last);
+        while from < waypoint_index {
+            let checked = *parent.points.checked(waypoint_index.get() as usize)?;
+            let d = checked - at;
             if d.x() * d.x() + 0.0 + d.y() * d.y() <= movement_tuning.look_ahead
-                && self.straight(me, p, target, world, by_id)?
+                && self.straight(me, checked, target, world, by_id)?
             {
                 break;
             }
-            k = k.previous();
+            waypoint_index = waypoint_index.previous();
         }
-        if k == from {
+        if waypoint_index == from {
             return Ok(LookAhead::Kept);
         }
         let _ = self.paths.remove(0);
         let parent = self.paths.walked_mut()?;
-        parent.waypoint = k;
+        parent.waypoint = waypoint_index;
         parent.state = PathState::WantsPath;
         Ok(LookAhead::MovedAhead)
     }
@@ -397,7 +404,7 @@ impl Mover {
             world.set_manager_buffer(None);
             return Ok(false);
         }
-        let player = world.get(me.id).map(|q| q.player);
+        let player = world.get(me.id).map(|placed| placed.player);
         let hits = world.walk_hits(WalkQuery {
             start: from,
             end: to,
@@ -510,9 +517,9 @@ impl Mover {
                 "a stop that resets the sprite (move algorithm bit 0)",
             ));
         }
-        if let Some(v) = self.velocity.as_mut() {
-            v.velocity = v.velocity.with_y(0.0);
-            v.acceleration = v.acceleration.with_y(0.0);
+        if let Some(velocity) = self.velocity.as_mut() {
+            velocity.velocity = velocity.velocity.with_y(0.0);
+            velocity.acceleration = velocity.acceleration.with_y(0.0);
         }
         self.waiting = 0;
         self.ignore_units.clear();
@@ -551,8 +558,8 @@ impl Mover {
     /// Object slot 185 (`0x1411583d0`): the unit has velocity data whose velocity is longer than 0.
     #[must_use]
     pub fn is_moving(&self) -> bool {
-        self.velocity.as_ref().is_some_and(|v| {
-            let [x, y, z] = v.velocity.get();
+        self.velocity.as_ref().is_some_and(|velocity| {
+            let [x, y, z] = velocity.velocity.get();
             0.0 < sqrt(x * x + y * y + z * z)
         })
     }

@@ -20,7 +20,7 @@ pub struct TransformObjectCommand {
 
 impl TransformObjectCommand {
     /// Its handler ([`World::transform_object`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.transform_object(self.player, self.id, self.master)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.transform_object(self.player, self.id, self.master)
     }
 }

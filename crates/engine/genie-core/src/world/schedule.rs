@@ -203,22 +203,22 @@ impl World {
         }
         // the parts' bookkeeping (FD-045-D51): a part whose object the world no longer holds
         // stops every player
-        if let Err(e) = self.check_parts() {
-            for p in PlayerId::each(self.players.len()) {
-                self.stop_player(p, e.clone());
+        if let Err(error) = self.check_parts() {
+            for player_id in PlayerId::each(self.players.len()) {
+                self.stop_player(player_id, error.clone());
             }
         }
     }
 
-    /// Player `p`'s time slot (`world+0x18c[p]`).
+    /// Player `player_id`'s time slot (`world+0x18c[p]`).
     ///
     /// # Errors
     ///
     /// A player without a slot.
-    fn clock_mut(&mut self, p: PlayerId) -> GenieResult<&mut Millis> {
+    fn clock_mut(&mut self, player_id: PlayerId) -> GenieResult<&mut Millis> {
         self.player_time
-            .get_mut(p.index())
-            .ok_or_else(|| NO_CLOCK.with("player", p))
+            .get_mut(player_id.index())
+            .ok_or_else(|| NO_CLOCK.with("player", player_id))
     }
 
     /// The world's players in their order; a world holds at most a byte's players (a save's
@@ -230,9 +230,9 @@ impl World {
     /// World step `step`; its error stops every player.
     fn world_step(&mut self, step: WorldStep, run: &mut UpdateRun<'_>) {
         let _step = tracing::trace_span!(target: UPDATE, "step", step = %step).entered();
-        if let Err(e) = self.run_world_step(step, run) {
-            for p in PlayerId::each(self.players.len()) {
-                self.stop_player(p, e.clone());
+        if let Err(error) = self.run_world_step(step, run) {
+            for player_id in PlayerId::each(self.players.len()) {
+                self.stop_player(player_id, error.clone());
             }
         }
     }
@@ -259,9 +259,9 @@ impl World {
                 }
             }
             WorldStep::Watched => {
-                for p in PlayerId::each(self.players.len()) {
-                    if let Err(e) = self.watch_pass(p) {
-                        self.stop_player(p, e);
+                for player_id in PlayerId::each(self.players.len()) {
+                    if let Err(error) = self.watch_pass(player_id) {
+                        self.stop_player(player_id, error);
                     }
                 }
             }
@@ -288,46 +288,46 @@ impl World {
         Ok(())
     }
 
-    /// Player `p`'s step `step`.
+    /// Player `player_id`'s step `step`.
     fn player_step(
         &mut self,
         step: PlayerStep,
         run: &mut UpdateRun<'_>,
-        p: PlayerId,
+        player_id: PlayerId,
     ) -> GenieResult<()> {
         match step {
             PlayerStep::Clock => {
-                let time = self.clock_mut(p)?;
+                let time = self.clock_mut(player_id)?;
                 *time = time.wrapping_add(run.dt);
             }
-            PlayerStep::OpenGates => self.open_gates(p, &mut run.gates_open)?,
-            PlayerStep::StartWork if run.start_work => self.start_work(p)?,
+            PlayerStep::OpenGates => self.open_gates(player_id, &mut run.gates_open)?,
+            PlayerStep::StartWork if run.start_work => self.start_work(player_id)?,
             PlayerStep::StartWork => {}
             PlayerStep::Groups => {
                 self.pathing.tiles_changed(self.spatial.take_changes());
-                self.update_groups(p)?;
+                self.update_groups(player_id)?;
             }
             // the world player's or Gaia's own update ([`crate::players::world_player`]), then
             // WorldPlayerBase::update: its plans start over (`+0x67c`), whatever the update met
             PlayerStep::WorldPlayer => {
-                let done = self.update_world_player(p);
-                self.pathing.reset_plans(p);
+                let done = self.update_world_player(player_id);
+                self.pathing.reset_plans(player_id);
                 done?;
             }
             PlayerStep::Objects => {
-                let turn = if p == self.player_turn {
-                    Some(*self.clock_mut(p)?)
+                let turn = if player_id == self.player_turn {
+                    Some(*self.clock_mut(player_id)?)
                 } else {
                     None
                 };
-                self.update_objects(p, (run.dt, turn))?;
+                self.update_objects(player_id, (run.dt, turn))?;
             }
-            PlayerStep::NewTiles => self.process_new_tiles(p)?,
-            PlayerStep::ScoutMap => self.world_player_tail(p)?,
-            PlayerStep::CloseGates => self.close_gates(p, &mut run.gates_open)?,
+            PlayerStep::NewTiles => self.process_new_tiles(player_id)?,
+            PlayerStep::ScoutMap => self.world_player_tail(player_id)?,
+            PlayerStep::CloseGates => self.close_gates(player_id, &mut run.gates_open)?,
             PlayerStep::ClearTiles => {
-                if let Some(v) = self.spatial.sight.as_mut() {
-                    v.clear_new_tiles(p);
+                if let Some(visibility) = self.spatial.sight.as_mut() {
+                    visibility.clear_new_tiles(player_id);
                 }
             }
         }
@@ -405,10 +405,13 @@ mod tests {
         let world: Vec<usize> = BEFORE_PLAYERS
             .iter()
             .chain(&AFTER_PLAYERS)
-            .map(|&s| world_place(s))
+            .map(|&world_step| world_place(world_step))
             .collect();
         assert_eq!(world, (0..WORLD_STEPS).collect::<Vec<_>>());
-        let player: Vec<usize> = EACH_PLAYER.iter().map(|&s| player_place(s)).collect();
+        let player: Vec<usize> = EACH_PLAYER
+            .iter()
+            .map(|&player_step| player_place(player_step))
+            .collect();
         assert_eq!(player, (0..PLAYER_STEPS).collect::<Vec<_>>());
     }
 
@@ -416,15 +419,15 @@ mod tests {
     /// first, then the steps after them.
     #[test]
     fn the_update_runs_each_player_steps_between_the_world_s() {
-        let mut w = bare(3);
+        let mut world = bare(3);
         let mut seen = Vec::new();
-        w.tick_observed(Millis::new(10), &[], &mut |_, step| seen.push(step));
+        world.tick_observed(Millis::new(10), &[], &mut |_, step| seen.push(step));
         let mut expected: Vec<UpdateStep> = BEFORE_PLAYERS.map(UpdateStep::World).to_vec();
-        for p in 0..3 {
+        for index in 0..3 {
             expected.extend(
                 EACH_PLAYER
                     .iter()
-                    .map(|&s| UpdateStep::Player(s, PlayerId::from(p))),
+                    .map(|&player_step| UpdateStep::Player(player_step, PlayerId::from(index))),
             );
         }
         expected.extend(AFTER_PLAYERS.map(UpdateStep::World));
@@ -435,12 +438,12 @@ mod tests {
     /// passes in the world's.
     #[test]
     fn an_observer_sees_the_world_as_each_step_left_it() {
-        let mut w = bare(3);
+        let mut bare = bare(3);
         let (mut clocks, mut turns) = (Vec::new(), Vec::new());
-        w.tick_observed(Millis::new(10), &[], &mut |w, step| match step {
-            UpdateStep::Player(PlayerStep::Clock, _) => clocks.push(w.player_time.clone()),
+        bare.tick_observed(Millis::new(10), &[], &mut |world, step| match step {
+            UpdateStep::Player(PlayerStep::Clock, _) => clocks.push(world.player_time.clone()),
             UpdateStep::World(WorldStep::Turn) => {
-                turns.push((w.player_turn, w.player_time.clone()));
+                turns.push((world.player_turn, world.player_time.clone()));
             }
             _ => {}
         });

@@ -93,13 +93,15 @@ pub fn header_survey(
         let saved = chapters(&game)?[0];
         let saved = saved.header()?;
         survey.saves += 1;
-        for (k, &p) in players.iter().enumerate() {
-            if stopped[k] {
+        for (index, &p) in players.iter().enumerate() {
+            if stopped[index] {
                 continue;
             }
             let game = header_objects(&saved, p, masters)?;
-            for d in object_field_differences_in(object_rows(&turns, p as usize), &game, scope) {
-                let field = field_key(&d.field);
+            for difference in
+                object_field_differences_in(object_rows(&turns, p as usize), &game, scope)
+            {
+                let field = field_key(&difference.field);
                 let _ = rows
                     .entry(field.clone())
                     .and_modify(|r| r.count += 1)
@@ -108,14 +110,14 @@ pub fn header_survey(
                         count: 1,
                         first: update,
                         player: p,
-                        example: d,
+                        example: difference,
                     });
             }
         }
     }
     survey.rows = rows.into_values().collect();
     // stable: the map's order by path stays within an update
-    survey.rows.sort_by_key(|r| r.first);
+    survey.rows.sort_by_key(|survey_row| survey_row.first);
     Ok(survey)
 }
 

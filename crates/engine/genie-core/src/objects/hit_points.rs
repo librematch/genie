@@ -54,20 +54,20 @@ impl HpPowerup {
         self.max - self.taken
     }
 
-    /// Slot 0xb0's first part: below its most, it takes the loss `d` up to its room. The rest
-    /// of the loss, or None when it took all of it.
-    pub fn absorb(&mut self, d: HitPoints) -> Option<HitPoints> {
+    /// Slot 0xb0's first part: below its most, it takes the loss `hit_points` up to its room. The
+    /// rest of the loss, or None when it took all of it.
+    pub fn absorb(&mut self, hit_points: HitPoints) -> Option<HitPoints> {
         let (taken, max) = (self.taken, self.max);
         if taken < max {
             let room = max - taken;
-            if d <= room {
-                self.taken = taken + d;
+            if hit_points <= room {
+                self.taken = taken + hit_points;
                 return None;
             }
             self.taken = taken + room;
-            return Some(d - room);
+            return Some(hit_points - room);
         }
-        Some(d)
+        Some(hit_points)
     }
 }
 
@@ -144,15 +144,15 @@ impl Unit {
     /// (no update of the recordings fills either list): a dying object's kill credits of its
     /// active stingers (`+0xb58`, `+0x954`) and a surviving one's hit point transforms
     /// (`FUN_141204450`); [`crate::combat::damage::lose`] is the same loss on a hit's victim.
-    pub(crate) fn lose_hp(&mut self, combat: &mut Combat, master: &Master, d: HitPoints) {
-        let Some(d) = combat.hp_powerup.absorb(d) else {
+    pub(crate) fn lose_hp(&mut self, combat: &mut Combat, master: &Master, loss: HitPoints) {
+        let Some(hit_points) = combat.hp_powerup.absorb(loss) else {
             return;
         };
         let floor = master
             .creatable_part()
             .invulnerability
             .floor(master.hit_points);
-        let left = self.life.hp - d;
+        let left = self.life.hp - hit_points;
         self.life.hp = if floor == HitPoints::ZERO || floor <= left {
             left
         } else {
@@ -235,15 +235,15 @@ impl Unit {
     /// (`+0xa38`) above its room (`+0xa3c`; `COMISS`/`JBE`, a NaN is not) comes off the hit points
     /// (`MAXSS` with 1: not below 1, a NaN becomes 1) and the powerup takes the room.
     pub(crate) fn clamp_hp_powerup(&mut self, combat: &mut Combat, turn_tuning: &TurnTuning) {
-        let p = combat.hp_powerup;
-        if at_most_or_unordered(p.taken.get(), p.max.get()) {
+        let hp_powerup = combat.hp_powerup;
+        if at_most_or_unordered(hp_powerup.taken.get(), hp_powerup.max.get()) {
             return;
         }
         self.life.hp = HitPoints::new(maxss(
-            self.life.hp.get() - p.room().get().abs(),
+            self.life.hp.get() - hp_powerup.room().get().abs(),
             turn_tuning.hp_powerup_floor,
         ));
-        combat.hp_powerup.taken = p.max;
+        combat.hp_powerup.taken = hp_powerup.max;
     }
 }
 
@@ -256,16 +256,25 @@ mod tests {
     /// passes the rest on, and passes all of it at or above its most (a NaN most too).
     #[test]
     fn powerup_takes_loss_up_to_its_room_and_passes_the_rest() {
-        let mut p = HpPowerup {
+        let mut hp_powerup = HpPowerup {
             taken: HitPoints::new(2.0),
             max: HitPoints::new(5.0),
         };
-        assert_eq!(p.room(), HitPoints::new(3.0));
-        assert_eq!(p.absorb(HitPoints::new(1.0)), None);
-        assert_eq!(p.taken, HitPoints::new(3.0));
-        assert_eq!(p.absorb(HitPoints::new(4.0)), Some(HitPoints::new(2.0)));
-        assert_eq!((p.taken, p.room()), (HitPoints::new(5.0), HitPoints::ZERO));
-        assert_eq!(p.absorb(HitPoints::new(1.5)), Some(HitPoints::new(1.5)));
+        assert_eq!(hp_powerup.room(), HitPoints::new(3.0));
+        assert_eq!(hp_powerup.absorb(HitPoints::new(1.0)), None);
+        assert_eq!(hp_powerup.taken, HitPoints::new(3.0));
+        assert_eq!(
+            hp_powerup.absorb(HitPoints::new(4.0)),
+            Some(HitPoints::new(2.0))
+        );
+        assert_eq!(
+            (hp_powerup.taken, hp_powerup.room()),
+            (HitPoints::new(5.0), HitPoints::ZERO)
+        );
+        assert_eq!(
+            hp_powerup.absorb(HitPoints::new(1.5)),
+            Some(HitPoints::new(1.5))
+        );
         let mut nan = HpPowerup {
             taken: HitPoints::ZERO,
             max: HitPoints::new(f32::NAN),

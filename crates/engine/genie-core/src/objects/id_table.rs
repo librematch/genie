@@ -70,7 +70,7 @@ impl<T> Column<T> {
         if let Some(word) = self.held.get_mut(i / 64) {
             *word |= 1 << (i % 64);
         }
-        self.values.get_mut(i).and_then(|v| v.replace(value))
+        self.values.get_mut(i).and_then(|slot| slot.replace(value))
     }
 
     /// The value at `i` taken out.
@@ -520,12 +520,12 @@ mod tests {
             1,
         ];
         let mut seed = 7_u32;
-        for (n, &v) in ids.iter().cycle().take(400).enumerate() {
+        for (index, &v) in ids.iter().cycle().take(400).enumerate() {
             seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
             if seed >> 30 == 0 {
                 assert_eq!(table.remove(id(v)), map.remove(&id(v)));
             } else {
-                assert_eq!(table.insert(id(v), n), map.insert(id(v), n));
+                assert_eq!(table.insert(id(v), index), map.insert(id(v), index));
             }
             assert_eq!(table.len(), map.len());
             assert!(
@@ -534,7 +534,7 @@ mod tests {
                     .map(|(k, &x)| (k, x))
                     .eq(map.iter().map(|(&k, &x)| (k, x)))
             );
-            let walked: Vec<ObjectId> = table.iter_mut().map(|(k, _)| k).collect();
+            let walked: Vec<ObjectId> = table.iter_mut().map(|(object_id, _)| object_id).collect();
             assert!(walked.into_iter().eq(map.keys().copied()));
         }
         for &v in &ids {

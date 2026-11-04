@@ -7,23 +7,35 @@ use genie_save::generated::world::World;
 /// The world's market as the save holds it: the save names the int net trades `*_price_delta`
 /// (their bits) and the swings `old_*_price_adj`.
 #[must_use]
-pub fn market(w: &World) -> Market {
+pub fn market(world: &World) -> Market {
     let commodity = |price: f32, trades: f32, swing: f32| Commodity {
         price: Price::new(price),
         trades: NetTrades::new(trades.to_bits().cast_signed()),
         swing: PriceSwing::new(swing),
     };
     Market {
-        min_price: Price::new(w.world_min_price),
-        max_price: Price::new(w.world_max_price),
-        food: commodity(w.world_food_price, w.food_price_delta, w.old_food_price_adj),
-        wood: commodity(w.world_wood_price, w.wood_price_delta, w.old_wood_price_adj),
-        stone: commodity(
-            w.world_stone_price,
-            w.stone_price_delta,
-            w.old_stone_price_adj,
+        min_price: Price::new(world.world_min_price),
+        max_price: Price::new(world.world_max_price),
+        food: commodity(
+            world.world_food_price,
+            world.food_price_delta,
+            world.old_food_price_adj,
         ),
-        ore: commodity(w.world_ore_price, w.ore_price_delta, w.old_ore_price_adj),
+        wood: commodity(
+            world.world_wood_price,
+            world.wood_price_delta,
+            world.old_wood_price_adj,
+        ),
+        stone: commodity(
+            world.world_stone_price,
+            world.stone_price_delta,
+            world.old_stone_price_adj,
+        ),
+        ore: commodity(
+            world.world_ore_price,
+            world.ore_price_delta,
+            world.old_ore_price_adj,
+        ),
     }
 }
 
@@ -43,13 +55,13 @@ mod tests {
             world_ore_price: 70.0,
             ..World::default()
         };
-        let m = market(&save);
-        assert_eq!(m.min_price, Price::new(20.0));
-        assert_eq!(m.max_price, Price::new(9999.0));
-        assert_eq!(m.food.price, Price::new(100.0));
-        assert_eq!(m.food.trades, NetTrades::new(3));
-        assert_eq!(m.food.swing, PriceSwing::new(0.5));
-        assert_eq!(m.ore.price, Price::new(70.0));
-        assert_eq!(m.wood.trades, NetTrades::new(0));
+        let market = market(&save);
+        assert_eq!(market.min_price, Price::new(20.0));
+        assert_eq!(market.max_price, Price::new(9999.0));
+        assert_eq!(market.food.price, Price::new(100.0));
+        assert_eq!(market.food.trades, NetTrades::new(3));
+        assert_eq!(market.food.swing, PriceSwing::new(0.5));
+        assert_eq!(market.ore.price, Price::new(70.0));
+        assert_eq!(market.wood.trades, NetTrades::new(0));
     }
 }

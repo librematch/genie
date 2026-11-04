@@ -128,23 +128,23 @@ impl MakeAction {
     /// A farm whose master the slice lacks, and an attribute its player has not got.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         farm: &mut Unit,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            c.w.parts.own_master.get(farm.id),
+            step.w.parts.own_master.get(farm.id),
             (farm.id, farm.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )?;
         match self.state {
             // `+0x18`: the state whose update reports the action done (`FUN_140a99e30` returns 1).
             MakeState::Done => return Ok(HeadCode::Deletes),
             MakeState::Making if Amount::ZERO < self.remaining || self.total <= Amount::ZERO => {
                 let rate = (master.action_part().work_rate
-                    + c.w.parts.combat_of(farm.id).work_rate_powerup)
+                    + step.w.parts.combat_of(farm.id).work_rate_powerup)
                     * self.task.work_val1.get()
-                    * c.dt.seconds();
+                    * step.dt.seconds();
                 let before = farm.life.amount;
                 if self.task.work_flag == 0 {
                     // FUN_14119d320: add, then at most the capacity
@@ -155,8 +155,9 @@ impl MakeAction {
                     }
                 } else {
                     let attribute = self.task.attribute_kind.ok_or(NO_ATTRIBUTE)?;
-                    c.w.players
-                        .player_mut(c.player)?
+                    step.w
+                        .players
+                        .player_mut(step.player)?
                         .add_attribute(attribute, Amount::new(rate))?;
                 }
                 self.remaining -= farm.life.amount - before;
@@ -181,15 +182,15 @@ impl Unit {
     pub(crate) fn make_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let Some(mut make) = actions.list.make().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let made = make.update(c, self, roles);
-        if let Some(m) = actions.list.make_mut() {
-            *m = make;
+        let made = make.update(step, self, roles);
+        if let Some(make_action) = actions.list.make_mut() {
+            *make_action = make;
         }
         made
     }
@@ -253,12 +254,12 @@ mod tests {
     }
 
     fn attributes() -> Vec<Amount> {
-        let mut a = vec![Amount::ZERO; 100];
+        let mut amounts = vec![Amount::ZERO; 100];
         (
-            a[attribute::FARM_FOOD_AMOUNT.index()],
-            a[attribute::FISH_TRAP_FOOD.index()],
+            amounts[attribute::FARM_FOOD_AMOUNT.index()],
+            amounts[attribute::FISH_TRAP_FOOD.index()],
         ) = (Amount::new(175.0), Amount::new(225.0));
-        a
+        amounts
     }
 
     /// Player 1's farm 600 of `master` holding `amount` of food under `make`, its masters the
@@ -283,7 +284,7 @@ mod tests {
             attributes: attributes(),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(1),
@@ -296,21 +297,24 @@ mod tests {
             ..farm_master(ids::ID_7)
         };
         let masters = Masters::new([farm_master(ids::FARM), farm_master(ids::PASTURE), wall]);
-        t.model.masters = vec![Arc::new(Masters::default()), Arc::new(masters)];
-        t
+        world.model.masters = vec![Arc::new(Masters::default()), Arc::new(masters)];
+        world
     }
 
     /// The farm's update of 104 ms through its step: its code, its Make, what it holds and its
     /// hit points.
-    fn made(t: &mut World) -> (HeadCode, MakeAction, f32, f32) {
-        let code = in_update(t, (PlayerId::new(1), ListIndex::new(0)), 104, |u, a, c| {
-            Unit::make_part(u, a, c, &roles())
-        })
+    fn made(world: &mut World) -> (HeadCode, MakeAction, f32, f32) {
+        let code = in_update(
+            world,
+            (PlayerId::new(1), ListIndex::new(0)),
+            104,
+            |unit, action, step| Unit::make_part(unit, action, step, &roles()),
+        )
         .unwrap();
-        let farm = &t.players[1].objects[ListIndex::new(0)];
+        let farm = &world.players[1].objects[ListIndex::new(0)];
         (
             code,
-            *t.parts.actions_of(farm.id).list.make().unwrap(),
+            *world.parts.actions_of(farm.id).list.make().unwrap(),
             farm.life.amount.get(),
             farm.life.hp.get(),
         )
@@ -367,19 +371,19 @@ mod tests {
 
     #[test]
     fn the_update_fills_the_farm_within_its_capacity_and_counts_what_it_made() {
-        let mut t = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 14.98);
-        let (code, make, amount, _) = made(&mut t);
+        let mut world = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 14.98);
+        let (code, make, amount, _) = made(&mut world);
         let gained = 15.0f32 - 14.98;
         assert_eq!(
             (code, amount, make.remaining),
             (HeadCode::Keeps, 15.0, Amount::new(100.0 - gained))
         );
         // at the capacity nothing more is made
-        let (_, make, _, _) = made(&mut t);
+        let (_, make, _, _) = made(&mut world);
         assert_eq!(make.remaining, Amount::new(100.0 - gained));
         // a farmer took 5: the rate's share comes back
-        t.players[1].objects[ListIndex::new(0)].life.amount = Amount::new(10.0);
-        let (_, make, amount, _) = made(&mut t);
+        world.players[1].objects[ListIndex::new(0)].life.amount = Amount::new(10.0);
+        let (_, make, amount, _) = made(&mut world);
         let rate = 0.4f32 * 1.0 * 0.104;
         assert_eq!(amount, 10.0 + rate);
         assert_eq!(
@@ -391,20 +395,21 @@ mod tests {
     /// The farm's powerup (slot 0x6e8, `+0xa30`) adds to its master's work rate.
     #[test]
     fn the_farm_powerup_adds_to_the_rate() {
-        let mut t = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 0.0);
-        t.parts
-            .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+        let mut world = farm_world(making(100.0, 175.0, farm_task()), ids::FARM, 0.0);
+        world
+            .parts
+            .combat_mut(world.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
             .work_rate_powerup = WorkRate::new(0.1);
-        let (_, _, amount, _) = made(&mut t);
+        let (_, _, amount, _) = made(&mut world);
         assert_eq!(amount, (0.4f32 + 0.1) * 1.0 * 0.104);
     }
 
     #[test]
     fn farm_with_nothing_left_to_make_and_nothing_held_is_exhausted_unless_pasture() {
         let exhausted = |master: MasterId, amount: f32| {
-            let mut t = farm_world(making(0.0, 175.0, farm_task()), master, amount);
-            made(&mut t).3 == 0.0
+            let mut world = farm_world(making(0.0, 175.0, farm_task()), master, amount);
+            made(&mut world).3 == 0.0
         };
         assert!(exhausted(ids::FARM, 0.0));
         assert!(!exhausted(ids::PASTURE, 0.0));
@@ -418,9 +423,9 @@ mod tests {
             work_flag: 1,
             ..farm_task()
         };
-        let mut t = farm_world(making(5.0, 5.0, task), ids::FARM, 0.0);
-        let (_, make, amount, _) = made(&mut t);
-        let food = t.players[1].attributes[attribute::FARM_FOOD.index()];
+        let mut world = farm_world(making(5.0, 5.0, task), ids::FARM, 0.0);
+        let (_, make, amount, _) = made(&mut world);
+        let food = world.players[1].attributes[attribute::FARM_FOOD.index()];
         assert_eq!(food, Amount::new(0.4 * 0.104));
         assert_eq!((amount, make.remaining), (0.0, Amount::new(5.0)));
     }
@@ -431,20 +436,20 @@ mod tests {
             state: MakeState::Done,
             ..making(0.0, 0.0, farm_task())
         };
-        let mut t = farm_world(done, ids::FARM, 0.0);
-        assert_eq!(made(&mut t).0, HeadCode::Deletes);
+        let mut world = farm_world(done, ids::FARM, 0.0);
+        assert_eq!(made(&mut world).0, HeadCode::Deletes);
     }
 
     /// A farm whose master the slice lacks stops its update, in any state.
     #[test]
     fn farm_without_its_master_fails() {
-        let mut t = farm_world(making(0.0, 0.0, farm_task()), master_id(99), 0.0);
-        let r = in_update(
-            &mut t,
+        let mut world = farm_world(making(0.0, 0.0, farm_task()), master_id(99), 0.0);
+        let head_code = in_update(
+            &mut world,
             (PlayerId::new(1), ListIndex::new(0)),
             104,
-            |u, a, c| Unit::make_part(u, a, c, &roles()),
+            |unit, action, step| Unit::make_part(unit, action, step, &roles()),
         );
-        assert!(r.is_err());
+        assert!(head_code.is_err());
     }
 }

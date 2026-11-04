@@ -121,8 +121,8 @@ impl<'a> DropDraws<'a> {
         while 0 < self.left {
             self.left -= 1;
             let (x, y) = {
-                let p = self.draw(transport_tuning)?;
-                (p.x(), p.y())
+                let point = self.draw(transport_tuning)?;
+                (point.x(), point.y())
             };
             if 0.0 > x || 0.0 > y || x >= w || y >= h {
                 continue;
@@ -247,10 +247,13 @@ impl<'a> MapShore<'a> {
 
     /// The unit's zone map (`FUN_1411931c0`: the map's for its restriction, `FUN_1414138d0`).
     pub(super) fn zone_map(&mut self) -> GenieResult<Option<&ZoneMap>> {
-        let Some(r) = self.restriction else {
+        let Some(restriction_id) = self.restriction else {
             return Ok(None);
         };
-        let values = self.terrain.restriction(r).ok_or(UNKNOWN_RESTRICTION)?;
+        let values = self
+            .terrain
+            .restriction(restriction_id)
+            .ok_or(UNKNOWN_RESTRICTION)?;
         let (w, h) = (self.map.width(), self.map.height());
         Ok(Some(self.zones.of(
             GridSize::new(w, h),
@@ -269,7 +272,9 @@ impl<'a> MapShore<'a> {
         if tile.x() < 0 || tile.y() < 0 {
             return Ok(ZoneId::OFF_MAP);
         }
-        Ok(self.zone_map()?.map_or(ZoneId::OFF_MAP, |m| m.zone(tile)))
+        Ok(self
+            .zone_map()?
+            .map_or(ZoneId::OFF_MAP, |zone_map| zone_map.zone(tile)))
     }
 
     /// `FUN_1411a7570`: a tile of zone `zone` lies within `reach` of the unit's tile (its place
@@ -284,7 +289,7 @@ impl<'a> MapShore<'a> {
         let zone = ZoneId::new(u16::from(zone.byte()));
         Ok(self
             .zone_map()?
-            .is_some_and(|m| m.near(zone, tile, reach).is_some()))
+            .is_some_and(|zone_map| zone_map.near(zone, tile, reach).is_some()))
     }
 
     /// The terrain table's flags of `tile`, its x and y shorts
@@ -305,7 +310,7 @@ impl<'a> MapShore<'a> {
     pub(crate) fn shore_point(&mut self, from: Point, to: Point) -> GenieResult<Option<Point>> {
         let Some(planner) = self
             .restriction
-            .and_then(|r| self.pathing.planner(r, self.tiles))
+            .and_then(|restriction_id| self.pathing.planner(restriction_id, self.tiles))
         else {
             return Ok(None);
         };

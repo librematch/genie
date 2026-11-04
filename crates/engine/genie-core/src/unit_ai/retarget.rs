@@ -94,7 +94,7 @@ impl UnitAi {
         }
         self.last_retarget_time = world_time;
         self.retarget_timer = Millis::new(750 + ai.rand15() % 500);
-        let target = at.target.map(|t| (t.owner, t.class));
+        let target = at.target.map(|seen| (seen.owner, seen.class));
         let listed = at
             .action_state
             .map(|_| at.flags.contains(SurroundingFlags::ATTACK_LISTED));
@@ -138,7 +138,9 @@ impl UnitAi {
                 self.current_order,
                 Some(OrderKind::Patrol | OrderKind::AttackMove)
             )
-            && !at.group.is_some_and(|g| g.contains(GroupState::PATROL));
+            && !at
+                .group
+                .is_some_and(|group_state| group_state.contains(GroupState::PATROL));
         // with patrol information (+0x1c0) the leash is the distance from where the unit last
         // moved to (slot 0x520) to the patrol's path (FUN_140f95e10): beyond it the unit stops
         // (slot 0xb0 with 1), forgets its target and walks the patrol on
@@ -267,9 +269,9 @@ impl UnitAi {
         let mut id = found.id;
         if let Some(n) = new {
             if n.kind == MasterKind::BUILDING {
-                let farm_rule = current
-                    .is_none_or(|c| !roles.of_class(c.class).contains(ClassRoles::FARM))
-                    || roles.of_class(n.class).contains(ClassRoles::FARM);
+                let farm_rule = current.is_none_or(|unit_seen| {
+                    !roles.of_class(unit_seen.class).contains(ClassRoles::FARM)
+                }) || roles.of_class(n.class).contains(ClassRoles::FARM);
                 if !roles
                     .of_class(n.class)
                     .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
@@ -428,7 +430,7 @@ impl UnitAi {
             defended = held.map(|t| (target, t));
         }
         let toward_it = self.current_action == Some(AiAction::Move)
-            && Self::top_target_live(at, side)?.map(|t| t.id) == self.defend_target;
+            && Self::top_target_live(at, side)?.map(|live_top| live_top.id) == self.defend_target;
         if matches!(
             self.current_action,
             Some(AiAction::Attack | AiAction::MoveAside)
@@ -444,18 +446,24 @@ impl UnitAi {
         };
         let reach = self.desired_distance.get() + unit_ai_tuning.defend_slack;
         if reach * reach < gap.get() {
-            if let Some((target, t)) = defended {
+            if let Some((target, unit_seen)) = defended {
                 let range = self.desired_distance;
-                self.move_to_object(target, (t.state, t.class, t.position), range, side, ai)?;
+                self.move_to_object(
+                    target,
+                    (unit_seen.state, unit_seen.class, unit_seen.position),
+                    range,
+                    side,
+                    ai,
+                )?;
             } else {
-                let m = self.move_to(AiMove {
+                let move_to = self.move_to(AiMove {
                     point: self.target_point,
                     range: self.desired_distance,
                     force: OrderForce::Forced,
                     pace: Pace::Run,
                 });
-                if let Some(m) = m {
-                    side.effect_now(Effect::Move(m), self, ai)?;
+                if let Some(ai_move) = move_to {
+                    side.effect_now(Effect::Move(ai_move), self, ai)?;
                 }
             }
             return Ok(MiscEnd::Ends);
@@ -501,7 +509,7 @@ impl UnitAi {
         let (Some(id), Some(target)) = (
             self.current_target,
             at.target
-                .filter(|t| t.state <= ObjectState::Alive && t.visible),
+                .filter(|seen| seen.state <= ObjectState::Alive && seen.visible),
         ) else {
             self.defend_target = None;
             self.remove_target();

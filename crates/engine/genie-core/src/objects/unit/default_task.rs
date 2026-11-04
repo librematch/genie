@@ -21,51 +21,52 @@ impl Unit {
     pub(crate) fn start_default_task(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<DefaultStart> {
         if self.life.state != ObjectState::Alive
             || actions.top_action_kind().is_some()
-            || c.w.parts.production.contains(self.id)
+            || step.w.parts.production.contains(self.id)
         {
             return Ok(DefaultStart::NotStarted);
         }
         match actions.default_task {
             DefaultTask::Nothing => Ok(DefaultStart::NotStarted),
             DefaultTask::Fly => {
-                let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
+                let task = Master::default_task(self.master(step.w.master_tables(), step.player)?)
                     .copied()
                     .ok_or(GenieError::missing_data(
                         "a bird's default Fly whose master has no default task",
                     ))?;
-                self.start_fly(actions, c, task)?;
+                self.start_fly(actions, step, task)?;
                 Ok(DefaultStart::Started)
             }
             DefaultTask::Make => {
                 // it starts once
                 actions.default_task = DefaultTask::Nothing;
-                let task = Master::default_task(self.master(c.w.master_tables(), c.player)?)
+                let task = Master::default_task(self.master(step.w.master_tables(), step.player)?)
                     .copied()
                     .ok_or(GenieError::unsupported("a Make whose master has no task"))?;
                 actions.list.set_make(Some(MakeAction::start(
                     task,
-                    &c.w.players.player(c.player)?.attributes,
+                    &step.w.players.player(step.player)?.attributes,
                     &mut self.life,
-                    &c.w.model.roles,
-                    c.w.model.slots,
+                    &step.w.model.roles,
+                    step.w.model.slots,
                 )));
                 Ok(DefaultStart::Started)
             }
             DefaultTask::Artifact => {
                 // the factory gives the action the default task, whose moving sprite its
                 // MoveTos take
-                let moving = Master::default_task(self.master(c.w.master_tables(), c.player)?)
-                    .and_then(|t| t.sprites.moving);
+                let moving =
+                    Master::default_task(self.master(step.w.master_tables(), step.player)?)
+                        .and_then(|t| t.sprites.moving);
                 actions
                     .list
-                    .set_artifact(Some(Artifact::new(c.player, moving)));
+                    .set_artifact(Some(Artifact::new(step.player, moving)));
                 Ok(DefaultStart::Started)
             }
-            DefaultTask::Fails(f) => Err(f.error()),
+            DefaultTask::Fails(unstartable) => Err(unstartable.error()),
         }
     }
 }

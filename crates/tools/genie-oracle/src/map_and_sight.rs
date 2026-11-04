@@ -35,10 +35,14 @@ pub(super) fn saved_terrain(header: &Header) -> (usize, Vec<(u8, u8, i16)>) {
     let tiles = map
         .rows
         .iter()
-        .flat_map(|r| {
-            r.tiles
-                .iter()
-                .map(|t| (t.terrain_kind, t.restore_terrain_kind, t.layer))
+        .flat_map(|rge_map_row| {
+            rge_map_row.tiles.iter().map(|rge_tile| {
+                (
+                    rge_tile.terrain_kind,
+                    rge_tile.restore_terrain_kind,
+                    rge_tile.layer,
+                )
+            })
         })
         .collect();
     (map.map_width as usize, tiles)
@@ -51,15 +55,15 @@ pub(super) fn tile_differences(
     tiles: &[(u8, u8, i16)],
 ) -> Vec<String> {
     let mut out = Vec::new();
-    for (i, &theirs) in tiles.iter().enumerate() {
+    for (index, &theirs) in tiles.iter().enumerate() {
         let ours = TileTerrain {
-            kind: slice.kinds[i],
-            restore: slice.restore[i],
-            layer: slice.layers[i],
+            kind: slice.kinds[index],
+            restore: slice.restore[index],
+            layer: slice.layers[index],
         };
         let theirs = TileTerrain::of_save(theirs.0, theirs.1, theirs.2);
         if ours != theirs {
-            let (x, y) = (i % width, i / width);
+            let (x, y) = (index % width, index / width);
             out.push(format!(
                 "terrain tile ({x}, {y}): slice {ours:?} game {theirs:?}"
             ));
@@ -118,20 +122,22 @@ pub fn saved_visibility(save: &[u8]) -> GenieResult<Visibility> {
 #[must_use]
 pub fn visibility_differences(slice: &Visibility, game: &Visibility, player: usize) -> Vec<String> {
     let mut out = Vec::new();
-    let (Some(a), Some(b)) = (slice.maps.get(player), game.maps.get(player)) else {
+    let (Some(player_visible_map), Some(visible_map)) =
+        (slice.maps.get(player), game.maps.get(player))
+    else {
         return vec![format!("player {player} has no visible map")];
     };
-    if a.explored != b.explored {
+    if player_visible_map.explored != visible_map.explored {
         out.push(format!(
             "player {player} explored {} tiles, the game {}",
-            a.explored.get(),
-            b.explored.get()
+            player_visible_map.explored.get(),
+            visible_map.explored.get()
         ));
     }
     out.extend(resource_differences(slice, game, player));
-    let w = slice.size.width().max(1) as usize;
-    let bits = PlayerId::try_from(player).map_or(VisionBits::NONE, |p| {
-        VisionBits::visible(p) | VisionBits::explored(p)
+    let width = slice.size.width().max(1) as usize;
+    let bits = PlayerId::try_from(player).map_or(VisionBits::NONE, |player_id| {
+        VisionBits::visible(player_id) | VisionBits::explored(player_id)
     });
     let unified_same = || {
         slice
@@ -141,15 +147,20 @@ pub fn visibility_differences(slice: &Visibility, game: &Visibility, player: usi
             .all(|(&u, &v)| u & bits == v & bits)
     };
     // the usual case, every tile the same, without a look at each tile's place
-    if a.counts == b.counts && unified_same() {
+    if player_visible_map.counts == visible_map.counts && unified_same() {
         return out;
     }
-    for (i, (&c, &g)) in a.counts.iter().zip(&b.counts).enumerate() {
-        let (u, v) = (slice.unified[i] & bits, game.unified[i] & bits);
+    for (index, (&c, &g)) in player_visible_map
+        .counts
+        .iter()
+        .zip(&visible_map.counts)
+        .enumerate()
+    {
+        let (u, v) = (slice.unified[index] & bits, game.unified[index] & bits);
         if c == g && u == v {
             continue;
         }
-        let (x, y) = (i % w, i / w);
+        let (x, y) = (index % width, index / width);
         if c != g {
             out.push(format!(
                 "player {player} tile ({x}, {y}) count {c}, the game {g}"
@@ -172,21 +183,23 @@ pub(super) fn resource_differences(
     game: &Visibility,
     player: usize,
 ) -> Vec<String> {
-    let (Some(a), Some(b)) = (slice.resources.get(player), game.resources.get(player)) else {
+    let (Some(player_visible_resources), Some(visible_resources)) =
+        (slice.resources.get(player), game.resources.get(player))
+    else {
         return vec![format!("player {player} has no visible-resource lists")];
     };
     let mut out = Vec::new();
-    if a.lists.len() != b.lists.len() {
+    if player_visible_resources.lists.len() != visible_resources.lists.len() {
         out.push(format!(
             "player {player} holds {} visible-resource lists, the game {}",
-            a.lists.len(),
-            b.lists.len()
+            player_visible_resources.lists.len(),
+            visible_resources.lists.len()
         ));
     }
-    if a.capacities != b.capacities {
+    if player_visible_resources.capacities != visible_resources.capacities {
         out.push(format!(
             "player {player} visible-resource capacities {:?}, the game {:?}",
-            a.capacities, b.capacities
+            player_visible_resources.capacities, visible_resources.capacities
         ));
     }
     let bits = |r: &VisibleResource| {
@@ -198,15 +211,20 @@ pub(super) fn resource_differences(
             r.at.y().to_bits(),
         )
     };
-    for (g, (x, y)) in a.lists.iter().zip(&b.lists).enumerate() {
+    for (index, (x, y)) in player_visible_resources
+        .lists
+        .iter()
+        .zip(&visible_resources.lists)
+        .enumerate()
+    {
         if let Some(k) = x.iter().zip(y).position(|(r, s)| bits(r) != bits(s)) {
             out.push(format!(
-                "player {player} visible resources {g}: record {k} {:?}, the game {:?}",
+                "player {player} visible resources {index}: record {k} {:?}, the game {:?}",
                 x[k], y[k]
             ));
         } else if x.len() != y.len() {
             out.push(format!(
-                "player {player} visible resources {g}: {} records, the game {}",
+                "player {player} visible resources {index}: {} records, the game {}",
                 x.len(),
                 y.len()
             ));

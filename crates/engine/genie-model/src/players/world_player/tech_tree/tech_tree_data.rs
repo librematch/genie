@@ -105,71 +105,82 @@ impl TechTree {
     /// unit's age 2 out with the Feudal Age, 3 with the Feudal or Castle and 4 with any. A
     /// building the civilisation lacks under the full tech tree tries the fallback civilisation
     /// once it is another.
-    pub(in crate::players::world_player) fn find(&self, q: &TreeQuery<'_>) -> Found<'_> {
-        let mut civ = q.civ;
+    pub(in crate::players::world_player) fn find(&self, tree_query: &TreeQuery<'_>) -> Found<'_> {
+        let mut civ = tree_query.civ;
         loop {
             let Some(buildings) = self.civs.get(civ.index()) else {
                 return Found::NoCiv;
             };
-            if let Some(b) = buildings.iter().find(|b| b.id == q.building) {
-                let unit = b.units.iter().find(|u| u.id == q.unit);
+            if let Some(b) = buildings
+                .iter()
+                .find(|tree_building| tree_building.id == tree_query.building)
+            {
+                let unit = b.units.iter().find(|u| u.id == tree_query.unit);
                 let age = unit.map_or(Age::Default, |u| u.age);
-                if q.settings.last_age().before() < age {
+                if tree_query.settings.last_age().before() < age {
                     return Found::OutOfAges;
                 }
-                let [feudal, castle, imperial] = q.ages_out;
-                let out = unit.is_some_and(|u| {
-                    (u.age == Age::Feudal && feudal)
-                        || (u.age == Age::Castle && (feudal || castle))
-                        || (u.age == Age::Imperial && (feudal || castle || imperial))
+                let [feudal, castle, imperial] = tree_query.ages_out;
+                let out = unit.is_some_and(|tree_unit| {
+                    (tree_unit.age == Age::Feudal && feudal)
+                        || (tree_unit.age == Age::Castle && (feudal || castle))
+                        || (tree_unit.age == Age::Imperial && (feudal || castle || imperial))
                 });
                 if out {
                     return Found::OutOfAges;
                 }
                 return Found::Unit(unit);
             }
-            if civ == q.fallback || !q.settings.flags.contains(OptionFlags::FULL_TECH_TREE) {
+            if civ == tree_query.fallback
+                || !tree_query
+                    .settings
+                    .flags
+                    .contains(OptionFlags::FULL_TECH_TREE)
+            {
                 return Found::NoBuilding;
             }
-            civ = q.fallback;
+            civ = tree_query.fallback;
         }
     }
 
     /// `FUN_1414f5970`: the unit is in the civilisation's tree at the building, within the ages.
     #[must_use]
-    pub fn has(&self, q: &TreeQuery<'_>) -> bool {
-        matches!(self.find(q), Found::Unit(Some(_)))
+    pub fn has(&self, tree_query: &TreeQuery<'_>) -> bool {
+        matches!(self.find(tree_query), Found::Unit(Some(_)))
     }
 
     /// `FUN_1414f5340`: the unit's link (`+0x4`); 0 out of the ages or without the civilisation,
     /// −1 without the building or the unit (a building found without the unit tries the
     /// fallback civilisation as one not found does).
     #[must_use]
-    pub fn link(&self, q: &TreeQuery<'_>) -> TreeMaster {
-        TreeMaster::of_data(self.field(q, |u| u.link.get()))
+    pub fn link(&self, tree_query: &TreeQuery<'_>) -> TreeMaster {
+        TreeMaster::of_data(self.field(tree_query, |tree_unit| tree_unit.link.get()))
     }
 
     /// `FUN_1414f4c80`: the unit's technology (`+0xc`), as [`TechTree::link`].
     #[must_use]
-    pub fn tech(&self, q: &TreeQuery<'_>) -> TreeTech {
-        TreeTech::of_data(self.field(q, |u| u.tech.get()))
+    pub fn tech(&self, tree_query: &TreeQuery<'_>) -> TreeTech {
+        TreeTech::of_data(self.field(tree_query, |tree_unit| tree_unit.tech.get()))
     }
 
     pub(in crate::players::world_player) fn field(
         &self,
-        q: &TreeQuery<'_>,
+        tree_query: &TreeQuery<'_>,
         f: impl Fn(&TreeUnit) -> i32,
     ) -> i32 {
-        match self.find(q) {
+        match self.find(tree_query) {
             Found::NoCiv | Found::OutOfAges => 0,
-            Found::Unit(Some(u)) => f(u),
+            Found::Unit(Some(tree_unit)) => f(tree_unit),
             Found::Unit(None)
-                if q.civ != q.fallback
-                    && q.settings.flags.contains(OptionFlags::FULL_TECH_TREE) =>
+                if tree_query.civ != tree_query.fallback
+                    && tree_query
+                        .settings
+                        .flags
+                        .contains(OptionFlags::FULL_TECH_TREE) =>
             {
                 let again = TreeQuery {
-                    civ: q.fallback,
-                    ..*q
+                    civ: tree_query.fallback,
+                    ..*tree_query
                 };
                 self.field(&again, f)
             }

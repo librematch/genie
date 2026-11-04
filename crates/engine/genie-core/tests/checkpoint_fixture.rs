@@ -16,27 +16,27 @@ fn load() -> (PlayerState, [Option<u32>; 11]) {
         .lines()
         .filter(|l| !l.starts_with('#') && !l.is_empty())
     {
-        let mut f = line.split_whitespace();
-        let tag = f.next().unwrap();
-        let v: Vec<&str> = f.collect();
-        let num = |i: usize| v[i].parse::<f32>().unwrap();
+        let mut fields = line.split_whitespace();
+        let tag = fields.next().unwrap();
+        let texts: Vec<&str> = fields.collect();
+        let num = |i: usize| texts[i].parse::<f32>().unwrap();
         match tag {
             "player" => {
-                player.id = v[0].parse().unwrap();
+                player.id = texts[0].parse().unwrap();
                 player.resources = [num(1), num(2), num(3), num(4)].map(Amount::new);
-                player.sleeping_count = v[5].parse().unwrap();
+                player.sleeping_count = texts[5].parse().unwrap();
             }
             "object" => player.live.push(CheckpointObject {
-                id: ObjectId::try_from(v[0].parse::<i32>().unwrap()).unwrap(),
-                main_id: MasterId::of_data(v[1].parse().unwrap()).unwrap(),
-                state: ObjectState::of_byte(v[2].parse().unwrap()).unwrap(),
+                id: ObjectId::try_from(texts[0].parse::<i32>().unwrap()).unwrap(),
+                main_id: MasterId::of_data(texts[1].parse().unwrap()).unwrap(),
+                state: ObjectState::of_byte(texts[2].parse().unwrap()).unwrap(),
                 amount_held: Amount::new(num(3)),
                 position: Position::new(num(4), num(5), num(6)),
                 ..CheckpointObject::default()
             }),
             "expected" => {
-                for (k, w) in v.iter().enumerate() {
-                    expected[k] = w.parse().ok();
+                for (index, text) in texts.iter().enumerate() {
+                    expected[index] = text.parse().ok();
                 }
             }
             other => panic!("unknown fixture line tag {other:?}"),
@@ -49,9 +49,9 @@ fn load() -> (PlayerState, [Option<u32>; 11]) {
 fn header_state_reproduces_checkpoint_1_for_player_2() {
     let (player, expected) = load();
     let got = player_block(&player);
-    for (k, want) in expected.iter().enumerate() {
+    for (index, want) in expected.iter().enumerate() {
         if let Some(want) = want {
-            assert_eq!(got[k], *want, "word {k}");
+            assert_eq!(got[index], *want, "word {index}");
         }
     }
 }

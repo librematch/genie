@@ -112,7 +112,9 @@ impl UnitAi {
             && (!busy || (!self.orders.is_empty() && side.interruptible_now()?))
             && result != 0xd
             && self.can_order(at, OrderTest::Any)
-            && at.group.is_none_or(|g| g.contains(GroupState::IDLE))
+            && at
+                .group
+                .is_none_or(|group_state| group_state.contains(GroupState::IDLE))
             && !at.flags.contains(SurroundingFlags::GARRISONED)
         {
             self.run_orders(at, side, player_kind, ai)?;
@@ -224,20 +226,21 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<()> {
         let id = side.top_target_now();
-        let Some(t) = id.map(|id| side.target_flags(id)).transpose()?.flatten() else {
+        let Some(target_flags) = id.map(|id| side.target_flags(id)).transpose()?.flatten() else {
             return Ok(());
         };
         let captured_again = at.player == PlayerId::GAIA
-            && t.owner == PlayerId::GAIA
-            && MasterKind::COMBAT <= t.kind
-            && t.capture == CaptureKind::Again;
+            && target_flags.owner == PlayerId::GAIA
+            && MasterKind::COMBAT <= target_flags.kind
+            && target_flags.capture == CaptureKind::Again;
         let action = if captured_again {
             None
         } else {
             self.current_action
         };
-        let untargeted = t.pasture.is_none()
-            && (t.untargetable || (!t.attackable && action == Some(AiAction::Attack)))
+        let untargeted = target_flags.pasture.is_none()
+            && (target_flags.untargetable
+                || (!target_flags.attackable && action == Some(AiAction::Attack)))
             && action != Some(AiAction::Trade);
         if captured_again {
             self.remove_target();
@@ -257,18 +260,18 @@ impl UnitAi {
         if self.current_order == Some(OrderKind::Build) {
             return Ok(());
         }
-        for k in (0..self.orders.len()).rev() {
-            let order = *self.orders.checked(k)?;
+        for index in (0..self.orders.len()).rev() {
+            let order = *self.orders.checked(index)?;
             if order.order != OrderKind::Build {
                 continue;
             }
             // none (−1) is a foundation the world does not hold
             let seen = match order.target {
-                Some(t) => side.seen_unit(t)?,
+                Some(object_id) => side.seen_unit(object_id)?,
                 None => None,
             };
-            if seen.is_none_or(|u| u.state != ObjectState::Foundation) {
-                let _ = self.orders.remove(k);
+            if seen.is_none_or(|unit_seen| unit_seen.state != ObjectState::Foundation) {
+                let _ = self.orders.remove(index);
             }
         }
         Ok(())
@@ -327,10 +330,10 @@ impl UnitAi {
                     self.idle_timer = self.idle_timeout;
                 }
             }
-            Some(t) => {
+            Some(seen) => {
                 if at.state == ObjectState::Alive
-                    && ObjectState::Alive < t.state
-                    && t.kind != MasterKind::BUILDING
+                    && ObjectState::Alive < seen.state
+                    && seen.kind != MasterKind::BUILDING
                 {
                     let attack_over = action == Some(AiAction::Attack)
                         && at
@@ -341,7 +344,7 @@ impl UnitAi {
                             .get()
                             != 2;
                     if self.stop_after_kill
-                        || action.is_some_and(|a| LIVE_TARGET_ACTIONS.contains(&a))
+                        || action.is_some_and(|ai_action| LIVE_TARGET_ACTIONS.contains(&ai_action))
                         || attack_over
                     {
                         self.stop_after_kill = false;
@@ -360,7 +363,9 @@ impl UnitAi {
                     && (matches!(
                         self.current_order,
                         Some(OrderKind::Patrol | OrderKind::AttackMove)
-                    ) || at.group.is_some_and(|g| g.contains(GroupState::PATROL)))
+                    ) || at
+                        .group
+                        .is_some_and(|group_state| group_state.contains(GroupState::PATROL)))
                 {
                     return Err(GenieError::unsupported(
                         "the patrol range of a unit AI's target",
@@ -389,14 +394,14 @@ impl UnitAi {
     /// computer player's villager that found nothing are not modelled.
     pub(super) fn hunter_search(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        let class = ClassId::of_param(n.p[1])?
+        let class = ClassId::of_param(notify.p[1])?
             .or(self.target_class)
             .or(self.last_target_class);
         let Some(class) = class else {
@@ -449,7 +454,7 @@ impl UnitAi {
                     } else {
                         WorkerCount::NO_CAP
                     },
-                    site: DropSiteId::of_field(n.p[2]),
+                    site: DropSiteId::of_field(notify.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,
@@ -484,14 +489,14 @@ impl UnitAi {
     /// notify's class 49) `ClosestObject`'s ninth argument is 0: friends' farms pass.
     pub(super) fn gatherer_search(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        let noted = ClassId::of_param(n.p[1])?;
+        let noted = ClassId::of_param(notify.p[1])?;
         let class = self.target_class.or(self.last_target_class).or(noted);
         let Some(class) = class else {
             self.remove_target();
@@ -542,7 +547,7 @@ impl UnitAi {
                 side.closest_resource(ResourceSearch {
                     kind,
                     cap,
-                    site: DropSiteId::of_field(n.p[2]),
+                    site: DropSiteId::of_field(notify.p[2]),
                     current: self.current_target,
                     point: NO_POINT,
                     min_state: ObjectState::Alive,
@@ -595,14 +600,14 @@ impl UnitAi {
     ) -> GenieResult<()> {
         let produced = self.process_idle(at, player_kind, ai, side)?;
         if produced == IdleOutcome::Idle {
-            let m = self.move_to(AiMove {
+            let move_to = self.move_to(AiMove {
                 point: self.target_point,
                 range: at.weapon_range,
                 force: OrderForce::Forced,
                 pace: Pace::Run,
             });
-            if let Some(m) = m {
-                side.effect_now(Effect::Move(m), self, ai)?;
+            if let Some(ai_move) = move_to {
+                side.effect_now(Effect::Move(ai_move), self, ai)?;
             }
         }
         self.leave_patrol_timers(ai);

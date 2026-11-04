@@ -131,15 +131,15 @@ impl AttributeId {
     #[must_use]
     pub const fn field(attribute: Option<Self>) -> i16 {
         match attribute {
-            Some(a) => a.0,
+            Some(attribute_id) => attribute_id.0,
             None => -1,
         }
     }
 }
 
 impl genie_diff::Diff for AttributeId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -181,7 +181,10 @@ mod tests {
     fn resources_are_the_four_resource_attributes_in_order() {
         let resources = AttributeId::resources();
         assert!(resources.iter().all(|a| a.is_resource()));
-        assert_eq!(resources.map(|a| a.get()), [0, 1, 2, 3]);
+        assert_eq!(
+            resources.map(|attribute_id| attribute_id.get()),
+            [0, 1, 2, 3]
+        );
         assert!(!AttributeId::named(4).is_resource());
     }
 
@@ -202,7 +205,7 @@ mod tests {
     fn field_minus_one_is_none_and_another_negative_value_an_error() {
         assert_eq!(AttributeId::of_field(-1), Ok(None));
         assert_eq!(AttributeId::of_field(16), Ok(Some(FARM_FOOD)));
-        assert!(AttributeId::of_field(-2).is_err_and(|e| e.kind() != ErrorKind::Io));
+        assert!(AttributeId::of_field(-2).is_err_and(|error| error.kind() != ErrorKind::Io));
     }
 
     /// The food loads are food and the kinds 15 to 17; a load's resource is itself for 0 to 3,
@@ -217,7 +220,9 @@ mod tests {
         }
         assert_eq!(WOOD.load_resource(), Some(WOOD));
         assert_eq!(
-            AttributeId::named(56).load_resource().map(|a| a.get()),
+            AttributeId::named(56)
+                .load_resource()
+                .map(|attribute_id| attribute_id.get()),
             Some(56)
         );
         assert_eq!(MEAT.load_resource(), Some(FOOD));

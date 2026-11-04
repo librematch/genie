@@ -27,15 +27,15 @@ impl BuildingQueueCommand {
     /// reads as the last commanded units; the handler reads the first of the packet's ids
     /// ([`World::read_units`], [`World::command_queue`]). With the count `0xffff` the handler
     /// reads its 60 (or 500) ids past the end of the packet.
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
         if self.units.names_last_commanded() {
             return Err(GenieError::invalid_input(
                 "a BUILDING_COMMAND_QUEUE of the last commanded units reads past its packet",
             ));
         }
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
-        w.command_queue(self.player, ids, self.target, self.point)
+        world.command_queue(self.player, ids, self.target, self.point)
     }
 }

@@ -70,8 +70,8 @@ impl ChargeKind {
 }
 
 impl genie_diff::Diff for ChargeKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -85,7 +85,7 @@ mod tests {
         let of = |test: fn(ChargeKind) -> bool| -> Vec<i16> {
             (-5..9)
                 .map(ChargeKind::of_data)
-                .filter(|&t| test(t))
+                .filter(|&charge_kind| test(charge_kind))
                 .map(ChargeKind::get)
                 .collect()
         };

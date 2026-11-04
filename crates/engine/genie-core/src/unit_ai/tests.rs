@@ -170,8 +170,8 @@ fn the_builder_flood_tests_left_right_below_above() {
     assert_eq!(found, Ok(Some(object_id(1))));
     let mut tested = Vec::new();
     assert_eq!(
-        flood_search(at, 3, |t: Tile| {
-            tested.push((t.x(), t.y()));
+        flood_search(at, 3, |tile: Tile| {
+            tested.push((tile.x(), tile.y()));
             Ok(None)
         }),
         Ok(None)
@@ -191,10 +191,10 @@ fn the_builder_flood_tests_left_right_below_above() {
 #[test]
 fn priest_converts_by_its_faith_its_task_and_the_object() {
     let attributes = {
-        let mut a = vec![Amount::ZERO; 100];
-        a[67] = Amount::new(1.0);
-        a[28] = Amount::ZERO;
-        a
+        let mut amounts = vec![Amount::ZERO; 100];
+        amounts[67] = Amount::new(1.0);
+        amounts[28] = Amount::ZERO;
+        amounts
     };
     let tasks = [
         Task {
@@ -317,17 +317,21 @@ fn priest_converts_by_its_faith_its_task_and_the_object() {
 #[test]
 fn the_order_history_keeps_the_eight_newest_first() {
     let mut ai = UnitAi::default();
-    for t in 0..10 {
+    for index in 0..10 {
         ai.remember_order(OrderRecord {
             order: Some(OrderKind::Attack),
             action: Some(AiAction::Attack),
-            time: WorldTime::from_millis(t),
-            target: ObjectId::of_field(100 + t as i32),
+            time: WorldTime::from_millis(index),
+            target: ObjectId::of_field(100 + index as i32),
             category: attack_category(1),
             ..OrderRecord::default()
         });
     }
-    let targets: Vec<Option<ObjectId>> = ai.order_history.iter().map(|r| r.target).collect();
+    let targets: Vec<Option<ObjectId>> = ai
+        .order_history
+        .iter()
+        .map(|order_record| order_record.target)
+        .collect();
     assert_eq!(
         targets,
         [
@@ -489,13 +493,13 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
                 )
             });
         }
-        let mut w = scene.build();
-        let r = run_ai(
-            &mut w,
+        let mut build = scene.build();
+        let run_ai = run_ai(
+            &mut build,
             (player_id(1), object_id(7558)),
             |ai, at, side, kind, _| ai.ask_for_help(object_id(7955), at, kind, side),
         );
-        (r, w)
+        (run_ai, build)
     };
     let alert = |w: &World| w.parts.unit_ai.get(object_id(7558)).unwrap().alert_mode;
     // an attacker the world does not hold: no search
@@ -504,10 +508,10 @@ fn call_for_help_searches_what_the_unit_cares_about_then_walks_the_lists() {
     assert!(w.spatial.searched().is_none());
     assert_eq!(alert(&w), AlertMode::Calm);
     // the search finds the enemy and the alert mode follows
-    let (r, w) = ask(true, false);
+    let (r, world) = ask(true, false);
     assert_eq!(r, Ok(()));
-    assert!(w.spatial.searched().is_some());
-    assert_eq!(alert(&w), AlertMode::Alert);
+    assert!(world.spatial.searched().is_some());
+    assert_eq!(alert(&world), AlertMode::Alert);
     // the walk meets the idle soldier within reach
     assert_eq!(ask(true, true).0, helper_answers());
 }
@@ -584,7 +588,7 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             Position::new(29.6, 89.6, 0.0),
         )
     };
-    let mut w = Scene::open(GridSize::new(120, 120))
+    let mut world = Scene::open(GridSize::new(120, 120))
         .object(villager)
         .object(SceneObject {
             desolid: true,
@@ -598,23 +602,23 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
             Position::new(33.5, 95.5, 0.0),
         ))
         .build();
-    let n = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
+    let notify = Notify::own(object_id(9175), NotifyKind::SENT_OFF, [100, 150, 10028]);
     let answer = run_ai(
-        &mut w,
+        &mut world,
         (player_id(1), object_id(9175)),
-        |ai, _, side, _, rng| ai.sent_off(n, side, rng, &roles(), &tuning().unit_ai),
+        |ai, _, side, _, rng| ai.sent_off(notify, side, rng, &roles(), &tuning().unit_ai),
     );
     assert_eq!(answer, Ok(GO_ON));
     let me = object_id(9175);
-    let walk = w
+    let walk = world
         .parts
         .actions
         .of(me)
         .list
         .move_to()
-        .map(|m| (m.point, m.target));
+        .map(|move_to_action| (move_to_action.point, move_to_action.target));
     assert_eq!(walk, Some((Position::new(28.5, 89.5, 0.0), None)));
-    let ai = w.parts.unit_ai.get(me).unwrap();
+    let ai = world.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::MoveAside), Some(AiAction::Gather))
@@ -622,7 +626,15 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
     let orders: Vec<_> = ai
         .orders
         .iter()
-        .map(|o| (o.order, o.target, o.point, o.priority.get(), o.ready))
+        .map(|queued_order| {
+            (
+                queued_order.order,
+                queued_order.target,
+                queued_order.point,
+                queued_order.priority.get(),
+                queued_order.ready,
+            )
+        })
         .collect();
     assert_eq!(
         orders,
@@ -653,12 +665,13 @@ fn unit_sent_off_footprint_walks_to_the_spot_and_comes_back_to_its_work() {
 /// it busy and the action value 0x2bf stays.
 #[test]
 fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
-    let mut u = idle(UnitAiKind::Hunted);
-    u.post(
-        Notify::own(object_id(14054), NotifyKind::SENT_OFF, [200, 200, 14100]),
-        ObjectState::Alive,
-    )
-    .unwrap();
+    let mut unit_ai = idle(UnitAiKind::Hunted);
+    unit_ai
+        .post(
+            Notify::own(object_id(14054), NotifyKind::SENT_OFF, [200, 200, 14100]),
+            ObjectState::Alive,
+        )
+        .unwrap();
     let deer = Master {
         id: master_id(65),
         kind: MasterKind::COMBAT,
@@ -675,9 +688,9 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         radius: Footprint::new(2.0, 2.0),
         ..house_and_tree().0
     };
-    let mut w = Scene::open(GridSize::new(200, 100))
+    let mut world = Scene::open(GridSize::new(200, 100))
         .object(SceneObject {
-            ai: Some(u),
+            ai: Some(unit_ai),
             ..SceneObject::new(14054, player_id(0), deer, Position::new(164.5, 50.5, 0.0))
         })
         .object(SceneObject {
@@ -692,7 +705,7 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
         })
         .build();
     let after = run_ai(
-        &mut w,
+        &mut world,
         (player_id(0), object_id(14054)),
         |ai, at, side, kind, rng| {
             ai.update(
@@ -707,9 +720,15 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
     );
     assert_eq!(after, Ok(None));
     let me = object_id(14054);
-    let walk = w.parts.actions.of(me).list.move_to().map(|m| m.point);
+    let walk = world
+        .parts
+        .actions
+        .of(me)
+        .list
+        .move_to()
+        .map(|move_to_action| move_to_action.point);
     assert_eq!(walk, Some(Position::new(164.5, 51.5, 0.0)));
-    let ai = w.parts.unit_ai.get(me).unwrap();
+    let ai = world.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::MoveAside), None)
@@ -722,17 +741,17 @@ fn unit_sent_off_footprint_keeps_its_move_aside_through_the_update() {
 #[test]
 fn the_unit_ai_calls_reach_the_unit_in_their_order() {
     let enemy = order_target(70, player_id(2), class::CLASS_6);
-    let mut w = order_world(
+    let mut world = order_world(
         order_unit(order_soldier(), idle(UnitAiKind::Soldier)),
         &[enemy],
     );
-    w.players[1]
+    world.players[1]
         .objects
         .by_id_mut(object_id(9))
         .unwrap()
         .last_human_order = WorldTime::from_millis(9000);
-    let r = run_ai(
-        &mut w,
+    let answer = run_ai(
+        &mut world,
         (player_id(1), object_id(9)),
         |ai, at, side, _, rng| {
             ai.cap_human_order(side, rng)?;
@@ -740,9 +759,9 @@ fn the_unit_ai_calls_reach_the_unit_in_their_order() {
             ai.attack_command(object_id(70), OrderForce::Forced, at, side)
         },
     );
-    assert_eq!(r, Ok(Answer::Taken));
-    assert_eq!(attacks_9(&w), Some(object_id(70)));
-    let unit = w.players[1].objects.by_id(object_id(9)).unwrap();
+    assert_eq!(answer, Ok(Answer::Taken));
+    assert_eq!(attacks_9(&world), Some(object_id(70)));
+    let unit = world.players[1].objects.by_id(object_id(9)).unwrap();
     assert_eq!(unit.last_human_order, HUMAN_ORDER_CAP);
 }
 
@@ -790,10 +809,10 @@ fn foundation_scene(villager: Master, ai: UnitAi) -> World {
         .build()
 }
 
-/// The wait for foundation 10028 that villager 9175 of `w` holds, and whether it is its top
+/// The wait for foundation 10028 that villager 9175 of `world` holds, and whether it is its top
 /// action (type 0x9a).
-fn waits(w: &World) -> (Option<WaitSolidify>, bool) {
-    let actions = w.parts.actions.of(object_id(9175));
+fn waits(world: &World) -> (Option<WaitSolidify>, bool) {
+    let actions = world.parts.actions.of(object_id(9175));
     (
         actions.list.wait_solidify().copied(),
         actions.top_action_kind() == Some(WAIT_SOLIDIFY),
@@ -848,7 +867,7 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
         ready: true,
         target_kind: order_kind(3),
     };
-    let mut w = foundation_scene(
+    let mut world = foundation_scene(
         builder_master(),
         UnitAi {
             current_action: None,
@@ -859,8 +878,8 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
             ..UnitAi::default()
         },
     );
-    let r = run_ai(
-        &mut w,
+    let order_outcome = run_ai(
+        &mut world,
         (player_id(1), object_id(9175)),
         |ai, at, side, kind, rng| {
             ai.process_order(
@@ -877,11 +896,17 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
             )
         },
     );
-    assert_eq!(r, Ok(OrderOutcome::Taken));
+    assert_eq!(order_outcome, Ok(OrderOutcome::Taken));
     let me = object_id(9175);
-    let built = w.parts.actions.of(me).list.build().map(|b| b.target);
+    let built = world
+        .parts
+        .actions
+        .of(me)
+        .list
+        .build()
+        .map(|build_action| build_action.target);
     assert_eq!(built, Some(Some(FoundationId::new(object_id(10028)))));
-    let ai = w.parts.unit_ai.get(me).unwrap();
+    let ai = world.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (
             ai.current_action,
@@ -913,12 +938,16 @@ fn the_build_order_builds_and_takes_the_order_at_once() {
 /// priority, which ends the queue's turn: the work waits in the queue.
 #[test]
 fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
-    let mut w = foundation_scene(builder_master(), sent_off_queue());
-    let r = run_ai(&mut w, (player_id(1), object_id(9175)), UnitAi::off_turn);
-    assert_eq!(r, Ok(()));
+    let mut world = foundation_scene(builder_master(), sent_off_queue());
+    let run_ai = run_ai(
+        &mut world,
+        (player_id(1), object_id(9175)),
+        UnitAi::off_turn,
+    );
+    assert_eq!(run_ai, Ok(()));
     let wait = WaitSolidify::new(build_task(), FoundationId::new(object_id(10028)));
-    assert_eq!(waits(&w), (Some(wait), true));
-    let ai = w.parts.unit_ai.get(object_id(9175)).unwrap();
+    assert_eq!(waits(&world), (Some(wait), true));
+    let ai = world.parts.unit_ai.get(object_id(9175)).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::WaitSolidify), Some(AiAction::WaitSolidify))
@@ -927,7 +956,11 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
         (ai.current_order, ai.order_priority.get()),
         (Some(OrderKind::Foundation), 100)
     );
-    let left: Vec<_> = ai.orders.iter().map(|o| (o.order, o.target)).collect();
+    let left: Vec<_> = ai
+        .orders
+        .iter()
+        .map(|queued_order| (queued_order.order, queued_order.target))
+        .collect();
     assert_eq!(left, vec![(OrderKind::OnTarget, Some(object_id(600)))]);
 }
 
@@ -938,23 +971,27 @@ fn foundation_order_waits_for_the_foundation_and_ends_the_queue_turn() {
 /// the tail takes the move's order at the work's priority.
 #[test]
 fn foundation_order_without_wait_goes_and_the_work_runs() {
-    let mut w = foundation_scene(villager_master(), sent_off_queue());
-    let r = run_ai(&mut w, (player_id(1), object_id(9175)), UnitAi::off_turn);
-    assert_eq!(r, Ok(()));
-    assert_eq!(waits(&w), (None, false));
+    let mut world = foundation_scene(villager_master(), sent_off_queue());
+    let run_ai = run_ai(
+        &mut world,
+        (player_id(1), object_id(9175)),
+        UnitAi::off_turn,
+    );
+    assert_eq!(run_ai, Ok(()));
+    assert_eq!(waits(&world), (None, false));
     let me = object_id(9175);
-    let walk = w
+    let walk = world
         .parts
         .actions
         .of(me)
         .list
         .move_to()
-        .map(|m| (m.point, m.target));
+        .map(|move_to_action| (move_to_action.point, move_to_action.target));
     assert_eq!(
         walk,
         Some((Position::new(33.5, 89.5, 0.0), Some(object_id(600))))
     );
-    let ai = w.parts.unit_ai.get(me).unwrap();
+    let ai = world.parts.unit_ai.get(me).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action),
         (Some(AiAction::Move), Some(AiAction::WaitSolidify))
@@ -978,14 +1015,14 @@ fn slot_0x108_asks_the_unit_when_forced_or_without_an_action_value() {
         ..UnitAi::default()
     };
     let ask = |villager: Master, ai: UnitAi, force: OrderForce| {
-        let mut w = foundation_scene(villager, ai);
+        let mut world = foundation_scene(villager, ai);
         let answer = run_ai(
-            &mut w,
+            &mut world,
             (player_id(1), object_id(9175)),
             |ai, _, side, _, _| ai.wait_for_foundation(object_id(10028), force, side),
         );
-        let ai = w.parts.unit_ai.get(object_id(9175)).unwrap();
-        (answer, (ai.current_action, ai.last_action), waits(&w).1)
+        let ai = world.parts.unit_ai.get(object_id(9175)).unwrap();
+        (answer, (ai.current_action, ai.last_action), waits(&world).1)
     };
     let (gather, heal) = (Some(AiAction::Gather), Some(AiAction::Heal));
     // unforced with an action value: the unit is not asked
@@ -1129,7 +1166,7 @@ fn resource(
 
 /// Gaia's deer `id` (master 65, class 9) at (x, y), holding 100 food, its unit AI idle.
 fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneObject {
-    let m = Master {
+    let master = Master {
         id: master_id(65),
         kind: MasterKind::COMBAT,
         class: class_id(9),
@@ -1143,13 +1180,13 @@ fn gaia_deer(id: i32, (x, y): (f32, f32)) -> SceneObject {
     SceneObject {
         ai: Some(idle(UnitAiKind::Hunted)),
         holds: Some((attribute::FOOD, Amount::new(100.0))),
-        ..SceneObject::new(id, PlayerId::GAIA, m, Position::new(x, y, 0.0))
+        ..SceneObject::new(id, PlayerId::GAIA, master, Position::new(x, y, 0.0))
     }
 }
 
 /// Player 1's farm 12557 at (17, 24), holding 175 food.
 fn own_farm() -> SceneObject {
-    let m = Master {
+    let master = Master {
         id: ids::FARM,
         kind: MasterKind::BUILDING,
         class: class::FARM,
@@ -1160,7 +1197,7 @@ fn own_farm() -> SceneObject {
     };
     SceneObject {
         holds: Some((attribute::FOOD, Amount::new(175.0))),
-        ..SceneObject::new(12557, player_id(1), m, Position::new(17.0, 24.0, 0.0))
+        ..SceneObject::new(12557, player_id(1), master, Position::new(17.0, 24.0, 0.0))
     }
 }
 
@@ -1187,36 +1224,36 @@ fn search_notify(action: i32, class: i32, site: i32) -> Notify {
     )
 }
 
-/// What villager 31237 of `w` targets and does: its unit AI's current target, target class
+/// What villager 31237 of `world` targets and does: its unit AI's current target, target class
 /// and action, and its top action's kind.
 fn gatherer_state(
-    w: &World,
+    world: &World,
 ) -> (
     Option<ObjectId>,
     Option<ClassId>,
     Option<AiAction>,
     Option<ActionKind>,
 ) {
-    let u = w.parts.unit_ai.get(object_id(31237)).unwrap();
+    let unit_ai = world.parts.unit_ai.get(object_id(31237)).unwrap();
     (
-        u.current_target,
-        u.target_class,
-        u.current_action,
-        w.parts.actions.of(object_id(31237)).top_action_kind(),
+        unit_ai.current_target,
+        unit_ai.target_class,
+        unit_ai.current_action,
+        world.parts.actions.of(object_id(31237)).top_action_kind(),
     )
 }
 
-/// Villager 31237's search of `w` on notify `n` by its action (`hunt`: [`UnitAi::hunter_search`],
-/// else [`UnitAi::gatherer_search`]).
-fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> GenieResult<u32> {
+/// Villager 31237's search of `world` on notify `notify` by its action (`hunt`:
+/// [`UnitAi::hunter_search`], else [`UnitAi::gatherer_search`]).
+fn gatherer_searches(world: &mut World, notify: Notify, hunt: bool) -> GenieResult<u32> {
     run_ai(
-        w,
+        world,
         (player_id(1), object_id(31237)),
         |ai, at, side, kind, rng| {
             if hunt {
-                ai.hunter_search(n, at, kind, side, rng)
+                ai.hunter_search(notify, at, kind, side, rng)
             } else {
-                ai.gatherer_search(n, at, kind, side, rng)
+                ai.gatherer_search(notify, at, kind, side, rng)
             }
         },
     )
@@ -1234,10 +1271,11 @@ fn gatherer_searches(w: &mut World, n: Notify, hunt: bool) -> GenieResult<u32> {
 fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
     let hunt = AiAction::Hunt.value();
     let run = |ai: UnitAi, others: &[SceneObject], class: i32, kind: PlayerKind| {
-        let mut w = gather_world((gatherer_master(), ai), others);
-        w.players[1].kind = kind;
-        let r = gatherer_searches(&mut w, search_notify(hunt, class, 31247), true);
-        (r, gatherer_state(&w))
+        let mut world = gather_world((gatherer_master(), ai), others);
+        world.players[1].kind = kind;
+        let gatherer_searches =
+            gatherer_searches(&mut world, search_notify(hunt, class, 31247), true);
+        (gatherer_searches, gatherer_state(&world))
     };
     let human = PlayerKind::Human;
     let hunting = (
@@ -1317,10 +1355,11 @@ fn hunter_asked_for_another_target_hunts_what_its_search_finds() {
 fn gatherer_without_class_stops_and_one_on_farm_searches_for_another() {
     let gather = AiAction::Gather.value();
     let run = |ai: UnitAi, others: &[SceneObject], class: i32, kind: PlayerKind| {
-        let mut w = gather_world((gatherer_master(), ai), others);
-        w.players[1].kind = kind;
-        let r = gatherer_searches(&mut w, search_notify(gather, class, 31247), false);
-        (r, gatherer_state(&w))
+        let mut world = gather_world((gatherer_master(), ai), others);
+        world.players[1].kind = kind;
+        let gatherer_searches =
+            gatherer_searches(&mut world, search_notify(gather, class, 31247), false);
+        (gatherer_searches, gatherer_state(&world))
     };
     let human = PlayerKind::Human;
     assert_eq!(
@@ -1403,16 +1442,16 @@ fn villager_searches_by_its_action() {
         target_class: class_of(9),
         ..UnitAi::default()
     };
-    let n = search_notify(0, -1, -1);
+    let notify = search_notify(0, -1, -1);
     let run = |ai: UnitAi, others: &[SceneObject], water: &[Tile], kind: PlayerKind| {
-        let mut w = gather_world_on(water, (gatherer_master(), ai), others);
-        w.players[1].kind = kind;
-        let r = run_ai(
-            &mut w,
+        let mut world = gather_world_on(water, (gatherer_master(), ai), others);
+        world.players[1].kind = kind;
+        let run_ai = run_ai(
+            &mut world,
             (player_id(1), object_id(31237)),
-            |ai, at, side, kind, rng| ai.villager_search(n, at, kind, side, rng),
+            |ai, at, side, kind, rng| ai.villager_search(notify, at, kind, side, rng),
         );
-        (r, gatherer_state(&w))
+        (run_ai, gatherer_state(&world))
     };
     let human = PlayerKind::Human;
     let deer40 = [gaia_deer(40, (23.0, 20.0))];
@@ -1475,7 +1514,7 @@ fn villager_searches_by_its_action() {
 /// as it was; with a task it builds (its Build at once).
 #[test]
 fn build_object_whose_build_command_answers_0_changes_nothing() {
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         ai_kind: UnitAiKind::Civilian,
         current_action: Some(AiAction::Gather),
         current_target: Some(object_id(28202)),
@@ -1483,9 +1522,12 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
         ..UnitAi::default()
     };
     let build = |villager: Master| {
-        let mut w = gather_world((villager, u.clone()), &[house_foundation((22.5, 20.5))]);
-        let r = run_ai(
-            &mut w,
+        let mut gather_world = gather_world(
+            (villager, unit_ai.clone()),
+            &[house_foundation((22.5, 20.5))],
+        );
+        let run_ai = run_ai(
+            &mut gather_world,
             (player_id(1), object_id(31237)),
             |ai, at, side, _, rng| {
                 ai.build_object(
@@ -1497,15 +1539,15 @@ fn build_object_whose_build_command_answers_0_changes_nothing() {
                 )
             },
         );
-        (r, w)
+        (run_ai, gather_world)
     };
     let (r, w) = build(villager_master());
     assert_eq!(r, Ok(Answer::NotTaken));
-    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&u));
+    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&unit_ai));
     assert_eq!(gatherer_state(&w).3, None);
-    let (r, w) = build(gatherer_master());
-    assert_eq!(r, Ok(Answer::Taken));
-    let (target, _, action, top) = gatherer_state(&w);
+    let (answer, world) = build(gatherer_master());
+    assert_eq!(answer, Ok(Answer::Taken));
+    let (target, _, action, top) = gatherer_state(&world);
     assert_eq!(
         (target, action, top),
         (
@@ -1547,9 +1589,9 @@ fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
             Some(GATHER)
         )
     );
-    let u = w.parts.unit_ai.get(object_id(31237)).unwrap();
+    let unit_ai = w.parts.unit_ai.get(object_id(31237)).unwrap();
     assert_eq!(
-        (u.last_target, u.target_point),
+        (unit_ai.last_target, unit_ai.target_point),
         (Some(object_id(28202)), Position::new(22.5, 23.5, 0.0))
     );
     let goldless = UnitAi {
@@ -1557,13 +1599,13 @@ fn gatherer_asked_for_another_target_gathers_what_its_search_finds() {
         current_target: None,
         ..civilian(AiAction::Gather, 32, -1)
     };
-    let mut w = gather_world((gatherer_master(), goldless.clone()), &[]);
+    let mut world = gather_world((gatherer_master(), goldless.clone()), &[]);
     assert_eq!(
-        gatherer_searches(&mut w, search_notify(gather, 32, 0), false),
+        gatherer_searches(&mut world, search_notify(gather, 32, 0), false),
         Ok(GO_ON)
     );
-    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&goldless));
-    assert_eq!(gatherer_state(&w).3, None);
+    assert_eq!(world.parts.unit_ai.get(object_id(31237)), Some(&goldless));
+    assert_eq!(gatherer_state(&world).3, None);
 }
 
 /// The villager's notify 0x202 on its hunt (`FUN_140c22bf0`, action 0x265) of a class the
@@ -1612,12 +1654,15 @@ fn hunter_of_kind_searches_by_it_from_its_drop_site() {
         current_target: None,
         ..civilian(AiAction::Hunt, -1, -1)
     };
-    let mut w = gather_world((gatherer_master(), idle_hunter.clone()), &[]);
+    let mut world = gather_world((gatherer_master(), idle_hunter.clone()), &[]);
     assert_eq!(
-        gatherer_searches(&mut w, search_notify(0x265, 32, -1), true),
+        gatherer_searches(&mut world, search_notify(0x265, 32, -1), true),
         Ok(GO_ON)
     );
-    assert_eq!(w.parts.unit_ai.get(object_id(31237)), Some(&idle_hunter));
+    assert_eq!(
+        world.parts.unit_ai.get(object_id(31237)),
+        Some(&idle_hunter)
+    );
 }
 
 fn hit_boar() -> UnitAi {
@@ -1689,33 +1734,35 @@ fn boar_world_with(id: i32, (level, ai): (CombatLevel, UnitAi), others: &[SceneO
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
-/// The target of Gaia's unit `id`'s Attack in `w`, none without one.
-fn gaia_attacks(w: &World, id: i32) -> Option<ObjectId> {
-    w.parts
+/// The target of Gaia's unit `id`'s Attack in `world`, none without one.
+fn gaia_attacks(world: &World, id: i32) -> Option<ObjectId> {
+    world
+        .parts
         .actions
         .of(object_id(id))
         .list
         .attack()
-        .and_then(|a| a.target)
+        .and_then(|attack| attack.target)
         .map(AttackTargetId::id)
 }
 
-/// Gaia's unit `id` in `w` handles `n` after its unit AI queued it ([`UnitAi::handle`]).
-fn gaia_hears(w: &mut World, id: i32, n: Notify) -> GenieResult<u32> {
-    w.parts
+/// Gaia's unit `id` in `world` handles `notify` after its unit AI queued it ([`UnitAi::handle`]).
+fn gaia_hears(world: &mut World, id: i32, notify: Notify) -> GenieResult<u32> {
+    world
+        .parts
         .unit_ai
         .get_mut(object_id(id))
         .unwrap()
-        .post(n, ObjectState::Alive)?;
+        .post(notify, ObjectState::Alive)?;
     run_ai(
-        w,
+        world,
         (PlayerId::GAIA, object_id(id)),
-        |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+        |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
     )
 }
 
@@ -1725,7 +1772,7 @@ fn gaia_hears(w: &mut World, id: i32, n: Notify) -> GenieResult<u32> {
 /// fails: it keeps the first.
 #[test]
 fn boar_attacks_its_first_attacker_and_keeps_it() {
-    let mut w = boar_world(
+    let mut boar_world = boar_world(
         9729,
         (CombatLevel::ANIMAL, hit_boar()),
         &[(10049, 23.4), (10050, 21.4)],
@@ -1736,39 +1783,43 @@ fn boar_attacks_its_first_attacker_and_keeps_it() {
         kind: NotifyKind::DAMAGED,
         p: [caller, 72, 75],
     };
-    let boar_damaged = |w: &mut World, n: Notify| {
-        w.parts
+    let boar_damaged = |world: &mut World, notify: Notify| {
+        world
+            .parts
             .unit_ai
             .get_mut(object_id(9729))
             .unwrap()
-            .post(n, ObjectState::Alive)
+            .post(notify, ObjectState::Alive)
             .unwrap();
         run_ai(
-            w,
+            world,
             (PlayerId::GAIA, object_id(9729)),
-            |ai, at, side, _, rng| ai.boar_damaged(n, Millis::ZERO, at, rng, side),
+            |ai, at, side, _, rng| ai.boar_damaged(notify, Millis::ZERO, at, rng, side),
         )
     };
-    assert_eq!(boar_damaged(&mut w, hit(10049)), Ok(BREAK));
-    assert_eq!(gaia_attacks(&w, 9729), Some(object_id(10049)));
-    let u = w.parts.unit_ai.get(object_id(9729)).unwrap();
+    assert_eq!(boar_damaged(&mut boar_world, hit(10049)), Ok(BREAK));
+    assert_eq!(gaia_attacks(&boar_world, 9729), Some(object_id(10049)));
+    let u = boar_world.parts.unit_ai.get(object_id(9729)).unwrap();
     assert_eq!(u.attackers, Attackers::of_saved(&[10049]));
     assert_eq!(
         (
             u.current_action,
             u.current_target,
-            u.home.map(|h| h.furious)
+            u.home.map(|home| home.furious)
         ),
         (Some(AiAction::Attack), Some(object_id(10049)), Some(true))
     );
-    let boar = w.players[0].objects.by_id(object_id(9729)).unwrap();
+    let boar = boar_world.players[0]
+        .objects
+        .by_id(object_id(9729))
+        .unwrap();
     assert!(boar.flags.contains(UnitFlags::UNDER_ATTACK));
     // the nearer second attacker is the closest now, but the attack is not forced
-    let _ = boar_damaged(&mut w, hit(10050));
-    let u = w.parts.unit_ai.get(object_id(9729)).unwrap();
-    assert_eq!(u.attackers, Attackers::of_saved(&[10049, 10050]));
-    assert_eq!(u.current_target, Some(object_id(10049)));
-    assert_eq!(gaia_attacks(&w, 9729), Some(object_id(10049)));
+    let _ = boar_damaged(&mut boar_world, hit(10050));
+    let unit_ai = boar_world.parts.unit_ai.get(object_id(9729)).unwrap();
+    assert_eq!(unit_ai.attackers, Attackers::of_saved(&[10049, 10050]));
+    assert_eq!(unit_ai.current_target, Some(object_id(10049)));
+    assert_eq!(gaia_attacks(&boar_world, 9729), Some(object_id(10049)));
 }
 
 /// The 4v4's boar 29825 in update 4599: its Attack on the villager 31126 completed (a stop,
@@ -1781,14 +1832,14 @@ fn stop_before_an_attack_command_runs_first() {
         current_target: Some(object_id(31126)),
         ..hit_boar()
     };
-    let mut w = boar_world(
+    let mut world = boar_world(
         29825,
         (CombatLevel::ANIMAL, attacking),
         &[(31126, 21.0), (27240, 21.4)],
     );
     // its Attack on the villager 31126 first
     let first = run_ai(
-        &mut w,
+        &mut world,
         (PlayerId::GAIA, object_id(29825)),
         |ai, at, side, _, _| ai.attack_command(object_id(31126), OrderForce::Forced, at, side),
     );
@@ -1798,19 +1849,22 @@ fn stop_before_an_attack_command_runs_first() {
         NotifyKind::ACTION_COMPLETED,
         [600, 31126, 0],
     );
-    assert_eq!(gaia_hears(&mut w, 29825, done), Ok(GO_ON));
-    assert_eq!(w.parts.actions.of(object_id(29825)).top_action_kind(), None);
+    assert_eq!(gaia_hears(&mut world, 29825, done), Ok(GO_ON));
+    assert_eq!(
+        world.parts.actions.of(object_id(29825)).top_action_kind(),
+        None
+    );
     let hit = Notify {
         caller: Some(object_id(27240)),
         recipient: object_id(29825),
         kind: NotifyKind::DAMAGED,
         p: [27240, 3, 33],
     };
-    let _ = gaia_hears(&mut w, 29825, hit);
-    assert_eq!(gaia_attacks(&w, 29825), Some(object_id(27240)));
-    let u = w.parts.unit_ai.get(object_id(29825)).unwrap();
+    let _ = gaia_hears(&mut world, 29825, hit);
+    assert_eq!(gaia_attacks(&world, 29825), Some(object_id(27240)));
+    let unit_ai = world.parts.unit_ai.get(object_id(29825)).unwrap();
     assert_eq!(
-        (u.current_action, u.current_target),
+        (unit_ai.current_action, unit_ai.current_target),
         (Some(AiAction::Attack), Some(object_id(27240)))
     );
 }
@@ -1825,24 +1879,24 @@ fn fresh_search_enemies_set_the_alert_mode() {
         fresh,
         ..Found::NONE
     };
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         time_since_enemy: Seconds::new(12.0),
         ..idle(UnitAiKind::Civilian)
     };
-    u.alert(found(true, true), Seconds::new(0.05));
+    unit_ai.alert(found(true, true), Seconds::new(0.05));
     assert_eq!(
-        (u.alert_mode, u.time_since_enemy),
+        (unit_ai.alert_mode, unit_ai.time_since_enemy),
         (AlertMode::Alert, Seconds::ZERO)
     );
-    u.time_since_enemy = Seconds::new(3.0);
-    u.alert(found(false, false), Seconds::new(0.05));
+    unit_ai.time_since_enemy = Seconds::new(3.0);
+    unit_ai.alert(found(false, false), Seconds::new(0.05));
     assert_eq!(
-        (u.alert_mode, u.time_since_enemy),
+        (unit_ai.alert_mode, unit_ai.time_since_enemy),
         (AlertMode::Alert, Seconds::new(3.0))
     );
-    u.alert(found(true, false), Seconds::new(0.05));
+    unit_ai.alert(found(true, false), Seconds::new(0.05));
     assert_eq!(
-        (u.alert_mode, u.time_since_enemy),
+        (unit_ai.alert_mode, unit_ai.time_since_enemy),
         (AlertMode::Calm, Seconds::new(3.0))
     );
 }
@@ -1852,7 +1906,7 @@ fn fresh_search_enemies_set_the_alert_mode() {
 /// order attacks it, forced, unless its stance is not aggressive.
 #[test]
 fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
-    let n = Notify::own(object_id(29823), NotifyKind::IN_THE_WAY, [29001, -1, -1]);
+    let notify = Notify::own(object_id(29823), NotifyKind::IN_THE_WAY, [29001, -1, -1]);
     let villagers = [(29001, 21.0), (29002, 30.0)];
     let walking = |ai| UnitAi {
         current_action: Some(AiAction::Attack),
@@ -1864,21 +1918,21 @@ fn unit_in_the_way_is_attacked_by_wolf_not_by_boar() {
         (CombatLevel::ANIMAL, walking(hit_boar())),
         &villagers,
     );
-    assert_eq!(gaia_hears(&mut w, 29823, n), Ok(GO_ON));
+    assert_eq!(gaia_hears(&mut w, 29823, notify), Ok(GO_ON));
     assert_eq!(gaia_attacks(&w, 29823), None);
     let wolf = walking(idle(UnitAiKind::Lion));
     let mut w = boar_world(29823, (CombatLevel::MILITARY, wolf), &villagers);
-    assert_eq!(gaia_hears(&mut w, 29823, n), Ok(GO_ON));
+    assert_eq!(gaia_hears(&mut w, 29823, notify), Ok(GO_ON));
     assert_eq!(gaia_attacks(&w, 29823), Some(object_id(29001)));
-    let u = w.parts.unit_ai.get(object_id(29823)).unwrap();
-    assert_eq!(u.current_target, Some(object_id(29001)));
+    let unit_ai = w.parts.unit_ai.get(object_id(29823)).unwrap();
+    assert_eq!(unit_ai.current_target, Some(object_id(29001)));
     let defensive = UnitAi {
         stance: UnitStance::Defensive,
         ..idle(UnitAiKind::Lion)
     };
-    let mut w = boar_world(29823, (CombatLevel::MILITARY, defensive), &villagers);
-    let _ = gaia_hears(&mut w, 29823, n);
-    assert_eq!(gaia_attacks(&w, 29823), None);
+    let mut world = boar_world(29823, (CombatLevel::MILITARY, defensive), &villagers);
+    let _ = gaia_hears(&mut world, 29823, notify);
+    assert_eq!(gaia_attacks(&world, 29823), None);
 }
 
 /// The standing sprite of the tests' attackers: 10 frames of 16 facets, looped.
@@ -1923,13 +1977,13 @@ fn wolf_world(ai: UnitAi, prey: &[(i32, ClassId, f32)]) -> World {
             )
         });
     }
-    let mut w = scene.build();
-    w.players[0]
+    let mut world = scene.build();
+    world.players[0]
         .objects
         .by_id_mut(object_id(20))
         .unwrap()
         .last_human_order = WorldTime::from_millis(9000);
-    w
+    world
 }
 
 /// The lion's idle check (`FUN_140c1fb70`): the cap on its last human order time first
@@ -1939,24 +1993,24 @@ fn wolf_world(ai: UnitAi, prey: &[(i32, ClassId, f32)]) -> World {
 #[test]
 fn an_idle_lion_attacks_what_it_finds_within_its_reach() {
     let run = |prey: (i32, ClassId, f32)| {
-        let mut w = wolf_world(idle(UnitAiKind::Lion), &[prey]);
+        let mut world = wolf_world(idle(UnitAiKind::Lion), &[prey]);
         let produced = run_ai(
-            &mut w,
+            &mut world,
             (PlayerId::GAIA, object_id(20)),
             |ai, at, side, _, rng| ai.lion_idle(at, rng, side),
         )
         .unwrap();
-        let wolf = w.players[0].objects.by_id(object_id(20)).unwrap();
+        let wolf = world.players[0].objects.by_id(object_id(20)).unwrap();
         assert_eq!(wolf.last_human_order, HUMAN_ORDER_CAP);
-        let attacks = w
+        let attacks = world
             .parts
             .actions
             .of(object_id(20))
             .list
             .attack()
-            .and_then(|a| a.target)
+            .and_then(|attack| attack.target)
             .map(AttackTargetId::id);
-        let ai = w.parts.unit_ai.get(object_id(20)).unwrap();
+        let ai = world.parts.unit_ai.get(object_id(20)).unwrap();
         (produced, attacks, ai.current_action, ai.current_target)
     };
     // a villager: the reach is 2 (half of 4), its gap 1.9; slot 0xb8 then gives 6 whatever it
@@ -2989,8 +3043,8 @@ fn the_damage_case_lets_known_dead_allied_and_ordered_ones_be() {
 /// computer player's soldier's with 10.
 #[test]
 fn each_unit_ai_kind_searches_its_constructor_classes() {
-    let list = |t: UnitAiKind, class: ClassId, player_kind: PlayerKind| {
-        cared_classes(t, Some(class), player_kind, &roles())
+    let list = |unit_ai_kind: UnitAiKind, class: ClassId, player_kind: PlayerKind| {
+        cared_classes(unit_ai_kind, Some(class), player_kind, &roles())
     };
     assert_eq!(
         list(UnitAiKind::Hunted, class::PREY, PlayerKind::Human),
@@ -3087,21 +3141,21 @@ fn each_unit_ai_kind_tests_neutral_object_by_its_module() {
         class::BUILDING,
         &roles()
     ));
-    for t in [UnitAiKind::Predator, UnitAiKind::Lion] {
+    for unit_ai_kind in [UnitAiKind::Predator, UnitAiKind::Lion] {
         for class in [13, 22, 52, 54, 55].map(ClassId::of_master) {
             assert!(
-                !kind_attacks_neutral(t, AttackPriority::PRIORITY_0, class, &roles()),
-                "type {t} class {class}"
+                !kind_attacks_neutral(unit_ai_kind, AttackPriority::PRIORITY_0, class, &roles()),
+                "type {unit_ai_kind} class {class}"
             );
         }
         assert!(kind_attacks_neutral(
-            t,
+            unit_ai_kind,
             AttackPriority::PRIORITY_0,
             class::VILLAGER,
             &roles()
         ));
         assert!(!kind_attacks_neutral(
-            t,
+            unit_ai_kind,
             AttackPriority::PRIORITY_3,
             class::CLASS_6,
             &roles()
@@ -3494,13 +3548,13 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         )
     };
     let run = |others: &[SceneObject]| {
-        let mut w = soldier_world((master.clone(), scout.clone()), None, others);
-        let r = run_ai(
-            &mut w,
+        let mut soldier_world = soldier_world((master.clone(), scout.clone()), None, others);
+        let run_ai = run_ai(
+            &mut soldier_world,
             (player_id(1), object_id(500)),
             |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
         );
-        (r, w)
+        (run_ai, soldier_world)
     };
     let (r, w) = run(&[villager]);
     assert_eq!(r, Ok(()));
@@ -3511,13 +3565,13 @@ fn scout_whose_sheep_died_attacks_the_next_or_walks_to_its_point() {
         (Some(AiAction::Attack), Some(object_id(26000)), None)
     );
     assert_eq!((u.last_order, u.order_priority.get()), (None, -1));
-    let (r, w) = run(&[]);
+    let (r, world) = run(&[]);
     assert_eq!(r, Ok(()));
-    assert_eq!(attacks_500(&w), None);
-    assert_eq!(walks_to(&w), Some(Position::new(5.0, 6.0, 0.0)));
-    let u = ai_500(&w);
+    assert_eq!(attacks_500(&world), None);
+    assert_eq!(walks_to(&world), Some(Position::new(5.0, 6.0, 0.0)));
+    let unit_ai = ai_500(&world);
     assert_eq!(
-        (u.current_order, u.last_order),
+        (unit_ai.current_order, unit_ai.last_order),
         (None, Some(OrderKind::Attack))
     );
 }
@@ -3536,19 +3590,23 @@ fn patrol_kill_ends_the_patrol_order_with_its_timers() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut w = soldier_world((soldier_master(), scout), None, &[]);
-    let r = run_ai(
-        &mut w,
+    let mut world = soldier_world((soldier_master(), scout), None, &[]);
+    let run_ai = run_ai(
+        &mut world,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
     );
-    assert_eq!(r, Ok(()));
-    let u = ai_500(&w);
+    assert_eq!(run_ai, Ok(()));
+    let unit_ai = ai_500(&world);
     assert_eq!(
-        (u.current_order, u.last_order, u.secondary_timer),
+        (
+            unit_ai.current_order,
+            unit_ai.last_order,
+            unit_ai.secondary_timer
+        ),
         (None, Some(OrderKind::Patrol), Millis::new(750))
     );
-    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
+    assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
 }
 
 /// processMisc's retarget check past its timer (`0x140c567c0`): a scout on the attack order
@@ -3750,11 +3808,11 @@ fn hunter_world(others: &[SceneObject]) -> World {
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
     let hunt = queued(OrderKind::Hunt, 9731);
-    let r = run_ai(
-        &mut w,
+    let order_outcome = run_ai(
+        &mut world,
         (player_id(1), object_id(10041)),
         |ai, at, side, kind, rng| {
             ai.process_order(
@@ -3771,8 +3829,8 @@ fn hunter_world(others: &[SceneObject]) -> World {
             )
         },
     );
-    assert_eq!(r, Ok(OrderOutcome::Taken));
-    w
+    assert_eq!(order_outcome, Ok(OrderOutcome::Taken));
+    world
 }
 
 /// MarvinBlue/426048731's villager 10041 in update 4839, hunting the boar 9731 (its Hunt in
@@ -3801,49 +3859,71 @@ fn hunter_hit_by_its_boar_ignores_the_damage() {
             Position::new(21.0, 21.0, 0.0),
         )
     };
-    let mut w = hunter_world(&[enemy]);
-    let damaged = |w: &mut World, n: Notify| {
-        w.parts
+    let mut hunter_world = hunter_world(&[enemy]);
+    let damaged = |world: &mut World, notify: Notify| {
+        world
+            .parts
             .unit_ai
             .get_mut(object_id(10041))
             .unwrap()
-            .post(n, ObjectState::Alive)
+            .post(notify, ObjectState::Alive)
             .unwrap();
         run_ai(
-            w,
+            world,
             (player_id(1), object_id(10041)),
-            |ai, at, side, kind, rng| ai.villager_damaged(n, Millis::ZERO, at, kind, rng, side),
+            |ai, at, side, kind, rng| {
+                ai.villager_damaged(notify, Millis::ZERO, at, kind, rng, side)
+            },
         )
     };
-    assert_eq!(damaged(&mut w, hit(9731)), Ok(GO_ON));
-    let u = w.parts.unit_ai.get(object_id(10041)).unwrap();
+    assert_eq!(damaged(&mut hunter_world, hit(9731)), Ok(GO_ON));
+    let u = hunter_world.parts.unit_ai.get(object_id(10041)).unwrap();
     assert_eq!(u.attackers, Attackers::of_saved(&[9731]));
     assert_eq!(
         (u.current_order, u.current_target),
         (Some(OrderKind::Hunt), Some(object_id(9731)))
     );
-    let hunter = w.players[1].objects.by_id(object_id(10041)).unwrap();
+    let hunter = hunter_world.players[1]
+        .objects
+        .by_id(object_id(10041))
+        .unwrap();
     assert!(hunter.flags.contains(UnitFlags::UNDER_ATTACK));
     assert_eq!(
-        w.parts.actions.of(object_id(10041)).top_action_kind(),
+        hunter_world
+            .parts
+            .actions
+            .of(object_id(10041))
+            .top_action_kind(),
         Some(HUNT)
     );
     // another player's attacker that is not its target: the call for help, then the evasion
-    assert_eq!(damaged(&mut w, hit(9800)), Ok(BREAK));
-    let u = w.parts.unit_ai.get(object_id(10041)).unwrap();
-    assert_eq!(u.attackers, Attackers::of_saved(&[9731, 9800]));
-    assert_eq!((u.current_order, u.current_target), (None, None));
-    assert!(u.orders.iter().any(|o| o.order == OrderKind::Hunt));
+    assert_eq!(damaged(&mut hunter_world, hit(9800)), Ok(BREAK));
+    let unit_ai = hunter_world.parts.unit_ai.get(object_id(10041)).unwrap();
+    assert_eq!(unit_ai.attackers, Attackers::of_saved(&[9731, 9800]));
     assert_eq!(
-        w.parts.actions.of(object_id(10041)).top_action_kind(),
+        (unit_ai.current_order, unit_ai.current_target),
+        (None, None)
+    );
+    assert!(
+        unit_ai
+            .orders
+            .iter()
+            .any(|queued_order| queued_order.order == OrderKind::Hunt)
+    );
+    assert_eq!(
+        hunter_world
+            .parts
+            .actions
+            .of(object_id(10041))
+            .top_action_kind(),
         Some(MOVE_TO)
     );
 }
 
 #[test]
 fn closest_valid_attacker_skips_classes_and_flips_coin_on_tie() {
-    let mut u = hit_boar();
-    u.attackers = Attackers::of_saved(&[1, 2, 3]);
+    let mut unit_ai = hit_boar();
+    unit_ai.attackers = Attackers::of_saved(&[1, 2, 3]);
     let at = Surroundings {
         units: vec![
             attacker(1, class::SIEGE, DistanceSquared::new(0.5)),
@@ -3858,7 +3938,7 @@ fn closest_valid_attacker_skips_classes_and_flips_coin_on_tie() {
     // 1 is of class 13; 3 lies within 0.0625 of 2: the coin decides
     let mut r = rng();
     let mut coin = rng();
-    let picked = u.closest_valid_attacker(&at, &mut r);
+    let picked = unit_ai.closest_valid_attacker(&at, &mut r);
     let expected = if coin.rand15() & 1 == 0 { 2 } else { 3 };
     assert_eq!(picked, ObjectId::of_field(expected));
 }
@@ -3880,16 +3960,17 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
         attackers: Attackers::of_saved(&[10049, 10050]),
         ..hit_boar()
     };
-    let mut w = boar_world_with(9729, (CombatLevel::ANIMAL, attacked), &[walked_off, dead]);
-    w.players[0]
+    let mut boar_world_with =
+        boar_world_with(9729, (CombatLevel::ANIMAL, attacked), &[walked_off, dead]);
+    boar_world_with.players[0]
         .objects
         .by_id_mut(object_id(9729))
         .unwrap()
         .flags
         .insert(UnitFlags::UNDER_ATTACK);
-    let upkeep = |w: &mut World| {
+    let upkeep = |world: &mut World| {
         run_ai(
-            w,
+            world,
             (PlayerId::GAIA, object_id(9729)),
             |ai, at, side, _, _| {
                 ai.keep_attackers(at, side);
@@ -3897,16 +3978,19 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
             },
         )
         .unwrap();
-        let boar = w.players[0].objects.by_id(object_id(9729)).unwrap();
-        let ai = w.parts.unit_ai.get(object_id(9729)).unwrap();
+        let boar = world.players[0].objects.by_id(object_id(9729)).unwrap();
+        let ai = world.parts.unit_ai.get(object_id(9729)).unwrap();
         (
             ai.attackers.clone(),
             boar.flags.contains(UnitFlags::UNDER_ATTACK),
         )
     };
-    assert_eq!(upkeep(&mut w), (Attackers::of_saved(&[10050]), true));
-    assert_eq!(upkeep(&mut w), (Attackers::default(), true));
-    assert_eq!(upkeep(&mut w), (Attackers::default(), false));
+    assert_eq!(
+        upkeep(&mut boar_world_with),
+        (Attackers::of_saved(&[10050]), true)
+    );
+    assert_eq!(upkeep(&mut boar_world_with), (Attackers::default(), true));
+    assert_eq!(upkeep(&mut boar_world_with), (Attackers::default(), false));
 }
 
 /// MarvinBlue/426048731's boar 9729 in updates 4157 to 4159: the hunter 10049 moves off, its
@@ -3915,23 +3999,25 @@ fn an_attacker_that_no_longer_targets_the_unit_leaves_one_an_update() {
 /// a unit that is not attacking it is ignored.
 #[test]
 fn released_attacker_leaves_the_set_through_notify_699() {
-    let mut u = hit_boar();
-    u.attackers = Attackers::of_saved(&[10049]);
+    let mut unit_ai = hit_boar();
+    unit_ai.attackers = Attackers::of_saved(&[10049]);
     let released = |caller| Notify {
         caller,
         recipient: object_id(9729),
         kind: NotifyKind::NO_LONGER_ON_ME,
         p: [4, 0, 0],
     };
-    u.post(released(Some(object_id(10050))), ObjectState::Alive)
+    unit_ai
+        .post(released(Some(object_id(10050))), ObjectState::Alive)
         .unwrap();
-    assert_eq!(u.notifies, Vec::new());
-    u.post(released(Some(object_id(10049))), ObjectState::Alive)
+    assert_eq!(unit_ai.notifies, Vec::new());
+    unit_ai
+        .post(released(Some(object_id(10049))), ObjectState::Alive)
         .unwrap();
-    assert_eq!(u.notifies, vec![released(Some(object_id(10049)))]);
-    let mut w = boar_world(9729, (CombatLevel::ANIMAL, u), &[(10049, 23.0)]);
-    let r = run_ai(
-        &mut w,
+    assert_eq!(unit_ai.notifies, vec![released(Some(object_id(10049)))]);
+    let mut world = boar_world(9729, (CombatLevel::ANIMAL, unit_ai), &[(10049, 23.0)]);
+    let run_ai = run_ai(
+        &mut world,
         (PlayerId::GAIA, object_id(9729)),
         |ai, at, side, kind, rng| {
             ai.base_notify(
@@ -3944,8 +4030,11 @@ fn released_attacker_leaves_the_set_through_notify_699() {
             )
         },
     );
-    let ai = w.parts.unit_ai.get(object_id(9729)).unwrap();
-    assert_eq!((r, ai.attackers.clone()), (Ok(GO_ON), Attackers::default()));
+    let ai = world.parts.unit_ai.get(object_id(9729)).unwrap();
+    assert_eq!(
+        (run_ai, ai.attackers.clone()),
+        (Ok(GO_ON), Attackers::default())
+    );
 }
 
 /// A builder walking to its foundation (busy: a `MoveTo` of its own) keeps its idle timer and
@@ -4016,7 +4105,7 @@ fn builder_idle_timer_stays_0_and_its_look_around_is_redrawn() {
 
 #[test]
 fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::Build),
         current_action: Some(AiAction::Build),
         current_target: Some(object_id(10028)),
@@ -4025,18 +4114,24 @@ fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Civilian)
     };
-    let mut r = rng();
-    u.notify_work(
-        Some(OrderKind::Hunt),
-        Some(AiAction::Hunt),
-        Some((object_id(9365), class::TREE)),
-        Position::new(24.5, 97.5, 0.0),
-        Notifies::Cleared,
-        &mut r,
-    )
-    .unwrap();
+    let mut rng = rng();
+    unit_ai
+        .notify_work(
+            Some(OrderKind::Hunt),
+            Some(AiAction::Hunt),
+            Some((object_id(9365), class::TREE)),
+            Position::new(24.5, 97.5, 0.0),
+            Notifies::Cleared,
+            &mut rng,
+        )
+        .unwrap();
     assert_eq!(
-        (u.current_order, u.current_action, u.current_target, r.draws),
+        (
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target,
+            rng.draws
+        ),
         (
             Some(OrderKind::Hunt),
             Some(AiAction::Hunt),
@@ -4044,18 +4139,19 @@ fn work_notify_sets_the_order_and_redraws_timeout_left_by_order_711() {
             0
         )
     );
-    u.current_order = Some(OrderKind::Patrol);
-    u.notify_work(
-        Some(OrderKind::Hunt),
-        Some(AiAction::Hunt),
-        Some((object_id(9365), class::TREE)),
-        Position::new(24.5, 97.5, 0.0),
-        Notifies::Cleared,
-        &mut r,
-    )
-    .unwrap();
-    assert_eq!((r.draws, u.secondary_timer), (1, Millis::new(750)));
-    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
+    unit_ai.current_order = Some(OrderKind::Patrol);
+    unit_ai
+        .notify_work(
+            Some(OrderKind::Hunt),
+            Some(AiAction::Hunt),
+            Some((object_id(9365), class::TREE)),
+            Position::new(24.5, 97.5, 0.0),
+            Notifies::Cleared,
+            &mut rng,
+        )
+        .unwrap();
+    assert_eq!((rng.draws, unit_ai.secondary_timer), (1, Millis::new(750)));
+    assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
 }
 
 /// records/425906646's update 1404: player 8's unit on the defend stance (1). Within 5 tiles of
@@ -4368,14 +4464,14 @@ fn retarget_draws_before_look_around() {
 /// quarters of it; a span below 1000 is 1000.
 #[test]
 fn the_randomized_retarget_timer_draws_around_its_span() {
-    let mut u = idle(UnitAiKind::Civilian);
-    u.set_randomized_retarget_timer(Millis::new(4000), &mut rng());
-    assert_eq!(u.retarget_timer, Millis::new(7241 % 2000 + 3000));
-    u.set_randomized_retarget_timer(Millis::new(10), &mut rng());
-    assert_eq!(u.retarget_timer, Millis::new(7241 % 500 + 750));
-    u.set_randomized_retarget_timer(Millis::new(u32::MAX), &mut rng());
+    let mut unit_ai = idle(UnitAiKind::Civilian);
+    unit_ai.set_randomized_retarget_timer(Millis::new(4000), &mut rng());
+    assert_eq!(unit_ai.retarget_timer, Millis::new(7241 % 2000 + 3000));
+    unit_ai.set_randomized_retarget_timer(Millis::new(10), &mut rng());
+    assert_eq!(unit_ai.retarget_timer, Millis::new(7241 % 500 + 750));
+    unit_ai.set_randomized_retarget_timer(Millis::new(u32::MAX), &mut rng());
     assert_eq!(
-        u.retarget_timer,
+        unit_ai.retarget_timer,
         Millis::new(7241_u32.wrapping_add(u32::MAX.wrapping_mul(3) >> 2))
     );
 }
@@ -4542,14 +4638,15 @@ fn scouting(ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]) -> World {
         .build()
 }
 
-/// The point the Explore of scout 30 of `w` walks to, none without one.
-fn exploring(w: &World) -> Option<Position> {
-    w.parts
+/// The point the Explore of scout 30 of `world` walks to, none without one.
+fn exploring(world: &World) -> Option<Position> {
+    world
+        .parts
         .actions
         .of(object_id(30))
         .list
         .explore()
-        .map(|e| e.point)
+        .map(|explore_action| explore_action.point)
 }
 
 /// The base handler's case 0x202 for the auto scout ([`UnitAi::seek_unexplored`]): a point
@@ -4570,14 +4667,14 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
     };
     let auto = Some(OrderKind::AutoScout);
     let seek = |ai: UnitAi, kind: PlayerKind, unexplored: &[Tile]| {
-        let mut w = scouting(ai, kind, unexplored);
-        let n = Notify::own(object_id(30), NotifyKind::REQUIRES_SEARCH, [605, 0, 0]);
-        let r = run_ai(
-            &mut w,
+        let mut scouting = scouting(ai, kind, unexplored);
+        let notify = Notify::own(object_id(30), NotifyKind::REQUIRES_SEARCH, [605, 0, 0]);
+        let run_ai = run_ai(
+            &mut scouting,
             (player_id(1), object_id(30)),
-            |ai, at, side, kind, rng| ai.seek_unexplored(n, at, kind, rng, side),
+            |ai, at, side, kind, rng| ai.seek_unexplored(notify, at, kind, rng, side),
         );
-        (r, w)
+        (run_ai, scouting)
     };
     let actions = |w: &World| {
         let ai = w.parts.unit_ai.get(object_id(30)).unwrap();
@@ -4644,9 +4741,9 @@ fn an_auto_scout_explores_what_its_searches_find_or_maps_what_it_saw() {
     // a computer player's explorer finds no tile (slot 0x90 gives none for it): the target goes,
     // the action stops and its owner hears the notify (its AI module, which the world does not
     // hold here, would)
-    let (r, w) = seek(scout(None, AiAction::Explore), PlayerKind::Computer, &[]);
+    let (r, world) = seek(scout(None, AiAction::Explore), PlayerKind::Computer, &[]);
     assert_eq!(r, Ok(GO_ON));
-    let ai = w.parts.unit_ai.get(object_id(30)).unwrap();
+    let ai = world.parts.unit_ai.get(object_id(30)).unwrap();
     assert_eq!((ai.current_target, ai.current_action), (None, None));
 }
 
@@ -4718,10 +4815,10 @@ fn church_world(
     scene.build()
 }
 
-/// The owner of the rock church in `w`, and whether it still holds its Artifact.
-fn church(w: &World) -> (PlayerId, bool) {
-    let (owner, _) = w.object(object_id(7108)).expect("the church");
-    let busy = w
+/// The owner of the rock church in `world`, and whether it still holds its Artifact.
+fn church(world: &World) -> (PlayerId, bool) {
+    let (owner, _) = world.object(object_id(7108)).expect("the church");
+    let busy = world
         .parts
         .actions
         .of(object_id(7108))
@@ -4741,13 +4838,13 @@ fn church(w: &World) -> (PlayerId, bool) {
 fn the_artifact_goes_to_the_owner_of_the_closest_object_one_player_sees() {
     let gaia = PlayerId::GAIA;
     let idle_of = |speed, others: &[(i32, PlayerId, f32, f32)], rocks: &[Tile]| {
-        let mut w = church_world((gaia, church_ai()), speed, others, (rocks, &[]));
+        let mut world = church_world((gaia, church_ai()), speed, others, (rocks, &[]));
         let took = run_ai(
-            &mut w,
+            &mut world,
             (gaia, object_id(7108)),
             |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
         );
-        (took, church(&w).0)
+        (took, church(&world).0)
     };
     let two = player_id(2);
     assert_eq!(
@@ -4794,9 +4891,9 @@ fn the_artifact_update_hands_it_over_then_stops() {
             idle_timer: Millis::new(900),
             ..church_ai()
         };
-        let mut w = church_world((PlayerId::GAIA, ai), None, others, (&[], &[]));
-        let r = run_ai(
-            &mut w,
+        let mut world = church_world((PlayerId::GAIA, ai), None, others, (&[], &[]));
+        let after_order = run_ai(
+            &mut world,
             (PlayerId::GAIA, object_id(7108)),
             |ai, at, side, kind, rng| {
                 ai.update(
@@ -4809,9 +4906,9 @@ fn the_artifact_update_hands_it_over_then_stops() {
                 )
             },
         );
-        assert_eq!(r, Ok(None));
-        let ai = w.parts.unit_ai.get(object_id(7108)).unwrap();
-        (church(&w), ai.current_target, ai.idle_timer)
+        assert_eq!(after_order, Ok(None));
+        let ai = world.parts.unit_ai.get(object_id(7108)).unwrap();
+        (church(&world), ai.current_target, ai.idle_timer)
     };
     assert_eq!(
         update(&[(500, player_id(2), 140.0, 100.0)]),
@@ -4833,7 +4930,7 @@ fn the_artifact_update_hands_it_over_then_stops() {
 fn the_artifact_notifies_stop_it_or_go_on() {
     let one = player_id(1);
     let run = |ai: &UnitAi, kind: NotifyKind, p: [i32; 3], sight: TileSight| {
-        let n = Notify {
+        let notify = Notify {
             caller: Some(object_id(500)),
             recipient: object_id(7108),
             kind,
@@ -4847,15 +4944,17 @@ fn the_artifact_notifies_stop_it_or_go_on() {
             TileSight::Explored => &[Tile::new(140, 104)],
             _ => &[],
         };
-        let mut w = church_world((one, ai.clone()), None, &others, (&[], fogged));
-        let r = run_ai(&mut w, (one, object_id(7108)), |ai, at, side, kind, rng| {
-            ai.handle(n, Millis::ZERO, at, kind, rng, side)
-        });
-        let unit = w.players[1].objects.by_id(object_id(7108)).unwrap();
+        let mut world = church_world((one, ai.clone()), None, &others, (&[], fogged));
+        let run_ai = run_ai(
+            &mut world,
+            (one, object_id(7108)),
+            |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
+        );
+        let unit = world.players[1].objects.by_id(object_id(7108)).unwrap();
         let under_attack = unit.flags.contains(UnitFlags::UNDER_ATTACK);
-        let stopped = !church(&w).1;
-        let after = w.parts.unit_ai.get(object_id(7108)).unwrap().clone();
-        ((r, stopped, under_attack), after)
+        let stopped = !church(&world).1;
+        let after = world.parts.unit_ai.get(object_id(7108)).unwrap().clone();
+        ((run_ai, stopped, under_attack), after)
     };
     let seen = TileSight::Seen;
     let mut ai = church_ai();
@@ -5217,9 +5316,9 @@ fn new_soldier_takes_its_stance_from_its_master_and_owner() {
         UnitStance::Defensive
     );
     assert_eq!(
-        stance(&|n| {
-            n.class = class::CLASS_61;
-            n.player_kind = PlayerKind::Computer;
+        stance(&|new_object| {
+            new_object.class = class::CLASS_61;
+            new_object.player_kind = PlayerKind::Computer;
         }),
         UnitStance::NoAttack
     );
@@ -5325,7 +5424,7 @@ fn new_object_takes_its_hunt_range_from_its_master_last_task_of_kind_6() {
 #[test]
 fn an_order_redraws_an_adjusted_idle_timeout_of_750_or_more_and_caps_the_secondary_timer() {
     // FUN_140e6cfc0 for each unit of an INTERACT, MOVE or RETREAT
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         idle_timeout: Millis::new(3000),
         adjusted_idle_timeout: Millis::new(2600),
         secondary_timer: Millis::new(900),
@@ -5334,13 +5433,16 @@ fn an_order_redraws_an_adjusted_idle_timeout_of_750_or_more_and_caps_the_seconda
         ..idle(UnitAiKind::Soldier)
     };
     let mut r = rng();
-    u.reset_for_order(&mut r);
+    unit_ai.reset_for_order(&mut r);
     assert_eq!(
-        (u.adjusted_idle_timeout, u.secondary_timer),
+        (unit_ai.adjusted_idle_timeout, unit_ai.secondary_timer),
         (Millis::new(7241 % 1500 + 2250), Millis::new(750))
     );
     // FUN_140c68de0 first: the patrol path and its waypoint go
-    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (None, 0));
+    assert_eq!(
+        (unit_ai.patrol_path, unit_ai.patrol_waypoint.get()),
+        (None, 0)
+    );
     let mut low = UnitAi {
         idle_timeout: Millis::new(3000),
         adjusted_idle_timeout: Millis::new(749),
@@ -5384,9 +5486,9 @@ fn seed_for(wanders: bool) -> Well512 {
             r
         })
         .find(|r| {
-            let mut e = r.clone();
-            let _ = e.below(81);
-            (e.rand15() % 7 == 0) == wanders
+            let mut rng = r.clone();
+            let _ = rng.below(81);
+            (rng.rand15() % 7 == 0) == wanders
         })
         .unwrap()
 }
@@ -5480,44 +5582,50 @@ fn boar_away_from_home_goes_back_and_furious_one_stays() {
 #[test]
 fn deer_adjusted_idle_timeout_is_five_quarters_of_its_idle_timeout() {
     // FUN_140c17170, the deer's and fox's slot 0x1a8: no draw
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         idle_timeout: Millis::new(4000),
         adjusted_idle_timeout: Millis::new(3000),
         ..idle(UnitAiKind::Hunted)
     };
-    let mut r = rng();
-    u.reset_for_order(&mut r);
-    assert_eq!((u.adjusted_idle_timeout, r.draws), (Millis::new(5000), 0));
+    let mut rng = rng();
+    unit_ai.reset_for_order(&mut rng);
+    assert_eq!(
+        (unit_ai.adjusted_idle_timeout, rng.draws),
+        (Millis::new(5000), 0)
+    );
 }
 
 #[test]
 fn move_forgets_the_target_and_an_order_keeps_its_history() {
     // MOVE of 9185 in 1044: order 710, action 610, no target, the point on the ground
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_target: Some(object_id(9365)),
         target_class: class_of(15),
         ..idle(UnitAiKind::Soldier)
     };
-    u.notify_move(true, None, Point::new(21.947_916, 92.489_586), &mut rng());
+    unit_ai.notify_move(true, None, Point::new(21.947_916, 92.489_586), &mut rng());
     assert_eq!(
         (
-            u.current_order,
-            u.current_action,
-            u.current_target,
-            u.target_class
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.target_class
         ),
         (Some(OrderKind::Move), Some(AiAction::Move), None, None)
     );
     assert_eq!(
         (
-            u.last_order,
-            u.last_action,
-            u.last_target,
-            u.last_target_class
+            unit_ai.last_order,
+            unit_ai.last_action,
+            unit_ai.last_target,
+            unit_ai.last_target_class
         ),
         (None, None, None, None)
     );
-    assert_eq!(u.target_point, Position::new(21.947_916, 92.489_586, 0.0));
+    assert_eq!(
+        unit_ai.target_point,
+        Position::new(21.947_916, 92.489_586, 0.0)
+    );
 }
 
 #[test]
@@ -5563,7 +5671,7 @@ fn wander_seed(wanders: bool) -> Well512 {
             r.set_seed(seed);
             r
         })
-        .find(|r| (r.clone().rand15() % 7 == 0) == wanders)
+        .find(|rng| (rng.clone().rand15() % 7 == 0) == wanders)
         .unwrap()
 }
 
@@ -5892,20 +6000,23 @@ fn gaia_unit_world_with(id: i32, ai: UnitAi, at: Position, others: &[SceneObject
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
-/// Gaia's unit `id` in `w` hears `n` through its action-failed handler
+/// Gaia's unit `id` in `world` hears `notify` through its action-failed handler
 /// ([`UnitAi::action_failed`]): its answer and its unit AI.
-fn gaia_failed(w: &mut World, id: i32, n: Notify) -> (GenieResult<u32>, UnitAi) {
-    let r = run_ai(
-        w,
+fn gaia_failed(world: &mut World, id: i32, notify: Notify) -> (GenieResult<u32>, UnitAi) {
+    let run_ai = run_ai(
+        world,
         (PlayerId::GAIA, object_id(id)),
-        |ai, at, side, kind, rng| ai.action_failed(n, at, kind, rng, side),
+        |ai, at, side, kind, rng| ai.action_failed(notify, at, kind, rng, side),
     );
-    (r, w.parts.unit_ai.get(object_id(id)).unwrap().clone())
+    (
+        run_ai,
+        world.parts.unit_ai.get(object_id(id)).unwrap().clone(),
+    )
 }
 
 #[test]
@@ -5918,13 +6029,13 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         current_target: Some(object_id(31234)),
         ..UnitAi::default()
     };
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(9183),
         NotifyKind::ACTION_FAILED,
         [AiAction::Move.value(), 0, 0],
     );
     let mut w = gaia_unit_world(9183, moving, Position::new(10.0, 10.0, 0.0));
-    let (r, u) = gaia_failed(&mut w, 9183, n);
+    let (r, u) = gaia_failed(&mut w, 9183, notify);
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(
         (u.current_action, u.last_action),
@@ -5941,7 +6052,7 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         ..UnitAi::default()
     };
     let mut w = gaia_unit_world(9183, ordered, Position::new(10.0, 12.0, 0.0));
-    let (_, u) = gaia_failed(&mut w, 9183, n);
+    let (_, u) = gaia_failed(&mut w, 9183, notify);
     assert_eq!((u.current_order, u.current_action), (None, None));
     assert_eq!(u.state_position, Point::new(10.0, 12.0));
     // another action's failure goes on; a failed attack on the attack order of a unit AI
@@ -5952,16 +6063,16 @@ fn failed_action_stops_like_completed_one_and_an_order_own_failure_ends_it() {
         ..UnitAi::default()
     };
     let mut w = gaia_unit_world(9183, building, Position::new(10.0, 12.0, 0.0));
-    let (_, u) = gaia_failed(&mut w, 9183, n);
-    assert_eq!(u.current_action, Some(AiAction::Build));
+    let (_, unit_ai) = gaia_failed(&mut w, 9183, notify);
+    assert_eq!(unit_ai.current_action, Some(AiAction::Build));
     let ranged = UnitAi {
         ai_kind: UnitAiKind::Ranged,
         current_order: Some(OrderKind::Attack),
         ..UnitAi::default()
     };
     let attack = Notify::own(object_id(9183), NotifyKind::ACTION_FAILED, [600, 0, 0]);
-    let mut w = gaia_unit_world(9183, ranged, Position::new(10.0, 12.0, 0.0));
-    assert!(gaia_failed(&mut w, 9183, attack).0.is_err());
+    let mut world = gaia_unit_world(9183, ranged, Position::new(10.0, 12.0, 0.0));
+    assert!(gaia_failed(&mut world, 9183, attack).0.is_err());
 }
 
 /// records/425906646's wolf 29827 (Gaia, a boar's unit AI) in update 3891: its Attack's target
@@ -5990,7 +6101,7 @@ fn boar_failed_attack_runs_its_idle_check() {
             .of(object_id(29827))
             .list
             .move_to()
-            .map(|m| m.point)
+            .map(|move_to_action| move_to_action.point)
     };
     let place = Position::new(169.5, 50.6, 0.0);
     let mut w = gaia_unit_world(29827, boar(home(true, false)), place);
@@ -6002,14 +6113,14 @@ fn boar_failed_attack_runs_its_idle_check() {
         (Some(AiAction::Move), Some(AiAction::Attack))
     );
     assert!(u.home.is_some_and(|h| !h.homeward));
-    let mut w = gaia_unit_world(29827, boar(home(false, true)), place);
-    let (r, u) = gaia_failed(&mut w, 29827, attack);
+    let mut world = gaia_unit_world(29827, boar(home(false, true)), place);
+    let (r, unit_ai) = gaia_failed(&mut world, 29827, attack);
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(
-        (u.current_target, u.last_target),
+        (unit_ai.current_target, unit_ai.last_target),
         (None, Some(object_id(31110)))
     );
-    assert_eq!(walks(&w), None);
+    assert_eq!(walks(&world), None);
 }
 
 #[test]
@@ -6133,7 +6244,11 @@ fn an_order_for_the_queue_goes_after_the_last_or_before_the_first() {
             Ok(Answer::Taken)
         );
     }
-    let targets: Vec<Option<ObjectId>> = ai.orders.iter().map(|o| o.target).collect();
+    let targets: Vec<Option<ObjectId>> = ai
+        .orders
+        .iter()
+        .map(|queued_order| queued_order.target)
+        .collect();
     assert_eq!(
         targets,
         [Some(object_id(3)), Some(object_id(1)), Some(object_id(2))]
@@ -6174,16 +6289,16 @@ fn saved_order_and_notify_read_as_the_game_wrote_them() {
     order[44] = 1;
     order[48..52].copy_from_slice(&(-1i32).to_le_bytes());
     // a player's order in a unit's queue (the issuer 1, a player of the nine)
-    let o = QueuedOrder::from_bytes(&order, object_id(9183), 9).unwrap();
+    let queued_order = QueuedOrder::from_bytes(&order, object_id(9183), 9).unwrap();
     assert_eq!(
         (
-            o.issuer,
-            o.order,
-            o.priority.get(),
-            o.point,
-            o.range,
-            o.ready,
-            o.target_kind
+            queued_order.issuer,
+            queued_order.order,
+            queued_order.priority.get(),
+            queued_order.point,
+            queued_order.range,
+            queued_order.ready,
+            queued_order.target_kind
         ),
         (
             Some(Issuer::Player(player_id(1))),
@@ -6198,12 +6313,12 @@ fn saved_order_and_notify_read_as_the_game_wrote_them() {
     // an order value no order holds (MOVE's action value)
     order[4..8].copy_from_slice(&AiAction::Move.value().to_le_bytes());
     assert_eq!(
-        QueuedOrder::from_bytes(&order, object_id(9183), 9).map_err(|e| e.kind()),
+        QueuedOrder::from_bytes(&order, object_id(9183), 9).map_err(|error| error.kind()),
         Err(crate::ErrorKind::InvalidInput)
     );
     let mut notify = [0u8; 24];
-    for (i, w) in [9851i32, 9851, 506, 610, 0, 0].iter().enumerate() {
-        notify[4 * i..4 * i + 4].copy_from_slice(&w.to_le_bytes());
+    for (index, w) in [9851i32, 9851, 506, 610, 0, 0].iter().enumerate() {
+        notify[4 * index..4 * index + 4].copy_from_slice(&w.to_le_bytes());
     }
     assert_eq!(
         Notify::from_bytes(&notify).unwrap(),
@@ -6251,7 +6366,7 @@ fn making_world(ai: UnitAi, missile: i16, firepower: f32) -> World {
         }),
         ..Master::default()
     };
-    let mut w = Scene::open(GridSize::new(64, 64))
+    let mut world = Scene::open(GridSize::new(64, 64))
         .players(2)
         .graphic(STANDING)
         .object(SceneObject {
@@ -6260,8 +6375,8 @@ fn making_world(ai: UnitAi, missile: i16, firepower: f32) -> World {
             ..SceneObject::new(500, player_id(1), centre, Position::new(30.0, 30.0, 0.0))
         })
         .build();
-    w.parts.combat_mut(object_id(500)).unwrap().firepower = Firepower::new(firepower);
-    w
+    world.parts.combat_mut(object_id(500)).unwrap().firepower = Firepower::new(firepower);
+    world
 }
 
 /// The town centre on its make action: with a target, or within its idle timeout, the idle
@@ -6281,13 +6396,13 @@ fn making_building_runs_process_idle_only_without_target() {
         ..UnitAi::default()
     };
     let run = |ai: UnitAi, missile, firepower| {
-        let mut w = making_world(ai, missile, firepower);
-        let r = run_ai(
-            &mut w,
+        let mut world = making_world(ai, missile, firepower);
+        let run_ai = run_ai(
+            &mut world,
             (player_id(1), object_id(500)),
             |ai, at, side, kind, rng| ai.idle_part(true, at.group, at, kind, rng, side),
         );
-        (r, ai_500(&w).clone())
+        (run_ai, ai_500(&world).clone())
     };
     let (r, u) = run(tc(Some(object_id(29826))), 363, 1.0);
     assert_eq!((r, u.idle_timer), (Ok(()), Millis::new(4000)));
@@ -6308,10 +6423,10 @@ fn making_building_runs_process_idle_only_without_target() {
         (None, Some(object_id(29826)), Millis::ZERO)
     );
     // with units inside it shoots more and keeps it
-    let (r, u) = run(tc(Some(object_id(29826))), -1, 3.0);
+    let (r, unit_ai) = run(tc(Some(object_id(29826))), -1, 3.0);
     assert_eq!(r, Ok(()));
     assert_eq!(
-        (u.current_target, u.idle_timer),
+        (unit_ai.current_target, unit_ai.idle_timer),
         (Some(object_id(29826)), Millis::new(4000))
     );
 }
@@ -6353,24 +6468,27 @@ fn busy_on_target(
 /// [`busy_on_target`]'s unit runs its full update ([`UnitAi::update`], 10 ms at `now`): its
 /// answer and the world.
 fn update_busy(
-    mut w: World,
+    mut world: World,
     player: PlayerId,
     now: WorldTime,
 ) -> (GenieResult<Option<AfterOrder>>, World) {
-    let r = run_ai(&mut w, (player, object_id(9)), |ai, at, side, kind, rng| {
-        ai.update(Millis::new(10), now, kind, at, rng, side)
-    });
-    (r, w)
+    let after_order = run_ai(
+        &mut world,
+        (player, object_id(9)),
+        |ai, at, side, kind, rng| ai.update(Millis::new(10), now, kind, at, rng, side),
+    );
+    (after_order, world)
 }
 
-/// The point and target of the `MoveTo` of unit 9 of `w`.
-fn following(w: &World) -> Option<(Position, Option<ObjectId>)> {
-    w.parts
+/// The point and target of the `MoveTo` of unit 9 of `world`.
+fn following(world: &World) -> Option<(Position, Option<ObjectId>)> {
+    world
+        .parts
         .actions
         .of(object_id(9))
         .list
         .move_to()
-        .map(|m| (m.point, m.target))
+        .map(|move_to_action| (move_to_action.point, move_to_action.target))
 }
 
 /// The full update with a target on the orders and action values the recordings met (it
@@ -6412,7 +6530,7 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
         ),
         (UnitAiKind::Boar, None, Some(AiAction::MoveAside)),
     ] {
-        let u = UnitAi {
+        let unit_ai = UnitAi {
             ai_kind,
             current_order: order,
             current_action: action,
@@ -6423,22 +6541,28 @@ fn unit_ai_with_target_runs_its_update_on_any_order() {
             home: (ai_kind == UnitAiKind::Boar).then(Home::default),
             ..UnitAi::default()
         };
-        let w = busy_on_target(
+        let busy_on_target = busy_on_target(
             (player_id(1), 2),
             class::CLASS_6,
-            u,
+            unit_ai,
             (14230, player_id(2), class::PREDATOR),
         );
-        let (r, w) = update_busy(w, player_id(1), WorldTime::from_millis(100));
-        assert_eq!(r, Ok(None), "{ai_kind} {order:?} {action:?}");
+        let (after_order, world) =
+            update_busy(busy_on_target, player_id(1), WorldTime::from_millis(100));
+        assert_eq!(after_order, Ok(None), "{ai_kind} {order:?} {action:?}");
         // no call on the unit: it follows its target still
         assert_eq!(
-            following(&w),
+            following(&world),
             Some((Position::new(24.0, 20.0, 0.0), Some(object_id(14230)))),
             "{ai_kind} {order:?} {action:?}"
         );
         assert_eq!(
-            w.parts.unit_ai.get(object_id(9)).unwrap().current_target,
+            world
+                .parts
+                .unit_ai
+                .get(object_id(9))
+                .unwrap()
+                .current_target,
             Some(object_id(14230)),
             "{ai_kind} {order:?} {action:?}"
         );
@@ -6462,19 +6586,19 @@ fn builder_world(ai: UnitAi, actions: Option<Action>, target: Option<SceneObject
             sprite: Some(STANDING.id),
             ..SceneObject::new(9175, player_id(1), villager, Position::new(29.5, 89.5, 0.0))
         });
-    if let Some(t) = target {
+    if let Some(scene_object) = target {
         scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(player_id(1))),
-            ..t
+            ..scene_object
         });
     }
-    let mut w = scene.build();
-    w.players[1]
+    let mut world = scene.build();
+    world.players[1]
         .objects
         .by_id_mut(object_id(9175))
         .unwrap()
         .last_human_order = WorldTime::from_millis(9000);
-    w
+    world
 }
 
 /// Player 1's house 10028 at (30, 88), standing.
@@ -6496,15 +6620,18 @@ fn dying_walker() -> SceneObject {
     }
 }
 
-/// Builder 9175 of `w` runs its target block ([`UnitAi::target_block`]): its answer and its
+/// Builder 9175 of `world` runs its target block ([`UnitAi::target_block`]): its answer and its
 /// unit AI.
-fn builder_target_block(w: &mut World) -> (GenieResult<()>, UnitAi) {
-    let r = run_ai(
-        w,
+fn builder_target_block(world: &mut World) -> (GenieResult<()>, UnitAi) {
+    let run_ai = run_ai(
+        world,
         (player_id(1), object_id(9175)),
         |ai, at, side, kind, rng| ai.target_block(at, kind, rng, side),
     );
-    (r, w.parts.unit_ai.get(object_id(9175)).unwrap().clone())
+    (
+        run_ai,
+        world.parts.unit_ai.get(object_id(9175)).unwrap().clone(),
+    )
 }
 
 /// The target block: the house 10028 standing in state 2 keeps it (1497). A target no longer
@@ -6526,15 +6653,15 @@ fn the_target_block_keeps_standing_target_and_drops_gone_one() {
     assert_eq!((u.current_target, u.target_class), (None, class_of(3)));
     assert_eq!(u.idle_timer, Millis::new(3000));
     // inside another
-    let mut w = builder_world(builder_done(), None, Some(standing_house()));
-    w.players[1]
+    let mut world = builder_world(builder_done(), None, Some(standing_house()));
+    world.players[1]
         .objects
         .by_id_mut(object_id(9175))
         .unwrap()
         .life
         .inside = Some(ContainerId::new(object_id(10028)));
-    let (r, u) = builder_target_block(&mut w);
-    assert_eq!((r, u.current_target), (Ok(()), None));
+    let (r, unit_ai) = builder_target_block(&mut world);
+    assert_eq!((r, unit_ai.current_target), (Ok(()), None));
 }
 
 /// A dead target: 0x25b needs a live one, so the target goes and the action stops (its
@@ -6574,11 +6701,15 @@ fn dead_target_stops_an_action_that_needs_live_one() {
         current_action: Some(AiAction::Hunt),
         ..builder_done()
     };
-    let mut w = builder_world(hunting, Some(walking), Some(dying_walker()));
-    let (r, u) = builder_target_block(&mut w);
+    let mut walking_world = builder_world(hunting, Some(walking), Some(dying_walker()));
+    let (r, u) = builder_target_block(&mut walking_world);
     assert_eq!((r, u.current_target), (Ok(()), Some(object_id(10028))));
     assert_eq!(
-        w.parts.actions.of(object_id(9175)).top_action_kind(),
+        walking_world
+            .parts
+            .actions
+            .of(object_id(9175))
+            .top_action_kind(),
         Some(MOVE_TO)
     );
     // the attack: its Attack swinging on the kill waits; done, the processIdle
@@ -6597,26 +6728,26 @@ fn dead_target_stops_an_action_that_needs_live_one() {
     );
     let (r, u) = builder_target_block(&mut w);
     assert_eq!((r, u.current_target), (Ok(()), Some(object_id(10028))));
-    let mut w = builder_world(
+    let mut world = builder_world(
         attack(),
         Some(attacking(AttackState::Done)),
         Some(dying_walker()),
     );
-    let (r, u) = builder_target_block(&mut w);
+    let (r, unit_ai) = builder_target_block(&mut world);
     assert_eq!(r, Ok(()));
-    let walk = w
+    let walk = world
         .parts
         .actions
         .of(object_id(9175))
         .list
         .move_to()
-        .map(|m| (m.point, m.range));
+        .map(|move_to_action| (move_to_action.point, move_to_action.range));
     assert_eq!(walk, Some((Position::new(30.0, 88.0, 0.0), Distance::ZERO)));
     assert_eq!(
-        (u.current_order, u.last_order),
+        (unit_ai.current_order, unit_ai.last_order),
         (None, Some(OrderKind::Build))
     );
-    let villager = w.players[1].objects.by_id(object_id(9175)).unwrap();
+    let villager = world.players[1].objects.by_id(object_id(9175)).unwrap();
     assert_eq!(villager.last_human_order, HUMAN_ORDER_CAP);
 }
 
@@ -7004,7 +7135,7 @@ fn each_unit_ai_kind_has_its_own_attack_check() {
                 &tuning().unit_ai,
             )
         };
-    for t in [
+    for unit_ai_kind in [
         UnitAiKind::Boar,
         UnitAiKind::Ranged,
         UnitAiKind::Ranged2,
@@ -7015,7 +7146,11 @@ fn each_unit_ai_kind_has_its_own_attack_check() {
         UnitAiKind::SiegeTower,
         UnitAiKind::Livestock,
     ] {
-        assert_eq!(check(t, None, 0, class::RELIC), Ok(true), "{t}");
+        assert_eq!(
+            check(unit_ai_kind, None, 0, class::RELIC),
+            Ok(true),
+            "{unit_ai_kind}"
+        );
     }
     assert_eq!(
         check(UnitAiKind::Building, None, 0, class::VILLAGER),
@@ -7177,8 +7312,8 @@ fn soldier_standing_its_ground_attacks_within_its_range_of_its_state_position() 
         ..BOAR
     };
     // the range against it plus 0.5 from the state position to its footprint
-    let reach = |s: &Seeker, x: f32| {
-        soldier_can_attack(&SCOUT, s, &villager(x), &roles(), &tuning().unit_ai)
+    let reach = |seeker: &Seeker, x: f32| {
+        soldier_can_attack(&SCOUT, seeker, &villager(x), &roles(), &tuning().unit_ai)
     };
     assert_eq!(reach(&STAND_GROUND, 119.2), Ok(true));
     assert_eq!(reach(&STAND_GROUND, 119.3), Ok(false));
@@ -7347,7 +7482,7 @@ fn found_ids(world: &World) -> Vec<ObjectId> {
 /// way before it takes the order's target.
 #[test]
 fn forgetting_the_targets_clears_the_current_and_the_last_and_the_point() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(12)),
@@ -7357,19 +7492,19 @@ fn forgetting_the_targets_clears_the_current_and_the_last_and_the_point() {
         last_target_class: class_of(9),
         ..idle(UnitAiKind::Soldier)
     };
-    u.forget_targets();
+    unit_ai.forget_targets();
     assert_eq!(
         (
-            u.current_target,
-            u.target_class,
-            u.last_target,
-            u.last_target_class
+            unit_ai.current_target,
+            unit_ai.target_class,
+            unit_ai.last_target,
+            unit_ai.last_target_class
         ),
         (None, None, None, None)
     );
-    assert_eq!(u.target_point, Position::new(-1.0, -1.0, -1.0));
+    assert_eq!(unit_ai.target_point, Position::new(-1.0, -1.0, -1.0));
     assert_eq!(
-        (u.current_order, u.current_action),
+        (unit_ai.current_order, unit_ai.current_action),
         (Some(OrderKind::Attack), Some(AiAction::Attack))
     );
     let mut moved = UnitAi {
@@ -7397,7 +7532,7 @@ fn forgetting_the_targets_clears_the_current_and_the_last_and_the_point() {
 /// orders only with that task, and without it any unit that passes does.
 #[test]
 fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
-    let mut u = idle(UnitAiKind::Soldier);
+    let mut unit_ai = idle(UnitAiKind::Soldier);
     let plain = no_surroundings();
     let carter = Surroundings {
         flags: SurroundingFlags::TASK_0X99,
@@ -7406,20 +7541,20 @@ fn unit_takes_orders_by_its_0x99_task_and_with_task_only_needs_it() {
         unit_ai_tuning: tuning().unit_ai,
         ..Surroundings::default()
     };
-    assert!(u.can_order(&plain, OrderTest::Any));
-    assert!(!u.can_order(&plain, OrderTest::TaskOnly));
-    assert!(u.can_order(&carter, OrderTest::Any));
-    assert!(u.can_order(&carter, OrderTest::TaskOnly));
-    u.current_action = Some(AiAction::Gather);
-    assert!(!u.can_order(&carter, OrderTest::Any));
-    assert!(!u.can_order(&carter, OrderTest::TaskOnly));
-    assert!(u.can_order(&plain, OrderTest::Any));
-    u.current_action = None;
+    assert!(unit_ai.can_order(&plain, OrderTest::Any));
+    assert!(!unit_ai.can_order(&plain, OrderTest::TaskOnly));
+    assert!(unit_ai.can_order(&carter, OrderTest::Any));
+    assert!(unit_ai.can_order(&carter, OrderTest::TaskOnly));
+    unit_ai.current_action = Some(AiAction::Gather);
+    assert!(!unit_ai.can_order(&carter, OrderTest::Any));
+    assert!(!unit_ai.can_order(&carter, OrderTest::TaskOnly));
+    assert!(unit_ai.can_order(&plain, OrderTest::Any));
+    unit_ai.current_action = None;
     let targeted = Surroundings {
         target: Some(Seen::default()),
         ..carter
     };
-    assert!(!u.can_order(&targeted, OrderTest::TaskOnly));
+    assert!(!unit_ai.can_order(&targeted, OrderTest::TaskOnly));
 }
 
 /// `FUN_140c1a760` at `LAB_140c1aa59`: an enemy building (master type `'P'`) passes the
@@ -7462,13 +7597,13 @@ fn tower_attacks_started_building_but_not_desolid_foundation() {
 /// the call answers 1; an id already in it changes nothing and answers 0.
 #[test]
 fn an_attacker_joins_the_sorted_set_once() {
-    let mut u = idle(UnitAiKind::Boar);
-    assert!(u.attackers.add(Some(object_id(30))));
-    assert!(u.attackers.add(Some(object_id(10))));
-    assert!(u.attackers.add(Some(object_id(20))));
-    assert!(!u.attackers.add(Some(object_id(10))));
-    assert!(u.attackers.add(None));
-    assert_eq!(u.attackers, Attackers::of_saved(&[-1, 10, 20, 30]));
+    let mut unit_ai = idle(UnitAiKind::Boar);
+    assert!(unit_ai.attackers.add(Some(object_id(30))));
+    assert!(unit_ai.attackers.add(Some(object_id(10))));
+    assert!(unit_ai.attackers.add(Some(object_id(20))));
+    assert!(!unit_ai.attackers.add(Some(object_id(10))));
+    assert!(unit_ai.attackers.add(None));
+    assert_eq!(unit_ai.attackers, Attackers::of_saved(&[-1, 10, 20, 30]));
 }
 
 /// The soldier's slot 0xa8 (`FUN_140c1ae60`): a neutral object of a class in the mask
@@ -7516,12 +7651,16 @@ fn an_inserted_order_goes_in_front_only_of_queue_that_holds_one() {
         ready: true,
         ..QueuedOrder::default()
     };
-    let mut u = idle(UnitAiKind::Soldier);
-    u.insert_order(order(Some(object_id(1))), QueueEnd::Front);
-    u.insert_order(order(Some(object_id(2))), QueueEnd::Back);
-    u.insert_order(order(Some(object_id(3))), QueueEnd::Front);
-    u.insert_order(order(Some(object_id(4))), QueueEnd::Back);
-    let targets: Vec<Option<ObjectId>> = u.orders.iter().map(|o| o.target).collect();
+    let mut unit_ai = idle(UnitAiKind::Soldier);
+    unit_ai.insert_order(order(Some(object_id(1))), QueueEnd::Front);
+    unit_ai.insert_order(order(Some(object_id(2))), QueueEnd::Back);
+    unit_ai.insert_order(order(Some(object_id(3))), QueueEnd::Front);
+    unit_ai.insert_order(order(Some(object_id(4))), QueueEnd::Back);
+    let targets: Vec<Option<ObjectId>> = unit_ai
+        .orders
+        .iter()
+        .map(|queued_order| queued_order.target)
+        .collect();
     assert_eq!(
         targets,
         [
@@ -8116,19 +8255,27 @@ fn wolf_whose_attack_target_died_attacks_the_next_villager() {
         ..idle(UnitAiKind::Lion)
     };
     // villager 700 a gap of 1 off
-    let mut w = wolf_world(u, &[(700, class::VILLAGER, 21.4)]);
+    let mut world = wolf_world(u, &[(700, class::VILLAGER, 21.4)]);
     run_ai(
-        &mut w,
+        &mut world,
         (PlayerId::GAIA, object_id(20)),
         |ai, at, side, kind, rng| ai.next_after_kill(at, kind, rng, side),
     )
     .unwrap();
-    let wolf = w.players[0].objects.by_id(object_id(20)).unwrap();
+    let wolf = world.players[0].objects.by_id(object_id(20)).unwrap();
     assert_eq!(wolf.last_human_order, HUMAN_ORDER_CAP);
-    assert!(w.parts.actions.of(object_id(20)).list.attack().is_none());
-    let u = w.parts.unit_ai.get(object_id(20)).unwrap();
+    assert!(
+        world
+            .parts
+            .actions
+            .of(object_id(20))
+            .list
+            .attack()
+            .is_none()
+    );
+    let unit_ai = world.parts.unit_ai.get(object_id(20)).unwrap();
     assert_eq!(
-        (u.current_action, u.current_target),
+        (unit_ai.current_action, unit_ai.current_target),
         (Some(AiAction::Attack), Some(object_id(50)))
     );
 }
@@ -8318,25 +8465,25 @@ fn civilian_world(priority: u8) -> World {
 #[test]
 fn villager_hunts_an_animal_and_attacks_another_object() {
     let attack = |priority, target| {
-        let mut w = civilian_world(priority);
-        let r = run_ai(
-            &mut w,
+        let mut world = civilian_world(priority);
+        let run_ai = run_ai(
+            &mut world,
             (player_id(1), object_id(10041)),
             |ai, at, side, _, rng| ai.civilian_attack(object_id(target), at, side, rng),
         );
-        let a = w.parts.actions.of(object_id(10041));
-        let attacks = a
+        let action = world.parts.actions.of(object_id(10041));
+        let attacks = action
             .list
             .attack()
             .and_then(|a| a.target)
             .map(AttackTargetId::id);
-        let u = w.parts.unit_ai.get(object_id(10041)).unwrap();
+        let unit_ai = world.parts.unit_ai.get(object_id(10041)).unwrap();
         (
-            r,
-            a.top_action_kind(),
+            run_ai,
+            action.top_action_kind(),
             attacks,
-            u.current_action,
-            u.current_target,
+            unit_ai.current_action,
+            unit_ai.current_target,
         )
     };
     let (r, top, ..) = attack(0, 9999);
@@ -8363,8 +8510,11 @@ fn villager_hunts_an_animal_and_attacks_another_object() {
     );
     assert_eq!(attack(0, 9801).0, Ok(Answer::NotTaken));
     assert_eq!(attack(3, 9800).0, Ok(Answer::NotTaken));
-    let (r, _, attacks, ..) = attack(3, 9802);
-    assert_eq!((r, attacks), (Ok(Answer::Taken), Some(object_id(9802))));
+    let (answer, _, attacks, ..) = attack(3, 9802);
+    assert_eq!(
+        (answer, attacks),
+        (Ok(Answer::Taken), Some(object_id(9802)))
+    );
 }
 
 /// Slot 0xa0 of the types whose `AttackObject` is the base's: the transport ship's and the
@@ -8378,9 +8528,9 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         (UnitAiKind::Building, None),
     ] {
         let enemy = order_target(9800, player_id(2), class::CLASS_6);
-        let mut w = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
-        let r = run_ai(
-            &mut w,
+        let mut world = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
+        let run_ai = run_ai(
+            &mut world,
             (player_id(1), object_id(9)),
             |ai, at, side, _, _| {
                 ai.attack_object(
@@ -8397,15 +8547,19 @@ fn ship_or_livestock_may_attack_anything_and_building_nothing() {
         } else {
             Answer::NotTaken
         };
-        assert_eq!((r, attacks_9(&w)), (Ok(answer), attacks), "type {ai_kind}");
+        assert_eq!(
+            (run_ai, attacks_9(&world)),
+            (Ok(answer), attacks),
+            "type {ai_kind}"
+        );
     }
 }
 
-/// Unit `id` of `player` in `w` handles `n` through its type's handler (slot 0x238,
+/// Unit `id` of `player` in `world` handles `notify` through its type's handler (slot 0x238,
 /// [`UnitAi::handle`]).
-fn hears(w: &mut World, (player, id): (PlayerId, i32), n: Notify) -> GenieResult<u32> {
-    run_ai(w, (player, object_id(id)), |ai, at, side, kind, rng| {
-        ai.handle(n, Millis::ZERO, at, kind, rng, side)
+fn hears(world: &mut World, (player, id): (PlayerId, i32), notify: Notify) -> GenieResult<u32> {
+    run_ai(world, (player, object_id(id)), |ai, at, side, kind, rng| {
+        ai.handle(notify, Millis::ZERO, at, kind, rng, side)
     })
 }
 
@@ -8423,21 +8577,21 @@ fn boar_whose_move_aside_completed_heads_home_next() {
         idle_timeout: Millis::new(3000),
         ..hit_boar()
     };
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(9729),
         NotifyKind::ACTION_COMPLETED,
         [AiAction::MoveAside.value(), 0, 0],
     );
-    let mut w = boar_world(9729, (CombatLevel::ANIMAL, u), &[]);
-    assert_eq!(hears(&mut w, (PlayerId::GAIA, 9729), n), Ok(GO_ON));
-    let u = w.parts.unit_ai.get(object_id(9729)).unwrap();
-    assert_eq!(u.idle_timeout, Millis::new(3101));
+    let mut world = boar_world(9729, (CombatLevel::ANIMAL, u), &[]);
+    assert_eq!(hears(&mut world, (PlayerId::GAIA, 9729), notify), Ok(GO_ON));
+    let unit_ai = world.parts.unit_ai.get(object_id(9729)).unwrap();
+    assert_eq!(unit_ai.idle_timeout, Millis::new(3101));
     assert_eq!(
-        (u.current_target, u.last_target),
+        (unit_ai.current_target, unit_ai.last_target),
         (None, Some(object_id(50)))
     );
-    assert_eq!(u.current_action, None);
-    assert!(u.home.is_some_and(|h| h.homeward));
+    assert_eq!(unit_ai.current_action, None);
+    assert!(unit_ai.home.is_some_and(|home| home.homeward));
 }
 
 /// The lion's handler (`FUN_140c266f0`): a completed attack (0x1fa with 600) sets its idle
@@ -8452,23 +8606,27 @@ fn lion_completed_attack_resets_its_idle_timeout_and_stops() {
         idle_timeout: Millis::new(6000),
         ..idle(UnitAiKind::Lion)
     };
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(800),
         NotifyKind::ACTION_COMPLETED,
         [AiAction::Attack.value(), 0, 0],
     );
     let expected = adjusted_idle_timeout(Millis::new(1000), &mut rng());
-    let mut w = gaia_unit_world(800, u, Position::new(10.0, 10.0, 0.0));
-    let before = w.streams.get(Stream::Ai).draws;
-    assert_eq!(hears(&mut w, (PlayerId::GAIA, 800), n), Ok(GO_ON));
-    assert_eq!(w.streams.get(Stream::Ai).draws - before, 1);
-    let u = w.parts.unit_ai.get(object_id(800)).unwrap();
+    let mut world = gaia_unit_world(800, u, Position::new(10.0, 10.0, 0.0));
+    let before = world.streams.get(Stream::Ai).draws;
+    assert_eq!(hears(&mut world, (PlayerId::GAIA, 800), notify), Ok(GO_ON));
+    assert_eq!(world.streams.get(Stream::Ai).draws - before, 1);
+    let unit_ai = world.parts.unit_ai.get(object_id(800)).unwrap();
     assert_eq!(
-        (u.idle_timeout, u.adjusted_idle_timeout),
+        (unit_ai.idle_timeout, unit_ai.adjusted_idle_timeout),
         (Millis::new(1000), expected)
     );
     assert_eq!(
-        (u.current_target, u.last_target, u.current_action),
+        (
+            unit_ai.current_target,
+            unit_ai.last_target,
+            unit_ai.current_action
+        ),
         (None, Some(object_id(700)), None)
     );
 }
@@ -8495,7 +8653,7 @@ fn lion_world(ai: UnitAi, villager: Option<(f32, ObjectFlags)>) -> World {
             Position::new(x, 10.0, 0.0),
         )
     });
-    let mut w = Scene::open(GridSize::new(64, 64))
+    let mut scene = Scene::open(GridSize::new(64, 64))
         .graphic(STANDING)
         .object(SceneObject {
             ai: Some(ai),
@@ -8510,15 +8668,15 @@ fn lion_world(ai: UnitAi, villager: Option<(f32, ObjectFlags)>) -> World {
                 Position::new(10.0, 10.0, 0.0),
             )
         });
-    if let Some(p) = prey {
-        w = w.object(SceneObject {
+    if let Some(scene_object) = prey {
+        scene = scene.object(SceneObject {
             seen_by: Some(VisionBits::visible(PlayerId::GAIA)),
-            ..p
+            ..scene_object
         });
     }
-    let mut w = w.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
 /// The lion's handler for a moved target (0x1fc): a target the world no longer holds, or
@@ -8533,12 +8691,17 @@ fn lion_drops_moved_target_out_of_its_sight() {
         current_target: Some(object_id(700)),
         ..idle(UnitAiKind::Lion)
     };
-    let n = Notify::own(object_id(800), NotifyKind::TARGET_MOVED, [0, 0, 0]);
+    let notify = Notify::own(object_id(800), NotifyKind::TARGET_MOVED, [0, 0, 0]);
     let run = |villager| {
-        let mut w = lion_world(lion(), villager);
-        let r = hears(&mut w, (PlayerId::GAIA, 800), n);
-        let u = w.parts.unit_ai.get(object_id(800)).unwrap();
-        (r, gaia_attacks(&w, 800), u.current_target, u.current_action)
+        let mut world = lion_world(lion(), villager);
+        let hears = hears(&mut world, (PlayerId::GAIA, 800), notify);
+        let unit_ai = world.parts.unit_ai.get(object_id(800)).unwrap();
+        (
+            hears,
+            gaia_attacks(&world, 800),
+            unit_ai.current_target,
+            unit_ai.current_action,
+        )
     };
     assert_eq!(run(None), (Ok(GO_ON), None, None, None));
     // 5 tiles apart, 4 between the footprints: at its sight, attacked again
@@ -8601,8 +8764,9 @@ fn building_counts_its_attackers() {
         let house = w.players[1].objects.by_id(object_id(10)).unwrap();
         house.flags.contains(UnitFlags::UNDER_ATTACK)
     };
-    let attackers = |w: &World| {
-        w.parts
+    let attackers = |world: &World| {
+        world
+            .parts
             .unit_ai
             .get(object_id(10))
             .unwrap()
@@ -8663,19 +8827,19 @@ fn building_counts_its_attackers() {
 /// (0x209, a human player's alert list), the notifies end and it gives up (4).
 #[test]
 fn destroyed_tower_gives_up() {
-    let n = Notify::own(object_id(60), NotifyKind::DAMAGED, [60, 0, 0]);
+    let notify = Notify::own(object_id(60), NotifyKind::DAMAGED, [60, 0, 0]);
     let tower = UnitAi {
-        notifies: vec![n],
+        notifies: vec![notify],
         ..idle(UnitAiKind::Tower)
     };
     let mut w = building_world(tower, PlayerKind::Human);
-    assert_eq!(hears(&mut w, (player_id(1), 10), n), Ok(DEAD));
+    assert_eq!(hears(&mut w, (player_id(1), 10), notify), Ok(DEAD));
     assert_eq!(
         w.parts.unit_ai.get(object_id(10)).unwrap().notifies.len(),
         0
     );
-    let mut w = building_world(idle(UnitAiKind::Tower), PlayerKind::Computer);
-    assert!(hears(&mut w, (player_id(1), 10), n).is_err());
+    let mut world = building_world(idle(UnitAiKind::Tower), PlayerKind::Computer);
+    assert!(hears(&mut world, (player_id(1), 10), notify).is_err());
 }
 
 /// A deer evading an object on its own point steps off by one tile down and left, the object
@@ -8757,19 +8921,20 @@ fn chased(
             )
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
-/// The point the `MoveTo` of unit 500 of `w` walks to, none without one.
-fn walks_to(w: &World) -> Option<Position> {
-    w.parts
+/// The point the `MoveTo` of unit 500 of `world` walks to, none without one.
+fn walks_to(world: &World) -> Option<Position> {
+    world
+        .parts
         .actions
         .of(object_id(500))
         .list
         .move_to()
-        .map(|m| m.point)
+        .map(|move_to_action| move_to_action.point)
 }
 
 /// `evasiveMoveTo` (`FUN_140c4d140`): without `uncon` a unit with an action stays; with
@@ -8781,18 +8946,18 @@ fn walks_to(w: &World) -> Option<Position> {
 fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     let evade = |ai: UnitAi, point: Position, flags: (OrderForce, BadPoint), rocks: &[Tile]| {
         let at = Position::new(10.0, 20.0, 0.0);
-        let mut w = chased(
+        let mut chased = chased(
             runner_unit(player_id(1), class::CLASS_6, ai, at),
             PlayerKind::Human,
             rocks,
             &[],
         );
-        let r = run_ai(
-            &mut w,
+        let run_ai = run_ai(
+            &mut chased,
             (player_id(1), object_id(500)),
             |ai, at, side, _, rng| ai.evasive_move(point, flags, at, rng, side),
         );
-        (r, w)
+        (run_ai, chased)
     };
     let busy = UnitAi {
         current_action: Some(AiAction::Attack),
@@ -8809,13 +8974,13 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
     };
     let ex = step(&mut expected, 12.0);
     let ey = step(&mut expected, 22.0);
-    let (r, mut w) = evade(
+    let (answer, mut w) = evade(
         idle(UnitAiKind::Hunted),
         Position::new(12.0, 22.0, 0.0),
         unforced,
         &[Tile::new(12, 22)],
     );
-    assert_eq!(r, Ok(Answer::Taken));
+    assert_eq!(answer, Ok(Answer::Taken));
     assert_eq!(w.streams.get(Stream::Ai).draws, 4);
     assert_eq!(walks_to(&w), Some(Position::new(ex, ey, 0.0)));
     let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
@@ -8824,13 +8989,13 @@ fn an_evasive_move_steps_off_point_the_unit_cannot_stand_at() {
         (Some(AiAction::Move), Position::new(ex, ey, 0.0))
     );
     // a point past the far edge is held a tile in, below 0 at 0
-    let (_, w) = evade(
+    let (_, world) = evade(
         idle(UnitAiKind::Hunted),
         Position::new(70.0, -3.0, 0.0),
         (OrderForce::Forced, BadPoint::Kept),
         &[],
     );
-    assert_eq!(walks_to(&w), Some(Position::new(63.0, 0.0, 0.0)));
+    assert_eq!(walks_to(&world), Some(Position::new(63.0, 0.0, 0.0)));
 }
 
 /// Slot 0x148 (`FUN_140c4d0d0`): unforced, a unit AI with an action value takes no move off
@@ -8895,7 +9060,7 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         force,
         pace: Pace::Walk,
     };
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_action: Some(AiAction::Attack),
         current_target: Some(object_id(40)),
         target_class: class_of(9),
@@ -8903,27 +9068,27 @@ fn an_ai_move_needs_force_or_no_action_and_keeps_the_target_class() {
         last_target_class: class_of(4),
         ..idle(UnitAiKind::Boar)
     };
-    let before = u.clone();
-    assert_eq!(u.move_to(m(OrderForce::Unforced)), None);
-    assert_eq!(u, before);
+    let before = unit_ai.clone();
+    assert_eq!(unit_ai.move_to(m(OrderForce::Unforced)), None);
+    assert_eq!(unit_ai, before);
     assert_eq!(
-        u.move_to(m(OrderForce::Forced)),
+        unit_ai.move_to(m(OrderForce::Forced)),
         Some(m(OrderForce::Forced))
     );
     assert_eq!(
-        (u.last_action, u.current_action),
+        (unit_ai.last_action, unit_ai.current_action),
         (Some(AiAction::Attack), Some(AiAction::Move))
     );
     assert_eq!(
         (
-            u.last_target,
-            u.last_target_class,
-            u.current_target,
-            u.target_class
+            unit_ai.last_target,
+            unit_ai.last_target_class,
+            unit_ai.current_target,
+            unit_ai.target_class
         ),
         (Some(object_id(40)), class_of(9), None, class_of(9))
     );
-    assert_eq!(u.target_point, Position::new(4.0, 5.0, 0.5));
+    assert_eq!(unit_ai.target_point, Position::new(4.0, 5.0, 0.5));
 }
 
 /// `FUN_140c64b60`: leaving a patrol order (711, 733) redraws an adjusted idle timeout of
@@ -8944,7 +9109,7 @@ fn the_order_setter_caps_by_signed_compare_and_may_keep_the_last_order() {
         (Some(OrderKind::Attack), Some(OrderKind::Wait))
     );
     assert_eq!(u.secondary_timer, Millis::new(0x8000_0000));
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::AttackMove),
         adjusted_idle_timeout: Millis::new(750),
         idle_timeout: Millis::new(3000),
@@ -8952,12 +9117,12 @@ fn the_order_setter_caps_by_signed_compare_and_may_keep_the_last_order() {
         ..idle(UnitAiKind::Soldier)
     };
     let mut r = rng();
-    u.set_order(None, &mut r);
+    unit_ai.set_order(None, &mut r);
     assert_eq!(
-        (u.current_order, u.last_order),
+        (unit_ai.current_order, unit_ai.last_order),
         (None, Some(OrderKind::AttackMove))
     );
-    assert_eq!(u.secondary_timer, Millis::new(750));
+    assert_eq!(unit_ai.secondary_timer, Millis::new(750));
     assert_eq!(r.draws, 1);
 }
 
@@ -9147,32 +9312,32 @@ fn the_building_cares_about_the_soldier_classes_in_its_own_order() {
 /// processing breaks off (3). A computer player's AI would hear the alert (not modelled).
 #[test]
 fn human_player_king_runs_from_its_attacker() {
-    let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
+    let notify = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let king = |kind| {
-        let mut u = UnitAi {
+        let mut unit_ai = UnitAi {
             hunted: None,
             ..idle(UnitAiKind::Hunted)
         };
-        u.post(n, ObjectState::Alive).unwrap();
+        unit_ai.post(notify, ObjectState::Alive).unwrap();
         let at = Position::new(20.0, 30.0, 0.0);
-        let mut w = chased(
-            runner_unit(player_id(1), class::KING, u, at),
+        let mut chased = chased(
+            runner_unit(player_id(1), class::KING, unit_ai, at),
             kind,
             &[],
             &[(77, class::CLASS_6, 22.0)],
         );
-        let r = run_ai(
-            &mut w,
+        let run_ai = run_ai(
+            &mut chased,
             (player_id(1), object_id(500)),
-            |ai, at, side, kind, rng| ai.hunted_damaged(n, Millis::ZERO, at, kind, rng, side),
+            |ai, at, side, kind, rng| ai.hunted_damaged(notify, Millis::ZERO, at, kind, rng, side),
         );
-        (r, w)
+        (run_ai, chased)
     };
-    let (r, w) = king(PlayerKind::Human);
+    let (r, world) = king(PlayerKind::Human);
     assert_eq!(r, Ok(BREAK));
-    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    let ai = world.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
-    assert_eq!(walks_to(&w), Some(Position::new(18.0, 30.0, 0.0)));
+    assert_eq!(walks_to(&world), Some(Position::new(18.0, 30.0, 0.0)));
     assert!(king(PlayerKind::Computer).0.is_err());
 }
 
@@ -9191,13 +9356,13 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     ];
     let run = |u: UnitAi, (owner, kind): (PlayerId, PlayerKind), class: ClassId, uncon| {
         let at = Position::new(20.0, 30.0, 0.0);
-        let mut w = chased(runner_unit(owner, class, u, at), kind, &[], &attackers);
-        let r = run_ai(
-            &mut w,
+        let mut world = chased(runner_unit(owner, class, u, at), kind, &[], &attackers);
+        let answer = run_ai(
+            &mut world,
             (owner, object_id(500)),
             |ai, at, side, kind, rng| ai.run_away(uncon, at, kind, rng, side),
         );
-        (r, walks_to(&w))
+        (answer, walks_to(&world))
     };
     let human = (player_id(1), PlayerKind::Human);
     let gaia = (PlayerId::GAIA, PlayerKind::Gaia);
@@ -9233,8 +9398,8 @@ fn unit_runs_from_its_attackers_within_its_leash() {
     // 77 and 78 on either side: the way two draws give
     let mut e = rng();
     let mut part = || {
-        let r = e.rand15() as i32 as f32;
-        (r + r) / RUN_DRAW_SCALE - RUN_ONE
+        let draw = e.rand15() as i32 as f32;
+        (draw + draw) / RUN_DRAW_SCALE - RUN_ONE
     };
     let (vx, vy) = (part(), part());
     let d = sqrt(vy * vy + vx * vx);
@@ -9244,12 +9409,12 @@ fn unit_runs_from_its_attackers_within_its_leash() {
         Some(way)
     );
     // a defensive unit with its state position 5 tiles east runs no farther than that
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         stance: UnitStance::Defensive,
         state_position: Point::new(25.0, 30.0),
         ..runner(vec![77])
     };
-    assert_eq!(run(u, human, class::CLASS_6, forced).1, away(20.0));
+    assert_eq!(run(unit_ai, human, class::CLASS_6, forced).1, away(20.0));
     let computer = (player_id(1), PlayerKind::Computer);
     assert!(
         run(runner(vec![79]), computer, class::CLASS_6, forced)
@@ -9272,18 +9437,18 @@ fn unit_runs_from_its_attackers_within_its_leash() {
 /// taken, and the class only when the world holds the object (else it stays).
 #[test]
 fn target_takes_its_class_only_from_an_object_the_world_holds() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_target: Some(object_id(40)),
         target_class: class_of(9),
         ..idle(UnitAiKind::Soldier)
     };
-    u.target_at(Some(object_id(41)), None, Position::new(1.0, 2.0, 3.0));
+    unit_ai.target_at(Some(object_id(41)), None, Position::new(1.0, 2.0, 3.0));
     assert_eq!(
         (
-            u.last_target,
-            u.last_target_class,
-            u.current_target,
-            u.target_class
+            unit_ai.last_target,
+            unit_ai.last_target_class,
+            unit_ai.current_target,
+            unit_ai.target_class
         ),
         (
             Some(object_id(40)),
@@ -9292,18 +9457,18 @@ fn target_takes_its_class_only_from_an_object_the_world_holds() {
             class_of(9)
         )
     );
-    assert_eq!(u.target_point, Position::new(1.0, 2.0, 3.0));
-    u.target_at(
+    assert_eq!(unit_ai.target_point, Position::new(1.0, 2.0, 3.0));
+    unit_ai.target_at(
         Some(object_id(42)),
         Some(class::VILLAGER),
         Position::new(5.0, 6.0, 0.0),
     );
     assert_eq!(
         (
-            u.last_target,
-            u.last_target_class,
-            u.current_target,
-            u.target_class
+            unit_ai.last_target,
+            unit_ai.last_target_class,
+            unit_ai.current_target,
+            unit_ai.target_class
         ),
         (
             Some(object_id(41)),
@@ -9319,28 +9484,28 @@ fn target_takes_its_class_only_from_an_object_the_world_holds() {
 /// for a movement completion it ignores (not queued) and for one it queues.
 #[test]
 fn the_unit_ai_notify_answers_whether_it_took_it() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_action: Some(AiAction::Gather),
         attackers: Attackers::of_saved(&[70]),
         ..idle(UnitAiKind::Civilian)
     };
     let n = |caller, kind, p0| Notify::own(caller, kind, [p0, 0, 0]);
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(object_id(70), NotifyKind::DAMAGED, 0),
             ObjectState::Foundation
         ),
         Answer::NotTaken
     );
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(object_id(71), NotifyKind::NO_LONGER_ON_ME, 0),
             ObjectState::Alive
         ),
         Answer::NotTaken
     );
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(
                 object_id(70),
                 NotifyKind::ACTION_INVALIDATED,
@@ -9351,7 +9516,7 @@ fn the_unit_ai_notify_answers_whether_it_took_it() {
         Answer::NotTaken
     );
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(
                 object_id(70),
                 NotifyKind::ACTION_COMPLETED,
@@ -9361,16 +9526,16 @@ fn the_unit_ai_notify_answers_whether_it_took_it() {
         ),
         Answer::Taken
     );
-    assert_eq!(u.notifies, Vec::new());
+    assert_eq!(unit_ai.notifies, Vec::new());
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(object_id(70), NotifyKind::NO_LONGER_ON_ME, 0),
             ObjectState::Alive
         ),
         Answer::Taken
     );
     assert_eq!(
-        u.accept(
+        unit_ai.accept(
             n(
                 object_id(70),
                 NotifyKind::ACTION_INVALIDATED,
@@ -9380,7 +9545,7 @@ fn the_unit_ai_notify_answers_whether_it_took_it() {
         ),
         Answer::Taken
     );
-    assert_eq!(u.notifies.len(), 2);
+    assert_eq!(unit_ai.notifies.len(), 2);
 }
 
 /// `0x140aa2a70` in state 3: a unit without an AI asks for its path even in range and keeps
@@ -9400,9 +9565,9 @@ fn unit_off_patrol_asks_plain_path() {
             ..PathAsk::default()
         }
     );
-    let mut u = idle(UnitAiKind::Soldier);
+    let mut unit_ai = idle(UnitAiKind::Soldier);
     let ask = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(30.0, 20.0),
         &tuning().unit_ai,
@@ -9415,26 +9580,29 @@ fn unit_off_patrol_asks_plain_path() {
         }
     );
     // a saved patrol off the patrol orders stays, and so does the attack move
-    u.patrol_path = Some(PatrolPath::default());
+    unit_ai.patrol_path = Some(PatrolPath::default());
     let ask = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(30.0, 20.0),
         &tuning().unit_ai,
     );
-    assert_eq!((ask.attack_move, u.patrol_path.is_some()), (None, true));
+    assert_eq!(
+        (ask.attack_move, unit_ai.patrol_path.is_some()),
+        (None, true)
+    );
 }
 
 /// `0x140aa2a70` in state 3 on a patrol order: the path loops; without a saved patrol it goes
 /// back and forth from 3 tiles (`SETBE`: a NaN distance too); order 733 attack-moves.
 #[test]
 fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::Patrol),
         ..idle(UnitAiKind::Soldier)
     };
     let ask = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(22.9, 20.0),
         &tuning().unit_ai,
@@ -9450,22 +9618,22 @@ fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
         }
     );
     let far = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(20.0, 23.0),
         &tuning().unit_ai,
     );
     assert!(far.back_and_forth);
     let nan = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(f32::NAN, 23.0),
         &tuning().unit_ai,
     );
     assert!(nan.back_and_forth);
-    u.current_order = Some(OrderKind::AttackMove);
+    unit_ai.current_order = Some(OrderKind::AttackMove);
     let attack = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(22.9, 20.0),
         &tuning().unit_ai,
@@ -9478,7 +9646,7 @@ fn patrol_order_path_loops_and_turns_back_from_three_tiles() {
 /// (`zeroPatrolInformation`), which then stops the attack move.
 #[test]
 fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::Patrol),
         patrol_path: Some(PatrolPath {
             flags: PathFlags::LOOPS | PathFlags::BACK_AND_FORTH,
@@ -9488,7 +9656,7 @@ fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
         ..idle(UnitAiKind::Soldier)
     };
     let ask = UnitAi::path_ask(
-        Some(&mut u),
+        Some(&mut unit_ai),
         Point::new(20.0, 20.0),
         Point::new(20.5, 20.0),
         &tuning().unit_ai,
@@ -9497,7 +9665,10 @@ fn saved_patrol_gives_its_waypoint_to_the_path_and_goes() {
         (ask.resume.get(), ask.back_and_forth, ask.attack_move),
         (2, true, Some(false))
     );
-    assert_eq!((u.patrol_path, u.patrol_waypoint.get()), (None, 0));
+    assert_eq!(
+        (unit_ai.patrol_path, unit_ai.patrol_waypoint.get()),
+        (None, 0)
+    );
 }
 
 /// The soldier of the patrol tests: master 4 of class 6, a walker of line of sight 4 and
@@ -9559,9 +9730,9 @@ fn soldier_world(
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
 /// Player 2's villager 77 at `at`, idle, for [`soldier_world`]'s others.
@@ -9588,35 +9759,36 @@ fn walker_unit(id: i32, owner: PlayerId, at: Point) -> SceneObject {
     )
 }
 
-/// Unit 500's unit AI in `w`.
-fn ai_500(w: &World) -> &UnitAi {
-    w.parts.unit_ai.get(object_id(500)).unwrap()
+/// Unit 500's unit AI in `world`.
+fn ai_500(world: &World) -> &UnitAi {
+    world.parts.unit_ai.get(object_id(500)).unwrap()
 }
 
-/// The target of unit 500's Attack in `w`, none without one.
-fn attacks_500(w: &World) -> Option<ObjectId> {
-    w.parts
+/// The target of unit 500's Attack in `world`, none without one.
+fn attacks_500(world: &World) -> Option<ObjectId> {
+    world
+        .parts
         .actions
         .of(object_id(500))
         .list
         .attack()
-        .and_then(|a| a.target)
+        .and_then(|attack| attack.target)
         .map(AttackTargetId::id)
 }
 
-/// Unit 500's full update in `w` ([`UnitAi::update`], 28 ms at time 0).
-fn update_500(w: &mut World) -> GenieResult<Option<AfterOrder>> {
+/// Unit 500's full update in `world` ([`UnitAi::update`], 28 ms at time 0).
+fn update_500(world: &mut World) -> GenieResult<Option<AfterOrder>> {
     run_ai(
-        w,
+        world,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.update(Millis::new(28), WorldTime::ZERO, kind, at, rng, side),
     )
 }
 
-/// Unit 500's idle check in `w` ([`UnitAi::soldier_idle`]).
-fn soldier_idle_500(w: &mut World) -> GenieResult<IdleOutcome> {
+/// Unit 500's idle check in `world` ([`UnitAi::soldier_idle`]).
+fn soldier_idle_500(world: &mut World) -> GenieResult<IdleOutcome> {
     run_ai(
-        w,
+        world,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.soldier_idle(at, kind, rng, side),
     )
@@ -9626,18 +9798,18 @@ fn soldier_idle_500(w: &mut World) -> GenieResult<IdleOutcome> {
 /// but the timer's count down; the busy check lets the walking patrol through.
 #[test]
 fn patrol_waits_for_its_secondary_timer() {
-    let mut w = soldier_world(
+    let mut world = soldier_world(
         (soldier_master(), patroller(300)),
         Some((Point::new(30.0, 20.0), None)),
         &[enemy_villager(Point::new(22.0, 20.0))],
     );
-    assert!(update_500(&mut w).is_ok());
-    let u = ai_500(&w);
+    assert!(update_500(&mut world).is_ok());
+    let unit_ai = ai_500(&world);
     assert_eq!(
-        (u.secondary_timer, u.current_order),
+        (unit_ai.secondary_timer, unit_ai.current_order),
         (Millis::new(272), Some(OrderKind::Patrol))
     );
-    assert_eq!(attacks_500(&w), None);
+    assert_eq!(attacks_500(&world), None);
 }
 
 /// The patrol branch with its secondary timer run out: it restarts at 750 (the adjusted
@@ -9651,7 +9823,7 @@ fn patrol_saves_itself_and_attacks_what_it_finds() {
         last_order: Some(OrderKind::Wait),
         ..patroller(0)
     };
-    let mut w = soldier_world(
+    let mut world = soldier_world(
         (soldier_master(), u),
         Some((Point::new(30.0, 20.0), None)),
         &[enemy_villager(Point::new(22.0, 20.0))],
@@ -9662,29 +9834,32 @@ fn patrol_saves_itself_and_attacks_what_it_finds() {
         BVector::new(30.0, 0.0, 30.0),
     ];
     let flags = PathFlags::LOOPS | PathFlags::BACK_AND_FORTH;
-    w.parts.mover_mut(object_id(500)).unwrap().paths = vec![PathData {
+    world.parts.mover_mut(object_id(500)).unwrap().paths = vec![PathData {
         points: points.clone(),
         has_path: true,
         path_flags: flags,
         waypoint: WaypointIndex::of_data(2),
         ..PathData::without_path()
     }];
-    let before = w.streams.get(Stream::Ai).draws;
-    assert!(update_500(&mut w).is_ok());
-    assert_eq!(attacks_500(&w), Some(object_id(77)));
-    let u = ai_500(&w);
+    let before = world.streams.get(Stream::Ai).draws;
+    assert!(update_500(&mut world).is_ok());
+    assert_eq!(attacks_500(&world), Some(object_id(77)));
+    let unit_ai = ai_500(&world);
     assert_eq!(
-        (u.current_order, u.last_order),
+        (unit_ai.current_order, unit_ai.last_order),
         (None, Some(OrderKind::Wait))
     );
-    let saved = u
+    let saved = unit_ai
         .patrol_path
         .as_ref()
-        .map(|p| (p.path.points.clone(), p.flags));
-    assert_eq!((saved, u.patrol_waypoint.get()), (Some((points, flags)), 2));
-    assert_eq!(u.secondary_timer, Millis::new(750));
-    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
-    assert!(before < w.streams.get(Stream::Ai).draws);
+        .map(|patrol_path| (patrol_path.path.points.clone(), patrol_path.flags));
+    assert_eq!(
+        (saved, unit_ai.patrol_waypoint.get()),
+        (Some((points, flags)), 2)
+    );
+    assert_eq!(unit_ai.secondary_timer, Millis::new(750));
+    assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
+    assert!(before < world.streams.get(Stream::Ai).draws);
 }
 
 /// The patrol branch passes over processIdle while the top action's target is a building
@@ -9700,7 +9875,7 @@ fn patrol_attacking_building_keeps_at_it() {
         hit_points: MasterHitPoints::of_data(550),
         ..Master::default()
     };
-    let mut w = soldier_world(
+    let mut world = soldier_world(
         (soldier_master(), patroller(0)),
         Some((Point::new(30.0, 30.0), Some(50))),
         &[
@@ -9708,9 +9883,9 @@ fn patrol_attacking_building_keeps_at_it() {
             enemy_villager(Point::new(22.0, 20.0)),
         ],
     );
-    assert!(update_500(&mut w).is_ok());
-    assert_eq!(attacks_500(&w), None);
-    assert_eq!(ai_500(&w).secondary_timer, Millis::new(750));
+    assert!(update_500(&mut world).is_ok());
+    assert_eq!(attacks_500(&world), None);
+    assert_eq!(ai_500(&world).secondary_timer, Millis::new(750));
 }
 
 /// The soldier's idle check (`FUN_140c20db0`) takes its top action's target within its
@@ -9718,13 +9893,13 @@ fn patrol_attacking_building_keeps_at_it() {
 /// weapon range squared) without a search; out of range it searches.
 #[test]
 fn soldier_idle_check_attacks_its_top_action_target_in_range() {
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         current_order: None,
         ..patroller(0)
     };
     let world = |soldier: Master, x: f32| {
         soldier_world(
-            (soldier, u.clone()),
+            (soldier, unit_ai.clone()),
             Some((Point::new(x, 20.0), Some(50))),
             &[
                 walker_unit(50, player_id(2), Point::new(x, 20.0)),
@@ -9772,9 +9947,9 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         id: ids::SABOTEUR,
         ..soldier_master()
     };
-    let mut w = soldier_world((saboteur, patroller(0)), walk, from_ref(&villager));
-    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Idle));
-    assert_eq!(attacks_500(&w), None);
+    let mut villager_world = soldier_world((saboteur, patroller(0)), walk, from_ref(&villager));
+    assert_eq!(soldier_idle_500(&mut villager_world), Ok(IdleOutcome::Idle));
+    assert_eq!(attacks_500(&villager_world), None);
     let holding = |target: i32| UnitAi {
         current_order: None,
         retarget_disabled: 1,
@@ -9825,12 +10000,12 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
         }),
         ..soldier_master()
     };
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         current_order: None,
         ..patroller(0)
     };
-    let mut w = soldier_world((healer, u), walk, &[]);
-    assert!(soldier_idle_500(&mut w).is_err());
+    let mut world = soldier_world((healer, unit_ai), walk, &[]);
+    assert!(soldier_idle_500(&mut world).is_err());
 }
 
 /// A stop earlier in the update (a failed Enter's notify, slot 0xb0) empties the action list
@@ -9839,17 +10014,17 @@ fn soldier_idle_check_holds_its_target_with_retargeting_off() {
 /// an effect that leaves the actions does not change it.
 #[test]
 fn soldier_stopped_in_the_update_finds_no_top_action_target() {
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         current_order: None,
         ..patroller(0)
     };
-    let mut w = soldier_world(
-        (soldier_master(), u),
+    let mut world = soldier_world(
+        (soldier_master(), unit_ai),
         Some((Point::new(21.0, 20.0), Some(50))),
         &[walker_unit(50, player_id(2), Point::new(21.0, 20.0))],
     );
     let read = run_ai(
-        &mut w,
+        &mut world,
         (player_id(1), object_id(500)),
         |ai, at, side, _, rng| {
             let first = UnitAi::top_target_in_range(at, side)?;
@@ -9889,22 +10064,23 @@ fn soldier_with_nothing_to_attack_goes_back_to_its_patrol() {
         patrol_waypoint: WaypointIndex::of_data(1),
         ..patroller(0)
     };
-    let mut w = soldier_world((soldier_master(), u), None, &[]);
-    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
-    assert_eq!(walks_to(&w), Some(Position::new(30.0, 20.0, 0.0)));
-    let u = ai_500(&w);
+    let mut world = soldier_world((soldier_master(), u), None, &[]);
+    assert_eq!(soldier_idle_500(&mut world), Ok(IdleOutcome::Acted));
+    assert_eq!(walks_to(&world), Some(Position::new(30.0, 20.0, 0.0)));
+    let unit_ai = ai_500(&world);
     assert_eq!(
-        (u.current_order, u.secondary_timer),
+        (unit_ai.current_order, unit_ai.secondary_timer),
         (Some(OrderKind::Patrol), Millis::new(750))
     );
-    w.parts
+    world
+        .parts
         .unit_ai
         .get_mut(object_id(500))
         .unwrap()
         .current_order = None;
-    w.parts.mover_mut(object_id(500)).unwrap().attack_moving = true;
-    assert_eq!(soldier_idle_500(&mut w), Ok(IdleOutcome::Acted));
-    assert_eq!(ai_500(&w).current_order, Some(OrderKind::AttackMove));
+    world.parts.mover_mut(object_id(500)).unwrap().attack_moving = true;
+    assert_eq!(soldier_idle_500(&mut world), Ok(IdleOutcome::Acted));
+    assert_eq!(ai_500(&world).current_order, Some(OrderKind::AttackMove));
 }
 
 /// The order check of a unit no longer busy: the attack move (733) ends, its timers reset
@@ -9926,12 +10102,12 @@ fn an_attack_move_not_busy_ends_and_patrol_stays() {
         (None, Millis::new(750))
     );
     assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
-    let mut u = UnitAi {
+    let mut unit_ai = UnitAi {
         current_order: Some(OrderKind::Patrol),
         ..idle(UnitAiKind::Soldier)
     };
-    u.check_order(&at, &mut rng());
-    assert_eq!(u.current_order, Some(OrderKind::Patrol));
+    unit_ai.check_order(&at, &mut rng());
+    assert_eq!(unit_ai.current_order, Some(OrderKind::Patrol));
 }
 
 /// Slot 0xb0 (`FUN_140c64ed0`) on a patrol order: the order ends even when the stop keeps
@@ -9994,10 +10170,10 @@ fn leaving_patrol_order_caps_its_secondary_timer() {
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let tail = |u: &mut UnitAi, o: QueuedOrder| {
+    let tail = |u: &mut UnitAi, queued_order: QueuedOrder| {
         u.order_tail(
-            Some(o.order),
-            o.priority,
+            Some(queued_order.order),
+            queued_order.priority,
             Some(class::CLASS_6),
             TakenAs::Order,
             &mut rng(),
@@ -10013,10 +10189,14 @@ fn leaving_patrol_order_caps_its_secondary_timer() {
     let mut u = patrolling();
     assert_eq!(tail(&mut u, order(OrderKind::Patrol)), OrderOutcome::Taken);
     assert_eq!(u.secondary_timer, Millis::new(900));
-    let mut u = patrolling();
-    u.end_order_and_action().unwrap();
+    let mut unit_ai = patrolling();
+    unit_ai.end_order_and_action().unwrap();
     assert_eq!(
-        (u.current_order, u.last_order, u.secondary_timer),
+        (
+            unit_ai.current_order,
+            unit_ai.last_order,
+            unit_ai.secondary_timer
+        ),
         (None, Some(OrderKind::Patrol), Millis::new(750))
     );
 }
@@ -10204,23 +10384,23 @@ fn the_transport_ship_passes_other_notifies_to_the_base_handler() {
         current_order: Some(OrderKind::Move),
         ..ship_ai()
     };
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(500),
         NotifyKind::ACTION_COMPLETED,
         [AiAction::Move.value(), 0, 0],
     );
-    let mut w = transport_world(moving.clone(), None, PlayerKind::Human);
-    let r = hears(&mut w, (player_id(1), 500), n);
+    let mut world = transport_world(moving.clone(), None, PlayerKind::Human);
+    let hears = hears(&mut world, (player_id(1), 500), notify);
     let mut base = transport_world(moving, None, PlayerKind::Human);
-    let b = run_ai(
+    let run_ai = run_ai(
         &mut base,
         (player_id(1), object_id(500)),
-        |ai, at, side, kind, rng| ai.base_notify(n, Millis::ZERO, at, kind, rng, side),
+        |ai, at, side, kind, rng| ai.base_notify(notify, Millis::ZERO, at, kind, rng, side),
     );
-    assert_eq!(r, b);
-    assert_eq!(ai_500(&w), ai_500(&base));
+    assert_eq!(hears, run_ai);
+    assert_eq!(ai_500(&world), ai_500(&base));
     assert_eq!(
-        w.parts.actions.of(object_id(500)).top_action_kind(),
+        world.parts.actions.of(object_id(500)).top_action_kind(),
         base.parts.actions.of(object_id(500)).top_action_kind()
     );
 }
@@ -10249,22 +10429,22 @@ fn ship_ai() -> UnitAi {
     }
 }
 
-/// [`transport_world`]'s ship handles `n` from its unit AI's queue ([`UnitAi::handle`]): its
+/// [`transport_world`]'s ship handles `notify` from its unit AI's queue ([`UnitAi::handle`]): its
 /// answer and the world.
 fn ship_hears(
-    n: Notify,
+    notify: Notify,
     mut ai: UnitAi,
     actions: Option<Action>,
     kind: PlayerKind,
 ) -> (GenieResult<u32>, World) {
-    ai.post(n, ObjectState::Alive).unwrap();
-    let mut w = transport_world(ai, actions, kind);
-    let r = run_ai(
-        &mut w,
+    ai.post(notify, ObjectState::Alive).unwrap();
+    let mut world = transport_world(ai, actions, kind);
+    let run_ai = run_ai(
+        &mut world,
         (player_id(1), object_id(500)),
-        |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+        |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
     );
-    (r, w)
+    (run_ai, world)
 }
 
 /// Its damage notify: the attacker it knows joins no one new (no call for help), the unit is
@@ -10273,9 +10453,9 @@ fn ship_hears(
 /// points left it gives up (4). A computer player's AI would hear the alert (not modelled).
 #[test]
 fn transport_ship_runs_from_its_attackers_without_an_order() {
-    let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
+    let notify = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let human = PlayerKind::Human;
-    let (r, w) = ship_hears(n, ship_ai(), None, human);
+    let (r, w) = ship_hears(notify, ship_ai(), None, human);
     assert_eq!(r, Ok(BREAK));
     let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
@@ -10286,7 +10466,7 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
     };
     assert_eq!(
         {
-            let (r, w) = ship_hears(n, ordered, None, human);
+            let (r, w) = ship_hears(notify, ordered, None, human);
             (r, walks_to(&w))
         },
         (Ok(GO_ON), None)
@@ -10300,27 +10480,27 @@ fn transport_ship_runs_from_its_attackers_without_an_order() {
         })),
         ..Action::default()
     };
-    let (r, w) = ship_hears(n, ship_ai(), Some(moving), human);
+    let (r, moving_world) = ship_hears(notify, ship_ai(), Some(moving), human);
     assert_eq!(
-        (r, walks_to(&w)),
+        (r, walks_to(&moving_world)),
         (Ok(BREAK), Some(Position::new(25.0, 30.0, 0.0)))
     );
     let dead = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 0, 0]);
     assert_eq!(ship_hears(dead, ship_ai(), None, human).0, Ok(DEAD));
     assert!(
-        ship_hears(n, ship_ai(), None, PlayerKind::Computer)
+        ship_hears(notify, ship_ai(), None, PlayerKind::Computer)
             .0
             .is_err()
     );
     // a new attacker that is not its target: the call for help (AskForHelp: the search finds
     // no helper in the registry, which holds no object), then it joins the set and the ship
     // runs
-    let (r, w) = ship_hears(n, idle(UnitAiKind::Transport), None, human);
+    let (r, world) = ship_hears(notify, idle(UnitAiKind::Transport), None, human);
     assert_eq!(
-        (r, walks_to(&w)),
+        (r, walks_to(&world)),
         (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    let ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    let ai = world.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(ai.attackers, Attackers::of_saved(&[77]));
 }
 
@@ -10331,21 +10511,21 @@ fn transport_ship_dodges_missile_warning_by_its_owner_chance() {
     let r = rng().rand15() as i32 * 100 / 0x7fff;
     let warning = Notify::own(object_id(77), NotifyKind::MISSILE_WARNING, [77, 40, 0]);
     let warned = |chance: i32| {
-        let mut w = transport_world(ship_ai(), None, PlayerKind::Human);
-        w.players[1].dodge_chance = Chance::of_data(u8::try_from(chance).unwrap());
+        let mut transport_world = transport_world(ship_ai(), None, PlayerKind::Human);
+        transport_world.players[1].dodge_chance = Chance::of_data(u8::try_from(chance).unwrap());
         let answer = run_ai(
-            &mut w,
+            &mut transport_world,
             (player_id(1), object_id(500)),
             |ai, at, side, kind, rng| ai.handle(warning, Millis::ZERO, at, kind, rng, side),
         );
-        (answer, w)
+        (answer, transport_world)
     };
     let (answer, mut w) = warned(r + 1);
     assert_eq!(answer, Ok(GO_ON));
     assert_eq!((w.streams.get(Stream::Ai).draws, walks_to(&w)), (1, None));
-    let (answer, w) = warned(r);
+    let (answer, world) = warned(r);
     assert_eq!(
-        (answer, walks_to(&w)),
+        (answer, walks_to(&world)),
         (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
 }
@@ -10363,24 +10543,24 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
         .unwrap()
         .last_human_order = WorldTime::from_millis(9000);
     let before = w.streams.get(Stream::Ai).draws;
-    let r = run_ai(
+    let idle_outcome = run_ai(
         &mut w,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
     );
-    assert_eq!(r, Ok(IdleOutcome::Idle));
+    assert_eq!(idle_outcome, Ok(IdleOutcome::Idle));
     assert_eq!(w.streams.get(Stream::Ai).draws - before, 0);
     let tower = w.players[1].objects.by_id(object_id(500)).unwrap();
     assert_eq!(tower.last_human_order, HUMAN_ORDER_CAP);
-    let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
+    let notify = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let tower = |idle_group: bool| {
         let ai = UnitAi {
             ai_kind: UnitAiKind::SiegeTower,
             ..ship_ai()
         };
-        let mut w = transport_world(ai, None, PlayerKind::Human);
+        let mut world = transport_world(ai, None, PlayerKind::Human);
         let speed = if idle_group { 0.0 } else { 1.0 };
-        w.groups.groups.push(UnitGroup {
+        world.groups.groups.push(UnitGroup {
             id: group_id(7),
             owner: Some(player_id(1)),
             members: vec![Member {
@@ -10393,25 +10573,25 @@ fn siege_tower_in_busy_group_ignores_its_damage() {
             },
             ..UnitGroup::default()
         });
-        w.players[1]
+        world.players[1]
             .objects
             .by_id_mut(object_id(500))
             .unwrap()
             .group
             .id = Some(group_id(7));
         let answer = run_ai(
-            &mut w,
+            &mut world,
             (player_id(1), object_id(500)),
-            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+            |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
         );
-        let attackers = w
+        let attackers = world
             .parts
             .unit_ai
             .get(object_id(500))
             .unwrap()
             .attackers
             .clone();
-        (answer, walks_to(&w), attackers)
+        (answer, walks_to(&world), attackers)
     };
     assert_eq!(tower(false), (Ok(GO_ON), None, Attackers::of_saved(&[77])));
     let (answer, walk, _) = tower(true);
@@ -10437,9 +10617,9 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
         UnitAiKind::SiegeTower,
     ] {
         let enemy = order_target(77, player_id(2), class::CLASS_6);
-        let mut w = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
-        let r = run_ai(
-            &mut w,
+        let mut world = order_world(order_unit(order_soldier(), idle(ai_kind)), &[enemy]);
+        let answer = run_ai(
+            &mut world,
             (player_id(1), object_id(9)),
             |ai, at, side, _, _| {
                 ai.attack_object(
@@ -10451,10 +10631,14 @@ fn the_base_attack_check_lets_every_kind_without_its_own_attack() {
                 )
             },
         );
-        assert_eq!(r, Ok(Answer::Taken), "type {ai_kind}");
-        let u = ai_9(&w);
+        assert_eq!(answer, Ok(Answer::Taken), "type {ai_kind}");
+        let unit_ai = ai_9(&world);
         assert_eq!(
-            (attacks_9(&w), u.current_action, u.current_target),
+            (
+                attacks_9(&world),
+                unit_ai.current_action,
+                unit_ai.current_target
+            ),
             (
                 Some(object_id(77)),
                 Some(AiAction::Attack),
@@ -10496,13 +10680,13 @@ fn ship_world(
             )
         });
     }
-    let mut w = scene.build();
-    w.players[1]
+    let mut world = scene.build();
+    world.players[1]
         .objects
         .by_id_mut(object_id(500))
         .unwrap()
         .last_human_order = WorldTime::from_millis(9000);
-    w
+    world
 }
 
 /// The ships' idle check (`FUN_140c21930`, `FUN_140c1eab0`): a human player's only caps the
@@ -10513,13 +10697,13 @@ fn ship_world(
 #[test]
 fn computer_player_ship_evades_the_closest_object_it_sees() {
     let idle_of = |class, ai: UnitAi, kind, others: &[(i32, PlayerId, ClassId, f32)]| {
-        let mut w = ship_world((class, ai), kind, others);
-        let r = run_ai(
-            &mut w,
+        let mut ship_world = ship_world((class, ai), kind, others);
+        let run_ai = run_ai(
+            &mut ship_world,
             (player_id(1), object_id(500)),
             |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
         );
-        (r, w)
+        (run_ai, ship_world)
     };
     let fishing = idle(UnitAiKind::Fishing);
     let warship = |x| [(77, player_id(2), class::WARSHIP, x)];
@@ -10554,9 +10738,9 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
     let (r, w) = idle_of(class::FISHING_SHIP, fishing, computer, &warship(33.4));
     assert_eq!((r, walks_to(&w)), (Ok(IdleOutcome::Idle), None));
     // a trade cart (class 19) finding nothing
-    let (r, w) = idle_of(class::TRADE_CART, idle(UnitAiKind::Trade), computer, &[]);
-    assert_eq!(r, Ok(IdleOutcome::Idle));
-    assert!(w.spatial.searched().is_some());
+    let (idle_outcome, world) = idle_of(class::TRADE_CART, idle(UnitAiKind::Trade), computer, &[]);
+    assert_eq!(idle_outcome, Ok(IdleOutcome::Idle));
+    assert!(world.spatial.searched().is_some());
 }
 
 /// The trade ship's case 0x202 (`FUN_140c29bf0`) off its trade and explore actions: the
@@ -10564,7 +10748,7 @@ fn computer_player_ship_evades_the_closest_object_it_sees() {
 /// two actions the case is not modelled.
 #[test]
 fn trade_ship_whose_action_needs_search_stops() {
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(500),
         NotifyKind::REQUIRES_SEARCH,
         [AiAction::Move.value(), 0, 0],
@@ -10587,13 +10771,16 @@ fn trade_ship_whose_action_needs_search_stops() {
         Some(walking),
         PlayerKind::Human,
     );
-    assert_eq!(hears(&mut w, (player_id(1), 500), n), Ok(GO_ON));
-    let u = ai_500(&w);
-    assert_eq!((u.current_action, u.current_target), (None, None));
+    assert_eq!(hears(&mut w, (player_id(1), 500), notify), Ok(GO_ON));
+    let unit_ai = ai_500(&w);
+    assert_eq!(
+        (unit_ai.current_action, unit_ai.current_target),
+        (None, None)
+    );
     assert_eq!(w.parts.actions.of(object_id(500)).top_action_kind(), None);
     for action in [AiAction::Trade, AiAction::Explore].map(Some) {
-        let mut w = transport_world(trading(action), None, PlayerKind::Human);
-        assert!(hears(&mut w, (player_id(1), 500), n).is_err());
+        let mut world = transport_world(trading(action), None, PlayerKind::Human);
+        assert!(hears(&mut world, (player_id(1), 500), notify).is_err());
     }
 }
 
@@ -10603,13 +10790,13 @@ fn trade_ship_whose_action_needs_search_stops() {
 /// (no stop: the move stays the last action's successor).
 #[test]
 fn trade_ship_stops_and_runs_from_its_attackers() {
-    let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
+    let notify = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let trade = |action| UnitAi {
         ai_kind: UnitAiKind::Trade,
         current_action: Some(action),
         ..ship_ai()
     };
-    let (r, w) = ship_hears(n, trade(AiAction::Gather), None, PlayerKind::Human);
+    let (r, w) = ship_hears(notify, trade(AiAction::Gather), None, PlayerKind::Human);
     assert_eq!(
         (r, walks_to(&w)),
         (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
@@ -10619,14 +10806,14 @@ fn trade_ship_stops_and_runs_from_its_attackers() {
         (u.current_action, u.last_action, u.orders.len()),
         (Some(AiAction::Move), None, 0)
     );
-    let (r, w) = ship_hears(n, trade(AiAction::Move), None, PlayerKind::Human);
+    let (r, world) = ship_hears(notify, trade(AiAction::Move), None, PlayerKind::Human);
     assert_eq!(
-        (r, walks_to(&w)),
+        (r, walks_to(&world)),
         (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
-    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
+    let unit_ai = world.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(
-        (u.current_action, u.last_action),
+        (unit_ai.current_action, unit_ai.last_action),
         (Some(AiAction::Move), Some(AiAction::Move))
     );
 }
@@ -10635,17 +10822,17 @@ fn trade_ship_stops_and_runs_from_its_attackers() {
 /// nor runs (3, nothing); off it, it stops and runs.
 #[test]
 fn fishing_ship_on_the_move_takes_its_damage_without_running() {
-    let n = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
+    let notify = Notify::own(object_id(77), NotifyKind::DAMAGED, [77, 40, 0]);
     let fishing = |action| UnitAi {
         ai_kind: UnitAiKind::Fishing,
         current_action: Some(action),
         ..ship_ai()
     };
-    let (r, w) = ship_hears(n, fishing(AiAction::Move), None, PlayerKind::Human);
+    let (r, w) = ship_hears(notify, fishing(AiAction::Move), None, PlayerKind::Human);
     assert_eq!((r, walks_to(&w)), (Ok(BREAK), None));
-    let (r, w) = ship_hears(n, fishing(AiAction::Gather), None, PlayerKind::Human);
+    let (r, world) = ship_hears(notify, fishing(AiAction::Gather), None, PlayerKind::Human);
     assert_eq!(
-        (r, walks_to(&w)),
+        (r, walks_to(&world)),
         (Ok(BREAK), Some(Position::new(18.0, 30.0, 0.0)))
     );
 }
@@ -10663,7 +10850,7 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
         current_action: Some(AiAction::Build),
         ..idle(UnitAiKind::Fishing)
     };
-    let n = Notify::own(
+    let notify = Notify::own(
         object_id(500),
         NotifyKind::REQUIRES_SEARCH,
         [AiAction::Build.value(), 0, 0],
@@ -10703,16 +10890,16 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
                     Position::new(20.0, 30.0, 0.0),
                 )
             });
-        for s in sites {
-            scene = scene.object(s);
+        for scene_object in sites {
+            scene = scene.object(scene_object);
         }
-        let mut w = scene.build();
-        let r = run_ai(
-            &mut w,
+        let mut build = scene.build();
+        let run_ai = run_ai(
+            &mut build,
             (player_id(1), object_id(500)),
-            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+            |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
         );
-        (r, w)
+        (run_ai, build)
     };
     let at = |x, y| Position::new(x, y, 0.0);
     // the gaps 6.5, 3.5 and 3.5: the distances 6, 3 and 3
@@ -10730,12 +10917,12 @@ fn fishing_ship_builds_the_nearest_foundation_it_reaches() {
     let (r, w) = hear(PlayerKind::Human, Vec::new());
     assert_eq!(r, Ok(GO_ON));
     assert!(w.parts.actions.of(object_id(500)).list.build().is_none());
-    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
-    assert_eq!((u.buffered.len(), u.notifies.len()), (0, 0));
-    let (r, w) = hear(PlayerKind::Computer, Vec::new());
+    let unit_ai = w.parts.unit_ai.get(object_id(500)).unwrap();
+    assert_eq!((unit_ai.buffered.len(), unit_ai.notifies.len()), (0, 0));
+    let (r, world) = hear(PlayerKind::Computer, Vec::new());
     assert_eq!(r, Ok(GO_ON));
     assert_eq!(
-        w.parts.unit_ai.get(object_id(500)).unwrap().notifies,
+        world.parts.unit_ai.get(object_id(500)).unwrap().notifies,
         vec![Notify::own(
             object_id(500),
             NotifyKind::ACTION_COMPLETED,
@@ -10787,11 +10974,11 @@ fn an_attacker_spares_by_its_priority_and_its_blast() {
     };
     assert!(spares_friends(&blast, &villager, &roles()).is_err());
     for level in [4, 8] {
-        let a = Attacker {
+        let attacker = Attacker {
             blast_level: BlastLevel::from_bits_retain(level),
             ..blast
         };
-        assert_eq!(spares_friends(&a, &villager, &roles()), Ok(true));
+        assert_eq!(spares_friends(&attacker, &villager, &roles()), Ok(true));
     }
     let melee = Attacker {
         range: Distance::new(1.0),
@@ -10834,12 +11021,12 @@ fn siege_unit_attacks_by_its_stance_its_class_and_its_priority() {
         Ok(false)
     );
     for class in [1, 42].map(ClassId::of_master) {
-        let t = Target {
+        let target = Target {
             class,
             ..villager(21.0)
         };
         assert_eq!(
-            check(&MANGONEL, &seeker(UnitStance::Aggressive), &t),
+            check(&MANGONEL, &seeker(UnitStance::Aggressive), &target),
             Ok(false)
         );
     }
@@ -11074,14 +11261,15 @@ fn siege_world(siege: SceneObject, targets: &[(i32, Point)], water: &[Tile]) -> 
     scene.build()
 }
 
-/// The target of mangonel 500's Attack in `w`, none without one.
-fn siege_attacks(w: &World) -> Option<ObjectId> {
-    w.parts
+/// The target of mangonel 500's Attack in `world`, none without one.
+fn siege_attacks(world: &World) -> Option<ObjectId> {
+    world
+        .parts
         .actions
         .of(object_id(500))
         .list
         .attack()
-        .and_then(|a| a.target)
+        .and_then(|attack| attack.target)
         .map(AttackTargetId::id)
 }
 
@@ -11105,9 +11293,13 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     let mut w = siege_world(mangonel_unit(one, u), &[(77, Point::new(25.0, 20.0))], &[]);
     assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Acted));
     assert_eq!(siege_attacks(&w), Some(object_id(77)));
-    let u = w.parts.unit_ai.get(object_id(500)).unwrap();
+    let unit_ai = w.parts.unit_ai.get(object_id(500)).unwrap();
     assert_eq!(
-        (u.current_action, u.current_target, u.current_order),
+        (
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.current_order
+        ),
         (Some(AiAction::Attack), Some(object_id(77)), None)
     );
     // nothing found: in a group 5 and no walk; defending without a group walks back
@@ -11136,16 +11328,16 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
     assert_eq!(walks_to(&w), None);
     let mut w = siege_world(mangonel_unit(one, defending), &[], &[]);
     assert_eq!(idle_of(&mut w, one), Ok(IdleOutcome::Idle));
-    assert!(walks_to(&w).is_some_and(|p| p.x() < 20.0));
+    assert!(walks_to(&w).is_some_and(|position| position.x() < 20.0));
     // Gaia's that does not take owners by sight (its seer's flag)
     let gaia = SceneObject {
         capture: CaptureKind::BySight,
         seen_by: Some(VisionBits::empty()),
         ..mangonel_unit(PlayerId::GAIA, idle(UnitAiKind::Siege))
     };
-    let mut w = siege_world(gaia, &[(77, Point::new(25.0, 20.0))], &[]);
-    assert_eq!(idle_of(&mut w, PlayerId::GAIA), Ok(IdleOutcome::Idle));
-    assert!(w.spatial.searched().is_none());
+    let mut world = siege_world(gaia, &[(77, Point::new(25.0, 20.0))], &[]);
+    assert_eq!(idle_of(&mut world, PlayerId::GAIA), Ok(IdleOutcome::Idle));
+    assert!(world.spatial.searched().is_none());
 }
 
 /// With retargeting off and its current target held, a top target the siege unit reaches
@@ -11156,7 +11348,7 @@ fn siege_unit_attacks_what_its_idle_search_finds() {
 /// target's centre).
 #[test]
 fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         retarget_disabled: 1,
         current_target: Some(object_id(88)),
         ..idle(UnitAiKind::Siege)
@@ -11172,26 +11364,26 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
     let check = |water: &[Tile]| {
         let siege = SceneObject {
             actions: Some(walk.clone()),
-            ..mangonel_unit(player_id(1), u.clone())
+            ..mangonel_unit(player_id(1), unit_ai.clone())
         };
-        let mut w = siege_world(siege, &[(88, Point::new(14.3, 14.3))], water);
-        let r = run_ai(
-            &mut w,
+        let mut world = siege_world(siege, &[(88, Point::new(14.3, 14.3))], water);
+        let idle_outcome = run_ai(
+            &mut world,
             (player_id(1), object_id(500)),
             |ai, at, side, kind, rng| ai.process_idle(at, kind, rng, side),
         );
-        let disabled = w
+        let disabled = world
             .parts
             .unit_ai
             .get(object_id(500))
             .unwrap()
             .retarget_disabled;
-        (r, disabled, siege_attacks(&w))
+        (idle_outcome, disabled, siege_attacks(&world))
     };
     assert_eq!(check(&[]), (Ok(IdleOutcome::Idle), 1, None));
     let lake: Vec<Tile> = (0..64)
         .flat_map(|y| (0..64).map(move |x| Tile::new(x, y)))
-        .filter(|t| (t.x() < 20 || t.y() < 20) && *t != Tile::new(14, 14))
+        .filter(|tile| (tile.x() < 20 || tile.y() < 20) && *tile != Tile::new(14, 14))
         .collect();
     assert_eq!(
         check(&lake),
@@ -11205,7 +11397,7 @@ fn siege_unit_with_retargeting_off_keeps_reachable_top_target() {
 /// building target; its run: a top target (its walk to villager 77) keeps it.
 #[test]
 fn siege_unit_hands_its_notifies_to_the_base_handler() {
-    let hear = |ai: UnitAi, n: Notify, kind: PlayerKind| {
+    let hear = |ai: UnitAi, notify: Notify, kind: PlayerKind| {
         let mut w = siege_world(
             mangonel_unit(player_id(1), ai),
             &[(77, Point::new(25.0, 20.0))],
@@ -11215,18 +11407,21 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
         let r = run_ai(
             &mut w,
             (player_id(1), object_id(500)),
-            |ai, at, side, kind, rng| ai.handle(n, Millis::ZERO, at, kind, rng, side),
+            |ai, at, side, kind, rng| ai.handle(notify, Millis::ZERO, at, kind, rng, side),
         );
         (r, w.streams.get(Stream::Ai).draws)
     };
-    let u = idle(UnitAiKind::Siege);
+    let unit_ai = idle(UnitAiKind::Siege);
     let under = Notify::own(object_id(500), NotifyKind::TOO_CLOSE, [77, 0, 0]);
-    assert!(hear(u.clone(), under, PlayerKind::Human).0.is_err());
+    assert!(hear(unit_ai.clone(), under, PlayerKind::Human).0.is_err());
     let executed = Notify::own(object_id(500), NotifyKind::ACTION_EXECUTED, [600, 77, 0]);
-    assert_eq!(hear(u.clone(), executed, PlayerKind::Human).0, Ok(GO_ON));
+    assert_eq!(
+        hear(unit_ai.clone(), executed, PlayerKind::Human).0,
+        Ok(GO_ON)
+    );
     // a computer player's, off the attack action: one draw, then 2
     assert_eq!(
-        hear(u.clone(), executed, PlayerKind::Computer),
+        hear(unit_ai.clone(), executed, PlayerKind::Computer),
         (Ok(GO_ON), 1)
     );
     // a building target: no draw, the base handler's
@@ -11249,16 +11444,16 @@ fn siege_unit_hands_its_notifies_to_the_base_handler() {
     };
     let pinned = SceneObject {
         actions: Some(walk),
-        ..mangonel_unit(player_id(1), u)
+        ..mangonel_unit(player_id(1), unit_ai)
     };
-    let mut w = siege_world(pinned, &[(77, Point::new(25.0, 20.0))], &[]);
-    let r = run_ai(
-        &mut w,
+    let mut world = siege_world(pinned, &[(77, Point::new(25.0, 20.0))], &[]);
+    let answer = run_ai(
+        &mut world,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.run_away(OrderForce::Forced, at, kind, rng, side),
     );
-    assert_eq!(r, Ok(Answer::NotTaken));
-    assert_eq!(walks_to(&w), Some(Position::new(25.0, 20.0, 0.0)));
+    assert_eq!(answer, Ok(Answer::NotTaken));
+    assert_eq!(walks_to(&world), Some(Position::new(25.0, 20.0, 0.0)));
 }
 
 /// The priest's slot 73 (`FUN_140c21f30`): the base's retarget check (a used timer redrawn: one
@@ -11283,11 +11478,11 @@ fn priest_retargets_but_on_an_order_on_target() {
         (Some(OrderKind::OnTarget), PlayerKind::Human, 0),
         (None, PlayerKind::Computer, 0),
     ] {
-        let mut w = order_world(order_unit(monk.clone(), priest(order)), &[]);
-        w.players[1].kind = player_kind;
-        let before = w.streams.get(Stream::Ai).draws;
+        let mut world = order_world(order_unit(monk.clone(), priest(order)), &[]);
+        world.players[1].kind = player_kind;
+        let before = world.streams.get(Stream::Ai).draws;
         let _ = run_ai(
-            &mut w,
+            &mut world,
             (player_id(1), object_id(9)),
             |ai, at, side, kind, rng| {
                 ai.update_tail(
@@ -11305,7 +11500,7 @@ fn priest_retargets_but_on_an_order_on_target() {
             },
         );
         assert_eq!(
-            w.streams.get(Stream::Ai).draws - before,
+            world.streams.get(Stream::Ai).draws - before,
             draws,
             "order {order:?}, computer {player_kind}"
         );
@@ -11390,22 +11585,24 @@ fn tail_scene(
 /// The tail's checks of the top action's target ([`UnitAi::top_target_tail`]) on
 /// [`tail_scene`]'s unit following object 500: the world after them.
 fn tail(player: PlayerId, action: Option<AiAction>, flags: TargetFlags) -> World {
-    let mut w = tail_scene(player, action, flags, Some(500)).build();
-    run_ai(&mut w, (player, object_id(40)), |ai, at, side, _, rng| {
-        ai.top_target_tail(at, side, rng)
-    })
+    let mut world = tail_scene(player, action, flags, Some(500)).build();
+    run_ai(
+        &mut world,
+        (player, object_id(40)),
+        |ai, at, side, _, rng| ai.top_target_tail(at, side, rng),
+    )
     .unwrap();
-    w
+    world
 }
 
-/// Whether unit 40 of `w` stopped: no action left.
-fn stopped(w: &World) -> bool {
-    w.parts.actions.of(object_id(40)).top_action().is_none()
+/// Whether unit 40 of `world` stopped: no action left.
+fn stopped(world: &World) -> bool {
+    world.parts.actions.of(object_id(40)).top_action().is_none()
 }
 
-/// Unit 40's unit AI in `w`.
-fn ai_of(w: &World) -> &UnitAi {
-    w.parts.unit_ai.get(object_id(40)).unwrap()
+/// Unit 40's unit AI in `world`.
+fn ai_of(world: &World) -> &UnitAi {
+    world.parts.unit_ai.get(object_id(40)).unwrap()
 }
 
 #[test]
@@ -11419,13 +11616,13 @@ fn the_tail_stops_gaia_unit_on_gaia_object_others_can_take_again() {
     };
     let w = tail(PlayerId::new(0), Some(AiAction::Attack), again);
     assert!(stopped(&w));
-    let u = ai_of(&w);
+    let unit_ai = ai_of(&w);
     assert_eq!(
-        (u.current_target, u.last_target),
+        (unit_ai.current_target, unit_ai.last_target),
         (None, Some(object_id(500)))
     );
     assert_eq!(
-        (u.current_action, u.last_action),
+        (unit_ai.current_action, unit_ai.last_action),
         (None, Some(AiAction::Attack))
     );
     // a player's unit, a player's target, another capture flag or a type below 70 stays
@@ -11453,9 +11650,9 @@ fn the_tail_stops_gaia_unit_on_gaia_object_others_can_take_again() {
             },
         ),
     ] {
-        let w = tail(PlayerId::new(player), Some(AiAction::Attack), flags);
-        assert!(!stopped(&w), "{player} {flags:?}");
-        assert_eq!(ai_of(&w).current_target, Some(object_id(500)));
+        let world = tail(PlayerId::new(player), Some(AiAction::Attack), flags);
+        assert!(!stopped(&world), "{player} {flags:?}");
+        assert_eq!(ai_of(&world).current_target, Some(object_id(500)));
     }
 }
 
@@ -11509,11 +11706,11 @@ fn the_tail_stops_work_on_target_without_its_targeting_flag() {
         attackable: false,
         ..both
     };
-    let w = tail(PlayerId::new(0), Some(AiAction::Attack), unattackable_again);
-    assert!(stopped(&w));
-    let u = ai_of(&w);
+    let world = tail(PlayerId::new(0), Some(AiAction::Attack), unattackable_again);
+    assert!(stopped(&world));
+    let unit_ai = ai_of(&world);
     assert_eq!(
-        (u.current_action, u.last_action),
+        (unit_ai.current_action, unit_ai.last_action),
         (None, Some(AiAction::Attack))
     );
 }
@@ -11528,21 +11725,25 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
     };
     let player = PlayerId::new(1);
     let after = |action, follows: Option<i32>, pending: Option<Effect>| {
-        let mut w = tail_scene(player, action, untargetable, follows)
+        let mut tail_scene = tail_scene(player, action, untargetable, follows)
             .object(target_object(
                 600,
                 untargetable,
                 Position::new(12.0, 10.0, 0.0),
             ))
             .build();
-        run_ai(&mut w, (player, object_id(40)), |ai, at, side, _, rng| {
-            if let Some(e) = pending {
-                side.effect_now(e, ai, rng)?;
-            }
-            ai.top_target_tail(at, side, rng)
-        })
+        run_ai(
+            &mut tail_scene,
+            (player, object_id(40)),
+            |ai, at, side, _, rng| {
+                if let Some(effect) = pending {
+                    side.effect_now(effect, ai, rng)?;
+                }
+                ai.top_target_tail(at, side, rng)
+            },
+        )
         .unwrap();
-        w
+        tail_scene
     };
     // a move to a point, a stop or an explore left no object to test
     for pending in [
@@ -11555,9 +11756,9 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
             pace: Pace::Run,
         }),
     ] {
-        let w = after(Some(AiAction::Gather), None, Some(pending));
+        let pending_world = after(Some(AiAction::Gather), None, Some(pending));
         assert_eq!(
-            ai_of(&w).current_action,
+            ai_of(&pending_world).current_action,
             Some(AiAction::Gather),
             "{pending:?}"
         );
@@ -11576,8 +11777,8 @@ fn the_tail_reads_the_top_target_the_update_commands_left() {
     );
     // no top action, or one on an object the world no longer holds: nothing
     for follows in [None, Some(700)] {
-        let w = after(Some(AiAction::Gather), follows, None);
-        assert_eq!(ai_of(&w).current_action, Some(AiAction::Gather));
+        let world = after(Some(AiAction::Gather), follows, None);
+        assert_eq!(ai_of(&world).current_action, Some(AiAction::Gather));
     }
 }
 
@@ -11606,7 +11807,7 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
             state: ObjectState::Foundation,
             ..SceneObject::new(id, player_id(1), house.clone(), at(x))
         };
-        let mut w = Scene::open(GridSize::new(64, 64))
+        let mut world = Scene::open(GridSize::new(64, 64))
             .object(SceneObject {
                 ai: Some(ai),
                 ..SceneObject::new(40, player_id(1), villager_master(), at(30.0))
@@ -11617,13 +11818,16 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
             .object(site(5, 22.0))
             .build();
         run_ai(
-            &mut w,
+            &mut world,
             (player_id(1), object_id(40)),
             |ai, _, side, _, _| ai.drop_started_builds(side),
         )
         .unwrap();
-        let orders = &w.parts.unit_ai.get(object_id(40)).unwrap().orders;
-        orders.iter().map(|o| o.target).collect::<Vec<_>>()
+        let orders = &world.parts.unit_ai.get(object_id(40)).unwrap().orders;
+        orders
+            .iter()
+            .map(|queued_order| queued_order.target)
+            .collect::<Vec<_>>()
     };
     let u = UnitAi {
         orders: queue.clone(),
@@ -11634,12 +11838,12 @@ fn queued_builds_on_started_or_gone_foundations_leave_the_queue() {
         [Some(object_id(1)), Some(object_id(3)), Some(object_id(5))]
     );
     // on the build order the queue stays
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         current_order: Some(OrderKind::Build),
         orders: queue,
         ..idle(UnitAiKind::Civilian)
     };
-    assert_eq!(left(u).len(), 5);
+    assert_eq!(left(unit_ai).len(), 5);
 }
 
 /// Slot 73's stand ground leash (0x140c57bc4): the squared gap from the unit's footprint to the
@@ -11857,22 +12061,27 @@ fn busy_villager_on_the_attack_order_runs_its_full_update() {
         idle_timer: Millis::new(400),
         ..idle(UnitAiKind::Civilian)
     };
-    let w = busy_on_target(
+    let busy_on_target = busy_on_target(
         (player_id(3), 3),
         class::VILLAGER,
         u,
         (18842, PlayerId::GAIA, class::PREDATOR),
     );
-    let (r, w) = update_busy(w, player_id(3), WorldTime::from_millis(1000));
-    assert_eq!(r, Ok(None));
+    let (after_order, world) =
+        update_busy(busy_on_target, player_id(3), WorldTime::from_millis(1000));
+    assert_eq!(after_order, Ok(None));
     assert_eq!(
-        following(&w),
+        following(&world),
         Some((Position::new(24.0, 20.0, 0.0), Some(object_id(18842))))
     );
-    let u = w.parts.unit_ai.get(object_id(9)).unwrap();
-    assert_eq!(u.idle_timer, Millis::ZERO);
+    let unit_ai = world.parts.unit_ai.get(object_id(9)).unwrap();
+    assert_eq!(unit_ai.idle_timer, Millis::ZERO);
     assert_eq!(
-        (u.current_order, u.current_action, u.current_target),
+        (
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target
+        ),
         (
             Some(OrderKind::Attack),
             Some(AiAction::Attack),
@@ -11925,9 +12134,9 @@ fn order_world_on(water: &[Tile], unit: SceneObject, others: &[SceneObject]) -> 
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
 /// A villager on its sprite whose tasks gather and hunt trees (wood, within 0.5).
@@ -11959,14 +12168,15 @@ fn order_tree() -> SceneObject {
     )
 }
 
-/// Unit 9's slot 0x230 on order `o` in `w` ([`UnitAi::process_order`] inside its update).
-fn orders(w: &mut World, o: &QueuedOrder) -> GenieResult<OrderOutcome> {
+/// Unit 9's slot 0x230 on order `queued_order` in `world` ([`UnitAi::process_order`] inside its
+/// update).
+fn orders(world: &mut World, queued_order: &QueuedOrder) -> GenieResult<OrderOutcome> {
     run_ai(
-        w,
+        world,
         (player_id(1), object_id(9)),
         |ai, at, side, kind, rng| {
             ai.process_order(
-                o,
+                queued_order,
                 Some((at, kind)),
                 None,
                 rng,
@@ -11981,24 +12191,25 @@ fn orders(w: &mut World, o: &QueuedOrder) -> GenieResult<OrderOutcome> {
     )
 }
 
-/// Unit 9's unit AI in `w`.
-fn ai_9(w: &World) -> &UnitAi {
-    w.parts.unit_ai.get(object_id(9)).unwrap()
+/// Unit 9's unit AI in `world`.
+fn ai_9(world: &World) -> &UnitAi {
+    world.parts.unit_ai.get(object_id(9)).unwrap()
 }
 
-/// Unit 9's top action's kind in `w`, none without one.
-fn top_9(w: &World) -> Option<ActionKind> {
-    w.parts.actions.of(object_id(9)).top_action_kind()
+/// Unit 9's top action's kind in `world`, none without one.
+fn top_9(world: &World) -> Option<ActionKind> {
+    world.parts.actions.of(object_id(9)).top_action_kind()
 }
 
-/// The target of unit 9's Attack in `w`, none without one.
-fn attacks_9(w: &World) -> Option<ObjectId> {
-    w.parts
+/// The target of unit 9's Attack in `world`, none without one.
+fn attacks_9(world: &World) -> Option<ObjectId> {
+    world
+        .parts
         .actions
         .of(object_id(9))
         .list
         .attack()
-        .and_then(|a| a.target)
+        .and_then(|attack| attack.target)
         .map(AttackTargetId::id)
 }
 
@@ -12022,14 +12233,15 @@ fn order_target(id: i32, owner: PlayerId, class: ClassId) -> SceneObject {
     }
 }
 
-/// The point unit 9's `MoveTo` of `w` walks to and its range, none without one.
-fn walk_9(w: &World) -> Option<(Position, Distance)> {
-    w.parts
+/// The point unit 9's `MoveTo` of `world` walks to and its range, none without one.
+fn walk_9(world: &World) -> Option<(Position, Distance)> {
+    world
+        .parts
         .actions
         .of(object_id(9))
         .list
         .move_to()
-        .map(|m| (m.point, m.range))
+        .map(|move_to_action| (move_to_action.point, move_to_action.range))
 }
 
 #[test]
@@ -12038,19 +12250,19 @@ fn an_order_not_ready_stays_and_patrol_or_unnamed_orders_take_nothing() {
         ready: false,
         ..queued(OrderKind::Move, -1)
     };
-    let mut w = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
-    assert_eq!(orders(&mut w, &waiting), Ok(OrderOutcome::NotReady));
+    let mut world = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
+    assert_eq!(orders(&mut world, &waiting), Ok(OrderOutcome::NotReady));
     // "I don't know what to do with patrol orders"; the trade's and the hero power's orders,
     // which no case names
     for order in [OrderKind::Patrol, OrderKind::Trade, OrderKind::HeroPower] {
         assert_eq!(
-            orders(&mut w, &queued(order, -1)),
+            orders(&mut world, &queued(order, -1)),
             Ok(OrderOutcome::NotTaken),
             "{order:?}"
         );
     }
-    assert_eq!(ai_9(&w), &idle(UnitAiKind::Soldier));
-    assert_eq!(top_9(&w), None);
+    assert_eq!(ai_9(&world), &idle(UnitAiKind::Soldier));
+    assert_eq!(top_9(&world), None);
 }
 
 /// The idle part's patrol branch (`0x140c67f0b`): a patrol or an attack-move order patrols, and
@@ -12058,12 +12270,12 @@ fn an_order_not_ready_stays_and_patrol_or_unnamed_orders_take_nothing() {
 #[test]
 fn patrolling_group_unit_on_the_hero_power_does_not_patrol() {
     let group = GroupState::PATROL;
-    let mut u = idle(UnitAiKind::Soldier);
-    assert!(u.patrols(Some(group)) && !u.patrols(None));
-    u.current_order = Some(OrderKind::HeroPower);
-    assert!(!u.patrols(Some(group)));
-    u.current_order = Some(OrderKind::AttackMove);
-    assert!(u.patrols(None));
+    let mut unit_ai = idle(UnitAiKind::Soldier);
+    assert!(unit_ai.patrols(Some(group)) && !unit_ai.patrols(None));
+    unit_ai.current_order = Some(OrderKind::HeroPower);
+    assert!(!unit_ai.patrols(Some(group)));
+    unit_ai.current_order = Some(OrderKind::AttackMove);
+    assert!(unit_ai.patrols(None));
 }
 
 /// The attack order by the unit AI's type: a soldier's is the base's `AttackObject` through
@@ -12167,12 +12379,12 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
         standing_sprite: Some(STANDING.id),
         ..walker(125, class::MONK)
     };
-    let mut w = order_world(order_unit(monk, idle(UnitAiKind::Boar)), from_ref(&other));
+    let mut other_world = order_world(order_unit(monk, idle(UnitAiKind::Boar)), from_ref(&other));
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Attack, 72)),
+        orders(&mut other_world, &queued(OrderKind::Attack, 72)),
         Ok(OrderOutcome::Taken)
     );
-    let u = ai_9(&w);
+    let u = ai_9(&other_world);
     assert_eq!(
         (
             u.current_order,
@@ -12187,13 +12399,16 @@ fn the_attack_order_attacks_by_the_unit_ai_kind_and_becomes_the_ai_s() {
         standing_sprite: Some(STANDING.id),
         ..walker(126, class::PREDATOR)
     };
-    let mut w = order_world(order_unit(predator, idle(UnitAiKind::Boar)), &[other]);
+    let mut world = order_world(order_unit(predator, idle(UnitAiKind::Boar)), &[other]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Attack, 99)),
+        orders(&mut world, &queued(OrderKind::Attack, 99)),
         Ok(OrderOutcome::NotTaken)
     );
-    let u = ai_9(&w);
-    assert_eq!((u.current_order, u.current_action), (None, None));
+    let unit_ai = ai_9(&world);
+    assert_eq!(
+        (unit_ai.current_order, unit_ai.current_action),
+        (None, None)
+    );
 }
 
 /// The defend order keeps near its target (within the order's range 3, its defend target) or,
@@ -12206,12 +12421,12 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
         current_action: Some(AiAction::Move),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut w = order_world(order_unit(order_soldier(), moving), from_ref(&friend));
+    let mut friend_world = order_world(order_unit(order_soldier(), moving), from_ref(&friend));
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Defend, 70)),
+        orders(&mut friend_world, &queued(OrderKind::Defend, 70)),
         Ok(OrderOutcome::Taken)
     );
-    let u = ai_9(&w);
+    let u = ai_9(&friend_world);
     assert_eq!(
         (u.current_order, u.current_action, u.last_action),
         (
@@ -12241,9 +12456,13 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
         orders(&mut w, &queued(OrderKind::Defend, -1)),
         Ok(OrderOutcome::Taken)
     );
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
-        (u.current_target, u.target_point, u.defend_target),
+        (
+            unit_ai.current_target,
+            unit_ai.target_point,
+            unit_ai.defend_target
+        ),
         (None, Position::new(12.7, 30.2, 0.0), None)
     );
     // a target the world does not hold: not taken
@@ -12260,12 +12479,12 @@ fn the_defend_order_keeps_near_its_target_or_its_point() {
         id: ids::TRADE_CART,
         ..order_soldier()
     };
-    let mut w = order_world(order_unit(cart, idle(UnitAiKind::Soldier)), &[]);
+    let mut world = order_world(order_unit(cart, idle(UnitAiKind::Soldier)), &[]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Defend, -1)),
+        orders(&mut world, &queued(OrderKind::Defend, -1)),
         Ok(OrderOutcome::NotTaken)
     );
-    assert_eq!(ai_9(&w).current_action, None);
+    assert_eq!(ai_9(&world).current_action, None);
 }
 
 /// The heal, conversion and repair orders give the unit their commands: the heal and the
@@ -12330,15 +12549,19 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
         .of(object_id(9))
         .list
         .repair()
-        .map(|r| r.target);
+        .map(|repair_action| repair_action.target);
     assert_eq!(repairs, Some(Some(RepairTargetId::new(object_id(70)))));
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
-        (u.current_order, u.current_action),
+        (unit_ai.current_order, unit_ai.current_action),
         (Some(OrderKind::Repair), Some(AiAction::Repair))
     );
     assert_eq!(
-        (u.current_target, u.target_class, u.target_point),
+        (
+            unit_ai.current_target,
+            unit_ai.target_class,
+            unit_ai.target_point
+        ),
         (
             Some(object_id(70)),
             class_of(3),
@@ -12346,17 +12569,17 @@ fn the_heal_conversion_and_repair_orders_give_the_unit_commands() {
         )
     );
     assert_eq!(
-        (u.last_target, u.last_target_class),
+        (unit_ai.last_target, unit_ai.last_target_class),
         (Some(object_id(5)), class_of(9))
     );
     // undamaged: no repair task, nothing changes
-    let mut w = order_world(order_unit(repairer, working.clone()), &[target(550.0)]);
+    let mut world = order_world(order_unit(repairer, working.clone()), &[target(550.0)]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Repair, 70)),
+        orders(&mut world, &queued(OrderKind::Repair, 70)),
         Ok(OrderOutcome::NotTaken)
     );
-    assert_eq!(ai_9(&w), &working);
-    assert_eq!(top_9(&w), None);
+    assert_eq!(ai_9(&world), &working);
+    assert_eq!(top_9(&world), None);
 }
 
 #[test]
@@ -12381,30 +12604,34 @@ fn the_explore_orders_explore_their_point_cut_to_tiles() {
             .explore()
             .map(|e| e.point);
         assert_eq!(explore, Some(Position::new(12.0, 30.0, 0.0)), "{order:?}");
-        let u = ai_9(&w);
+        let unit_ai = ai_9(&w);
         assert_eq!(
-            (u.current_order, u.current_action, u.last_action),
+            (
+                unit_ai.current_order,
+                unit_ai.current_action,
+                unit_ai.last_action
+            ),
             (Some(order), Some(action), last)
         );
         assert_eq!(
-            u.target_point,
+            unit_ai.target_point,
             Position::new(12.0, 30.0, tuning().unit_ai.explore_z)
         );
     }
     // a point that is not a number cuts to i32::MIN (CVTTSS2SI)
-    let o = QueuedOrder {
+    let queued_order = QueuedOrder {
         point: Position::new(f32::NAN, 1.5, 0.0),
         ..queued(OrderKind::Explore, -1)
     };
-    let mut w = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
-    let _ = orders(&mut w, &o);
-    let explore = w
+    let mut world = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
+    let _ = orders(&mut world, &queued_order);
+    let explore = world
         .parts
         .actions
         .of(object_id(9))
         .list
         .explore()
-        .map(|e| e.point);
+        .map(|explore_action| explore_action.point);
     assert_eq!(explore, Some(Position::new(i32::MIN as f32, 1.0, 0.0)));
 }
 
@@ -12430,27 +12657,27 @@ fn the_stop_order_stops_and_ends_the_order() {
         actions: Some(walk),
         ..order_unit(order_soldier(), u)
     };
-    let mut w = order_world(unit, &[]);
+    let mut world = order_world(unit, &[]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Stop, -1)),
+        orders(&mut world, &queued(OrderKind::Stop, -1)),
         Ok(OrderOutcome::Taken)
     );
-    assert_eq!(top_9(&w), None);
-    let u = ai_9(&w);
+    assert_eq!(top_9(&world), None);
+    let unit_ai = ai_9(&world);
     assert_eq!(
         (
-            u.current_order,
-            u.order_priority.get(),
-            u.current_action,
-            u.current_target
+            unit_ai.current_order,
+            unit_ai.order_priority.get(),
+            unit_ai.current_action,
+            unit_ai.current_target
         ),
         (None, -1, None, None)
     );
     assert_eq!(
-        (u.last_order, u.last_target),
+        (unit_ai.last_order, unit_ai.last_target),
         (Some(OrderKind::Move), Some(object_id(70)))
     );
-    assert_eq!(u.state_position, Point::new(5.0, 6.0));
+    assert_eq!(unit_ai.state_position, Point::new(5.0, 6.0));
 }
 
 /// The run-away order without attackers: a random direction (two draws), by twice the speed
@@ -12473,18 +12700,18 @@ fn the_run_away_order_runs_from_the_unit_attackers() {
         walk_9(&w),
         Some((Position::new(5.0, 6.0, 0.0), Distance::ZERO))
     );
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
-        (u.current_order, u.current_action),
+        (unit_ai.current_order, unit_ai.current_action),
         (Some(OrderKind::RunAway), Some(AiAction::Move))
     );
     let standing = UnitAi {
         stance: UnitStance::StandGround,
         ..idle(UnitAiKind::Soldier)
     };
-    let mut w = order_world(order_unit(still, standing), &[]);
+    let mut world = order_world(order_unit(still, standing), &[]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::RunAway, -1)),
+        orders(&mut world, &queued(OrderKind::RunAway, -1)),
         Ok(OrderOutcome::NotTaken)
     );
 }
@@ -12539,12 +12766,12 @@ fn the_gather_and_hunt_orders_work_an_object_the_world_holds() {
         (u.current_order, u.current_action, top_9(&w)),
         (Some(OrderKind::Hunt), Some(AiAction::Hunt), Some(HUNT))
     );
-    let mut w = world(gathering);
+    let mut gathering_world = world(gathering);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Hunt, 99)),
+        orders(&mut gathering_world, &queued(OrderKind::Hunt, 99)),
         Ok(OrderOutcome::NotTaken)
     );
-    let u = ai_9(&w);
+    let u = ai_9(&gathering_world);
     assert_eq!((u.current_order, u.current_action), (None, None));
     // the auto boar luring hunts, then holds 0x2be either way
     let luring = OrderKind::AutoBoarLuring;
@@ -12564,9 +12791,9 @@ fn the_gather_and_hunt_orders_work_an_object_the_world_holds() {
         orders(&mut w, &queued(luring, 99)),
         Ok(OrderOutcome::NotTaken)
     );
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
-        (u.current_order, u.current_action),
+        (unit_ai.current_order, unit_ai.current_action),
         (None, Some(AiAction::BoarLuring))
     );
 }
@@ -12576,16 +12803,19 @@ fn the_gather_and_hunt_orders_work_an_object_the_world_holds() {
 #[test]
 fn the_move_orders_move_to_their_point_within_their_range() {
     for order in [OrderKind::Move, OrderKind::GroupGather] {
-        let mut w = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
-        assert_eq!(orders(&mut w, &queued(order, -1)), Ok(OrderOutcome::Taken));
+        let mut world = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
         assert_eq!(
-            walk_9(&w),
+            orders(&mut world, &queued(order, -1)),
+            Ok(OrderOutcome::Taken)
+        );
+        assert_eq!(
+            walk_9(&world),
             Some((Position::new(12.7, 30.2, 0.5), Distance::new(3.0))),
             "{order:?}"
         );
-        let u = ai_9(&w);
+        let unit_ai = ai_9(&world);
         assert_eq!(
-            (u.current_order, u.current_action),
+            (unit_ai.current_order, unit_ai.current_action),
             (Some(order), Some(AiAction::Move))
         );
     }
@@ -12636,20 +12866,20 @@ fn the_follow_order_follows_and_moves_to_target_beyond_its_range() {
         .of(object_id(9))
         .list
         .move_to()
-        .map(|m| (m.target, m.range));
+        .map(|move_to_action| (move_to_action.target, move_to_action.range));
     assert_eq!(to, Some((Some(object_id(70)), Distance::new(3.0))));
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
-        (u.current_action, u.last_action),
+        (unit_ai.current_action, unit_ai.last_action),
         (Some(AiAction::Move), Some(AiAction::Follow))
     );
     // a gone target
-    let mut w = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
+    let mut world = order_world(order_unit(order_soldier(), idle(UnitAiKind::Soldier)), &[]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Follow, 99)),
+        orders(&mut world, &queued(OrderKind::Follow, 99)),
         Ok(OrderOutcome::NotTaken)
     );
-    assert_eq!(walk_9(&w), None);
+    assert_eq!(walk_9(&world), None);
 }
 
 /// The transport, enter and unload orders give the unit their commands. The transport and the
@@ -12709,7 +12939,12 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
         .of(object_id(9))
         .list
         .enter()
-        .and_then(|e| e.state.move_to().map(|m| m.target));
+        .and_then(|enter_action| {
+            enter_action
+                .state
+                .move_to()
+                .map(|move_to_action| move_to_action.target)
+        });
     assert_eq!(walks, Some(Some(object_id(70))));
     let u = ai_9(&w);
     assert_eq!(
@@ -12729,27 +12964,27 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
         )
     );
     for ai in [UnitAiKind::Civilian, UnitAiKind::Soldier] {
-        let mut w = order_world(order_unit(villager.clone(), idle(ai)), &[]);
+        let mut ai_world = order_world(order_unit(villager.clone(), idle(ai)), &[]);
         assert_eq!(
-            orders(&mut w, &queued(enter, 99)),
+            orders(&mut ai_world, &queued(enter, 99)),
             Ok(OrderOutcome::NotTaken),
             "{ai:?}"
         );
-        assert_eq!((ai_9(&w), top_9(&w)), (&idle(ai), None));
+        assert_eq!((ai_9(&ai_world), top_9(&ai_world)), (&idle(ai), None));
     }
     // the unload
-    let mut w = order_world(order_unit(ship, idle(UnitAiKind::Transport)), &[]);
+    let mut world = order_world(order_unit(ship, idle(UnitAiKind::Transport)), &[]);
     assert_eq!(
-        orders(&mut w, &queued(OrderKind::Unload, -1)),
+        orders(&mut world, &queued(OrderKind::Unload, -1)),
         Ok(OrderOutcome::Taken)
     );
-    let sails = w
+    let sails = world
         .parts
         .actions
         .of(object_id(9))
         .list
         .transport()
-        .map(|t| (t.state.bare(), t.point));
+        .map(|transport_action| (transport_action.state.bare(), transport_action.point));
     assert_eq!(
         sails,
         Some((
@@ -12757,14 +12992,14 @@ fn the_transport_enter_and_unload_orders_give_the_unit_commands() {
             Position::new(12.7, 30.2, 0.0)
         ))
     );
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&world);
     assert_eq!(
         (
-            u.current_order,
-            u.current_action,
-            u.current_target,
-            u.target_class,
-            u.target_point
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.target_class,
+            unit_ai.target_point
         ),
         (
             Some(OrderKind::Unload),
@@ -12807,26 +13042,26 @@ fn seek_and_destroy_attacks_and_explore_and_destroy_explores_at_tiles() {
         Position::new(12.0, 30.0, tuning().unit_ai.explore_z)
     );
     let destroy = OrderKind::ExploreAndDestroy;
-    let mut w = order_world(soldier(), &[]);
+    let mut world = order_world(soldier(), &[]);
     assert_eq!(
-        orders(&mut w, &queued(destroy, -1)),
+        orders(&mut world, &queued(destroy, -1)),
         Ok(OrderOutcome::Taken)
     );
-    let explore = w
+    let explore = world
         .parts
         .actions
         .of(object_id(9))
         .list
         .explore()
-        .map(|e| e.point);
+        .map(|explore_action| explore_action.point);
     assert_eq!(explore, Some(Position::new(12.0, 30.0, 0.0)));
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&world);
     assert_eq!(
         (
-            u.current_order,
-            u.current_action,
-            u.current_target,
-            u.target_point
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.target_point
         ),
         (
             Some(destroy),
@@ -12851,23 +13086,26 @@ fn the_wait_order_waits_and_leaves_patrol_order() {
         ..idle(UnitAiKind::Soldier)
     };
     let wait = OrderKind::Wait;
-    let mut w = order_world(order_unit(order_soldier(), patrolling), &[]);
-    let before = w.streams.get(Stream::Ai).draws;
-    assert_eq!(orders(&mut w, &queued(wait, -1)), Ok(OrderOutcome::Taken));
-    assert_eq!(w.streams.get(Stream::Ai).draws - before, 1);
-    assert_eq!(top_9(&w), None);
-    let u = ai_9(&w);
+    let mut world = order_world(order_unit(order_soldier(), patrolling), &[]);
+    let before = world.streams.get(Stream::Ai).draws;
+    assert_eq!(
+        orders(&mut world, &queued(wait, -1)),
+        Ok(OrderOutcome::Taken)
+    );
+    assert_eq!(world.streams.get(Stream::Ai).draws - before, 1);
+    assert_eq!(top_9(&world), None);
+    let unit_ai = ai_9(&world);
     assert_eq!(
         (
-            u.current_order,
-            u.order_priority.get(),
-            u.current_action,
-            u.last_action
+            unit_ai.current_order,
+            unit_ai.order_priority.get(),
+            unit_ai.current_action,
+            unit_ai.last_action
         ),
         (Some(wait), 40, Some(AiAction::Wait), Some(AiAction::Heal))
     );
-    assert_eq!(u.secondary_timer, Millis::new(750));
-    assert_ne!(u.adjusted_idle_timeout, Millis::new(750));
+    assert_eq!(unit_ai.secondary_timer, Millis::new(750));
+    assert_ne!(unit_ai.adjusted_idle_timeout, Millis::new(750));
 }
 
 /// The attack roundup on player 2's unit 70 passes its own target; with an action value it
@@ -12881,9 +13119,12 @@ fn the_attack_roundup_passes_its_own_target_and_one_it_cannot_reach() {
         current_target: Some(object_id(70)),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut w = order_world(order_unit(order_soldier(), own), from_ref(&enemy));
-    assert_eq!(orders(&mut w, &roundup), Ok(OrderOutcome::NotTaken));
-    assert_eq!(attacks_9(&w), None);
+    let mut order_world = order_world(order_unit(order_soldier(), own), from_ref(&enemy));
+    assert_eq!(
+        orders(&mut order_world, &roundup),
+        Ok(OrderOutcome::NotTaken)
+    );
+    assert_eq!(attacks_9(&order_world), None);
     // with an action value it must reach the target: a lake around it
     let moving = UnitAi {
         current_action: Some(AiAction::Move),
@@ -12893,21 +13134,29 @@ fn the_attack_roundup_passes_its_own_target_and_one_it_cannot_reach() {
         .flat_map(|x| [Tile::new(x, 18), Tile::new(x, 22)])
         .chain((19..=21).flat_map(|y| [Tile::new(8, y), Tile::new(12, y)]))
         .collect();
-    let mut w = order_world_on(&lake, order_unit(order_soldier(), moving), from_ref(&enemy));
-    assert_eq!(orders(&mut w, &roundup), Ok(OrderOutcome::NotTaken));
-    assert_eq!(attacks_9(&w), None);
+    let mut enemy_world =
+        order_world_on(&lake, order_unit(order_soldier(), moving), from_ref(&enemy));
+    assert_eq!(
+        orders(&mut enemy_world, &roundup),
+        Ok(OrderOutcome::NotTaken)
+    );
+    assert_eq!(attacks_9(&enemy_world), None);
     // without one it attacks, and the order becomes 700, leaving a patrol order
     let patrolling = UnitAi {
         current_order: Some(OrderKind::Patrol),
         secondary_timer: Millis::new(900),
         ..idle(UnitAiKind::Soldier)
     };
-    let mut w = order_world_on(&lake, order_unit(order_soldier(), patrolling), &[enemy]);
-    assert_eq!(orders(&mut w, &roundup), Ok(OrderOutcome::Taken));
-    assert_eq!(attacks_9(&w), Some(object_id(70)));
-    let u = ai_9(&w);
+    let mut world = order_world_on(&lake, order_unit(order_soldier(), patrolling), &[enemy]);
+    assert_eq!(orders(&mut world, &roundup), Ok(OrderOutcome::Taken));
+    assert_eq!(attacks_9(&world), Some(object_id(70)));
+    let unit_ai = ai_9(&world);
     assert_eq!(
-        (u.current_order, u.current_action, u.secondary_timer),
+        (
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.secondary_timer
+        ),
         (
             Some(OrderKind::Attack),
             Some(AiAction::Attack),
@@ -12921,28 +13170,34 @@ fn the_attack_roundup_passes_its_own_target_and_one_it_cannot_reach() {
 /// the move to the order's point (its `MoveTo` at once) and the order on a target the AI's.
 #[test]
 fn the_order_on_target_goes_to_the_caller_or_moves_to_gone_one_point() {
-    let o = queued(OrderKind::OnTarget, 70);
+    let queued_order = queued(OrderKind::OnTarget, 70);
     let mut w = order_world(
         order_unit(order_gatherer(), idle(UnitAiKind::Civilian)),
         &[order_tree()],
     );
-    assert_eq!(orders(&mut w, &o), Ok(OrderOutcome::Taken));
+    assert_eq!(orders(&mut w, &queued_order), Ok(OrderOutcome::Taken));
     assert_eq!(top_9(&w), Some(GATHER));
     let u = ai_9(&w);
     assert!(u.ordered_on_target);
     // gone, without its type
     for order in [OrderKind::OnTarget, OrderKind::OnTarget2] {
-        let mut w = order_world(
+        let mut world = order_world(
             order_unit(order_gatherer(), idle(UnitAiKind::Civilian)),
             &[],
         );
-        assert_eq!(orders(&mut w, &queued(order, 99)), Ok(OrderOutcome::Taken));
         assert_eq!(
-            walk_9(&w),
+            orders(&mut world, &queued(order, 99)),
+            Ok(OrderOutcome::Taken)
+        );
+        assert_eq!(
+            walk_9(&world),
             Some((Position::new(12.7, 30.2, 0.5), Distance::new(3.0)))
         );
-        let u = ai_9(&w);
-        assert_eq!((u.current_order, u.order_priority.get()), (Some(order), 40));
+        let unit_ai = ai_9(&world);
+        assert_eq!(
+            (unit_ai.current_order, unit_ai.order_priority.get()),
+            (Some(order), 40)
+        );
     }
 }
 
@@ -12973,7 +13228,7 @@ fn gone_target_of_kind_sends_the_unit_to_the_closest_resource_of_its_kind() {
             .of(object_id(9))
             .list
             .gather()
-            .and_then(|g| g.target)
+            .and_then(|gather_action| gather_action.target)
             .map(GatherTargetId::id)
     };
     let tree = resource(
@@ -12985,13 +13240,13 @@ fn gone_target_of_kind_sends_the_unit_to_the_closest_resource_of_its_kind() {
     let mut w = order_world(villager(), &[tree]);
     assert_eq!(orders(&mut w, &typed), Ok(OrderOutcome::NotTaken));
     assert_eq!(gathers(&w), Some(object_id(80)));
-    let u = ai_9(&w);
+    let unit_ai = ai_9(&w);
     assert_eq!(
         (
-            u.current_order,
-            u.current_action,
-            u.current_target,
-            u.last_target
+            unit_ai.current_order,
+            unit_ai.current_action,
+            unit_ai.current_target,
+            unit_ai.last_target
         ),
         (
             Some(OrderKind::Gather),
@@ -13026,16 +13281,19 @@ fn gone_target_of_kind_sends_the_unit_to_the_closest_resource_of_its_kind() {
         target_kind: order_kind(6),
         ..queued(OrderKind::OnTarget, 99)
     };
-    let mut w = order_world(villager(), from_ref(&mine));
-    assert_eq!(orders(&mut w, &soldier_kind), Ok(OrderOutcome::NotTaken));
-    assert_eq!(top_9(&w), None);
+    let mut mine_world = order_world(villager(), from_ref(&mine));
+    assert_eq!(
+        orders(&mut mine_world, &soldier_kind),
+        Ok(OrderOutcome::NotTaken)
+    );
+    assert_eq!(top_9(&mine_world), None);
     let soldier = Master {
         standing_sprite: Some(STANDING.id),
         ..gatherer_master()
     };
-    let mut w = order_world(order_unit(soldier, idle(UnitAiKind::Soldier)), &[mine]);
-    assert_eq!(orders(&mut w, &owned(66)), Ok(OrderOutcome::NotTaken));
-    assert_eq!(top_9(&w), None);
+    let mut world = order_world(order_unit(soldier, idle(UnitAiKind::Soldier)), &[mine]);
+    assert_eq!(orders(&mut world, &owned(66)), Ok(OrderOutcome::NotTaken));
+    assert_eq!(top_9(&world), None);
 }
 
 #[test]
@@ -13078,27 +13336,27 @@ fn the_attack_move_attacks_with_trebuchet_and_moves_otherwise() {
     let mut w = order_world(unit(class::CLASS_51, UnitAiKind::Siege), from_ref(&enemy));
     assert_eq!(orders(&mut w, &attack_move), Ok(OrderOutcome::NotTaken));
     assert_eq!((attacks_9(&w), ai_9(&w)), (None, &idle(UnitAiKind::Siege)));
-    let mut w = order_world(unit(class::CLASS_54, UnitAiKind::Siege), from_ref(&enemy));
+    let mut enemy_world = order_world(unit(class::CLASS_54, UnitAiKind::Siege), from_ref(&enemy));
     assert_eq!(
-        orders(&mut w, &attack_move),
+        orders(&mut enemy_world, &attack_move),
         Err(GenieError::unsupported(
             "the attack command of a unit of class 51 or 54"
         ))
     );
     for (class, target) in [(class::CLASS_6, 70), (class::CLASS_51, -1)] {
-        let mut w = order_world(unit(class, UnitAiKind::Soldier), from_ref(&enemy));
+        let mut world = order_world(unit(class, UnitAiKind::Soldier), from_ref(&enemy));
         assert_eq!(
-            orders(&mut w, &queued(OrderKind::AttackMove, target)),
+            orders(&mut world, &queued(OrderKind::AttackMove, target)),
             Ok(OrderOutcome::Taken)
         );
         assert_eq!(
-            walk_9(&w),
+            walk_9(&world),
             Some((Position::new(12.7, 30.2, 0.5), Distance::new(3.0))),
             "{class:?}"
         );
-        let u = ai_9(&w);
+        let unit_ai = ai_9(&world);
         assert_eq!(
-            (u.current_order, u.current_action),
+            (unit_ai.current_order, unit_ai.current_action),
             (Some(OrderKind::AttackMove), Some(AiAction::Move))
         );
     }
@@ -13183,8 +13441,8 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         (Some(OrderKind::Attack), Millis::new(750))
     );
     // a class-18 unit's attack order: the target goes, the order is -1
-    let mut u = patrolling(None);
-    let _ = u.order_tail(
+    let mut unit_ai = patrolling(None);
+    let _ = unit_ai.order_tail(
         Some(OrderKind::Attack),
         OrderPriority::of_data(40),
         Some(class::MONK),
@@ -13193,7 +13451,11 @@ fn the_order_tail_takes_the_order_and_leaves_patrol_order() {
         &roles(),
     );
     assert_eq!(
-        (u.current_order, u.order_priority.get(), u.current_target),
+        (
+            unit_ai.current_order,
+            unit_ai.order_priority.get(),
+            unit_ai.current_target
+        ),
         (None, 40, None)
     );
 }
@@ -13224,9 +13486,9 @@ fn player_unit_world(id: i32, (master, ai): (Master, UnitAi), others: &[SceneObj
             ..other.clone()
         });
     }
-    let mut w = scene.build();
-    w.streams.get(Stream::Ai).set_seed(0);
-    w
+    let mut world = scene.build();
+    world.streams.get(Stream::Ai).set_seed(0);
+    world
 }
 
 /// The villager's handler (`FUN_140c22bf0`) on the attack action (600): a moved target
@@ -13243,10 +13505,13 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
         stop_after_kill,
         ..idle(UnitAiKind::Civilian)
     };
-    let run = |ai, n| {
-        let mut w = player_unit_world(6116, (villager_master(), ai), &[]);
-        let r = hears(&mut w, (player_id(1), 6116), n);
-        (r, w.parts.unit_ai.get(object_id(6116)).unwrap().clone())
+    let run = |ai, notify| {
+        let mut world = player_unit_world(6116, (villager_master(), ai), &[]);
+        let hears = hears(&mut world, (player_id(1), 6116), notify);
+        (
+            hears,
+            world.parts.unit_ai.get(object_id(6116)).unwrap().clone(),
+        )
     };
     let moved = Notify::own(object_id(6116), NotifyKind::TARGET_MOVED, [0, 0, 0]);
     let (r, u) = run(attacking(true), moved);
@@ -13269,9 +13534,9 @@ fn villager_attack_target_that_moved_is_the_base_handler_or_its_failure() {
         NotifyKind::ACTION_INVALIDATED,
         [AiAction::Attack.value(), 0, 0],
     );
-    let (r, u) = run(attacking(false), invalid);
+    let (r, unit_ai) = run(attacking(false), invalid);
     assert!(r.is_ok());
-    assert_eq!(u.current_action, None);
+    assert_eq!(unit_ai.current_action, None);
 }
 
 /// Player 1's villager 20 at (20, 20) holding 10 wood on its Gather of Gaia's stone 77 at
@@ -13282,9 +13547,9 @@ fn other_load_world(with_camp: bool) -> World {
     let gatherer = gatherer_master();
     let villager = Master {
         standing_sprite: Some(STANDING.id),
-        action: gatherer.action.clone().map(|a| ActionPart {
+        action: gatherer.action.clone().map(|action_part| ActionPart {
             drop_sites: vec![ids::TOWN_CENTRE, master_id(562)],
-            ..a
+            ..action_part
         }),
         ..gatherer
     };
@@ -13322,27 +13587,27 @@ fn other_load_world(with_camp: bool) -> World {
             ..SceneObject::new(45, player_id(1), camp, Position::new(26.0, 20.0, 0.0))
         });
     }
-    let mut w = scene.build();
-    w.model.drop_sites = Arc::new(vec![DropSite {
+    let mut world = scene.build();
+    world.model.drop_sites = Arc::new(vec![DropSite {
         building: master_id(562),
         worker_class: Some(class::VILLAGER),
         resource_kinds: vec![attribute::WOOD],
         ..DropSite::default()
     }]);
     if with_camp {
-        let k = w.tracker_key(player_id(1), master_id(562));
-        w.players[1].tracker.add(
+        let key = world.tracker_key(player_id(1), master_id(562));
+        world.players[1].tracker.add(
             object_id(45),
             Key {
                 pending: false,
-                ..k
+                ..key
             },
         );
     }
-    w.streams.get(Stream::Ai).set_seed(0);
+    world.streams.get(Stream::Ai).set_seed(0);
     let gather = queued(OrderKind::Gather, 77);
-    let r = run_ai(
-        &mut w,
+    let order_outcome = run_ai(
+        &mut world,
         (player_id(1), object_id(20)),
         |ai, at, side, kind, rng| {
             ai.process_order(
@@ -13359,8 +13624,8 @@ fn other_load_world(with_camp: bool) -> World {
             )
         },
     );
-    assert_eq!(r, Ok(OrderOutcome::Taken));
-    w
+    assert_eq!(order_outcome, Ok(OrderOutcome::Taken));
+    world
 }
 
 /// The villager's case 0x21c (`FUN_140c22bf0`), a load of another resource asked off: the
@@ -13376,21 +13641,25 @@ fn villager_drops_another_resource_at_the_table_building() {
     assert_eq!(hears(&mut w, (player_id(1), 20), other), Ok(GO_ON));
     let gather = w.parts.actions.of(object_id(20)).list.gather().copied();
     assert_eq!(
-        gather.map(|g| (g.carry_to, g.state.bare())),
+        gather.map(|gather_action| (gather_action.carry_to, gather_action.state.bare())),
         Some((
             Some(DropSiteId::new(object_id(45))),
             GatherState::Drop { move_to: None }
         ))
     );
-    let u = w.parts.unit_ai.get(object_id(20)).unwrap();
-    let back: Vec<_> = u.orders.iter().map(|o| (o.order, o.target)).collect();
+    let unit_ai = w.parts.unit_ai.get(object_id(20)).unwrap();
+    let back: Vec<_> = unit_ai
+        .orders
+        .iter()
+        .map(|queued_order| (queued_order.order, queued_order.target))
+        .collect();
     assert_eq!(back, [(OrderKind::OnTarget, Some(object_id(77)))]);
-    let mut w = other_load_world(false);
-    assert_eq!(hears(&mut w, (player_id(1), 20), other), Ok(GO_ON));
-    let a = w.parts.actions.of(object_id(20));
-    assert_eq!(a.top_target(), Some(object_id(77)));
+    let mut world = other_load_world(false);
+    assert_eq!(hears(&mut world, (player_id(1), 20), other), Ok(GO_ON));
+    let action = world.parts.actions.of(object_id(20));
+    assert_eq!(action.top_target(), Some(object_id(77)));
     assert_eq!(
-        w.parts.unit_ai.get(object_id(20)).unwrap().orders,
+        world.parts.unit_ai.get(object_id(20)).unwrap().orders,
         Vec::new()
     );
 }
@@ -13413,14 +13682,14 @@ fn villager_works_the_pasture_it_built() {
             [action, 15342, 0],
         )
     };
-    let run = |n| {
-        let mut w = player_unit_world(
+    let run = |notify| {
+        let mut world = player_unit_world(
             15295,
             (gatherer_master(), idle(UnitAiKind::Civilian)),
             from_ref(&farm),
         );
-        let r = hears(&mut w, (player_id(1), 15295), n);
-        (r, w.parts.actions.of(object_id(15295)).top_target())
+        let hears = hears(&mut world, (player_id(1), 15295), notify);
+        (hears, world.parts.actions.of(object_id(15295)).top_target())
     };
     for action in [AiAction::Build.value(), AiAction::Hunt.value()] {
         assert_eq!(run(built(action)), (Ok(GO_ON), Some(object_id(15342))));
@@ -13479,14 +13748,29 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         current_target: Some(object_id(70)),
         ..boar()
     };
-    let mut w = gaia_unit_world(9, boar, Position::new(43.5, 105.5, 0.0));
-    *w.streams.get(Stream::Ai) = seed_for(false);
-    assert_eq!(hears(&mut w, (PlayerId::GAIA, 9), done), Ok(PRODUCED));
-    assert!(w.parts.actions.of(object_id(9)).list.move_to().is_some());
-    // (its move forgot the target: FUN_140c64c10 with -1)
-    let u = w.parts.unit_ai.get(object_id(9)).unwrap();
+    let mut gaia_unit_world = gaia_unit_world(9, boar, Position::new(43.5, 105.5, 0.0));
+    *gaia_unit_world.streams.get(Stream::Ai) = seed_for(false);
     assert_eq!(
-        (u.current_order, u.current_target, u.last_target),
+        hears(&mut gaia_unit_world, (PlayerId::GAIA, 9), done),
+        Ok(PRODUCED)
+    );
+    assert!(
+        gaia_unit_world
+            .parts
+            .actions
+            .of(object_id(9))
+            .list
+            .move_to()
+            .is_some()
+    );
+    // (its move forgot the target: FUN_140c64c10 with -1)
+    let unit_ai = gaia_unit_world.parts.unit_ai.get(object_id(9)).unwrap();
+    assert_eq!(
+        (
+            unit_ai.current_order,
+            unit_ai.current_target,
+            unit_ai.last_target
+        ),
         (Some(OrderKind::Attack), None, Some(object_id(70)))
     );
     // without an order, in a group with a command: the state position, then the stop
@@ -13514,9 +13798,9 @@ fn an_attack_completed_on_the_attack_order_looks_for_the_next_or_ends_it() {
         .id = Some(group_id(7));
     assert_eq!(hears(&mut w, (player_id(1), 9), done), Ok(GO_ON));
     assert_eq!(ai_9(&w).state_position, Point::new(5.0, 6.0));
-    let mut w = order_world(order_unit(order_soldier(), attacking), &[]);
-    let _ = hears(&mut w, (player_id(1), 9), done);
-    assert_eq!(ai_9(&w).state_position, Point::new(0.0, 0.0));
+    let mut world = order_world(order_unit(order_soldier(), attacking), &[]);
+    let _ = hears(&mut world, (player_id(1), 9), done);
+    assert_eq!(ai_9(&world).state_position, Point::new(0.0, 0.0));
 }
 
 /// A computer player's packed siege unit 500 (class 51) at (20, 30) on its Attack of player
@@ -13590,9 +13874,9 @@ fn computer_packed_siege_unit_stops_and_runs_when_damaged() {
     assert_eq!(hears(&mut w, (player_id(1), 500), hit(78, 40)), Ok(GO_ON));
     assert_eq!(ai_500(&w), &before);
     assert_eq!(attacks_500(&w), Some(object_id(90)));
-    let mut w = packed_siege_world();
+    let mut world = packed_siege_world();
     assert_eq!(
-        hears(&mut w, (player_id(1), 500), hit(77, 0)),
+        hears(&mut world, (player_id(1), 500), hit(77, 0)),
         Err(GenieError::unsupported(
             "a computer player's AI hearing its unit's alert (slot 0x2e8, then slot 0x3c8)"
         ))
@@ -13606,13 +13890,13 @@ fn retargeter(target: i32) -> (Master, UnitAi) {
         line_of_sight: Distance::new(6.0),
         ..soldier_master()
     };
-    let u = UnitAi {
+    let unit_ai = UnitAi {
         current_order: Some(OrderKind::Attack),
         current_action: Some(AiAction::Attack),
         current_target: ObjectId::of_field(target),
         ..idle(UnitAiKind::Soldier)
     };
-    (soldier, u)
+    (soldier, unit_ai)
 }
 
 /// Player 2's object `id` of master `master` at (x, y), its unit AI of `kind`.
@@ -13638,23 +13922,28 @@ fn building_master(id: i16, class: ClassId) -> Master {
     }
 }
 
-/// The retarget's search ([`UnitAi::retarget_search`]) of unit 500 of `w`: its answer, its
+/// The retarget's search ([`UnitAi::retarget_search`]) of unit 500 of `world`: its answer, its
 /// Attack's target, and the objects the search's enemies list held.
 fn retargets(
-    w: &mut World,
+    world: &mut World,
     search: RetargetSearch,
 ) -> (GenieResult<u32>, Option<ObjectId>, Vec<ObjectId>) {
-    let r = run_ai(
-        w,
+    let run_ai = run_ai(
+        world,
         (player_id(1), object_id(500)),
         |ai, at, side, kind, rng| ai.retarget_search(search, kind, at, side, rng),
     );
-    let seen = w
+    let seen = world
         .spatial
         .searched()
-        .map(|l| l[UnitRelation::Enemy].iter().map(|r| r.id).collect())
+        .map(|by_relation| {
+            by_relation[UnitRelation::Enemy]
+                .iter()
+                .map(|record| record.id)
+                .collect()
+        })
         .unwrap_or_default();
-    (r, attacks_500(w), seen)
+    (run_ai, attacks_500(world), seen)
 }
 
 /// The retarget's search for a better target ([`UnitAi::retarget_search`]): from the current
@@ -13699,8 +13988,8 @@ fn retarget_search_ends_on_another_category_or_without_building_target() {
     // without a target: from the unit
     let mut w = soldier_world(retargeter(-1), None, &[archer(30, (22.0, 20.0))]);
     assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![object_id(30)]));
-    let mut w = soldier_world(retargeter(-1), None, &[archer(30, (40.0, 20.0))]);
-    assert_eq!(retargets(&mut w, plain), (Ok(9), None, vec![]));
+    let mut world = soldier_world(retargeter(-1), None, &[archer(30, (40.0, 20.0))]);
+    assert_eq!(retargets(&mut world, plain), (Ok(9), None, vec![]));
 }
 
 /// With a building target the search goes on (off the attack order): a found building keeps
@@ -13753,9 +14042,9 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
         UnitAiKind::Building,
     );
     let attacked = |target: i32, others: &[SceneObject]| {
-        let (soldier, mut u) = retargeter(target);
-        u.current_order = None;
-        let mut w = soldier_world((soldier, u), None, others);
+        let (soldier, mut unit_ai) = retargeter(target);
+        unit_ai.current_order = None;
+        let mut w = soldier_world((soldier, unit_ai), None, others);
         let (r, attacked, _) = retargets(&mut w, building);
         (r, attacked)
     };
@@ -13778,10 +14067,10 @@ fn retarget_search_with_building_target_attacks_what_it_finds() {
     assert_eq!(attacked(43, &[farm]), (Ok(10), None));
     assert_eq!(attacked(30, &[archer()]), (Ok(9), None));
     // a computer player's search
-    let mut w = soldier_world(retargeter(40), None, &[house(near), archer()]);
-    w.players[1].kind = PlayerKind::Computer;
+    let mut world = soldier_world(retargeter(40), None, &[house(near), archer()]);
+    world.players[1].kind = PlayerKind::Computer;
     assert_eq!(
-        retargets(&mut w, building).0,
+        retargets(&mut world, building).0,
         Err(GenieError::unsupported(
             "a computer player's bestUnitToAttack"
         ))

@@ -166,13 +166,13 @@ impl Cells {
 impl Index<CellIndex> for Cells {
     type Output = Cell;
 
-    fn index(&self, i: CellIndex) -> &Cell {
-        &self.0[i.0]
+    fn index(&self, cell_index: CellIndex) -> &Cell {
+        &self.0[cell_index.0]
     }
 }
 
 impl IndexMut<CellIndex> for Cells {
-    fn index_mut(&mut self, i: CellIndex) -> &mut Cell {
-        &mut self.0[i.0]
+    fn index_mut(&mut self, cell_index: CellIndex) -> &mut Cell {
+        &mut self.0[cell_index.0]
     }
 }

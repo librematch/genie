@@ -57,7 +57,7 @@ pub(super) struct Strike<'a> {
 ///
 /// A part of the hit the slice does not model.
 pub fn take(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
     weapons: &[ClassAmount],
@@ -66,10 +66,10 @@ pub fn take(
     layer: HitLayer<'_>,
 ) -> GenieResult<()> {
     let HitLayer { roles, .. } = layer;
-    match t.kind {
-        MasterKind::COMBAT => take_unit(t, src, others, weapons, factor, blast_taken, layer),
+    match victim.kind {
+        MasterKind::COMBAT => take_unit(victim, src, others, weapons, factor, blast_taken, layer),
         MasterKind::RGE_COMBAT | MasterKind::MISSILE => {
-            damage(t, src, weapons, factor, blast_taken, roles)
+            damage(victim, src, weapons, factor, blast_taken, roles)
         }
         MasterKind::BUILDING => {
             let strike = Strike {
@@ -77,16 +77,16 @@ pub fn take(
                 factor,
                 blast_taken,
             };
-            take_building(t, src, others, strike, HitRoute::Dealt, layer).map(|_| ())
+            take_building(victim, src, others, strike, HitRoute::Dealt, layer).map(|_| ())
         }
         _ => {
-            take_static(t, &src.source, weapons, factor, roles);
+            take_static(victim, &src.source, weapons, factor, roles);
             Ok(())
         }
     }
 }
 
-/// A razing's counts for the attacker's player `ap` and the owner `q` (16-bit adds of the
+/// A razing's counts for the attacker's player `ap` and the owner `player_id` (16-bit adds of the
 /// players' ids, `ADD DX, word ptr [.. + 0x718]`): the razings (43), the kill values (170, 152),
 /// the razings of the other (155) and the per-player tables (350, 375, 425).
 ///
@@ -94,45 +94,65 @@ pub fn take(
 ///
 /// A per-player table past the attributes.
 fn razing_counts(
-    (ap, q): (PlayerId, PlayerId),
+    (ap, player_id): (PlayerId, PlayerId),
     cost: Amount,
     slots: Slots,
 ) -> GenieResult<[(PlayerId, AttributeId, Amount); 7]> {
     Ok([
         (ap, slots.attribute.razings, ONE_COUNT),
         (ap, slots.attribute.kills_value, cost),
-        (q, slots.attribute.kills_value_other, cost),
-        (q, slots.attribute.razings_other, ONE_COUNT),
-        (ap, slots.attribute.razings_of.offset(q.index())?, ONE_COUNT),
-        (q, slots.attribute.razed_by.offset(ap.index())?, ONE_COUNT),
+        (player_id, slots.attribute.kills_value_other, cost),
+        (player_id, slots.attribute.razings_other, ONE_COUNT),
         (
             ap,
-            slots.attribute.razings_value_of.offset(q.index())?,
+            slots.attribute.razings_of.offset(player_id.index())?,
+            ONE_COUNT,
+        ),
+        (
+            player_id,
+            slots.attribute.razed_by.offset(ap.index())?,
+            ONE_COUNT,
+        ),
+        (
+            ap,
+            slots.attribute.razings_value_of.offset(player_id.index())?,
             cost,
         ),
     ])
 }
 
-/// A trebuchet's kill counts (its damage did not count the kill) for the attacker's player `ap`
-/// and the owner `q`: the kills (20), the kill values (170, 152), the kills of the other (154)
+/// A trebuchet's kill counts (its damage did not count the kill) for the attacker's player `ap` and
+/// the owner `player_id`: the kills (20), the kill values (170, 152), the kills of the other (154)
 /// and the per-player tables (300, 325, 400).
 ///
 /// # Errors
 ///
 /// A per-player table past the attributes.
 fn kill_counts(
-    (ap, q): (PlayerId, PlayerId),
+    (ap, player_id): (PlayerId, PlayerId),
     cost: Amount,
     slots: Slots,
 ) -> GenieResult<[(PlayerId, AttributeId, Amount); 7]> {
     Ok([
         (ap, slots.attribute.kills, ONE_COUNT),
         (ap, slots.attribute.kills_value, cost),
-        (q, slots.attribute.kills_other, ONE_COUNT),
-        (q, slots.attribute.kills_value_other, cost),
-        (ap, slots.attribute.kills_of.offset(q.index())?, ONE_COUNT),
-        (q, slots.attribute.killed_by.offset(ap.index())?, ONE_COUNT),
-        (ap, slots.attribute.kills_value_of.offset(q.index())?, cost),
+        (player_id, slots.attribute.kills_other, ONE_COUNT),
+        (player_id, slots.attribute.kills_value_other, cost),
+        (
+            ap,
+            slots.attribute.kills_of.offset(player_id.index())?,
+            ONE_COUNT,
+        ),
+        (
+            player_id,
+            slots.attribute.killed_by.offset(ap.index())?,
+            ONE_COUNT,
+        ),
+        (
+            ap,
+            slots.attribute.kills_value_of.offset(player_id.index())?,
+            cost,
+        ),
     ])
 }
 
@@ -215,9 +235,9 @@ pub(super) fn take_building(
             lose(t, HitPoints::new(least));
         }
     }
-    let b = t.building.get_or_insert_with(Building::default);
+    let building = t.building.get_or_insert_with(Building::default);
     if t.player != PlayerId::GAIA && ONE > t.hp.get() {
-        let (ap, q) = (src.player, t.player);
+        let (ap, player_id) = (src.player, t.player);
         let event = {
             let held = roles.of_master(t.master_id);
             if held.contains(MasterRoles::CASTLE) {
@@ -229,30 +249,33 @@ pub(super) fn take_building(
             }
         };
         let mut adds = Vec::new();
-        if b.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {
-            let cost = b.cost;
-            if !b.trebuchet {
-                adds.extend(razing_counts((ap, q), cost, slots)?);
+        if building.main.is_none() && !roles.of_class(t.class).contains(ClassRoles::WALL) {
+            let cost = building.cost;
+            if !building.trebuchet {
+                adds.extend(razing_counts((ap, player_id), cost, slots)?);
             } else if !counted {
-                adds.extend(kill_counts((ap, q), cost, slots)?);
+                adds.extend(kill_counts((ap, player_id), cost, slots)?);
             }
             kill_bonus(&src.source)?;
             adds.extend([
                 (ap, slots.attribute.razings_value, cost),
-                (q, slots.attribute.razings_value_other, cost),
+                (player_id, slots.attribute.razings_value_other, cost),
             ]);
         }
-        b.razed.push(Razed {
+        building.razed.push(Razed {
             attacker_player: ap,
-            owner: q,
+            owner: player_id,
             event,
             adds,
         });
     }
-    b.damaged_lately = DamagedTimer::HIT;
-    b.struck = true;
-    let annexes = b.annexes.clone();
-    for a in others.iter_mut().filter(|a| annexes.contains(&a.id)) {
+    building.damaged_lately = DamagedTimer::HIT;
+    building.struck = true;
+    let annexes = building.annexes.clone();
+    for a in others
+        .iter_mut()
+        .filter(|victim| annexes.contains(&victim.id))
+    {
         a.hp = t.hp;
     }
     if route == HitRoute::Dealt && MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE)
@@ -288,16 +311,16 @@ fn forward_to_main(
         .iter()
         .position(|v| v.id == main.id())
         .ok_or(NOT_HELD)?;
-    let mut m = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
-    let struck = take_building(&mut m, src, others, strike, HitRoute::Forwarded, layer);
-    let annexed = m
+    let mut victim = replace(&mut **others.checked_mut(k)?, Victim::placeholder());
+    let struck = take_building(&mut victim, src, others, strike, HitRoute::Forwarded, layer);
+    let annexed = victim
         .building
         .as_ref()
-        .is_some_and(|b| b.annexes.contains(&t.id));
+        .is_some_and(|building| building.annexes.contains(&t.id));
     if matches!(struck, Ok(BuildingHit::Past)) && annexed {
-        t.hp = m.hp;
+        t.hp = victim.hp;
     }
-    **others.checked_mut(k)? = m;
+    **others.checked_mut(k)? = victim;
     struck.map(|_| ())
 }
 
@@ -313,12 +336,12 @@ pub(super) fn kill_bonus(src: &Attacker) -> GenieResult<()> {
     Ok(())
 }
 
-/// `FUN_14107bdf0`, the attacker `src`'s combat ability's effects on its target `t`: only a combat
-/// ability with [`CombatAbility::HIT_EFFECTS`], against a target whose player is not allied with
-/// the attacker's both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does anything
-/// (its master's effects on the target, not modelled).
-pub(super) const fn attack_effects(src: &Attacker, t: &Victim) -> GenieResult<()> {
-    if src.ability.contains(CombatAbility::HIT_EFFECTS) && !t.allied.both() {
+/// `FUN_14107bdf0`, the attacker `src`'s combat ability's effects on its target `victim`: only a
+/// combat ability with [`CombatAbility::HIT_EFFECTS`], against a target whose player is not allied
+/// with the attacker's both ways (`FUN_141663d90` with the ally flag, [`Victim::allied`]), does
+/// anything (its master's effects on the target, not modelled).
+pub(super) const fn attack_effects(src: &Attacker, victim: &Victim) -> GenieResult<()> {
+    if src.ability.contains(CombatAbility::HIT_EFFECTS) && !victim.allied.both() {
         return Err(GenieError::unsupported(
             "an attacker whose hits apply effects (FUN_14107bdf0)",
         ));
@@ -348,7 +371,7 @@ impl Victim {
 /// the master's damage sound (`+0x700`), whose draws are the Unsynced stream's: no simulation
 /// state.
 pub(super) fn take_static(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &Attacker,
     weapons: &[ClassAmount],
     factor: f32,
@@ -356,21 +379,21 @@ pub(super) fn take_static(
 ) {
     // slot 0x2f0 of a TRIBE attacker (types 70, 80; [`charge_hit`]) starts the sum at its raw
     // charge (slot 0x310, `+0x9e0`) plus 0
-    let mut damage = if MasterKind::COMBAT <= src.kind && charge_hit(src, t, roles) {
+    let mut damage = if MasterKind::COMBAT <= src.kind && charge_hit(src, victim, roles) {
         src.charge.get() + 0.0
     } else {
         0.0f32
     };
-    for w in weapons {
-        damage += w.amount.as_f32() * factor;
+    for class_amount in weapons {
+        damage += class_amount.amount.as_f32() * factor;
     }
-    t.hp -= HitPoints::new(damage);
-    if t.hp < HitPoints::new(1.0) {
-        t.hp = HitPoints::ZERO;
-        t.goto_sleep = false;
+    victim.hp -= HitPoints::new(damage);
+    if victim.hp < HitPoints::new(1.0) {
+        victim.hp = HitPoints::ZERO;
+        victim.goto_sleep = false;
         // The villager class (4): its hits leave what a static target holds.
         if !roles.of_class(src.class).contains(ClassRoles::VILLAGER) {
-            t.amount = Amount::ZERO;
+            victim.amount = Amount::ZERO;
         }
     }
 }
@@ -387,7 +410,7 @@ pub(super) fn take_static(
 /// attacker (action type 0x9a, `FUN_1415c6510`) and its combat ability's effects
 /// ([`CombatAbility::HIT_EFFECTS`], `FUN_14107bdf0`).
 pub(super) fn take_unit(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
     weapons: &[ClassAmount],
@@ -400,40 +423,40 @@ pub(super) fn take_unit(
         damage_tuning,
         ..
     } = layer;
-    let before = effective(t);
-    if t.hp < HitPoints::new(1.0) {
+    let before = effective(victim);
+    if victim.hp < HitPoints::new(1.0) {
         return Ok(());
     }
-    let a = t.armored.clone().ok_or(GenieError::unsupported(
+    let armored = victim.armored.clone().ok_or(GenieError::unsupported(
         "a combat object without its combat values",
     ))?;
     let mut factor = factor;
-    if a.special_attack == SpecialAttack::FRONT_DEFENCE && !a.busy {
-        let off = facing_to(&a, t.position, src)?;
+    if armored.special_attack == SpecialAttack::FRONT_DEFENCE && !armored.busy {
+        let off = facing_to(&armored, victim.position, src)?;
         if damage_tuning.minus_facing < off && off < damage_tuning.facing {
             factor *= damage_tuning.special;
-            if a.special_sprite.is_some() {
+            if armored.special_sprite.is_some() {
                 return Err(GenieError::unsupported(
                     "a special attack's sprite (master +0x8e8)",
                 ));
             }
         }
     }
-    if retaliates(t, src, others, &a, layer)? {
+    if retaliates(victim, src, others, &armored, layer)? {
         factor = 0.0;
     }
-    damage(t, src, weapons, factor, blast_taken, roles)?;
-    after_hit(t, src, &a, before)
+    damage(victim, src, weapons, factor, blast_taken, roles)?;
+    after_hit(victim, src, &armored, before)
 }
 
-/// [`take_unit`]'s facing of a target (`a`, at `at`) to its attacker `src`
+/// [`take_unit`]'s facing of a target (`armored`, at `at`) to its attacker `src`
 /// ([`facing_offset`]).
 ///
 /// # Errors
 ///
 /// A target without its facing (`+0x7e8`).
-pub(super) fn facing_to(a: &Armored, at: Position, src: &Victim) -> GenieResult<f32> {
-    let facing = a.facing.ok_or(GenieError::unsupported(
+pub(super) fn facing_to(armored: &Armored, at: Position, src: &Victim) -> GenieResult<f32> {
+    let facing = armored.facing.ok_or(GenieError::unsupported(
         "the facing of a target with a special attack or a retaliation (+0x7e8)",
     ))?;
     Ok(facing_offset(at, facing, src.position))
@@ -448,10 +471,10 @@ pub(super) fn facing_to(a: &Armored, at: Position, src: &Victim) -> GenieResult<
 ///
 /// A retaliating target without its unit AI's alert mode, and what the strike does not model.
 pub(super) fn retaliates(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &mut Victim,
     others: &mut [&mut Victim],
-    a: &Armored,
+    armored: &Armored,
     layer: HitLayer<'_>,
 ) -> GenieResult<bool> {
     let HitLayer { damage_tuning, .. } = layer;
@@ -459,25 +482,42 @@ pub(super) fn retaliates(
     let melee = reach <= Distance::new(damage_tuning.retaliation_range)
         && damage_tuning.retaliation_range != reach.get();
     // the conditions are pure: the ones the slice holds decide first
-    if !(a.special_attack == SpecialAttack::RETALIATION && a.unit_ai && !a.busy && melee) {
+    if !(armored.special_attack == SpecialAttack::RETALIATION
+        && armored.unit_ai
+        && !armored.busy
+        && melee)
+    {
         return Ok(false);
     }
-    let idle = a.alert_idle.ok_or(GenieError::unsupported(
+    let idle = armored.alert_idle.ok_or(GenieError::unsupported(
         "the alert mode and attackers of a retaliating target's unit AI (FUN_140c42b30)",
     ))?;
     if !idle {
         return Ok(false);
     }
-    let off = facing_to(a, t.position, src)?;
+    let off = facing_to(armored, victim.position, src)?;
     if !(damage_tuning.minus_facing < off && off < damage_tuning.facing) {
         return Ok(false);
     }
-    let mut f = elevation_factor(t.position.z(), t.attack_elevation, src, damage_tuning);
+    let mut elevation_factor = elevation_factor(
+        victim.position.z(),
+        victim.attack_elevation,
+        src,
+        damage_tuning,
+    );
     if src.kind == MasterKind::COMBAT && special_charge_ready(&src.source)? {
-        f *= damage_tuning.retaliation_scale;
+        elevation_factor *= damage_tuning.retaliation_scale;
     }
-    let w = t.weapons.clone();
-    take(src, t, others, &w, f, HitPoints::ZERO, layer)?;
+    let class_amounts = victim.weapons.clone();
+    take(
+        src,
+        victim,
+        others,
+        &class_amounts,
+        elevation_factor,
+        HitPoints::ZERO,
+        layer,
+    )?;
     Ok(src.hp <= HitPoints::new(1.0))
 }
 
@@ -490,26 +530,26 @@ pub(super) fn retaliates(
 ///
 /// A kill bonus task and the combat ability's effects, which are not modelled.
 pub(super) fn after_hit(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &mut Victim,
-    a: &Armored,
+    armored: &Armored,
     before: HitPoints,
 ) -> GenieResult<()> {
     // a hit takes at least one hit point
-    let mut lost = before - effective(t);
-    let floor = hp_floor(a, t.master_hp);
+    let mut lost = before - effective(victim);
+    let floor = hp_floor(armored, victim.master_hp);
     if lost < HitPoints::new(1.0)
         && (floor == HitPoints::ZERO || floor + HitPoints::new(1.0) <= before)
     {
-        t.hp = before - HitPoints::new(1.0);
+        victim.hp = before - HitPoints::new(1.0);
         lost = HitPoints::new(1.0);
     }
-    if EPSILON < a.reflection.get() {
-        let d = a.reflection.get() * lost;
+    if EPSILON < armored.reflection.get() {
+        let hit_points = armored.reflection.get() * lost;
         lose(
             src,
-            if HitPoints::new(1.0) <= d {
-                d
+            if HitPoints::new(1.0) <= hit_points {
+                hit_points
             } else {
                 HitPoints::new(1.0)
             },
@@ -517,11 +557,11 @@ pub(super) fn after_hit(
     }
     // COMISS 1, hp / JBE past: below 1 (not NaN) the kill bonus; COMISS hp, 1 / JC past: at 1
     // or more (not NaN) the attacker's effects
-    if ONE > t.hp.get() {
+    if ONE > victim.hp.get() {
         kill_bonus(&src.source)?;
     }
-    if MasterKind::RGE_COMBAT <= src.kind && t.hp >= HitPoints::new(ONE) {
-        attack_effects(&src.source, t)?;
+    if MasterKind::RGE_COMBAT <= src.kind && victim.hp >= HitPoints::new(ONE) {
+        attack_effects(&src.source, victim)?;
     }
     Ok(())
 }

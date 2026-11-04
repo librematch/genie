@@ -13,16 +13,19 @@ fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aoe2record") {
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "aoe2record")
+        {
             out.push(path);
         }
     }
 }
 
 /// The header written back.
-fn written(h: &genie_save::Header) -> Vec<u8> {
+fn written(header: &genie_save::Header) -> Vec<u8> {
     let mut out = Cursor::new(Vec::new());
-    genie_save::write(h, &mut out).unwrap();
+    genie_save::write(header, &mut out).unwrap();
     out.into_inner()
 }
 

@@ -59,7 +59,7 @@ impl World {
     /// The local player's interface flag (`FUN_141663f50`) is not held.
     pub(crate) fn unload(
         &mut self,
-        u: &UnloadCommand,
+        unload_command: &UnloadCommand,
         ids: &[Option<ObjectId>],
     ) -> GenieResult<()> {
         let UnloadCommand {
@@ -68,7 +68,7 @@ impl World {
             pick,
             sound,
             ..
-        } = *u;
+        } = *unload_command;
         let Some(checked) = self.unload_check(player, ids, pick)? else {
             return Ok(());
         };
@@ -109,7 +109,7 @@ impl World {
             if master.kind < MasterKind::BUILDING {
                 let transport = container
                     .filter(|&(_, kind)| MasterKind::COMBAT <= kind)
-                    .map(|(c, _)| c);
+                    .map(|(role_id, _)| role_id);
                 if matches!(pick, UnloadPick::Object(_)) || transport.is_some() {
                     self.drop_out(player, idx, transport, pick.object(), &mut last)?;
                 } else if self
@@ -129,7 +129,7 @@ impl World {
         Ok(())
     }
 
-    /// [`World::unload`] of unit `id` inside building `c`: it leaves toward `point`
+    /// [`World::unload`] of unit `id` inside building `object_id`: it leaves toward `point`
     /// (`FUN_1411e7220` with no work and its sound); a combat unit is no longer under the town
     /// bell (`+0x9dc`), and its unit AI's orders go (`FUN_140c5e010`).
     ///
@@ -138,12 +138,12 @@ impl World {
     /// A building outside the live lists, and what [`World::let_out`] does not model.
     pub(super) fn leave_building(
         &mut self,
-        c: ObjectId,
+        object_id: ObjectId,
         id: ObjectId,
         point: Point,
     ) -> GenieResult<()> {
         // only static objects sleep, and a building that holds units is none
-        let Some(Place::Live(cp, ci)) = self.place(c) else {
+        let Some(Place::Live(cp, ci)) = self.place(object_id) else {
             return Err(GenieError::unreachable(
                 "a building that holds units outside the live lists",
             ));
@@ -155,11 +155,11 @@ impl World {
             .live(up, ui)?
             .master(self.master_tables(), up)?
             .kind;
-        let u = self.players.live_mut(up, ui)?;
+        let unit = self.players.live_mut(up, ui)?;
         if MasterKind::COMBAT <= kind {
-            self.parts.set_town_bell_flag(u.id, BellShelter::Free);
+            self.parts.set_town_bell_flag(unit.id, BellShelter::Free);
         }
-        if let Some(ai) = self.parts.unit_ai.get_mut(u.id) {
+        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
             ai.orders.clear();
         }
         Ok(())
@@ -194,17 +194,17 @@ impl World {
                 "an unload toward a building's command queue location",
             ));
         }
-        let mut i = unit.garrison.len();
-        while 0 < i {
-            i -= 1;
-            let Some(&inside) = self.players.live(player, idx)?.garrison.get(i) else {
+        let mut count = unit.garrison.len();
+        while 0 < count {
+            count -= 1;
+            let Some(&inside) = self.players.live(player, idx)?.garrison.get(count) else {
                 continue;
             };
             // the game skips a null entry; an id the world no longer holds is one
-            let Some((up, u)) = self.object(inside) else {
+            let Some((up, inside_unit)) = self.object(inside) else {
                 continue;
             };
-            if !self.unload_picks(up, u, pick)? {
+            if !self.unload_picks(up, inside_unit, pick)? {
                 continue;
             }
             let _ = self.let_out(player, idx, inside, point, (None, sound))?;
@@ -246,9 +246,11 @@ impl World {
     ) -> GenieResult<()> {
         let own = self.players.live(player, idx)?.id;
         let (inner, holder) = match (transport, named) {
-            (Some(t), _) => (own, t),
+            (Some(role_id), _) => (own, role_id),
             (None, Some(named)) => match self.object(named) {
-                Some((_, o)) if o.life.inside.key() == Some(own) => (named, ContainerId::new(own)),
+                Some((_, own_unit)) if own_unit.life.inside.key() == Some(own) => {
+                    (named, ContainerId::new(own))
+                }
                 _ => return Ok(()),
             },
             (None, None) => return Ok(()),
@@ -264,12 +266,12 @@ impl World {
                 "a transport that holds units outside the live lists",
             ));
         };
-        let h = self.players.live(hp, hi)?;
-        let at = h.position();
-        let r = h.master(self.master_tables(), hp)?.radius;
+        let live = self.players.live(hp, hi)?;
+        let at = live.position();
+        let footprint = live.master(self.master_tables(), hp)?.radius;
         let around = Around {
             center: at.ground(),
-            radius: Footprint::new(r.x() + r.x(), r.y() + r.y()),
+            radius: Footprint::new(footprint.x() + footprint.x(), footprint.y() + footprint.y()),
         };
         let Some(spot) = self.drop_location((hp, hi), inner, &made, around, None, last)? else {
             return Ok(());
@@ -314,8 +316,8 @@ impl World {
         let id = self.players.live(player, idx)?.id;
         self.leave_group_of(id, None)?;
         let unit = self.players.live_mut(player, idx)?;
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.ignore_units.clear();
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.ignore_units.clear();
         }
         let unit = self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
@@ -362,59 +364,59 @@ impl World {
         ids: &[Option<ObjectId>],
     ) -> GenieResult<()> {
         for id in self.checked_units(player, ids).into_iter().flatten() {
-            let Some((p, _)) = self.object(id) else {
+            let Some((player_id, _)) = self.object(id) else {
                 continue;
             };
-            let _ = self.players.player(p)?;
-            let Some(idx) = self.live_index(p, id) else {
+            let _ = self.players.player(player_id)?;
+            let Some(idx) = self.live_index(player_id, id) else {
                 return Err(GenieError::unsupported(
                     "a GO_BACK_TO_WORK of a sleeping object",
                 ));
             };
-            let b = self.players.live(p, idx)?;
-            if b.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
+            let live = self.players.live(player_id, idx)?;
+            if live.master(self.master_tables(), player_id)?.kind != MasterKind::BUILDING {
                 continue;
             }
-            let mut i = b.garrison.len();
-            while 0 < i {
-                i -= 1;
-                let Some(&inside) = self.players.live(p, idx)?.garrison.get(i) else {
+            let mut count = live.garrison.len();
+            while 0 < count {
+                count -= 1;
+                let Some(&inside) = self.players.live(player_id, idx)?.garrison.get(count) else {
                     continue;
                 };
                 // any player's unit (an ally's too); the game skips a null entry, and an id the
                 // world no longer holds is one
-                let Some((up, u)) = self.object(inside) else {
+                let Some((up, unit)) = self.object(inside) else {
                     continue;
                 };
-                let m = u.master(self.master_tables(), up)?;
-                if MasterKind::COMBAT <= m.kind
+                let master = unit.master(self.master_tables(), up)?;
+                if MasterKind::COMBAT <= master.kind
                     && (self
                         .model
                         .roles
-                        .of_class(m.class)
+                        .of_class(master.class)
                         .contains(ClassRoles::VILLAGER)
                         || self
                             .model
                             .roles
-                            .of_master(m.id)
+                            .of_master(master.id)
                             .contains(MasterRoles::MULE_CART))
                 {
-                    let _ = self.back_to_work(Some((p, idx)), inside)?;
+                    let _ = self.back_to_work(Some((player_id, idx)), inside)?;
                 }
             }
         }
         Ok(())
     }
 
-    /// `FUN_1412081e0` for the unit `id`, `from` the building it is inside (player `p`'s object
-    /// at an index) or outside (None): the work to go back to ([`TownBell::back_to_work`]: the
-    /// town-bell records' object the world holds); with none but a record of an action and a
-    /// target class, the unit AI takes the action (`FUN_140c64b50`) and the unit tells it to
-    /// search (notify 0x202 with the action, the class and the old target). From a building the
-    /// unit then leaves it toward the record's point with the object to work on
-    /// ([`World::let_out`], `FUN_1411e7220` with its sound); outside it goes back
-    /// ([`World::back_outside`]). Once out or back it is no longer under the town bell
-    /// (`+0x9dc`; `+0xa14` takes 1, not held). [`WorkReturn::Went`] when it went.
+    /// `FUN_1412081e0` for the unit `id`, `from` the building it is inside (player `player_id`'s
+    /// object at an index) or outside (None): the work to go back to ([`TownBell::back_to_work`]:
+    /// the town-bell records' object the world holds); with none but a record of an action and a
+    /// target class, the unit AI takes the action (`FUN_140c64b50`) and the unit tells it to search
+    /// (notify 0x202 with the action, the class and the old target). From a building the unit then
+    /// leaves it toward the record's point with the object to work on ([`World::let_out`],
+    /// `FUN_1411e7220` with its sound); outside it goes back ([`World::back_outside`]). Once out or
+    /// back it is no longer under the town bell (`+0x9dc`; `+0xa14` takes 1, not held).
+    /// [`WorkReturn::Went`] when it went.
     ///
     /// [`TownBell::back_to_work`]: crate::orders::town_bell::TownBell::back_to_work
     pub(crate) fn back_to_work(
@@ -425,7 +427,7 @@ impl World {
         let (up, ui) = match from {
             Some(_) => self.live_inside(id)?,
             None => match self.place(id) {
-                Some(Place::Live(p, i)) => (p, i),
+                Some(Place::Live(p, list_index)) => (p, list_index),
                 // the callers pass an object of type 70 or more the world holds, which never
                 // sleeps
                 _ => return Ok(WorkReturn::Stayed),
@@ -449,11 +451,16 @@ impl World {
                 ],
             )?;
         }
-        let Some((p, building)) = from else {
+        let Some((player_id, building)) = from else {
             return self.back_outside(id, found.map(|f| f.id), record.point);
         };
-        let out = self.let_out(p, building, id, record.point, (found.map(|f| f.id), true))?
-            == LetOut::Out;
+        let out = self.let_out(
+            player_id,
+            building,
+            id,
+            record.point,
+            (found.map(|record_target| record_target.id), true),
+        )? == LetOut::Out;
         if out && self.object(id).is_some() {
             self.parts.set_town_bell_flag(id, BellShelter::Free);
         }
@@ -487,7 +494,7 @@ impl World {
                 .transpose()?,
             _ => None,
         };
-        let same_player = named.is_none_or(|(p, _)| p == player);
+        let same_player = named.is_none_or(|(player_id, _)| player_id == player);
         let named = named.map(|(_, m)| m);
         Ok(match pick {
             UnloadPick::All(_) => !self
@@ -513,9 +520,9 @@ impl World {
                 }
                 None => false,
             },
-            UnloadPick::AllBut(o) => {
+            UnloadPick::AllBut(object_id) => {
                 same_player
-                    && Some(id) != o
+                    && Some(id) != object_id
                     && !self
                         .model
                         .roles

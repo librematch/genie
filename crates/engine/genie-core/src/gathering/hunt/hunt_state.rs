@@ -153,7 +153,7 @@ impl HuntState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self.walk() {
-            Some(Some(m)) => Some(m),
+            Some(Some(move_to_action)) => Some(move_to_action),
             _ => None,
         }
     }
@@ -161,7 +161,7 @@ impl HuntState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -186,7 +186,7 @@ impl HuntState {
     /// Its attack's Attack taken out (the state stays), none in any other state.
     pub const fn take_attack(&mut self) -> Option<Attack> {
         match self.attack_mut() {
-            Some(a) => a.take(),
+            Some(attack) => attack.take(),
             None => None,
         }
     }
@@ -194,10 +194,10 @@ impl HuntState {
     /// The same state without its sub-actions: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        let _ = s.take_attack();
-        s
+        let mut hunt_state = self;
+        let _ = hunt_state.take_move_to();
+        let _ = hunt_state.take_attack();
+        hunt_state
     }
 }
 
@@ -217,29 +217,39 @@ mod tests {
     /// its Attack.
     #[test]
     fn hunt_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match HuntState::of_byte(b, None, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 5 | 9 | 14 | 16..), "{b}"),
+        for index in 0..=255_u8 {
+            match HuntState::of_byte(index, None, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(matches!(index, 5 | 9 | 14 | 16..), "{index}"),
             }
         }
         assert_eq!(HuntState::Attack { attack: None }.to_string(), "12");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 8, 11, 15] {
-            let mut s = HuntState::of_byte(b, Some(walk), None).unwrap();
-            assert_eq!((s.get(), s.move_to(), s.attack()), (b, Some(&walk), None));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut walk_hunt_state = HuntState::of_byte(b, Some(walk), None).unwrap();
+            assert_eq!(
+                (
+                    walk_hunt_state.get(),
+                    walk_hunt_state.move_to(),
+                    walk_hunt_state.attack()
+                ),
+                (b, Some(&walk), None)
+            );
+            assert_eq!(walk_hunt_state.bare().move_to(), None);
+            assert_eq!(walk_hunt_state.take_move_to(), Some(walk));
+            assert_eq!(walk_hunt_state.move_to(), None);
         }
         for b in [2, 12] {
             assert!(HuntState::of_byte(b, Some(walk), None).is_err(), "{b}");
         }
         let attack = own_attack(5, AttackState::New, Distance::ZERO);
-        let mut s = HuntState::of_byte(12, None, Some(attack)).unwrap();
-        assert_eq!((s.attack(), s.move_to()), (Some(&attack), None));
-        assert_eq!(s.bare().attack(), None);
-        assert_eq!(s.take_attack(), Some(attack));
+        let mut hunt_state = HuntState::of_byte(12, None, Some(attack)).unwrap();
+        assert_eq!(
+            (hunt_state.attack(), hunt_state.move_to()),
+            (Some(&attack), None)
+        );
+        assert_eq!(hunt_state.bare().attack(), None);
+        assert_eq!(hunt_state.take_attack(), Some(attack));
         assert!(HuntState::of_byte(4, None, Some(attack)).is_err());
         assert_eq!(HuntState::Idle.bare(), HuntState::Idle);
     }

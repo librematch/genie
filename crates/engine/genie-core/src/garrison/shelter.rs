@@ -85,18 +85,20 @@ impl World {
         dispatch: Dispatch,
         scope: GarrisonScope,
     ) -> GenieResult<()> {
-        let Some((tp, t)) = self.object(target) else {
+        let Some((tp, target_unit)) = self.object(target) else {
             return Ok(());
         };
-        let target = t.id;
-        let (target_master, target_annex) =
-            (t.life.master_id, self.parts.building_of(t.id).annex_of);
+        let target = target_unit.id;
+        let (target_master, target_annex) = (
+            target_unit.life.master_id,
+            self.parts.building_of(target_unit.id).annex_of,
+        );
         let mut units = Vec::with_capacity(ids.len());
         for &id in ids.iter().flatten() {
-            let Some((p, u)) = self.object(id) else {
+            let Some((player_id, unit)) = self.object(id) else {
                 continue;
             };
-            if MasterKind::COMBAT <= u.master(self.master_tables(), p)?.kind {
+            if MasterKind::COMBAT <= unit.master(self.master_tables(), player_id)?.kind {
                 units.push(id);
             }
         }
@@ -164,10 +166,10 @@ impl World {
         }
         let mut units = Vec::with_capacity(checked.len());
         for id in checked.into_iter().flatten() {
-            let Some((p, u)) = self.object(id) else {
+            let Some((player_id, u)) = self.object(id) else {
                 continue;
             };
-            let m = u.master(self.master_tables(), p)?;
+            let m = u.master(self.master_tables(), player_id)?;
             if self
                 .model
                 .roles
@@ -187,22 +189,22 @@ impl World {
             }
         }
         let mut buildings = Vec::new();
-        for b in &self.players.player(player)?.objects {
-            let m = b.master(self.master_tables(), player)?;
-            let takes_villagers = m
+        for unit in &self.players.player(player)?.objects {
+            let master = unit.master(self.master_tables(), player)?;
+            let takes_villagers = master
                 .building
                 .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            if b.life.state == ObjectState::Alive
-                && b.life.inside.is_none()
-                && m.kind == MasterKind::BUILDING
+            if unit.life.state == ObjectState::Alive
+                && unit.life.inside.is_none()
+                && master.kind == MasterKind::BUILDING
                 && takes_villagers
             {
-                buildings.push(ContainerId::new(b.id));
+                buildings.push(ContainerId::new(unit.id));
             }
         }
         let counts = buildings
             .iter()
-            .map(|&b| self.garrisoned(b.id()))
+            .map(|&role_id| self.garrisoned(role_id.id()))
             .collect::<GenieResult<Vec<_>>>()?;
         let shelters = Shelters {
             buildings,
@@ -228,17 +230,17 @@ impl World {
         for &id in self.players.player(tp)?.tracker.list(key) {
             // the tracker's keepers follow every object its player gains and loses, so the
             // world holds each (the game reads a null one's place)
-            let Some((op, o)) = self.object(id) else {
+            let Some((op, unit)) = self.object(id) else {
                 continue;
             };
-            let id = o.id;
+            let id = unit.id;
             let (other_at, other_radius) = self.ground(id)?;
             // COMISS NEARBY, gap; JC: a gap above it, or a NaN, is out
             let gap = footprint_gap_squared(other_at, other_radius, at, radius);
             if below_or_unordered(self.model.tuning.garrison.nearby, gap.get()) {
                 continue;
             }
-            let om = o.master(self.master_tables(), op)?;
+            let om = unit.master(self.master_tables(), op)?;
             if om.kind < MasterKind::BUILDING {
                 shelters.transports.push(ContainerId::new(id));
             } else if !self
@@ -246,7 +248,7 @@ impl World {
                 .roles
                 .of_class(om.class)
                 .contains(ClassRoles::GATE)
-                && self.parts.building_of(o.id).annex_of.is_none()
+                && self.parts.building_of(unit.id).annex_of.is_none()
             {
                 shelters.buildings.push(ContainerId::new(id));
             }
@@ -259,7 +261,7 @@ impl World {
     pub(crate) fn ground(&self, id: ObjectId) -> GenieResult<(Position, Footprint)> {
         self.spatial
             .get_known(id)?
-            .map(|p| (p.position, p.radius))
+            .map(|placed| (placed.position, placed.radius))
             .ok_or(GenieError::unsupported(
                 "a garrison's object without a place",
             ))
@@ -309,16 +311,16 @@ impl World {
         }
         let first_transport = shelters.buildings.len();
         for (i, &id) in units.iter().enumerate() {
-            let (p, u) = self
+            let (player_id, unit) = self
                 .object(id)
                 .ok_or(GenieError::unsupported("a garrison's unit is gone"))?;
-            let own = u.master(self.master_tables(), p)?;
+            let own = unit.master(self.master_tables(), player_id)?;
             let (copy, master, class) = (own.copy_id, own.id, own.class);
             // COMISS reach, gap; JBE: a gap at the reach or past it, or a NaN, pairs nothing
             let gap_to = |shelter: ObjectId| -> GenieResult<f32> {
-                let (at, r) = self.ground(id)?;
+                let (at, footprint) = self.ground(id)?;
                 let (sat, sr) = self.ground(shelter)?;
-                Ok(footprint_gap_squared(at, r, sat, sr).get())
+                Ok(footprint_gap_squared(at, footprint, sat, sr).get())
             };
             for (j, (&building, &(is_building, capacity, _))) in
                 shelters.buildings.iter().zip(&capacities).enumerate()
@@ -333,15 +335,15 @@ impl World {
             if !class_has_flags(class, ClassFlags::TRANSPORTED) {
                 continue;
             }
-            for (k, &transport) in shelters.transports.iter().enumerate() {
+            for (index, &transport) in shelters.transports.iter().enumerate() {
                 // FUN_1415c9240 reads the commanding player's master of the unit's master id
                 // (its slot unchecked: one the player lacks would crash the game)
-                let (_, _, transport_class) = *capacities.checked(first_transport + k)?;
+                let (_, _, transport_class) = *capacities.checked(first_transport + index)?;
                 let list = self.master(player, master)?;
                 if has_garrison_task(&list.action_part().tasks, GARRISON, transport_class) {
                     let gap = gap_to(transport.id())?;
                     if gap < reach {
-                        pairs.push((i, first_transport + k, gap));
+                        pairs.push((i, first_transport + index, gap));
                     }
                 }
             }
@@ -356,27 +358,27 @@ impl World {
             // `assign_shelters` takes its buildings from `all` alone
             let j = all
                 .iter()
-                .position(|&b| b == building)
+                .position(|&role_id| role_id == building)
                 .ok_or(NO_LISTED_BUILDING)?;
             self.shelter_in(building, going.checked(j)?, dispatch)?;
         }
         Ok(())
     }
 
-    /// `FUN_140c40e00`: a unit AI's test of the building `b` of player `bp` for its unit of
+    /// `FUN_140c40e00`: a unit AI's test of the building `unit` of player `bp` for its unit of
     /// player `player` and master `master`: none for an object below type 70, else whether it
     /// takes the unit in ([`World::takes_in`], with 1 and 1).
     pub(super) fn ai_takes(
         &self,
         bp: PlayerId,
-        b: &Unit,
+        unit: &Unit,
         player: PlayerId,
         master: MasterId,
     ) -> GenieResult<bool> {
-        if b.master(self.master_tables(), bp)?.kind < MasterKind::COMBAT {
+        if unit.master(self.master_tables(), bp)?.kind < MasterKind::COMBAT {
             return Ok(false);
         }
-        self.takes_in(ContainerId::new(b.id), player, Some(master))
+        self.takes_in(ContainerId::new(unit.id), player, Some(master))
     }
 
     /// One shelter's part of [`World::shelter`]: the order splitter (`FUN_140fd9dc0` with
@@ -414,13 +416,13 @@ impl World {
         let going: Vec<Option<ObjectId>> = going.iter().copied().map(Some).collect();
         let loose = self.loose_units_kept(&going, Kept::Listed(&kept))?;
         for id in loose {
-            let Some(Place::Live(p, idx)) = self.place(id) else {
+            let Some(Place::Live(player_id, idx)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a garrison of a unit the slice does not hold live",
                 ));
             };
-            let unit = self.players.live(p, idx)?;
-            let kind = unit.master(self.master_tables(), p)?.kind;
+            let unit = self.players.live(player_id, idx)?;
+            let kind = unit.master(self.master_tables(), player_id)?.kind;
             if (ObjectState::Alive < unit.life.state && unit.life.state != ObjectState::Undead)
                 || kind < MasterKind::COMBAT
             {
@@ -452,7 +454,7 @@ impl World {
                 filter: Some(GARRISON),
                 source: OrderSource::Direct,
             };
-            self.order_work(p, idx, &work)?;
+            self.order_work(player_id, idx, &work)?;
         }
         Ok(())
     }

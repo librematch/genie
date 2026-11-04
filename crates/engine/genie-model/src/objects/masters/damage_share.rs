@@ -39,8 +39,8 @@ impl MulAssign<f32> for DamageShare {
 }
 
 impl genie_diff::Diff for DamageShare {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -51,11 +51,11 @@ mod tests {
     /// A share adds and scales as `f32`.
     #[test]
     fn damage_share_adds_and_scales_as_floats() {
-        let mut s = DamageShare::new(0.25);
-        s += DamageShare::new(0.5);
-        assert_eq!(s, DamageShare::new(0.75));
-        s *= 2.0;
-        assert_eq!(s.get(), 1.5);
-        assert!(DamageShare::ZERO < s);
+        let mut damage_share = DamageShare::new(0.25);
+        damage_share += DamageShare::new(0.5);
+        assert_eq!(damage_share, DamageShare::new(0.75));
+        damage_share *= 2.0;
+        assert_eq!(damage_share.get(), 1.5);
+        assert!(DamageShare::ZERO < damage_share);
     }
 }

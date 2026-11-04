@@ -25,20 +25,20 @@ pub fn linked_techs(json: &str) -> GenieResult<BTreeMap<TechId, Linked>> {
         .linked_techs
         .iter()
         .filter_map(|g| Linked::of(&g.kind).map(|k| (g, k)))
-        .flat_map(|(g, k)| {
-            g.techs.iter().filter_map(move |&t| {
+        .flat_map(|(linked_tech_group, linked)| {
+            linked_tech_group.techs.iter().filter_map(move |&t| {
                 i16::try_from(t)
                     .ok()
                     .and_then(TechId::of_data)
-                    .map(|t| (t, k))
+                    .map(|tech_id| (tech_id, linked))
             })
         })
         .collect())
 }
 
 /// A table that is not JSON.
-fn not_json(e: serde_json::Error) -> GenieError {
-    GenieError::invalid_input("a table that is not JSON").with_source(e)
+fn not_json(error: serde_json::Error) -> GenieError {
+    GenieError::invalid_input("a table that is not JSON").with_source(error)
 }
 
 /// A unit line's value of another kind than the game reads: the entry's index and the key.
@@ -59,8 +59,11 @@ fn unit_line_value(entry: usize, key: &'static str) -> GenieError {
 ///
 /// A file that is not JSON, or a value of another kind than the game reads.
 pub fn unit_lines(json: &str) -> GenieResult<Vec<UnitLine>> {
-    let v: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
-    let Some(entries) = v.get("UnitLines").and_then(serde_json::Value::as_array) else {
+    let json_value: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
+    let Some(entries) = json_value
+        .get("UnitLines")
+        .and_then(serde_json::Value::as_array)
+    else {
         return Ok(Vec::new());
     };
     let int = |i: usize, key: &'static str, v: &serde_json::Value| {
@@ -96,7 +99,7 @@ pub fn unit_lines(json: &str) -> GenieResult<Vec<UnitLine>> {
                 None => Vec::new(),
                 Some(serde_json::Value::Array(names)) => names
                     .iter()
-                    .map(|n| text(i, n))
+                    .map(|value| text(i, value))
                     .collect::<Result<Vec<_>, _>>()?,
                 Some(name) => vec![text(i, name)?],
             };
@@ -142,12 +145,12 @@ fn object_state(i: usize, n: i64) -> GenieResult<Option<ObjectState>> {
 /// that is neither a class nor (the worker group only) -1, or a target's `object_state` past 8.
 pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
     use genie_model::objects::masters::{ClassId, MasterId};
-    let v: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
+    let json_value: serde_json::Value = serde_json::from_str(json).map_err(not_json)?;
     let num = |v: &serde_json::Value| v.as_i64().unwrap_or(-1);
     let list = |e: &serde_json::Value, key: &str| -> Vec<i64> {
         e.get(key)
             .and_then(|l| l.as_array())
-            .map_or_else(Vec::new, |l| l.iter().map(num).collect())
+            .map_or_else(Vec::new, |values| values.iter().map(num).collect())
     };
     let class = |i: usize, key: &'static str, n: i64| {
         i16::try_from(n)
@@ -155,7 +158,7 @@ pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
             .and_then(|n| ClassId::try_from(n).ok())
             .ok_or_else(|| drop_site_value("a drop site's class that is no master class", i, key))
     };
-    let Some(entries) = v["drop_site_list"].as_array() else {
+    let Some(entries) = json_value["drop_site_list"].as_array() else {
         return Ok(Vec::new());
     };
     entries
@@ -208,8 +211,8 @@ pub fn drop_sites(json: &str) -> GenieResult<Vec<DropSite>> {
                     .as_array()
                     .map_or_else(Vec::new, Vec::clone)
                     .iter()
-                    .map(|t| {
-                        AttributeId::try_from(t.get("resource_type").map_or(-1, num) as i16)
+                    .map(|value| {
+                        AttributeId::try_from(value.get("resource_type").map_or(-1, num) as i16)
                             .map_err(|_| {
                                 drop_site_value(
                                     "a drop site's attribute that is no attribute",
@@ -242,9 +245,9 @@ mod tests {
                 .collect();
             (e.reason(), context.join(", "))
         };
-        let e = drop_sites("[").unwrap_err();
-        assert_eq!(e.reason(), "a table that is not JSON");
-        assert!(StdError::source(&e).is_some());
+        let error = drop_sites("[").unwrap_err();
+        assert_eq!(error.reason(), "a table that is not JSON");
+        assert!(StdError::source(&error).is_some());
         let site = |target: &str| {
             format!(r#"{{"drop_site_list": [{{"building_id": 562, "target_list": [{target}]}}]}}"#)
         };
@@ -290,7 +293,7 @@ mod tests {
         assert_eq!(state(None).unwrap(), None);
         assert_eq!(state(Some(-2)).unwrap(), None);
         assert_eq!(
-            state(Some(9)).map_err(|e| e.reason()),
+            state(Some(9)).map_err(|error| error.reason()),
             Err("a drop site's object state past 8")
         );
     }

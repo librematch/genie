@@ -38,7 +38,11 @@ impl World {
             return master;
         }
         let tile = Tile::new(position.x() as i32, position.y() as i32);
-        let terrain = self.spatial.terrain.as_ref().and_then(|t| t.kind(tile));
+        let terrain = self
+            .spatial
+            .terrain
+            .as_ref()
+            .and_then(|tile_terrain| tile_terrain.kind(tile));
         if terrain.is_some_and(is_rice_terrain) {
             self.model.slots.master.rice_farm
         } else {
@@ -216,7 +220,10 @@ impl World {
         self.spatial
             .terrain
             .as_ref()
-            .and_then(|t| site.terrain_restriction.and_then(|r| t.restriction(r)))
+            .and_then(|terrain| {
+                site.terrain_restriction
+                    .and_then(|restriction_id| terrain.restriction(restriction_id))
+            })
             .ok_or(GenieError::unsupported(
                 "a foundation's terrain restriction the data file does not have",
             ))
@@ -229,13 +236,13 @@ impl World {
         let site = self.master(player, master)?;
         let owner = self.players.player(player)?;
         for (resource, amount, _) in cost_entries(&site.creatable_part().cost) {
-            let r = resource.index();
-            if r == 4 {
+            let index = resource.index();
+            if index == 4 {
                 return Err(GenieError::unsupported(
                     "a BUILD whose cost lists the population",
                 ));
             }
-            let held = owner.attributes.get(r).copied().unwrap_or(Amount::ZERO);
+            let held = owner.attributes.get(index).copied().unwrap_or(Amount::ZERO);
             if held < Amount::new(amount.as_f32()) {
                 return Ok(false);
             }

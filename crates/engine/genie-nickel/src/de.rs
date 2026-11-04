@@ -32,18 +32,18 @@ pub fn from_expr<T: DeserializeOwned>(expr: &Expr) -> GenieResult<T> {
         expr: expr.clone(),
         path: Vec::new(),
     })
-    .map_err(|e| {
-        if has_path(&e) {
-            e
+    .map_err(|error| {
+        if has_path(&error) {
+            error
         } else {
-            e.with("path", "(root)")
+            error.with("path", "(root)")
         }
     })
 }
 
-/// Whether `e` names its field's path.
-fn has_path(e: &GenieError) -> bool {
-    e.context().any(|(key, _)| key == "path")
+/// Whether `error` names its field's path.
+fn has_path(error: &GenieError) -> bool {
+    error.context().any(|(key, _)| key == "path")
 }
 
 /// A value and its path from the root.
@@ -59,11 +59,11 @@ impl ExprDeserializer {
     }
 
     /// An error from below that names no path yet takes this one; the root names none.
-    fn at(&self, e: GenieError) -> GenieError {
-        if self.path.is_empty() || has_path(&e) {
-            e
+    fn at(&self, error: GenieError) -> GenieError {
+        if self.path.is_empty() || has_path(&error) {
+            error
         } else {
-            e.with("path", self.path.join("."))
+            error.with("path", self.path.join("."))
         }
     }
 
@@ -99,8 +99,8 @@ impl ExprDeserializer {
             return visitor.visit_i64(i).map_err(|x| self.at(x));
         }
         let (n, d) = self.rational()?;
-        let f = round_to_f64(&n, &d).map_err(|x| self.error(x))?;
-        visitor.visit_f64(f).map_err(|x| self.at(x))
+        let rounded = round_to_f64(&n, &d).map_err(|x| self.error(x))?;
+        visitor.visit_f64(rounded).map_err(|x| self.at(x))
     }
 
     /// A bool, a string or an enum tag (as its name) of a field of any type.
@@ -108,8 +108,10 @@ impl ExprDeserializer {
         if let Some(b) = self.expr.as_bool() {
             return visitor.visit_bool(b).map_err(|x| self.at(x));
         }
-        if let Some(s) = self.expr.as_str() {
-            return visitor.visit_string(s.to_owned()).map_err(|x| self.at(x));
+        if let Some(text) = self.expr.as_str() {
+            return visitor
+                .visit_string(text.to_owned())
+                .map_err(|x| self.at(x));
         }
         if let Some(tag) = self.expr.as_enum_tag() {
             return visitor.visit_string(tag.to_owned()).map_err(|x| self.at(x));
@@ -156,14 +158,14 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
 
     fn deserialize_f32<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let (n, d) = self.rational()?;
-        let f = round_to_f32(&n, &d).map_err(|x| self.error(x))?;
-        visitor.visit_f32(f).map_err(|x| self.at(x))
+        let rounded = round_to_f32(&n, &d).map_err(|x| self.error(x))?;
+        visitor.visit_f32(rounded).map_err(|x| self.at(x))
     }
 
     fn deserialize_f64<V: Visitor<'de>>(self, visitor: V) -> GenieResult<V::Value> {
         let (n, d) = self.rational()?;
-        let f = round_to_f64(&n, &d).map_err(|x| self.error(x))?;
-        visitor.visit_f64(f).map_err(|x| self.at(x))
+        let rounded = round_to_f64(&n, &d).map_err(|x| self.error(x))?;
+        visitor.visit_f64(rounded).map_err(|x| self.at(x))
     }
 
     integer!(deserialize_i8, visit_i8, i8);
@@ -220,7 +222,7 @@ impl<'de> Deserializer<'de> for ExprDeserializer {
         let fields: Vec<(String, Expr)> = match self.expr.as_record() {
             Some(record) => record
                 .iter()
-                .filter_map(|(k, v)| v.map(|v| (k.to_owned(), v)))
+                .filter_map(|(text, v)| v.map(|expr| (text.to_owned(), expr)))
                 .collect(),
             None => return Err(self.error("not a record")),
         };
@@ -349,9 +351,11 @@ impl<'de> EnumAccess<'de> for Variant<'_> {
     type Variant = Self;
 
     fn variant_seed<T: DeserializeSeed<'de>>(self, seed: T) -> GenieResult<(T::Value, Self)> {
-        let k: StrDeserializer<'_, GenieError> = self.tag.as_str().into_deserializer();
-        let v = seed.deserialize(k).map_err(|e| self.parent.at(e))?;
-        Ok((v, self))
+        let key: StrDeserializer<'_, GenieError> = self.tag.as_str().into_deserializer();
+        let value = seed
+            .deserialize(key)
+            .map_err(|error| self.parent.at(error))?;
+        Ok((value, self))
     }
 }
 

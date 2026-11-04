@@ -130,11 +130,11 @@ fn the_models_contracts_parse_as_one_record_and_check_values() {
         &format!("let C = {text} in std.record.fields C"),
         "genie.ncl",
     );
-    let fields = fields.map(|f| f.as_array().map(|a| a.len()));
+    let fields = fields.map(|expr| expr.as_array().map(|array| array.len()));
     assert!(
         matches!(fields, Ok(Some(n)) if n > 100),
         "{:?}",
-        fields.err().map(|e| e.to_string())
+        fields.err().map(|error| error.to_string())
     );
     let spread = format!("let C = {text} in ({{ x = 1, y = 2.5, start = 0 }} | C.VolleySpread)");
     assert!(evaluate(&spread, "genie.ncl").is_ok());

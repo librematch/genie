@@ -75,7 +75,7 @@ impl UnloadPick {
             Self::Object(o) => (3, ObjectId::field(o)),
             Self::SameMaster(o) => (4, ObjectId::field(o)),
             Self::AllBut(o) => (5, ObjectId::field(o)),
-            Self::OtherMasters(o) => (6, ObjectId::field(o)),
+            Self::OtherMasters(object_id) => (6, ObjectId::field(object_id)),
             Self::Other(flag, v) => (flag, v),
         }
     }
@@ -84,7 +84,10 @@ impl UnloadPick {
     #[must_use]
     pub const fn object(self) -> Option<ObjectId> {
         match self {
-            Self::Object(o) | Self::SameMaster(o) | Self::AllBut(o) | Self::OtherMasters(o) => o,
+            Self::Object(object_id)
+            | Self::SameMaster(object_id)
+            | Self::AllBut(object_id)
+            | Self::OtherMasters(object_id) => object_id,
             Self::All(_) | Self::Player(_) | Self::Group(_) | Self::Other(..) => None,
         }
     }
@@ -93,10 +96,10 @@ impl UnloadPick {
 impl UnloadCommand {
     /// The check (`FUN_140e6f620`, [`World::unload_check`]) refuses a count past the packet's
     /// ids; the handler reads the first of them ([`World::read_units`], [`World::unload`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
-        w.unload(self, ids)
+        world.unload(self, ids)
     }
 }

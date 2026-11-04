@@ -1054,7 +1054,7 @@ fn an_unmodelled_packet_stays_raw() {
     short[2] -= 1;
     assert_eq!(raw(&short).kind(), ErrorKind::Unsupported);
     assert_eq!(
-        decode(&[0]).map_err(|e| e.kind()),
+        decode(&[0]).map_err(|error| error.kind()),
         Err(ErrorKind::InvalidInput)
     );
 }
@@ -1069,7 +1069,7 @@ fn command_its_packet_cannot_hold_is_an_error() {
             units: unit_list(object_ids(ids)),
         })
     };
-    let refused = |c: &Command| encode(c).map_err(|e| e.kind());
+    let refused = |command: &Command| encode(command).map_err(|error| error.kind());
     let most = (usize::from(u16::MAX) + 4 - packets::Stop::FIXED) / 4;
     assert_eq!(
         encode(&stop(player_id(1), vec![0; most])).map(|p| p.len()),

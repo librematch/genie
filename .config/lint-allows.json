@@ -63,7 +63,6 @@
   "crates/engine/genie-model/src/lib.rs": 1,
   "crates/formats/genie-cpx/src/read.rs": 1,
   "crates/formats/genie-scx/src/format/rge.rs": 1,
-  "crates/formats/genie-scx/src/format/tribe_read.rs": 1,
   "crates/formats/genie-scx/src/format/tribe_write.rs": 2,
   "crates/formats/genie-scx/src/player.rs": 1,
   "crates/formats/genie-scx/src/triggers/condition.rs": 1,
@@ -138,7 +137,6 @@
  },
  "clippy::struct_excessive_bools": {
   "crates/formats/genie-dat/src/unit_kind/statics.rs": 1,
-  "crates/formats/genie-rec/src/lib.rs": 1,
   "crates/formats/genie-rec/src/unit/building.rs": 1,
   "crates/formats/genie-rec/src/unit/statics.rs": 1,
   "crates/formats/genie-rec/src/unit_kind.rs": 1,
@@ -172,7 +170,7 @@
  "clippy::too_many_lines": {
   "crates/engine/genie-core/src/groups/formation/passability.rs": 1,
   "crates/engine/genie-core/src/lib.rs": 1,
-  "crates/engine/genie-core/src/unit_ai/unit.rs": 1,
+  "crates/engine/genie-core/src/unit_ai/surroundings.rs": 1,
   "crates/engine/genie-core/src/world/object_step.rs": 1,
   "crates/engine/genie-import/src/lib.rs": 1,
   "crates/engine/genie-math/src/lib.rs": 1,

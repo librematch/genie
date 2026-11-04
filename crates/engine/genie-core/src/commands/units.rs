@@ -135,15 +135,17 @@ mod tests {
 
     #[test]
     fn handler_reads_60_units_of_human_and_500_of_computer() {
-        let w = world();
+        let world = world();
         let many = unit_list(object_ids(0..600));
         assert_eq!(
-            w.read_units(player_id(1), &many)
+            world
+                .read_units(player_id(1), &many)
                 .map(<[Option<ObjectId>]>::len),
             Some(60)
         );
         assert_eq!(
-            w.read_units(player_id(2), &many)
+            world
+                .read_units(player_id(2), &many)
                 .map(<[Option<ObjectId>]>::len),
             Some(500)
         );
@@ -151,32 +153,32 @@ mod tests {
 
     #[test]
     fn check_refuses_count_past_the_ids_and_player_the_world_lacks() {
-        let w = world();
+        let world = world();
         let short = UnitList {
             count: 2,
             ids: object_ids([7]),
         };
-        assert_eq!(w.read_units(player_id(1), &short), None);
+        assert_eq!(world.read_units(player_id(1), &short), None);
         assert_eq!(
-            w.read_units(player_id(1), &UnitList::last_commanded()),
+            world.read_units(player_id(1), &UnitList::last_commanded()),
             None
         );
         assert_eq!(
-            w.read_units(player_id(3), &unit_list(object_ids([7]))),
+            world.read_units(player_id(3), &unit_list(object_ids([7]))),
             None
         );
         assert_eq!(
-            w.read_units(player_id(1), &unit_list(object_ids([7]))),
+            world.read_units(player_id(1), &unit_list(object_ids([7]))),
             Some(&object_ids([7])[..])
         );
     }
 
     #[test]
     fn refused_list_command_does_nothing_and_stops_no_one() {
-        let mut w = world();
-        let before = w.clone();
+        let mut world = world();
+        let before = world.clone();
         // BUILD of the last commanded units: its count overruns the packet (do_command's 0x66)
-        w.run(&Command::Build(BuildCommand {
+        world.run(&Command::Build(BuildCommand {
             player: player_id(1),
             master: master_id(70),
             position: Point::new(1.0, 1.0),
@@ -187,14 +189,14 @@ mod tests {
             commits: true,
             frame: Frame::of_data(0),
         }));
-        w.run(&Command::Stop(StopCommand {
+        world.run(&Command::Stop(StopCommand {
             player: player_id(1),
             units: UnitList {
                 count: 3,
                 ids: object_ids([7]),
             },
         }));
-        assert_eq!(w, before);
+        assert_eq!(world, before);
     }
 
     #[test]
@@ -242,9 +244,12 @@ mod tests {
             Err(ErrorKind::InvalidInput)
         );
         assert_eq!(
-            UnitList::try_from(ids(0x1_0000)).map_err(|e| e.kind()),
+            UnitList::try_from(ids(0x1_0000)).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
-        assert_eq!(UnitList::try_from(ids(0xfffe)).map(|l| l.count), Ok(0xfffe));
+        assert_eq!(
+            UnitList::try_from(ids(0xfffe)).map(|unit_list| unit_list.count),
+            Ok(0xfffe)
+        );
     }
 }

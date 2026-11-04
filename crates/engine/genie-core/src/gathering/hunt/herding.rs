@@ -31,29 +31,29 @@ impl HuntAction {
     /// it (slot 0x68 with master `+0x8e8`) and the timer starts at −1 s.
     pub(super) fn set_lead(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &HuntReads,
+        fight: &Fight,
+        hunt_reads: &HuntReads,
         herd: &Herd,
     ) -> GenieResult<()> {
-        self.tear_down(c.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.w.parts.mover_mut(unit.id))?;
         self.state = HuntState::Lead;
         self.lead.still_time = 0;
-        let at = f.victim.position;
+        let at = fight.victim.position;
         self.lead.start = at.ground();
         self.face_animal(
-            (unit.position(), c.w.parts.mover_mut(unit.id)),
+            (unit.position(), step.w.parts.mover_mut(unit.id)),
             at,
-            r.attack.world_time,
+            hunt_reads.attack.world_time,
         )?;
-        if let Some(g) = herd.special_graphic {
+        if let Some(graphic) = herd.special_graphic {
             new_sprite(
                 &mut unit.sprite,
-                c.w.parts.move_stats_mut(unit.id),
-                g,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.move_stats_mut(unit.id),
+                graphic,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             );
         }
         self.timer = LEAD_WAIT;
@@ -85,56 +85,62 @@ impl HuntAction {
     /// second; one farther is walked to (`set_state(4)`).
     pub(super) fn update_lead(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &HuntReads,
+        fight: &Fight,
+        hunt_reads: &HuntReads,
         roles: &Roles,
     ) -> GenieResult<HuntNext> {
         if self.target.is_none() {
             self.state = HuntState::Search;
             return Ok(HuntNext::Search);
         }
-        let herd = r.herd.ok_or(GenieError::unsupported(
+        let herd = hunt_reads.herd.ok_or(GenieError::unsupported(
             "a hunt leading livestock unprepared",
         ))?;
         if herd.idle {
-            self.start_attack(c, unit, &herd, roles)?;
+            self.start_attack(step, unit, &herd, roles)?;
             return Ok(HuntNext::Stay);
         }
-        self.timer += c.dt.seconds();
+        self.timer += step.dt.seconds();
         if self.timer < Seconds::ZERO {
             return Ok(HuntNext::Stay);
         }
-        let v = f.victim.position;
-        if v.x() == self.lead.start.x() && v.y() == self.lead.start.y() {
-            self.start_attack(c, unit, &herd, roles)?;
+        let position = fight.victim.position;
+        if position.x() == self.lead.start.x() && position.y() == self.lead.start.y() {
+            self.start_attack(step, unit, &herd, roles)?;
             return Ok(HuntNext::Stay);
         }
-        let ground =
-            c.w.parts
-                .mover_of(unit.id)
-                .map(|m| m.stats.radius.ground())
-                .ok_or(HUNTER_UNMOVING)?;
-        if footprint_gap_squared(unit.place.position(), ground, v, f.victim.radius) <= LEAD_REACH {
-            self.lead.start = v.ground();
+        let ground = step
+            .w
+            .parts
+            .mover_of(unit.id)
+            .map(|mover| mover.stats.radius.ground())
+            .ok_or(HUNTER_UNMOVING)?;
+        if footprint_gap_squared(unit.place.position(), ground, position, fight.victim.radius)
+            <= LEAD_REACH
+        {
+            self.lead.start = position.ground();
             self.face_animal(
-                (unit.position(), c.w.parts.mover_mut(unit.id)),
-                v,
-                r.attack.world_time,
+                (unit.position(), step.w.parts.mover_mut(unit.id)),
+                position,
+                hunt_reads.attack.world_time,
             )?;
             self.timer = LEAD_WAIT;
             return Ok(HuntNext::Stay);
         }
-        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-        let player = f.own.player;
+        let walks = hunt_reads.walks(
+            &step.w.model.graphics,
+            (unit, step.w.parts.mover_of(unit.id)),
+        );
+        let player = fight.own.player;
         self.set_walk(
-            (&c.w.spatial, unit.position()),
-            c.w.parts.motion_mut(unit.id),
-            &f.victim,
+            (&step.w.spatial, unit.position()),
+            step.w.parts.motion_mut(unit.id),
+            &fight.victim,
             player,
             &walks,
-            &c.w.model,
+            &step.w.model,
         )?;
         Ok(HuntNext::Stay)
     }
@@ -146,15 +152,15 @@ impl HuntAction {
     /// world at once ([`Victim::decay`]). Otherwise it does nothing.
     pub(super) fn decay_check(
         &self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         hunter: &mut Unit,
         actions: &mut Action,
         decay: DecayRule,
-        f: &mut Fight,
+        fight: &mut Fight,
         roles: &Roles,
     ) -> GenieResult<()> {
-        if self.stops_decay_of(decay, &mut f.victim, roles) {
-            write_target_back(c, hunter, actions, f, roles)?;
+        if self.stops_decay_of(decay, &mut fight.victim, roles) {
+            write_target_back(step, hunter, actions, fight, roles)?;
         }
         Ok(())
     }

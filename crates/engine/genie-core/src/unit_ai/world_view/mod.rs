@@ -119,13 +119,13 @@ pub(crate) struct Foreign<'a> {
 
 impl<'a> Foreign<'a> {
     /// Player `q`, unless it is the one whose list is out.
-    pub(crate) fn player(&self, q: PlayerId) -> Option<&'a Player> {
-        let q = q.index();
+    pub(crate) fn player(&self, player_id: PlayerId) -> Option<&'a Player> {
+        let index = player_id.index();
         let own = self.before.len();
-        match q.cmp(&own) {
-            Ordering::Less => self.before.get(q),
+        match index.cmp(&own) {
+            Ordering::Less => self.before.get(index),
             Ordering::Equal => None,
-            Ordering::Greater => self.after.get(q - own - 1),
+            Ordering::Greater => self.after.get(index - own - 1),
         }
     }
 }
@@ -145,17 +145,19 @@ pub(crate) struct OwnerView {
 
 impl OwnerView {
     /// The owner's side: player `new`'s when the unit changed hands to it in its update, else
-    /// the updating player's (`c`).
+    /// the updating player's (`step`).
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn of(c: &Step<'_>, new: Option<PlayerId>) -> GenieResult<Self> {
-        let taker = new.filter(|&n| n != c.player);
-        let Some((new, q)) = taker.and_then(|n| Some((n, c.w.players.get(n.index())?))) else {
-            let owner = c.w.players.player(c.player)?;
+    pub(crate) fn of(step: &Step<'_>, new: Option<PlayerId>) -> GenieResult<Self> {
+        let taker = new.filter(|&n| n != step.player);
+        let Some((new, player)) =
+            taker.and_then(|player_id| Some((player_id, step.w.players.get(player_id.index())?)))
+        else {
+            let owner = step.w.players.player(step.player)?;
             return Ok(Self {
-                player: c.player,
+                player: step.player,
                 new_owner: None,
                 civ: owner.civ,
                 ai_settings: owner.ai_settings,
@@ -164,8 +166,8 @@ impl OwnerView {
         Ok(Self {
             player: new,
             new_owner: Some(new),
-            civ: q.civ,
-            ai_settings: q.ai_settings,
+            civ: player.civ,
+            ai_settings: player.ai_settings,
         })
     }
 
@@ -174,27 +176,27 @@ impl OwnerView {
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub(crate) fn relations(self, w: &World) -> GenieResult<&Relations> {
-        Ok(&w.players.player(self.player)?.relations)
+    pub(crate) fn relations(self, world: &World) -> GenieResult<&Relations> {
+        Ok(&world.players.player(self.player)?.relations)
     }
 }
 
-/// The objects as the unit AI of player `p`'s updating unit reads them: the update's view of
-/// `players`, or for a unit player `new` took over in its update, that player's live list as its
+/// The objects as the unit AI of player `player_id`'s updating unit reads them: the update's view
+/// of `players`, or for a unit player `new` took over in its update, that player's live list as its
 /// own and the old owner's among the others' ([`OthersRef::changed_hands`]).
 pub(crate) fn owner_view<'a>(
     players: &'a [Player],
     index: &'a ObjectIndex,
-    p: PlayerId,
+    player_id: PlayerId,
     new: Option<PlayerId>,
 ) -> GenieResult<OthersRef<'a>> {
-    Ok(changed_view(OthersRef::of(players, index, p)?, new))
+    Ok(changed_view(OthersRef::of(players, index, player_id)?, new))
 }
 
 /// `view` as the unit AI of a unit player `new` took over reads it ([`owner_view`]).
 pub(crate) fn changed_view(view: OthersRef<'_>, new: Option<PlayerId>) -> OthersRef<'_> {
     match new.and_then(|new| Some((new, view.players().player(new)?))) {
-        Some((new, q)) => view.changed_hands(new, &q.objects),
+        Some((new, player)) => view.changed_hands(new, &player.objects),
         None => view,
     }
 }

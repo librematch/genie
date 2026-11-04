@@ -35,32 +35,34 @@ impl Unit {
     /// A player the world does not hold, or what the death does not model.
     fn built_building_died(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         master: &Master,
     ) -> GenieResult<Option<(MasterId, TechId)>> {
         // FUN_1411dbb70 to state 3 from 2: the storage leaves (FUN_1411e63f0), the owner's
         // watched list lets it go (FUN_141091310), the tiles unlink (FUN_140f65580), and
         // a monastery's, wonder's or castle's count leaves, at least 0 left
-        let player_kind = c.w.players.player(c.player)?.kind;
-        let (id, annex_of) = (self.id, c.w.parts.building_of(self.id).annex_of);
+        let player_kind = step.w.players.player(step.player)?.kind;
+        let (id, annex_of) = (self.id, step.w.parts.building_of(self.id).annex_of);
         let death = built_death(
-            (self, c.w.parts.combat_mut(id)?),
+            (self, step.w.parts.combat_mut(id)?),
             annex_of,
             master,
             player_kind,
-            &c.w.model.roles,
-            c.w.model.slots,
+            &step.w.model.roles,
+            step.w.model.slots,
         )?;
-        c.w.players
-            .player_mut(c.player)?
+        step.w
+            .players
+            .player_mut(step.player)?
             .add_attributes(death.adds)?;
-        c.w.unwatch(c.player, self.id)?;
-        if let (Some(v), Some(at)) = (c.w.spatial.sight.as_mut(), death.unlink) {
-            v.unlink_building(at, master.radius, c.w.model.tuning.visibility)?;
+        step.w.unwatch(step.player, self.id)?;
+        if let (Some(visibility), Some(at)) = (step.w.spatial.sight.as_mut(), death.unlink) {
+            visibility.unlink_building(at, master.radius, step.w.model.tuning.visibility)?;
         }
         if let Some(kind) = death.building.count {
-            c.w.players
-                .player_mut(c.player)?
+            step.w
+                .players
+                .player_mut(step.player)?
                 .take_at_least_zero(kind, Amount::new(1.0))?;
         }
         Ok(death.building.tech)
@@ -79,12 +81,12 @@ impl Unit {
     pub(crate) fn died(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         before: ObjectState,
         roles: &Roles,
     ) -> GenieResult<()> {
         // its master as the death starts: the world's calls below change other objects
-        let master = &self.master(c.w.master_tables(), c.player)?.clone();
+        let master = &self.master(step.w.master_tables(), step.player)?.clone();
         // the last building of a master with a technology withdraws it, after the combat part
         let mut tech = None;
         if master.kind == MasterKind::BUILDING {
@@ -92,18 +94,18 @@ impl Unit {
             // each slot (`+0xbc0`..) clears and its annex's `+0xbb8` with it, and each annex takes
             // the building's hit points (`+0x278`), so it dies in its own update; the set_state
             // (FUN_1411dbb70) then finds no annex to take along
-            let annexes = c.w.parts.building_of(self.id).annexes;
-            c.w.parts.building_mut(self.id)?.annexes.clear();
+            let annexes = step.w.parts.building_of(self.id).annexes;
+            step.w.parts.building_mut(self.id)?.annexes.clear();
             for annex in annexes.ids() {
-                if let Some((a, layer)) = c.w.object_and_layer_mut(annex)? {
+                if let Some((unit, layer)) = step.w.object_and_layer_mut(annex)? {
                     layer.annex_of = None;
-                    a.life.hp = self.life.hp;
+                    unit.life.hp = self.life.hp;
                 }
             }
             if before == ObjectState::Alive {
-                tech = self.built_building_died(c, master)?;
+                tech = self.built_building_died(step, master)?;
             } else if before == ObjectState::Foundation {
-                self.foundation_died(actions, c, master, roles)?;
+                self.foundation_died(actions, step, master, roles)?;
             }
         } else if master.kind != MasterKind::COMBAT {
             // a static object's dying sprite is the lifecycle's ([`Lifecycle::die`]); an
@@ -114,53 +116,56 @@ impl Unit {
                 && self.life.dying_sprite.is_some()
                 && let Some(id) = dying(master, None)
             {
-                self.show_dying(c, id)?;
+                self.show_dying(step, id)?;
             }
             return Ok(());
         }
         combat_dies(
             self,
-            c.w.parts.building_of(self.id),
+            step.w.parts.building_of(self.id),
             master,
-            &mut c.w.spatial,
-            &mut c.w.pathing,
+            &mut step.w.spatial,
+            &mut step.w.pathing,
             roles,
-            c.w.model.tuning.visibility,
+            step.w.model.tuning.visibility,
         )?;
         if before == ObjectState::Alive {
             // FUN_14121cc40: the paid cost leaves attributes 98 and 164 (a building's 98 and
             // 165), each at least 0 (slots 0xf8, then 0xf0 with 0)
-            let owner = c.w.players.player_mut(c.player)?;
+            let owner = step.w.players.player_mut(step.player)?;
             for (kind, cost) in refund_of(
                 master,
-                c.w.parts.building_of(self.id).annex_of,
+                step.w.parts.building_of(self.id).annex_of,
                 roles,
-                c.w.model.slots,
+                step.w.model.slots,
             ) {
                 owner.take_at_least_zero(kind, cost)?;
             }
         }
-        if let Some((m, t)) = tech {
+        if let Some((master_id, tech_id)) = tech {
             // FUN_141166ab0 finds no other of the master standing (the building lent to the
             // world for the scan), then FUN_1413d4ec0
-            let p = c.player;
-            c.lend((&mut *self, &mut *actions), |w| w.withdraw_tech(p, m, t))?;
+            let player_id = step.player;
+            step.lend((&mut *self, &mut *actions), |world| {
+                world.withdraw_tech(player_id, master_id, tech_id)
+            })?;
         }
         // the static update's sprite after the death (0x14118ad50): a building's by its build
         // points (its destruction sprite unbuilt), any other combat object's slot 0x7a0's
-        let look = c.w.parts.combat_of(self.id).abilities.look.as_ref();
+        let look = step.w.parts.combat_of(self.id).abilities.look.as_ref();
         let shown = if master.kind == MasterKind::BUILDING {
-            let built =
-                c.w.parts
-                    .building_of(self.id)
-                    .construction
-                    .ok_or(NO_CONSTRUCTION)?;
+            let built = step
+                .w
+                .parts
+                .building_of(self.id)
+                .construction
+                .ok_or(NO_CONSTRUCTION)?;
             building_death(master, look, built.progress)
         } else {
             dying(master, look)
         };
         if let Some(id) = shown {
-            self.show_dying(c, id)?;
+            self.show_dying(step, id)?;
         }
         Ok(())
     }
@@ -169,14 +174,20 @@ impl Unit {
     /// ([`crate::objects::sprite::top_speed`]: the deer 9655 of MarvinBlue/426048731, running at
     /// 1.4003 when the spears kill it in update 3147, moves at its master's 0.737 with its
     /// dying sprite).
-    fn show_dying(&mut self, c: &mut Step<'_>, id: SpriteId) -> GenieResult<()> {
-        let g = c.w.model.graphics.get(id).copied().ok_or(NO_DYING_SPRITE)?;
+    fn show_dying(&mut self, step: &mut Step<'_>, id: SpriteId) -> GenieResult<()> {
+        let graphic = step
+            .w
+            .model
+            .graphics
+            .get(id)
+            .copied()
+            .ok_or(NO_DYING_SPRITE)?;
         new_sprite(
             &mut self.sprite,
-            c.w.parts.move_stats_mut(self.id),
-            g,
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.move_stats_mut(self.id),
+            graphic,
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         );
         Ok(())
     }
@@ -192,44 +203,47 @@ impl Unit {
     pub(crate) fn foundation_died(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         master: &Master,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let ai = c.w.parts.unit_ai.contains(self.id);
-        let construction =
-            c.w.parts
-                .building_mut(self.id)?
-                .construction
-                .as_mut()
-                .ok_or(NO_CONSTRUCTION)?;
+        let ai = step.w.parts.unit_ai.contains(self.id);
+        let construction = step
+            .w
+            .parts
+            .building_mut(self.id)?
+            .construction
+            .as_mut()
+            .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
             master: Some(master),
-            farm_bonus: farm_bonus(&c.w.players.player(c.player)?.attributes),
-            masters: c.w.model.masters.of(c.player),
-            player_kind: c.w.players.player(c.player)?.kind,
+            farm_bonus: farm_bonus(&step.w.players.player(step.player)?.attributes),
+            masters: step.w.model.masters.of(step.player),
+            player_kind: step.w.players.player(step.player)?.kind,
             ai,
         };
         let part = completion.first_part(construction, roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
-        let k = key(
-            c.w.model.masters.of(c.player),
-            &c.w.model.lines,
+        let key = key(
+            step.w.model.masters.of(step.player),
+            &step.w.model.lines,
             self.life.master_id,
             roles,
         );
-        c.w.players
-            .player_mut(c.player)?
+        step.w
+            .players
+            .player_mut(step.player)?
             .tracker
-            .complete(self.id, k);
-        c.w.players
-            .player_mut(c.player)?
+            .complete(self.id, key);
+        step.w
+            .players
+            .player_mut(step.player)?
             .add_attributes(part.attributes)?;
         // a pasture's livestock and a mule cart's search (from state 0), the foundation lent to
         // the world for what they place and search
         if part.pasture || part.cart {
-            let (p, id) = (c.player, self.id);
-            c.lend((&mut *self, &mut *actions), |w| {
+            let (p, id) = (step.player, self.id);
+            step.lend((&mut *self, &mut *actions), |w| {
                 if part.pasture {
                     w.setup_pasture(p, PastureId::new(id))?;
                 }
@@ -239,24 +253,26 @@ impl Unit {
                 Ok(())
             })?;
         }
-        let (layer, mover) = c.w.parts.building_and_mover_mut(self.id)?;
+        let (layer, mover) = step.w.parts.building_and_mover_mut(self.id)?;
         let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
         let started = Construction::begin(
             self.id,
             construction,
             mover,
-            &mut c.w.spatial,
-            &mut c.w.pathing,
-            c.w.world_time,
+            &mut step.w.spatial,
+            &mut step.w.pathing,
+            step.w.world_time,
             SightLayer {
                 roles,
-                visibility_tuning: c.w.model.tuning.visibility,
+                visibility_tuning: step.w.model.tuning.visibility,
             },
         )?;
         if started == ConstructionStart::Begun {
-            c.w.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
-            let (p, id) = (c.player, self.id);
-            c.lend((&mut *self, &mut *actions), |w| w.watch_started(p, id))?;
+            step.w.parts.combat_mut(self.id)?.firepower = master.creatable_part().volley_fire;
+            let (player_id, id) = (step.player, self.id);
+            step.lend((&mut *self, &mut *actions), |world| {
+                world.watch_started(player_id, id)
+            })?;
         }
         Ok(())
     }

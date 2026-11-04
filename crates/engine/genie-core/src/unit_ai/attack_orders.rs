@@ -163,7 +163,7 @@ impl UnitAi {
         ) {
             return side.may_attack(target, &self.seeker(at));
         }
-        let Some(t) = Self::world_object(target, at, side)? else {
+        let Some(unit_seen) = Self::world_object(target, at, side)? else {
             return Ok(None);
         };
         let may = match self.ai_kind {
@@ -180,9 +180,10 @@ impl UnitAi {
             | UnitAiKind::SiegeTower
             | UnitAiKind::Livestock => true,
             UnitAiKind::Lion => {
-                rules == TargetRules::Any || lion_may_attack(at.attack_priority, t.class, roles)
+                rules == TargetRules::Any
+                    || lion_may_attack(at.attack_priority, unit_seen.class, roles)
             }
-            UnitAiKind::Civilian => civilian_may_attack(at.attack_priority, t.class, roles),
+            UnitAiKind::Civilian => civilian_may_attack(at.attack_priority, unit_seen.class, roles),
             // FUN_140c18b60
             UnitAiKind::Building => false,
             _ => {
@@ -191,7 +192,7 @@ impl UnitAi {
                 ));
             }
         };
-        Ok(may.then_some((t.class, t.position)))
+        Ok(may.then_some((unit_seen.class, unit_seen.position)))
     }
 
     /// The unit's attack command (slot 0x338, [`UnitView::attack`]) on `target`, `force`d or not,
@@ -230,18 +231,25 @@ impl UnitAi {
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
         let roles = &at.roles;
-        let t = match at.unit(target) {
+        let target_unit_seen = match at.unit(target) {
             Some(t) => *t,
             None => match side.seen_unit(target)? {
-                Some(t) => t,
+                Some(unit_seen) => unit_seen,
                 None => return Ok(Answer::NotTaken),
             },
         };
         if roles
-            .of_class(t.class)
+            .of_class(target_unit_seen.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR | ClassRoles::TREE)
         {
-            self.hunt_object(target, t.class, t.position, at, side, rng)?;
+            self.hunt_object(
+                target,
+                target_unit_seen.class,
+                target_unit_seen.position,
+                at,
+                side,
+                rng,
+            )?;
             return Ok(Answer::Taken);
         }
         self.attack_object(target, OrderForce::Forced, TargetRules::Own, at, side)
@@ -260,8 +268,9 @@ impl UnitAi {
         }
         // none (−1) is an object the world does not hold
         self.attackers.remove_first(|id| {
-            id.and_then(|id| at.unit(id))
-                .is_none_or(|u| ObjectState::Alive < u.state || u.target != Some(at.id))
+            id.and_then(|id| at.unit(id)).is_none_or(|unit_seen| {
+                ObjectState::Alive < unit_seen.state || unit_seen.target != Some(at.id)
+            })
         });
     }
 }

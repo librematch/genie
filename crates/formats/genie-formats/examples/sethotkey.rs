@@ -57,7 +57,7 @@ fn main() -> anyhow::Result<()> {
         cli_input.alt,
         cli_input.shift,
     )?;
-    let mut f = File::create(&cli_input.file_name)?;
-    info.write_to(&mut f)?;
+    let mut file = File::create(&cli_input.file_name)?;
+    info.write_to(&mut file)?;
     Ok(())
 }

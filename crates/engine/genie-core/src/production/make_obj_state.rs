@@ -45,8 +45,8 @@ impl MakeObjState {
 }
 
 impl genie_diff::Diff for MakeObjState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -57,10 +57,10 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match MakeObjState::of_byte(b) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 2..=5 | 7..=9 | 11..), "{b}"),
+        for index in 0..=255_u8 {
+            match MakeObjState::of_byte(index) {
+                Ok(make_obj_state) => assert_eq!(make_obj_state.get(), index),
+                Err(_) => assert!(matches!(index, 2..=5 | 7..=9 | 11..), "{index}"),
             }
         }
         assert_eq!(MakeObjState::NoSpot.to_string(), "10");

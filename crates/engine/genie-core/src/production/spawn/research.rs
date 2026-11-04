@@ -48,57 +48,63 @@ impl World {
         }))
     }
 
-    /// The technology `tech` of a research at player `p`'s building: its index in the player's
-    /// tree and the `.dat`'s record (RESEARCH queued only technologies of both).
+    /// The technology `tech` of a research at player `player_id`'s building: its index in the
+    /// player's tree and the `.dat`'s record (RESEARCH queued only technologies of both).
     pub(super) fn research_tech(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         tech: TechId,
     ) -> GenieResult<(usize, &TechDef)> {
-        let tree = self.players.player(p)?.techs.len();
-        let t = Some(tech.index())
-            .filter(|&t| t < tree)
+        let tree = self.players.player(player_id)?.techs.len();
+        let tech_index =
+            Some(tech.index())
+                .filter(|&t| t < tree)
+                .ok_or(GenieError::unsupported(
+                    "a research of a technology the tree has not got",
+                ))?;
+        let def = self
+            .model
+            .techs
+            .get(tech_index)
             .ok_or(GenieError::unsupported(
-                "a research of a technology the tree has not got",
+                "a technology the data file has not got",
             ))?;
-        let def = self.model.techs.get(t).ok_or(GenieError::unsupported(
-            "a technology the data file has not got",
-        ))?;
-        Ok((t, def))
+        Ok((tech_index, def))
     }
 
-    /// The research's update (slot 0x30, `0x140ad2a20`) at the building at `i` of player `p`:
-    /// in state 1 it is done, in a state other than 6 it waits; in state 6 the building's work rate (its powerup and its master's rate) times dt adds to
-    /// the progress, 32767 once the technology was researched 0x100 times, which the
-    /// technology's work done takes; a repeatable technology or one of the shared kind turns to
-    /// state 2 first. The research is done once the progress reaches the location's time,
-    /// times the research time modifier (attribute 86, above 0 and not an age), plus its
-    /// adjustment ([`World::research_done`]). Not held: the human player's sound; not
-    /// modelled: a computer player's handicaps and the game's instant work (`FUN_140c884c0`,
-    /// 0 as the tick oracle holds it).
+    /// The research's update (slot 0x30, `0x140ad2a20`) at the building at `list_index` of player
+    /// `player_id`: in state 1 it is done, in a state other than 6 it waits; in state 6 the
+    /// building's work rate (its powerup and its master's rate) times dt adds to the progress,
+    /// 32767 once the technology was researched 0x100 times, which the technology's work done
+    /// takes; a repeatable technology or one of the shared kind turns to state 2 first. The
+    /// research is done once the progress reaches the location's time, times the research time
+    /// modifier (attribute 86, above 0 and not an age), plus its adjustment
+    /// ([`World::research_done`]). Not held: the human player's sound; not modelled: a computer
+    /// player's handicaps and the game's instant work (`FUN_140c884c0`, 0 as the tick oracle holds
+    /// it).
     pub(super) fn research_step(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
-        r: MakeTech,
+        (player_id, list_index): (PlayerId, ListIndex),
+        make_tech: MakeTech,
         dt_seconds: Seconds,
     ) -> GenieResult<UpdateCode> {
         use crate::technology::Attributes;
-        if self.players.player(p)?.kind.is_computer() {
+        if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's research (its handicaps)",
             ));
         }
-        let owner = self.players.player(p)?;
-        let building = owner.objects.checked(i)?;
-        match r.state {
+        let owner = self.players.player(player_id)?;
+        let building = owner.objects.checked(list_index)?;
+        match make_tech.state {
             MakeTechState::Done => return Ok(UpdateCode::Done),
             MakeTechState::Researching => {}
             MakeTechState::New => return Ok(UpdateCode::UnderWay),
         }
-        let (t, def) = self.research_tech(p, r.tech)?;
+        let (t, def) = self.research_tech(player_id, make_tech.tech)?;
         let master = building.life.master_id;
         let rate = self.parts.combat_of(building.id).work_rate_powerup
-            + self.master(p, master)?.action_part().work_rate;
+            + self.master(player_id, master)?.action_part().work_rate;
         let state = owner.techs.checked(t)?;
         let repeatable = state.repeatable(def, RepeatLimit::Own);
         let shared = def.kind == TechKind::SHARED;
@@ -110,19 +116,19 @@ impl World {
                 "a research at a technology without locations",
             ))?;
         let times = state.times_researched.get();
-        let owner = self.players.player_mut(p)?;
+        let owner = self.players.player_mut(player_id)?;
         let state = owner.techs.checked_mut(t)?;
         if state.state != ResearchState::Researching && (repeatable || shared) {
             state.state = ResearchState::Researching;
         }
-        let mut progress = r.progress + Seconds::new(rate * dt_seconds);
+        let mut progress = make_tech.progress + Seconds::new(rate * dt_seconds);
         if 0xff < times {
             progress = Seconds::new(32767.0);
         }
         state.research_done = progress;
-        let id = owner.objects.checked(i)?.id;
+        let id = owner.objects.checked(list_index)?.id;
         set_progress(self.parts.production.get_mut(id), progress);
-        if research_time(&location, r.tech, time_modifier) <= progress {
+        if research_time(&location, make_tech.tech, time_modifier) <= progress {
             if 0xff < times {
                 return Err(GenieError::unsupported(
                     "a research done 0x100 times (set_state 1)",
@@ -133,7 +139,7 @@ impl World {
             } else {
                 Repeat::Denied
             };
-            self.research_done(p, i, r.tech, master, repeat)?;
+            self.research_done(player_id, list_index, make_tech.tech, master, repeat)?;
             return Ok(UpdateCode::Done);
         }
         Ok(UpdateCode::UnderWay)
@@ -154,15 +160,15 @@ impl World {
     /// [`TechState::repeatable`]: crate::technology::TechState::repeatable
     pub(super) fn research_done(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        t: TechId,
+        player_id: PlayerId,
+        list_index: ListIndex,
+        tech_id: TechId,
         master: MasterId,
         repeat: Repeat,
     ) -> GenieResult<()> {
         use crate::technology::Attributes;
-        let (tech, t) = (t, t.index());
-        let owner = self.players.player(p)?;
+        let (tech, t) = (tech_id, tech_id.index());
+        let owner = self.players.player(player_id)?;
         let state = owner.techs.checked(t)?;
         let def = self.model.techs.checked(t)?;
         if state.state == ResearchState::Researching || repeat == Repeat::Allowed {
@@ -177,17 +183,20 @@ impl World {
             }
             let adjustment = state
                 .location(master)
-                .map_or(Seconds::ZERO, |l| l.adjustment);
+                .map_or(Seconds::ZERO, |location| location.adjustment);
             if repeat == Repeat::Allowed || Seconds::new(time) + adjustment <= state.research_done {
-                let _ = self.complete_research(p, tech, Some(master))?;
+                let _ = self.complete_research(player_id, tech, Some(master))?;
             }
         }
-        let building = self.players.live_mut(p, i)?;
+        let building = self.players.live_mut(player_id, list_index)?;
         let (id, state) = (building.id, building.life.state);
-        if let Some(Some(Making::Research(r))) =
-            self.parts.production.get_mut(id).map(|q| q.action.as_mut())
+        if let Some(Some(Making::Research(make_tech))) = self
+            .parts
+            .production
+            .get_mut(id)
+            .map(|production| production.action.as_mut())
         {
-            r.state = MakeTechState::Done;
+            make_tech.state = MakeTechState::Done;
         }
         if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
@@ -205,12 +214,12 @@ impl World {
         let reward = cvttss2si(
             (self
                 .players
-                .player(p)?
+                .player(player_id)?
                 .get(self.model.slots.attribute.world_effect)?)
             .get(),
         ) as i16;
         if 0 < reward {
-            self.do_table_effect(p, EffectId::of_data(reward), Some(id))?;
+            self.do_table_effect(player_id, EffectId::of_data(reward), Some(id))?;
         }
         Ok(())
     }
@@ -221,20 +230,20 @@ impl World {
     /// failed (0x1f9 with 0x26c).
     fn research_failed(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        r: &MakeTech,
+        player_id: PlayerId,
+        list_index: ListIndex,
+        make_tech: &MakeTech,
         t: usize,
     ) -> GenieResult<()> {
-        if !r.paid {
+        if !make_tech.paid {
             let def = self.model.techs.checked(t)?;
-            let owner = self.players.player_mut(p)?;
+            let owner = self.players.player_mut(player_id)?;
             let mut state = take(owner.techs.checked_mut(t)?);
-            let done = refund_tech(&mut state, def, r.tech, owner, self.model.slots);
+            let done = refund_tech(&mut state, def, make_tech.tech, owner, self.model.slots);
             *owner.techs.checked_mut(t)? = state;
             let _ = done?;
         }
-        let building = self.players.live_mut(p, i)?;
+        let building = self.players.live_mut(player_id, list_index)?;
         let (id, state) = (building.id, building.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
@@ -249,34 +258,34 @@ impl World {
         Ok(())
     }
 
-    /// The research action's destructor (`FUN_140ad0be0`) at the building at `i` of player
-    /// `p`. Done (state 1), the human player's sound is the interface's; else, while the game is
-    /// not over, a research made unpaid (`+0x60` clear) gives its technology's costs back
-    /// ([`crate::production::refund_tech`]) and the building's unit AI is told the research
-    /// failed (0x1f9 with 0x26c). Then a technology of the shared kind (`FUN_1413d1020`) is in
-    /// state 1 again, neither researched nor queued; another that stacks below its cap (`+0x56`,
-    /// 0x100 above 0x7fff; the player's `+0x648`, which would count too, is not held) takes the
-    /// action's progress as its work done and, done (the progress at least the `.dat`'s time at
-    /// the building times the research time modifier, above 0 and not an age, plus the
-    /// location's adjustment; `COMISS`, `SETNC`), counts one more researched and one less
-    /// queued, in state 1 while one more stays below the cap and it may be queued again (its
-    /// `+0xe` set and its effect no upgrade), else in state 3; not done, state 1.
+    /// The research action's destructor (`FUN_140ad0be0`) at the building at `list_index` of player
+    /// `player_id`. Done (state 1), the human player's sound is the interface's; else, while the
+    /// game is not over, a research made unpaid (`+0x60` clear) gives its technology's costs back
+    /// ([`crate::production::refund_tech`]) and the building's unit AI is told the research failed
+    /// (0x1f9 with 0x26c). Then a technology of the shared kind (`FUN_1413d1020`) is in state 1
+    /// again, neither researched nor queued; another that stacks below its cap (`+0x56`, 0x100
+    /// above 0x7fff; the player's `+0x648`, which would count too, is not held) takes the action's
+    /// progress as its work done and, done (the progress at least the `.dat`'s time at the building
+    /// times the research time modifier, above 0 and not an age, plus the location's adjustment;
+    /// `COMISS`, `SETNC`), counts one more researched and one less queued, in state 1 while one
+    /// more stays below the cap and it may be queued again (its `+0xe` set and its effect no
+    /// upgrade), else in state 3; not done, state 1.
     pub(super) fn research_destroyed(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
-        r: &MakeTech,
+        player_id: PlayerId,
+        list_index: ListIndex,
+        make_tech: &MakeTech,
     ) -> GenieResult<()> {
         use crate::technology::Attributes;
-        let (t, _) = self.research_tech(p, r.tech)?;
-        if r.state != MakeTechState::Done && self.game_state == PlayState::Playing {
-            self.research_failed(p, i, r, t)?;
+        let (t, _) = self.research_tech(player_id, make_tech.tech)?;
+        if make_tech.state != MakeTechState::Done && self.game_state == PlayState::Playing {
+            self.research_failed(player_id, list_index, make_tech, t)?;
         }
         let def = self.model.techs.checked(t)?;
-        let owner = self.players.player(p)?;
+        let owner = self.players.player(player_id)?;
         let state = owner.techs.checked(t)?;
         if def.kind == TechKind::SHARED {
-            let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
+            let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
             state.state = ResearchState::Available;
             state.times_researched = ResearchCount::ZERO;
             state.pending = ResearchCount::ZERO;
@@ -292,7 +301,7 @@ impl World {
                 .effects
                 .get(def.effect_id)
                 .is_some_and(Effect::upgrades);
-        let master = owner.objects.checked(i)?.life.master_id;
+        let master = owner.objects.checked(list_index)?.life.master_id;
         let mut time = def
             .locations
             .iter()
@@ -300,14 +309,14 @@ impl World {
             .map_or(-1.0, |l| Seconds::of_master(l.1).get());
         let adjustment = state
             .location(master)
-            .map_or(Seconds::ZERO, |l| l.adjustment);
+            .map_or(Seconds::ZERO, |location| location.adjustment);
         let modifier = owner.get(self.model.slots.attribute.research_time_modifier)?;
-        if !is_age(r.tech) && Amount::ZERO < modifier {
+        if !is_age(make_tech.tech) && Amount::ZERO < modifier {
             time *= modifier.get();
         }
-        let done = adjustment + Seconds::new(time) <= r.progress;
-        let state = self.players.player_mut(p)?.techs.checked_mut(t)?;
-        state.research_done = r.progress;
+        let done = adjustment + Seconds::new(time) <= make_tech.progress;
+        let state = self.players.player_mut(player_id)?.techs.checked_mut(t)?;
+        state.research_done = make_tech.progress;
         if done {
             state.times_researched = state.times_researched.plus(1);
             state.pending = state.pending.minus(1);
@@ -325,8 +334,8 @@ impl World {
 
 /// The research action of a building's `production` takes the progress `progress`.
 fn set_progress(production: Option<&mut Production>, progress: Seconds) {
-    if let Some(Some(Making::Research(r))) = production.map(|q| q.action.as_mut()) {
-        r.progress = progress;
+    if let Some(Some(Making::Research(make_tech))) = production.map(|q| q.action.as_mut()) {
+        make_tech.progress = progress;
     }
 }
 

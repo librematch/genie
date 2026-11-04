@@ -185,7 +185,11 @@ mod tests {
         lists[UnitRelation::Own] = 10;
         assert_eq!(lists[UnitRelation::Own], 10);
         assert_eq!(lists.values(), &[0, 10, 2, 3, 4]);
-        let order: Vec<u8> = lists.iter().rev().map(|(r, _)| r.get()).collect();
+        let order: Vec<u8> = lists
+            .iter()
+            .rev()
+            .map(|(unit_relation, _)| unit_relation.get())
+            .collect();
         assert_eq!(order, [4, 3, 2, 1, 0]);
         assert_eq!(lists.map(|v| v * 2).values(), &[0, 20, 4, 6, 8]);
     }

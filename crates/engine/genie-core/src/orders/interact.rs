@@ -92,7 +92,10 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let speed = master
+            .move_stats
+            .as_ref()
+            .map_or(Speed::ZERO, |move_stats| move_stats.speed);
         let still = master.kind < MasterKind::MOVING
             || (!self
                 .model
@@ -151,9 +154,10 @@ impl World {
         let state = unit.life.state;
         match self.parts.unit_ai.get_mut(unit.id) {
             Some(ai) if queues(ai) => {
-                let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
-                    (Some(OrderTargetKind::of_master(m)), Some(o))
-                });
+                let (target_kind, target_owner) =
+                    target.map_or((None, None), |(master_id, player_id)| {
+                        (Some(OrderTargetKind::of_master(master_id)), Some(player_id))
+                    });
                 let queued = QueuedOrder {
                     issuer: Some(Issuer::Player(issuer)),
                     order: OrderKind::OnTarget,
@@ -262,10 +266,10 @@ impl World {
         idx: ListIndex,
         order: QueuedOrder,
     ) -> GenieResult<()> {
-        let (_, t) = self.object(order.target).ok_or(GenieError::unsupported(
+        let (_, unit) = self.object(order.target).ok_or(GenieError::unsupported(
             "a queued order on a target that is gone",
         ))?;
-        let point = t.position();
+        let point = unit.position();
         if order.target != Some(self.players.live(player, idx)?.id) {
             let work = Work {
                 target: order.target,
@@ -332,7 +336,9 @@ impl World {
             _ => {
                 let loose = self
                     .split(units, Kept::All, order.control)
-                    .and_then(|mut s| self.move_groups(&mut s, order).map(|()| s.loose));
+                    .and_then(|mut split| {
+                        self.move_groups(&mut split, order).map(|()| split.loose)
+                    });
                 self.groups.count_command();
                 let loose = loose?;
                 self.leave_groups(player, &loose, order.target)?;
@@ -350,15 +356,22 @@ impl World {
                 .order_spread(&loose, order.flags.contains(OrderFlags::QUEUED))?
                 .is_some();
         let map = self.spatial.map;
-        for (i, &id) in loose.iter().enumerate() {
+        for (index, &id) in loose.iter().enumerate() {
             let others: Vec<ObjectId> = loose
                 .iter()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, &u)| u)
+                .filter(|&(j, _)| j != index)
+                .map(|(_, &object_id)| object_id)
                 .collect();
-            let cell = narrow
-                .then(|| grid_point(i, loose.len(), order.point, map, &self.model.tuning.order));
+            let cell = narrow.then(|| {
+                grid_point(
+                    index,
+                    loose.len(),
+                    order.point,
+                    map,
+                    &self.model.tuning.order,
+                )
+            });
             self.move_unit(player, id, &others, cell, order)?;
         }
         Ok(())
@@ -439,7 +452,9 @@ impl World {
             let new = kept.is_none();
             let id = if let Some(common) = kept {
                 // FUN_140e6b820's target: the order's object while the world holds it
-                let held = order.target.filter(|&t| self.world_object(t).is_some());
+                let held = order
+                    .target
+                    .filter(|&object_id| self.world_object(object_id).is_some());
                 self.keep_group(split, common, held)?;
                 common
             } else {
@@ -479,8 +494,8 @@ impl World {
             let _ = self.group_command(id, order.target, order.point, order.args)?;
         }
         for &id in &listed {
-            if let Some(g) = self.groups.get_mut(id) {
-                set_differentiator_groups(g, &listed);
+            if let Some(group) = self.groups.get_mut(id) {
+                set_differentiator_groups(group, &listed);
             }
         }
         Ok(())
@@ -494,7 +509,11 @@ impl World {
     pub(super) fn first_unit_target(&self, units: &[ObjectId]) -> Option<(ObjectId, Point, bool)> {
         let (_, first) = units.iter().find_map(|&id| self.object(id))?;
         let ai = self.parts.unit_ai.get(first.id)?;
-        let t = self.world_object(ai.current_target)?;
-        Some((t.id(), t.position().ground(), ai.retarget_disabled == 0))
+        let world_object = self.world_object(ai.current_target)?;
+        Some((
+            world_object.id(),
+            world_object.position().ground(),
+            ai.retarget_disabled == 0,
+        ))
     }
 }

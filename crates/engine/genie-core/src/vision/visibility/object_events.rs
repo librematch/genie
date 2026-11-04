@@ -54,7 +54,7 @@ pub fn sight_taker(
                 || allows.get(q.index()).copied().unwrap_or(false)
         })
         .map(|(q, _)| q)
-        .find(|&q| q != owner && mask.intersects(VisionBits::visible(q)))
+        .find(|&player_id| player_id != owner && mask.intersects(VisionBits::visible(player_id)))
 }
 
 /// Whether an object sees (state 2, not inside another): an ownership change moves only a seeing
@@ -87,16 +87,16 @@ impl Visibility {
         class: ClassId,
         main: Option<(Position, u8)>,
     ) -> GenieResult<Option<VisionBits>> {
-        let Some(s) = self.seers.get(id).copied() else {
+        let Some(seer) = self.seers.get(id).copied() else {
             return Ok(None);
         };
         if self.registry.is_none() || id.is_recyclable() {
             return Ok(None);
         }
-        let annex = main.filter(|_| s.state < ObjectState::Removed && s.building.is_some());
+        let annex = main.filter(|_| seer.state < ObjectState::Removed && seer.building.is_some());
         let (place, umv, edge) = match annex {
             Some((place, umv)) => (place, umv, false),
-            None => (at, s.umv, true),
+            None => (at, seer.umv, true),
         };
         let (x, y) = (place.x(), place.y());
         let mut mask = self.word_at(Point::new(x, y))?;
@@ -104,7 +104,7 @@ impl Visibility {
             let offsets = self
                 .extents
                 .get(usize::from(umv) - 1)
-                .map(|e| e.offsets.clone())
+                .map(|extent| extent.offsets.clone())
                 .ok_or(GenieError::unsupported(
                     "an object's UMV entry beyond the list",
                 ))?;
@@ -121,7 +121,9 @@ impl Visibility {
             }
         }
         let registry = self.registry.as_mut().ok_or(NO_REGISTRY)?;
-        let old = registry.entry(id).map_or(VisionBits::NONE, |e| e.mask);
+        let old = registry
+            .entry(id)
+            .map_or(VisionBits::NONE, |entry| entry.mask);
         if mask == old {
             return Ok(None);
         }
@@ -138,7 +140,7 @@ impl Visibility {
             old: old & VisionBits::VISIBLE_HALF,
             new: mask,
         })?;
-        Ok((s.capture == CaptureKind::BySight).then_some(mask))
+        Ok((seer.capture == CaptureKind::BySight).then_some(mask))
     }
 
     /// The registry's part of a combat object's new place (`FUN_14108c320`): its records follow.
@@ -146,8 +148,8 @@ impl Visibility {
         if id.is_recyclable() || (from.x() == to.x() && from.y() == to.y()) {
             return;
         }
-        if let Some(r) = self.registry.as_mut() {
-            r.moved(id, class, to.ground());
+        if let Some(registry) = self.registry.as_mut() {
+            registry.moved(id, class, to.ground());
         }
     }
 
@@ -161,12 +163,14 @@ impl Visibility {
         old: (Footprint, ClassId),
         new: (Footprint, ClassId),
     ) -> GenieResult<()> {
-        let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
+        let Some(registry) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
-        let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
+        let mask = registry
+            .entry(id)
+            .map_or(VisionBits::NONE, |entry| entry.mask);
         let place = at.ground();
-        r.update_unit(UnitUpdate {
+        registry.update_unit(UnitUpdate {
             id,
             owner,
             position: place,
@@ -175,7 +179,7 @@ impl Visibility {
             old: mask & VisionBits::VISIBLE_HALF,
             new: VisionBits::NONE,
         })?;
-        r.update_unit(UnitUpdate {
+        registry.update_unit(UnitUpdate {
             id,
             owner,
             position: place,
@@ -195,11 +199,13 @@ impl Visibility {
         radius: Footprint,
         class: ClassId,
     ) -> GenieResult<()> {
-        let Some(r) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
+        let Some(registry) = self.registry.as_mut().filter(|_| !id.is_recyclable()) else {
             return Ok(());
         };
-        let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
-        r.update_unit(UnitUpdate {
+        let mask = registry
+            .entry(id)
+            .map_or(VisionBits::NONE, |entry| entry.mask);
+        registry.update_unit(UnitUpdate {
             id,
             owner,
             position: at.ground(),
@@ -208,7 +214,7 @@ impl Visibility {
             old: mask & VisionBits::VISIBLE_HALF,
             new: VisionBits::NONE,
         })?;
-        let _ = r.entries.remove(id);
+        let _ = registry.entries.remove(id);
         Ok(())
     }
 
@@ -217,7 +223,7 @@ impl Visibility {
     /// its records (`+0x8b0`..`+0x8f0`), which keep their place in every list.
     pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> GenieResult<()> {
         match self.registry.as_mut() {
-            Some(r) if !id.is_recyclable() => r.owner_changed(id, new),
+            Some(registry) if !id.is_recyclable() => registry.owner_changed(id, new),
             _ => Ok(()),
         }
     }
@@ -256,9 +262,9 @@ impl Visibility {
                 },
             )?;
         }
-        if let Some(s) = self.seers.get_mut(id) {
-            s.player = new;
-            s.los = Distance::new(los);
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.player = new;
+            seer.los = Distance::new(los);
         }
         if sees == Seeing::Sees {
             let _ = self.sight_on(
@@ -287,13 +293,17 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut()) else {
+        let Some(building_sight) = self
+            .seers
+            .get_mut(id)
+            .and_then(|seer| seer.building.as_mut())
+        else {
             return Ok(());
         };
-        if *b == BuildingSight::Built {
+        if *building_sight == BuildingSight::Built {
             return Ok(());
         }
-        *b = BuildingSight::Built;
+        *building_sight = BuildingSight::Built;
         self.sight_off(
             id,
             position,
@@ -329,10 +339,13 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        if let Some(b) = self.seers.get_mut(id).and_then(|s| s.building.as_mut())
-            && *b == BuildingSight::Unstarted
+        if let Some(building_sight) = self
+            .seers
+            .get_mut(id)
+            .and_then(|seer| seer.building.as_mut())
+            && *building_sight == BuildingSight::Unstarted
         {
-            *b = BuildingSight::Started;
+            *building_sight = BuildingSight::Started;
         }
         let _ = self.sight_on(
             id,

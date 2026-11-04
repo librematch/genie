@@ -51,22 +51,22 @@ const UNCOVERED: [TerrainId; 2] = [TerrainId::named(47), TerrainId::named(69)];
 
 /// The terrains foundation 27 covers, and the layers it covers them under (the bits of
 /// `0x500001209`; the layer test lists their complement, `0x2ffffedf6` and above 34).
-const fn plain(t: TerrainId) -> bool {
-    matches!(t.get(), 0 | 3 | 9 | 12 | 32 | 34)
+const fn plain(terrain_id: TerrainId) -> bool {
+    matches!(terrain_id.get(), 0 | 3 | 9 | 12 | 32 | 34)
 }
 
 /// `FUN_1413fc100` and `FUN_1413fc220`: mangrove shallows or forest (54, 55) or a rice farm's
 /// terrain (63 to 67), where a farm is a rice farm.
 #[must_use]
-pub const fn is_rice_terrain(t: TerrainId) -> bool {
-    matches!(t.get(), 54 | 55 | 63..=67)
+pub const fn is_rice_terrain(terrain_id: TerrainId) -> bool {
+    matches!(terrain_id.get(), 54 | 55 | 63..=67)
 }
 
 /// `FUN_1413fc120`: the terrain table entry's first byte, the terrain's id, is a farm's: 7, 8,
 /// 29 to 31, 63 to 67 and 117 to 121.
 #[must_use]
-pub const fn is_farm_terrain(t: TerrainId) -> bool {
-    matches!(t.get(), 7 | 8 | 29..=31 | 63..=67 | 117..=121)
+pub const fn is_farm_terrain(terrain_id: TerrainId) -> bool {
+    matches!(terrain_id.get(), 7 | 8 | 29..=31 | 63..=67 | 117..=121)
 }
 
 /// A tile's terrain as the map holds it (`+0x9`, `+0xa`, `+0xc`).
@@ -241,7 +241,9 @@ impl Terrain {
                     .map(|(t, _)| {
                         self.terrains
                             .get(t)
-                            .map_or(TerrainMask::NONE, |k| terrain_class(k.flags))
+                            .map_or(TerrainMask::NONE, |terrain_kind| {
+                                terrain_class(terrain_kind.flags)
+                            })
                     })
                     .collect()
             })
@@ -259,7 +261,10 @@ impl Terrain {
             size,
             kinds: tiles.iter().map(|t| t.kind).collect(),
             restore: tiles.iter().map(|t| t.restore).collect(),
-            layers: tiles.iter().map(|t| t.layer).collect(),
+            layers: tiles
+                .iter()
+                .map(|tile_terrain| tile_terrain.layer)
+                .collect(),
             terrains,
             restrictions,
             elevations: Vec::new(),
@@ -362,26 +367,26 @@ impl Terrain {
         };
         let t = match *self.restore.get(i)? {
             None => *self.kinds.get(i)?,
-            Some(t) => t,
+            Some(terrain_id) => terrain_id,
         };
-        let v = self.restriction(bonus.restriction()?)?.value(t)?;
-        Some(if v == 0.0 { 1.0 } else { v })
+        let restriction = self.restriction(bonus.restriction()?)?.value(t)?;
+        Some(if restriction == 0.0 { 1.0 } else { restriction })
     }
 
-    /// The terrain a map read sees of `t` (`FUN_140f690e0`): `t` when its record exists and it is
-    /// shown, else 0.
-    fn seen(&self, t: TerrainId) -> TerrainId {
-        match self.terrains.get(t.index()) {
-            Some(k) if k.shown => t,
+    /// The terrain a map read sees of `terrain_id` (`FUN_140f690e0`): `terrain_id` when its record
+    /// exists and it is shown, else 0.
+    fn seen(&self, terrain_id: TerrainId) -> TerrainId {
+        match self.terrains.get(terrain_id.index()) {
+            Some(terrain_kind) if terrain_kind.shown => terrain_id,
             _ => TerrainId::named(0),
         }
     }
 
     /// `FUN_1413fc280`: the terrain table's snow bit; a terrain beyond the records has none.
-    fn snowy(&self, t: TerrainId) -> bool {
+    fn snowy(&self, terrain_id: TerrainId) -> bool {
         self.terrains
-            .get(t.index())
-            .is_some_and(|k| k.flags.contains(TerrainFlags::SNOW))
+            .get(terrain_id.index())
+            .is_some_and(|terrain_kind| terrain_kind.flags.contains(TerrainFlags::SNOW))
     }
 
     /// `FUN_1413fbee0` (`FUN_1413fbf30` on a place's tile) with `FUN_1413fc0f0`: the terrain a map
@@ -393,10 +398,10 @@ impl Terrain {
             .size
             .index(tile)
             .and_then(|i| self.kinds.get(i))
-            .map_or(TerrainId::named(0), |&k| self.seen(k));
+            .map_or(TerrainId::named(0), |&terrain_id| self.seen(terrain_id));
         self.terrains
             .get(t.index())
-            .is_some_and(|k| k.flags.contains(TerrainFlags::BEACH))
+            .is_some_and(|terrain_kind| terrain_kind.flags.contains(TerrainFlags::BEACH))
     }
 
     /// `FUN_1413fbee0`: the terrain table's flags (the `.dat`'s `is_water` byte) of the terrain a
@@ -406,10 +411,10 @@ impl Terrain {
     /// shore (`FUN_1413fc270`).
     #[must_use]
     pub fn flags_at(&self, tile: Tile) -> TerrainFlags {
-        let t = self.read(tile);
+        let terrain_id = self.read(tile);
         self.terrains
-            .get(t.index())
-            .map_or(TerrainFlags::NONE, |k| k.flags)
+            .get(terrain_id.index())
+            .map_or(TerrainFlags::NONE, |terrain_kind| terrain_kind.flags)
     }
 
     /// The terrain the general task search reads at a point (`FUN_1411a8ba0`): none for x or y
@@ -435,7 +440,7 @@ impl Terrain {
         self.size
             .index(tile)
             .and_then(|i| self.kinds.get(i))
-            .map_or(TerrainId::named(0), |&k| self.seen(k))
+            .map_or(TerrainId::named(0), |&terrain_id| self.seen(terrain_id))
     }
 
     /// The snow check of a completed building on `tile` (`FUN_1411dbb70`'s "pick snow"):
@@ -461,7 +466,7 @@ impl Terrain {
             return false;
         };
         let farm = |t: TerrainId| t.get() < 200 && is_farm_terrain(t);
-        (plain(t) || farm(t)) && l.is_none_or(|l| plain(l) || farm(l))
+        (plain(t) || farm(t)) && l.is_none_or(|terrain_id| plain(terrain_id) || farm(terrain_id))
     }
 
     /// A completed building's foundation terrain (`FUN_1411ddd90`) over its position plus and
@@ -483,12 +488,12 @@ impl Terrain {
     /// Never: the tiles it covers are held on the map.
     pub fn cover(
         &mut self,
-        f: &Foundation,
+        foundation: &Foundation,
         roles: &Roles,
         terrain_tuning: TerrainTuning,
     ) -> GenieResult<()> {
-        let (x, y) = (f.position.x(), f.position.y());
-        let (cx, cy) = (f.clearance.x(), f.clearance.y());
+        let (x, y) = (foundation.position.x(), foundation.position.y());
+        let (cx, cy) = (foundation.clearance.x(), foundation.clearance.y());
         let (mut x0, mut y0) = ((x - cx) as i32, (y - cy) as i32);
         let (mut x1, mut y1) = (
             ((x + cx) - terrain_tuning.inside) as i32,
@@ -509,21 +514,24 @@ impl Terrain {
         // and fourth rows
         let gap = |tx: i32, ty: i32| {
             // The town centre's master (109), whose foundation terrain leaves its gap (`FUN_1411ddd90`).
-            roles.of_master(f.master).contains(MasterRoles::TOWN_CENTRE)
+            roles
+                .of_master(foundation.master)
+                .contains(MasterRoles::TOWN_CENTRE)
                 && (tx == x0 || tx == x0 + 1)
                 && (ty == y0 + 2 || ty == y0 + 3)
         };
-        let (mut wanted, mut kind, mut layer) = (f.terrain, f.terrain, None);
-        if f.terrain == FOUNDATION && f.snow.on_snow() {
+        let (mut wanted, mut kind, mut layer) = (foundation.terrain, foundation.terrain, None);
+        if foundation.terrain == FOUNDATION && foundation.snow.on_snow() {
             (wanted, kind, layer) = (SNOW_SKIPPED, SNOW_FOUNDATION, Some(SNOW_LAYER));
         }
-        let bonus = f
+        let bonus = foundation
             .terrain_bonus
             .restriction()
-            .map(|r| {
-                self.restriction(r).ok_or(GenieError::unsupported(
-                    "a terrain bonus the data file does not have",
-                ))
+            .map(|restriction_id| {
+                self.restriction(restriction_id)
+                    .ok_or(GenieError::unsupported(
+                        "a terrain bonus the data file does not have",
+                    ))
             })
             .transpose()?
             .cloned();
@@ -531,36 +539,36 @@ impl Terrain {
         // nothing deferred), or a building of class 14 always goes into the terrain
         let into_terrain = is_farm_terrain(wanted)
             || roles
-                .of_master(f.master)
+                .of_master(foundation.master)
                 .intersects(MasterRoles::DEAD_FARM | MasterRoles::DEAD_RICE_FARM)
             || roles
-                .of_class(f.class)
+                .of_class(foundation.class)
                 .contains(ClassRoles::FOUNDATION_TERRAIN);
         for ty in y0..=y1 {
             for tx in x0..=x1 {
-                let i = self.size.index(Tile::new(tx, ty)).ok_or(TILE_OFF_MAP)?;
-                let t = *self.kinds.checked(i)?;
+                let index = self.size.index(Tile::new(tx, ty)).ok_or(TILE_OFF_MAP)?;
+                let terrain_id = *self.kinds.checked(index)?;
                 if let Some(values) = bonus.as_ref() {
-                    let v = values.value(t).unwrap_or(0.0);
-                    if v != 0.0 && v != 1.0 {
-                        *self.restore.checked_mut(i)? = Some(t);
+                    let value = values.value(terrain_id).unwrap_or(0.0);
+                    if value != 0.0 && value != 1.0 {
+                        *self.restore.checked_mut(index)? = Some(terrain_id);
                     }
                 }
-                if UNCOVERED.contains(&t) {
+                if UNCOVERED.contains(&terrain_id) {
                     continue;
                 }
                 let covered = if wanted == FOUNDATION {
-                    self.foundation_covers(i, t)
+                    self.foundation_covers(index, terrain_id)
                 } else {
-                    wanted != t
+                    wanted != terrain_id
                 };
                 if !covered || gap(tx, ty) {
                     continue;
                 }
-                let cell = self.layers.checked_mut(i)?;
+                let cell = self.layers.checked_mut(index)?;
                 *cell = layer;
-                if into_terrain || layer.is_some() || !f.mode_680.is_one() {
-                    *self.kinds.checked_mut(i)? = kind;
+                if into_terrain || layer.is_some() || !foundation.mode_680.is_one() {
+                    *self.kinds.checked_mut(index)? = kind;
                 } else {
                     *cell = Some(kind);
                 }
@@ -592,7 +600,7 @@ mod tests {
     }
 
     fn map(kinds: Vec<u8>, layers: Vec<i16>) -> Terrain {
-        let n = kinds.len();
+        let count = kinds.len();
         let mut terrains = vec![
             TerrainKind {
                 shown: true,
@@ -603,14 +611,14 @@ mod tests {
         ];
         terrains[32].flags = TerrainFlags::LAND | TerrainFlags::SNOW;
         Terrain {
-            size: GridSize::new(2, n as i32 / 2),
+            size: GridSize::new(2, count as i32 / 2),
             kinds: ids(&kinds),
-            restore: vec![None; n],
+            restore: vec![None; count],
             layers: layers_of(&layers),
             terrains,
             restrictions: vec![Restriction::new(vec![0.0; 40]); 5],
-            elevations: vec![0; n],
-            shapes: vec![0; n],
+            elevations: vec![0; count],
+            shapes: vec![0; count],
         }
     }
 
@@ -619,64 +627,67 @@ mod tests {
     /// the data lacks has none.
     #[test]
     fn tile_defense_is_its_restriction_value_for_its_terrain() {
-        let mut t = map(vec![0, 1, 2, 3], vec![0; 4]);
+        let mut terrain = map(vec![0, 1, 2, 3], vec![0; 4]);
         let mut values = vec![0.0; 40];
         values[1] = 1.25;
         values[3] = 0.75;
-        t.restrictions[2] = Restriction::new(values);
-        t.restore[3] = Some(TerrainId::named(1));
+        terrain.restrictions[2] = Restriction::new(values);
+        terrain.restore[3] = Some(TerrainId::named(1));
         assert_eq!(
-            t.defense(RestrictionField::of_data(2), Tile::new(1, 0)),
+            terrain.defense(RestrictionField::of_data(2), Tile::new(1, 0)),
             Some(1.25)
         );
         assert_eq!(
-            t.defense(RestrictionField::of_data(2), Tile::new(0, 0)),
+            terrain.defense(RestrictionField::of_data(2), Tile::new(0, 0)),
             Some(1.0)
         );
         assert_eq!(
-            t.defense(RestrictionField::of_data(2), Tile::new(1, 1)),
+            terrain.defense(RestrictionField::of_data(2), Tile::new(1, 1)),
             Some(1.25)
         );
         assert_eq!(
-            t.defense(RestrictionField::of_data(2), Tile::new(5, 5)),
+            terrain.defense(RestrictionField::of_data(2), Tile::new(5, 5)),
             Some(1.0)
         );
         assert_eq!(
-            t.defense(RestrictionField::of_data(9), Tile::new(1, 0)),
+            terrain.defense(RestrictionField::of_data(9), Tile::new(1, 0)),
             None
         );
-        assert_eq!(t.defense(RestrictionField::NONE, Tile::new(1, 0)), None);
+        assert_eq!(
+            terrain.defense(RestrictionField::NONE, Tile::new(1, 0)),
+            None
+        );
     }
 
     /// `FUN_1411a8ba0`'s terrain at a point: x or y exactly −1 reads none, a NaN reads tile 0
     /// (`CVTTSS2SI` gives `0x80000000`, whose low 16 bits are 0), a tile off the map none.
     #[test]
     fn the_task_search_reads_the_terrain_at_point_on_the_map() {
-        let t = map(vec![0, 1, 2, 3], vec![0; 4]);
+        let terrain = map(vec![0, 1, 2, 3], vec![0; 4]);
         assert_eq!(
-            t.at_task_point(Point::new(1.5, 1.25)),
+            terrain.at_task_point(Point::new(1.5, 1.25)),
             Some(TerrainId::named(3))
         );
         assert_eq!(
-            t.at_task_point(Point::new(0.0, 0.99)),
+            terrain.at_task_point(Point::new(0.0, 0.99)),
             Some(TerrainId::named(0))
         );
-        assert_eq!(t.at_task_point(Point::new(-1.0, 1.0)), None);
-        assert_eq!(t.at_task_point(Point::new(1.0, -1.0)), None);
+        assert_eq!(terrain.at_task_point(Point::new(-1.0, 1.0)), None);
+        assert_eq!(terrain.at_task_point(Point::new(1.0, -1.0)), None);
         assert_eq!(
-            t.at_task_point(Point::new(-0.5, 1.0)),
+            terrain.at_task_point(Point::new(-0.5, 1.0)),
             Some(TerrainId::named(2))
         );
         assert_eq!(
-            t.at_task_point(Point::new(f32::NAN, 1.0)),
+            terrain.at_task_point(Point::new(f32::NAN, 1.0)),
             Some(TerrainId::named(2))
         );
-        assert_eq!(t.at_task_point(Point::new(2.0, 0.0)), None);
-        assert_eq!(t.at_task_point(Point::new(0.0, 2.0)), None);
-        assert_eq!(t.at_task_point(Point::new(-1.5, 0.0)), None);
+        assert_eq!(terrain.at_task_point(Point::new(2.0, 0.0)), None);
+        assert_eq!(terrain.at_task_point(Point::new(0.0, 2.0)), None);
+        assert_eq!(terrain.at_task_point(Point::new(-1.5, 0.0)), None);
         // 65536.5 truncates to tile 0 in 16 bits
         assert_eq!(
-            t.at_task_point(Point::new(65_536.5, 1.0)),
+            terrain.at_task_point(Point::new(65_536.5, 1.0)),
             Some(TerrainId::named(2))
         );
     }
@@ -685,13 +696,13 @@ mod tests {
     fn the_ground_is_the_tile_elevation_plus_its_slope_share() {
         // two columns, four rows: (0, 3) is one up, so (0, 2) slopes up to the south (shape 7)
         // and (1, 2) up to the south-west corner (9); (1, 3) slopes up to the west (5)
-        let mut t = map(vec![0; 8], vec![-1; 8]);
-        t.set_elevations(vec![1, 1, 1, 1, 1, 1, 2, 1]);
-        assert_eq!(t.shapes, [0, 0, 0, 0, 7, 9, 0, 5]);
-        assert_eq!(t.ground(Point::new(0.5, 0.5)), Ok(1.0));
-        assert_eq!(t.ground(Point::new(0.5, 2.25)), Ok(1.25));
-        assert_eq!(t.ground(Point::new(1.25, 2.75)), Ok(1.5));
-        assert_eq!(t.ground(Point::new(1.75, 2.25)), Ok(1.0));
+        let mut terrain = map(vec![0; 8], vec![-1; 8]);
+        terrain.set_elevations(vec![1, 1, 1, 1, 1, 1, 2, 1]);
+        assert_eq!(terrain.shapes, [0, 0, 0, 0, 7, 9, 0, 5]);
+        assert_eq!(terrain.ground(Point::new(0.5, 0.5)), Ok(1.0));
+        assert_eq!(terrain.ground(Point::new(0.5, 2.25)), Ok(1.25));
+        assert_eq!(terrain.ground(Point::new(1.25, 2.75)), Ok(1.5));
+        assert_eq!(terrain.ground(Point::new(1.75, 2.25)), Ok(1.0));
         let mut unknown = map(vec![0; 8], vec![-1; 8]);
         unknown.elevations.clear();
         assert!(unknown.ground(Point::new(0.5, 0.5)).is_err());
@@ -701,36 +712,45 @@ mod tests {
     fn tile_flags_are_its_seen_terrain_s() {
         // water 1 at (0, 0), a beach 2 at (1, 0), a hidden 3 and 45, beyond the records, at
         // (0, 1) and (1, 1): both read as terrain 0, shallows
-        let mut t = map(vec![1, 2, 3, 45], vec![-1; 4]);
-        t.terrains[0].flags = TerrainFlags::SHALLOWS;
-        t.terrains[1].flags = TerrainFlags::WATER;
-        t.terrains[2].flags = TerrainFlags::BEACH;
-        t.terrains[3].shown = false;
+        let mut terrain = map(vec![1, 2, 3, 45], vec![-1; 4]);
+        terrain.terrains[0].flags = TerrainFlags::SHALLOWS;
+        terrain.terrains[1].flags = TerrainFlags::WATER;
+        terrain.terrains[2].flags = TerrainFlags::BEACH;
+        terrain.terrains[3].shown = false;
         assert_eq!(
-            [t.flags_at(Tile::new(0, 0)), t.flags_at(Tile::new(1, 0))],
+            [
+                terrain.flags_at(Tile::new(0, 0)),
+                terrain.flags_at(Tile::new(1, 0))
+            ],
             [TerrainFlags::WATER, TerrainFlags::BEACH]
         );
         assert_eq!(
-            [t.flags_at(Tile::new(0, 1)), t.flags_at(Tile::new(1, 1))],
+            [
+                terrain.flags_at(Tile::new(0, 1)),
+                terrain.flags_at(Tile::new(1, 1))
+            ],
             [TerrainFlags::SHALLOWS; 2]
         );
         assert_eq!(
             [
-                t.read(Tile::new(0, 0)),
-                t.read(Tile::new(0, 1)),
-                t.read(Tile::new(1, 1)),
-                t.read(Tile::new(5, 5))
+                terrain.read(Tile::new(0, 0)),
+                terrain.read(Tile::new(0, 1)),
+                terrain.read(Tile::new(1, 1)),
+                terrain.read(Tile::new(5, 5))
             ],
             [1, 0, 0, 0].map(TerrainId::named)
         );
         // off the map: terrain 0
         assert_eq!(
-            [t.flags_at(Tile::new(-1, 0)), t.flags_at(Tile::new(2, 0))],
+            [
+                terrain.flags_at(Tile::new(-1, 0)),
+                terrain.flags_at(Tile::new(2, 0))
+            ],
             [TerrainFlags::SHALLOWS; 2]
         );
         // without terrain 0's record, none
-        t.terrains.clear();
-        assert_eq!(t.flags_at(Tile::new(0, 1)), TerrainFlags::NONE);
+        terrain.terrains.clear();
+        assert_eq!(terrain.flags_at(Tile::new(0, 1)), TerrainFlags::NONE);
     }
 
     #[test]
@@ -793,27 +813,28 @@ mod tests {
     /// and grass 9 with a snow layer; the save after 1115 holds terrain 6 with layer 32 on each.
     #[test]
     fn house_completed_on_snow_leaves_terrain_6_under_snow_layer() {
-        let mut t = map(vec![32, 32, 32, 9], vec![-1, -1, -1, 32]);
-        assert!(t.snow_under(Tile::new(0, 0)).unwrap());
-        assert!(t.snow_under(Tile::new(1, 1)).unwrap());
-        t.cover(
-            &Foundation {
-                position: Position::new(1.0, 1.0, 0.0),
-                clearance: Footprint::new(1.0, 1.0),
-                terrain: FOUNDATION,
-                snow: Snow::Completed,
-                master: ids::HOUSE,
-                class: class::BUILDING,
-                terrain_bonus: RestrictionField::of_data(4),
-                mode_680: Mode680::ZERO,
-            },
-            &roles(),
-            tuning().terrain,
-        )
-        .unwrap();
-        assert_eq!(t.kinds, ids(&[6, 6, 6, 6]));
-        assert_eq!(t.layers, layers_of(&[32, 32, 32, 32]));
-        assert_eq!(t.restore, [None; 4]);
+        let mut terrain = map(vec![32, 32, 32, 9], vec![-1, -1, -1, 32]);
+        assert!(terrain.snow_under(Tile::new(0, 0)).unwrap());
+        assert!(terrain.snow_under(Tile::new(1, 1)).unwrap());
+        terrain
+            .cover(
+                &Foundation {
+                    position: Position::new(1.0, 1.0, 0.0),
+                    clearance: Footprint::new(1.0, 1.0),
+                    terrain: FOUNDATION,
+                    snow: Snow::Completed,
+                    master: ids::HOUSE,
+                    class: class::BUILDING,
+                    terrain_bonus: RestrictionField::of_data(4),
+                    mode_680: Mode680::ZERO,
+                },
+                &roles(),
+                tuning().terrain,
+            )
+            .unwrap();
+        assert_eq!(terrain.kinds, ids(&[6, 6, 6, 6]));
+        assert_eq!(terrain.layers, layers_of(&[32, 32, 32, 32]));
+        assert_eq!(terrain.restore, [None; 4]);
     }
 
     /// The town centre's foundation (master 109, terrain 27; records/428759682's 8768 at
@@ -822,29 +843,30 @@ mod tests {
     /// terrain (and still keep it to restore).
     #[test]
     fn the_town_centre_foundation_leaves_its_gap() {
-        let mut t = map(vec![0; 2 * 4], vec![-1; 2 * 4]);
-        t.size = GridSize::new(4, 4);
-        t.kinds = ids(&[0; 16]);
-        t.layers = vec![None; 16];
-        t.restore = vec![None; 16];
+        let mut terrain = map(vec![0; 2 * 4], vec![-1; 2 * 4]);
+        terrain.size = GridSize::new(4, 4);
+        terrain.kinds = ids(&[0; 16]);
+        terrain.layers = vec![None; 16];
+        terrain.restore = vec![None; 16];
         let mut values = vec![0.0; 40];
         values[0] = 0.5;
-        t.restrictions[4] = Restriction::new(values);
-        t.cover(
-            &Foundation {
-                position: Position::new(2.0, 2.0, 0.0),
-                clearance: Footprint::new(2.0, 2.0),
-                terrain: FOUNDATION,
-                snow: Snow::None,
-                master: TOWN_CENTRE,
-                class: class::BUILDING,
-                terrain_bonus: RestrictionField::of_data(4),
-                mode_680: Mode680::ZERO,
-            },
-            &roles(),
-            tuning().terrain,
-        )
-        .unwrap();
+        terrain.restrictions[4] = Restriction::new(values);
+        terrain
+            .cover(
+                &Foundation {
+                    position: Position::new(2.0, 2.0, 0.0),
+                    clearance: Footprint::new(2.0, 2.0),
+                    terrain: FOUNDATION,
+                    snow: Snow::None,
+                    master: TOWN_CENTRE,
+                    class: class::BUILDING,
+                    terrain_bonus: RestrictionField::of_data(4),
+                    mode_680: Mode680::ZERO,
+                },
+                &roles(),
+                tuning().terrain,
+            )
+            .unwrap();
         #[rustfmt::skip]
         let covered = [
             27, 27, 27, 27,
@@ -852,30 +874,31 @@ mod tests {
             0, 0, 27, 27,
             0, 0, 27, 27,
         ];
-        assert_eq!(t.kinds, ids(&covered));
-        assert_eq!(t.restore, [Some(TerrainId::named(0)); 16]);
+        assert_eq!(terrain.kinds, ids(&covered));
+        assert_eq!(terrain.restore, [Some(TerrainId::named(0)); 16]);
     }
 
     #[test]
     fn foundation_27_covers_grass_but_not_terrain_outside_its_list() {
-        let mut t = map(vec![0, 2, 9, 47], vec![-1, -1, -1, -1]);
-        assert!(!t.snow_under(Tile::new(0, 0)).unwrap());
-        t.cover(
-            &Foundation {
-                position: Position::new(1.0, 1.0, 0.0),
-                clearance: Footprint::new(1.0, 1.0),
-                terrain: FOUNDATION,
-                snow: Snow::None,
-                master: ids::HOUSE,
-                class: class::BUILDING,
-                terrain_bonus: RestrictionField::NONE,
-                mode_680: Mode680::ZERO,
-            },
-            &roles(),
-            tuning().terrain,
-        )
-        .unwrap();
-        assert_eq!(t.kinds, ids(&[27, 2, 27, 47]));
+        let mut terrain = map(vec![0, 2, 9, 47], vec![-1, -1, -1, -1]);
+        assert!(!terrain.snow_under(Tile::new(0, 0)).unwrap());
+        terrain
+            .cover(
+                &Foundation {
+                    position: Position::new(1.0, 1.0, 0.0),
+                    clearance: Footprint::new(1.0, 1.0),
+                    terrain: FOUNDATION,
+                    snow: Snow::None,
+                    master: ids::HOUSE,
+                    class: class::BUILDING,
+                    terrain_bonus: RestrictionField::NONE,
+                    mode_680: Mode680::ZERO,
+                },
+                &roles(),
+                tuning().terrain,
+            )
+            .unwrap();
+        assert_eq!(terrain.kinds, ids(&[27, 2, 27, 47]));
     }
 
     /// A farm's foundation (terrain 29, then its stages 30 and 31) covers every tile of another
@@ -883,7 +906,7 @@ mod tests {
     /// foundation into the layer (records/425906646's farm 31311 from update 8654).
     #[test]
     fn farm_foundation_lays_its_terrain_into_the_terrain() {
-        let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
+        let mut terrain = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
         let farm = Foundation {
             position: Position::new(1.0, 1.0, 0.0),
             clearance: Footprint::new(1.0, 1.0),
@@ -894,21 +917,22 @@ mod tests {
             terrain_bonus: RestrictionField::NONE,
             mode_680: Mode680::ONE,
         };
-        t.cover(&farm, &roles(), tuning().terrain).unwrap();
+        terrain.cover(&farm, &roles(), tuning().terrain).unwrap();
         assert_eq!(
-            (t.kinds.clone(), t.layers.clone()),
+            (terrain.kinds.clone(), terrain.layers.clone()),
             (ids(&[29, 29, 29, 47]), vec![None; 4])
         );
-        t.cover(
-            &Foundation {
-                terrain: TerrainId::named(30),
-                ..farm
-            },
-            &roles(),
-            tuning().terrain,
-        )
-        .unwrap();
-        assert_eq!(t.kinds, ids(&[30, 30, 30, 47]));
+        terrain
+            .cover(
+                &Foundation {
+                    terrain: TerrainId::named(30),
+                    ..farm
+                },
+                &roles(),
+                tuning().terrain,
+            )
+            .unwrap();
+        assert_eq!(terrain.kinds, ids(&[30, 30, 30, 47]));
     }
 
     /// Masters 357 and 1188 (428408213's 19365 in update 1069) go into the terrain as a farm's
@@ -934,10 +958,11 @@ mod tests {
                 (ids(&[14, 14, 14, 47]), vec![None; 4])
             );
         }
-        let mut t = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
-        t.cover(&site(ids::HOUSE), &roles(), tuning().terrain)
+        let mut terrain = map(vec![0, 3, 29, 47], vec![-1, -1, -1, -1]);
+        terrain
+            .cover(&site(ids::HOUSE), &roles(), tuning().terrain)
             .unwrap();
-        assert_eq!(t.kinds, ids(&[0, 3, 29, 47]));
-        assert_eq!(t.layers, layers_of(&[14, 14, 14, -1]));
+        assert_eq!(terrain.kinds, ids(&[0, 3, 29, 47]));
+        assert_eq!(terrain.layers, layers_of(&[14, 14, 14, -1]));
     }
 }

@@ -163,7 +163,7 @@ fn take_turn(
         .paths
         .last()
         .filter(|t| t.has_path)
-        .map(|t| t.path_flags.contains(PathFlags::LOOPS));
+        .map(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
     let lead_group = lead.group.as_ref();
     let spends = top_loops.is_none_or(|loops| !loops && lead_group.is_some_and(|g| !g.patrols()));
     if spends {
@@ -190,10 +190,11 @@ fn tile_plan(
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<()> {
     let spatial = &mut *world.spatial;
-    let radii = Distance::new(target.map_or(0.0, |t| t.radius.x()) + lead.walker.radius.get());
+    let radii =
+        Distance::new(target.map_or(0.0, |placed| placed.radius.x()) + lead.walker.radius.get());
     let mut planning = world.plan.reborrow();
     planning.player_kind = lead.player_kind;
-    let r = tile_plan_for(
+    let tile_plan_for = tile_plan_for(
         lead.walker,
         leg.from,
         target.and(leg.target_id),
@@ -207,14 +208,14 @@ fn tile_plan(
         },
         &mut plan.path,
     )?;
-    match r {
+    match tile_plan_for {
         None => {
             let _ = plan.path.insert(0, leg.at);
             let _ = plan.path.push(leg.waypoint);
             (plan.planned, plan.has_plan, plan.found) = (true, true, true);
         }
         // the game's `1 <= result <= 2 || 4 < result`: above 4 the planner never returns
-        Some(r) if r.leads() => {
+        Some(found) if found.leads() => {
             (plan.planned, plan.found, plan.has_plan) = (true, true, true);
             let end = plan.path.points.last().copied().unwrap_or(BVector::ZERO);
             if leg.way < ground(leg.waypoint, end) {
@@ -248,15 +249,15 @@ fn short_plan(
     let spatial = &mut *world.spatial;
     plan.planned = false;
     plan.path.points.clear();
-    let ignore = lead
-        .group
-        .as_ref()
-        .map_or_else(|| vec![lead.walker.id], |g| g.differentiator_units.clone());
-    let mut r = ShortFound::InRange;
+    let ignore = lead.group.as_ref().map_or_else(
+        || vec![lead.walker.id],
+        |lead_group| lead_group.differentiator_units.clone(),
+    );
+    let mut short_found = ShortFound::InRange;
     if lead.solid {
         let mut planning = world.plan.reborrow();
         planning.player_kind = lead.player_kind;
-        r = short_path_for(
+        short_found = short_path_for(
             lead.walker,
             leg.from,
             (spatial, by_id),
@@ -268,14 +269,15 @@ fn short_plan(
     }
     plan.path.measure();
     plan.has_plan = plan.found;
-    if r.fails() {
+    if short_found.fails() {
         return Ok(None);
     }
     if EPSILON < plan.path.length.get() && 1 < plan.path.points.len() {
         (plan.found, plan.has_plan) = (true, true);
         return Ok(None);
     }
-    if r != ShortFound::InRange || !(plan.path.points.len() < 2 || plan.path.length.get() < EPSILON)
+    if short_found != ShortFound::InRange
+        || !(plan.path.points.len() < 2 || plan.path.length.get() < EPSILON)
     {
         return Ok(None);
     }
@@ -330,7 +332,10 @@ fn straight_way(
     let ignore: Vec<RecordId> = lead
         .group
         .as_ref()
-        .map_or_else(|| vec![lead.walker.id], |g| g.members.clone())
+        .map_or_else(
+            || vec![lead.walker.id],
+            |lead_group| lead_group.members.clone(),
+        )
         .into_iter()
         .map(RecordId::from)
         .collect();
@@ -370,7 +375,10 @@ fn long_plan(
         mask: lead.walker.mask,
         moves: lead.moves,
         ignore_units: &lead.ignore_units,
-        group_units: lead.group.as_ref().map(|g| g.lowered.clone()),
+        group_units: lead
+            .group
+            .as_ref()
+            .map(|lead_group| lead_group.lowered.clone()),
     };
     let (reached, long) = long_path_for(
         &walker,
@@ -423,10 +431,10 @@ pub(super) fn link(
                         motion.paths.checked_mut(0)?.pause_time = PATROL_PAUSE;
                         return Ok(Some(Pass::Done(false)));
                     }
-                    let top_has_more = motion
-                        .paths
-                        .last()
-                        .is_some_and(|t| t.has_path && !t.waypoint.at_or_past_last(t.points.len()));
+                    let top_has_more = motion.paths.last().is_some_and(|path_data| {
+                        path_data.has_path
+                            && !path_data.waypoint.at_or_past_last(path_data.points.len())
+                    });
                     if level.level < WaypointLevel::Top && top_has_more {
                         motion.paths.checked_mut(0)?.state = PathState::Unplanned;
                         return Ok(Some(Pass::Next));

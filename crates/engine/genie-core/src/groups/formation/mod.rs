@@ -12,6 +12,7 @@ mod column_line;
 mod desired_positions;
 mod passability;
 mod slots;
+mod unreachable;
 
 pub(crate) use self::column_line::LineKind;
 #[cfg(test)]
@@ -72,8 +73,8 @@ impl Formation {
         self.spare_slots = vec![fresh; n - self.slots.len()];
         // the copy moves `+0x00..+0x43` (0x14102d646..0x14102d6bf): the transform mark (`+0x44`)
         // is the new array's 0
-        for s in &mut self.slots {
-            s.transformed = 0;
+        for slot in &mut self.slots {
+            slot.transformed = 0;
         }
     }
 
@@ -88,9 +89,9 @@ impl Formation {
     /// `FUN_141041810`: every slot of the array (in use and spare) loses its unit and its filled
     /// mark.
     pub fn clear_units(&mut self) {
-        for s in self.every_slot_mut() {
-            s.unit_id = None;
-            s.position_filled = 0;
+        for slot in self.every_slot_mut() {
+            slot.unit_id = None;
+            slot.position_filled = 0;
         }
     }
 

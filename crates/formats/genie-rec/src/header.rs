@@ -62,11 +62,11 @@ impl ReadableHeaderElement for AiListRule {
         let num_facts = input.read_u8()?;
         let num_facts_actions = input.read_u8()?;
         let _padding = input.read_u16::<LE>()?;
-        for i in 0..16 {
+        for index in 0..16 {
             let cmd = AiCommand::read_from(input)?;
-            if i < num_facts {
+            if index < num_facts {
                 rule.facts.push(cmd);
-            } else if i < num_facts_actions {
+            } else if index < num_facts_actions {
                 rule.actions.push(cmd);
             }
         }
@@ -163,8 +163,9 @@ pub struct AiFactState {
 }
 
 impl Debug for AiFactState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("AIFactState")
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("AIFactState")
             .field("save_version", &self.save_version)
             .field("version", &self.version)
             .field("death_match", &self.death_match)

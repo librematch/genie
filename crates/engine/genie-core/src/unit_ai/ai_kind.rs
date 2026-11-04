@@ -104,14 +104,14 @@ impl TryFrom<u32> for UnitAiKind {
 }
 
 impl Display for UnitAiKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.get().fmt(f)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        self.get().fmt(formatter)
     }
 }
 
 impl Diff for UnitAiKind {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -127,8 +127,11 @@ mod tests {
         }
         assert_eq!(UnitAiKind::try_from(13), Ok(UnitAiKind::Soldier));
         for value in [0, 1, 0x14, 99] {
-            let e = UnitAiKind::try_from(value).unwrap_err();
-            assert!(e.to_string().contains("no constructor makes"), "{e}");
+            let error = UnitAiKind::try_from(value).unwrap_err();
+            assert!(
+                error.to_string().contains("no constructor makes"),
+                "{error}"
+            );
         }
     }
 }

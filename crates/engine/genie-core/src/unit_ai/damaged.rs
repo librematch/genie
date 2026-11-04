@@ -69,7 +69,7 @@ impl UnitAi {
     /// with 1) and it runs from its attackers ([`UnitAi::run_away`] with 1). Both return 3.
     pub(super) fn villager_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -77,11 +77,11 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        let Some(attacker) = at.unit(n.caller).copied() else {
+        let Some(attacker) = at.unit(notify.caller).copied() else {
             return Ok(GO_ON);
         };
         let caller = attacker.id;
@@ -162,7 +162,7 @@ impl UnitAi {
                 && state == 12
                 && at
                     .target
-                    .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::PREDATOR))
+                    .is_some_and(|seen| roles.of_class(seen.class).contains(ClassRoles::PREDATOR))
                 && attacker.owner == PlayerId::GAIA)
             || order == Some(OrderKind::Repair)
             || (fierce && gathers && state < 16 && (0x9110u32 >> state) & 1 != 0))
@@ -182,7 +182,7 @@ impl UnitAi {
     /// state 2, it runs from its attackers (slot 0x160 with 1, [`UnitAi::run_away`]) and returns 3.
     pub(super) fn transport_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -190,26 +190,28 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        let new = !self.attackers.contains(n.caller);
+        let new = !self.attackers.contains(notify.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
             && !player_kind.is_computer()
-            && self.current_target != n.caller
-            && let Some(caller) = n.caller
+            && self.current_target != notify.caller
+            && let Some(caller) = notify.caller
         {
             self.ask_for_help(caller, at, player_kind, side)?;
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         if self.current_order.is_some() {
             return Ok(GO_ON);
         }
-        let held_by_group =
-            at.group.is_some_and(|g| !g.contains(GroupState::IDLE)) && !player_kind.is_computer();
+        let held_by_group = at
+            .group
+            .is_some_and(|group_state| !group_state.contains(GroupState::IDLE))
+            && !player_kind.is_computer();
         if self.ai_kind == UnitAiKind::SiegeTower && held_by_group {
             return Ok(GO_ON);
         }
@@ -280,14 +282,14 @@ impl UnitAi {
     /// 0x160 with 1) and returns 3.
     pub(super) fn trade_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
@@ -295,16 +297,16 @@ impl UnitAi {
         if self.attackers.is_empty() || player_kind.is_computer() {
             alert_owner(player_kind)?;
         }
-        let new = !self.attackers.contains(n.caller);
+        let new = !self.attackers.contains(notify.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
             && !player_kind.is_computer()
-            && self.current_target != n.caller
-            && let Some(caller) = n.caller
+            && self.current_target != notify.caller
+            && let Some(caller) = notify.caller
         {
             self.ask_for_help(caller, at, player_kind, side)?;
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         if self.current_order.is_some() {
             return Ok(GO_ON);
@@ -325,7 +327,7 @@ impl UnitAi {
     /// runs from its attackers (slot 0x160 with 1). It returns 3.
     pub(super) fn fishing_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -333,20 +335,20 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         alert_owner(player_kind)?;
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        let new = !self.attackers.contains(n.caller);
+        let new = !self.attackers.contains(notify.caller);
         // a help request on no attacker asks no one (`AskForHelp` finds none)
         if new
             && !player_kind.is_computer()
-            && self.current_target != n.caller
-            && let Some(caller) = n.caller
+            && self.current_target != notify.caller
+            && let Some(caller) = notify.caller
         {
             self.ask_for_help(caller, at, player_kind, side)?;
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         if self.current_order.is_some() {
             return Ok(GO_ON);
@@ -457,30 +459,30 @@ impl UnitAi {
     /// unit is under attack (`FUN_14119d2d0` with 1) and it returns 2.
     pub(super) fn building_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<u32> {
-        let new = !self.attackers.contains(n.caller);
+        let new = !self.attackers.contains(notify.caller);
         alert_owner(player_kind)?;
-        if n.p[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
+        if notify.p[1] >= 1 && at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
             alert_owner(PlayerKind::Computer)?;
         }
-        if n.p[1] >= 1
+        if notify.p[1] >= 1
             && new
-            && self.current_target != n.caller
-            && let Some(caller) = n.caller
+            && self.current_target != notify.caller
+            && let Some(caller) = notify.caller
         {
             self.ask_for_help(caller, at, player_kind, side)?;
         }
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, rng)?;
             return Ok(DEAD);
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         Ok(GO_ON)
     }
@@ -499,10 +501,10 @@ impl UnitAi {
         let mut best = (ATTACKER_FAR, None);
         // none (−1) is an object the update does not hold
         for id in self.attackers.iter().flatten() {
-            let Some(u) = at.unit(id) else {
+            let Some(unit_seen) = at.unit(id) else {
                 continue;
             };
-            if roles.of_class(u.class).intersects(
+            if roles.of_class(unit_seen.class).intersects(
                 ClassRoles::BUILDING
                     | ClassRoles::SIEGE
                     | ClassRoles::TOWER
@@ -510,13 +512,14 @@ impl UnitAi {
             ) {
                 continue;
             }
-            let d = u.gap_squared;
-            if best.0 - unit_ai_tuning.attacker_tie <= d.get()
-                && (best.0 + unit_ai_tuning.attacker_tie <= d.get() || ai_rng.rand15() & 1 == 0)
+            let distance_squared = unit_seen.gap_squared;
+            if best.0 - unit_ai_tuning.attacker_tie <= distance_squared.get()
+                && (best.0 + unit_ai_tuning.attacker_tie <= distance_squared.get()
+                    || ai_rng.rand15() & 1 == 0)
             {
                 continue;
             }
-            best = (d.get(), Some(id));
+            best = (distance_squared.get(), Some(id));
         }
         best.1
     }

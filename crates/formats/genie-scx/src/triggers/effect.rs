@@ -86,8 +86,8 @@ impl TriggerEffect {
         write_opt_i32_str(&mut output, &self.audio_file)?;
 
         if version > 1.1 {
-            for i in 0..self.num_objects() {
-                output.write_i32::<LE>(*self.objects.get(i as usize).unwrap_or(&-1))?;
+            for index in 0..self.num_objects() {
+                output.write_i32::<LE>(*self.objects.get(index as usize).unwrap_or(&-1))?;
             }
         }
 

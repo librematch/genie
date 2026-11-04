@@ -72,14 +72,14 @@ impl Ord for WaypointLevel {
 }
 
 impl Display for WaypointLevel {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{}", self.raw())
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(formatter, "{}", self.raw())
     }
 }
 
 impl genie_diff::Diff for WaypointLevel {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

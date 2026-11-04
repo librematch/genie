@@ -27,8 +27,8 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
         Ok(Outcome::Written | Outcome::Current) => ExitCode::SUCCESS,
-        Err(e) => {
-            eprintln!("contracts: {e}");
+        Err(error) => {
+            eprintln!("contracts: {error}");
             ExitCode::FAILURE
         }
     }

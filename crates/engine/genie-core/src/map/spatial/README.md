@@ -8,7 +8,8 @@ group of queries.
 - The obstruction grid's cells and its line queries (`grid.rs`).
 - The objects on the map: their tiles, their moves, their freezing (`objects.rs`).
 - The queries of the old short pather (`pather.rs`).
-- The unit AI's searches for the closest object and the best unit to attack (`search.rs`).
+- The unit AI's searches for the closest object (`closest.rs`) and the best unit to attack
+  (`search.rs`).
 - Sight, ghosts and ownership changes as the map sees them (`sight.rs`).
 
 The game files its records in a grid of levels. `Spatial` keeps them by object id and asks the
@@ -20,6 +21,7 @@ found, as in the game.
 <!-- files -->
 | File | What it holds |
 | --- | --- |
+| [`closest.rs`](closest.rs) | `ClosestObject` (`FUN_140c488b0`): the search's pick of the closest object it found, and its tests of each one. |
 | [`footprint.rs`](footprint.rs) | A footprint's spots, occupants and clearing, foreign marks, clear points and obstruction candidates. |
 | [`grid.rs`](grid.rs) | The obstruction grid's cells and visits, the scout map, alliances and the line queries. |
 | [`mod.rs`](mod.rs) | Where the world's objects are, as movement reads them: each live object's position, radii and class, and the obstruction record the game keeps for it in its obstruction manager (`DAT_143f0a088`, queried by `FUN_141051900`). |

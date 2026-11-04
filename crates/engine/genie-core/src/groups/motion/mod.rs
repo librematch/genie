@@ -123,7 +123,7 @@ impl World {
         self.parts
             .actions_of(id)
             .top_target()
-            .filter(|&t| !t.is_recyclable() && self.object(t).is_some())
+            .filter(|&object_id| !object_id.is_recyclable() && self.object(object_id).is_some())
     }
 }
 
@@ -142,8 +142,12 @@ impl Motion {
     /// 0).
     #[must_use]
     pub fn moving(&self) -> bool {
-        let v = self.velocity;
-        0.0 < sqrt(v.x() * v.x() + v.height() * v.height() + v.y() * v.y())
+        let velocity = self.velocity;
+        0.0 < sqrt(
+            velocity.x() * velocity.x()
+                + velocity.height() * velocity.height()
+                + velocity.y() * velocity.y(),
+        )
     }
 
     /// `FUN_141046640`: the walked level wants a path; false without one. Its test,
@@ -153,7 +157,7 @@ impl Motion {
     pub fn waits_to_move(&self) -> bool {
         self.paths
             .first()
-            .is_some_and(|l| l.state == PathState::WantsPath)
+            .is_some_and(|path_data| path_data.state == PathState::WantsPath)
     }
 
     /// `FUN_1410481f0`: with a walked level below another, the levels below the first of level
@@ -225,9 +229,9 @@ impl Motion {
         if at_most_or_unordered(yaw.get().abs(), EPSILON) {
             return;
         }
-        let r = rotation(yaw.get(), self.new_position[2]);
-        self.new_position[1] = normalize(rotate(&r, self.new_position[1]));
-        self.new_position[3] = normalize(rotate(&r, self.new_position[3]));
+        let rotation = rotation(yaw.get(), self.new_position[2]);
+        self.new_position[1] = normalize(rotate(&rotation, self.new_position[1]));
+        self.new_position[3] = normalize(rotate(&rotation, self.new_position[3]));
         self.flags |= MotionFlags::MOVED;
     }
 
@@ -247,8 +251,12 @@ impl Motion {
             let d = dt.get() * speed;
             if EPSILON < d.abs() {
                 let v = d * *self.new_position.checked(along)?;
-                let p = &mut self.new_position[0];
-                *p = BVector::new(p.x() + v.x(), v.height() + p.height(), v.y() + p.y());
+                let new_position = &mut self.new_position[0];
+                *new_position = BVector::new(
+                    new_position.x() + v.x(),
+                    v.height() + new_position.height(),
+                    v.y() + new_position.y(),
+                );
                 self.flags |= MotionFlags::MOVED;
             }
         }
@@ -268,35 +276,35 @@ impl World {
     /// What `BMotion` reads of the lead `id` (a unit with movement state), None without one.
     fn lead_view(&self, id: Option<ObjectId>) -> Option<Lead> {
         let id = id?;
-        let (p, u) = self.object(id)?;
-        let mover = self.parts.mover_of(u.id)?;
-        let group = u
+        let (player_id, unit) = self.object(id)?;
+        let mover = self.parts.mover_of(unit.id)?;
+        let group = unit
             .group
             .id
             .and_then(|id| self.groups.get(id))
             .map(|g| LeadGroup {
                 flags: g.flags,
-                members: g.members.iter().map(|m| m.id).collect(),
+                members: g.members.iter().map(|member| member.id).collect(),
                 differentiator_units: self.groups.differentiator_units(g, SHORT_IGNORED),
-                lowered: self.groups.group_units(u.group.id).unwrap_or_default(),
+                lowered: self.groups.group_units(unit.group.id).unwrap_or_default(),
             });
         Some(Lead {
             walker: mover.walker(id),
-            position: u.position(),
+            position: unit.position(),
             radius: mover.stats.radius.ground(),
             moves: mover.stats.speed != Speed::ZERO
                 || self
                     .model
                     .roles
-                    .of_master(u.life.master_id)
+                    .of_master(unit.life.master_id)
                     .contains(MasterRoles::LONG_PATH_MOVER),
             solid: mover.stats.radius.sized(),
             ignore_units: mover.ignore_units.clone(),
-            player: p,
+            player: player_id,
             player_kind: self
                 .players
-                .get(p.index())
-                .map_or(PlayerKind::Phantom, |q| q.kind),
+                .get(player_id.index())
+                .map_or(PlayerKind::Phantom, |player| player.kind),
             group,
         })
     }

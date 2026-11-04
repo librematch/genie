@@ -84,8 +84,9 @@ impl ExploreState {
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
             Self::Walk {
-                move_to: Some(m), ..
-            } => Some(m),
+                move_to: Some(move_to_action),
+                ..
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -94,8 +95,9 @@ impl ExploreState {
     pub const fn move_to_mut(&mut self) -> Option<&mut MoveToAction> {
         match self {
             Self::Walk {
-                move_to: Some(m), ..
-            } => Some(m),
+                move_to: Some(move_to_action),
+                ..
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -114,10 +116,10 @@ mod tests {
     /// `MoveTo` of a state that does not walk.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match ExploreState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 4..=10 | 12 | 15..), "{b}"),
+        for index in 0..=255_u8 {
+            match ExploreState::of_byte(index, None) {
+                Ok(explore_state) => assert_eq!(explore_state.get(), index),
+                Err(_) => assert!(matches!(index, 4..=10 | 12 | 15..), "{index}"),
             }
         }
         assert_eq!(ExploreState::Ended.to_string(), "14");
@@ -145,7 +147,10 @@ mod tests {
         assert_eq!(ExploreState::Wait.move_to(), None);
         let mut walking = ExploreState::of_byte(11, Some(walk)).unwrap();
         walking.move_to_mut().unwrap().range = Distance::new(2.0);
-        assert_eq!(walking.move_to().map(|m| m.range), Some(Distance::new(2.0)));
+        assert_eq!(
+            walking.move_to().map(|move_to_action| move_to_action.range),
+            Some(Distance::new(2.0))
+        );
         assert_eq!(ExploreState::Wait.move_to_mut(), None);
     }
 }

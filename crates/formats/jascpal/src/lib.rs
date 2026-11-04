@@ -80,32 +80,32 @@ impl TryFrom<i32> for PaletteIndex {
     type Error = GenieError;
     #[inline]
     fn try_from(n: i32) -> GenieResult<Self> {
-        n.try_into().map(Self).map_err(|e| {
+        n.try_into().map(Self).map_err(|try_from_int_error| {
             GenieError::invalid_input("a palette index past a byte")
                 .with("index", n)
-                .with_source(e)
+                .with_source(try_from_int_error)
         })
     }
 }
 
 impl From<PaletteIndex> for u8 {
     #[inline]
-    fn from(n: PaletteIndex) -> Self {
-        n.0
+    fn from(palette_index: PaletteIndex) -> Self {
+        palette_index.0
     }
 }
 
 impl From<PaletteIndex> for i32 {
     #[inline]
-    fn from(n: PaletteIndex) -> Self {
-        n.0.into()
+    fn from(palette_index: PaletteIndex) -> Self {
+        palette_index.0.into()
     }
 }
 
 impl From<PaletteIndex> for usize {
     #[inline]
-    fn from(n: PaletteIndex) -> Self {
-        n.0.into()
+    fn from(palette_index: PaletteIndex) -> Self {
+        palette_index.0.into()
     }
 }
 
@@ -113,8 +113,9 @@ impl FromStr for PaletteIndex {
     type Err = GenieError;
     #[inline]
     fn from_str(input: &str) -> GenieResult<Self> {
-        input.parse().map(Self).map_err(|e| {
-            GenieError::invalid_input("a palette index that is not a byte").with_source(e)
+        input.parse().map(Self).map_err(|parse_int_error| {
+            GenieError::invalid_input("a palette index that is not a byte")
+                .with_source(parse_int_error)
         })
     }
 }
@@ -128,7 +129,7 @@ fn whitespace(input: &[u8]) -> IResult<&[u8], ()> {
 fn parse_bytes<Parsed: FromStr>(string: &[u8]) -> Result<Parsed, ()> {
     str::from_utf8(string)
         .map_err(|_| ())
-        .and_then(|s| s.parse().map_err(|_| ()))
+        .and_then(|text| text.parse().map_err(|_| ()))
 }
 
 /// Eat and return a number.
@@ -342,11 +343,11 @@ impl<'a> IntoIterator for &'a Palette {
 
 impl Display for Palette {
     /// Write the palette in the JASC-PAL text format.
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        f.write_str("JASC-PAL\r\n0100\r\n")?;
-        write!(f, "{}\r\n", self.colors.len())?;
-        for c in &self.colors {
-            write!(f, "{} {} {}\r\n", c.r, c.g, c.b)?;
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), FmtError> {
+        formatter.write_str("JASC-PAL\r\n0100\r\n")?;
+        write!(formatter, "{}\r\n", self.colors.len())?;
+        for rgb in &self.colors {
+            write!(formatter, "{} {} {}\r\n", rgb.r, rgb.g, rgb.b)?;
         }
         Ok(())
     }
@@ -399,15 +400,15 @@ mod tests {
                 b: 127_u8.wrapping_add(r),
             });
         }
-        let s = pal.to_string();
-        let mut lines = s.lines();
+        let text = pal.to_string();
+        let mut lines = text.lines();
         assert_eq!(lines.next(), Some("JASC-PAL"));
         assert_eq!(lines.next(), Some("0100"));
         assert_eq!(lines.next(), Some("256"));
-        for r in 0..=255 {
+        for index in 0..=255 {
             assert_eq!(
                 lines.next(),
-                Some(format!("{} {} {}", r, 255 - r, 127_u8.wrapping_add(r)).as_str())
+                Some(format!("{} {} {}", index, 255 - index, 127_u8.wrapping_add(index)).as_str())
             );
         }
         assert_eq!(lines.next(), None);

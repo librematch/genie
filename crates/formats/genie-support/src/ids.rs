@@ -16,29 +16,29 @@ impl From<u16> for UnitKindId {
 
 impl From<UnitKindId> for u16 {
     #[inline]
-    fn from(n: UnitKindId) -> Self {
-        n.0
+    fn from(unit_kind_id: UnitKindId) -> Self {
+        unit_kind_id.0
     }
 }
 
 impl From<UnitKindId> for i32 {
     #[inline]
-    fn from(n: UnitKindId) -> Self {
-        n.0.into()
+    fn from(unit_kind_id: UnitKindId) -> Self {
+        unit_kind_id.0.into()
     }
 }
 
 impl From<UnitKindId> for u32 {
     #[inline]
-    fn from(n: UnitKindId) -> Self {
-        n.0.into()
+    fn from(unit_kind_id: UnitKindId) -> Self {
+        unit_kind_id.0.into()
     }
 }
 
 impl From<UnitKindId> for usize {
     #[inline]
-    fn from(n: UnitKindId) -> Self {
-        n.0.into()
+    fn from(unit_kind_id: UnitKindId) -> Self {
+        unit_kind_id.0.into()
     }
 }
 
@@ -58,14 +58,14 @@ impl From<u16> for TechId {
 }
 
 impl From<TechId> for u16 {
-    fn from(n: TechId) -> Self {
-        n.0
+    fn from(tech_id: TechId) -> Self {
+        tech_id.0
     }
 }
 
 impl From<TechId> for usize {
-    fn from(n: TechId) -> Self {
-        n.0.into()
+    fn from(tech_id: TechId) -> Self {
+        tech_id.0.into()
     }
 }
 
@@ -84,26 +84,26 @@ impl From<u16> for SpriteId {
 }
 
 impl From<SpriteId> for u16 {
-    fn from(n: SpriteId) -> Self {
-        n.0
+    fn from(sprite_id: SpriteId) -> Self {
+        sprite_id.0
     }
 }
 
 impl From<SpriteId> for i32 {
-    fn from(n: SpriteId) -> Self {
-        n.0.into()
+    fn from(sprite_id: SpriteId) -> Self {
+        sprite_id.0.into()
     }
 }
 
 impl From<SpriteId> for u32 {
-    fn from(n: SpriteId) -> Self {
-        n.0.into()
+    fn from(sprite_id: SpriteId) -> Self {
+        sprite_id.0.into()
     }
 }
 
 impl From<SpriteId> for usize {
-    fn from(n: SpriteId) -> Self {
-        n.0.into()
+    fn from(sprite_id: SpriteId) -> Self {
+        sprite_id.0.into()
     }
 }
 
@@ -175,10 +175,10 @@ impl StringKey {
 }
 
 impl fmt::Display for StringKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Num(n) => write!(f, "{n}"),
-            Self::Name(s) => write!(f, "{s}"),
+            Self::Num(n) => write!(formatter, "{n}"),
+            Self::Name(text) => write!(formatter, "{text}"),
         }
     }
 }
@@ -219,16 +219,16 @@ impl TryFrom<i16> for StringKey {
 
 impl From<&str> for StringKey {
     #[inline]
-    fn from(s: &str) -> Self {
-        s.parse()
-            .map_or_else(|_| Self::Name(String::from(s)), Self::Num)
+    fn from(text: &str) -> Self {
+        text.parse()
+            .map_or_else(|_| Self::Name(String::from(text)), Self::Num)
     }
 }
 
 impl From<String> for StringKey {
     #[inline]
-    fn from(s: String) -> Self {
-        Self::from(s.as_ref())
+    fn from(text: String) -> Self {
+        Self::from(text.as_ref())
     }
 }
 
@@ -276,8 +276,8 @@ mod tests {
     /// Tests converting from a string representing an int to a string key.
     #[test]
     fn string_key_from_str_to_int() {
-        let s = "57329";
-        if let StringKey::Num(n) = StringKey::from(s) {
+        let text = "57329";
+        if let StringKey::Num(n) = StringKey::from(text) {
             assert_eq!(57329, n);
         } else {
             panic!();
@@ -288,8 +288,8 @@ mod tests {
     #[test]
     fn string_key_from_str_to_str() {
         let s = "grassDaut";
-        if let StringKey::Name(n) = StringKey::from(s) {
-            assert_eq!(s, n);
+        if let StringKey::Name(text) = StringKey::from(s) {
+            assert_eq!(s, text);
         } else {
             panic!();
         }
@@ -304,9 +304,9 @@ mod error_tests {
     #[test]
     fn named_or_too_large_key_does_not_fit() {
         for key in [StringKey::from("grassDaut"), StringKey::from(70_000u32)] {
-            let e = u16::try_from(&key).unwrap_err();
+            let error = u16::try_from(&key).unwrap_err();
             assert_eq!(
-                (e.kind(), e.reason()),
+                (error.kind(), error.reason()),
                 (
                     genie_error::ErrorKind::InvalidInput,
                     "a string key that does not fit the integer"

@@ -177,19 +177,19 @@ fn context(header: &[u8], ours: &[(u64, u64)], trace: &Trace, at: u64, radius: u
     let hex = |pos: u64, len: u64| {
         let end = (pos + len).min(header.len() as u64).min(pos + 12);
         let range = usize::try_from(pos).unwrap()..usize::try_from(end).unwrap();
-        let b: Vec<String> = header[range].iter().map(|b| format!("{b:02x}")).collect();
-        b.join(" ")
+        let texts: Vec<String> = header[range].iter().map(|b| format!("{b:02x}")).collect();
+        texts.join(" ")
     };
     let mut out = String::from("  game reads (offset +size bytes, caller RVA):\n");
     let mut pos = 0u64;
-    for (i, &size) in trace.sizes.iter().enumerate() {
+    for (index, &size) in trace.sizes.iter().enumerate() {
         let len = u64::from(size);
         if window(pos, len) {
             writeln!(
                 out,
                 "    {pos:>8} +{len:<4} {:<36} {:#x}",
                 hex(pos, len),
-                trace.callers[i]
+                trace.callers[index]
             )
             .unwrap();
         }
@@ -214,7 +214,10 @@ fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.unwrap().path();
         if path.is_dir() {
             recordings(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aoe2record") {
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "aoe2record")
+        {
             out.push(path);
         }
     }
@@ -261,17 +264,17 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
             reads: Vec::new(),
         };
         let parsed = genie_save::parse_reader(&mut reader);
-        if let Err(e) = parsed {
+        if let Err(error) = parsed {
             // the reads before the failure still say where this reader left the game's
             if failures.is_empty() {
                 let at = reader.reads.last().map_or(0, |&(p, l)| p + l);
                 failures.push(format!(
-                    "{}: {e:?}\n{}",
+                    "{}: {error:?}\n{}",
                     path.display(),
                     context(&header, &reader.reads, &trace, at, 48)
                 ));
             } else {
-                failures.push(format!("{}: {e:?}", path.display()));
+                failures.push(format!("{}: {error:?}", path.display()));
             }
         }
         checked += 1;
@@ -282,23 +285,26 @@ fn the_reader_agrees_with_the_games_reads_on_every_traced_recording() {
         let all = crossings(&reader.reads, &trace.sizes);
         let mut callers_here = BTreeSet::new();
         for c in &all {
-            let e = by_caller.entry(trace.callers[c.theirs.2]).or_default();
-            e.0 += 1;
+            let entry = by_caller.entry(trace.callers[c.theirs.2]).or_default();
+            entry.0 += 1;
             if callers_here.insert(trace.callers[c.theirs.2]) {
-                e.1 += 1;
+                entry.1 += 1;
             }
         }
-        if let Some(c) = all.into_iter().next() {
+        if let Some(crossing) = all.into_iter().next() {
             if first_context.is_none() {
-                first_context = Some(context(&header, &reader.reads, &trace, c.ours.0, 24));
+                first_context = Some(context(&header, &reader.reads, &trace, crossing.ours.0, 24));
             }
-            let (site, caller) = (trace.sites[c.theirs.2], trace.callers[c.theirs.2]);
+            let (site, caller) = (
+                trace.sites[crossing.theirs.2],
+                trace.callers[crossing.theirs.2],
+            );
             crossed.push(format!(
                 "{}: our read {:?} crosses the game's read at {:#x} (+{}, site {:#x} from {:#x}; RVAs)",
                 path.display(),
-                c.ours,
-                c.theirs.0,
-                c.theirs.1,
+                crossing.ours,
+                crossing.theirs.0,
+                crossing.theirs.1,
                 site,
                 caller
             ));

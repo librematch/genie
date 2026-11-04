@@ -103,8 +103,8 @@ impl From<[f32; 2]> for Point {
 }
 
 impl genie_diff::Diff for Point {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -115,10 +115,10 @@ mod tests {
     /// A point's x and y keep their bits, and a height makes it a place.
     #[test]
     fn point_keeps_its_bits_and_height_makes_it_place() {
-        let p = Point::new(-0.0, f32::from_bits(0x7fc0_0001));
-        assert_eq!(p.get().map(f32::to_bits), [0x8000_0000, 0x7fc0_0001]);
+        let point = Point::new(-0.0, f32::from_bits(0x7fc0_0001));
+        assert_eq!(point.get().map(f32::to_bits), [0x8000_0000, 0x7fc0_0001]);
         assert_eq!(
-            (p.x().to_bits(), p.y().to_bits()),
+            (point.x().to_bits(), point.y().to_bits()),
             (0x8000_0000, 0x7fc0_0001)
         );
         assert_eq!(Point::from([1.0, 2.0]), Point::new(1.0, 2.0));
@@ -144,9 +144,9 @@ mod tests {
     /// A point's component along an axis is its x or its y, and setting it changes only that.
     #[test]
     fn point_component_along_axis_is_that_coordinate() {
-        let p = Point::new(1.0, 2.0);
-        assert_eq!((p.along(Axis::X), p.along(Axis::Y)), (1.0, 2.0));
-        assert_eq!(p.with_along(Axis::X, 5.0), Point::new(5.0, 2.0));
-        assert_eq!(p.with_along(Axis::Y, 5.0), Point::new(1.0, 5.0));
+        let point = Point::new(1.0, 2.0);
+        assert_eq!((point.along(Axis::X), point.along(Axis::Y)), (1.0, 2.0));
+        assert_eq!(point.with_along(Axis::X, 5.0), Point::new(5.0, 2.0));
+        assert_eq!(point.with_along(Axis::Y, 5.0), Point::new(1.0, 5.0));
     }
 }

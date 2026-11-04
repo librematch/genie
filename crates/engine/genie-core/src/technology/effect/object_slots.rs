@@ -44,44 +44,54 @@ pub(super) const OBJECT_HP_CAP: f32 = 32767.0;
 pub(super) const ROUND: f32 = EFFECT_ROUND;
 
 impl World {
-    /// The ids player `p`'s tracker files under class `class` (`FUN_14104f8f0`, key class + 900)
-    /// and those pending under it (`FUN_14104f9e0`, key class + 90900), each in the tracker's
-    /// order. A queued unit's place holds −1, which no object has: every reader's lookup passes
-    /// it over, so it is left out ([`tracked_ids`]).
+    /// The ids player `player_id`'s tracker files under class `class` (`FUN_14104f8f0`, key
+    /// class + 900) and those pending under it (`FUN_14104f9e0`, key class + 90900), each in the
+    /// tracker's order. A queued unit's place holds −1, which no object has: every reader's lookup
+    /// passes it over, so it is left out ([`tracked_ids`]).
     pub(super) fn tracked_class(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         class: ClassId,
     ) -> GenieResult<(Vec<ObjectId>, Vec<ObjectId>)> {
-        let t = &self.players.player(p)?.tracker;
+        let tracker = &self.players.player(player_id)?.tracker;
         let key = ListKey::class(class);
-        Ok((tracked_ids(t.list(key)), tracked_ids(t.list(key.pending()))))
-    }
-
-    /// The ids player `p`'s tracker files as done under key master `key` (`FUN_14104f560`'s list
-    /// of one key, whatever the objects' masters), in the tracker's order.
-    pub(super) fn tracked_key(&self, p: PlayerId, key: MasterId) -> GenieResult<Vec<ObjectId>> {
-        Ok(tracked_ids(
-            self.players.player(p)?.tracker.list(ListKey::master(key)),
+        Ok((
+            tracked_ids(tracker.list(key)),
+            tracked_ids(tracker.list(key.pending())),
         ))
     }
 
-    /// The ids player `p`'s tracker files under master `master` (`FUN_14104f960`), of which
+    /// The ids player `player_id`'s tracker files as done under key master `key` (`FUN_14104f560`'s
+    /// list of one key, whatever the objects' masters), in the tracker's order.
+    pub(super) fn tracked_key(
+        &self,
+        player_id: PlayerId,
+        key: MasterId,
+    ) -> GenieResult<Vec<ObjectId>> {
+        Ok(tracked_ids(
+            self.players
+                .player(player_id)?
+                .tracker
+                .list(ListKey::master(key)),
+        ))
+    }
+
+    /// The ids player `player_id`'s tracker files under master `master` (`FUN_14104f960`), of which
     /// `FUN_14165a860` keeps those of that very master; and for a building master those pending
     /// under it, or under the stack unit it heads (`FUN_14104fa50`, key + 90000), whatever their
     /// masters. Each in the tracker's order.
     pub(super) fn tracked_master(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         master: &Master,
     ) -> GenieResult<(Vec<ObjectId>, Vec<ObjectId>)> {
-        let player = self.players.player(p)?;
+        let player = self.players.player(player_id)?;
         let of_master = |id: &ObjectId| {
             player
                 .objects
                 .iter()
                 .chain(&player.sleeping)
-                .any(|u| u.id == *id && u.life.master_id == master.id)
+                .any(|unit| unit.id == *id && unit.life.master_id == master.id)
         };
         let done: Vec<ObjectId> = tracked_ids(player.tracker.list(ListKey::master(master.id)))
             .into_iter()
@@ -91,12 +101,12 @@ impl World {
         if MasterKind::BUILDING <= master.kind {
             let stack = master.building.as_ref().and_then(|b| b.stack_unit);
             let key = stack
-                .and_then(|stack| player_master(&self.model.masters, p, stack))
+                .and_then(|stack| player_master(&self.model.masters, player_id, stack))
                 .filter(|s| {
                     s.kind == MasterKind::BUILDING
-                        && s.building
-                            .as_ref()
-                            .is_some_and(|b| b.head_unit == Some(master.id))
+                        && s.building.as_ref().is_some_and(|building_master| {
+                            building_master.head_unit == Some(master.id)
+                        })
                 })
                 .map_or(master.id, |s| s.id);
             pending = tracked_ids(player.tracker.list(ListKey::master(key).pending()));
@@ -132,10 +142,10 @@ impl World {
         v: f32,
         attribute: MasterAttribute,
     ) -> GenieResult<ObjectChange> {
-        let Some((owner, u)) = self.object(id) else {
+        let Some((owner, unit)) = self.object(id) else {
             return Ok(ObjectChange::NotHeld);
         };
-        let master = u.master(self.master_tables(), owner)?.clone();
+        let master = unit.master(self.master_tables(), owner)?.clone();
         match master.kind {
             MasterKind::BUILDING => {
                 self.change_building(owner, id, &master, change, v, attribute)?;
@@ -155,7 +165,7 @@ impl World {
     /// old amount to the new one (slot 0xf8 twice) unless the master keeps it (flag `'@'`).
     pub(super) fn change_static(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         change: Change,
@@ -165,11 +175,11 @@ impl World {
         use crate::objects::masters::MasterAttribute;
         match attribute {
             MasterAttribute::HIT_POINTS => {
-                let (_, u) = self.object_mut(id).ok_or(OBJECT_GONE)?;
+                let (_, unit) = self.object_mut(id).ok_or(OBJECT_GONE)?;
                 let full = HitPoints::of_master(master.hit_points).get();
-                let hp = u.life.hp.get();
+                let hp = unit.life.hp.get();
                 let short = |x: f32| f32::from(cvttss2si(x) as i16);
-                u.life.hp = HitPoints::new(match change {
+                unit.life.hp = HitPoints::new(match change {
                     Change::Set => short(v * hp / full),
                     Change::Add => short((full + v) * hp / full),
                     // COMISS 32767, x; JBE: a NaN holds the cap too
@@ -202,7 +212,7 @@ impl World {
                 if let Some(&(Some(kind), amount, flag)) = master.storage.get(j)
                     && flag != KEPT_STORAGE
                 {
-                    let owner = self.players.player_mut(p)?;
+                    let owner = self.players.player_mut(player_id)?;
                     owner.add_attribute(kind, -amount)?;
                     owner.add_attribute(kind, Amount::new(v))?;
                 }
@@ -216,10 +226,10 @@ impl World {
     /// the map (its tile `+0x2e8`, which one inside another has not) in state 2 lets its circle go
     /// (slot 0x1d8, its master's line of sight) and takes one of `los` (slot 0x1d0).
     pub(super) fn sight_again(&mut self, id: ObjectId, los: SightTiles) -> GenieResult<()> {
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        if u.life.state != ObjectState::Alive || u.life.inside.is_some() {
+        if unit.life.state != ObjectState::Alive || unit.life.inside.is_some() {
             return Ok(());
         }
         let Some(placed) = self.spatial.get(id).copied() else {
@@ -255,7 +265,7 @@ impl World {
     /// glow's particles (40) are not simulation; the rest is the static object's.
     pub(super) fn change_combat(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         change: Change,
@@ -273,8 +283,10 @@ impl World {
                 Ok(())
             }
             (MasterAttribute::TOTAL_MISSILES, _) => self.change_firepower(id, change, v),
-            (MasterAttribute::POPULATION, Change::Set) => self.population_storage(p, master, v),
-            _ => self.change_static(p, id, master, change, v, attribute),
+            (MasterAttribute::POPULATION, Change::Set) => {
+                self.population_storage(player_id, master, v)
+            }
+            _ => self.change_static(player_id, id, master, change, v, attribute),
         }
     }
 
@@ -297,11 +309,11 @@ impl World {
     /// magnitude (slot 0xf8 each).
     pub(super) fn population_storage(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         master: &Master,
         v: f32,
     ) -> GenieResult<()> {
-        let owner = self.players.player_mut(p)?;
+        let owner = self.players.player_mut(player_id)?;
         for &(kind, amount, _) in master.storage.iter().take(3) {
             // The resources the population attribute (110) moves an object's storage of
             // (`FUN_1412163c0`): headroom (4), and current population (11) and 19, which hold
@@ -327,7 +339,7 @@ impl World {
     /// its icon override (17, `+0xe`) is the interface's; the rest is the combat unit's.
     pub(super) fn change_building(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: ObjectId,
         master: &Master,
         change: Change,
@@ -339,9 +351,9 @@ impl World {
             (MasterAttribute::BUILDING_ICON_OVERRIDE, Change::Set) => Ok(()),
             (MasterAttribute::TRAIN_TIME, _) => {
                 let (_, layer) = self.object_and_layer_mut(id)?.ok_or(OBJECT_GONE)?;
-                if let Some(c) = layer.construction.as_mut() {
-                    c.progress = build_points_after(
-                        c.progress,
+                if let Some(construction) = layer.construction.as_mut() {
+                    construction.progress = build_points_after(
+                        construction.progress,
                         master.creatable_part().build_time,
                         change,
                         v,
@@ -349,7 +361,7 @@ impl World {
                 }
                 Ok(())
             }
-            _ => self.change_combat(p, id, master, change, v, attribute),
+            _ => self.change_combat(player_id, id, master, change, v, attribute),
         }
     }
 }
@@ -397,7 +409,7 @@ pub(super) fn build_points_after(
 /// `unit` lies within the player's master table (`0 <= unit < player+0x20`): the slice's
 /// [`Masters`] hold no count past their last master, which stands for the table's end.
 pub(super) fn within_table(masters: &Masters, unit: MasterId) -> bool {
-    masters.iter().any(|m| unit <= m.id)
+    masters.iter().any(|master| unit <= master.id)
 }
 
 /// The object has an action in its list (`+0x880`'s first node; a building producing has its

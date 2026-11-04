@@ -21,10 +21,10 @@ pub struct UnitAiStateCommand {
 impl UnitAiStateCommand {
     /// The check (`FUN_140e55d30`) refuses a count past the packet's ids; the handler reads
     /// the first of them ([`World::read_units`], [`World::unit_ai_state`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
-        w.unit_ai_state(self.player, ids, self.state)
+        world.unit_ai_state(self.player, ids, self.state)
     }
 }

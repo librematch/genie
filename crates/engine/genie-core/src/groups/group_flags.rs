@@ -61,7 +61,7 @@ impl GroupFlags {
 
 impl genie_diff::Diff for GroupFlags {
     /// By equality: the flags are one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }

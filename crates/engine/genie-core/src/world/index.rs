@@ -61,11 +61,11 @@ pub(crate) enum Place {
 }
 
 impl Place {
-    /// Slot `i` of player `p`'s list of `kind`.
-    pub(crate) const fn of(p: PlayerId, kind: ListKind, i: ListIndex) -> Self {
+    /// Slot `list_index` of player `player_id`'s list of `kind`.
+    pub(crate) const fn of(player_id: PlayerId, kind: ListKind, list_index: ListIndex) -> Self {
         match kind {
-            ListKind::Sleeping => Self::Sleeping(p, i),
-            ListKind::Live => Self::Live(p, i),
+            ListKind::Sleeping => Self::Sleeping(player_id, list_index),
+            ListKind::Live => Self::Live(player_id, list_index),
         }
     }
 
@@ -80,14 +80,14 @@ impl Place {
     /// The object's player (`+0x138`'s number).
     pub(crate) const fn player(self) -> PlayerId {
         match self {
-            Self::Live(p, _) | Self::Sleeping(p, _) => p,
+            Self::Live(player_id, _) | Self::Sleeping(player_id, _) => player_id,
         }
     }
 
     /// The slot in its list.
     pub(crate) const fn slot(self) -> ListIndex {
         match self {
-            Self::Live(_, i) | Self::Sleeping(_, i) => i,
+            Self::Live(_, list_index) | Self::Sleeping(_, list_index) => list_index,
         }
     }
 
@@ -96,9 +96,9 @@ impl Place {
         matches!(self, Self::Sleeping(..))
     }
 
-    /// Slot `i` of the same list.
-    const fn at(self, i: ListIndex) -> Self {
-        Self::of(self.player(), self.list(), i)
+    /// Slot `list_index` of the same list.
+    const fn at(self, list_index: ListIndex) -> Self {
+        Self::of(self.player(), self.list(), list_index)
     }
 }
 
@@ -123,12 +123,12 @@ impl ObjectIndex {
     #[must_use]
     pub fn of(players: &[Player]) -> Self {
         let mut index = Self::default();
-        for (p, player) in PlayerId::each(players.len()).zip(players) {
+        for (player_id, player) in PlayerId::each(players.len()).zip(players) {
             for (i, u) in player.objects.indexed() {
-                index.file(u.id, Place::Live(p, i));
+                index.file(u.id, Place::Live(player_id, i));
             }
-            for (i, u) in player.sleeping.indexed() {
-                index.file(u.id, Place::Sleeping(p, i));
+            for (list_index, unit) in player.sleeping.indexed() {
+                index.file(unit.id, Place::Sleeping(player_id, list_index));
             }
         }
         index
@@ -171,7 +171,7 @@ impl ObjectIndex {
         let player = players.get(place.player().index())?;
         list(player, place.list())
             .get(place.slot())
-            .is_some_and(|u| u.id == id)
+            .is_some_and(|unit| unit.id == id)
             .then_some(place)
     }
 
@@ -182,17 +182,17 @@ impl ObjectIndex {
         id: impl ObjectKey,
     ) -> Option<(PlayerId, &'a Unit, bool)> {
         let place = self.place(players, id)?;
-        let u = players.at(place).ok()?;
-        Some((place.player(), u, place.sleeping()))
+        let unit = players.at(place).ok()?;
+        Some((place.player(), unit, place.sleeping()))
     }
 
     /// `unit` goes to the end of `list`, the list of `at`'s player and kind; returns its slot.
     pub(crate) fn push(&mut self, list: &mut ObjectList, at: Place, unit: Unit) -> ListIndex {
-        let i = list.next_place();
+        let list_index = list.next_place();
         let id = unit.id;
         list.push(unit);
-        self.file(id, at.at(i));
-        i
+        self.file(id, at.at(list_index));
+        list_index
     }
 
     /// The object at `place` leaves `list` (the list there); the last one takes its slot.
@@ -201,11 +201,11 @@ impl ObjectIndex {
     ///
     /// The list holds no such slot.
     pub(crate) fn swap_remove(&mut self, list: &mut ObjectList, place: Place) -> GenieResult<Unit> {
-        let i = place.slot();
-        let out = list.out_at(i);
-        let gone = list.swap_remove(i)?;
+        let list_index = place.slot();
+        let out = list.out_at(list_index);
+        let gone = list.swap_remove(list_index)?;
         self.left(gone.id, out, place);
-        if let Some(moved) = list.get(i).map(|u| u.id) {
+        if let Some(moved) = list.get(list_index).map(|unit| unit.id) {
             self.refile(moved, place);
         }
         Ok(gone)
@@ -217,18 +217,18 @@ impl ObjectIndex {
     ///
     /// The list holds no such slot.
     pub(crate) fn remove(&mut self, list: &mut ObjectList, place: Place) -> GenieResult<Unit> {
-        let i = place.slot();
-        let out = list.out_at(i);
-        let gone = list.remove(i)?;
+        let slot = place.slot();
+        let out = list.out_at(slot);
+        let gone = list.remove(slot)?;
         self.left(gone.id, out, place);
-        for (k, u) in list.indexed().skip(i.get()) {
-            self.refile(u.id, place.at(k));
+        for (list_index, unit) in list.indexed().skip(slot.get()) {
+            self.refile(unit.id, place.at(list_index));
         }
         Ok(gone)
     }
 
-    /// `unit`, which `list` (player `p`'s live list) let out, goes back to the slot its stand-in
-    /// holds now: that slot.
+    /// `unit`, which `list` (player `player_id`'s live list) let out, goes back to the slot its
+    /// stand-in holds now: that slot.
     ///
     /// # Errors
     ///
@@ -236,13 +236,13 @@ impl ObjectIndex {
     pub(crate) fn put_back(
         &mut self,
         list: &mut ObjectList,
-        p: PlayerId,
+        player_id: PlayerId,
         unit: Unit,
     ) -> Result<ListIndex, Box<Unit>> {
         let id = unit.id;
-        let i = list.put_back(unit)?;
-        self.refile(id, Place::Live(p, i));
-        Ok(i)
+        let list_index = list.put_back(unit)?;
+        self.refile(id, Place::Live(player_id, list_index));
+        Ok(list_index)
     }
 
     /// Object `id` takes `place`, unless the table holds it already (then the lists hold it
@@ -371,8 +371,8 @@ impl<'a> ObjectsRef<'a> {
     /// or one out for its update.
     #[must_use]
     pub fn mover_of(&self, id: impl ObjectKey) -> Option<&'a Mover> {
-        let u = self.get(id)?;
-        self.motions.get(u.id).and_then(Motion::mover)
+        let unit = self.get(id)?;
+        self.motions.get(unit.id).and_then(Motion::mover)
     }
 
     /// Object `id`'s combat layer, an object out for its update's too: a new object's where
@@ -416,7 +416,7 @@ impl<'a> ObjectsRef<'a> {
     /// Object `id`, live or sleeping.
     #[must_use]
     pub fn get(&self, id: impl ObjectKey) -> Option<&'a Unit> {
-        self.index.locate(self.players, id).map(|(_, u, _)| u)
+        self.index.locate(self.players, id).map(|(_, unit, _)| unit)
     }
 
     /// Object `id`, live or sleeping, with its owner and its master ([`Unit::master`]); none
@@ -429,20 +429,24 @@ impl<'a> ObjectsRef<'a> {
         &self,
         id: impl ObjectKey,
     ) -> GenieResult<Option<(PlayerId, &'a Unit, &'a Master)>> {
-        let Some((p, u, _)) = self.index.locate(self.players, id) else {
+        let Some((player_id, unit, _)) = self.index.locate(self.players, id) else {
             return Ok(None);
         };
-        Ok(Some((p, u, u.master(self.masters, p)?)))
+        Ok(Some((
+            player_id,
+            unit,
+            unit.master(self.masters, player_id)?,
+        )))
     }
 
     /// What a walk reads of the moving object `id` ([`Unit::gait`]); none for an object without
     /// movement state, one the world does not hold or one out for its update.
     #[must_use]
     pub fn gait(&self, id: impl ObjectKey) -> Option<Gait> {
-        let u = self.get(id)?;
-        u.gait(
-            self.actions.of(u.id),
-            self.motions.get(u.id).and_then(Motion::mover),
+        let unit = self.get(id)?;
+        unit.gait(
+            self.actions.of(unit.id),
+            self.motions.get(unit.id).and_then(Motion::mover),
         )
     }
 
@@ -479,8 +483,8 @@ impl<'a> ObjectsRef<'a> {
     #[must_use]
     pub fn annexes(&self, main: impl ObjectKey) -> Annexes {
         self.get(main)
-            .and_then(|u| self.buildings.get(u.id))
-            .map_or(Annexes::NONE, |b| b.annexes)
+            .and_then(|unit| self.buildings.get(unit.id))
+            .map_or(Annexes::NONE, |building| building.annexes)
     }
 
     /// The obstruction query's ignore list for `ids` (−1 for none), as `FUN_14114e8a0` adds each
@@ -498,7 +502,7 @@ impl<'a> ObjectsRef<'a> {
     /// Whether object `id` moves now ([`crate::map::spatial::Gait::moving`]).
     #[must_use]
     pub fn moving(&self, id: impl ObjectKey) -> bool {
-        self.gait(id).is_some_and(|g| g.moving)
+        self.gait(id).is_some_and(|gait| gait.moving)
     }
 }
 
@@ -525,12 +529,12 @@ impl TestObjects {
             return;
         };
         let made = gait.map(|g| {
-            let o = unit_with_gait(id, g);
+            let object = unit_with_gait(id, g);
             let _ = self
                 .parts
                 .motion
-                .insert(id, o.parts.motion.expect("a walker's motion part"));
-            o.unit
+                .insert(id, object.parts.motion.expect("a walker's motion part"));
+            object.unit
         });
         if made.is_none() {
             let _ = self.parts.building.remove(id);
@@ -539,7 +543,7 @@ impl TestObjects {
         player.objects = player
             .objects
             .iter()
-            .filter(|u| u.id != id)
+            .filter(|unit| unit.id != id)
             .cloned()
             .chain(made)
             .collect();
@@ -600,12 +604,12 @@ impl World {
     /// A test's link of `annex` to the building `main`: the annex's `+0xbb8` and the building's
     /// first empty slot, as far as the world holds each.
     pub(crate) fn link_test_annex(&mut self, annex: ObjectId, main: ObjectId) {
-        if let Ok(Some((_, a))) = self.object_and_layer_mut(annex) {
-            a.annex_of = Some(MainBuildingId::new(main));
+        if let Ok(Some((_, annex_building))) = self.object_and_layer_mut(annex) {
+            annex_building.annex_of = Some(MainBuildingId::new(main));
         }
-        if let Ok(Some((_, m))) = self.object_and_layer_mut(main) {
-            let slot = m.annexes.ids().count();
-            let _ = m.annexes.link(slot, annex);
+        if let Ok(Some((_, building))) = self.object_and_layer_mut(main) {
+            let slot = building.annexes.ids().count();
+            let _ = building.annexes.link(slot, annex);
         }
     }
 }
@@ -614,12 +618,12 @@ impl World {
 fn scan(players: &[Player], id: ObjectId) -> Option<Place> {
     PlayerId::each(players.len())
         .zip(players)
-        .find_map(|(p, player)| {
+        .find_map(|(player_id, player)| {
             if let Some(i) = player.objects.position_of(id) {
-                return Some(Place::Live(p, i));
+                return Some(Place::Live(player_id, i));
             }
-            let i = player.sleeping.position_of(id)?;
-            Some(Place::Sleeping(p, i))
+            let list_index = player.sleeping.position_of(id)?;
+            Some(Place::Sleeping(player_id, list_index))
         })
 }
 
@@ -656,42 +660,50 @@ impl World {
         self.index.place(&self.players, id)
     }
 
-    /// Object `id`'s slot in player `p`'s live list, if it is there.
-    pub(crate) fn live_index(&self, p: PlayerId, id: impl ObjectKey) -> Option<ListIndex> {
+    /// Object `id`'s slot in player `owner`'s live list, if it is there.
+    pub(crate) fn live_index(&self, owner: PlayerId, id: impl ObjectKey) -> Option<ListIndex> {
         match self.place(id)? {
-            Place::Live(q, i) if q == p => Some(i),
+            Place::Live(player_id, list_index) if player_id == owner => Some(list_index),
             _ => None,
         }
     }
 
-    /// Player `p`'s live object `id`, if its live list holds it.
-    pub(crate) fn live_object(&self, p: PlayerId, id: impl ObjectKey) -> Option<&Unit> {
-        let i = self.live_index(p, id)?;
-        self.players.live(p, i).ok()
+    /// Player `player_id`'s live object `id`, if its live list holds it.
+    pub(crate) fn live_object(&self, player_id: PlayerId, id: impl ObjectKey) -> Option<&Unit> {
+        let list_index = self.live_index(player_id, id)?;
+        self.players.live(player_id, list_index).ok()
     }
 
-    /// Player `p`'s live object `id` to change, if its live list holds it.
-    pub(crate) fn live_object_mut(&mut self, p: PlayerId, id: impl ObjectKey) -> Option<&mut Unit> {
-        let i = self.live_index(p, id)?;
-        self.players.live_mut(p, i).ok()
+    /// Player `player_id`'s live object `id` to change, if its live list holds it.
+    pub(crate) fn live_object_mut(
+        &mut self,
+        player_id: PlayerId,
+        id: impl ObjectKey,
+    ) -> Option<&mut Unit> {
+        let list_index = self.live_index(player_id, id)?;
+        self.players.live_mut(player_id, list_index).ok()
     }
 
-    /// `object` goes to the end of player `p`'s live list, its parts into the world's tables;
-    /// returns its slot.
+    /// `object` goes to the end of player `player_id`'s live list, its parts into the world's
+    /// tables; returns its slot.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
-    pub fn push_live(&mut self, p: PlayerId, object: impl Into<Object>) -> GenieResult<ListIndex> {
+    pub fn push_live(
+        &mut self,
+        player_id: PlayerId,
+        object: impl Into<Object>,
+    ) -> GenieResult<ListIndex> {
         let Object { unit, parts } = object.into();
-        let list = &mut self.players.player_mut(p)?.objects;
+        let list = &mut self.players.player_mut(player_id)?.objects;
         self.parts.file(unit.id, parts);
         Ok(self
             .index
-            .push(list, Place::Live(p, ListIndex::new(0)), unit))
+            .push(list, Place::Live(player_id, ListIndex::new(0)), unit))
     }
 
-    /// `object` goes to the end of player `p`'s sleeping list, its parts into the world's
+    /// `object` goes to the end of player `player_id`'s sleeping list, its parts into the world's
     /// tables; returns its slot.
     ///
     /// # Errors
@@ -699,64 +711,84 @@ impl World {
     /// A player the world does not hold.
     pub fn push_asleep(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         object: impl Into<Object>,
     ) -> GenieResult<ListIndex> {
         let Object { unit, parts } = object.into();
-        let list = &mut self.players.player_mut(p)?.sleeping;
+        let list = &mut self.players.player_mut(player_id)?.sleeping;
         self.parts.file(unit.id, parts);
         Ok(self
             .index
-            .push(list, Place::Sleeping(p, ListIndex::new(0)), unit))
+            .push(list, Place::Sleeping(player_id, ListIndex::new(0)), unit))
     }
 
-    /// The objects of `objects` go to the end of player `p`'s live list, in their order.
+    /// The objects of `objects` go to the end of player `player_id`'s live list, in their order.
     ///
     /// # Errors
     ///
     /// A player the world does not hold.
     pub fn extend_live<O: Into<Object>>(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         objects: impl IntoIterator<Item = O>,
     ) -> GenieResult<()> {
         for object in objects {
-            let _ = self.push_live(p, object)?;
+            let _ = self.push_live(player_id, object)?;
         }
         Ok(())
     }
 
-    /// The object in slot `i` of player `p`'s live list leaves it; the last one takes its slot.
+    /// The object in slot `list_index` of player `player_id`'s live list leaves it; the last one
+    /// takes its slot.
     ///
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_live(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
-        let list = &mut self.players.player_mut(p)?.objects;
-        let unit = self.index.swap_remove(list, Place::Live(p, i))?;
+    pub fn swap_remove_live(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+    ) -> GenieResult<Object> {
+        let list = &mut self.players.player_mut(player_id)?.objects;
+        let unit = self
+            .index
+            .swap_remove(list, Place::Live(player_id, list_index))?;
         Ok(self.whole_from(unit))
     }
 
-    /// The object in slot `i` of player `p`'s sleeping list leaves it; the last one takes its
-    /// slot.
+    /// The object in slot `list_index` of player `player_id`'s sleeping list leaves it; the last
+    /// one takes its slot.
     ///
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn swap_remove_asleep(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
-        let list = &mut self.players.player_mut(p)?.sleeping;
-        let unit = self.index.swap_remove(list, Place::Sleeping(p, i))?;
+    pub fn swap_remove_asleep(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+    ) -> GenieResult<Object> {
+        let list = &mut self.players.player_mut(player_id)?.sleeping;
+        let unit = self
+            .index
+            .swap_remove(list, Place::Sleeping(player_id, list_index))?;
         Ok(self.whole_from(unit))
     }
 
-    /// The object in slot `i` of player `p`'s live list leaves it; the ones after it move up.
+    /// The object in slot `list_index` of player `player_id`'s live list leaves it; the ones after
+    /// it move up.
     ///
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn remove_live(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Object> {
-        let list = &mut self.players.player_mut(p)?.objects;
-        let unit = self.index.remove(list, Place::Live(p, i))?;
+    pub fn remove_live(
+        &mut self,
+        player_id: PlayerId,
+        list_index: ListIndex,
+    ) -> GenieResult<Object> {
+        let list = &mut self.players.player_mut(player_id)?.objects;
+        let unit = self
+            .index
+            .remove(list, Place::Live(player_id, list_index))?;
         Ok(self.whole_from(unit))
     }
 
@@ -766,29 +798,32 @@ impl World {
         Object { unit, parts }
     }
 
-    /// The object in slot `i` of player `p`'s live list leaves its slot for a while (its update,
-    /// a call on it); its stand-in holds the slot, which the list's removals keep track of. The
-    /// table keeps its place, which answers none while the stand-in holds it.
+    /// The object in slot `list_index` of player `player_id`'s live list leaves its slot for a
+    /// while (its update, a call on it); its stand-in holds the slot, which the list's removals
+    /// keep track of. The table keeps its place, which answers none while the stand-in holds it.
     ///
     /// # Errors
     ///
     /// A player or a slot the world does not hold.
-    pub fn take_out(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<Unit> {
-        self.players.player_mut(p)?.objects.take_out(i)
+    pub fn take_out(&mut self, player_id: PlayerId, list_index: ListIndex) -> GenieResult<Unit> {
+        self.players
+            .player_mut(player_id)?
+            .objects
+            .take_out(list_index)
     }
 
-    /// `unit`, which [`World::take_out`] took from player `p`'s live list, goes back to the slot
-    /// its stand-in holds now: that slot.
+    /// `unit`, which [`World::take_out`] took from player `player_id`'s live list, goes back to the
+    /// slot its stand-in holds now: that slot.
     ///
     /// # Errors
     ///
     /// The unit, when its stand-in left the list (or it was never taken out), or the player is
     /// not the world's.
-    pub fn put_back(&mut self, p: PlayerId, unit: Unit) -> Result<ListIndex, Box<Unit>> {
-        let Some(player) = self.players.get_mut(p.index()) else {
+    pub fn put_back(&mut self, player_id: PlayerId, unit: Unit) -> Result<ListIndex, Box<Unit>> {
+        let Some(player) = self.players.get_mut(player_id.index()) else {
             return Err(Box::new(unit));
         };
-        self.index.put_back(&mut player.objects, p, unit)
+        self.index.put_back(&mut player.objects, player_id, unit)
     }
 }
 
@@ -839,152 +874,178 @@ mod tests {
     #[test]
     fn the_objects_view_reads_each_unit_gait_by_id() {
         use crate::map::spatial::Gait;
-        let mut t = world(&[&[1, 2]]);
+        let mut world = world(&[&[1, 2]]);
         let walking = Gait {
             moving: true,
             last_move: WorldTime::from_millis(70),
             ..Gait::default()
         };
-        let p = PlayerId::new(0);
-        let _ = t
-            .push_live(p, unit_with_gait(object_id(3), walking))
+        let player_id = PlayerId::new(0);
+        let _ = world
+            .push_live(player_id, unit_with_gait(object_id(3), walking))
             .unwrap();
-        assert_eq!(t.objects().gait(object_id(3)), Some(walking));
-        assert!(t.objects().moving(object_id(3)));
-        assert_eq!(t.objects().gait(object_id(1)), None, "no movement state");
-        assert!(!t.objects().moving(object_id(9)), "not held");
-        let i = t.live_index(p, object_id(3)).unwrap();
-        let out = t.take_out(p, i).unwrap();
-        assert_eq!(t.objects().gait(object_id(3)), None, "out for its update");
-        let _ = t.put_back(p, out).unwrap();
-        assert!(t.objects().moving(object_id(3)));
+        assert_eq!(world.objects().gait(object_id(3)), Some(walking));
+        assert!(world.objects().moving(object_id(3)));
+        assert_eq!(
+            world.objects().gait(object_id(1)),
+            None,
+            "no movement state"
+        );
+        assert!(!world.objects().moving(object_id(9)), "not held");
+        let list_index = world.live_index(player_id, object_id(3)).unwrap();
+        let out = world.take_out(player_id, list_index).unwrap();
+        assert_eq!(
+            world.objects().gait(object_id(3)),
+            None,
+            "out for its update"
+        );
+        let _ = world.put_back(player_id, out).unwrap();
+        assert!(world.objects().moving(object_id(3)));
     }
 
     #[test]
     fn the_table_finds_each_object_of_the_players_lists() {
-        let mut t = world(&[&[1, 2], &[3]]);
-        assert_eq!(t.place(object_id(2)), Some(live(0, 1)));
-        assert_eq!(t.place(object_id(3)), Some(live(1, 0)));
-        assert_eq!(t.place(object_id(9)), None);
-        let i = t.push_asleep(PlayerId::new(1), unit(4)).unwrap();
+        let mut world = world(&[&[1, 2], &[3]]);
+        assert_eq!(world.place(object_id(2)), Some(live(0, 1)));
+        assert_eq!(world.place(object_id(3)), Some(live(1, 0)));
+        assert_eq!(world.place(object_id(9)), None);
+        let list_index = world.push_asleep(PlayerId::new(1), unit(4)).unwrap();
         assert_eq!(
-            (i, t.place(object_id(4))),
+            (list_index, world.place(object_id(4))),
             (ListIndex::new(0), Some(asleep(1, 0)))
         );
         assert_eq!(
-            t.live_index(PlayerId::new(1), object_id(4)),
+            world.live_index(PlayerId::new(1), object_id(4)),
             None,
             "asleep, not live"
         );
         assert_eq!(
-            t.live_index(PlayerId::new(0), object_id(3)),
+            world.live_index(PlayerId::new(0), object_id(3)),
             None,
             "another player's"
         );
         assert_eq!(
-            t.live_index(PlayerId::new(1), object_id(3)),
+            world.live_index(PlayerId::new(1), object_id(3)),
             Some(ListIndex::new(0))
         );
         assert_eq!(
-            t.locate(object_id(4)).map(|(p, u, s)| (p, u.id, s)),
+            world
+                .locate(object_id(4))
+                .map(|(player_id, u, s)| (player_id, u.id, s)),
             Some((PlayerId::new(1), object_id(4), true))
         );
     }
 
     #[test]
     fn swap_remove_files_the_object_that_took_the_slot() {
-        let mut t = world(&[&[1, 2, 3]]);
-        let gone = t
+        let mut world = world(&[&[1, 2, 3]]);
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::new(0))
             .unwrap();
         assert_eq!(gone.unit.id, object_id(1));
-        assert_eq!(t.place(object_id(1)), None);
-        assert_eq!(t.place(object_id(3)), Some(live(0, 0)));
-        assert_eq!(t.place(object_id(2)), Some(live(0, 1)));
-        let gone = t
+        assert_eq!(world.place(object_id(1)), None);
+        assert_eq!(world.place(object_id(3)), Some(live(0, 0)));
+        assert_eq!(world.place(object_id(2)), Some(live(0, 1)));
+        let gone = world
             .swap_remove_live(PlayerId::new(0), ListIndex::new(1))
             .unwrap();
         assert_eq!(
-            (gone.unit.id, t.place(object_id(3))),
+            (gone.unit.id, world.place(object_id(3))),
             (object_id(2), Some(live(0, 0)))
         );
         assert!(
-            t.swap_remove_live(PlayerId::new(0), ListIndex::new(4))
+            world
+                .swap_remove_live(PlayerId::new(0), ListIndex::new(4))
                 .is_err()
         );
         assert!(
-            t.swap_remove_live(PlayerId::new(5), ListIndex::new(0))
+            world
+                .swap_remove_live(PlayerId::new(5), ListIndex::new(0))
                 .is_err()
         );
     }
 
     #[test]
     fn remove_moves_the_later_objects_up_in_the_table() {
-        let mut t = world(&[&[1, 2, 3]]);
-        let gone = t.remove_live(PlayerId::new(0), ListIndex::new(0)).unwrap();
+        let mut world = world(&[&[1, 2, 3]]);
+        let gone = world
+            .remove_live(PlayerId::new(0), ListIndex::new(0))
+            .unwrap();
         assert_eq!(gone.unit.id, object_id(1));
         assert_eq!(
-            (t.place(object_id(2)), t.place(object_id(3))),
+            (world.place(object_id(2)), world.place(object_id(3))),
             (Some(live(0, 0)), Some(live(0, 1)))
         );
     }
 
     #[test]
     fn an_object_out_for_its_update_is_none_until_it_goes_back() {
-        let mut t = world(&[&[1, 2, 3]]);
-        let p = PlayerId::new(0);
-        let out = t.take_out(p, ListIndex::new(0)).unwrap();
-        assert_eq!(t.place(object_id(1)), None, "its stand-in holds the slot");
+        let mut world = world(&[&[1, 2, 3]]);
+        let player_id = PlayerId::new(0);
+        let out = world.take_out(player_id, ListIndex::new(0)).unwrap();
+        assert_eq!(
+            world.place(object_id(1)),
+            None,
+            "its stand-in holds the slot"
+        );
         // another object leaves: the last one takes its slot
-        let _ = t.swap_remove_live(p, ListIndex::new(1)).unwrap();
-        assert_eq!(t.place(object_id(3)), Some(live(0, 1)));
-        assert_eq!(t.put_back(p, out).ok(), Some(ListIndex::new(0)));
-        assert_eq!(t.place(object_id(1)), Some(live(0, 0)));
+        let _ = world
+            .swap_remove_live(player_id, ListIndex::new(1))
+            .unwrap();
+        assert_eq!(world.place(object_id(3)), Some(live(0, 1)));
+        assert_eq!(world.put_back(player_id, out).ok(), Some(ListIndex::new(0)));
+        assert_eq!(world.place(object_id(1)), Some(live(0, 0)));
         // a stand-in that moves with a swap remove: its object goes back where it went
-        let out = t.take_out(p, ListIndex::new(1)).unwrap();
-        let _ = t.swap_remove_live(p, ListIndex::new(0)).unwrap();
-        assert_eq!(t.put_back(p, out).ok(), Some(ListIndex::new(0)));
-        assert_eq!(t.place(object_id(3)), Some(live(0, 0)));
+        let out = world.take_out(player_id, ListIndex::new(1)).unwrap();
+        let _ = world
+            .swap_remove_live(player_id, ListIndex::new(0))
+            .unwrap();
+        assert_eq!(world.put_back(player_id, out).ok(), Some(ListIndex::new(0)));
+        assert_eq!(world.place(object_id(3)), Some(live(0, 0)));
     }
 
     #[test]
     fn an_object_whose_stand_in_left_leaves_the_table_for_good() {
-        let mut t = world(&[&[1, 2]]);
-        let p = PlayerId::new(0);
-        let out = t.take_out(p, ListIndex::new(0)).unwrap();
+        let mut world = world(&[&[1, 2]]);
+        let player_id = PlayerId::new(0);
+        let out = world.take_out(player_id, ListIndex::new(0)).unwrap();
         assert_eq!(
-            t.swap_remove_live(p, ListIndex::new(0)).unwrap().unit.id,
+            world
+                .swap_remove_live(player_id, ListIndex::new(0))
+                .unwrap()
+                .unit
+                .id,
             TAKEN_OUT
         );
-        assert!(t.put_back(p, out).is_err());
+        assert!(world.put_back(player_id, out).is_err());
         // its id comes again (a recycled missile's): filed once, the table still answers
-        let _ = t.push_live(p, unit(1)).unwrap();
-        assert!(!t.index.scans());
-        assert_eq!(t.place(object_id(1)), Some(live(0, 1)));
+        let _ = world.push_live(player_id, unit(1)).unwrap();
+        assert!(!world.index.scans());
+        assert_eq!(world.place(object_id(1)), Some(live(0, 1)));
     }
 
     #[test]
     fn lists_that_hold_an_id_twice_answer_by_scanning() {
-        let t = world(&[&[5], &[0, 5]]);
-        assert!(t.index.scans());
+        let world = world(&[&[5], &[0, 5]]);
+        assert!(world.index.scans());
         assert_eq!(
-            t.place(object_id(5)),
+            world.place(object_id(5)),
             Some(live(0, 0)),
             "the first player's"
         );
-        assert_eq!(t.place(object_id(0)), Some(live(1, 0)));
+        assert_eq!(world.place(object_id(0)), Some(live(1, 0)));
     }
 
     #[test]
     fn list_changed_in_place_answers_once_reindexed() {
-        let mut t = world(&[&[1, 2]]);
-        t.players[0].objects.push(unit(7));
+        let mut world = world(&[&[1, 2]]);
+        world.players[0].objects.push(unit(7));
         assert_eq!(
-            t.place(object_id(7)),
+            world.place(object_id(7)),
             None,
             "the table does not know a raw push"
         );
-        t.reindex();
-        assert_eq!(t.place(object_id(7)), Some(live(0, 2)));
+        world.reindex();
+        assert_eq!(world.place(object_id(7)), Some(live(0, 2)));
     }
 }

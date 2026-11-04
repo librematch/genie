@@ -50,8 +50,8 @@ impl World {
         idx: ListIndex,
         target: ObjectId,
     ) -> GenieResult<()> {
-        let (_, t) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
-        let point = t.position();
+        let (_, unit) = self.object(target).ok_or(HUNT_TARGET_GONE)?;
+        let point = unit.position();
         let task = self
             .find_work_task(player, idx, target, None, MasterSwap::Change)?
             .ok_or(NO_HUNT_TASK)?;
@@ -105,7 +105,7 @@ impl World {
                 .actions_of(unit.id)
                 .list
                 .gather()
-                .is_some_and(|g| g.task.id == task.id)
+                .is_some_and(|gather_action| gather_action.task.id == task.id)
         {
             let _ = self.retarget_gather(player, idx, target)?;
             return Ok(());
@@ -130,12 +130,12 @@ impl World {
         point: Position,
         notifies: Notifies,
     ) -> GenieResult<()> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
         ))?;
-        let tm = t.master(self.master_tables(), tp)?;
-        let (target_at, target_radius, class) = (t.position(), tm.radius, tm.class);
-        let target_state = Some(t.life.state);
+        let tm = target_unit.master(self.master_tables(), tp)?;
+        let (target_at, target_radius, class) = (target_unit.position(), tm.radius, tm.class);
+        let target_state = Some(target_unit.life.state);
         let unit = &self.players.live(player, idx)?;
         let builder = unit.master(self.master_tables(), player)?;
         let to = WalkTo {
@@ -193,8 +193,8 @@ impl World {
         target: ObjectId,
         task: &Task,
     ) -> GenieResult<(RepairAction, ClassId)> {
-        let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
-        let tm = t.master(self.master_tables(), tp)?;
+        let (tp, target_unit) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
+        let tm = target_unit.master(self.master_tables(), tp)?;
         if self
             .model
             .roles
@@ -215,7 +215,7 @@ impl World {
             ),
             &self.model.roles,
         );
-        let to = move_reads.walk_to_found(self, (tp, t))?;
+        let to = move_reads.walk_to_found(self, (tp, target_unit))?;
         let repair_task = RepairTask::of(task);
         let repair = RepairAction::start(
             to,
@@ -350,8 +350,8 @@ impl World {
         repair: RepairAction,
         target: ObjectId,
     ) -> GenieResult<ClassId> {
-        let (tp, t) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
-        let tm = t.master(self.master_tables(), tp)?;
+        let (tp, target_unit) = self.object(target).ok_or(REPAIR_TARGET_GONE)?;
+        let tm = target_unit.master(self.master_tables(), tp)?;
         let (class, ship) = (
             tm.class,
             self.model
@@ -398,19 +398,23 @@ impl World {
             let unit = self.players.live_mut(player, idx)?;
             // the retarget's release and take changed other objects only: `repair` is still the
             // Repair on top, which goes back changed
-            let mut r = repair;
+            let mut repair_action = repair;
             // slot 0x68 dropped the count on another target; set_state(4)'s prelude makes a
             // repairer still counted leave its repairers
-            let counted = same && r.counted;
-            r.counted = false;
-            r.target = taken;
-            let walked = r.walk_again(
+            let counted = same && repair_action.counted;
+            repair_action.counted = false;
+            repair_action.target = taken;
+            let walked = repair_action.walk_again(
                 to,
                 self.parts.motion.mover_mut(unit.id),
                 &move_reads,
                 &self.model.tuning.move_to,
             );
-            self.parts.actions.of_mut(unit.id)?.list.set_repair(Some(r));
+            self.parts
+                .actions
+                .of_mut(unit.id)?
+                .list
+                .set_repair(Some(repair_action));
             walked?;
             if counted {
                 self.leave_builders(Some(target))?;
@@ -459,7 +463,7 @@ impl World {
         old: BuildAction,
         target: ObjectId,
     ) -> GenieResult<ClassId> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "a Build's foundation the slice does not hold",
         ))?;
         if tp != player {
@@ -467,9 +471,9 @@ impl World {
                 "a Build retargeted to another player's object (set_state 11)",
             ));
         }
-        let tm = t.master(self.master_tables(), tp)?;
-        let (target_at, target_radius, class) = (t.position(), tm.radius, tm.class);
-        let target_state = Some(t.life.state);
+        let tm = target_unit.master(self.master_tables(), tp)?;
+        let (target_at, target_radius, class) = (target_unit.position(), tm.radius, tm.class);
+        let target_state = Some(target_unit.life.state);
         let unit = &self.players.live(player, idx)?;
         let builder = unit.master(self.master_tables(), player)?;
         let to = WalkTo {
@@ -527,9 +531,9 @@ impl World {
         };
         let builders = counted
             .and_then(|id| self.parts.building.get_mut(id))
-            .and_then(|b| b.construction.as_mut())
-            .map(|k| &mut k.builders);
-        let r = build.retake(target_at, walk, mover.as_mut(), builders, player_kind);
+            .and_then(|building| building.construction.as_mut())
+            .map(|construction| &mut construction.builders);
+        let retake = build.retake(target_at, walk, mover.as_mut(), builders, player_kind);
         let unit = self.players.live_mut(player, idx)?;
         self.parts
             .actions
@@ -537,7 +541,7 @@ impl World {
             .list
             .set_build(Some(build));
         self.parts.put_mover(unit.id, mover);
-        r?;
+        retake?;
         Ok(class)
     }
 
@@ -582,13 +586,14 @@ impl World {
     /// `id` (live or sleeping, `FUN_1415417a0`): the object itself, or for a building (type 80)
     /// that is an annex (`+0xbb8`) its main building.
     pub(crate) fn counted_building(&self, id: impl ObjectKey) -> GenieResult<Option<ObjectId>> {
-        let Some((id, (p, f))) = id.key().and_then(|id| Some((id, self.object(id)?))) else {
+        let Some((id, (player_id, unit))) = id.key().and_then(|id| Some((id, self.object(id)?)))
+        else {
             return Ok(None);
         };
-        let kind = f.master(self.master_tables(), p)?.kind;
+        let kind = unit.master(self.master_tables(), player_id)?.kind;
         Ok(Some(if kind == MasterKind::BUILDING {
             self.parts
-                .building_of(f.id)
+                .building_of(unit.id)
                 .annex_of
                 .map_or(id, MainBuildingId::id)
         } else {

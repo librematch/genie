@@ -17,8 +17,8 @@ use std::iter::once;
 /// A little-endian vector of three floats, as the save holds one.
 fn vec3(v: [f32; 3]) -> [u8; 12] {
     let mut b = [0; 12];
-    for (i, f) in v.iter().enumerate() {
-        b[4 * i..4 * i + 4].copy_from_slice(&f.to_le_bytes());
+    for (index, f) in v.iter().enumerate() {
+        b[4 * index..4 * index + 4].copy_from_slice(&f.to_le_bytes());
     }
     b
 }
@@ -119,11 +119,11 @@ fn full_group_view_imports_the_groups() {
 #[test]
 fn an_object_view_has_row_per_live_object() {
     let mut walker = with_actions(5, vec![(4, explore(3))]);
-    let s = static_mut(&mut walker);
-    s.hp = 25.0;
-    s.tx = 1.0;
-    s.ty = 2.0;
-    s.sprite = -1;
+    let rge_static_object = static_mut(&mut walker);
+    rge_static_object.hp = 25.0;
+    rge_static_object.tx = 1.0;
+    rge_static_object.ty = 2.0;
+    rge_static_object.sprite = -1;
     combat_mut(&mut walker).unit_ai_module = Some(Box::new(UnitAiModule {
         randomized_retarget_timer: 2500,
         ..UnitAiModule::default()
@@ -141,7 +141,7 @@ fn an_object_view_has_row_per_live_object() {
     assert_eq!(rows[2], "6\t4\t0\t0\t0\t0\t0\t0\t\t\t0 -");
     let with_list = objects_of(&save, 0, Some(5)).unwrap();
     assert!(with_list.contains("action_kind_list"), "{with_list}");
-    assert!(objects_of(&save, 1, None).is_err_and(|e| e == no_player(1)));
+    assert!(objects_of(&save, 1, None).is_err_and(|error| error == no_player(1)));
 }
 
 /// The objects asked for, with their velocity, orientation and path data; each level's path
@@ -149,9 +149,9 @@ fn an_object_view_has_row_per_live_object() {
 #[test]
 fn movement_view_shows_the_paths_of_the_objects_asked_for() {
     let mut walker = combat_object(5, 83);
-    let m = moving_mut(&mut walker);
-    m.angle = 0.5;
-    m.temp_path_data = vec![PathData {
+    let rge_moving_object = moving_mut(&mut walker);
+    rge_moving_object.angle = 0.5;
+    rge_moving_object.temp_path_data = vec![PathData {
         path_id: 7,
         ..PathData::default()
     }];
@@ -174,7 +174,7 @@ fn movement_view_shows_the_paths_of_the_objects_asked_for() {
         "{text}"
     );
     assert!(!text.contains("6 master"), "{text}");
-    assert!(movement_of(&save, 2, &[5]).is_err_and(|e| e == no_player(2)));
+    assert!(movement_of(&save, 2, &[5]).is_err_and(|error| error == no_player(2)));
 }
 
 /// The objects asked for that have a unit AI: its order, action and target, the timers, an
@@ -208,7 +208,7 @@ fn unit_ai_view_shows_the_ai_of_the_objects_asked_for() {
     );
     assert!(lines[5].starts_with("    order "), "{text}");
     assert_eq!(lines.len(), 6);
-    assert!(unit_ais_of(&save, 1, &[5]).is_err_and(|e| e == no_player(1)));
+    assert!(unit_ais_of(&save, 1, &[5]).is_err_and(|error| error == no_player(1)));
 }
 
 /// Each checkpoint the run reaches: per recorded player (lane word 8) the differing words as

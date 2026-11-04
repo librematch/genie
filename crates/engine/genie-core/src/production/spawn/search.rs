@@ -34,9 +34,9 @@ pub(super) fn try_spot(
     spot: &Spot,
     test: &mut dyn FnMut(Point) -> GenieResult<Tested>,
 ) -> GenieResult<Option<Point>> {
-    for i in 0..=spot.count {
-        let x = spot.dir.dx() as f32 * spot.step.x() * i as f32 + spot.at.x();
-        let y = spot.dir.dy() as f32 * spot.step.y() * i as f32 + spot.at.y();
+    for index in 0..=spot.count {
+        let x = spot.dir.dx() as f32 * spot.step.x() * index as f32 + spot.at.x();
+        let y = spot.dir.dy() as f32 * spot.step.y() * index as f32 + spot.at.y();
         match test(Point::new(x, y))? {
             Tested::Free => return Ok(Some(Point::new(x, y))),
             Tested::Blocked { stays: true } => return Ok(None),
@@ -63,10 +63,10 @@ pub fn spawn_point(
     for pass in [SearchPass::First, SearchPass::Second] {
         for segment in frame.segments(pass, spawn_tuning) {
             // a segment's spots are all made before its first is tried
-            let spots: Vec<Spot> = segment.iter().flat_map(|r| frame.spots(r)).collect();
+            let spots: Vec<Spot> = segment.iter().flat_map(|run| frame.spots(run)).collect();
             for spot in &spots {
-                if let Some(p) = try_spot(spot, test)? {
-                    return Ok(p);
+                if let Some(point) = try_spot(spot, test)? {
+                    return Ok(point);
                 }
             }
         }
@@ -148,8 +148,8 @@ impl Frame {
         let (bx, by) = (site.radius.x(), site.radius.y());
         let (x, y) = (site.position.x(), site.position.y());
         let (gx, gy) = {
-            let p = site.gather.unwrap_or(Point::new(NONE, NONE));
-            (p.x(), p.y())
+            let point = site.gather.unwrap_or(Point::new(NONE, NONE));
+            (point.x(), point.y())
         };
         Self {
             step: GroundOffset::new(sx, sy),
@@ -319,19 +319,31 @@ impl Frame {
     /// A run's spots: from its start by its step while short of its end. A spot of a
     /// horizontal run tries its point and the next one up (or down); a vertical run's, the next
     /// one out.
-    fn spots(&self, r: &Run) -> Vec<Spot> {
+    fn spots(&self, run: &Run) -> Vec<Spot> {
         let (sx, sy) = (self.step.x(), self.step.y());
         let mut spots = Vec::new();
-        let mut c = r.start;
-        while match r.course {
-            Course::Rising => c < r.end,
-            Course::Falling => r.end < c,
+        let mut start = run.start;
+        while match run.course {
+            Course::Rising => start < run.end,
+            Course::Falling => run.end < start,
         } {
-            let (at, step, dir) = match r.side {
-                Side::Up => (Point::new(c, r.fixed), GroundOffset::new(0.0, sy), UP),
-                Side::Down => (Point::new(c, r.fixed), GroundOffset::new(0.0, sy), DOWN),
-                Side::Left => (Point::new(r.fixed, c), GroundOffset::new(sx, 0.0), LEFT),
-                Side::Right => (Point::new(r.fixed, c), GroundOffset::new(sx, 0.0), RIGHT),
+            let (at, step, dir) = match run.side {
+                Side::Up => (Point::new(start, run.fixed), GroundOffset::new(0.0, sy), UP),
+                Side::Down => (
+                    Point::new(start, run.fixed),
+                    GroundOffset::new(0.0, sy),
+                    DOWN,
+                ),
+                Side::Left => (
+                    Point::new(run.fixed, start),
+                    GroundOffset::new(sx, 0.0),
+                    LEFT,
+                ),
+                Side::Right => (
+                    Point::new(run.fixed, start),
+                    GroundOffset::new(sx, 0.0),
+                    RIGHT,
+                ),
             };
             spots.push(Spot {
                 at,
@@ -339,7 +351,7 @@ impl Frame {
                 dir,
                 count: 1,
             });
-            c += r.step;
+            start += run.step;
         }
         spots
     }

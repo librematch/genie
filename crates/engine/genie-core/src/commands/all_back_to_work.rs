@@ -17,7 +17,7 @@ pub struct AllBackToWorkCommand {
 
 impl AllBackToWorkCommand {
     /// Its handler ([`World::all_back_to_work`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.all_back_to_work(self.player, self.id)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.all_back_to_work(self.player, self.id)
     }
 }

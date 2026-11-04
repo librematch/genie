@@ -408,7 +408,8 @@ impl HuntAction {
                 "a hunter leaving its pasture (FUN_141189ca0)",
             ));
         }
-        if let Some(t) = target.filter(|t| t.player == player && drops_here && Amount::ZERO < held)
+        if let Some(t) =
+            target.filter(|quarry| quarry.player == player && drops_here && Amount::ZERO < held)
         {
             if Some(t.id) == self.carry_to.map(DropSiteId::id)
                 && matches!(self.state, HuntState::Drop { .. })
@@ -516,7 +517,7 @@ impl HuntAction {
     /// What the point walk does not model, and the walk's.
     pub(crate) fn update_point_walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
         who: PointWalker,
@@ -529,7 +530,7 @@ impl HuntAction {
             },
             stance: who.stance,
         };
-        let ended = match self.update_list(c, unit, me, gives_up)? {
+        let ended = match self.update_list(step, unit, me, gives_up)? {
             SubCode::UnderWay => return Ok(PointWalk::Walking),
             SubCode::Done | SubCode::TargetGone => true,
             SubCode::Failed => false,
@@ -541,7 +542,7 @@ impl HuntAction {
                 "a computer player's hunt whose walk to a point failed (set_state 13)"
             }));
         }
-        self.tear_down(c.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.w.parts.mover_mut(unit.id))?;
         if matches!(self.state, HuntState::WalkSearch { .. }) {
             self.state = HuntState::Search;
             return Ok(PointWalk::Search);

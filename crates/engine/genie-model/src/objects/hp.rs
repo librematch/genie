@@ -77,8 +77,8 @@ impl MasterHitPoints {
 }
 
 impl genie_diff::Diff for MasterHitPoints {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -126,8 +126,8 @@ impl Div for HitPoints {
 }
 
 impl genie_diff::Diff for HitPoints {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

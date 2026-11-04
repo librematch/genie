@@ -29,7 +29,7 @@ pub(super) fn weapons_sum(weapons: &[ClassAmount], counts: impl Fn(DamageClass) 
     weapons
         .iter()
         .filter(|w| counts(w.class))
-        .fold(0.0, |sum, w| sum + w.amount.as_f32())
+        .fold(0.0, |sum, class_amount| sum + class_amount.amount.as_f32())
 }
 
 /// `FUN_14120dc10`: the attack rate of an object of `master` (its reload powerup `+0xa28`
@@ -77,8 +77,8 @@ pub fn attack_rate(
             })
         },
         |v| {
-            weapons_sum(&v.combat_part().weapons, |c| {
-                matches!(c, DamageClass::PIERCE | DamageClass::CLASS_38)
+            weapons_sum(&v.combat_part().weapons, |damage_class| {
+                matches!(damage_class, DamageClass::PIERCE | DamageClass::CLASS_38)
             })
         },
     );
@@ -89,7 +89,7 @@ pub fn attack_rate(
 /// [`Masters`] knows it: up to its last master. The game's count can run past the last master
 /// with null slots, which [`Masters`] does not keep.
 pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
-    masters.iter().any(|m| id <= m.id)
+    masters.iter().any(|master| id <= master.id)
 }
 
 /// `FUN_14120e1a0`: what a unit of `master` (its reload powerup `reload_powerup`) fires inside a
@@ -100,10 +100,10 @@ pub(super) fn in_table(masters: &Masters, id: MasterId) -> bool {
 /// 38 amounts, over its reload (none at most 1e-7).
 #[must_use]
 pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) -> DamageRate {
-    let g = master.combat_part().garrison_firepower.get();
+    let combat_part = master.combat_part().garrison_firepower.get();
     // COMISS 0, g; JC: an unordered firepower goes on
-    if g <= 0.0 {
-        return DamageRate::new(g.abs());
+    if combat_part <= 0.0 {
+        return DamageRate::new(combat_part.abs());
     }
     let mut sum = 0.0f32;
     // COMISS volley, 1.0; JBE: an unordered volley fire adds no missiles
@@ -142,7 +142,7 @@ pub fn firepower(master: &Master, masters: &Masters, reload_powerup: Seconds) ->
     if reload <= EPSILON {
         return DamageRate::ZERO;
     }
-    DamageRate::new(sum / reload * g)
+    DamageRate::new(sum / reload * combat_part)
 }
 
 /// `FUN_141213520`: the share of a building's volleys a unit of `master` inside it adds, against

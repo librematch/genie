@@ -23,7 +23,7 @@ impl Issuer {
     #[must_use]
     pub fn value(self) -> i32 {
         match self {
-            Self::Player(p) => i32::from(p.get()),
+            Self::Player(player_id) => i32::from(player_id.get()),
             Self::Object(id) => id.get(),
         }
     }
@@ -47,8 +47,8 @@ impl Issuer {
 }
 
 impl From<PlayerId> for Issuer {
-    fn from(p: PlayerId) -> Self {
-        Self::Player(p)
+    fn from(player_id: PlayerId) -> Self {
+        Self::Player(player_id)
     }
 }
 
@@ -81,8 +81,8 @@ impl PartialEq<ObjectId> for Issuer {
 
 impl genie_diff::Diff for Issuer {
     /// By value, as the game compares it.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(&self.value(), &other.value());
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(&self.value(), &other.value());
     }
 }
 
@@ -104,7 +104,7 @@ mod tests {
         ));
         assert!(matches!(
             Issuer::of_saved(3, own, 9),
-            Some(Issuer::Player(p)) if p == PlayerId::new(3)
+            Some(Issuer::Player(player_id)) if player_id == PlayerId::new(3)
         ));
         assert!(matches!(
             Issuer::of_saved(9, own, 9),

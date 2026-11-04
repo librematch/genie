@@ -49,32 +49,35 @@ use std::sync::Arc;
 /// frame at the origin facing x, one level without a path.
 #[test]
 fn new_motion_holds_the_constructor_values() {
-    let m = Motion::new();
+    let motion = Motion::new();
     assert_eq!(
         (
-            m.turn_radius_speed,
-            m.maximum_yaw_per_second_moving,
-            m.maximum_yaw_per_second_stationary
+            motion.turn_radius_speed,
+            motion.maximum_yaw_per_second_moving,
+            motion.maximum_yaw_per_second_stationary
         ),
         (Speed::new(f32::MAX), TurnRate::MAX, TurnRate::MAX)
     );
     assert_eq!(
-        (m.flags, m.lead, m.number_wait_delays),
+        (motion.flags, motion.lead, motion.number_wait_delays),
         (
             (MotionFlags::MOVED | MotionFlags::NEW),
             None,
             DelayCount::ZERO
         )
     );
-    assert_eq!((m.velocity, m.acceleration), (BVector::ZERO, BVector::ZERO));
+    assert_eq!(
+        (motion.velocity, motion.acceleration),
+        (BVector::ZERO, BVector::ZERO)
+    );
     let frame = [
         BVector::ZERO,
         BVector::new(1.0, 0.0, 0.0),
         BVector::new(0.0, 1.0, 0.0),
         BVector::new(0.0, 0.0, -1.0),
     ];
-    assert_eq!((m.position, m.new_position), (frame, frame));
-    assert_eq!(m.paths, vec![PathData::without_path()]);
+    assert_eq!((motion.position, motion.new_position), (frame, frame));
+    assert_eq!(motion.paths, vec![PathData::without_path()]);
 }
 
 /// `FUN_14152ece0` over units 1, 2 (group 7), 3 (group 8), 4 (no group), 9 (gone) and a null
@@ -119,11 +122,11 @@ fn member(id: i32) -> Member {
 /// orders before every member as the game's −1 does.
 #[test]
 fn member_index_is_its_place_and_stranger_none() {
-    let mut g = UnitGroup::new(group_id(1));
-    g.members = vec![member(10), member(11)];
-    assert_eq!(g.index_of(object_id(11)), Some(1));
-    assert_eq!(g.index_of(object_id(12)), None);
-    assert!(g.index_of(object_id(12)) < g.index_of(object_id(10)));
+    let mut group = UnitGroup::new(group_id(1));
+    group.members = vec![member(10), member(11)];
+    assert_eq!(group.index_of(object_id(11)), Some(1));
+    assert_eq!(group.index_of(object_id(12)), None);
+    assert!(group.index_of(object_id(12)) < group.index_of(object_id(10)));
 }
 
 /// `FUN_141017590`: a member's own move's reason (`+0xf8`'s record at the member's index,
@@ -245,7 +248,11 @@ fn the_stored_positions_keep_their_desired_length() {
     assert_eq!((line.points.len(), line.length), (4, Distance::new(3.0)));
     // 4 less 1 is 3: the oldest goes; 3 less 1 is 2: the rest stay
     line.add_at_front(at(4.0, 0.0)).unwrap();
-    let xs: Vec<f32> = line.points.iter().map(|p| p.point.x()).collect();
+    let xs: Vec<f32> = line
+        .points
+        .iter()
+        .map(|line_point| line_point.point.x())
+        .collect();
     assert_eq!(xs, [4.0, 3.0, 2.0, 1.0]);
     assert_eq!(line.length, Distance::new(3.0));
 }
@@ -317,33 +324,41 @@ fn unit_sub_formation_follows_its_category_and_its_hero_flag() {
 /// `FUN_140fe1550`: every value the constructor writes that the group holds.
 #[test]
 fn new_group_holds_the_constructor_values() {
-    let g = UnitGroup::new(group_id(7));
-    assert_eq!((g.id, g.owner, g.stance), (group_id(7), None, None));
+    let group = UnitGroup::new(group_id(7));
     assert_eq!(
-        (g.flags, g.current_command, g.differentiator_id),
+        (group.id, group.owner, group.stance),
+        (group_id(7), None, None)
+    );
+    assert_eq!(
+        (group.flags, group.current_command, group.differentiator_id),
         (
             GroupFlags::TURN,
             GroupCommandKind::NONE,
             Differentiator::NONE
         )
     );
-    assert_eq!(g.current_target.target, GroupTarget::None);
+    assert_eq!(group.current_target.target, GroupTarget::None);
     assert_eq!(
         (
-            g.hibernating,
-            g.replaces_queue,
-            g.attack_plan_kind,
-            g.idle_timer
+            group.hibernating,
+            group.replaces_queue,
+            group.attack_plan_kind,
+            group.idle_timer
         ),
         (0, 1, 0, Millis::ZERO)
     );
-    assert_eq!((g.previous_formation, g.current_formation), (None, None));
-    assert!(g.members.is_empty() && g.unit_kinds.is_empty() && g.command_queue.is_empty());
     assert_eq!(
-        (g.formation_locked_kind, g.desired_spacing),
+        (group.previous_formation, group.current_formation),
+        (None, None)
+    );
+    assert!(
+        group.members.is_empty() && group.unit_kinds.is_empty() && group.command_queue.is_empty()
+    );
+    assert_eq!(
+        (group.formation_locked_kind, group.desired_spacing),
         (None, Distance::ZERO)
     );
-    assert_eq!(g.motion, Motion::new());
+    assert_eq!(group.motion, Motion::new());
 }
 
 #[test]
@@ -359,7 +374,7 @@ fn new_group_takes_the_next_id_at_the_list_end() {
         groups
             .groups
             .iter()
-            .map(|g| (g.id, g.owner))
+            .map(|group| (group.id, group.owner))
             .collect::<Vec<_>>(),
         [
             (group_id(4), Some(PlayerId::new(2))),
@@ -385,7 +400,7 @@ fn tasked_world(masters: Vec<Master>, owner_range: f32) -> World {
     };
     let mut attributes = vec![Amount::ZERO; 100];
     attributes[90] = Amount::new(owner_range);
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -413,8 +428,8 @@ fn tasked_world(masters: Vec<Master>, owner_range: f32) -> World {
             },
         ],
     );
-    t.model.masters = vec![Arc::new(Masters::new([])), Arc::new(Masters::new(masters))];
-    t
+    world.model.masters = vec![Arc::new(Masters::new([])), Arc::new(Masters::new(masters))];
+    world
 }
 
 fn task_master(id: MasterId, tasks: Vec<Task>) -> Master {
@@ -468,7 +483,7 @@ fn member_11() -> ObjectId {
 /// `FUN_14106b8b0`: the unit's own master's task is the command, with the task's range.
 #[test]
 fn member_own_task_is_the_command_with_the_task_range() {
-    let t = tasked_world(
+    let world = tasked_world(
         vec![
             task_master(
                 ids::VILLAGER_MALE,
@@ -478,7 +493,7 @@ fn member_own_task_is_the_command_with_the_task_range() {
         ],
         9.0,
     );
-    let got = t.member_task(member_11(), &query_on(60)).unwrap();
+    let got = world.member_task(member_11(), &query_on(60)).unwrap();
     assert_eq!(
         got,
         Some(task::TargetTask {
@@ -491,7 +506,7 @@ fn member_own_task_is_the_command_with_the_task_range() {
 /// The slot answers none (-1) for a target that is the member itself.
 #[test]
 fn member_has_no_task_on_itself() {
-    let t = tasked_world(
+    let world = tasked_world(
         vec![
             task_master(
                 ids::VILLAGER_MALE,
@@ -501,7 +516,7 @@ fn member_has_no_task_on_itself() {
         ],
         9.0,
     );
-    assert_eq!(t.member_task(member_11(), &query_on(11)).unwrap(), None);
+    assert_eq!(world.member_task(member_11(), &query_on(11)).unwrap(), None);
 }
 
 /// Task 0x69's range is the target owner's attribute 90; task 0x68's is the unit's slot 0x230,
@@ -509,14 +524,15 @@ fn member_has_no_task_on_itself() {
 /// find 0x68 and 0x69 yet, so the answer is built from a task given.)
 #[test]
 fn the_ranges_of_tasks_0x69_and_0x68_do_not_come_from_the_task() {
-    let t = tasked_world(
+    let world = tasked_world(
         vec![task_master(ids::VILLAGER_MALE, vec![]), building_master()],
         9.0,
     );
-    let target = t.task_target(object_id(60), 1).unwrap();
+    let target = world.task_target(object_id(60), 1).unwrap();
     let range = |action| {
-        t.task_range(&plain_task(action, Distance::new(2.5)), &target)
-            .map(|g| (g.command, g.range))
+        world
+            .task_range(&plain_task(action, Distance::new(2.5)), &target)
+            .map(|target_task| (target_task.command, target_task.range))
     };
     assert_eq!(
         range(ActionKind::HEAL).unwrap(),
@@ -533,7 +549,7 @@ fn the_ranges_of_tasks_0x69_and_0x68_do_not_come_from_the_task() {
 /// group that has one, searched with the same filter.
 #[test]
 fn member_without_task_takes_the_swap_group_first_with_one() {
-    let t = tasked_world(
+    let world = tasked_world(
         vec![
             task_master(ids::VILLAGER_MALE, vec![]),
             task_master(
@@ -548,9 +564,9 @@ fn member_without_task_takes_the_swap_group_first_with_one() {
         ],
         9.0,
     );
-    let got = t.member_task(member_11(), &query_on(60)).unwrap();
+    let got = world.member_task(member_11(), &query_on(60)).unwrap();
     assert_eq!(
-        got.map(|g| (g.command, g.range)),
+        got.map(|target_task| (target_task.command, target_task.range)),
         Some((ActionKind::BUILD, Some(Distance::new(1.5))))
     );
 }
@@ -562,7 +578,7 @@ fn master_without_swap_group_has_no_other_to_try() {
     own.action
         .get_or_insert_with(Default::default)
         .task_by_group = TaskGroup::NONE;
-    let t = tasked_world(
+    let world = tasked_world(
         vec![
             own,
             task_master(
@@ -573,7 +589,7 @@ fn master_without_swap_group_has_no_other_to_try() {
         ],
         9.0,
     );
-    assert_eq!(t.member_task(member_11(), &query_on(60)).unwrap(), None);
+    assert_eq!(world.member_task(member_11(), &query_on(60)).unwrap(), None);
 }
 
 /// A master of type 0x28 or above that holds a board task (0x84) asks the player's commands
@@ -592,8 +608,8 @@ fn master_with_board_task_and_no_task_found_is_not_modelled() {
     let t = tasked_world(vec![own.clone(), building_master()], 9.0);
     assert!(t.member_task(member_11(), &query_on(60)).is_err());
     own.kind = MasterKind::of_data(0x27);
-    let t = tasked_world(vec![own, building_master()], 9.0);
-    assert_eq!(t.member_task(member_11(), &query_on(60)).unwrap(), None);
+    let world = tasked_world(vec![own, building_master()], 9.0);
+    assert_eq!(world.member_task(member_11(), &query_on(60)).unwrap(), None);
 }
 
 /// Player 1's group 1 of the members `members` (`(id, master, x, y)`, 25 hit points, state 2) and
@@ -633,7 +649,7 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         },
         ..Unit::default()
     };
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::from_millis(50),
         FrameSeed::of_data(0),
         PlayerId::new(0),
@@ -675,46 +691,50 @@ fn attack_world(members: &[(i32, i16, f32, f32)]) -> World {
         soldier(ids::ID_329, class::CLASS_6),
         building,
     ]);
-    t.model.masters = vec![
+    world.model.masters = vec![
         Arc::new(Masters::new([])),
         Arc::new(masters.clone()),
         Arc::new(masters),
     ];
-    let mut g = UnitGroup::new(group_id(1));
-    g.owner = Some(PlayerId::new(1));
-    g.members = members
+    let mut group = UnitGroup::new(group_id(1));
+    group.owner = Some(PlayerId::new(1));
+    group.members = members
         .iter()
         .map(|&(id, ..)| Member {
             id: object_id(id),
             ..Member::default()
         })
         .collect();
-    g.motion.flags = MotionFlags::NEW;
-    g.motion.maximum_velocity_forward = Speed::new(1.0);
-    g.smallest_unit_range = Distance::new(2.5);
-    t.groups = UnitGroups {
-        groups: vec![g],
+    group.motion.flags = MotionFlags::NEW;
+    group.motion.maximum_velocity_forward = Speed::new(1.0);
+    group.smallest_unit_range = Distance::new(2.5);
+    world.groups = UnitGroups {
+        groups: vec![group],
         ..UnitGroups::default()
     };
-    t
+    world
 }
 
 /// Every object of every player in the spatial index at its place (`FUN_14118f8c0`-style gaps and
 /// the work command's reach read it).
-fn register(t: &mut World) {
-    let placed: Vec<(i32, Placed)> = PlayerId::each(t.players.len())
-        .zip(&t.players)
+fn register(world: &mut World) {
+    let placed: Vec<(i32, Placed)> = PlayerId::each(world.players.len())
+        .zip(&world.players)
         .flat_map(|(p, player)| player.objects.iter().map(move |u| (p, u)))
-        .filter_map(|(p, u)| {
-            let m = t.model.masters.of(p)?.get(u.life.master_id)?;
+        .filter_map(|(player_id, unit)| {
+            let master = world
+                .model
+                .masters
+                .of(player_id)?
+                .get(unit.life.master_id)?;
             Some((
-                u.id.get(),
+                unit.id.get(),
                 Placed {
-                    position: u.position(),
-                    radius: m.radius,
-                    class: m.class,
-                    player: p,
-                    master: m.id,
+                    position: unit.position(),
+                    radius: master.radius,
+                    class: master.class,
+                    player: player_id,
+                    master: master.id,
                     obstruction_kind: ObstructionKind::NONE,
                     buildable_on: BuildableOn::NO,
                     tall: false,
@@ -726,7 +746,7 @@ fn register(t: &mut World) {
         })
         .collect();
     for (id, placed) in placed {
-        t.spatial.insert(object_id(id), placed);
+        world.spatial.insert(object_id(id), placed);
     }
 }
 
@@ -748,20 +768,21 @@ fn building_60() -> ObjectId {
 /// on.
 #[test]
 fn group_commanded_on_target_out_of_reach_moves_to_it() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
     assert_eq!(
-        t.command_attack(
-            group_id(1),
-            building_60(),
-            attack_on(Some(ActionKind::named(0x1234)))
-        )
-        .unwrap(),
+        world
+            .command_attack(
+                group_id(1),
+                building_60(),
+                attack_on(Some(ActionKind::named(0x1234)))
+            )
+            .unwrap(),
         GroupMove::Begun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     let radius = sqrt(8.0);
     assert_eq!(
-        g.current_target,
+        group.current_target,
         TargetData {
             target: GroupTarget::Object(object_id(60)),
             original_position: BVector::new(40.0, 0.0, 45.0),
@@ -771,18 +792,19 @@ fn group_commanded_on_target_out_of_reach_moves_to_it() {
             certain_action: Some(ActionKind::named(0x1234)),
         }
     );
-    assert_eq!(g.current_command, GroupCommandKind::ATTACK);
+    assert_eq!(group.current_command, GroupCommandKind::ATTACK);
     assert_eq!(
         (
-            g.flags & GroupFlags::ARRIVED,
-            g.flags & GroupFlags::ATTACKING
+            group.flags & GroupFlags::ARRIVED,
+            group.flags & GroupFlags::ATTACKING
         ),
         (GroupFlags::NONE, GroupFlags::ATTACKING)
     );
     assert!(
-        g.members
+        group
+            .members
             .iter()
-            .all(|m| m.seconds_since_attacking == Seconds::MAX)
+            .all(|member| member.seconds_since_attacking == Seconds::MAX)
     );
 }
 
@@ -791,29 +813,33 @@ fn group_commanded_on_target_out_of_reach_moves_to_it() {
 /// member on another target, it commands again.
 #[test]
 fn group_already_on_its_target_only_notes_the_place() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
     assert_eq!(
-        t.command_attack(group_id(1), building_60(), attack_on(None))
+        world
+            .command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap(),
         GroupMove::Begun
     );
-    t.players[2].objects[ListIndex::new(0)].place = Static::at(Position::new(41.0, 45.0, 0.0));
+    world.players[2].objects[ListIndex::new(0)].place = Static::at(Position::new(41.0, 45.0, 0.0));
     assert_eq!(
-        t.command_attack(group_id(1), building_60(), attack_on(None))
+        world
+            .command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap(),
         GroupMove::NotBegun
     );
     assert_eq!(
-        t.groups
+        world
+            .groups
             .get(group_id(1))
             .unwrap()
             .current_target
             .original_position,
         BVector::new(41.0, 0.0, 45.0)
     );
-    t.groups.get_mut(group_id(1)).unwrap().flags |= GroupFlags::JOINED;
+    world.groups.get_mut(group_id(1)).unwrap().flags |= GroupFlags::JOINED;
     assert_eq!(
-        t.command_attack(group_id(1), building_60(), attack_on(None))
+        world
+            .command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap(),
         GroupMove::Begun
     );
@@ -823,16 +849,17 @@ fn group_already_on_its_target_only_notes_the_place() {
 /// range, and a member within reach attacks nothing here.
 #[test]
 fn group_with_two_queued_commands_takes_its_smallest_unit_range() {
-    let mut t = attack_world(&[(7, 4, 38.0, 45.0)]);
-    t.groups.get_mut(group_id(1)).unwrap().command_queue =
+    let mut world = attack_world(&[(7, 4, 38.0, 45.0)]);
+    world.groups.get_mut(group_id(1)).unwrap().command_queue =
         vec![GroupCommand::default(), GroupCommand::default()];
     assert_eq!(
-        t.command_attack(group_id(1), building_60(), attack_on(None))
+        world
+            .command_attack(group_id(1), building_60(), attack_on(None))
             .unwrap(),
         GroupMove::Begun
     );
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().current_target.range,
+        world.groups.get(group_id(1)).unwrap().current_target.range,
         Distance::new(2.5)
     );
 }
@@ -863,12 +890,13 @@ fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
     let timers: Vec<u32> = t.players[1]
         .objects
         .iter()
-        .map(|u| t.parts.unit_ai.get(u.id).unwrap().retarget_timer.get())
+        .map(|unit| t.parts.unit_ai.get(unit.id).unwrap().retarget_timer.get())
         .collect();
     assert_eq!(timers, [7, 750 + draw % 500]);
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
     let mut range = -1.0;
-    t.reach_pass(group_id(1), object_id(60), attack_on(None), &mut range)
+    world
+        .reach_pass(group_id(1), object_id(60), attack_on(None), &mut range)
         .unwrap();
     assert_eq!(range, 4.0);
 }
@@ -878,53 +906,60 @@ fn the_reach_pass_raises_the_range_and_sends_member_in_reach() {
 /// not have 0.
 #[test]
 fn filter_takes_the_range_of_the_members_task_of_that_kind() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
-    for master in t
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
+    for master in world
         .model
         .masters
         .iter_mut()
-        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+        .filter_map(|masters| Arc::make_mut(masters).get_mut(master_id(4)))
     {
         master.action.get_or_insert_with(Default::default).tasks = vec![
             plain_task(GATHER, Distance::new(6.0)),
             plain_task(ActionKind::CONVERT, Distance::new(1.5)),
         ];
     }
-    t.players[1].attributes = vec![Amount::ZERO; 300];
-    t.players[1].attributes[280] = Amount::new(2.0);
+    world.players[1].attributes = vec![Amount::ZERO; 300];
+    world.players[1].attributes[280] = Amount::new(2.0);
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(4), None).unwrap(),
+        world
+            .task_reach(PlayerId::new(1), master_id(4), None)
+            .unwrap(),
         -1.0
     );
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(4), Some(GATHER))
+        world
+            .task_reach(PlayerId::new(1), master_id(4), Some(GATHER))
             .unwrap(),
         6.0
     );
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(4), Some(ActionKind::CONVERT))
+        world
+            .task_reach(PlayerId::new(1), master_id(4), Some(ActionKind::CONVERT))
             .unwrap(),
         3.5
     );
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(4), Some(ATTACK))
+        world
+            .task_reach(PlayerId::new(1), master_id(4), Some(ATTACK))
             .unwrap(),
         -1.0
     );
     assert_eq!(
-        t.task_reach(PlayerId::new(1), master_id(99), Some(GATHER))
+        world
+            .task_reach(PlayerId::new(1), master_id(99), Some(GATHER))
             .unwrap(),
         0.0
     );
     // the range is the task's with the filter: the pass raises the group's range to it
     let mut range = -1.0;
-    t.reach_pass(
-        group_id(1),
-        object_id(60),
-        attack_on(Some(GATHER)),
-        &mut range,
-    )
-    .unwrap();
+    world
+        .reach_pass(
+            group_id(1),
+            object_id(60),
+            attack_on(Some(GATHER)),
+            &mut range,
+        )
+        .unwrap();
     assert_eq!(range, 6.0);
 }
 
@@ -943,8 +978,8 @@ fn general(queued: bool, direct: bool) -> CommandArgs {
 /// maximum.
 #[test]
 fn general_command_moves_the_group_to_the_target_and_takes_the_command() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
-    let moved = t
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
+    let moved = world
         .general_command(
             group_id(1),
             (GroupCommandKind::named(5), building_60()),
@@ -954,10 +989,10 @@ fn general_command_moves_the_group_to_the_target_and_takes_the_command() {
         )
         .unwrap();
     assert_eq!(moved, GroupMove::Begun);
-    let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.current_command, GroupCommandKind::named(5));
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!(group.current_command, GroupCommandKind::named(5));
     assert_eq!(
-        g.current_target,
+        group.current_target,
         TargetData {
             target: GroupTarget::Object(object_id(60)),
             original_position: BVector::new(40.0, 0.0, 45.0),
@@ -968,34 +1003,37 @@ fn general_command_moves_the_group_to_the_target_and_takes_the_command() {
         }
     );
     assert!(
-        g.members
+        group
+            .members
             .iter()
-            .all(|m| m.seconds_since_attacking == Seconds::MAX)
+            .all(|member| member.seconds_since_attacking == Seconds::MAX)
     );
 }
 
 /// A group that cannot move (its top speed below the tolerance) takes no command (false).
 #[test]
 fn general_command_of_group_that_cannot_move_does_nothing() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
-    t.groups
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
+    world
+        .groups
         .get_mut(group_id(1))
         .unwrap()
         .motion
         .maximum_velocity_forward = Speed::ZERO;
     assert_eq!(
-        t.general_command(
-            group_id(1),
-            (GroupCommandKind::named(5), building_60()),
-            Point::new(40.0, 45.0),
-            Distance::new(3.0),
-            general(false, true)
-        )
-        .unwrap(),
+        world
+            .general_command(
+                group_id(1),
+                (GroupCommandKind::named(5), building_60()),
+                Point::new(40.0, 45.0),
+                Distance::new(3.0),
+                general(false, true)
+            )
+            .unwrap(),
         GroupMove::NotBegun
     );
     assert_eq!(
-        t.groups.get(group_id(1)).unwrap().current_command,
+        world.groups.get(group_id(1)).unwrap().current_command,
         GroupCommandKind::NONE
     );
 }
@@ -1005,19 +1043,20 @@ fn general_command_of_group_that_cannot_move_does_nothing() {
 /// approved and runs, and a general command on a held target in it is run (the group takes it).
 #[test]
 fn general_command_queues_or_runs_the_queue() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
     assert_eq!(
-        t.general_command(
-            group_id(1),
-            (GroupCommandKind::named(5), building_60()),
-            Point::new(40.0, 45.0),
-            Distance::new(3.0),
-            general(true, true)
-        )
-        .unwrap(),
+        world
+            .general_command(
+                group_id(1),
+                (GroupCommandKind::named(5), building_60()),
+                Point::new(40.0, 45.0),
+                Distance::new(3.0),
+                general(true, true)
+            )
+            .unwrap(),
         GroupMove::NotBegun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let g = world.groups.get(group_id(1)).unwrap();
     assert_eq!((g.command_queue.len(), g.hibernating), (1, 1));
     let node = g.command_queue[0];
     assert_eq!(
@@ -1039,19 +1078,20 @@ fn general_command_queues_or_runs_the_queue() {
         )
     );
     assert_eq!(
-        t.general_command(
-            group_id(1),
-            (GroupCommandKind::named(5), building_60()),
-            Point::new(40.0, 45.0),
-            Distance::new(3.0),
-            general(false, false)
-        )
-        .unwrap(),
+        world
+            .general_command(
+                group_id(1),
+                (GroupCommandKind::named(5), building_60()),
+                Point::new(40.0, 45.0),
+                Distance::new(3.0),
+                general(false, false)
+            )
+            .unwrap(),
         GroupMove::Begun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.command_queue, []);
-    assert_eq!(g.current_command, GroupCommandKind::named(5));
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!(group.command_queue, []);
+    assert_eq!(group.current_command, GroupCommandKind::named(5));
 }
 
 /// `FUN_14100c6c0`: a group of fewer than five members lists one special unit, of five or more
@@ -1068,18 +1108,20 @@ fn the_special_units_follow_the_target_class() {
         (11, 5, 0.0, 0.0),
     ];
     let special = |target_class: ClassId, target_master: MasterId, take: usize| {
-        let mut t = attack_world(&units[..take]);
-        for b in t
+        let mut world = attack_world(&units[..take]);
+        for master in world
             .model
             .masters
             .iter_mut()
-            .filter_map(|m| Arc::make_mut(m).get_mut(ids::HOUSE))
+            .filter_map(|masters| Arc::make_mut(masters).get_mut(ids::HOUSE))
         {
-            b.class = target_class;
+            master.class = target_class;
         }
         let _ = target_master;
-        t.refill_special_units(group_id(1), object_id(60)).unwrap();
-        t.groups.get(group_id(1)).unwrap().special_units.clone()
+        world
+            .refill_special_units(group_id(1), object_id(60))
+            .unwrap();
+        world.groups.get(group_id(1)).unwrap().special_units.clone()
     };
     assert_eq!(
         special(class::CLASS_24, ids::HOUSE, 5),
@@ -1093,8 +1135,8 @@ fn the_special_units_follow_the_target_class() {
 /// have against the target (never down); a category without units stays.
 #[test]
 fn the_categories_attack_ranges_rise_to_their_members_ranges() {
-    let mut t = attack_world(&[(7, 4, 0.0, 0.0), (8, 4, 0.0, 0.0)]);
-    t.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
+    let mut world = attack_world(&[(7, 4, 0.0, 0.0), (8, 4, 0.0, 0.0)]);
+    world.groups.get_mut(group_id(1)).unwrap().unit_kinds = vec![
         UnitKindStatistic {
             formation_category: FormationCategory::named(1),
             units: vec![object_id(7), object_id(8)],
@@ -1113,14 +1155,16 @@ fn the_categories_attack_ranges_rise_to_their_members_ranges() {
             ..UnitKindStatistic::default()
         },
     ];
-    t.raise_attack_ranges(group_id(1), object_id(60)).unwrap();
-    let ranges: Vec<f32> = t
+    world
+        .raise_attack_ranges(group_id(1), object_id(60))
+        .unwrap();
+    let ranges: Vec<f32> = world
         .groups
         .get(group_id(1))
         .unwrap()
         .unit_kinds
         .iter()
-        .map(|s| s.attack_range.get())
+        .map(|unit_kind_statistic| unit_kind_statistic.attack_range.get())
         .collect();
     assert_eq!(ranges, [4.0, 9.0, 0.5]);
 }
@@ -1138,16 +1182,16 @@ fn attack_task() -> Task {
 
 /// [`attack_world`] whose soldiers (master 4) have the attack task.
 fn attack_world_with_task(members: &[(i32, i16, f32, f32)]) -> World {
-    let mut t = attack_world(members);
-    for master in t
+    let mut world = attack_world(members);
+    for master in world
         .model
         .masters
         .iter_mut()
-        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+        .filter_map(|masters| Arc::make_mut(masters).get_mut(master_id(4)))
     {
         master.action.get_or_insert_with(Default::default).tasks = vec![attack_task()];
     }
-    t
+    world
 }
 
 fn command_args(queued: bool, direct: bool) -> CommandArgs {
@@ -1163,8 +1207,8 @@ fn command_args(queued: bool, direct: bool) -> CommandArgs {
 /// the group moves to it in command 9 and the move stops the members.
 #[test]
 fn group_ordered_on_an_enemy_building_runs_the_attack_path() {
-    let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
-    let moved = t
+    let mut world = attack_world_with_task(&[(7, 4, 10.0, 10.0), (8, 4, 11.0, 10.0)]);
+    let moved = world
         .group_command(
             group_id(1),
             Some(object_id(60)),
@@ -1173,24 +1217,24 @@ fn group_ordered_on_an_enemy_building_runs_the_attack_path() {
         )
         .unwrap();
     assert_eq!(moved, GroupMove::Begun);
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        (g.current_command, g.current_target.target),
+        (group.current_command, group.current_target.target),
         (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
-    assert_eq!(g.flags & GroupFlags::JOINED, GroupFlags::NONE);
+    assert_eq!(group.flags & GroupFlags::JOINED, GroupFlags::NONE);
 }
 
 /// `FUN_14100efd0`: a member whose task on the building is action 5 gives the general command: the
 /// group moves to it within the task's range and is in command 5 with the target's data.
 #[test]
 fn group_ordered_with_general_task_runs_the_general_command() {
-    let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
-    for master in t
+    let mut world = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
+    for master in world
         .model
         .masters
         .iter_mut()
-        .filter_map(|m| Arc::make_mut(m).get_mut(master_id(4)))
+        .filter_map(|masters| Arc::make_mut(masters).get_mut(master_id(4)))
     {
         master.action.get_or_insert_with(Default::default).tasks = vec![Task {
             action_kind: GATHER,
@@ -1199,43 +1243,45 @@ fn group_ordered_with_general_task_runs_the_general_command() {
         }];
     }
     assert_eq!(
-        t.group_command(
-            group_id(1),
-            Some(object_id(60)),
-            Point::new(40.0, 45.0),
-            command_args(false, true)
-        )
-        .unwrap(),
+        world
+            .group_command(
+                group_id(1),
+                Some(object_id(60)),
+                Point::new(40.0, 45.0),
+                command_args(false, true)
+            )
+            .unwrap(),
         GroupMove::Begun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        (g.current_command, g.current_target.target),
+        (group.current_command, group.current_target.target),
         (
             GroupCommandKind::named(5),
             GroupTarget::Object(object_id(60))
         )
     );
-    assert_eq!(g.current_target.range, Distance::new(6.0));
+    assert_eq!(group.current_target.range, Distance::new(6.0));
 }
 
 /// A target the world does not hold is a null object for the command: the plain move.
 #[test]
 fn group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
-    let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
+    let mut world = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     assert_eq!(
-        t.group_command(
-            group_id(1),
-            Some(object_id(99)),
-            Point::new(40.0, 45.0),
-            command_args(false, true)
-        )
-        .unwrap(),
+        world
+            .group_command(
+                group_id(1),
+                Some(object_id(99)),
+                Point::new(40.0, 45.0),
+                command_args(false, true)
+            )
+            .unwrap(),
         GroupMove::Begun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        (g.current_command, g.current_target.target),
+        (group.current_command, group.current_target.target),
         (GroupCommandKind::MOVE, GroupTarget::None)
     );
 }
@@ -1245,7 +1291,7 @@ fn group_ordered_on_an_object_the_world_lacks_moves_to_the_point() {
 /// that is told directly hibernates.
 #[test]
 fn queued_attack_joins_the_command_queue() {
-    let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
+    let mut world = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
     let args = CommandArgs {
         queued: true,
         direct: true,
@@ -1253,18 +1299,19 @@ fn queued_attack_joins_the_command_queue() {
         filter: None,
     };
     assert_eq!(
-        t.group_command(
-            group_id(1),
-            Some(object_id(60)),
-            Point::new(40.0, 45.0),
-            args
-        )
-        .unwrap(),
+        world
+            .group_command(
+                group_id(1),
+                Some(object_id(60)),
+                Point::new(40.0, 45.0),
+                args
+            )
+            .unwrap(),
         GroupMove::NotBegun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
     assert_eq!(
-        g.command_queue,
+        group.command_queue,
         [GroupCommand {
             command: GroupCommandKind::named(7),
             target_id: Some(object_id(60)),
@@ -1276,7 +1323,11 @@ fn queued_attack_joins_the_command_queue() {
         }]
     );
     assert_eq!(
-        (g.current_command, g.hibernating, g.replaces_queue),
+        (
+            group.current_command,
+            group.hibernating,
+            group.replaces_queue
+        ),
         (GroupCommandKind::NONE, 1, 0)
     );
 }
@@ -1286,8 +1337,8 @@ fn queued_attack_joins_the_command_queue() {
 /// the second stays queued.
 #[test]
 fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
-    let mut t = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
-    t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
+    let mut world = attack_world_with_task(&[(7, 4, 10.0, 10.0)]);
+    world.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
         command: GroupCommandKind::named(7),
         target_id: Some(object_id(60)),
         range: Distance::new(1.5),
@@ -1297,19 +1348,20 @@ fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
         approved_2: 0xffff,
     }];
     assert_eq!(
-        t.group_command(
-            group_id(1),
-            Some(object_id(60)),
-            Point::new(40.0, 45.0),
-            command_args(false, false)
-        )
-        .unwrap(),
+        world
+            .group_command(
+                group_id(1),
+                Some(object_id(60)),
+                Point::new(40.0, 45.0),
+                command_args(false, false)
+            )
+            .unwrap(),
         GroupMove::Begun
     );
-    let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.command_queue.len(), 1);
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!(group.command_queue.len(), 1);
     assert_eq!(
-        (g.current_command, g.current_target.target),
+        (group.current_command, group.current_target.target),
         (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
 }
@@ -1319,8 +1371,8 @@ fn an_indirect_attack_behind_queued_commands_runs_the_queue() {
 /// without the move to the last command's point.
 #[test]
 fn queued_attack_on_held_target_ends_the_run_with_the_attack() {
-    let mut t = attack_world(&[(7, 4, 10.0, 10.0)]);
-    t.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
+    let mut world = attack_world(&[(7, 4, 10.0, 10.0)]);
+    world.groups.get_mut(group_id(1)).unwrap().command_queue = vec![GroupCommand {
         command: GroupCommandKind::named(7),
         target_id: Some(object_id(60)),
         range: Distance::new(1.5),
@@ -1329,14 +1381,14 @@ fn queued_attack_on_held_target_ends_the_run_with_the_attack() {
         disable_retargeting: 1,
         approved_2: 0x0102,
     }];
-    t.check_queued_orders(group_id(1)).unwrap();
-    let g = t.groups.get(group_id(1)).unwrap();
-    assert_eq!(g.command_queue, []);
-    assert_eq!(g.current_command, GroupCommandKind::ATTACK);
+    world.check_queued_orders(group_id(1)).unwrap();
+    let group = world.groups.get(group_id(1)).unwrap();
+    assert_eq!(group.command_queue, []);
+    assert_eq!(group.current_command, GroupCommandKind::ATTACK);
     assert_eq!(
         (
-            g.current_target.disable_retargeting,
-            g.current_target.certain_action
+            group.current_target.disable_retargeting,
+            group.current_target.certain_action
         ),
         (1, ActionKind::of_data(0x0102))
     );
@@ -1355,21 +1407,23 @@ fn the_special_units_of_masters_6_and_7_and_of_the_category_classes() {
         (11, 4, 0.0, 0.0),
     ];
     let world = |target_class: ClassId, target_master: MasterId| {
-        let mut t = attack_world(&units);
-        t.players[2].objects[ListIndex::new(0)].life.master_id = target_master;
-        for masters in &mut t.model.masters {
-            let mut b = building_master();
-            b.id = target_master;
-            b.class = target_class;
+        let mut attack_world = attack_world(&units);
+        attack_world.players[2].objects[ListIndex::new(0)]
+            .life
+            .master_id = target_master;
+        for masters in &mut attack_world.model.masters {
+            let mut building_master = building_master();
+            building_master.id = target_master;
+            building_master.class = target_class;
             *masters = Arc::new(Masters::new(
                 masters
                     .iter()
-                    .filter(|m| m.id != ids::HOUSE)
+                    .filter(|master| master.id != ids::HOUSE)
                     .cloned()
-                    .chain([b]),
+                    .chain([building_master]),
             ));
         }
-        t
+        attack_world
     };
     let mut t = world(class::BUILDING, ids::ID_7);
     t.refill_special_units(group_id(1), object_id(60)).unwrap();

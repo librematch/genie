@@ -307,10 +307,10 @@ impl TechTreeDependencies {
         for i in 0..10 {
             output.write_i32::<LE>(self.0.get(i).copied().map_or(0, TechTreeDependency::raw_id))?;
         }
-        for i in 0..10 {
+        for index in 0..10 {
             output.write_i32::<LE>(
                 self.0
-                    .get(i)
+                    .get(index)
                     .copied()
                     .map(TechTreeDependency::dependency_kind)
                     .map_or(0, Into::into),

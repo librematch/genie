@@ -66,7 +66,7 @@ use crate::{GenieError, GenieResult};
 fn units_inside(others: OthersRef<'_>, id: ObjectId) -> usize {
     others
         .every()
-        .filter(|u| u.life.inside.key() == Some(id))
+        .filter(|unit| unit.life.inside.key() == Some(id))
         .count()
 }
 
@@ -83,17 +83,17 @@ impl Unit {
     pub(crate) fn enter_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let Some(mut enter) = actions.list.enter().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let reads = self.enter_reads(c, &enter, roles)?;
-        let updated = enter.update(c, self, actions, me, &reads, roles);
-        if let Some(e) = actions.list.enter_mut() {
-            *e = enter;
+        let reads = self.enter_reads(step, &enter, roles)?;
+        let updated = enter.update(step, self, actions, me, &reads, roles);
+        if let Some(enter_action) = actions.list.enter_mut() {
+            *enter_action = enter;
         }
         updated
     }
@@ -110,39 +110,39 @@ impl Unit {
     /// The target's master's and [`crate::garrison::enter_view`]'s.
     fn enter_reads(
         &self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         enter: &EnterAction,
         roles: &Roles,
     ) -> GenieResult<EnterReads> {
         let by_id = ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.model.masters,
-            &c.w.parts,
-            &c.w.model.roles,
-            &c.w.model.tuning,
+            &step.w.players,
+            &step.w.index,
+            &step.w.model.masters,
+            &step.w.parts,
+            &step.w.model.roles,
+            &step.w.model.tuning,
         );
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
+        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
         let (target, start) = match others.find(enter.target) {
-            Some((tp, t)) => {
-                let master = t.master(
-                    MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+            Some((tp, unit)) => {
+                let master = unit.master(
+                    MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
                     tp,
                 )?;
-                let room = units_inside(others, t.id) < master.garrison.units();
+                let room = units_inside(others, unit.id) < master.garrison.units();
                 let (mut view, start) = enter_view(
-                    &mut c.w.spatial,
-                    &c.w.model.masters,
-                    (self, c.w.parts.mover_of(self.id)),
-                    ((t, c.w.parts.mover_of(t.id)), master, room),
+                    &mut step.w.spatial,
+                    &step.w.model.masters,
+                    (self, step.w.parts.mover_of(self.id)),
+                    ((unit, step.w.parts.mover_of(unit.id)), master, room),
                     enter.range,
                     by_id,
                 )?;
                 // FUN_141663dc0 with allies, or Gaia's
                 view.allied = tp == PlayerId::GAIA
                     || allied(
-                        &c.w.players.player(c.player)?.relations,
-                        c.player,
+                        &step.w.players.player(step.player)?.relations,
+                        step.player,
                         tp,
                         AllyTest::WithRelation4,
                     );
@@ -155,17 +155,17 @@ impl Unit {
                 },
             ),
         };
-        let master = self.master(c.w.master_tables(), c.player)?;
+        let master = self.master(step.w.master_tables(), step.player)?;
         let villager = roles.of_class(master.class).contains(ClassRoles::VILLAGER);
         Ok(EnterReads {
             target,
             start,
-            patience: if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+            patience: if villager && !step.w.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
-            stance: c
+            stance: step
                 .w
                 .parts
                 .unit_ai
@@ -173,7 +173,7 @@ impl Unit {
                 .map_or(UnitStance::Aggressive, |ai| ai.stance),
             defaults: MoveDefaults::of(
                 master,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
                 roles,
             ),
         })
@@ -184,21 +184,21 @@ impl Unit {
     pub(crate) fn enter_in_update(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         target: ContainerId,
         roles: &Roles,
     ) -> GenieResult<()> {
         let inside = units_inside(
-            OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+            OthersRef::of(&step.w.players, &step.w.index, step.player)?,
             target.id(),
         );
-        if self.enter_building(actions, c, target, inside, roles)? == EnterOutcome::NoRoom {
+        if self.enter_building(actions, step, target, inside, roles)? == EnterOutcome::NoRoom {
             return Err(GenieError::unsupported(
                 "an Enter that did not get in (state 2)",
             ));
         }
         // the update's own set_state(1) after the enter's
-        self.entered(actions, c)
+        self.entered(actions, step)
     }
 
     /// `FUN_140a867b0` on a unit inside its target already (the update's walk again put it in):
@@ -211,15 +211,15 @@ impl Unit {
     pub(crate) fn entered_again(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<()> {
         self.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Enter.value(), 0, 0],
         )?;
         for _ in 0..2 {
-            self.entered(actions, c)?;
+            self.entered(actions, step)?;
         }
         Ok(())
     }
@@ -232,26 +232,29 @@ impl Unit {
     /// # Errors
     ///
     /// A unit without its Enter, and the stop's, the sprite's and the notify's.
-    pub(crate) fn entered(&mut self, actions: &mut Action, c: &mut Step<'_>) -> GenieResult<()> {
+    pub(crate) fn entered(&mut self, actions: &mut Action, step: &mut Step<'_>) -> GenieResult<()> {
         let enter = actions
             .list
             .enter_mut()
             .ok_or(GenieError::unsupported("an entered unit without its Enter"))?;
         if enter.state.take_move_to().is_some()
-            && let Some(m) = c.w.parts.mover_mut(self.id)
+            && let Some(mover) = step.w.parts.mover_mut(self.id)
         {
-            m.stop()?;
+            mover.stop()?;
         }
         enter.state = EnterState::Done;
         self.shows_standing_sprite(
-            c.w.parts.motion.layer_mut(self.id),
-            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-            &c.w.model.graphics,
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion.layer_mut(self.id),
+            OwnerMasters::new(
+                &step.w.parts.own_master,
+                step.w.model.masters.of(step.player),
+            ),
+            &step.w.model.graphics,
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         self.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
             [AiAction::Enter.value(), 0, 0],
         )
@@ -277,33 +280,33 @@ impl Unit {
     pub(crate) fn enter_building(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         target: ContainerId,
         inside: usize,
         roles: &Roles,
     ) -> GenieResult<EnterOutcome> {
         // the callers found it: the Enter's update in its reads, `World::enter_now` by its place
-        let (tp, building) = c.w.object(target).ok_or(GenieError::unreachable(
+        let (tp, building) = step.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
-        let own = c.w.model.masters.of(c.player);
+        let own = step.w.model.masters.of(step.player);
         let masters = own.ok_or(NO_MASTERS)?;
         // copies: going inside changes the unit and the world, which hold them
         let bm = building
             .master_in(OwnerMasters::new(
-                &c.w.parts.own_master,
-                c.w.model.masters.of(tp).or(own),
+                &step.w.parts.own_master,
+                step.w.model.masters.of(tp).or(own),
             ))?
             .clone();
         let hp = building.life.hp;
         let me = self
-            .master_in(OwnerMasters::new(&c.w.parts.own_master, Some(masters)))?
+            .master_in(OwnerMasters::new(&step.w.parts.own_master, Some(masters)))?
             .clone();
-        let owner = c.w.players.player(c.player)?;
+        let owner = step.w.players.player(step.player)?;
         let actor = Actor {
             id: self.id,
             master: &me,
-            player: c.player,
+            player: step.player,
             held: self.life.held(),
             attribute_95: Amount::new(
                 owner
@@ -315,7 +318,7 @@ impl Unit {
             ),
             civ: owner.civ,
         };
-        if drops_at(&c.w.model.drop_sites, bm.id, &actor)
+        if drops_at(&step.w.model.drop_sites, bm.id, &actor)
             && Amount::ZERO < self.life.amount
             && bm.kind == MasterKind::BUILDING
         {
@@ -323,7 +326,7 @@ impl Unit {
             // and the ore themselves, nothing else
             let resource = self.life.attribute_kind.and_then(|kind| {
                 if !roles.of_attribute(kind).contains(AttributeRoles::FOOD) && kind.is_food_load() {
-                    Some(c.w.model.slots.attribute.food)
+                    Some(step.w.model.slots.attribute.food)
                 } else {
                     (kind.is_resource() || roles.of_attribute(kind).contains(AttributeRoles::ORE))
                         .then_some(kind)
@@ -334,17 +337,20 @@ impl Unit {
                 let mut adds = Vec::new();
                 give_load(
                     (
-                        &c.w.spatial.relations,
+                        &step.w.spatial.relations,
                         owner.ally_sharing.contains(AllySharing::RESOURCES),
                     ),
-                    c.player,
+                    step.player,
                     &mut adds,
                     resource,
                     self.life.amount,
                     roles,
-                    c.w.model.slots,
+                    step.w.model.slots,
                 )?;
-                c.w.players.player_mut(c.player)?.add_attributes(adds)?;
+                step.w
+                    .players
+                    .player_mut(step.player)?
+                    .add_attributes(adds)?;
                 self.life.attribute_kind = None;
                 self.life.amount = Amount::ZERO;
             }
@@ -353,7 +359,7 @@ impl Unit {
             && hp
                 <= HitPoints::new(
                     HitPoints::of_master(bm.hit_points).get()
-                        * c.w.model.tuning.garrison.enter_hp_share,
+                        * step.w.model.tuning.garrison.enter_hp_share,
                 )
         {
             return Err(GenieError::unsupported(
@@ -365,7 +371,7 @@ impl Unit {
             .tasks
             .iter()
             .find(|t| t.action_kind == ActionKind::DEPOSIT)
-            .is_some_and(|t| t.object_id == Some(bm.id))
+            .is_some_and(|task| task.object_id == Some(bm.id))
         {
             return Err(GenieError::unsupported(
                 "an enter of a master that transforms (task 0x88)",
@@ -374,13 +380,13 @@ impl Unit {
         if bm.garrison.units() <= inside {
             return Ok(EnterOutcome::NoRoom);
         }
-        self.go_inside(actions, c, target, &me, &bm, roles)?;
+        self.go_inside(actions, step, target, &me, &bm, roles)?;
         self.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::ACTION_COMPLETED,
             [AiAction::Enter.value(), 0, 0],
         )?;
-        self.entered(actions, c)?;
+        self.entered(actions, step)?;
         Ok(EnterOutcome::Inside)
     }
 
@@ -397,7 +403,7 @@ impl Unit {
     pub(crate) fn go_inside(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         target: ContainerId,
         me: &Master,
         bm: &Master,
@@ -413,13 +419,14 @@ impl Unit {
                 "an enter of a unit with units inside it",
             ));
         }
-        let placed =
-            c.w.spatial
-                .get(id)
-                .copied()
-                .ok_or(GenieError::unsupported("an entering unit without a place"))?;
-        if let Some(v) = c.w.spatial.sight.as_mut() {
-            v.sight_off(
+        let placed = step
+            .w
+            .spatial
+            .get(id)
+            .copied()
+            .ok_or(GenieError::unsupported("an entering unit without a place"))?;
+        if let Some(visibility) = step.w.spatial.sight.as_mut() {
+            visibility.sight_off(
                 id,
                 self.position(),
                 placed.radius,
@@ -427,43 +434,48 @@ impl Unit {
                 SightCentre::Tile,
                 SightLayer {
                     roles,
-                    visibility_tuning: c.w.model.tuning.visibility,
+                    visibility_tuning: step.w.model.tuning.visibility,
                 },
             )?;
         }
         // the callers found it (`Unit::enter_building`, `World::enter_now`), and the sight's
         // change removes no object
-        let (bp, building) = c.w.object(target).ok_or(GenieError::unreachable(
+        let (bp, building) = step.w.object(target).ok_or(GenieError::unreachable(
             "an enter into a building the world does not hold",
         ))?;
         let (at, state, reload) = (
             building.position(),
             building.life.state,
-            c.w.parts.combat_of(building.id).reload_powerup,
+            step.w.parts.combat_of(building.id).reload_powerup,
         );
-        self.place.go_inside(id, at, &mut c.w.spatial);
-        c.w.pathing.removed(id);
+        self.place.go_inside(id, at, &mut step.w.spatial);
+        step.w.pathing.removed(id);
         // a member of a unit group (+0x6d0) leaves the group the world holds, then stands
         // (slot 0x560)
         if let Some(group) = self.group.id {
-            if c.w.groups.get(group).is_some() {
-                c.lend((&mut *self, &mut *actions), |w| {
-                    w.remove_unit(group, id, Some(target.id()), LeavingWalk::Stands)
+            if step.w.groups.get(group).is_some() {
+                step.lend((&mut *self, &mut *actions), |world| {
+                    world
+                        .remove_unit(group, id, Some(target.id()), LeavingWalk::Stands)
                         .map(drop)
                 })?;
             }
-            if let Some(m) = c.w.parts.mover_mut(self.id) {
-                m.stand()?;
+            if let Some(mover) = step.w.parts.mover_mut(self.id) {
+                mover.stand()?;
             }
         }
-        let building_radius = c.w.spatial.get(target).map_or(bm.radius, |p| p.radius);
+        let building_radius = step
+            .w
+            .spatial
+            .get(target)
+            .map_or(bm.radius, |target_placed| target_placed.radius);
         self.life.inside = Some(target);
-        self.join_building(c, Some(target), bp, reload, me, bm)?;
-        self.enter_sight(c, target, at, building_radius, placed, bm)?;
-        let mut bell = c.w.parts.town_bell_of(id);
-        let ai = c.w.parts.unit_ai.get(id);
+        self.join_building(step, Some(target), bp, reload, me, bm)?;
+        self.enter_sight(step, target, at, building_radius, placed, bm)?;
+        let mut bell = step.w.parts.town_bell_of(id);
+        let ai = step.w.parts.unit_ai.get(id);
         self.enter_town_bell((&mut bell, ai), Some(target), at, state, (me, bm), roles)?;
-        c.w.parts.set_town_bell(id, bell);
+        step.w.parts.set_town_bell(id, bell);
         Ok(())
     }
 
@@ -472,32 +484,37 @@ impl Unit {
     /// and a unit (type 70) adds its share to the building's volleys.
     fn join_building(
         &self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         target: Option<ContainerId>,
         bp: PlayerId,
         reload: Seconds,
         me: &Master,
         bm: &Master,
     ) -> GenieResult<()> {
-        let roles = &c.w.model.roles.clone();
-        let masters = c.w.model.masters.get(c.player.index()).ok_or(NO_MASTERS)?;
+        let roles = &step.w.model.roles.clone();
+        let masters = step
+            .w
+            .model
+            .masters
+            .get(step.player.index())
+            .ok_or(NO_MASTERS)?;
         let firepower = if me.kind == MasterKind::COMBAT {
-            let own = c.w.model.masters.of(bp).unwrap_or(masters);
-            let rate = attack_rate(bm, own, reload, roles, &c.w.model.tuning.garrison);
+            let own = step.w.model.masters.of(bp).unwrap_or(masters);
+            let rate = attack_rate(bm, own, reload, roles, &step.w.model.tuning.garrison);
             share(
                 me,
                 masters,
-                c.w.parts.combat_of(self.id).reload_powerup,
+                step.w.parts.combat_of(self.id).reload_powerup,
                 rate,
                 roles,
             )?
         } else {
             Firepower::ZERO
         };
-        if let Some((_, b)) = c.w.object_mut(target) {
-            b.garrison.push(self.id);
-            let id = b.id;
-            c.w.parts.combat_mut(id)?.firepower += firepower;
+        if let Some((_, unit)) = step.w.object_mut(target) {
+            unit.garrison.push(self.id);
+            let id = unit.id;
+            step.w.parts.combat_mut(id)?.firepower += firepower;
         }
         Ok(())
     }
@@ -507,7 +524,7 @@ impl Unit {
     /// `target` at `at` (radius `radius`) sees a circle of 5 (slot 0x1d0 with 5).
     fn enter_sight(
         &self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         target: ContainerId,
         at: Position,
         radius: Footprint,
@@ -515,14 +532,16 @@ impl Unit {
         bm: &Master,
     ) -> GenieResult<()> {
         let id = self.id;
-        let Some(v) = c.w.spatial.sight.as_mut() else {
+        let Some(visibility) = step.w.spatial.sight.as_mut() else {
             return Ok(());
         };
-        if let Some(r) = v.registry.as_mut().filter(|_| 0 <= id.get()) {
-            let mask = r.entry(id).map_or(VisionBits::NONE, |e| e.mask);
-            r.update_unit(UnitUpdate {
+        if let Some(registry) = visibility.registry.as_mut().filter(|_| 0 <= id.get()) {
+            let mask = registry
+                .entry(id)
+                .map_or(VisionBits::NONE, |entry| entry.mask);
+            registry.update_unit(UnitUpdate {
                 id,
-                owner: c.player,
+                owner: step.player,
                 position: self.position().ground(),
                 radii: placed.radius,
                 class: placed.class,
@@ -530,15 +549,18 @@ impl Unit {
                 new: VisionBits::NONE,
             })?;
             // its mask (`+0x8f8`) is none after
-            r.entries.get_or_insert_with(id, Entry::default)?.mask = VisionBits::NONE;
+            registry
+                .entries
+                .get_or_insert_with(id, Entry::default)?
+                .mask = VisionBits::NONE;
         }
         // a building's sight takes a circle of 5 (FUN_141212e10, type 80 only)
         if bm.kind == MasterKind::BUILDING {
-            let _ = v.sight_on_los(
+            let _ = visibility.sight_on_los(
                 target.id(),
                 LosSight::tile_circle(at, radius, INSIDE_SIGHT),
-                &c.w.model.roles,
-                c.w.model.tuning.visibility,
+                &step.w.model.roles,
+                step.w.model.tuning.visibility,
             )?;
         }
         Ok(())
@@ -580,9 +602,11 @@ impl Unit {
         }
         if bm.kind == MasterKind::BUILDING
             && state == ObjectState::Alive
-            && bm
-                .building
-                .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS))
+            && bm.building.is_some_and(|building_master| {
+                building_master
+                    .garrison_kind
+                    .contains(GarrisonKinds::VILLAGERS)
+            })
         {
             bell.flag = BellShelter::Sheltered;
         }
@@ -602,12 +626,12 @@ impl Unit {
     pub(crate) fn inside_update(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
     ) -> GenieResult<()> {
         if !actions.list.is_empty() {
-            return self.end_head_update(actions, c, HeadCode::Deletes);
+            return self.end_head_update(actions, step, HeadCode::Deletes);
         }
-        if c.w.parts.unread.contains(self.id) {
+        if step.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "the inside update of an action the slice does not hold",
             ));

@@ -44,35 +44,35 @@ use std::mem::replace;
 /// time (`+0x648`), the alerts of another owner (slot 0x2e8), the killer (`+0x690`, `+0x694`),
 /// the local player's statistics, the damage sprites (slot 0x4c0) and the trigger events.
 pub(super) fn damage(
-    t: &mut Victim,
+    victim: &mut Victim,
     src: &mut Victim,
     weapons: &[ClassAmount],
     factor: f32,
     blast_taken: HitPoints,
     roles: &Roles,
 ) -> GenieResult<()> {
-    let d = armor_damage(
-        t,
+    let hit_points = armor_damage(
+        victim,
         weapons,
         factor,
         &src.source,
-        bonus_damage(src, t, roles),
+        bonus_damage(src, victim, roles),
         roles,
     )?;
-    if blast_taken < d {
+    if blast_taken < hit_points {
         if MasterKind::COMBAT <= src.kind {
-            let hit = charge_hit(&src.source, t, roles);
+            let hit = charge_hit(&src.source, victim, roles);
             src.source.charge_hit = hit;
             if hit && src.source.area_effect <= Distance::ZERO {
                 src.source.charge = Charge::ZERO;
             }
         }
-        lose(t, d - blast_taken);
+        lose(victim, hit_points - blast_taken);
     }
-    let marks = t.kind == MasterKind::COMBAT
-        || (t.kind == MasterKind::BUILDING
+    let marks = victim.kind == MasterKind::COMBAT
+        || (victim.kind == MasterKind::BUILDING
             && roles
-                .of_class(t.class)
+                .of_class(victim.class)
                 .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET));
     if MasterKind::MISSILE <= src.kind
         && src.source.ability.contains(CombatAbility::MARKS_TARGET)
@@ -82,7 +82,7 @@ pub(super) fn damage(
             "an attacker whose combat ability marks its target (FUN_141206250)",
         ));
     }
-    let master_hp = i32::from(t.master_hp.get());
+    let master_hp = i32::from(victim.master_hp.get());
     if !roles
         .of_class(src.source.class)
         .contains(ClassRoles::SELF_ALERTING)
@@ -93,39 +93,44 @@ pub(super) fn damage(
             Some(src.id)
         };
         // the notify's p1 is the attacker's id (the game's record)
-        t.damaged
-            .push((sender, [src.id.get(), t.hp.get() as i32, master_hp]));
+        victim
+            .damaged
+            .push((sender, [src.id.get(), victim.hp.get() as i32, master_hp]));
     }
-    if t.hp < HitPoints::new(1.0) {
-        t.hp = HitPoints::ZERO;
-        if t.armored.as_ref().is_some_and(|a| a.kill_tasks) {
+    if victim.hp < HitPoints::new(1.0) {
+        victim.hp = HitPoints::ZERO;
+        if victim
+            .armored
+            .as_ref()
+            .is_some_and(|armored| armored.kill_tasks)
+        {
             return Err(GenieError::unsupported(
                 "a kill reward task (action type 0xa1)",
             ));
         }
-        t.killed = Some(Kill {
+        victim.killed = Some(Kill {
             attacker: src.id,
             attacker_player: src.player,
             attacker_class: src.class,
             // The livestock class, which goes to Gaia when killed.
             // The artifact class (1), which no blast reaches.
-            to_gaia: t.kind == MasterKind::COMBAT
-                && roles.of_class(t.class).contains(ClassRoles::LIVESTOCK)
-                && t.player != PlayerId::new(0),
+            to_gaia: victim.kind == MasterKind::COMBAT
+                && roles.of_class(victim.class).contains(ClassRoles::LIVESTOCK)
+                && victim.player != PlayerId::new(0),
         });
     }
     Ok(())
 }
 
-/// The blast's rectangle of tiles about `center` for radius `r` (`FUN_14107f690`): the tiles
-/// from `(int)(c - r) - 6` (at least 0) to before `(int)(c + r) + 6` (at most the map's edge,
-/// which no object passes), each `CVTTSS2SI` into 32 bits kept as a short.
-pub(super) fn blast_tiles(center: Position, r: Distance) -> (Tile, Tile) {
+/// The blast's rectangle of tiles about `center` for radius `distance` (`FUN_14107f690`): the tiles
+/// from `(int)(c - distance) - 6` (at least 0) to before `(int)(c + distance) + 6` (at most the
+/// map's edge, which no object passes), each `CVTTSS2SI` into 32 bits kept as a short.
+pub(super) fn blast_tiles(center: Position, distance: Distance) -> (Tile, Tile) {
     let low = |c: f32| {
-        let t = (cvttss2si(c - r.get()) as i16).wrapping_sub(6);
+        let t = (cvttss2si(c - distance.get()) as i16).wrapping_sub(6);
         i32::from(t.max(0))
     };
-    let high = |c: f32| i32::from((cvttss2si(c + r.get()) as i16).wrapping_add(6));
+    let high = |c: f32| i32::from((cvttss2si(c + distance.get()) as i16).wrapping_add(6));
     (
         Tile::new(low(center.x()), low(center.y())),
         Tile::new(high(center.x()), high(center.y())),
@@ -156,8 +161,8 @@ pub(super) fn blast_tiles(center: Position, r: Distance) -> (Tile, Tile) {
 /// adds its loss to it; the main building of an annex it reaches is among `targets`. The compares
 /// are the assembly's: a NaN gap past a radius is 0 (`COMISS`/`JBE`), a NaN square distance is
 /// beyond the radius (`JBE`), a NaN facet offset stays in a cone (`JA` past, both the narrow and
-/// the wide one), a NaN `area_damage` leaves the factor as it is. Neither caller reads the
-/// game's answer (whether the radius is above 0, or NaN: `COMISS 0, r`/`JC`): the port has none.
+/// the wide one), a NaN `area_damage` leaves the factor as it is. Neither caller reads the game's
+/// answer (whether the radius is above 0, or NaN: `COMISS 0, distance`/`JC`): the port has none.
 pub fn blast(
     attacker: &mut Victim,
     center: Position,
@@ -167,23 +172,23 @@ pub fn blast(
     factor: f32,
     layer: HitLayer<'_>,
 ) -> GenieResult<()> {
-    let a = attacker.source;
-    let r = a.area_effect;
-    if !below_or_unordered(0.0, r.get()) {
+    let source = attacker.source;
+    let distance = source.area_effect;
+    if !below_or_unordered(0.0, distance.get()) {
         return Ok(());
     }
-    let wide = if a.blast_level.contains(BlastLevel::CONE) {
-        r
+    let wide = if source.blast_level.contains(BlastLevel::CONE) {
+        distance
     } else {
         Distance::ZERO
     };
     let blast = Blast {
-        a,
+        a: source,
         center,
-        r,
+        r: distance,
         wide,
-        tiles: blast_tiles(center, r),
-        spares_friends: a.blast_level.spares_friends(a.weapon_range),
+        tiles: blast_tiles(center, distance),
+        spares_friends: source.blast_level.spares_friends(source.weapon_range),
         exclude,
         main,
         factor,
@@ -194,16 +199,16 @@ pub fn blast(
         .iter_mut()
         // The building type (`'P'`): its slot 0xe8 is `FUN_1411cea90` ([`take_building`]).
         // The wall class (27): its razing counts nothing.
-        .filter(|t| t.kind == MasterKind::BUILDING && blast.on_tiles(t))
+        .filter(|victim| victim.kind == MasterKind::BUILDING && blast.on_tiles(victim))
     {
-        if let Some(b) = t.building.as_mut() {
-            b.blast_taken = HitPoints::ZERO;
+        if let Some(building) = t.building.as_mut() {
+            building.blast_taken = HitPoints::ZERO;
         }
     }
     attacker.source.charge_hit = false;
     let weapons = attacker.weapons.clone();
-    for i in 0..targets.len() {
-        blast_one(attacker, targets, i, (&blast, &weapons), layer)?;
+    for index in 0..targets.len() {
+        blast_one(attacker, targets, index, (&blast, &weapons), layer)?;
     }
     Ok(())
 }
@@ -226,9 +231,9 @@ pub(super) struct Blast {
 
 impl Blast {
     /// Whether the object stands on the blast's tiles (its place truncated).
-    pub(super) const fn on_tiles(&self, t: &Victim) -> bool {
+    pub(super) const fn on_tiles(&self, victim: &Victim) -> bool {
         let (from, to) = self.tiles;
-        let (x, y) = (t.position.x() as i32, t.position.y() as i32);
+        let (x, y) = (victim.position.x() as i32, victim.position.y() as i32);
         from.x() <= x && x < to.x() && from.y() <= y && y < to.y()
     }
 }
@@ -242,7 +247,7 @@ pub(super) fn blast_one(
     attacker: &mut Victim,
     targets: &mut [&mut Victim],
     i: usize,
-    (b, weapons): (&Blast, &[ClassAmount]),
+    (blast, weapons): (&Blast, &[ClassAmount]),
     layer: HitLayer<'_>,
 ) -> GenieResult<()> {
     let HitLayer {
@@ -250,9 +255,9 @@ pub(super) fn blast_one(
         damage_tuning,
         ..
     } = layer;
-    let a = &b.a;
+    let a = &blast.a;
     let t = &**targets.checked(i)?;
-    if !b.on_tiles(t) {
+    if !blast.on_tiles(t) {
         return Ok(());
     }
     if t.uncertain {
@@ -261,14 +266,14 @@ pub(super) fn blast_one(
         )
         .with("blasted", t.id));
     }
-    if (b.spares_friends && t.allied.by_attacker)
-        || Some(t.id) == b.exclude
+    if (blast.spares_friends && t.allied.by_attacker)
+        || Some(t.id) == blast.exclude
         || t.id == attacker.id
         || roles.of_class(t.class).contains(ClassRoles::ARTIFACT)
     {
         return Ok(());
     }
-    let hit = if Some(t.id) == b.main {
+    let hit = if Some(t.id) == blast.main {
         BlastHit::Main
     } else {
         BlastHit::Splash
@@ -278,40 +283,41 @@ pub(super) fn blast_one(
     if !(BlastDefense::ALWAYS_REACHED <= defense || a.blast_level.reaches(defense)) {
         return Ok(());
     }
-    let t = &mut **targets.checked_mut(i)?;
+    let victim = &mut **targets.checked_mut(i)?;
     if roles
         .of_master(a.master_id)
         .contains(MasterRoles::BUILDINGS_ONLY_BLAST)
-        && t.kind != MasterKind::BUILDING
+        && victim.kind != MasterKind::BUILDING
         && hit == BlastHit::Splash
     {
         return Ok(());
     }
-    let Some(d2) = blast_distance2(t, b.center, b.r.get()) else {
+    let Some(d2) = blast_distance2(victim, blast.center, blast.r.get()) else {
         return Ok(());
     };
-    if MasterKind::COMBAT <= t.kind && shield(t, HitKind::Melee) == ShieldBlock::Blocked {
+    if MasterKind::COMBAT <= victim.kind && shield(victim, HitKind::Melee) == ShieldBlock::Blocked {
         return Ok(());
     }
-    let mut f = blast_falloff(attacker, a, t, (b.r.get(), d2), hit, damage_tuning);
+    let mut blast_falloff =
+        blast_falloff(attacker, a, victim, (blast.r.get(), d2), hit, damage_tuning);
     if hit == BlastHit::Splash {
-        if outside_cone(attacker, a, t, (d2, b.wide.get()), damage_tuning)? {
+        if outside_cone(attacker, a, victim, (d2, blast.wide.get()), damage_tuning)? {
             return Ok(());
         }
         // COMISS share, 0 / JC, then COMISS 0, share / JBE: a share below 0 is a fixed
         // damage, a NaN one goes on to the hit with the factor as it is
         if share < 0.0 {
-            return fixed_blast(attacker, a, t, share);
+            return fixed_blast(attacker, a, victim, share);
         }
         if !share.is_nan() {
-            f *= share;
+            blast_falloff *= share;
         }
     }
     blast_hit(
         attacker,
         targets,
         i,
-        (weapons, f * b.factor),
+        (weapons, blast_falloff * blast.factor),
         (ledger, blast_taken),
         layer,
     )
@@ -325,16 +331,19 @@ pub(super) fn blast_ledger(targets: &[&mut Victim], i: usize) -> GenieResult<Opt
     if t.kind != MasterKind::BUILDING {
         return Ok(None);
     }
-    t.building.as_ref().and_then(|b| b.main).map_or_else(
-        || Ok(Some(i)),
-        |m| {
-            targets
-                .iter()
-                .position(|v| v.id == m.id())
-                .map(Some)
-                .ok_or(NOT_HELD)
-        },
-    )
+    t.building
+        .as_ref()
+        .and_then(|building| building.main)
+        .map_or_else(
+            || Ok(Some(i)),
+            |role_id| {
+                targets
+                    .iter()
+                    .position(|victim| victim.id == role_id.id())
+                    .map(Some)
+                    .ok_or(NOT_HELD)
+            },
+        )
 }
 
 /// What the blast reads of object `i` through its `ledger`: the `area_damage` share, the blast
@@ -343,28 +352,32 @@ pub(super) fn ledger_values(
     targets: &[&mut Victim],
     i: usize,
     ledger: Option<usize>,
-    a: &Attacker,
+    attacker: &Attacker,
 ) -> GenieResult<(f32, BlastDefense, HitPoints)> {
     let taken = |v: &Victim| {
         v.building
             .as_ref()
-            .map_or(HitPoints::ZERO, |b| b.blast_taken)
+            .map_or(HitPoints::ZERO, |building| building.blast_taken)
     };
     let t = &**targets.checked(i)?;
     Ok(match ledger {
         Some(k) if k != i => {
-            let m = &**targets.checked(k)?;
-            (m.source.area_damage.get(), m.blast_defense, taken(m))
+            let victim = &**targets.checked(k)?;
+            (
+                victim.source.area_damage.get(),
+                victim.blast_defense,
+                taken(victim),
+            )
         }
-        Some(_) => (a.area_damage.get(), t.blast_defense, taken(t)),
-        None => (a.area_damage.get(), t.blast_defense, HitPoints::ZERO),
+        Some(_) => (attacker.area_damage.get(), t.blast_defense, taken(t)),
+        None => (attacker.area_damage.get(), t.blast_defense, HitPoints::ZERO),
     })
 }
 
 /// The square distance from the blast's `center` to the object's box (the gap past each
 /// radius, a NaN gap 0: `COMISS`/`JBE`); None beyond the radius `r` (a NaN square distance is
 /// beyond it: `JBE`). The hit's slack (its info's `+0xc`, `+0x10`) is 0 for a melee hit.
-pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f32> {
+pub(super) fn blast_distance2(victim: &Victim, center: Position, r: f32) -> Option<f32> {
     let gap = |d: f32, radius: Distance| {
         if at_most_or_unordered(d, radius.get()) {
             0.0
@@ -373,12 +386,12 @@ pub(super) fn blast_distance2(t: &Victim, center: Position, r: f32) -> Option<f3
         }
     };
     let dx = gap(
-        (t.position.x() - center.x()).abs(),
-        Distance::new(t.radius.x()),
+        (victim.position.x() - center.x()).abs(),
+        Distance::new(victim.radius.x()),
     );
     let dy = gap(
-        (t.position.y() - center.y()).abs(),
-        Distance::new(t.radius.y()),
+        (victim.position.y() - center.y()).abs(),
+        Distance::new(victim.radius.y()),
     );
     let d2 = dy * dy + dx * dx;
     if at_most_or_unordered(r * r, d2) {
@@ -397,50 +410,55 @@ pub(super) enum BlastHit {
     Splash,
 }
 
-/// The blast's damage factor on `t` at square distance `d2` within radius `r`: the attacker's
-/// elevation factor, times `t`'s `friendly_fire_damage` when it is of type 70 and up and its player
-/// is the attacker's or allied, times the falloff `(r - d) / r` (a melee attacker's only with
-/// [`BlastLevel::FALLS_OFF`] and not on the main target; a missile's everywhere, at distance 0 on
-/// the main target's building, [`BlastHit`]).
+/// The blast's damage factor on `victim` at square distance `d2` within radius `r`: the attacker's
+/// elevation factor, times `victim`'s `friendly_fire_damage` when it is of type 70 and up and its
+/// player is the attacker's or allied, times the falloff `(r - d) / r` (a melee attacker's only
+/// with [`BlastLevel::FALLS_OFF`] and not on the main target; a missile's everywhere, at distance 0
+/// on the main target's building, [`BlastHit`]).
 pub(super) fn blast_falloff(
     attacker: &Victim,
     a: &Attacker,
-    t: &Victim,
+    victim: &Victim,
     (r, d2): (f32, f32),
     hit: BlastHit,
     damage_tuning: &DamageTuning,
 ) -> f32 {
-    let mut f = elevation_factor(
+    let mut elevation_factor = elevation_factor(
         attacker.position.z(),
         attacker.attack_elevation,
-        t,
+        victim,
         damage_tuning,
     );
-    if MasterKind::COMBAT <= t.kind && (t.player == attacker.player || t.allied.by_target) {
-        f *= t.armored.as_ref().map_or(1.0, |x| x.friendly_fire.get());
+    if MasterKind::COMBAT <= victim.kind
+        && (victim.player == attacker.player || victim.allied.by_target)
+    {
+        elevation_factor *= victim
+            .armored
+            .as_ref()
+            .map_or(1.0, |x| x.friendly_fire.get());
     }
     if a.missile.is_none() {
         if a.blast_level.contains(BlastLevel::FALLS_OFF) && hit == BlastHit::Splash {
-            f *= (r - sqrt(d2)) / r;
+            elevation_factor *= (r - sqrt(d2)) / r;
         }
     } else {
-        let d = if hit == BlastHit::Splash || t.kind != MasterKind::BUILDING {
+        let d = if hit == BlastHit::Splash || victim.kind != MasterKind::BUILDING {
             sqrt(d2)
         } else {
             0.0
         };
-        f *= (r - d) / r;
+        elevation_factor *= (r - d) / r;
     }
-    f
+    elevation_factor
 }
 
-/// Whether `t` lies outside the cone of a cone blast ([`BlastLevel::CONE`]): beyond half a facet of
-/// the attacker's facing, or for a wide one ([`BlastLevel::WIDE_CONE`]) beyond the wide radius or
-/// 1.67 facets; a NaN facet offset stays in either. A blast of no cone has none to leave.
+/// Whether `victim` lies outside the cone of a cone blast ([`BlastLevel::CONE`]): beyond half a
+/// facet of the attacker's facing, or for a wide one ([`BlastLevel::WIDE_CONE`]) beyond the wide
+/// radius or 1.67 facets; a NaN facet offset stays in either. A blast of no cone has none to leave.
 pub(super) fn outside_cone(
     attacker: &Victim,
     a: &Attacker,
-    t: &Victim,
+    victim: &Victim,
     (d2, wide): (f32, f32),
     damage_tuning: &DamageTuning,
 ) -> GenieResult<bool> {
@@ -456,38 +474,38 @@ pub(super) fn outside_cone(
                 "the facing of an attacker with a cone blast (+0x7e8)",
             ))?;
     if !a.blast_level.contains(BlastLevel::WIDE_CONE) {
-        let off = facing_offset(attacker.position, facing, t.position);
+        let off = facing_offset(attacker.position, facing, victim.position);
         return Ok(damage_tuning.cone < off || off < damage_tuning.minus_cone);
     }
     if wide * wide < d2 {
         return Ok(true);
     }
-    let off = facing_offset(attacker.position, facing, t.position).abs();
+    let off = facing_offset(attacker.position, facing, victim.position).abs();
     Ok(damage_tuning.wide_cone < off)
 }
 
-/// A fixed blast damage (an `area_damage` `share` below 0) on `t`: it loses the share's size
+/// A fixed blast damage (an `area_damage` `share` below 0) on `victim`: it loses the share's size
 /// alone (slot 0xb0); below 1 it has 0 hit points and holds nothing (`FUN_14119d320`); a combat
 /// unit of a player that had 1 is counted killed (`FUN_1412005b0`).
 pub(super) fn fixed_blast(
     attacker: &Victim,
     a: &Attacker,
-    t: &mut Victim,
+    victim: &mut Victim,
     share: f32,
 ) -> GenieResult<()> {
-    let before = t.hp;
-    lose(t, HitPoints::new(share.abs()));
-    if t.hp < HitPoints::new(1.0) {
-        t.hp = HitPoints::ZERO;
-        t.amount = Amount::ZERO;
-        if Amount::of_master(t.capacity) < t.amount {
-            t.amount = Amount::of_master(t.capacity);
+    let before = victim.hp;
+    lose(victim, HitPoints::new(share.abs()));
+    if victim.hp < HitPoints::new(1.0) {
+        victim.hp = HitPoints::ZERO;
+        victim.amount = Amount::ZERO;
+        if Amount::of_master(victim.capacity) < victim.amount {
+            victim.amount = Amount::of_master(victim.capacity);
         }
         if HitPoints::new(1.0) <= before
-            && t.player != PlayerId::GAIA
-            && t.kind == MasterKind::COMBAT
+            && victim.player != PlayerId::GAIA
+            && victim.kind == MasterKind::COMBAT
         {
-            t.killed = Some(Kill {
+            victim.killed = Some(Kill {
                 attacker: attacker.id,
                 attacker_player: attacker.player,
                 attacker_class: attacker.class,
@@ -513,9 +531,9 @@ pub(super) fn blast_hit(
 ) -> GenieResult<()> {
     let HitLayer { roles, .. } = layer;
     let before = targets.checked(i)?.hp;
-    let mut t = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
+    let mut victim = replace(&mut **targets.checked_mut(i)?, Victim::placeholder());
     let hit = take(
-        &mut t,
+        &mut victim,
         attacker,
         targets,
         weapons,
@@ -525,18 +543,18 @@ pub(super) fn blast_hit(
     );
     if hit.is_ok() {
         if !attacker.source.charge_hit {
-            attacker.source.charge_hit = charge_hit(&attacker.source, &t, roles);
+            attacker.source.charge_hit = charge_hit(&attacker.source, &victim, roles);
         }
-        let lost = before - t.hp;
+        let lost = before - victim.hp;
         let ledger = match ledger {
-            Some(k) if k == i => t.building.as_mut(),
+            Some(k) if k == i => victim.building.as_mut(),
             Some(k) => targets.checked_mut(k)?.building.as_mut(),
             None => None,
         };
-        if let Some(b) = ledger {
-            b.blast_taken += lost;
+        if let Some(building) = ledger {
+            building.blast_taken += lost;
         }
     }
-    **targets.checked_mut(i)? = t;
+    **targets.checked_mut(i)? = victim;
     hit
 }

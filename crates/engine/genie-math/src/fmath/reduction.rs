@@ -226,14 +226,14 @@ pub(super) fn rem_pio2_large(x: &[f64], e0: i32, prec: usize) -> (i32, [f64; 3])
         fw *= TWO_POW_MINUS_24;
     }
     // fq[jz − i] = π/2 · q[i..], at most jp + 1 pieces of π/2
-    for i in (0..=jz).rev() {
+    for index in (0..=jz).rev() {
         let mut fw = 0.0;
         let mut k = 0;
-        while k <= jp && k <= jz - i {
-            fw += PIO2[k] * q[i + k];
+        while k <= jp && k <= jz - index {
+            fw += PIO2[k] * q[index + k];
             k += 1;
         }
-        fq[jz - i] = fw;
+        fq[jz - index] = fw;
     }
 
     (n & 7, remainder_pieces(&mut fq, jz, prec, ih != 0))
@@ -306,8 +306,8 @@ pub(super) fn remainder_pieces(
                 fq[i - 1] = fw;
             }
             let mut fw = 0.0;
-            for i in (2..=jz).rev() {
-                fw += fq[i];
+            for index in (2..=jz).rev() {
+                fw += fq[index];
             }
             y = [sign(fq[0]), sign(fq[1]), sign(fw)];
         }

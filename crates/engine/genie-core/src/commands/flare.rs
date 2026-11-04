@@ -26,7 +26,7 @@ pub struct FlareCommand {
 
 impl FlareCommand {
     /// Its handler ([`World::flare`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        w.flare(self.target, self.point, self.players)
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        world.flare(self.target, self.point, self.players)
     }
 }

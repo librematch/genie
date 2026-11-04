@@ -32,23 +32,24 @@ impl VisionBits {
     /// The bits an object's mask keeps (`0x1ffffff01ffffff`): 25 visible and 25 explored.
     pub const OBJECT_MASK: Self = Self::from_bits_retain(0x1ff_ffff_01ff_ffff);
 
-    /// Player `p`'s visible bit (`1 << p`, the shift's count taken mod 64 as the game's).
+    /// Player `player_id`'s visible bit (`1 << player_id`, the shift's count taken mod 64 as the
+    /// game's).
     #[must_use]
-    pub fn visible(p: PlayerId) -> Self {
-        Self::from_bits_retain(1u64.wrapping_shl(u32::from(p.get())))
+    pub fn visible(player_id: PlayerId) -> Self {
+        Self::from_bits_retain(1u64.wrapping_shl(u32::from(player_id.get())))
     }
 
-    /// Player `p`'s explored bit (`1 << (32 + p)`, the count mod 64).
+    /// Player `player_id`'s explored bit (`1 << (32 + player_id)`, the count mod 64).
     #[must_use]
-    pub fn explored(p: PlayerId) -> Self {
-        Self::from_bits_retain(1u64.wrapping_shl(32 + u32::from(p.get())))
+    pub fn explored(player_id: PlayerId) -> Self {
+        Self::from_bits_retain(1u64.wrapping_shl(32 + u32::from(player_id.get())))
     }
 }
 
 impl Diff for VisionBits {
     /// By equality: a word is one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -71,23 +72,23 @@ mod tests {
     /// is ever dropped.
     #[test]
     fn player_bits_are_its_index_and_32_plus_its_index() {
-        let p = PlayerId::new(3);
-        assert_eq!(VisionBits::visible(p).bits(), 1 << 3);
-        assert_eq!(VisionBits::explored(p).bits(), 1 << 35);
-        let word = VisionBits::visible(p) | VisionBits::NO_TILE;
-        assert!(word.intersects(VisionBits::visible(p)));
-        assert!(!word.intersects(VisionBits::explored(p)));
-        assert_eq!(word & !VisionBits::visible(p), VisionBits::NO_TILE);
+        let player_id = PlayerId::new(3);
+        assert_eq!(VisionBits::visible(player_id).bits(), 1 << 3);
+        assert_eq!(VisionBits::explored(player_id).bits(), 1 << 35);
+        let word = VisionBits::visible(player_id) | VisionBits::NO_TILE;
+        assert!(word.intersects(VisionBits::visible(player_id)));
+        assert!(!word.intersects(VisionBits::explored(player_id)));
+        assert_eq!(word & !VisionBits::visible(player_id), VisionBits::NO_TILE);
         assert_eq!((!VisionBits::NONE).bits(), u64::MAX);
         assert!(VisionBits::NONE.is_empty() && !word.is_empty());
         assert_eq!(VisionBits::from_bits_retain(0x20).bits(), 0x20);
         assert_eq!(format!("{:?}", VisionBits::ENDED), "VisionBits(ENDED)");
         assert_eq!(format!("{word:?}"), "VisionBits(NO_TILE | 0x8)");
         assert_eq!(format!("{:x}", VisionBits::NO_TILE), "20000000");
-        assert_eq!(format!("{:b}", VisionBits::visible(p)), "1000");
-        let mut m = VisionBits::NONE;
-        m |= VisionBits::ENDED;
-        m &= VisionBits::OBJECT_MASK;
-        assert!(m.is_empty());
+        assert_eq!(format!("{:b}", VisionBits::visible(player_id)), "1000");
+        let mut vision_bits = VisionBits::NONE;
+        vision_bits |= VisionBits::ENDED;
+        vision_bits &= VisionBits::OBJECT_MASK;
+        assert!(vision_bits.is_empty());
     }
 }

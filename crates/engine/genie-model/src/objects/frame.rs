@@ -95,8 +95,8 @@ impl Rem for Frame {
 }
 
 impl genie_diff::Diff for Frame {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -155,8 +155,8 @@ impl AnimateState {
 }
 
 impl genie_diff::Diff for AnimateState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.raw().diff(&other.raw(), differ);
     }
 }
 

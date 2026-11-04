@@ -80,14 +80,18 @@ pub enum MeetAt {
 /// state 3, 4 or 11 meets it where that action goes, but a siege weapon (class 13) at its
 /// place; any other state at its place.
 #[must_use]
-pub fn meet_at(t: &MeetingTarget, roles: &Roles) -> MeetAt {
-    if !t.room || t.speed <= Speed::ZERO {
+pub fn meet_at(meeting_target: &MeetingTarget, roles: &Roles) -> MeetAt {
+    if !meeting_target.room || meeting_target.speed <= Speed::ZERO {
         return MeetAt::Place;
     }
-    if matches!(t.state.get(), 0 | 2) {
+    if matches!(meeting_target.state.get(), 0 | 2) {
         return MeetAt::Shore;
     }
-    if roles.of_class(t.class).contains(ClassRoles::SIEGE) || !matches!(t.state.get(), 11 | 4 | 3) {
+    if roles
+        .of_class(meeting_target.class)
+        .contains(ClassRoles::SIEGE)
+        || !matches!(meeting_target.state.get(), 11 | 4 | 3)
+    {
         return MeetAt::Place;
     }
     MeetAt::ActionPoint
@@ -211,24 +215,23 @@ pub fn walled_off(
 /// An object whose master the slice lacks.
 fn buildings_on(spatial: &Spatial, masters: &[Arc<Masters>], tile: Tile) -> GenieResult<usize> {
     let mut n = 0;
-    for (_, o) in spatial.objects_on(tile) {
-        let m = player_master(masters, o.player, o.master).ok_or(GenieError::unsupported(
-            "an object on a tile of a master the slice lacks",
-        ))?;
-        n += usize::from(m.kind == MasterKind::BUILDING);
+    for (_, placed) in spatial.objects_on(tile) {
+        let master = player_master(masters, placed.player, placed.master).ok_or(
+            GenieError::unsupported("an object on a tile of a master the slice lacks"),
+        )?;
+        n += usize::from(master.kind == MasterKind::BUILDING);
     }
     Ok(n)
 }
 
-/// [`MeetingTarget`] of the target `t` with its action layer `target_actions`, why the load could not
-/// read it whole `target_unread` ([`crate::world::Unread`]) and its mover `target_mover` (of master `tm`)
-/// with `room` for
-/// the unit: its top speed ([`crate::movement::MoveStats::speed`]), its top action's state and
-/// its point (`+0x38`, `+0x3c`): a `MoveTo`'s
-/// ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An action the slice
-/// does not hold has neither; another no point the slice keeps.
+/// [`MeetingTarget`] of the target `unit` with its action layer `target_actions`, why the load
+/// could not read it whole `target_unread` ([`crate::world::Unread`]) and its mover `target_mover`
+/// (of master `tm`) with `room` for the unit: its top speed
+/// ([`crate::movement::MoveStats::speed`]), its top action's state and its point (`+0x38`,
+/// `+0x3c`): a `MoveTo`'s ([`crate::movement::move_to::MoveToAction::point`]) or a Transport's. An
+/// action the slice does not hold has neither; another no point the slice keeps.
 pub(crate) fn meeting_target(
-    (t, target_actions, target_unread, target_mover): (
+    (unit, target_actions, target_unread, target_mover): (
         &Unit,
         &Action,
         Option<&Unread>,
@@ -237,14 +240,14 @@ pub(crate) fn meeting_target(
     tm: &Master,
     room: bool,
 ) -> GenieResult<MeetingTarget> {
-    if let Some(e) = target_unread {
-        return Err(e.error());
+    if let Some(unread) = target_unread {
+        return Err(unread.error());
     }
     let action_point = match (
         target_actions.top_action_kind(),
         target_actions.list.move_to().copied(),
     ) {
-        (Some(MOVE_TO), Some(m)) => Ok(m.point.ground()),
+        (Some(MOVE_TO), Some(move_to_action)) => Ok(move_to_action.point.ground()),
         // the Transport's point (+0x38, +0x3c), where it sails
         (Some(TRANSPORT), _) => target_actions
             .list
@@ -255,12 +258,12 @@ pub(crate) fn meeting_target(
     };
     Ok(MeetingTarget {
         room,
-        speed: target_mover.map_or(Speed::ZERO, |m| m.stats.speed),
+        speed: target_mover.map_or(Speed::ZERO, |mover| mover.stats.speed),
         state: target_actions
             .top_action()
-            .map_or(ActionState::NO_ACTION, |a| a.state),
+            .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
         class: tm.class,
-        position: t.position().ground(),
+        position: unit.position().ground(),
         action_point,
     })
 }
@@ -270,7 +273,7 @@ pub(super) const UNPLACED: GenieError =
     GenieError::unsupported("an Enter's transport under an action the slice does not place");
 
 /// `FUN_140a85f30`: where an Enter of `unit` (its id, place and movement state) meets its
-/// target `t` and the code its `set_state(4)` reads (1: the transport moves there), by
+/// target `meeting_target` and the code its `set_state(4)` reads (1: the transport moves there), by
 /// [`meet_at`]: at the target's place, where its top action goes, or at the shore
 /// ([`shore_or_beach`]).
 ///
@@ -278,17 +281,17 @@ pub(super) const UNPLACED: GenieError =
 ///
 /// A target under an action whose point the slice does not keep, and the shore's search's.
 pub(crate) fn meeting_point(
-    t: &MeetingTarget,
+    meeting_target: &MeetingTarget,
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<(Point, u8)> {
     let roles = by_id.roles();
-    match meet_at(t, roles) {
-        MeetAt::Place => Ok((t.position, 0)),
-        MeetAt::ActionPoint => Ok((t.action_point.clone()?, 0)),
-        MeetAt::Shore => shore_or_beach(t, unit, spatial, zones, by_id),
+    match meet_at(meeting_target, roles) {
+        MeetAt::Place => Ok((meeting_target.position, 0)),
+        MeetAt::ActionPoint => Ok((meeting_target.action_point.clone()?, 0)),
+        MeetAt::Shore => shore_or_beach(meeting_target, unit, spatial, zones, by_id),
     }
 }
 
@@ -301,14 +304,14 @@ pub(crate) fn meeting_point(
 ///
 /// The shore's search's.
 fn shore_or_beach(
-    t: &MeetingTarget,
+    meeting_target: &MeetingTarget,
     unit: (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut Zones,
     by_id: ObjectsRef<'_>,
 ) -> GenieResult<(Point, u8)> {
     let (ux, uy) = (unit.1.x(), unit.1.y());
-    if let Some(tile) = shore(t, unit, spatial, zones, by_id)? {
+    if let Some(tile) = shore(meeting_target, unit, spatial, zones, by_id)? {
         let (x, y) = (tile.x() as f32, tile.y() as f32);
         return Ok((Point::new(x + HALF_TILE, y + HALF_TILE), 1));
     }
@@ -319,7 +322,7 @@ fn shore_or_beach(
             1,
         ));
     }
-    Ok((t.position, 0))
+    Ok((meeting_target.position, 0))
 }
 
 /// The shore on the way from the target's tile to the unit's ([`LandingWalk`]): a beach
@@ -332,7 +335,7 @@ fn shore_or_beach(
 ///
 /// A map without terrain or the unit's restriction, and slot 0x278's.
 fn shore(
-    t: &MeetingTarget,
+    meeting_target: &MeetingTarget,
     (id, at, stats): (ObjectId, Position, &MoveStats),
     spatial: &mut Spatial,
     zones: &mut Zones,
@@ -345,7 +348,7 @@ fn shore(
         .ok_or(UNKNOWN_RESTRICTION)?;
     let map = zones.of(spatial.map, &terrain.kinds, values)?;
     let own = map.zone(Tile::new(cvttss2si(ux), cvttss2si(uy)));
-    let from = t.position.tile();
+    let from = meeting_target.position.tile();
     for (tile, place) in LandingWalk::new(from, Tile::new(cvttss2si(ux), cvttss2si(uy))) {
         let (x, y) = (tile.x(), tile.y());
         let terrain = spatial.terrain.as_ref().ok_or(NO_TERRAIN)?;
@@ -428,7 +431,7 @@ pub(crate) fn enter_reach(
     ))?;
     let gap = footprint_gap_squared(me.position, me.radius, them.position, them.radius);
     let speed = target_mover.map_or(Speed::ZERO, |m| m.stats.speed);
-    let them_at = target_mover.map_or(them.position, |m| m.moved_at);
+    let them_at = target_mover.map_or(them.position, |mover| mover.moved_at);
     let mut walls = Walls {
         me: moved_at.ground(),
         them: them_at.ground(),
@@ -538,8 +541,8 @@ impl Meeting<'_> {
         if self.master.kind == MasterKind::BUILDING {
             return Ok((at.ground(), 0));
         }
-        let stats = self.mover.map(|m| m.stats).ok_or(NO_SPEED)?;
-        let t = meeting_target(
+        let stats = self.mover.map(|mover| mover.stats).ok_or(NO_SPEED)?;
+        let meeting_target = meeting_target(
             (
                 self.target,
                 self.target_actions,
@@ -550,7 +553,7 @@ impl Meeting<'_> {
             self.room,
         )?;
         meeting_point(
-            &t,
+            &meeting_target,
             (self.unit.id, self.unit.position(), &stats),
             self.spatial,
             self.zones,

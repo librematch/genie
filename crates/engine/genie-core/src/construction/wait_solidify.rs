@@ -75,7 +75,8 @@ impl WaitSolidify {
         progress: Option<Seconds>,
         wait_solidify_tuning: WaitSolidifyTuning,
     ) -> UpdateCode {
-        if progress.is_none_or(|p| f64::from(p.get()) > wait_solidify_tuning.solid_from) {
+        if progress.is_none_or(|seconds| f64::from(seconds.get()) > wait_solidify_tuning.solid_from)
+        {
             UpdateCode::Done
         } else {
             UpdateCode::UnderWay
@@ -123,7 +124,7 @@ impl UnitView<'_, '_> {
             }
             others.find(id)
         };
-        let (Some(t), Some(general)) = (
+        let (Some(task_target), Some(general)) = (
             task_target_with(
                 target,
                 1,
@@ -172,13 +173,13 @@ impl UnitView<'_, '_> {
             drop_sites: &self.c.w.model.drop_sites,
         };
         // slot 0x820's point: the target's place
-        let at = find(target).map_or(Position::ORIGIN, |(_, u)| u.position());
+        let at = find(target).map_or(Position::ORIGIN, |(_, target_unit)| target_unit.position());
         let terrain = point_terrain(self.c.w.spatial.terrain.as_ref(), at);
         let Some((task, switch)) = task_search(
             masters,
             &actor,
             &TaskOn {
-                target: Some(&t),
+                target: Some(&task_target),
                 general: Some(&general),
                 terrain,
             },
@@ -193,12 +194,12 @@ impl UnitView<'_, '_> {
         let wait = Wait {
             target: FoundationId::new(target),
             task,
-            switch: switch.map(|m| m.id),
+            switch: switch.map(|master| master.id),
         };
-        self.c
-            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                w.wait_for_foundation(p, i, wait)
-            })?;
+        self.c.lend_at(
+            (&mut *self.unit, &mut *self.actions),
+            |world, player_id, list_index| world.wait_for_foundation(player_id, list_index, wait),
+        )?;
         Ok(Answer::Taken)
     }
 }
@@ -226,9 +227,13 @@ mod tests {
 
     #[test]
     fn new_wait_holds_its_task_and_foundation_in_state_10() {
-        let w = WaitSolidify::new(task(), foundation(8123));
+        let wait_solidify = WaitSolidify::new(task(), foundation(8123));
         assert_eq!(
-            (w.state, w.task, w.target),
+            (
+                wait_solidify.state,
+                wait_solidify.task,
+                wait_solidify.target
+            ),
             (WaitSolidifyState::Waiting, task(), foundation(8123))
         );
         assert_eq!(WaitSolidifyState::Waiting.get(), 10);
@@ -237,37 +242,43 @@ mod tests {
 
     #[test]
     fn the_wait_ends_once_the_foundation_is_past_hundredth_or_gone() {
-        let w = WaitSolidify::new(task(), foundation(8123));
+        let wait_solidify = WaitSolidify::new(task(), foundation(8123));
         let wait = tuning().wait_solidify;
         assert_eq!(
-            w.update(None, wait),
+            wait_solidify.update(None, wait),
             UpdateCode::Done,
             "a foundation the world does not hold"
         );
-        assert_eq!(w.update(Some(Seconds::ZERO), wait), UpdateCode::UnderWay);
+        assert_eq!(
+            wait_solidify.update(Some(Seconds::ZERO), wait),
+            UpdateCode::UnderWay
+        );
         // 0.01f32 widens to 0.009999999776…, at most the double 0.01
         assert_eq!(
-            w.update(Some(Seconds::new(0.01)), wait),
+            wait_solidify.update(Some(Seconds::new(0.01)), wait),
             UpdateCode::UnderWay
         );
         assert_eq!(
-            w.update(Some(Seconds::new(0.010_001)), wait),
+            wait_solidify.update(Some(Seconds::new(0.010_001)), wait),
             UpdateCode::Done
         );
-        assert_eq!(w.update(Some(Seconds::new(1.5)), wait), UpdateCode::Done);
+        assert_eq!(
+            wait_solidify.update(Some(Seconds::new(1.5)), wait),
+            UpdateCode::Done
+        );
         // COMISD with JA: unordered is not above
         assert_eq!(
-            w.update(Some(Seconds::new(f32::NAN)), wait),
+            wait_solidify.update(Some(Seconds::new(f32::NAN)), wait),
             UpdateCode::UnderWay
         );
     }
 
     #[test]
     fn its_set_state_sets_the_state_alone() {
-        let mut w = WaitSolidify::new(task(), foundation(8123));
-        w.set_state(WaitSolidifyState::Stopped);
+        let mut wait_solidify = WaitSolidify::new(task(), foundation(8123));
+        wait_solidify.set_state(WaitSolidifyState::Stopped);
         assert_eq!(
-            w,
+            wait_solidify,
             WaitSolidify {
                 state: WaitSolidifyState::Stopped,
                 ..WaitSolidify::new(task(), foundation(8123))

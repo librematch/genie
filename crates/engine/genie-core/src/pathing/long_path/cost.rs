@@ -57,20 +57,20 @@ impl Heap {
     /// `FUN_140fa0bd0` on a slot just filled: it rises while its cost is at most its parent's.
     pub(super) fn push(&mut self, at: Tile, cost: LongCost) -> GenieResult<()> {
         self.slots.push((at, cost));
-        let mut i = self.slots.len() - 1;
-        let mut parent = i >> 1;
+        let mut count = self.slots.len() - 1;
+        let mut parent = count >> 1;
         if self.slots.checked(parent)?.1 < cost {
             return Ok(());
         }
         loop {
-            *self.slots.checked_mut(i)? = *self.slots.checked_mut(parent)?;
-            i /= 2;
+            *self.slots.checked_mut(count)? = *self.slots.checked_mut(parent)?;
+            count /= 2;
             parent /= 2;
             if self.slots.checked(parent)?.1 < cost {
                 break;
             }
         }
-        *self.slots.checked_mut(i)? = (at, cost);
+        *self.slots.checked_mut(count)? = (at, cost);
         Ok(())
     }
 
@@ -133,16 +133,16 @@ mod tests {
 
     #[test]
     fn the_heap_sinks_the_games_way() {
-        let mut h = Heap {
+        let mut heap = Heap {
             slots: vec![(Tile::new(0, 0), SENTINEL)],
         };
-        for (i, c) in [5, 3, 8, 1, 9, 2].into_iter().enumerate() {
-            h.push(Tile::new(i as i32, 0), LongCost(c)).unwrap();
+        for (index, c) in [5, 3, 8, 1, 9, 2].into_iter().enumerate() {
+            heap.push(Tile::new(index as i32, 0), LongCost(c)).unwrap();
         }
-        assert_eq!(h.slots[1].1, LongCost(1));
-        h.pop().unwrap();
+        assert_eq!(heap.slots[1].1, LongCost(1));
+        heap.pop().unwrap();
         // count 5, half 2: no sinking past the top's children below 2
-        let costs: Vec<i32> = h.slots[1..].iter().map(|s| s.1.0).collect();
+        let costs: Vec<i32> = heap.slots[1..].iter().map(|s| s.1.0).collect();
         assert_eq!(costs, [2, 3, 8, 5, 9]);
     }
 

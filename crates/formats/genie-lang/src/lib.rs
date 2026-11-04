@@ -150,15 +150,15 @@ impl LangFileKind {
 
 impl FromStr for LangFileKind {
     type Err = GenieError;
-    fn from_str(s: &str) -> GenieResult<Self> {
+    fn from_str(text: &str) -> GenieResult<Self> {
         use LangFileKind::{Dll, Ini, KeyValue};
-        match &s.to_lowercase()[..] {
+        match &text.to_lowercase()[..] {
             "dll" => Ok(Dll),
             "ini" => Ok(Ini),
             "key-value" => Ok(KeyValue),
             _ => Err(
                 GenieError::invalid_input("a language file type this reader does not know")
-                    .with("kind", s),
+                    .with("kind", text),
             ),
         }
     }
@@ -193,9 +193,9 @@ mod error_tests {
             (e.kind(), e.reason()),
             (ErrorKind::InvalidInput, "a string id that is no number")
         );
-        let e = LangFileKind::Dll.read_from(&b"MZ"[..]).unwrap_err();
+        let error = LangFileKind::Dll.read_from(&b"MZ"[..]).unwrap_err();
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (ErrorKind::InvalidInput, "a language DLL that does not read")
         );
     }

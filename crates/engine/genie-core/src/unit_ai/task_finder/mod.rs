@@ -52,8 +52,8 @@ use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 
 /// The task types the general search leaves out (`FUN_14109f8c0`: 151, 152, 154, 155, 157, 160).
-const fn special_kind(t: ActionKind) -> bool {
-    let d = t.get().wrapping_sub(0x97) as u16;
+const fn special_kind(action_kind: ActionKind) -> bool {
+    let d = action_kind.get().wrapping_sub(0x97) as u16;
     d < 10 && (0x25bu32 >> d) & 1 != 0
 }
 
@@ -125,7 +125,9 @@ pub fn allied(relations: &Relations, from: PlayerId, to: PlayerId, test: AllyTes
     if to == PlayerId::GAIA {
         return false;
     }
-    relations.get(to).is_some_and(|r| r.allied(test))
+    relations
+        .get(to)
+        .is_some_and(|relation| relation.allied(test))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.
@@ -156,17 +158,22 @@ pub fn drop_site(
 /// building is `building` decides, by whether it takes the kind the actor carries.
 #[must_use]
 pub fn drops_at(table: &[DropSite], building: MasterId, actor: &Actor<'_>) -> bool {
-    for e in table {
-        if !e.civs.is_empty() && !e.civs.contains(&actor.civ) {
+    for drop_site in table {
+        if !drop_site.civs.is_empty() && !drop_site.civs.contains(&actor.civ) {
             continue;
         }
-        let worker = if e.workers.is_empty() {
-            e.worker_class.is_none_or(|w| w == actor.master.class)
+        let worker = if drop_site.workers.is_empty() {
+            drop_site
+                .worker_class
+                .is_none_or(|class_id| class_id == actor.master.class)
         } else {
-            e.workers.contains(&actor.master.id)
+            drop_site.workers.contains(&actor.master.id)
         };
-        if worker && e.building == building {
-            return e.targets.iter().any(|t| t.attribute == actor.held.kind);
+        if worker && drop_site.building == building {
+            return drop_site
+                .targets
+                .iter()
+                .any(|drop_target| drop_target.attribute == actor.held.kind);
         }
     }
     false
@@ -186,14 +193,19 @@ pub fn table_drop_buildings(
 ) -> Vec<MasterId> {
     table
         .iter()
-        .filter(|e| class.is_none_or(|c| e.worker_class == Some(c)))
+        .filter(|class_drop_site| {
+            class.is_none_or(|class_id| class_drop_site.worker_class == Some(class_id))
+        })
         .filter(|e| !e.resource_kinds.is_empty())
-        .filter(|e| e.civs.is_empty() || e.civs.contains(&civ))
+        .filter(|civ_drop_site| civ_drop_site.civs.is_empty() || civ_drop_site.civs.contains(&civ))
         .filter(|e| match kind {
             Some(basic) if basic.is_resource() => e.resource_kinds.contains(&basic),
-            _ => e.targets.iter().any(|t| t.attribute == kind),
+            _ => e
+                .targets
+                .iter()
+                .any(|drop_target| drop_target.attribute == kind),
         })
-        .map(|e| e.building)
+        .map(|drop_site| drop_site.building)
         .collect()
 }
 
@@ -201,17 +213,21 @@ pub fn table_drop_buildings(
 /// that index above 0.
 #[must_use]
 pub fn enabled(attributes: &[Amount], resource: Option<AttributeId>) -> bool {
-    resource.is_none_or(|r| attributes.get(r.index()).is_some_and(|&v| Amount::ZERO < v))
+    resource.is_none_or(|attribute_id| {
+        attributes
+            .get(attribute_id.index())
+            .is_some_and(|&amount| Amount::ZERO < amount)
+    })
 }
 
 /// One search over the list: the first task the predicate takes, in list order.
 fn first(list: &Master, pred: impl Fn(&Task) -> bool) -> Option<&Task> {
-    list.action_part().tasks.iter().find(|t| pred(t))
+    list.action_part().tasks.iter().find(|task| pred(task))
 }
 
 /// The filter: any task (−1), or one of this type.
-fn wanted(filter: Option<ActionKind>, t: &Task) -> bool {
-    filter.is_none_or(|f| f == t.action_kind)
+fn wanted(filter: Option<ActionKind>, task: &Task) -> bool {
+    filter.is_none_or(|action_kind| action_kind == task.action_kind)
 }
 
 /// The task's own test on a target (`FUN_1411a8620`): a task for a holder (`holding_attr` 1)
@@ -283,22 +299,26 @@ fn general<'m>(
     if list.action_part().tasks.is_empty() {
         return None;
     }
-    if let Some(t) = target {
+    if let Some(task_target) = target {
         let usable = |task: &Task| {
-            !special_kind(task.action_kind) && applies(task, actor, t, dip) && wanted(filter, task)
+            !special_kind(task.action_kind)
+                && applies(task, actor, task_target, dip)
+                && wanted(filter, task)
         };
-        if t.state < ObjectState::Dying
-            && t.master.combat_level.is_some()
+        if task_target.state < ObjectState::Dying
+            && task_target.master.combat_level.is_some()
             && let Some(task) = first(list, |task| task.combat_level != 0 && usable(task))
         {
             return Some(task);
         }
         if let Some(task) = first(list, |task| {
-            task.object_id == Some(t.master.id) && usable(task)
+            task.object_id == Some(task_target.master.id) && usable(task)
         }) {
             return Some(task);
         }
-        if let Some(task) = first(list, |task| task.for_class(t.master.class) && usable(task)) {
+        if let Some(task) = first(list, |task| {
+            task.for_class(task_target.master.class) && usable(task)
+        }) {
             return Some(task);
         }
     }
@@ -324,23 +344,25 @@ fn garrison_task<'m>(
     dip: &impl Diplomacy,
     roles: &Roles,
 ) -> GenieResult<Option<&'m Task>> {
-    let Some(t) = target else {
+    let Some(task_target) = target else {
         return Ok(None);
     };
-    let mutual = dip.allied(actor.player, t.player, AllyTest::WithRelation4)
-        && dip.allied(t.player, actor.player, AllyTest::WithRelation4);
-    if (t.player == actor.player || mutual)
-        && t.player != PlayerId::GAIA
-        && t.state == ObjectState::Alive
+    let mutual = dip.allied(actor.player, task_target.player, AllyTest::WithRelation4)
+        && dip.allied(task_target.player, actor.player, AllyTest::WithRelation4);
+    if (task_target.player == actor.player || mutual)
+        && task_target.player != PlayerId::GAIA
+        && task_target.state == ObjectState::Alive
         // A building's master type (`'P'`).
-        && t.master.kind == MasterKind::BUILDING
+        && task_target.master.kind == MasterKind::BUILDING
         && (list.kind == MasterKind::COMBAT || roles.of_master(list.id).contains(MasterRoles::MULE_CART))
-        && t.master.garrison.holds()
+        && task_target.master.garrison.holds()
     {
-        let garrison_kind = t
+        let garrison_kind = task_target
             .master
             .building
-            .map_or(GarrisonKinds::NONE, |b| b.garrison_kind);
+            .map_or(GarrisonKinds::NONE, |building_master| {
+                building_master.garrison_kind
+            });
         let takes = garrison_kind_takes(
             garrison_kind,
             list.class,
@@ -349,7 +371,10 @@ fn garrison_task<'m>(
             roles,
         );
         if let Some(task) = first(list, |t| is_garrison_task(t, roles)).filter(|_| takes) {
-            if matches!(t.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
+            if matches!(
+                task_target.top_action,
+                Some(ActionKind::PACK | ActionKind::UNPACK)
+            ) {
                 return Err(GenieError::unsupported(
                     "a garrison task on a building at work 0x7c or 0x7d (FUN_1411e8630)",
                 ));
@@ -378,8 +403,8 @@ pub fn find_task<'m>(
     if let Finding::Answer(task) = finder_head(list, actor, on.target, filter, dip, roles)? {
         return Ok(task);
     }
-    if let Some(t) = on.target
-        && let Finding::Answer(task) = on_target(list, actor, t, filter, dip, roles)?
+    if let Some(task_target) = on.target
+        && let Finding::Answer(task) = on_target(list, actor, task_target, filter, dip, roles)?
     {
         return Ok(task);
     }
@@ -463,9 +488,9 @@ fn finder_head<'m>(
     }
     if actor.attribute_95 == Amount::new(3.0)
         && monk_master
-        && target.is_some_and(|t| {
+        && target.is_some_and(|task_target| {
             roles
-                .of_class(t.master.class)
+                .of_class(task_target.master.class)
                 .contains(ClassRoles::BUILDING)
         })
     {
@@ -561,9 +586,9 @@ fn finder_tail<'m>(
     }
     // LAB_14127bb9f: a villager on livestock (or on what is inside something) takes task 110
     // for class 58; anything else the general search
-    if let Some(t) = target
+    if let Some(task_target) = target
         && (roles
-            .of_class(t.master.class)
+            .of_class(task_target.master.class)
             .contains(ClassRoles::LIVESTOCK)
             || inside)
         && roles.of_class(own.class).contains(ClassRoles::VILLAGER)
@@ -817,10 +842,14 @@ mod tests {
         assert!(!applies_to(&of(TargetOwner::OWN), &own, &itself));
     }
 
-    fn find<'m>(list: &'m Master, held: Held, t: &TaskTarget<'_>) -> GenieResult<Option<&'m Task>> {
+    fn find<'m>(
+        list: &'m Master,
+        held: Held,
+        task_target: &TaskTarget<'_>,
+    ) -> GenieResult<Option<&'m Task>> {
         let on = TaskOn {
-            target: Some(t),
-            general: Some(t),
+            target: Some(task_target),
+            general: Some(task_target),
             terrain: None,
         };
         find_task(
@@ -946,9 +975,9 @@ mod tests {
             storage: vec![(Some(attribute::FOOD), Amount::new(100.0), 1)],
             ..master(master_id(65), MasterKind::COMBAT, class::PREY, vec![])
         };
-        let target = |m| TaskTarget {
+        let target = |master| TaskTarget {
             state: ObjectState::Alive,
-            ..building(m, PlayerId::new(0), ObjectState::Alive)
+            ..building(master, PlayerId::new(0), ObjectState::Alive)
         };
         assert_eq!(find(&hunter, carrying(None, 0.0), &target(&deer)), Ok(None));
         let eaten = Master {
@@ -1053,9 +1082,9 @@ mod tests {
             hp: HitPoints::new(300.0),
             ..building(&house, PlayerId::new(2), ObjectState::Alive)
         };
-        let by = |tasks: Vec<Task>, t: &TaskTarget<'_>, filter: Option<ActionKind>| {
+        let by = |tasks: Vec<Task>, task_target: &TaskTarget<'_>, filter: Option<ActionKind>| {
             let builder = master(ids::BUILDER, MasterKind::COMBAT, class::VILLAGER, tasks);
-            find_with(&builder, t, filter).map(Option::<&Task>::copied)
+            find_with(&builder, task_target, filter).map(Option::<&Task>::copied)
         };
         let any = task(REPAIR, -1, -1, 0.0);
         let class3 = task(REPAIR, 3, -1, 2.0);
@@ -1101,12 +1130,12 @@ mod tests {
 
     fn find_with<'m>(
         list: &'m Master,
-        t: &TaskTarget<'_>,
+        task_target: &TaskTarget<'_>,
         filter: Option<ActionKind>,
     ) -> GenieResult<Option<&'m Task>> {
         let on = TaskOn {
-            target: Some(t),
-            general: Some(t),
+            target: Some(task_target),
+            general: Some(task_target),
             terrain: None,
         };
         find_task(
@@ -1276,13 +1305,20 @@ mod tests {
             vec![task(ActionKind::ACTION_135, -1, -1, 0.0)],
         );
         let a = actor(&villager, carrying(None, 0.0));
-        let t = building(&house, PlayerId::new(2), ObjectState::Alive);
+        let task_target = building(&house, PlayerId::new(2), ObjectState::Alive);
         assert_eq!(
-            finder_head(&villager, &a, Some(&t), None, &alone(), &roles()),
+            finder_head(&villager, &a, Some(&task_target), None, &alone(), &roles()),
             Ok(Finding::Next)
         );
         assert_eq!(
-            finder_head(&villager, &a, Some(&t), Some(ENTER), &alone(), &roles()),
+            finder_head(
+                &villager,
+                &a,
+                Some(&task_target),
+                Some(ENTER),
+                &alone(),
+                &roles()
+            ),
             Ok(Finding::Answer(None))
         );
         let ship = Master {
@@ -1363,14 +1399,14 @@ mod tests {
             class::TRANSPORT,
             vec![task(ActionKind::named(109), -1, -1, 0.0), beach],
         );
-        let a = actor(&ship, carrying(None, 0.0));
-        let found = |t: Option<&TaskTarget<'_>>, terrain, filter| {
+        let actor = actor(&ship, carrying(None, 0.0));
+        let found = |task_target: Option<&TaskTarget<'_>>, terrain, filter| {
             let on = TaskOn {
-                target: t,
-                general: t,
+                target: task_target,
+                general: task_target,
                 terrain,
             };
-            find_task(&ship, &a, &on, filter, &alone(), slots(), &roles())
+            find_task(&ship, &actor, &on, filter, &alone(), slots(), &roles())
                 .map(|f| f.map(|k| k.action_kind))
         };
         assert_eq!(
@@ -1540,8 +1576,8 @@ mod tests {
     /// none, an idle one goes on.
     #[test]
     fn the_drop_off_step_takes_the_task_for_the_load() {
-        fn drop<'m>(list: &'m Master, held: Held, t: &TaskTarget<'_>) -> Finding<'m> {
-            drop_off_finding(list, &actor(list, held), t, None, &alone())
+        fn drop<'m>(list: &'m Master, held: Held, task_target: &TaskTarget<'_>) -> Finding<'m> {
+            drop_off_finding(list, &actor(list, held), task_target, None, &alone())
         }
         let camp = master(
             master_id(562),
@@ -1587,13 +1623,13 @@ mod tests {
     fn the_garrison_into_transport_takes_its_class_task() {
         fn into<'m>(
             list: &'m Master,
-            t: &TaskTarget<'_>,
+            task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
         ) -> (Finding<'m>, bool) {
             garrison_into(
                 list,
                 &actor(list, carrying(None, 0.0)),
-                t,
+                task_target,
                 filter,
                 &alone(),
                 &roles(),
@@ -1611,16 +1647,19 @@ mod tests {
             vec![boarding],
         );
         let bare = master(master_id(4), MasterKind::COMBAT, class::CLASS_6, vec![]);
-        let t = transport(&ship, PlayerId::new(2));
+        let task_target = transport(&ship, PlayerId::new(2));
         assert_eq!(
-            into(&soldier, &t, None),
+            into(&soldier, &task_target, None),
             (
                 Finding::Answer(Some(&soldier.action_part().tasks[0])),
                 false
             )
         );
-        assert_eq!(into(&bare, &t, Some(ENTER)), (Finding::Answer(None), false));
-        assert_eq!(into(&bare, &t, None), (Finding::Next, true));
+        assert_eq!(
+            into(&bare, &task_target, Some(ENTER)),
+            (Finding::Answer(None), false)
+        );
+        assert_eq!(into(&bare, &task_target, None), (Finding::Next, true));
         let barge = Master {
             object_flags: ObjectFlags::GARRISON,
             ..master(ids::ID_546, MasterKind::COMBAT, class::CLASS_6, vec![])
@@ -1643,13 +1682,13 @@ mod tests {
     fn the_repair_step_takes_damaged_building_task() {
         fn repair<'m>(
             list: &'m Master,
-            t: &TaskTarget<'_>,
+            task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
         ) -> Finding<'m> {
             repair_finding(
                 list,
                 &actor(list, carrying(None, 0.0)),
-                t,
+                task_target,
                 filter,
                 &alone(),
                 &roles(),
@@ -1695,12 +1734,12 @@ mod tests {
     fn the_finder_tail_takes_task_13_livestock_or_the_general_search() {
         fn tail<'m>(
             list: &'m Master,
-            t: &TaskTarget<'_>,
+            task_target: &TaskTarget<'_>,
             filter: Option<ActionKind>,
         ) -> GenieResult<Option<&'m Task>> {
             let on = TaskOn {
-                target: Some(t),
-                general: Some(t),
+                target: Some(task_target),
+                general: Some(task_target),
                 terrain: None,
             };
             finder_tail(

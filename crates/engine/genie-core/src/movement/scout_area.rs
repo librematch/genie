@@ -56,44 +56,51 @@ impl<'a> ScoutArea<'a> {
     /// A unit without its master or movement state, a map without its terrain, or a restriction
     /// the terrain has not got.
     pub(crate) fn of(
-        w: &'a mut World,
+        world: &'a mut World,
         unit: &Unit,
         me: Me,
         player: PlayerId,
         player_kind: PlayerKind,
     ) -> GenieResult<(Self, GridSize, Distance)> {
         let master = unit.master(
-            MasterTables::new(&w.model.masters, &w.parts.own_master),
+            MasterTables::new(&world.model.masters, &world.parts.own_master),
             player,
         )?;
-        let mover = w.parts.mover_of(unit.id).ok_or(GenieError::unsupported(
-            "an auto scout without movement state",
-        ))?;
-        let map = w.spatial.map;
-        let terrain = w.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
-            "the map's zones without its terrain",
-        ))?;
+        let mover = world
+            .parts
+            .mover_of(unit.id)
+            .ok_or(GenieError::unsupported(
+                "an auto scout without movement state",
+            ))?;
+        let map = world.spatial.map;
+        let terrain = world
+            .spatial
+            .terrain
+            .as_ref()
+            .ok_or(GenieError::unsupported(
+                "the map's zones without its terrain",
+            ))?;
         let values = terrain
             .restriction(mover.stats.restriction)
             .ok_or(UNKNOWN_RESTRICTION)?;
-        let zones = w.zones.of(map, &terrain.kinds, values)?;
+        let zones = world.zones.of(map, &terrain.kinds, values)?;
         let area = ScoutArea {
-            spatial: &mut w.spatial,
+            spatial: &mut world.spatial,
             by_id: ObjectsRef::new(
-                &w.players,
-                &w.index,
-                &w.model.masters,
-                &w.parts,
-                &w.model.roles,
-                &w.model.tuning,
+                &world.players,
+                &world.index,
+                &world.model.masters,
+                &world.parts,
+                &world.model.roles,
+                &world.model.tuning,
             ),
             zones,
             plan: Planning {
-                pathing: &mut w.pathing,
-                now: w.world_time,
+                pathing: &mut world.pathing,
+                now: world.world_time,
                 player_kind,
-                object: w.streams.get(Stream::Object),
-                groups: &w.groups,
+                object: world.streams.get(Stream::Object),
+                groups: &world.groups,
             },
             mover,
             at: unit.position(),
@@ -101,7 +108,7 @@ impl<'a> ScoutArea<'a> {
             player,
             master: master.id,
             radius: master.radius,
-            reach: master.line_of_sight - Distance::new(w.model.tuning.explore.los_margin),
+            reach: master.line_of_sight - Distance::new(world.model.tuning.explore.los_margin),
             scouted: false,
         };
         Ok((area, map, master.line_of_sight))
@@ -118,7 +125,7 @@ impl<'a> ScoutArea<'a> {
             return self
                 .spatial
                 .scout_map(self.player)
-                .and_then(|m| m.get(tile))
+                .and_then(|influence_map| influence_map.get(tile))
                 .map(|v| v == 1)
                 .ok_or(GenieError::unsupported("a tile off the player's scout map"));
         }

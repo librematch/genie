@@ -61,8 +61,8 @@ impl AttackPriority {
 }
 
 impl genie_diff::Diff for AttackPriority {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

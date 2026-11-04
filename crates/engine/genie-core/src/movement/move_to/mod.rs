@@ -242,13 +242,13 @@ impl Walk<'_> {
     /// The walking unit's movement values to change (its top speed among them), none for an
     /// object that does not move.
     pub fn move_stats_mut(&mut self) -> Option<&mut MoveStats> {
-        self.mover_mut().map(|m| &mut m.stats)
+        self.mover_mut().map(|mover| &mut mover.stats)
     }
 
     /// Sets the walking unit's animation speed (`+0x7b8`, the animated layer in its mover).
     pub fn set_anim_speed(&mut self, speed: Speed) {
-        if let Some(m) = self.mover_mut() {
-            m.animated.speed = speed;
+        if let Some(mover) = self.mover_mut() {
+            mover.animated.speed = speed;
         }
     }
 
@@ -260,7 +260,7 @@ impl Walk<'_> {
             me: self.me,
             dt: self.dt,
             world: &mut *self.world,
-            plan: self.plan.as_mut().map(|p| p.reborrow()),
+            plan: self.plan.as_mut().map(|planning| planning.reborrow()),
             by_id: self.by_id,
         }
     }
@@ -307,15 +307,18 @@ pub fn ask_walk(
     let sprite_tuning = walk.by_id.tuning().sprite;
     let (point, target, radius) = match goal {
         Goal::Target(id) => {
-            let t = walk
+            let placed = walk
                 .world
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a MoveTo whose target is gone"))?;
-            (t.position, Some(id), t.radius)
+            (placed.position, Some(id), placed.radius)
         }
-        Goal::Point(p) => (p, None, Footprint::ZERO),
+        Goal::Point(position) => (position, None, Footprint::ZERO),
     };
-    let now = walk.plan.as_ref().map_or(WorldTime::ZERO, |p| p.now);
+    let now = walk
+        .plan
+        .as_ref()
+        .map_or(WorldTime::ZERO, |planning| planning.now);
     let here = walk.position();
     let mover = walk.mover_mut().ok_or(WALKER_UNMOVING)?;
     let ground = mover.stats.radius.ground();
@@ -440,8 +443,8 @@ impl Shown<'_> {
     /// top speed (`stats`) with it. A `MoveTo` without one (`+0x58` null) is not modelled: slot
     /// 0x68 would show the master's standing sprite (`+0x470`); genie shows nothing.
     pub fn show(&mut self, stats: Option<&mut MoveStats>, sprite_tuning: SpriteTuning) {
-        if let Some(g) = self.graphic {
-            new_sprite(self.sprite, stats, g, self.rng, sprite_tuning);
+        if let Some(graphic) = self.graphic {
+            new_sprite(self.sprite, stats, graphic, self.rng, sprite_tuning);
         }
     }
 }
@@ -529,11 +532,11 @@ pub fn target_left(
     if mode == TargetMoved::Ignores {
         return Ok(Follow::Stays);
     }
-    let t = walk
+    let placed = walk
         .world
         .get_known(target)?
         .ok_or(GenieError::unsupported("a MoveTo whose target is gone"))?;
-    let at = t.position;
+    let at = placed.position;
     let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
     if !(dx < move_to_tuning.off_low
         || move_to_tuning.off_high < dx
@@ -617,10 +620,10 @@ mod tests {
             stance: UnitStance::Aggressive,
         };
         let mut ai = None;
-        let mut update = |m: &mut MoveToAction| {
+        let mut update = |move_to_action: &mut MoveToAction| {
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             // the house 10028 stands (state 2)
-            m.sub_update(
+            move_to_action.sub_update(
                 &mut rig.walk(4),
                 PathAsk::default(),
                 gives_up,
@@ -754,7 +757,7 @@ mod tests {
                 }
                 rig.world = tiled_world(classes);
             }
-            let mut m = MoveToAction {
+            let mut move_to_action = MoveToAction {
                 point: Position::new(30.6, 88.0, 0.0),
                 target: Some(object_id(10028)),
                 range: Distance::new(0.1),
@@ -763,7 +766,7 @@ mod tests {
             };
             let mut ai = Some(UnitAi::default());
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
-            let code = m.sub_update(
+            let code = move_to_action.sub_update(
                 &mut rig.walk(4),
                 PathAsk::default(),
                 GiveUp::default(),
@@ -771,14 +774,15 @@ mod tests {
                 None,
                 &mut inbox,
             );
-            let posted: Vec<NotifyKind> =
-                ai.map_or(vec![], |ai| ai.notifies.iter().map(|n| n.kind).collect());
+            let posted: Vec<NotifyKind> = ai.map_or(vec![], |ai| {
+                ai.notifies.iter().map(|notify| notify.kind).collect()
+            });
             (
                 code,
-                m.state,
+                move_to_action.state,
                 posted,
                 rig.mover_mut().angle != Angle::ZERO,
-                m.point,
+                move_to_action.point,
             )
         };
         let off = Position::new(30.6, 88.0, 0.0);
@@ -833,7 +837,10 @@ mod tests {
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
             let code = m.check_held(state, &mut inbox).unwrap();
             let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
-                ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
+                ai.notifies
+                    .iter()
+                    .map(|notify| (notify.kind, notify.p))
+                    .collect()
             });
             (code, ObjectId::field(m.target), posted)
         };
@@ -857,14 +864,14 @@ mod tests {
         );
         // through the sub-action's update, before its state's case
         let mut rig = WalkRig::on_the_path();
-        let mut m = MoveToAction {
+        let mut move_to_action = MoveToAction {
             target: Some(object_id(10028)),
             ..MoveToAction::sub_in(MoveTo::Moving)
         };
         let mut ai = None;
         let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
         let ask = PathAsk::default();
-        let code = m.sub_update(
+        let code = move_to_action.sub_update(
             &mut rig.walk(4),
             ask,
             GiveUp::default(),
@@ -873,7 +880,11 @@ mod tests {
             &mut inbox,
         );
         assert_eq!(
-            (code, ObjectId::field(m.target), m.state),
+            (
+                code,
+                ObjectId::field(move_to_action.target),
+                move_to_action.state
+            ),
             (Ok(SubCode::TargetGone), -1, MoveTo::Moving)
         );
         let mut loud = MoveToAction {
@@ -898,7 +909,7 @@ mod tests {
     fn not_quiet_move_to_posts_its_end_and_quiet_one_does_not() {
         let mut rig = WalkRig::on_the_path();
         let mut update = |voice: Voice, state: MoveTo| {
-            let mut m = MoveToAction {
+            let mut move_to_action = MoveToAction {
                 voice,
                 ..MoveToAction::sub_in(state)
             };
@@ -907,7 +918,7 @@ mod tests {
                 ..UnitAi::default()
             });
             let mut inbox = Inbox::of(&mut ai, object_id(9177), ObjectState::Alive);
-            let code = m
+            let code = move_to_action
                 .sub_update(
                     &mut rig.walk(4),
                     PathAsk::default(),
@@ -918,7 +929,10 @@ mod tests {
                 )
                 .unwrap();
             let posted: Vec<(NotifyKind, [i32; 3])> = ai.map_or(vec![], |ai| {
-                ai.notifies.iter().map(|n| (n.kind, n.p)).collect()
+                ai.notifies
+                    .iter()
+                    .map(|notify| (notify.kind, notify.p))
+                    .collect()
             });
             (code, posted)
         };
@@ -1015,7 +1029,11 @@ mod tests {
             &tuning().move_to,
         );
         assert_eq!(
-            added.map(|a| (a.point, a.range, a.voice)),
+            added.map(|move_to_action| (
+                move_to_action.point,
+                move_to_action.range,
+                move_to_action.voice
+            )),
             Some((m.point, Distance::new(0.5), Voice::Quiet))
         );
     }

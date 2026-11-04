@@ -72,10 +72,14 @@ pub fn refund_research(
     Ok(())
 }
 
-/// `FUN_141630770` with `n` 1, the make action's destructor's refund of a unit its queue did
-/// not pay for: each cost entry of a master of type 70 and up with an attribute and a paid
-/// flag gives back its amount times `n` (an integer product), straight into the attribute.
-pub fn refund_master(master: &Master, n: QueueCount, owner: &mut Player) -> GenieResult<()> {
+/// `FUN_141630770` with `queue_count` 1, the make action's destructor's refund of a unit its queue
+/// did not pay for: each cost entry of a master of type 70 and up with an attribute and a paid flag
+/// gives back its amount times `queue_count` (an integer product), straight into the attribute.
+pub fn refund_master(
+    master: &Master,
+    queue_count: QueueCount,
+    owner: &mut Player,
+) -> GenieResult<()> {
     if master.kind < MasterKind::COMBAT {
         return Ok(());
     }
@@ -86,7 +90,7 @@ pub fn refund_master(master: &Master, n: QueueCount, owner: &mut Player) -> Geni
         let held = owner.get(attribute)?;
         owner.set_attribute(
             attribute,
-            Amount::new((i32::from(amount.get()) * n.get()) as f32 + held.get()),
+            Amount::new((i32::from(amount.get()) * queue_count.get()) as f32 + held.get()),
         )?;
     }
     Ok(())
@@ -118,11 +122,11 @@ pub fn refund_tech(
         // costs above 0.
         owner.get(slots.attribute.research_cost_modifier)?.get()
     };
-    for (c, adj) in def.costs.iter().zip(&state.cost_adj) {
-        let Some(attribute) = c.attribute.filter(|_| c.paid.is_paid()) else {
+    for (cost, adj) in def.costs.iter().zip(&state.cost_adj) {
+        let Some(attribute) = cost.attribute.filter(|_| cost.paid.is_paid()) else {
             continue;
         };
-        let mut v = (i32::from(adj.get()) + i32::from(c.amount.get())) as f32;
+        let mut v = (i32::from(adj.get()) + i32::from(cost.amount.get())) as f32;
         if 0.0 < modifier {
             v = f32::from(cvttss2si(v * modifier) as i16);
         }
@@ -146,27 +150,27 @@ fn cost_entry(master: &Master, j: usize) -> Option<(AttributeId, CostAmount, boo
         .and_then(|slot| slot.entry())
 }
 
-/// The master whose costs the cost tests read for player's master `m` (`FUN_141618db0`,
+/// The master whose costs the cost tests read for player's master `master` (`FUN_141618db0`,
 /// `FUN_141614450`): a building (type 80) that is an annex (a head unit, `+0x9b8`, the player
 /// has) reads its head's, and the head's stack unit's (`+0x986`) when the player has that one,
 /// then only the paid entries (the second value true).
 #[must_use]
-pub fn costed<'m>(masters: &'m Masters, m: &'m Master) -> (&'m Master, bool) {
+pub fn costed<'m>(masters: &'m Masters, master: &'m Master) -> (&'m Master, bool) {
     // The buildings' master type (`'P'`), whose annex's costs the cost test reads.
-    if m.kind != MasterKind::BUILDING {
-        return (m, false);
+    if master.kind != MasterKind::BUILDING {
+        return (master, false);
     }
-    let Some(head) = m
+    let Some(head) = master
         .building
         .as_ref()
         .and_then(|b| b.head_unit)
         .and_then(|head| masters.get(head))
     else {
-        return (m, false);
+        return (master, false);
     };
     head.building
         .as_ref()
-        .and_then(|b| b.stack_unit)
+        .and_then(|building_master| building_master.stack_unit)
         .and_then(|stack| masters.get(stack))
         .map_or((head, false), |stack| (stack, true))
 }
@@ -201,8 +205,8 @@ pub fn cost_test(
         return Ok(false);
     };
     let (m, annex) = costed(masters, m);
-    for j in 0..3 {
-        let Some((attribute, amount, paid)) = cost_entry(m, j) else {
+    for index in 0..3 {
+        let Some((attribute, amount, paid)) = cost_entry(m, index) else {
             continue;
         };
         if annex && !paid {
@@ -266,8 +270,8 @@ pub fn pay(
     let Some(m) = masters.get(master) else {
         return Ok(Payment::Unpaid);
     };
-    for j in 0..3 {
-        let Some((attribute, amount, true)) = cost_entry(m, j) else {
+    for index in 0..3 {
+        let Some((attribute, amount, true)) = cost_entry(m, index) else {
             continue;
         };
         attributes.subtract(attribute, Amount::new(amount.as_f32() * count.get()))?;
@@ -304,8 +308,8 @@ pub fn master_costs(
         return Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))));
     };
     let mut extra = 0i16;
-    for (j, slot) in out.iter_mut().enumerate() {
-        let Some((attribute, amount, _)) = cost_entry(m, j) else {
+    for (index, slot) in out.iter_mut().enumerate() {
+        let Some((attribute, amount, _)) = cost_entry(m, index) else {
             continue;
         };
         slot.0 = Some(attribute);
@@ -334,7 +338,7 @@ pub fn master_costs(
             slot.0 = None;
         }
     }
-    Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))))
+    Ok(out.map(|(attribute_id, n)| (attribute_id, CostAmount::of_data(n))))
 }
 
 /// The costs a queue entry records from listed ones (`FUN_1411c3190`, `FUN_1411c81a0`): each
@@ -343,5 +347,10 @@ pub fn master_costs(
 pub fn as_entry_costs(
     listed: [(Option<AttributeId>, CostAmount); 3],
 ) -> [(Option<AttributeId>, Amount); 3] {
-    listed.map(|(a, n)| (a, Amount::new(f32::from(n.get()) + 0.0)))
+    listed.map(|(attribute_id, cost_amount)| {
+        (
+            attribute_id,
+            Amount::new(f32::from(cost_amount.get()) + 0.0),
+        )
+    })
 }

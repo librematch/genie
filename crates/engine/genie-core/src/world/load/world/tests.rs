@@ -101,29 +101,46 @@ fn the_load_takes_the_worlds_and_the_players_fields() {
     );
     assert_eq!(turns.recycling.next_id, object_id(-5));
     assert_eq!(
-        turns.teams[..2].iter().map(|t| t.get()).collect::<Vec<_>>(),
+        turns.teams[..2]
+            .iter()
+            .map(|team| team.get())
+            .collect::<Vec<_>>(),
         [0, 2]
     );
-    let p = &turns.players[1];
-    assert_eq!((p.civ, p.kind), (CivId::new(3), PlayerKind::Human));
+    let players = &turns.players[1];
     assert_eq!(
-        p.resources().map(|r| r.get().to_bits()),
+        (players.civ, players.kind),
+        (CivId::new(3), PlayerKind::Human)
+    );
+    assert_eq!(
+        players.resources().map(|amount| amount.get().to_bits()),
         [200.0_f32, 150.0, 100.0, 50.0].map(f32::to_bits)
     );
     assert!(
-        p.departures.contains(Departures::DROPPED) && !p.departures.contains(Departures::RESIGNED)
+        players.departures.contains(Departures::DROPPED)
+            && !players.departures.contains(Departures::RESIGNED)
     );
-    assert_eq!(p.victory_times.ruins.get().to_bits(), 12.5_f32.to_bits());
-    assert_eq!(p.victory_times.wonder.get().to_bits(), (-1.0_f32).to_bits());
     assert_eq!(
-        p.objects.iter().map(|u| u.id.get()).collect::<Vec<_>>(),
+        players.victory_times.ruins.get().to_bits(),
+        12.5_f32.to_bits()
+    );
+    assert_eq!(
+        players.victory_times.wonder.get().to_bits(),
+        (-1.0_f32).to_bits()
+    );
+    assert_eq!(
+        players
+            .objects
+            .iter()
+            .map(|u| u.id.get())
+            .collect::<Vec<_>>(),
         [7]
     );
     assert_eq!(
         turns.players[0]
             .objects
             .iter()
-            .map(|u| u.id.get())
+            .map(|unit| unit.id.get())
             .collect::<Vec<_>>(),
         [1]
     );
@@ -204,7 +221,7 @@ fn unit_inside_building_is_in_its_garrison() {
     let building = turns.players[1]
         .objects
         .iter()
-        .find(|u| u.id == object_id(10))
+        .find(|unit| unit.id == object_id(10))
         .unwrap();
     assert_eq!(building.garrison, [object_id(11)]);
     assert_eq!(

@@ -64,21 +64,21 @@ impl Well512 {
         self.draws = self.draws.wrapping_add(1);
         // the ring from the index on: index − 3 is its 14th word, index − 7 its 10th, and
         // index − 1, the next index, its last
-        let s = &mut self.state;
-        let v0 = s[0];
-        let t = s[13];
+        let state = &mut self.state;
+        let v0 = state[0];
+        let t = state[13];
         let z1 = (((v0 << 1) ^ t) << 15) ^ t ^ v0;
-        let c = s[9];
+        let c = state[9];
         let z2 = c ^ (c >> 11);
         let new1 = z1 ^ z2;
-        s[0] = new1;
-        let z0 = s[15];
-        s[15] =
+        state[0] = new1;
+        let z0 = state[15];
+        state[15] =
             z0 ^ ((((z2 << 10) ^ z1) << 16 ^ z0) << 2) ^ ((new1 & 0xfed2_2169) << 5) ^ new1 ^ z1;
         // the next index's word comes first
-        s.rotate_right(1);
-        draw(self.stream, self.draws, s[0]);
-        s[0]
+        state.rotate_right(1);
+        draw(self.stream, self.draws, state[0]);
+        state[0]
     }
 
     /// `rand15`: a step masked to 15 bits, kept as `last`.
@@ -141,9 +141,9 @@ impl Well512 {
     #[track_caller]
     pub fn index(&mut self, n: u32) -> u32 {
         loop {
-            let v = self.raw();
-            if v / n < u32::MAX / n || u32::MAX % n == n - 1 {
-                return v % n;
+            let raw = self.raw();
+            if raw / n < u32::MAX / n || u32::MAX % n == n - 1 {
+                return raw % n;
             }
         }
     }
@@ -153,9 +153,9 @@ impl Well512 {
     #[track_caller]
     pub fn shuffle<T>(&mut self, items: &mut [T]) {
         for i in 1..items.len() {
-            let j = self.index(i as u32 + 1) as usize;
-            if j != i {
-                items.swap(i, j);
+            let index = self.index(i as u32 + 1) as usize;
+            if index != i {
+                items.swap(i, index);
             }
         }
     }
@@ -286,7 +286,7 @@ mod tests {
         // FUN_1408115a0 run in unicorn on this state (words at +0x24, index at +0x64 = 5)
         let mut state: [u32; 16] = from_fn(|i| 0x9e37_79b9_u32.wrapping_mul(i as u32 + 1));
         state.rotate_left(5);
-        let mut r = Well512 {
+        let mut rng = Well512 {
             state,
             ..Well512::default()
         };
@@ -300,9 +300,9 @@ mod tests {
             0x3f68_7e1e,
             0x3f3b_f800,
         ];
-        let ours: Vec<u32> = (0..8).map(|_| r.float01().to_bits()).collect();
+        let ours: Vec<u32> = (0..8).map(|_| rng.float01().to_bits()).collect();
         assert_eq!(ours, game);
-        assert_eq!((r.draws, r.last), (8, u32::MAX));
+        assert_eq!((rng.draws, rng.last), (8, u32::MAX));
     }
 
     // Expected values from an independent Python transcription of the same decompiled functions.
@@ -316,7 +316,7 @@ mod tests {
         let mut copy = streams.clone();
         let values = streams.set_last_randoms();
         let expected = [Stream::Ai, Stream::Action, Stream::Object, Stream::Player]
-            .map(|s| copy.get(s).rand15());
+            .map(|draw| copy.get(draw).rand15());
         assert_eq!(values, expected);
         assert_eq!(streams, copy);
         assert_eq!(streams.get(Stream::Ai).last, values[0]);
@@ -324,19 +324,19 @@ mod tests {
 
     #[test]
     fn set_seed_fills_the_state_and_restarts_the_index() {
-        let mut r = Well512::default();
-        r.set_seed(29910);
+        let mut rng = Well512::default();
+        rng.set_seed(29910);
         assert_eq!(
-            &r.state[..4],
+            &rng.state[..4],
             &[0xd80f_fb63, 0x00fd_e7a2, 0x5fd2_5128, 0x2699_7df5]
         );
     }
 
     #[test]
     fn raw_draws_follow_the_reference() {
-        let mut r = Well512::default();
-        r.set_seed(29910);
-        let got: Vec<u32> = (0..5).map(|_| r.raw()).collect();
+        let mut rng = Well512::default();
+        rng.set_seed(29910);
+        let got: Vec<u32> = (0..5).map(|_| rng.raw()).collect();
         assert_eq!(
             got,
             [
@@ -347,16 +347,16 @@ mod tests {
                 1_361_767_319
             ]
         );
-        assert_eq!(r.draws, 5);
+        assert_eq!(rng.draws, 5);
     }
 
     #[test]
     fn rand15_masks_to_15_bits_and_keeps_the_last_value() {
-        let mut r = Well512::default();
-        r.set_seed(0);
-        let got: Vec<u32> = (0..5).map(|_| r.rand15()).collect();
+        let mut rng = Well512::default();
+        rng.set_seed(0);
+        let got: Vec<u32> = (0..5).map(|_| rng.rand15()).collect();
         assert_eq!(got, [7241, 25269, 9993, 9310, 16801]);
-        assert_eq!(r.last, 16801);
+        assert_eq!(rng.last, 16801);
     }
 
     /// The ring turned to its index draws as the game's 16 words with their index (`+0x64`,
@@ -387,28 +387,30 @@ mod tests {
             .collect();
         let mut state = words;
         state.rotate_left(5);
-        let mut r = Well512 {
+        let mut rng = Well512 {
             state,
             ..Well512::default()
         };
-        let ours: Vec<u32> = (0..40).map(|_| r.raw()).collect();
+        let ours: Vec<u32> = (0..40).map(|_| rng.raw()).collect();
         assert_eq!(ours, game);
     }
 
     #[test]
     fn twenty_draws_wrap_the_index_twice_over() {
-        let mut r = Well512::default();
-        r.set_seed(0xdead_be3f);
-        let got: Vec<u32> = (0..20).map(|_| r.raw()).collect();
+        let mut rng = Well512::default();
+        rng.set_seed(0xdead_be3f);
+        let got: Vec<u32> = (0..20).map(|_| rng.raw()).collect();
         assert_eq!(&got[17..], &[3_247_376_368, 3_960_506_532, 2_739_179_492]);
     }
 
     #[test]
     fn seed_all_chains_the_seeds_in_registry_order() {
-        let mut s = Streams::default();
-        s.seed_all(29910);
-        let world: Vec<u32> = (0..3).map(|_| s.get(Stream::World).rand15()).collect();
-        let ai: Vec<u32> = (0..3).map(|_| s.get(Stream::Ai).rand15()).collect();
+        let mut streams = Streams::default();
+        streams.seed_all(29910);
+        let world: Vec<u32> = (0..3)
+            .map(|_| streams.get(Stream::World).rand15())
+            .collect();
+        let ai: Vec<u32> = (0..3).map(|_| streams.get(Stream::Ai).rand15()).collect();
         assert_eq!(world, [19550, 2220, 13198]);
         assert_eq!(ai, [16591, 22366, 24306]);
     }

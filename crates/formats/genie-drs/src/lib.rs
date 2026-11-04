@@ -91,8 +91,8 @@ impl AsRef<str> for ResourceKind {
 }
 
 impl Display for ResourceKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        f.write_str(self.as_ref())
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), FmtError> {
+        formatter.write_str(self.as_ref())
     }
 }
 
@@ -103,8 +103,8 @@ const BAD_RESOURCE_KIND: GenieError =
 impl FromStr for ResourceKind {
     type Err = GenieError;
     /// Parse a resource type from a string, with error handling.
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.as_bytes().try_into()
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        text.as_bytes().try_into()
     }
 }
 
@@ -135,8 +135,8 @@ impl TryFrom<&[u8]> for ResourceKind {
 /// Parse a resource type from a string of at most 4 bytes.
 impl TryFrom<&str> for ResourceKind {
     type Error = GenieError;
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        s.as_bytes().try_into()
+    fn try_from(text: &str) -> Result<Self, Self::Error> {
+        text.as_bytes().try_into()
     }
 }
 
@@ -229,9 +229,9 @@ impl DrsHeader {
 }
 
 impl Debug for DrsHeader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
-            f,
+            formatter,
             "DRSHeader {{ banner_msg: '{}', version: '{}', password: '{}', num_resource_types: {}, directory_size: {} }}",
             String::from_utf8_lossy(&self.banner_msg),
             String::from_utf8_lossy(&self.version),
@@ -349,9 +349,9 @@ impl DrsTable {
 }
 
 impl Debug for DrsTable {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
-            f,
+            formatter,
             "DRSTable {{ resource_type: '{}', offset: {}, num_resources: {} }}",
             self.resource_kind, self.offset, self.num_resources
         )

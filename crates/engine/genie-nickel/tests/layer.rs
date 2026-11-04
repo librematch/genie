@@ -24,5 +24,9 @@ fn the_layer_source_passes_the_committed_contracts() {
     let layer = include_str!("../../../../builds/158041.ncl");
     let checked = format!("let C = {contracts} in ({layer} | C.BuildLayer)");
     let result = genie_nickel::evaluate(&checked, "158041.ncl").map(drop);
-    assert!(result.is_ok(), "{:?}", result.err().map(|e| e.to_string()));
+    assert!(
+        result.is_ok(),
+        "{:?}",
+        result.err().map(|error| error.to_string())
+    );
 }

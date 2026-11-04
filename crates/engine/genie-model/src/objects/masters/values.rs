@@ -55,8 +55,9 @@ pub struct AttributeWorld<'a> {
 
 /// The sprite table shows as its absence of a name.
 impl Debug for AttributeWorld<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("AttributeWorld")
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        formatter
+            .debug_struct("AttributeWorld")
             .field("handicap", &self.handicap)
             .field("capped", &self.capped)
             .finish_non_exhaustive()
@@ -160,9 +161,9 @@ pub const fn cost_resource(attribute: MasterAttribute) -> Option<AttributeId> {
 /// the most; to an unsigned 64-bit count, at most `most`), new ones `fill`; the selected entry
 /// (`entry`) stays below the count (an unsigned compare: with none left it stays).
 pub(super) fn resize_count(v: f32) -> u64 {
-    let f = maxss(0.0, v);
+    let clamped = maxss(0.0, v);
     // `CVTTSS2SI RBX` plus 2^63 past 2^63: any value from there on is past the most
-    cvttss2si_64(f) as u64
+    cvttss2si_64(clamped) as u64
 }
 
 /// The damage sprites resized to `v` (`FUN_1410e87c0`): new entries are zero, the selected entry
@@ -172,9 +173,9 @@ pub(super) fn resize_damage_graphics(
     entry: &mut DamageGraphicEntry,
     v: f32,
 ) {
-    let n = resize_count(v).min(MOST_DAMAGE_GRAPHICS) as usize;
-    list.resize(n, DamageGraphic::default());
-    let last = DamageGraphicEntry::of_data((n as u8).wrapping_sub(1));
+    let resize_count = resize_count(v).min(MOST_DAMAGE_GRAPHICS) as usize;
+    list.resize(resize_count, DamageGraphic::default());
+    let last = DamageGraphicEntry::of_data((resize_count as u8).wrapping_sub(1));
     if last < *entry {
         *entry = last;
     }
@@ -188,10 +189,10 @@ pub(super) fn resize_train_locations(
     entry: &mut TrainLocationEntry,
     v: f32,
 ) {
-    let n = resize_count(v).min(MOST_TRAIN_LOCATIONS) as usize;
+    let resize_count = resize_count(v).min(MOST_TRAIN_LOCATIONS) as usize;
     let fill = list.last().copied().unwrap_or_default();
-    list.resize(n, fill);
-    let last = TrainLocationEntry::of_data((n as i16).wrapping_sub(1));
+    list.resize(resize_count, fill);
+    let last = TrainLocationEntry::of_data((resize_count as i16).wrapping_sub(1));
     if last < *entry {
         *entry = last;
     }

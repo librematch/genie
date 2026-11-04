@@ -93,20 +93,20 @@ pub enum MarketTrade {
 }
 
 impl genie_diff::Diff for Price {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
 impl genie_diff::Diff for PriceSwing {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
 impl genie_diff::Diff for NetTrades {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -148,8 +148,8 @@ impl LotVolume {
 }
 
 impl genie_diff::Diff for LotVolume {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -161,10 +161,16 @@ mod tests {
     /// A step raises or lowers a price by one `f32` operation; the net trades count both ways.
     #[test]
     fn the_market_values_move_by_the_game_operations() {
-        let p = Price::new(1.3);
-        assert_eq!(p.raised(0.02).get().to_bits(), (1.3_f32 + 0.02).to_bits());
-        assert_eq!(p.lowered(0.02).get().to_bits(), (1.3_f32 - 0.02).to_bits());
-        assert!(Price::new(0.2) < p);
+        let price = Price::new(1.3);
+        assert_eq!(
+            price.raised(0.02).get().to_bits(),
+            (1.3_f32 + 0.02).to_bits()
+        );
+        assert_eq!(
+            price.lowered(0.02).get().to_bits(),
+            (1.3_f32 - 0.02).to_bits()
+        );
+        assert!(Price::new(0.2) < price);
         assert_eq!(
             NetTrades::ZERO
                 .traded(MarketTrade::Buy)

@@ -25,10 +25,10 @@ pub struct DiplomacyAi {
 impl ReadableHeaderElement for DiplomacyAi {
     fn read_from<R: Read>(input: &mut RecordingHeaderReader<R>) -> GenieResult<Self> {
         let mut ai = Self::default();
-        for i in 0..10 {
-            ai.dislike[i] = input.read_u32::<LE>()?;
-            ai.like[i] = input.read_u32::<LE>()?;
-            ai.changeable[i] = input.read_u8()?;
+        for index in 0..10 {
+            ai.dislike[index] = input.read_u32::<LE>()?;
+            ai.like[index] = input.read_u32::<LE>()?;
+            ai.changeable[index] = input.read_u8()?;
         }
         Ok(ai)
     }

@@ -20,9 +20,9 @@ impl Effect {
     /// to one at a time (`FUN_1411d70f0`).
     #[must_use]
     pub fn upgrades(&self) -> bool {
-        self.commands.iter().any(|c| {
+        self.commands.iter().any(|effect_command| {
             matches!(
-                c,
+                effect_command,
                 EffectCommand::Upgrade {
                     party: Party::Own,
                     ..
@@ -38,7 +38,7 @@ impl Effect {
     pub fn marks_upgrade(&self) -> bool {
         self.commands
             .iter()
-            .any(|c| matches!(c, EffectCommand::Upgrade { .. }))
+            .any(|effect_command| matches!(effect_command, EffectCommand::Upgrade { .. }))
     }
 }
 
@@ -94,13 +94,15 @@ mod tests {
     /// An id inside the table reads its effect; one past its end reads none.
     #[test]
     fn an_effect_id_outside_the_table_reads_as_none() {
-        let t = table();
+        let effects = table();
         assert_eq!(
-            t.get(EffectId::of_data(1)).map(|e| e.commands.len()),
+            effects
+                .get(EffectId::of_data(1))
+                .map(|effect| effect.commands.len()),
             Some(1)
         );
-        assert_eq!(t.get(EffectId::of_data(2)), None);
-        assert_eq!((t.len(), t.is_empty()), (2, false));
+        assert_eq!(effects.get(EffectId::of_data(2)), None);
+        assert_eq!((effects.len(), effects.is_empty()), (2, false));
     }
 
     /// A negative id (−1, a technology without an effect) reads none.

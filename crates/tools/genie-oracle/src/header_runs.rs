@@ -74,8 +74,8 @@ pub(super) fn run(turns: &mut World, decoder: &mut Decoder, frames: &[Frame<'_>]
             .filter_map(|p| decoder.command(p))
             .collect();
         if trace {
-            for c in &commands {
-                eprintln!("update {}: {c:?}", turns.ticks.get() + 1);
+            for command in &commands {
+                eprintln!("update {}: {command:?}", turns.ticks.get() + 1);
             }
         }
         turns.tick_with(frame.dt, &commands);
@@ -104,10 +104,13 @@ pub fn simulate_word9(recording: &[u8], masters: Option<&MasterTable>) -> GenieR
         .enumerate()
         .find_map(|(i, f)| f.checkpoint.as_ref().map(|c| (i, c)))
         .ok_or(no_checkpoint())?;
-    let group_command = all[..first].iter().enumerate().find_map(|(i, f)| {
-        let packet = f.commands.iter().find(|p| GROUP_COMMANDS.contains(&p[0]))?;
+    let group_command = all[..first].iter().enumerate().find_map(|(index, frame)| {
+        let packet = frame
+            .commands
+            .iter()
+            .find(|p| GROUP_COMMANDS.contains(&p[0]))?;
         Some(GroupCommand {
-            tick: i as u32 + 1,
+            tick: index as u32 + 1,
             player: packet.get(1).copied().unwrap_or_default(),
             command: packet[0],
         })
@@ -132,7 +135,7 @@ pub fn simulate_word9(recording: &[u8], masters: Option<&MasterTable>) -> GenieR
                 unsupported: simulated
                     .unsupported
                     .clone()
-                    .map(|(t, i, e)| (t.get(), i, e)),
+                    .map(|(tick, list_index, error)| (tick.get(), list_index, error)),
             })
         })
         .collect()
@@ -243,7 +246,7 @@ pub fn word9_terms(
                 .actions_of(unit.id)
                 .list
                 .artifact()
-                .map_or(0, |a| a.state.get()),
+                .map_or(0, |artifact| artifact.state.get()),
             retarget: ais
                 .get(unit.id)
                 .map_or(0, |ai| ai.retarget_timer.get() as i32),

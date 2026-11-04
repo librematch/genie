@@ -6,28 +6,32 @@ use crate::pathing::FixedPoint;
 use crate::pathing::FixedRect;
 use crate::pathing::ShapeSide;
 
-/// `FUN_140fa8460`: corner `k` of `r` shrunk by `d`.
-pub(super) const fn shrunk_corner(r: FixedRect, k: u32, d: FixedDistance) -> FixedPoint {
-    let d = d.get();
+/// `FUN_140fa8460`: corner `k` of `fixed_rect` shrunk by `fixed_distance`.
+pub(super) const fn shrunk_corner(
+    fixed_rect: FixedRect,
+    k: u32,
+    fixed_distance: FixedDistance,
+) -> FixedPoint {
+    let d = fixed_distance.get();
     match k {
-        0 => FixedPoint::new(r.x0() + d, r.y0() + d),
-        1 => FixedPoint::new(r.x1() - d, r.y0() + d),
-        2 => FixedPoint::new(r.x1() - d, r.y1() - d),
-        3 => FixedPoint::new(r.x0() + d, r.y1() - d),
-        _ => FixedPoint::new(r.x0(), r.y0()),
+        0 => FixedPoint::new(fixed_rect.x0() + d, fixed_rect.y0() + d),
+        1 => FixedPoint::new(fixed_rect.x1() - d, fixed_rect.y0() + d),
+        2 => FixedPoint::new(fixed_rect.x1() - d, fixed_rect.y1() - d),
+        3 => FixedPoint::new(fixed_rect.x0() + d, fixed_rect.y1() - d),
+        _ => FixedPoint::new(fixed_rect.x0(), fixed_rect.y0()),
     }
 }
 
-/// `FUN_140fa8350`: a contact's junction moved by `d` into the free space beside its side (the
-/// other way along it for a contact at its side's start).
+/// `FUN_140fa8350`: a contact's junction moved by `fixed_distance` into the free space beside its
+/// side (the other way along it for a contact at its side's start).
 pub(super) const fn contact_point(
-    p: FixedPoint,
+    fixed_point: FixedPoint,
     side: ShapeSide,
-    d: FixedDistance,
+    fixed_distance: FixedDistance,
     at_side_start: bool,
 ) -> FixedPoint {
-    let [x, y] = p.get();
-    let d = d.get();
+    let [x, y] = fixed_point.get();
+    let d = fixed_distance.get();
     let f = at_side_start;
     match side {
         ShapeSide::HighX => {
@@ -61,9 +65,15 @@ pub(super) const fn contact_point(
     }
 }
 
-/// `FUN_140fa39f0`: `p` moved onto side `side` of `r` shrunk by `d`, held within the side.
-pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d: FixedDistance) {
-    let d = d.get();
+/// `FUN_140fa39f0`: `fixed_point` moved onto side `side` of `fixed_rect` shrunk by
+/// `fixed_distance`, held within the side.
+pub(super) fn snap_to_side(
+    fixed_point: &mut FixedPoint,
+    fixed_rect: FixedRect,
+    side: ShapeSide,
+    fixed_distance: FixedDistance,
+) {
+    let d = fixed_distance.get();
     let hold = |v: i32, lo: i32, hi: i32| {
         if v < lo {
             lo
@@ -75,16 +85,28 @@ pub(super) fn snap_to_side(p: &mut FixedPoint, r: FixedRect, side: ShapeSide, d:
     };
     match side {
         ShapeSide::LowY => {
-            *p = FixedPoint::new(hold(p.x(), r.x0() + d, r.x1() - d), r.y0() + d);
+            *fixed_point = FixedPoint::new(
+                hold(fixed_point.x(), fixed_rect.x0() + d, fixed_rect.x1() - d),
+                fixed_rect.y0() + d,
+            );
         }
         ShapeSide::HighX => {
-            *p = FixedPoint::new(r.x1() - d, hold(p.y(), r.y0() + d, r.y1() - d));
+            *fixed_point = FixedPoint::new(
+                fixed_rect.x1() - d,
+                hold(fixed_point.y(), fixed_rect.y0() + d, fixed_rect.y1() - d),
+            );
         }
         ShapeSide::HighY => {
-            *p = FixedPoint::new(hold(p.x(), r.x0() + d, r.x1() - d), r.y1() - d);
+            *fixed_point = FixedPoint::new(
+                hold(fixed_point.x(), fixed_rect.x0() + d, fixed_rect.x1() - d),
+                fixed_rect.y1() - d,
+            );
         }
         ShapeSide::LowX => {
-            *p = FixedPoint::new(r.x0() + d, hold(p.y(), r.y0() + d, r.y1() - d));
+            *fixed_point = FixedPoint::new(
+                fixed_rect.x0() + d,
+                hold(fixed_point.y(), fixed_rect.y0() + d, fixed_rect.y1() - d),
+            );
         }
     }
 }
@@ -121,15 +143,16 @@ impl RayFraction {
     }
 }
 
-/// `FUN_140faa380`: segment `a`–`b` against segment `c`–`e` in fixed point; `t` the parameter along
-/// `a`–`b`. A proper crossing nearer than `t`; a touch or graze (tolerances 1e-4
-/// and 1e-3); a touch at `a` itself on an end of `c`–`e`; none. Sets `t` on a hit.
+/// `FUN_140faa380`: segment `a`–`b` against segment `c`–`e` in fixed point; `ray_fraction` the
+/// parameter along `a`–`b`. A proper crossing nearer than `ray_fraction`; a touch or graze
+/// (tolerances 1e-4 and 1e-3); a touch at `a` itself on an end of `c`–`e`; none. Sets
+/// `ray_fraction` on a hit.
 pub(super) fn segment_hit(
     a: FixedPoint,
     b: FixedPoint,
     c: FixedPoint,
     e: FixedPoint,
-    t: &mut RayFraction,
+    ray_fraction: &mut RayFraction,
 ) -> Option<Meet> {
     let w = |v: i32| i64::from(v);
     let (x1, y1, x2, y2) = (w(a.x()), w(a.y()), w(b.x()), w(b.y()));
@@ -142,7 +165,7 @@ pub(super) fn segment_hit(
         (((((y1 - y3) * (x4 - x3)) >> 22) - (((y4 - y3) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
     let ub =
         (((((y1 - y3) * (x2 - x1)) >> 22) - (((y2 - y1) * (x1 - x3)) >> 22)) * 0x40_0000) / den;
-    let current = i64::from(t.get());
+    let current = i64::from(ray_fraction.get());
     let mut test_ub_low = true;
     if ua < 0x1a3 {
         if !(-0x1062..=0x40_1062).contains(&ua) || current <= ua {
@@ -158,7 +181,7 @@ pub(super) fn segment_hit(
         }
         if 0x1a2 < ub {
             if ub < 0x3f_fe5e {
-                *t = RayFraction::new(ua as i32);
+                *ray_fraction = RayFraction::new(ua as i32);
                 return Some(Meet::Cross);
             }
             test_ub_low = false;
@@ -170,7 +193,7 @@ pub(super) fn segment_hit(
     if 0x40_1062 < ub {
         return None;
     }
-    *t = RayFraction::new(ua as i32);
+    *ray_fraction = RayFraction::new(ua as i32);
     Some(if ua == 0 && (ub & !0x40_0000) == 0 {
         Meet::TouchAtStart
     } else {
@@ -178,37 +201,50 @@ pub(super) fn segment_hit(
     })
 }
 
-/// `FUN_140faa4e0`: the ray `a`–`b` against the sides of the rectangle `r` it faces (the right side
-/// for a ray going left, the left for one going right, then the bottom or the top): how it meets
-/// one, as [`segment_hit`], and the side; none for none. A y side wins only when strictly nearer.
+/// `FUN_140faa4e0`: the ray `a`–`b` against the sides of the rectangle `fixed_rect` it faces (the
+/// right side for a ray going left, the left for one going right, then the bottom or the top): how
+/// it meets one, as [`segment_hit`], and the side; none for none. A y side wins only when strictly
+/// nearer.
 pub(super) fn ray_rect(
     a: FixedPoint,
     b: FixedPoint,
-    r: FixedRect,
-    t: &mut RayFraction,
+    fixed_rect: FixedRect,
+    ray_fraction: &mut RayFraction,
 ) -> Option<(Meet, ShapeSide)> {
     let (dx, dy) = (b.x() - a.x(), b.y() - a.y());
     let mut found = None;
     // the side across x it faces: the right (1) for a ray going left, the left (3) for one going
     // right
     let (k, s) = match dx {
-        ..0 => (ray_right_side(a, b, r, t), ShapeSide::HighX),
+        ..0 => (
+            ray_right_side(a, b, fixed_rect, ray_fraction),
+            ShapeSide::HighX,
+        ),
         0 => (None, ShapeSide::HighX),
-        _ => (ray_left_side(a, b, r, t), ShapeSide::LowX),
+        _ => (
+            ray_left_side(a, b, fixed_rect, ray_fraction),
+            ShapeSide::LowX,
+        ),
     };
     if let Some(k) = k {
         found = Some((k, s));
     }
     // then the bottom (0) for a ray going up in y, the top (2) for one going down
-    let (k, s) = match dy {
-        1.. => (ray_bottom_side(a, b, r, t), ShapeSide::LowY),
+    let (k, shape_side) = match dy {
+        1.. => (
+            ray_bottom_side(a, b, fixed_rect, ray_fraction),
+            ShapeSide::LowY,
+        ),
         0 => return found,
-        _ => (ray_top_side(a, b, r, t), ShapeSide::HighY),
+        _ => (
+            ray_top_side(a, b, fixed_rect, ray_fraction),
+            ShapeSide::HighY,
+        ),
     };
-    let Some(k) = k else {
+    let Some(meet) = k else {
         return found;
     };
-    Some((k, s))
+    Some((meet, shape_side))
 }
 
 /// [`ray_rect`]'s ratio of a side's offset `num` along the ray's `den` (`num << 22 / den`).
@@ -216,23 +252,23 @@ pub(super) fn ray_ratio(num: i32, den: i32) -> i32 {
     ((i64::from(num) << 22) / i64::from(den)) as i32
 }
 
-/// [`ray_rect`]'s right side (x1) for the ray `a`–`b` going left: a ray along x (no y step)
-/// crosses it within its open span from at or right of it to left of it, nearer than `t` (a
-/// crossing, its ratio into `t`); any other ray as [`segment_hit`]; none for none.
+/// [`ray_rect`]'s right side (x1) for the ray `a`–`b` going left: a ray along x (no y step) crosses
+/// it within its open span from at or right of it to left of it, nearer than `ray_fraction` (a
+/// crossing, its ratio into `ray_fraction`); any other ray as [`segment_hit`]; none for none.
 pub(super) fn ray_right_side(
     a: FixedPoint,
     b: FixedPoint,
-    r: FixedRect,
-    t: &mut RayFraction,
+    fixed_rect: FixedRect,
+    ray_fraction: &mut RayFraction,
 ) -> Option<Meet> {
-    let [_, ry0, rx1, ry1] = r.get();
+    let [_, ry0, rx1, ry1] = fixed_rect.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
             a,
             b,
             FixedPoint::new(rx1, ry0),
             FixedPoint::new(rx1, ry1),
-            t,
+            ray_fraction,
         );
     }
     if a.y() <= ry0 || ry1 <= a.y() {
@@ -241,11 +277,11 @@ pub(super) fn ray_right_side(
     if rx1 <= b.x() || a.x() < rx1 {
         return None;
     }
-    let u = ray_ratio(rx1 - a.x(), b.x() - a.x());
-    if t.get() <= u {
+    let ray_ratio = ray_ratio(rx1 - a.x(), b.x() - a.x());
+    if ray_fraction.get() <= ray_ratio {
         return None;
     }
-    *t = RayFraction::new(u);
+    *ray_fraction = RayFraction::new(ray_ratio);
     Some(Meet::Cross)
 }
 
@@ -254,17 +290,17 @@ pub(super) fn ray_right_side(
 pub(super) fn ray_left_side(
     a: FixedPoint,
     b: FixedPoint,
-    r: FixedRect,
-    t: &mut RayFraction,
+    fixed_rect: FixedRect,
+    ray_fraction: &mut RayFraction,
 ) -> Option<Meet> {
-    let [rx0, ry0, _, ry1] = r.get();
+    let [rx0, ry0, _, ry1] = fixed_rect.get();
     if b.y() - a.y() != 0 {
         return segment_hit(
             a,
             b,
             FixedPoint::new(rx0, ry0),
             FixedPoint::new(rx0, ry1),
-            t,
+            ray_fraction,
         );
     }
     if a.y() <= ry0 || ry1 <= a.y() {
@@ -273,31 +309,31 @@ pub(super) fn ray_left_side(
     if b.x() <= rx0 || rx0 < a.x() {
         return None;
     }
-    let u = ray_ratio(rx0 - a.x(), b.x() - a.x());
-    if t.get() <= u {
+    let ray_ratio = ray_ratio(rx0 - a.x(), b.x() - a.x());
+    if ray_fraction.get() <= ray_ratio {
         return None;
     }
-    *t = RayFraction::new(u);
+    *ray_fraction = RayFraction::new(ray_ratio);
     Some(Meet::Cross)
 }
 
 /// [`ray_rect`]'s bottom side (y0) for the ray `a`–`b` going up in y: a ray along y (no x step)
-/// crosses it within its open span from at or below it to above it, nearer than `t` (a
-/// crossing, its ratio into `t`); any other ray as [`segment_hit`]; none for none.
+/// crosses it within its open span from at or below it to above it, nearer than `ray_fraction` (a
+/// crossing, its ratio into `ray_fraction`); any other ray as [`segment_hit`]; none for none.
 pub(super) fn ray_bottom_side(
     a: FixedPoint,
     b: FixedPoint,
-    r: FixedRect,
-    t: &mut RayFraction,
+    fixed_rect: FixedRect,
+    ray_fraction: &mut RayFraction,
 ) -> Option<Meet> {
-    let [rx0, ry0, rx1, _] = r.get();
+    let [rx0, ry0, rx1, _] = fixed_rect.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
             a,
             b,
             FixedPoint::new(rx0, ry0),
             FixedPoint::new(rx1, ry0),
-            t,
+            ray_fraction,
         );
     }
     if !(rx0 < a.x() && a.x() < rx1) {
@@ -306,11 +342,11 @@ pub(super) fn ray_bottom_side(
     if b.y() <= ry0 || ry0 < a.y() {
         return None;
     }
-    let u = ray_ratio(ry0 - a.y(), b.y() - a.y());
-    if t.get() <= u {
+    let ray_ratio = ray_ratio(ry0 - a.y(), b.y() - a.y());
+    if ray_fraction.get() <= ray_ratio {
         return None;
     }
-    *t = RayFraction::new(u);
+    *ray_fraction = RayFraction::new(ray_ratio);
     Some(Meet::Cross)
 }
 
@@ -319,17 +355,17 @@ pub(super) fn ray_bottom_side(
 pub(super) fn ray_top_side(
     a: FixedPoint,
     b: FixedPoint,
-    r: FixedRect,
-    t: &mut RayFraction,
+    fixed_rect: FixedRect,
+    ray_fraction: &mut RayFraction,
 ) -> Option<Meet> {
-    let [rx0, _, rx1, ry1] = r.get();
+    let [rx0, _, rx1, ry1] = fixed_rect.get();
     if b.x() - a.x() != 0 {
         return segment_hit(
             a,
             b,
             FixedPoint::new(rx0, ry1),
             FixedPoint::new(rx1, ry1),
-            t,
+            ray_fraction,
         );
     }
     if !(rx0 < a.x() && a.x() < rx1) {
@@ -338,10 +374,10 @@ pub(super) fn ray_top_side(
     if ry1 <= b.y() || a.y() < ry1 {
         return None;
     }
-    let u = ray_ratio(ry1 - a.y(), b.y() - a.y());
-    if t.get() <= u {
+    let ray_ratio = ray_ratio(ry1 - a.y(), b.y() - a.y());
+    if ray_fraction.get() <= ray_ratio {
         return None;
     }
-    *t = RayFraction::new(u);
+    *ray_fraction = RayFraction::new(ray_ratio);
     Some(Meet::Cross)
 }

@@ -282,13 +282,13 @@ mod tests {
     /// The states after each update until the object leaves, and the update (1-based) it leaves in.
     fn run(mut life: Lifecycle, dt: Millis, limit: usize) -> (Vec<ObjectState>, Option<usize>) {
         let mut states = Vec::new();
-        for i in 1..=limit {
+        for index in 1..=limit {
             if life
                 .update(dt.seconds(), &mut Well512::default(), SpritePlay::Still)
                 .unwrap()
                 == ListFate::Leaves
             {
-                return (states, Some(i));
+                return (states, Some(index));
             }
             states.push(life.state);
         }
@@ -378,15 +378,15 @@ mod tests {
             dying_sprite,
             ..dead(class)
         };
-        let step = |mut l: Lifecycle| {
-            let _ = l
+        let step = |mut lifecycle: Lifecycle| {
+            let _ = lifecycle
                 .update(
                     Seconds::new(0.025),
                     &mut Well512::default(),
                     SpritePlay::Animating,
                 )
                 .unwrap();
-            l.state
+            lifecycle.state
         };
         assert_eq!(
             step(held(Class::Animated, Some(SpriteId::named(8220)))),
@@ -464,7 +464,7 @@ mod tests {
                 ..dead(Class::Animated)
             },
         ];
-        for (i, mut life) in cases.into_iter().enumerate() {
+        for (index, mut life) in cases.into_iter().enumerate() {
             assert!(
                 life.update(
                     Seconds::new(0.104),
@@ -472,7 +472,7 @@ mod tests {
                     SpritePlay::Still
                 )
                 .is_err(),
-                "case {i}"
+                "case {index}"
             );
         }
     }

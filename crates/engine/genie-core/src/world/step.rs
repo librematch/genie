@@ -161,7 +161,7 @@ impl Step<'_> {
         me: (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        self.lend_to(me, |w, _| f(w))
+        self.lend_to(me, |world, _| f(world))
     }
 
     /// [`Step::lend`], `f` given the slot the object went back to.
@@ -174,7 +174,7 @@ impl Step<'_> {
         (me, actions): (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World, ListIndex) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        let p = self.player;
+        let player_id = self.player;
         // while the unit AI's side runs, its AI is out of the unit: a stand-in holds its place,
         // which no routine on the lent unit may reach
         let side = self.side_notifies.is_some();
@@ -183,13 +183,16 @@ impl Step<'_> {
         }
         let lent = replace(me, Unit::taken_out());
         self.w.parts.put_actions(self.me, take(actions));
-        let answer = self.w.put_back_own(p, lent).and_then(|i| f(self.w, i));
+        let answer = self
+            .w
+            .put_back_own(player_id, lent)
+            .and_then(|i| f(self.w, i));
         // `f` may move the lent object's slot (another's removal), and no routine run on a
         // lent object removes it (a gate's toggle, an unload, a group's leave)
-        let i = self.w.live_index(p, self.me).ok_or_else(|| {
+        let list_index = self.w.live_index(player_id, self.me).ok_or_else(|| {
             GenieError::unreachable("a lent object left its list").with("object", self.me)
         })?;
-        *me = self.w.take_out(p, i)?;
+        *me = self.w.take_out(player_id, list_index)?;
         *actions = self.w.parts.take_actions(self.me);
         let stand_in = if side {
             self.w.lend_unit_ai(me.id)
@@ -217,8 +220,8 @@ impl Step<'_> {
         me: (&mut Unit, &mut Action),
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        let p = self.player;
-        self.lend_to(me, |w, i| f(w, p, i))
+        let player_id = self.player;
+        self.lend_to(me, |world, list_index| f(world, player_id, list_index))
     }
 
     /// A notify for the updating unit `me`'s own AI from a call of the step (an Enter's own
@@ -228,13 +231,13 @@ impl Step<'_> {
     /// # Errors
     ///
     /// A notify the unit AI's queue does not take.
-    pub(crate) fn notify_own(&mut self, me: &Unit, n: Notify) -> GenieResult<()> {
+    pub(crate) fn notify_own(&mut self, me: &Unit, notify: Notify) -> GenieResult<()> {
         let state = me.life.state;
         if let Some(ai) = self.w.parts.unit_ai.get_mut(me.id) {
-            return ai.post(n, state);
+            return ai.post(notify, state);
         }
         if let Some(own) = self.side_notifies.as_mut() {
-            own.push((n, state));
+            own.push((notify, state));
         }
         Ok(())
     }

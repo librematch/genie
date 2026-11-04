@@ -55,8 +55,8 @@ impl PathState {
 }
 
 impl genie_diff::Diff for PathState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -70,10 +70,10 @@ mod tests {
         for v in [i32::MIN, -1, 1, 7, 256, i32::MAX] {
             assert!(PathState::of_int(v).is_err(), "{v}");
         }
-        for v in 0..=6 {
-            match PathState::of_int(v) {
-                Ok(s) => assert_eq!(s.get(), v),
-                Err(_) => assert_eq!(v, 1),
+        for index in 0..=6 {
+            match PathState::of_int(index) {
+                Ok(path_state) => assert_eq!(path_state.get(), index),
+                Err(_) => assert_eq!(index, 1),
             }
         }
         assert_eq!(PathState::GaveUp.to_string(), "6");

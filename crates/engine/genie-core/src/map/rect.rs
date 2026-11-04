@@ -99,11 +99,14 @@ impl Rect {
             && other.y0() <= self.y1()
     }
 
-    /// Whether it holds point `p`, edges included: `p.x <= x1`, `x0 <= p.x`, then the same on y
-    /// (a NaN is not held).
+    /// Whether it holds point `point`, edges included: `point.x <= x1`, `x0 <= point.x`, then the
+    /// same on y (a NaN is not held).
     #[must_use]
-    pub fn holds(self, p: Point) -> bool {
-        p.x() <= self.x1() && self.x0() <= p.x() && p.y() <= self.y1() && self.y0() <= p.y()
+    pub fn holds(self, point: Point) -> bool {
+        point.x() <= self.x1()
+            && self.x0() <= point.x()
+            && point.y() <= self.y1()
+            && self.y0() <= point.y()
     }
 
     /// Whether it leaves a map of `size` tiles (width, height): a low corner below 0 or a high
@@ -137,8 +140,8 @@ impl From<[f32; 4]> for Rect {
 }
 
 impl genie_diff::Diff for Rect {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -174,30 +177,36 @@ mod tests {
             Rect::between(Point::new(1.0, 2.0), Point::new(3.0, 4.0)),
             Rect::new(1.0, 2.0, 3.0, 4.0)
         );
-        let r = Rect::new(1.0, 2.0, 3.0, 4.0);
-        assert_eq!((r.x0(), r.y0(), r.x1(), r.y1()), (1.0, 2.0, 3.0, 4.0));
+        let rect = Rect::new(1.0, 2.0, 3.0, 4.0);
         assert_eq!(
-            (r.corner0(), r.corner1()),
+            (rect.x0(), rect.y0(), rect.x1(), rect.y1()),
+            (1.0, 2.0, 3.0, 4.0)
+        );
+        assert_eq!(
+            (rect.corner0(), rect.corner1()),
             (Point::new(1.0, 2.0), Point::new(3.0, 4.0))
         );
-        assert_eq!(r.grown(Distance::new(0.5)), Rect::new(0.5, 1.5, 3.5, 4.5));
-        assert!(r.overlaps(Rect::new(3.0, 4.0, 5.0, 6.0)));
-        assert!(!r.overlaps(Rect::new(3.5, 4.0, 5.0, 6.0)));
-        assert!(!r.overlaps(Rect::new(f32::NAN, 2.0, 3.0, 4.0)));
+        assert_eq!(
+            rect.grown(Distance::new(0.5)),
+            Rect::new(0.5, 1.5, 3.5, 4.5)
+        );
+        assert!(rect.overlaps(Rect::new(3.0, 4.0, 5.0, 6.0)));
+        assert!(!rect.overlaps(Rect::new(3.5, 4.0, 5.0, 6.0)));
+        assert!(!rect.overlaps(Rect::new(f32::NAN, 2.0, 3.0, 4.0)));
         assert_eq!(
             Rect::new(3.0, 4.0, 1.0, 2.0).ordered(),
             Rect::new(1.0, 2.0, 3.0, 4.0)
         );
-        assert_eq!(r.ordered(), r);
-        assert!(r.holds(Point::new(1.0, 4.0)) && r.holds(Point::new(2.0, 3.0)));
-        assert!(!r.holds(Point::new(0.5, 3.0)) && !r.holds(Point::new(2.0, f32::NAN)));
+        assert_eq!(rect.ordered(), rect);
+        assert!(rect.holds(Point::new(1.0, 4.0)) && rect.holds(Point::new(2.0, 3.0)));
+        assert!(!rect.holds(Point::new(0.5, 3.0)) && !rect.holds(Point::new(2.0, f32::NAN)));
         assert_eq!(
             Rect::spanning(Point::new(3.0, 2.0), Point::new(1.0, 4.0)),
             Rect::new(1.0, 2.0, 3.0, 4.0)
         );
         let map = GridSize::new;
-        assert!(!r.leaves_map(map(3, 4)));
-        assert!(r.leaves_map(map(2, 4)) && r.leaves_map(map(3, 3)));
+        assert!(!rect.leaves_map(map(3, 4)));
+        assert!(rect.leaves_map(map(2, 4)) && rect.leaves_map(map(3, 3)));
         assert!(Rect::new(-0.5, 2.0, 3.0, 4.0).leaves_map(map(9, 9)));
         assert!(!Rect::new(f32::NAN, 2.0, 3.0, 4.0).leaves_map(map(3, 4)));
     }

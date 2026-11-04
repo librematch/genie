@@ -105,26 +105,26 @@ pub fn reward(
 }
 
 impl World {
-    /// A terrain look task of the object at `(p, i)` (`0x141207501`): its walk's distance factor
-    /// (`+0x878`, [`crate::movement::Mover::factor`]) and its attack timer's rate (`+0x87c`) go
-    /// back to 1 and its look to its master's, then on a tile of the task's terrains
-    /// ([`terrain_mask`], [`look`]) take the task's `work_val1`, `work_val2` and look. The tile
-    /// is the one under where the object last moved to (slot 0x520: `+0x824`, `+0x82c`,
-    /// truncated; a building's place); without the map's terrain no tile matches. False when
-    /// the task's terrain mask throws ([`terrain_mask`]): the routine ends.
+    /// A terrain look task of the object at `(player_id, list_index)` (`0x141207501`): its walk's
+    /// distance factor (`+0x878`, [`crate::movement::Mover::factor`]) and its attack timer's rate
+    /// (`+0x87c`) go back to 1 and its look to its master's, then on a tile of the task's terrains
+    /// ([`terrain_mask`], [`look`]) take the task's `work_val1`, `work_val2` and look. The tile is
+    /// the one under where the object last moved to (slot 0x520: `+0x824`, `+0x82c`, truncated; a
+    /// building's place); without the map's terrain no tile matches. False when the task's terrain
+    /// mask throws ([`terrain_mask`]): the routine ends.
     ///
     /// # Errors
     ///
-    /// An object `(p, i)` the player's list has not got.
+    /// An object `(player_id, list_index)` the player's list has not got.
     pub(super) fn terrain_look(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         task: &Task,
     ) -> GenieResult<bool> {
         let Some(mask) = terrain_mask(task.terrain) else {
             return Ok(false);
         };
-        let unit = self.players.live(p, i)?;
+        let unit = self.players.live(player_id, list_index)?;
         let at = self
             .parts
             .mover_of(unit.id)
@@ -133,10 +133,11 @@ impl World {
             .spatial
             .terrain
             .as_ref()
-            .map_or(TerrainFlags::NONE, |t| {
-                t.kind(at.ground().tile())
-                    .and_then(|k| t.terrains.get(k.index()))
-                    .map_or(TerrainFlags::NONE, |k| k.flags)
+            .map_or(TerrainFlags::NONE, |terrain| {
+                terrain
+                    .kind(at.ground().tile())
+                    .and_then(|terrain_id| terrain.terrains.get(terrain_id.index()))
+                    .map_or(TerrainFlags::NONE, |terrain_kind| terrain_kind.flags)
             });
         let graphics = &self.model.graphics;
         let exists = |id: i32| {
@@ -146,14 +147,14 @@ impl World {
                 .is_some_and(|id| graphics.contains_key(id))
         };
         let look = look(task, mask, flags, exists);
-        let unit = self.players.live_mut(p, i)?;
+        let unit = self.players.live_mut(player_id, list_index)?;
         let (factor, rate) = if look.is_some() {
             (task.work_val1.get(), task.work_val2.get())
         } else {
             (ONE, ONE)
         };
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.factor = factor;
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.factor = factor;
         }
         self.parts.combat_mut(unit.id)?.abilities.attack_rate = rate;
         self.parts.combat_mut(unit.id)?.abilities.look = look;

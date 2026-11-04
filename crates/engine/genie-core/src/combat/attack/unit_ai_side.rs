@@ -75,17 +75,16 @@ impl UnitView<'_, '_> {
             ));
         }
         let no = Attacked::default;
-        let Some(t) = self.c.w.spatial.get_known(target)?.copied() else {
+        let Some(placed) = self.c.w.spatial.get_known(target)?.copied() else {
             return Ok(no());
         };
-        if let Some(&attack) = self
-            .actions
-            .list
-            .attack()
-            .filter(|a| a.target.map(AttackTargetId::id) == Some(target))
+        if let Some(&attack) =
+            self.actions.list.attack().filter(|target_attack| {
+                target_attack.target.map(AttackTargetId::id) == Some(target)
+            })
         {
             if force == OrderForce::Forced {
-                self.attack_again((target, attack), &t, master, ai, roles)?;
+                self.attack_again((target, attack), &placed, master, ai, roles)?;
             }
             return Ok(Attacked {
                 attacks: true,
@@ -99,10 +98,11 @@ impl UnitView<'_, '_> {
             .spatial
             .get(self.unit.id)
             .ok_or(ATTACKER_UNPLACED)?;
-        let target_master = player_master(&self.c.w.model.masters, t.player, t.master).ok_or(
-            GenieError::unsupported("an attack's target of a master the slice does not have"),
-        )?;
-        let visible = self.target_visible(&t, target_master)?;
+        let target_master = player_master(&self.c.w.model.masters, placed.player, placed.master)
+            .ok_or(GenieError::unsupported(
+                "an attack's target of a master the slice does not have",
+            ))?;
+        let visible = self.target_visible(&placed, target_master)?;
         let unit = &mut *self.unit;
         // the attack command's Attack (`FUN_141081a80`) takes no MoveTo sprite: the unit's
         let look = self.c.w.parts.combat_of(unit.id).abilities.look.as_ref();
@@ -123,11 +123,18 @@ impl UnitView<'_, '_> {
         let by = self.attack_clears_actions(master.class)?;
         let unit = &mut *self.unit;
         let speed = speed_of(self.c.w.parts.mover_of(unit.id))?;
-        let e = engagement(Some(ai), speed, master, &me_at, &t, self.c.w.world_time)?;
+        let engagement = engagement(
+            Some(ai),
+            speed,
+            master,
+            &me_at,
+            &placed,
+            self.c.w.world_time,
+        )?;
         // the constructor clears +0x900 for a target other than its own (none yet)
         self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         if unit.life.inside.is_some() {
-            return self.attack_from_inside(Attack::own(target, &e, arms), by, roles);
+            return self.attack_from_inside(Attack::own(target, &engagement, arms), by, roles);
         }
         new_sprite(
             &mut unit.sprite,
@@ -138,10 +145,10 @@ impl UnitView<'_, '_> {
         );
         let cmd = AttackCommand {
             target,
-            engagement: &e,
+            engagement: &engagement,
             arms,
             visible,
-            target_owner: t.player,
+            target_owner: placed.player,
             ready: self.ready_reads(target, master, ai, roles)?,
         };
         let unit = &mut *self.unit;
@@ -238,11 +245,12 @@ impl UnitView<'_, '_> {
             )?
             .get(id)
             .ok_or(NOT_HELD)?;
-            let m = player_master(&self.c.w.model.masters, p.player, p.master).ok_or(NOT_HELD)?;
+            let player_master =
+                player_master(&self.c.w.model.masters, p.player, p.master).ok_or(NOT_HELD)?;
             Ok(Mark {
                 id,
-                kind: m.kind,
-                class: m.class,
+                kind: player_master.kind,
+                class: player_master.class,
                 state: u.life.state,
                 position: p.position,
                 radius: p.radius,
@@ -258,8 +266,8 @@ impl UnitView<'_, '_> {
         .get(target)
         .and_then(|u| self.c.w.parts.building_of(u.id).annex_of)
         {
-            Some(m) => match self.c.w.spatial.get(m).copied() {
-                Some(p) => Some(mark(m.id(), &p)?),
+            Some(role_id) => match self.c.w.spatial.get(role_id).copied() {
+                Some(placed) => Some(mark(role_id.id(), &placed)?),
                 None => None,
             },
             None => None,
@@ -272,12 +280,12 @@ impl UnitView<'_, '_> {
                 .w
                 .parts
                 .mover_of(unit.id)
-                .map_or(Speed::ZERO, |m| m.stats.speed),
+                .map_or(Speed::ZERO, |mover| mover.stats.speed),
             position: unit.position(),
             radius: master.radius,
         };
         let can_move = ai.current_order.is_some() || ai.stance <= UnitStance::Defensive;
-        let w = attack.work(Some(target_mark), main, &wielder, |_| can_move, roles);
+        let worked = attack.work(Some(target_mark), main, &wielder, |_| can_move, roles);
         // the reads above reach no action of the unit's: the copy is the head
         self.actions.list.set_attack(Some(attack));
         let by = Releaser {
@@ -285,13 +293,13 @@ impl UnitView<'_, '_> {
             class: Some(master.class),
             player: self.player,
         };
-        if w.clears_count {
+        if worked.clears_count {
             self.c.w.parts.combat_mut(unit.id)?.attack_count = AttackCount::ZERO;
         }
-        if let Some(old) = w.lets_go {
+        if let Some(old) = worked.lets_go {
             self.release(old, by)?;
         }
-        if let Some(new) = w.takes {
+        if let Some(new) = worked.takes {
             self.take(new, by, roles)?;
         }
         Ok(())
@@ -308,18 +316,18 @@ impl UnitView<'_, '_> {
             self.c.player,
             self.new_owner,
         )?;
-        let Some((q, t)) = view.find(id) else {
+        let Some((player_id, unit)) = view.find(id) else {
             return Ok(None);
         };
         let attributes = if view.own(id).is_some() {
             &self.c.w.players.player(self.player)?.attributes
         } else {
-            let Some(owner) = view.players().player(q) else {
+            let Some(owner) = view.players().player(player_id) else {
                 return Ok(None);
             };
             &owner.attributes[..]
         };
-        let master = t.master(self.c.w.master_tables(), q)?;
+        let master = unit.master(self.c.w.master_tables(), player_id)?;
         let dip = SideWorld {
             player: self.player,
             relations: &self.c.w.players.player(self.player)?.relations,
@@ -328,14 +336,14 @@ impl UnitView<'_, '_> {
         };
         Ok(Some(victim_in(
             (
-                t,
-                self.c.w.parts.unit_ai.contains(t.id),
-                self.c.w.parts.building_of(t.id),
-                self.c.w.parts.combat_of(t.id),
-                self.c.w.parts.actions.of(t.id),
-                self.c.w.parts.unread.get(t.id),
+                unit,
+                self.c.w.parts.unit_ai.contains(unit.id),
+                self.c.w.parts.building_of(unit.id),
+                self.c.w.parts.combat_of(unit.id),
+                self.c.w.parts.actions.of(unit.id),
+                self.c.w.parts.unread.get(unit.id),
             ),
-            (q, master, attributes),
+            (player_id, master, attributes),
             (self.player, &dip),
             &self.c.w.spatial,
             self.c.w.mode_680,
@@ -396,14 +404,14 @@ impl UnitView<'_, '_> {
         }))
     }
 
-    /// The attack command's sight of its target `t` (of master `target_master`): its tile seen by the
-    /// unit's player, or explored when the master shows in the fog (its fog flag).
+    /// The attack command's sight of its target `placed` (of master `target_master`): its tile seen
+    /// by the unit's player, or explored when the master shows in the fog (its fog flag).
     ///
     /// # Errors
     ///
     /// A tile the map's sight does not hold.
-    fn target_visible(&self, t: &Placed, target_master: &Master) -> GenieResult<bool> {
-        let (tx, ty) = (t.position.x() as i32, t.position.y() as i32);
+    fn target_visible(&self, placed: &Placed, target_master: &Master) -> GenieResult<bool> {
+        let (tx, ty) = (placed.position.x() as i32, placed.position.y() as i32);
         Ok(self.c.w.spatial.sees_tile(self.player, Tile::new(tx, ty))
             || (target_master.fog_visibility != FogVisibility::INVISIBLE
                 && self.c.w.spatial.explored(self.player, Tile::new(tx, ty))?))

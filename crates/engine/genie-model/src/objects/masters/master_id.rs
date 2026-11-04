@@ -76,15 +76,15 @@ impl MasterId {
     #[must_use]
     pub const fn field(master: Option<Self>) -> i16 {
         match master {
-            Some(m) => m.0,
+            Some(master_id) => master_id.0,
             None => Self::NONE,
         }
     }
 }
 
 impl genie_diff::Diff for MasterId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -125,7 +125,7 @@ mod tests {
         assert_eq!(MasterId::of_field(-1), Ok(None));
         for value in [0, 83, i16::MAX] {
             let master = MasterId::of_field(value).unwrap();
-            assert_eq!(master.map(|m| m.get()), Some(value));
+            assert_eq!(master.map(|master_id| master_id.get()), Some(value));
             assert_eq!(MasterId::field(master), value);
         }
         assert_eq!(MasterId::field(None), -1);
@@ -136,12 +136,12 @@ mod tests {
     fn negative_value_is_no_master() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
-                MasterId::try_from(value).map_err(|e| e.kind()),
+                MasterId::try_from(value).map_err(|value_error| value_error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
         assert_eq!(
-            MasterId::of_field(-2).map_err(|e| e.kind()),
+            MasterId::of_field(-2).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }

@@ -37,7 +37,7 @@ use crate::world::slots::PlayerSlots;
 /// The terrain the task finder's general search reads at `point` (`FUN_1411a8ba0`,
 /// [`Terrain::at_task_point`]); none on a world without its map's terrain.
 pub(crate) fn point_terrain(map: Option<&Terrain>, point: Position) -> Option<TerrainId> {
-    map.and_then(|t| t.at_task_point(point.ground()))
+    map.and_then(|terrain| terrain.at_task_point(point.ground()))
 }
 
 /// The players' relations and the drop sites, as the task finder reads them.
@@ -52,7 +52,7 @@ impl Diplomacy for TaskWorld<'_> {
         let relations = self
             .players
             .player(from)
-            .map_or(&NO_RELATIONS, |p| &p.relations);
+            .map_or(&NO_RELATIONS, |player| &player.relations);
         task_finder_allied(relations, from, to, test)
     }
 
@@ -79,7 +79,7 @@ impl Diplomacy for SideWorld<'_> {
         } else {
             self.foreign
                 .player(from)
-                .map_or(&NO_RELATIONS, |p| &p.relations)
+                .map_or(&NO_RELATIONS, |player| &player.relations)
         };
         task_finder_allied(relations, from, to, test)
     }
@@ -100,16 +100,19 @@ pub(crate) fn wait_progress(
     others: OthersRef<'_>,
     buildings: &PartTable<Building>,
 ) -> Option<Seconds> {
-    others
-        .get(foundation.id())
-        .and_then(|u| buildings.get(u.id)?.construction.map(|k| k.progress))
+    others.get(foundation.id()).and_then(|unit| {
+        buildings
+            .get(unit.id)?
+            .construction
+            .map(|construction| construction.progress)
+    })
 }
 
 /// The state (`+0x640`) of object `id` among its owner's other objects and the other players'
 /// lists: None when they do not hold it (the unit itself, or one of its owner's sleeping objects:
 /// static objects only, never a drop site, which the callers ask for).
 pub(crate) fn state_of(id: Option<ObjectId>, others: OthersRef<'_>) -> Option<ObjectState> {
-    others.get(id).map(|u| u.life.state)
+    others.get(id).map(|unit| unit.life.state)
 }
 
 /// What the task finder reads of object `id`, as `find` holds the objects (with their owners)
@@ -130,21 +133,21 @@ pub(crate) fn task_target_with<'a>(
             None => break,
         }
     }
-    let Some((player, u)) = find(id) else {
+    let Some((player, unit)) = find(id) else {
         return Ok(None);
     };
-    let master = u.master(every, player)?;
+    let master = unit.master(every, player)?;
     Ok(Some(TaskTarget {
-        id: u.id,
+        id: unit.id,
         master,
         player,
-        state: u.life.state,
-        held: u.life.held(),
-        hp: u.life.hp + parts.combat_of(u.id).hp_powerup.room(),
-        max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(u.id).hp_powerup.max,
-        attackable: u.flags.contains(UnitFlags::ATTACKABLE),
-        pasture: u.pasture,
-        top_action: parts.actions_of(u.id).top_action_kind(),
+        state: unit.life.state,
+        held: unit.life.held(),
+        hp: unit.life.hp + parts.combat_of(unit.id).hp_powerup.room(),
+        max_hp: HitPoints::of_master(master.hit_points) + parts.combat_of(unit.id).hp_powerup.max,
+        attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
+        pasture: unit.pasture,
+        top_action: parts.actions_of(unit.id).top_action_kind(),
     }))
 }
 

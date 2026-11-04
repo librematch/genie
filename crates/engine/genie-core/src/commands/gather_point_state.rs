@@ -49,7 +49,7 @@ impl GatherPointState {
     #[must_use]
     pub const fn of_byte(value: u8) -> Option<Self> {
         match NonZeroU8::new(value) {
-            Some(v) => Some(Self::of_raw(v)),
+            Some(non_zero) => Some(Self::of_raw(non_zero)),
             None => None,
         }
     }
@@ -74,8 +74,8 @@ impl GatherPointState {
 }
 
 impl genie_diff::Diff for GatherPointState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

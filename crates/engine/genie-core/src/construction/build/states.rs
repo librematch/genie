@@ -37,11 +37,13 @@ impl BuildAction {
     /// The foundation as the update reads it ([`BuildReads::site`]): the builder's player's
     /// object, None once the player no longer holds it.
     pub(super) fn site_unit<'w>(
-        c: &'w Step<'_>,
+        step: &'w Step<'_>,
         reads: &BuildReads,
     ) -> GenieResult<Option<&'w Unit>> {
-        let _ = c.w.players.player(c.player)?;
-        Ok(reads.site.and_then(|id| c.w.live_object(c.player, id)))
+        let _ = step.w.players.player(step.player)?;
+        Ok(reads
+            .site
+            .and_then(|id| step.w.live_object(step.player, id)))
     }
 
     /// The builder count (`+0x9e8`) of the building `FUN_140aaddb0` gives a Build on `site`
@@ -51,12 +53,16 @@ impl BuildAction {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub(super) fn count(c: &mut Step<'_>, site: Option<FoundationId>, by: i8) -> GenieResult<()> {
-        if let Some(id) = c.w.counted_building(site)?
-            && c.w.object(id).is_some()
+    pub(super) fn count(
+        step: &mut Step<'_>,
+        site: Option<FoundationId>,
+        by: i8,
+    ) -> GenieResult<()> {
+        if let Some(id) = step.w.counted_building(site)?
+            && step.w.object(id).is_some()
         {
-            let n = c.w.parts.repairers_mut(id)?;
-            *n = n.changed_by(by);
+            let builder_count = step.w.parts.repairers_mut(id)?;
+            *builder_count = builder_count.changed_by(by);
         }
         Ok(())
     }
@@ -67,11 +73,17 @@ impl BuildAction {
     /// # Errors
     ///
     /// An object of a master its owner lacks.
-    pub(super) fn builders(c: &Step<'_>, site: Option<FoundationId>) -> GenieResult<BuilderCount> {
-        Ok(c.w
+    pub(super) fn builders(
+        step: &Step<'_>,
+        site: Option<FoundationId>,
+    ) -> GenieResult<BuilderCount> {
+        Ok(step
+            .w
             .counted_building(site)?
-            .and_then(|id| c.w.object(id))
-            .map_or(BuilderCount::NONE, |(_, u)| c.w.parts.repairers_of(u.id)))
+            .and_then(|id| step.w.object(id))
+            .map_or(BuilderCount::NONE, |(_, unit)| {
+                step.w.parts.repairers_of(unit.id)
+            }))
     }
 
     /// A counted builder leaves the builders of its foundation ([`BuildAction::count`]) and
@@ -80,9 +92,9 @@ impl BuildAction {
     /// # Errors
     ///
     /// [`BuildAction::count`]'s.
-    pub(super) fn uncount(&mut self, c: &mut Step<'_>) -> GenieResult<()> {
+    pub(super) fn uncount(&mut self, step: &mut Step<'_>) -> GenieResult<()> {
         if self.added {
-            Self::count(c, self.target, -1)?;
+            Self::count(step, self.target, -1)?;
             self.added = false;
         }
         Ok(())
@@ -95,12 +107,12 @@ impl BuildAction {
     /// # Errors
     ///
     /// The builder count's, and the unit's stop that the motion step does not model.
-    pub(super) fn leave(&mut self, c: &mut Step<'_>, builder: &Unit) -> GenieResult<()> {
-        self.uncount(c)?;
+    pub(super) fn leave(&mut self, step: &mut Step<'_>, builder: &Unit) -> GenieResult<()> {
+        self.uncount(step)?;
         if self.state.take_move_to().is_some()
-            && let Some(m) = c.w.parts.mover_mut(builder.id)
+            && let Some(mover) = step.w.parts.mover_mut(builder.id)
         {
-            m.stop()?;
+            mover.stop()?;
         }
         Ok(())
     }
@@ -113,12 +125,12 @@ impl BuildAction {
     ///
     /// [`Step::give_load`]'s.
     pub(super) fn drop_load(
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         kind: AttributeId,
         amount: Amount,
     ) -> GenieResult<()> {
-        c.give_load(kind, amount)?;
+        step.give_load(kind, amount)?;
         builder.life.attribute_kind = None;
         builder.life.amount = Amount::ZERO;
         Ok(())
@@ -133,11 +145,11 @@ impl BuildAction {
     /// The prelude's and the drop's.
     pub(super) fn finish(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         self.state = BuildState::Finished;
         let (amount, kind) = (builder.life.amount, builder.life.attribute_kind);
         let Some(kind) = kind.filter(|_| reads.drop_site && Amount::ZERO < amount) else {
@@ -145,11 +157,11 @@ impl BuildAction {
         };
         // the foods a unit carries (15 to 17) as food
         let kind = if kind.is_food_load() {
-            c.w.model.slots.attribute.food
+            step.w.model.slots.attribute.food
         } else {
             kind
         };
-        Self::drop_load(c, builder, kind, amount)
+        Self::drop_load(step, builder, kind, amount)
     }
 
     /// Case 0xdf of the update, the work ended (224): a villager works the farm it built (class
@@ -167,21 +179,21 @@ impl BuildAction {
     /// What it does not model.
     pub(super) fn after_work(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
-        if c.w.players.player(c.player)?.kind.is_computer() {
+        if step.w.players.player(step.player)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's builder after its work",
             ));
         }
-        let site = Self::site_unit(c, reads)?.ok_or(GenieError::unsupported(
+        let site = Self::site_unit(step, reads)?.ok_or(GenieError::unsupported(
             "the end of a Build on a foundation the slice does not read",
         ))?;
-        let master = site.master(c.w.master_tables(), c.player)?;
+        let master = site.master(step.w.master_tables(), step.player)?;
         // LAB_140ab09af: a villager works the farm it built (FUN_141194b20, FUN_141195750), a
         // fishing ship its fish trap (FUN_141194640, FUN_1411945a0): its unit AI drops its build
         // orders (FUN_140c5e020 with 0x2be), then slot 0x7e8 on the building
@@ -212,26 +224,28 @@ impl BuildAction {
             Some((site.id, site.life.state)),
             (FoundationId::new(site.id), site.life.master_id),
         );
-        let ai =
-            c.w.parts
-                .unit_ai
-                .get_mut(builder.id)
-                .ok_or(GenieError::unsupported(
-                    "a builder without a unit AI after its work",
-                ))?;
+        let ai = step
+            .w
+            .parts
+            .unit_ai
+            .get_mut(builder.id)
+            .ok_or(GenieError::unsupported(
+                "a builder without a unit AI after its work",
+            ))?;
         if works_it {
-            ai.orders.retain(|o| o.order != OrderKind::Build);
-            self.works_it(actions, c, builder)?;
+            ai.orders
+                .retain(|queued_order| queued_order.order != OrderKind::Build);
+            self.works_it(actions, step, builder)?;
             return Ok(HeadCode::Keeps);
         }
         // FUN_140c5dcd0 (the building just completed is in state 2 now)
         drop_done_orders(ai, built, &reads.build_targets);
         if ai.orders.is_empty() {
-            self.search(c, builder, actions, (found, reads), roles)?;
+            self.search(step, builder, actions, (found, reads), roles)?;
             return Ok(HeadCode::Keeps);
         }
         ai.end_order_and_action()?;
-        self.end(c, builder, BuildState::Done)?;
+        self.end(step, builder, BuildState::Done)?;
         Ok(HeadCode::Deletes)
     }
 
@@ -243,16 +257,17 @@ impl BuildAction {
     fn works_it(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
     ) -> GenieResult<()> {
-        let point =
-            c.w.spatial
-                .get(self.target)
-                .ok_or(GenieError::unsupported(
-                    "a builder's building without a place",
-                ))?
-                .position;
+        let point = step
+            .w
+            .spatial
+            .get(self.target)
+            .ok_or(GenieError::unsupported(
+                "a builder's building without a place",
+            ))?
+            .position;
         let work = Work {
             target: self.target.map(FoundationId::id),
             point,
@@ -260,7 +275,9 @@ impl BuildAction {
             filter: None,
             source: OrderSource::Direct,
         };
-        self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work))
+        self.lend(step, builder, actions, |world, player_id, list_index| {
+            world.order_work(player_id, list_index, &work)
+        })
     }
 
     /// The Build's case 0xdf after the work: the builder's search for more work around the building
@@ -276,23 +293,25 @@ impl BuildAction {
     /// [`World::order_work`]: crate::world::World::order_work
     fn search(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         ((site, built), reads): ((FoundationId, MasterId), &BuildReads),
         roles: &Roles,
     ) -> GenieResult<()> {
-        if let Some(work) = builder.more_work(actions, c, site.id(), built, roles)? {
-            return self.lend(c, builder, actions, |w, p, i| w.order_work(p, i, &work));
+        if let Some(work) = builder.more_work(actions, step, site.id(), built, roles)? {
+            return self.lend(step, builder, actions, |world, player_id, list_index| {
+                world.order_work(player_id, list_index, &work)
+            });
         }
         self.no_more_work()?;
-        release(c, builder, site, reads.by)?;
+        release(step, builder, site, reads.by)?;
         builder.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::REQUIRES_SEARCH,
             [AiAction::Build.value(), 0, 0],
         )?;
-        Self::stand(c, builder)
+        Self::stand(step, builder)
     }
 
     /// The unit's slot 0x68 with its master's standing sprite (`+0x470`,
@@ -301,13 +320,16 @@ impl BuildAction {
     /// # Errors
     ///
     /// [`Unit::show_standing`]'s.
-    pub(super) fn stand(c: &mut Step<'_>, builder: &mut Unit) -> GenieResult<()> {
+    pub(super) fn stand(step: &mut Step<'_>, builder: &mut Unit) -> GenieResult<()> {
         builder.show_standing(
-            c.w.parts.motion.layer_mut(builder.id),
-            OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-            &c.w.model.graphics,
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion.layer_mut(builder.id),
+            OwnerMasters::new(
+                &step.w.parts.own_master,
+                step.w.model.masters.of(step.player),
+            ),
+            &step.w.model.graphics,
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )
     }
 
@@ -325,13 +347,17 @@ impl BuildAction {
     /// The prelude's, a builder without movement state, a foundation without a place.
     pub(super) fn restart(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
-        let (to, walk) = self.walk_to_foundation(c, builder, roles)?;
-        *self = self.restarted(self.target, to.map_or(self.point, |t| t.at), walk);
+        self.leave(step, builder)?;
+        let (to, walk) = self.walk_to_foundation(step, builder, roles)?;
+        *self = self.restarted(
+            self.target,
+            to.map_or(self.point, |walk_to| walk_to.at),
+            walk,
+        );
         Ok(())
     }
 }
@@ -350,29 +376,29 @@ impl BuildAction {
     /// A unit AI on a patrol order, and what the prelude and the sprite do not model.
     pub(super) fn idle(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        let built = Self::site_unit(c, reads)?.map(|s| (s.id, s.life.state));
-        self.leave(c, builder)?;
+        let built = Self::site_unit(step, reads)?.map(|unit| (unit.id, unit.life.state));
+        self.leave(step, builder)?;
         self.state = BuildState::Idle;
         let mut left = 0;
-        if let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) {
+        if let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) {
             drop_done_orders(ai, built, &reads.build_targets);
             left = ai.orders.len();
             if left != 0 {
                 ai.end_order_and_action()?;
-                self.end(c, builder, BuildState::Done)?;
+                self.end(step, builder, BuildState::Done)?;
             }
         }
         if left == 0 {
             builder.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
                 [AiAction::Build.value(), 0, 0],
             )?;
-            Self::stand(c, builder)?;
+            Self::stand(step, builder)?;
         }
         Ok(())
     }
@@ -403,10 +429,10 @@ impl BuildAction {
             return Ok(());
         }
         if self.added {
-            let b = builders.ok_or(GenieError::unsupported(
+            let builder_count = builders.ok_or(GenieError::unsupported(
                 "a builder retaking a foundation the slice does not hold",
             ))?;
-            *b = b.left();
+            *builder_count = builder_count.left();
         }
         if self.state.move_to().is_some()
             && let Some(m) = mover
@@ -480,17 +506,17 @@ impl BuildAction {
     /// The builder count's, the sprite's and the releases'.
     pub(super) fn halt_in(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        let (counted, target, second) = self.halt(c.w.parts.mover_mut(builder.id))?;
+        let (counted, target, second) = self.halt(step.w.parts.mover_mut(builder.id))?;
         if counted {
-            Self::count(c, target, -1)?;
+            Self::count(step, target, -1)?;
         }
-        Self::stand(c, builder)?;
-        release(c, builder, target, reads.by)?;
-        release(c, builder, second, reads.by)?;
+        Self::stand(step, builder)?;
+        release(step, builder, target, reads.by)?;
+        release(step, builder, second, reads.by)?;
         Ok(())
     }
 
@@ -520,12 +546,12 @@ impl BuildAction {
     /// The prelude's and the sprite's.
     pub(super) fn end(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         state: BuildState,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         self.state = state;
-        Self::stand(c, builder)
+        Self::stand(step, builder)
     }
 }

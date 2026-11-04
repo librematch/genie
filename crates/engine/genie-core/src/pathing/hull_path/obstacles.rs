@@ -94,12 +94,12 @@ impl HullPather<'_> {
                 {
                     continue;
                 }
-                let n = o.points.len();
+                let count = o.points.len();
                 let overlaps = h.points.iter().any(|p| o.inside(*p))
                     || o.points.iter().any(|p| h.inside(*p))
                     // the other's sides k = 0..n-1 (`cmp edi, esi; jl` at 0x140f8b2c4, esi = n - 1)
-                    || (0..n.saturating_sub(1)).any(|k| {
-                        let prev = if k == 0 { n - 1 } else { k - 1 };
+                    || (0..count.saturating_sub(1)).any(|k| {
+                        let prev = if k == 0 { count - 1 } else { k - 1 };
                         o.points
                             .get(k)
                             .zip(o.points.get(prev))
@@ -121,7 +121,7 @@ impl HullPather<'_> {
         let other = hulls.checked(j)?.clone();
         for s in &other.objects {
             let mine_objects = &mut hulls.checked_mut(mine.index())?.objects;
-            if !mine_objects.iter().any(|m| m.id == s.id) {
+            if !mine_objects.iter().any(|shape| shape.id == s.id) {
                 mine_objects.push(*s);
             }
         }
@@ -149,10 +149,10 @@ impl HullPather<'_> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
         let world = &*self.world;
         for &id in world.tiles().list(tile) {
-            let Some(p) = world.get(id) else {
+            let Some(placed) = world.get(id) else {
                 continue;
             };
-            if !p.tall || self.passes(id, p, player)? {
+            if !placed.tall || self.passes(id, placed, player)? {
                 continue;
             }
             // slot 0x5c8 is asked only of an object not ignored
@@ -160,7 +160,14 @@ impl HullPather<'_> {
             if left_out && !self.include.contains(&id) {
                 continue;
             }
-            Self::add_box(&mut self.hulls, self.radius, id, p, hull, hull_path_tuning)?;
+            Self::add_box(
+                &mut self.hulls,
+                self.radius,
+                id,
+                placed,
+                hull,
+                hull_path_tuning,
+            )?;
         }
         Ok(())
     }
@@ -172,11 +179,11 @@ impl HullPather<'_> {
     pub(super) fn passes(
         &self,
         id: ObjectId,
-        p: &Placed,
+        placed: &Placed,
         player: Option<PlayerId>,
     ) -> GenieResult<bool> {
         let roles = self.by_id.roles();
-        if !roles.of_class(p.class).contains(ClassRoles::GATE) || player.is_none() {
+        if !roles.of_class(placed.class).contains(ClassRoles::GATE) || player.is_none() {
             return Ok(false);
         }
         let gates = self.gates.ok_or(GenieError::unsupported(
@@ -188,28 +195,32 @@ impl HullPather<'_> {
     /// One object's box into the hulls ([`HullPather::add_tile_objects`]).
     pub(super) fn add_box(
         hulls: &mut Vec<Hull>,
-        r: Distance,
+        distance: Distance,
         id: ObjectId,
-        p: &Placed,
+        placed: &Placed,
         hull: Option<HullIndex>,
         hull_path_tuning: &HullPathTuning,
     ) -> GenieResult<()> {
-        let (x, y) = (p.position.x(), p.position.y());
-        let (rx, ry) = (p.radius.x(), p.radius.y());
+        let (x, y) = (placed.position.x(), placed.position.y());
+        let (rx, ry) = (placed.radius.x(), placed.radius.y());
         let bounds = Rect::new(
-            (x - rx) - r.get(),
-            (y - ry) - r.get(),
-            x + rx + r.get(),
-            y + ry + r.get(),
+            (x - rx) - distance.get(),
+            (y - ry) - distance.get(),
+            x + rx + distance.get(),
+            y + ry + distance.get(),
         );
         // `COMISS`/`JA` (0x140f8b772, 0x140f8b7a4): an unordered radius takes the given hull
         let h = match hull {
-            Some(h) if at_most_or_unordered(rx, HALF) && at_most_or_unordered(ry, HALF) => h,
+            Some(hull_index)
+                if at_most_or_unordered(rx, HALF) && at_most_or_unordered(ry, HALF) =>
+            {
+                hull_index
+            }
             _ => Self::add_shape_to(hulls, bounds.corner0(), bounds.corner1(), hull_path_tuning)?,
         };
         let objects = &mut hulls.checked_mut(h.index())?.objects;
         let id = RecordId::from(id);
-        if !objects.iter().any(|o| o.id == id) {
+        if !objects.iter().any(|shape| shape.id == id) {
             objects.push(Shape { bounds, id });
         }
         Ok(())
@@ -237,19 +248,19 @@ impl HullPather<'_> {
         if word & self.mask.blocked() != 0 {
             let id = tile_record_id(tile);
             if !self.ignore.contains(&id) {
-                let r = self.radius;
+                let distance = self.radius;
                 let bounds = Rect::new(
-                    x as f32 - r.get(),
-                    y as f32 - r.get(),
-                    (x + 1) as f32 + r.get(),
-                    (y + 1) as f32 + r.get(),
+                    x as f32 - distance.get(),
+                    y as f32 - distance.get(),
+                    (x + 1) as f32 + distance.get(),
+                    (y + 1) as f32 + distance.get(),
                 );
                 let k = match hull {
-                    Some(k) => k,
+                    Some(hull_index) => hull_index,
                     None => self.add_shape(bounds.corner0(), bounds.corner1())?,
                 };
                 let objects = &mut self.hulls.checked_mut(k.index())?.objects;
-                if !objects.iter().any(|o| o.id == id) {
+                if !objects.iter().any(|shape| shape.id == id) {
                     objects.push(Shape { bounds, id });
                 }
             }
@@ -276,7 +287,7 @@ impl HullPather<'_> {
         let (w, h) = (self.world.map.width(), self.world.map.height());
         let [x0, y0, x1, y1] = self.area.get();
         self.area = TileRect::new(x0.max(0), y0.max(0), x1.min(w - 1), y1.min(h - 1));
-        let r = self.radius;
+        let distance = self.radius;
         let not_mask = self.mask.blocked();
         for y in self.area.y0()..=self.area.y1() {
             let mut run: Option<i32> = None;
@@ -287,7 +298,7 @@ impl HullPather<'_> {
                     word & not_mask == 0 && ((word >> 14) & 1 == 0 || word & 0x3f00 == 0x500);
                 if open {
                     if let Some(x0) = run.take() {
-                        self.add_run(x0, x, y, r)?;
+                        self.add_run(x0, x, y, distance)?;
                     }
                     self.process_tile(Tile::new(x, y), self.area, None)?;
                 } else if run.is_none() {
@@ -296,19 +307,25 @@ impl HullPather<'_> {
                 x += 1;
             }
             if let Some(x0) = run {
-                self.add_run(x0, x, y, r)?;
+                self.add_run(x0, x, y, distance)?;
             }
         }
         self.process_cliffs()
     }
 
     /// A run of tiles `x0`..`x1` of row `y` the unit cannot cross: one box, then its tiles.
-    pub(super) fn add_run(&mut self, x0: i32, x1: i32, y: i32, r: Distance) -> GenieResult<()> {
-        let min = Point::new(x0 as f32 - r.get(), y as f32 - r.get());
-        let max = Point::new(x1 as f32 + r.get(), (y + 1) as f32 + r.get());
+    pub(super) fn add_run(
+        &mut self,
+        x0: i32,
+        x1: i32,
+        y: i32,
+        distance: Distance,
+    ) -> GenieResult<()> {
+        let min = Point::new(x0 as f32 - distance.get(), y as f32 - distance.get());
+        let max = Point::new(x1 as f32 + distance.get(), (y + 1) as f32 + distance.get());
         let hull = self.add_shape(min, max)?;
-        for t in x0..x1 {
-            self.process_tile(Tile::new(t, y), self.area, Some(hull))?;
+        for index in x0..x1 {
+            self.process_tile(Tile::new(index, y), self.area, Some(hull))?;
         }
         Ok(())
     }
@@ -343,32 +360,32 @@ impl HullPather<'_> {
         Ok(())
     }
 
-    /// `MShortPather::checkPointInsideHull` (`FUN_140f8be30`): the first hull holding `p`.
-    pub(super) fn hull_of(&self, p: Point) -> Option<HullIndex> {
+    /// `MShortPather::checkPointInsideHull` (`FUN_140f8be30`): the first hull holding `point`.
+    pub(super) fn hull_of(&self, point: Point) -> Option<HullIndex> {
         self.hulls
             .iter()
-            .position(|h| !h.points.is_empty() && h.inside(p))
+            .position(|hull| !hull.points.is_empty() && hull.inside(point))
             .map(HullIndex::new)
     }
 
-    /// Whether `p` lies within the area's tiles, `r` from their edge. Each bound skips by
-    /// `COMISS`/`JA` (0x140f86a44, 0x140f8d942, 0x140f899d3): an unordered coordinate is inside.
-    pub(super) fn in_area(&self, p: Point) -> bool {
-        let r = self.radius;
+    /// Whether `point` lies within the area's tiles, `distance` from their edge. Each bound skips
+    /// by `COMISS`/`JA` (0x140f86a44, 0x140f8d942, 0x140f899d3): an unordered coordinate is inside.
+    pub(super) fn in_area(&self, point: Point) -> bool {
+        let distance = self.radius;
         let [x0, y0, x1, y1] = self.area.get();
-        at_most_or_unordered(x0 as f32 + r.get(), p.x())
-            && at_most_or_unordered(p.x(), (x1 + 1) as f32 - r.get())
-            && at_most_or_unordered(y0 as f32 + r.get(), p.y())
-            && at_most_or_unordered(p.y(), (y1 + 1) as f32 - r.get())
+        at_most_or_unordered(x0 as f32 + distance.get(), point.x())
+            && at_most_or_unordered(point.x(), (x1 + 1) as f32 - distance.get())
+            && at_most_or_unordered(y0 as f32 + distance.get(), point.y())
+            && at_most_or_unordered(point.y(), (y1 + 1) as f32 - distance.get())
     }
 
-    /// Whether `p` lies on the map, `r` from its edge.
-    pub(super) fn on_map(&self, p: Point) -> bool {
-        let r = self.radius;
+    /// Whether `point` lies on the map, `distance` from its edge.
+    pub(super) fn on_map(&self, point: Point) -> bool {
+        let distance = self.radius;
         let (w, h) = (self.world.map.width(), self.world.map.height());
-        !(p.x() < r.get()
-            || w as f32 - r.get() < p.x()
-            || p.y() < r.get()
-            || h as f32 - r.get() < p.y())
+        !(point.x() < distance.get()
+            || w as f32 - distance.get() < point.x()
+            || point.y() < distance.get()
+            || h as f32 - distance.get() < point.y())
     }
 }

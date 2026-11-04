@@ -52,8 +52,8 @@ impl FixedPoint {
 }
 
 impl Display for FixedPoint {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "({}, {})", self.0[0], self.0[1])
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(formatter, "({}, {})", self.0[0], self.0[1])
     }
 }
 
@@ -64,11 +64,14 @@ mod tests {
     /// x and y keep their places; each `with_` changes one.
     #[test]
     fn fixed_point_keeps_both_coordinates() {
-        let p = FixedPoint::new(3, -4);
-        assert_eq!((p.x(), p.y(), p.get()), (3, -4, [3, -4]));
-        assert_eq!(p.with_x(7), FixedPoint::new(7, -4));
-        assert_eq!(p.with_y(7), FixedPoint::new(3, 7));
+        let fixed_point = FixedPoint::new(3, -4);
+        assert_eq!(
+            (fixed_point.x(), fixed_point.y(), fixed_point.get()),
+            (3, -4, [3, -4])
+        );
+        assert_eq!(fixed_point.with_x(7), FixedPoint::new(7, -4));
+        assert_eq!(fixed_point.with_y(7), FixedPoint::new(3, 7));
         assert_eq!(FixedPoint::ORIGIN, FixedPoint::default());
-        assert_eq!(p.to_string(), "(3, -4)");
+        assert_eq!(fixed_point.to_string(), "(3, -4)");
     }
 }

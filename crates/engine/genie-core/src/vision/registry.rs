@@ -156,7 +156,7 @@ impl Registry {
         if self.classes <= class {
             return Ok(());
         }
-        for p in 0..self.players {
+        for index in 0..self.players {
             if changed == 0 {
                 return Ok(());
             }
@@ -165,10 +165,10 @@ impl Registry {
                     .entries
                     .get_or_insert_with(id, Entry::default)?
                     .slots
-                    .get(p)
+                    .get(index)
                     .copied()
                     .flatten();
-                let list = self.lists.checked_mut(p)?.checked_mut(class)?;
+                let list = self.lists.checked_mut(index)?.checked_mut(class)?;
                 if seen & 1 == 0 {
                     if !list.is_empty() {
                         let i = slot.ok_or(GenieError::unsupported(
@@ -178,15 +178,21 @@ impl Registry {
                         if i != last {
                             list.swap(i, last);
                             let moved = list.checked(i)?.id;
-                            if let Some(s) =
-                                self.entries.get_mut(moved).and_then(|e| e.slots.get_mut(p))
+                            if let Some(s) = self
+                                .entries
+                                .get_mut(moved)
+                                .and_then(|moved_entry| moved_entry.slots.get_mut(index))
                             {
                                 *s = Some(i);
                             }
                         }
-                        let _ = self.lists.checked_mut(p)?.checked_mut(class)?.pop();
+                        let _ = self.lists.checked_mut(index)?.checked_mut(class)?.pop();
                     }
-                    if let Some(s) = self.entries.get_mut(id).and_then(|e| e.slots.get_mut(p)) {
+                    if let Some(s) = self
+                        .entries
+                        .get_mut(id)
+                        .and_then(|e| e.slots.get_mut(index))
+                    {
                         *s = None;
                     }
                 } else {
@@ -197,9 +203,13 @@ impl Registry {
                         at: position,
                         radius: radii,
                     });
-                    let i = list.len() - 1;
-                    if let Some(s) = self.entries.get_mut(id).and_then(|e| e.slots.get_mut(p)) {
-                        *s = Some(i);
+                    let count = list.len() - 1;
+                    if let Some(s) = self
+                        .entries
+                        .get_mut(id)
+                        .and_then(|entry| entry.slots.get_mut(index))
+                    {
+                        *s = Some(count);
                     }
                 }
             }
@@ -211,14 +221,14 @@ impl Registry {
 
     /// An ownership change (`FUN_14120f800`): the object's records take the new owner's id.
     pub fn owner_changed(&mut self, id: ObjectId, owner: PlayerId) -> GenieResult<()> {
-        let Some(e) = self.entries.get(id).copied() else {
+        let Some(entry) = self.entries.get(id).copied() else {
             return Ok(());
         };
-        for (p, slot) in e.slots.iter().enumerate().take(self.players) {
+        for (index, slot) in entry.slots.iter().enumerate().take(self.players) {
             let Some(i) = *slot else { continue };
             let record = self
                 .lists
-                .checked_mut(p)?
+                .checked_mut(index)?
                 .iter_mut()
                 .filter_map(|list| list.get_mut(i))
                 .find(|r| r.id == id)
@@ -233,15 +243,17 @@ impl Registry {
     /// The combat object's new place (`FUN_14108c320`): its records in every list follow.
     pub fn moved(&mut self, id: ObjectId, class: ClassId, at: Point) {
         let (x, y) = (at.x(), at.y());
-        let Some(e) = self.entries.get(id).copied() else {
+        let Some(entry) = self.entries.get(id).copied() else {
             return;
         };
         let Some(class) = class.index() else {
             return;
         };
-        for (p, slot) in e.slots.iter().enumerate().take(self.players) {
-            if let Some(r) = slot.and_then(|i| self.lists.get_mut(p)?.get_mut(class)?.get_mut(i)) {
-                r.at = Point::new(x, y);
+        for (index, slot) in entry.slots.iter().enumerate().take(self.players) {
+            if let Some(record) =
+                slot.and_then(|i| self.lists.get_mut(index)?.get_mut(class)?.get_mut(i))
+            {
+                record.at = Point::new(x, y);
             }
         }
     }
@@ -297,19 +309,21 @@ impl Registry {
                 .ok_or(GenieError::unsupported(
                     "a query of a class beyond the registry's",
                 ))?;
-            for r in list {
-                let relation = *relations.get(r.owner).ok_or(GenieError::unsupported(
+            for record in list {
+                let relation = *relations.get(record.owner).ok_or(GenieError::unsupported(
                     "a record of an owner without a relation",
                 ))?;
-                let Some(relation) = relation.filter(|r| wanted & r.bit() != 0) else {
+                let Some(relation) =
+                    relation.filter(|unit_relation| wanted & unit_relation.bit() != 0)
+                else {
                     continue;
                 };
-                let (px, py) = (r.at.x(), r.at.y());
+                let (px, py) = (record.at.x(), record.at.y());
                 if !(px <= x1 && x0 <= px && py <= y1 && y0 <= py) {
                     continue;
                 }
-                let dx = (px - x).abs() - r.radius.x();
-                let dy = (py - y).abs() - r.radius.y();
+                let dx = (px - x).abs() - record.radius.x();
+                let dy = (py - y).abs() - record.radius.y();
                 let inside = match mode {
                     0 => {
                         if rx < dx {
@@ -332,7 +346,7 @@ impl Registry {
                 if out.len() < MOST_FOUND {
                     out.push(Record {
                         distance: Distance::new((dy * dy + dx * dx).sqrt()),
-                        ..*r
+                        ..*record
                     });
                 }
             }
@@ -356,95 +370,110 @@ mod tests {
 
     #[test]
     fn an_object_joins_list_when_seen_and_leaves_by_swap_with_the_last() {
-        let mut r = registry();
+        let mut registry = registry();
         for id in [1, 2, 3] {
-            r.update_unit(UnitUpdate {
-                id: object_id(id),
-                owner: PlayerId::new(1),
-                position: Point::new(id as f32, 5.0),
-                radii: Footprint::new(0.2, 0.2),
-                class: class::VILLAGER,
-                old: VisionBits::NONE,
-                new: VisionBits::from_bits_retain(0b101),
-            })
-            .unwrap();
+            registry
+                .update_unit(UnitUpdate {
+                    id: object_id(id),
+                    owner: PlayerId::new(1),
+                    position: Point::new(id as f32, 5.0),
+                    radii: Footprint::new(0.2, 0.2),
+                    class: class::VILLAGER,
+                    old: VisionBits::NONE,
+                    new: VisionBits::from_bits_retain(0b101),
+                })
+                .unwrap();
         }
         assert_eq!(
-            r.lists[0][4].iter().map(|x| x.id).collect::<Vec<_>>(),
+            registry.lists[0][4]
+                .iter()
+                .map(|x| x.id)
+                .collect::<Vec<_>>(),
             [object_id(1), object_id(2), object_id(3)]
         );
-        assert_eq!(r.lists[2][4].len(), 3);
-        assert_eq!(r.lists[1][4], Vec::<Record>::new());
+        assert_eq!(registry.lists[2][4].len(), 3);
+        assert_eq!(registry.lists[1][4], Vec::<Record>::new());
         // 1 leaves player 0's sight: 3 takes its place
-        r.update_unit(UnitUpdate {
-            id: object_id(1),
-            owner: PlayerId::new(1),
-            position: Point::new(1.0, 5.0),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::from_bits_retain(0b101),
-            new: VisionBits::from_bits_retain(0b100),
-        })
-        .unwrap();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(1),
+                owner: PlayerId::new(1),
+                position: Point::new(1.0, 5.0),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::from_bits_retain(0b101),
+                new: VisionBits::from_bits_retain(0b100),
+            })
+            .unwrap();
         assert_eq!(
-            r.lists[0][4].iter().map(|x| x.id).collect::<Vec<_>>(),
+            registry.lists[0][4]
+                .iter()
+                .map(|x| x.id)
+                .collect::<Vec<_>>(),
             [object_id(3), object_id(2)]
         );
-        assert_eq!(r.entry(object_id(3)).unwrap().slots[0], Some(0));
-        assert_eq!(r.entry(object_id(1)).unwrap().slots[0], None);
-        assert_eq!(r.entry(object_id(1)).unwrap().slots[2], Some(0));
-        r.moved(object_id(3), class::VILLAGER, Point::new(7.0, 7.0));
+        assert_eq!(registry.entry(object_id(3)).unwrap().slots[0], Some(0));
+        assert_eq!(registry.entry(object_id(1)).unwrap().slots[0], None);
+        assert_eq!(registry.entry(object_id(1)).unwrap().slots[2], Some(0));
+        registry.moved(object_id(3), class::VILLAGER, Point::new(7.0, 7.0));
         assert_eq!(
-            (r.lists[0][4][0].at.x(), r.lists[2][4][2].at.y()),
+            (
+                registry.lists[0][4][0].at.x(),
+                registry.lists[2][4][2].at.y()
+            ),
             (7.0, 7.0)
         );
     }
 
     #[test]
     fn query_finds_the_records_within_its_rounded_box_by_relation() {
-        let mut r = registry();
-        r.update_unit(UnitUpdate {
-            id: object_id(1),
-            owner: PlayerId::new(1),
-            position: Point::new(12.0, 10.0),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        r.update_unit(UnitUpdate {
-            id: object_id(2),
-            owner: PlayerId::new(2),
-            position: Point::new(10.0, 13.5),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        r.update_unit(UnitUpdate {
-            id: object_id(3),
-            owner: PlayerId::new(2),
-            position: Point::new(13.0, 13.0),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        r.update_unit(UnitUpdate {
-            id: object_id(4),
-            owner: PlayerId::new(0),
-            position: Point::new(10.5, 10.5),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::PREY,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
+        let mut registry = registry();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(1),
+                owner: PlayerId::new(1),
+                position: Point::new(12.0, 10.0),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(2),
+                owner: PlayerId::new(2),
+                position: Point::new(10.0, 13.5),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(3),
+                owner: PlayerId::new(2),
+                position: Point::new(13.0, 13.0),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(4),
+                owner: PlayerId::new(0),
+                position: Point::new(10.5, 10.5),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::PREY,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
         let relations = relations([1, 4, 4]);
-        let found = r
+        let found = registry
             .visible_units(
                 VisibleQuery {
                     player: PlayerId::new(0),
@@ -484,48 +513,51 @@ mod tests {
                 < 1e-6
         );
         assert_eq!(
-            r.visible_units(
-                VisibleQuery {
-                    player: PlayerId::new(0),
-                    position: Point::new(10.0, 10.0),
-                    radius: Distance::new(3.0),
-                    mode: 0,
-                    classes: &[],
-                    relations: &relations,
-                    size: Footprint::new(0.2, 0.2),
-                    wanted: 0xff
-                },
-                tuning().registry
-            )
-            .unwrap(),
+            registry
+                .visible_units(
+                    VisibleQuery {
+                        player: PlayerId::new(0),
+                        position: Point::new(10.0, 10.0),
+                        radius: Distance::new(3.0),
+                        mode: 0,
+                        classes: &[],
+                        relations: &relations,
+                        size: Footprint::new(0.2, 0.2),
+                        wanted: 0xff
+                    },
+                    tuning().registry
+                )
+                .unwrap(),
             None
         );
     }
 
     #[test]
     fn query_caps_its_radius_at_44() {
-        let mut r = registry();
-        r.update_unit(UnitUpdate {
-            id: object_id(1),
-            owner: PlayerId::new(1),
-            position: Point::new(53.5, 10.0),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        r.update_unit(UnitUpdate {
-            id: object_id(2),
-            owner: PlayerId::new(1),
-            position: Point::new(60.0, 10.0),
-            radii: Footprint::new(0.2, 0.2),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        let found = r
+        let mut registry = registry();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(1),
+                owner: PlayerId::new(1),
+                position: Point::new(53.5, 10.0),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(2),
+                owner: PlayerId::new(1),
+                position: Point::new(60.0, 10.0),
+                radii: Footprint::new(0.2, 0.2),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        let found = registry
             .visible_units(
                 VisibleQuery {
                     player: PlayerId::new(0),
@@ -557,18 +589,19 @@ mod tests {
 
     #[test]
     fn query_keeps_wide_object_whose_centre_lies_beyond_the_radius() {
-        let mut r = registry();
-        r.update_unit(UnitUpdate {
-            id: object_id(1),
-            owner: PlayerId::new(1),
-            position: Point::new(15.0, 10.0),
-            radii: Footprint::new(2.0, 2.0),
-            class: class::VILLAGER,
-            old: VisionBits::NONE,
-            new: VisionBits::from_bits_retain(1),
-        })
-        .unwrap();
-        let found = r
+        let mut registry = registry();
+        registry
+            .update_unit(UnitUpdate {
+                id: object_id(1),
+                owner: PlayerId::new(1),
+                position: Point::new(15.0, 10.0),
+                radii: Footprint::new(2.0, 2.0),
+                class: class::VILLAGER,
+                old: VisionBits::NONE,
+                new: VisionBits::from_bits_retain(1),
+            })
+            .unwrap();
+        let found = registry
             .visible_units(
                 VisibleQuery {
                     player: PlayerId::new(0),

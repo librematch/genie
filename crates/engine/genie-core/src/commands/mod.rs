@@ -232,13 +232,13 @@ impl Command {
     /// # Errors
     ///
     /// What the run does not model.
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
         by_kind!(
             self,
-            c => c.run(w),
-            g => g.run(w),
-            u => Err(u.why.clone()),
-            t => t.run(w),
+            build_command => build_command.run(world),
+            game_command => game_command.run(world),
+            unmodelled_command => Err(unmodelled_command.why.clone()),
+            trade_command => trade_command.run(world),
         )
     }
 
@@ -248,7 +248,7 @@ impl Command {
     #[must_use]
     pub fn stopped_player(&self, players: usize) -> PlayerId {
         match self {
-            Self::Game(g) => g.target(players).unwrap_or(g.issuer),
+            Self::Game(game_command) => game_command.target(players).unwrap_or(game_command.issuer),
             other => other.player(),
         }
     }
@@ -258,10 +258,10 @@ impl Command {
     pub const fn player(&self) -> PlayerId {
         by_kind!(
             self,
-            c => c.player,
-            g => g.issuer,
-            u => u.player,
-            t => t.player,
+            build_command => build_command.player,
+            game_command => game_command.issuer,
+            unmodelled_command => unmodelled_command.player,
+            trade_command => trade_command.player,
         )
     }
 }
@@ -290,8 +290,8 @@ impl World {
         units
             .iter()
             .map(|&id| match self.place(id) {
-                Some(p)
-                    if p.player() == player
+                Some(place)
+                    if place.player() == player
                         || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) =>
                 {
                     id

@@ -47,13 +47,13 @@ impl World {
         Ok(id.and_then(|id| self.live_index(player, id)))
     }
 
-    /// Whether the player's object `i` takes a gather point: its master garrisons (`+0xb53`) or
-    /// the player trains a unit there (`FUN_141625a20`'s count with no object,
+    /// Whether the player's object `list_index` takes a gather point: its master garrisons
+    /// (`+0xb53`) or the player trains a unit there (`FUN_141625a20`'s count with no object,
     /// [`World::trainable_count`]). The test SET GATHER POINT and SET GATHER STATE make.
-    fn takes_gather_point(&self, player: PlayerId, i: ListIndex) -> GenieResult<bool> {
+    fn takes_gather_point(&self, player: PlayerId, list_index: ListIndex) -> GenieResult<bool> {
         let master = self
             .players
-            .live(player, i)?
+            .live(player, list_index)?
             .master(self.master_tables(), player)?;
         Ok(master.garrison.holds() || self.trainable_count(player, master.id) > 0)
     }
@@ -67,7 +67,7 @@ impl World {
     /// kept). The z stays what the point held, 0 for none.
     pub(crate) fn gather_point(
         &mut self,
-        g: &GatherPointCommand,
+        gather_point_command: &GatherPointCommand,
         ids: &[Option<ObjectId>],
     ) -> GenieResult<()> {
         let GatherPointCommand {
@@ -77,17 +77,17 @@ impl World {
             target_master,
             own,
             ..
-        } = *g;
+        } = *gather_point_command;
         let (player, [x, y]) = (player, point.get());
         for &id in ids {
             // another player's object (the game clears its id) or one that is gone
-            let Some(i) = self.position_of_id(player, id)? else {
+            let Some(list_index) = self.position_of_id(player, id)? else {
                 continue;
             };
-            if !self.takes_gather_point(player, i)? {
+            if !self.takes_gather_point(player, list_index)? {
                 continue;
             }
-            let unit = &self.players.live(player, i)?;
+            let unit = &self.players.live(player, list_index)?;
             let old = self.parts.gather_point.get(unit.id).copied();
             let kept = old.is_some_and(|g| g.state == GatherPointState::Kept);
             let z = old.map_or(0.0, |g| g.point.z());
@@ -120,9 +120,9 @@ impl World {
                     target_master,
                 })
             };
-            let id = self.players.live(player, i)?.id;
+            let id = self.players.live(player, list_index)?.id;
             self.set_part(id, Part::GatherPoint(gather))?;
-            let unit = self.players.live_mut(player, i)?;
+            let unit = self.players.live_mut(player, list_index)?;
             // the unit AI's slot 0x210 (FUN_140c16790): its command queue empties
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.building_orders.clear();
@@ -144,14 +144,14 @@ impl World {
         ids: &[Option<ObjectId>],
     ) -> GenieResult<()> {
         for &id in ids {
-            let Some(i) = self.position_of_id(player, id)? else {
+            let Some(list_index) = self.position_of_id(player, id)? else {
                 continue;
             };
             let gather = if let Some(state) = state {
-                if !self.takes_gather_point(player, i)? {
+                if !self.takes_gather_point(player, list_index)? {
                     continue;
                 }
-                let unit = &self.players.live(player, i)?;
+                let unit = &self.players.live(player, list_index)?;
                 Some(GatherPoint {
                     state,
                     point: unit.position(),
@@ -161,7 +161,7 @@ impl World {
             } else {
                 None
             };
-            let id = self.players.live(player, i)?.id;
+            let id = self.players.live(player, list_index)?.id;
             self.set_part(id, Part::GatherPoint(gather))?;
         }
         Ok(())
@@ -183,37 +183,38 @@ impl World {
         point: Point,
     ) -> GenieResult<()> {
         let [x, y] = point.get();
-        let step = |turns: &Self, t: Option<ObjectId>, at: Point| -> GenieResult<QueuedOrder> {
-            // the target's class, which the order on a gone target reads as a master of the
-            // owner (the game's)
-            let (target, owner, class) = match turns.object(t) {
-                Some((tp, u)) => (
-                    t,
-                    Some(tp),
-                    OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
-                ),
-                None => (None, None, None),
+        let step =
+            |turns: &Self, object_id: Option<ObjectId>, at: Point| -> GenieResult<QueuedOrder> {
+                // the target's class, which the order on a gone target reads as a master of the
+                // owner (the game's)
+                let (target, owner, class) = match turns.object(object_id) {
+                    Some((tp, u)) => (
+                        object_id,
+                        Some(tp),
+                        OrderTargetKind::of_class(u.master(turns.master_tables(), tp)?.class),
+                    ),
+                    None => (None, None, None),
+                };
+                Ok(QueuedOrder {
+                    issuer: Some(Issuer::Player(player)),
+                    // the game tests the id's sign: a recyclable object's is no target
+                    order: if target.is_none_or(ObjectId::is_recyclable) {
+                        OrderKind::Move
+                    } else {
+                        OrderKind::OnTarget
+                    },
+                    priority: OrderPriority::NONE,
+                    target,
+                    target_owner: owner,
+                    point: at.with_height(-1.0),
+                    range: Distance::ZERO,
+                    shown: Point::new(-1.0, -1.0),
+                    ready: false,
+                    target_kind: class,
+                })
             };
-            Ok(QueuedOrder {
-                issuer: Some(Issuer::Player(player)),
-                // the game tests the id's sign: a recyclable object's is no target
-                order: if target.is_none_or(ObjectId::is_recyclable) {
-                    OrderKind::Move
-                } else {
-                    OrderKind::OnTarget
-                },
-                priority: OrderPriority::NONE,
-                target,
-                target_owner: owner,
-                point: at.with_height(-1.0),
-                range: Distance::ZERO,
-                shown: Point::new(-1.0, -1.0),
-                ready: false,
-                target_kind: class,
-            })
-        };
         for &id in ids {
-            let Some(Place::Live(p, i)) = self.place(id) else {
+            let Some(Place::Live(player_id, list_index)) = self.place(id) else {
                 if self.place(id).is_some() {
                     return Err(GenieError::unsupported(
                         "a command queue on a sleeping object",
@@ -221,31 +222,32 @@ impl World {
                 }
                 continue;
             };
-            let unit = &self.players.live(p, i)?;
+            let unit = &self.players.live(player_id, list_index)?;
             let Some(ai) = self.parts.unit_ai.get(unit.id) else {
                 continue;
             };
-            let building = unit.master(self.master_tables(), p)?.kind == MasterKind::BUILDING;
+            let building =
+                unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING;
             let mut queued = Vec::new();
             if building
-                && let Some(g) = self.parts.gather_point.get(unit.id).copied()
+                && let Some(gather_point) = self.parts.gather_point.get(unit.id).copied()
                 && ai.building_orders.is_empty()
-                && g.target != Some(unit.id)
+                && gather_point.target != Some(unit.id)
             {
                 // the gather point's own target id stays even when the world lost it
-                let mut first = step(self, g.target, g.point.ground())?;
-                if first.target.is_none() && g.target.is_some() {
-                    first.target = g.target;
+                let mut first = step(self, gather_point.target, gather_point.point.ground())?;
+                if first.target.is_none() && gather_point.target.is_some() {
+                    first.target = gather_point.target;
                     first.order = OrderKind::OnTarget;
                 }
                 queued.push(first);
             }
             queued.push(step(self, target, Point::new(x, y))?);
             if building {
-                let id = self.players.live(p, i)?.id;
+                let id = self.players.live(player_id, list_index)?.id;
                 self.set_part(id, Part::GatherPoint(None))?;
             }
-            let unit = self.players.live_mut(p, i)?;
+            let unit = self.players.live_mut(player_id, list_index)?;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 ai.building_orders.extend(queued);
             }
@@ -266,25 +268,29 @@ impl World {
     /// A player the world does not hold.
     pub(crate) fn research_check(
         &self,
-        r: &ResearchCommand,
+        research_command: &ResearchCommand,
     ) -> GenieResult<Option<Vec<Option<ObjectId>>>> {
-        let player = r.player;
-        let listed = usize::try_from(r.count).unwrap_or(0);
+        let player = research_command.player;
+        let listed = usize::try_from(research_command.count).unwrap_or(0);
         if listed == 0 {
             return Ok(None);
         }
         let own = self
-            .object(r.building)
-            .map(|(p, _)| p == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED));
+            .object(research_command.building)
+            .map(|(player_id, _)| {
+                player_id == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
+            });
         match own {
             Some(false) => return Ok(None),
             None if listed == 1 => return Ok(None),
             _ => {}
         }
         if listed == 1 {
-            return Ok(Some(r.buildings.clone()));
+            return Ok(Some(research_command.buildings.clone()));
         }
-        let (listed_ids, rest) = r.buildings.split_at(listed.min(r.buildings.len()));
+        let (listed_ids, rest) = research_command
+            .buildings
+            .split_at(listed.min(research_command.buildings.len()));
         let Some(checked) = self.command_check(player, listed_ids)? else {
             return Ok(None);
         };
@@ -309,15 +315,18 @@ impl World {
     /// monitor's `+0x17`; no other game mode marks it).
     pub(crate) fn research(
         &mut self,
-        r: &ResearchCommand,
+        research_command: &ResearchCommand,
         buildings: &[Option<ObjectId>],
     ) -> GenieResult<()> {
-        let player = r.player;
+        let player = research_command.player;
         let owner = self.players.player(player)?;
-        let Some(tech_id) = r.tech.filter(|t| t.index() < owner.techs.len()) else {
+        let Some(tech_id) = research_command
+            .tech
+            .filter(|known_tech| known_tech.index() < owner.techs.len())
+        else {
             return Ok(());
         };
-        if r.queue_id.is_queued() {
+        if research_command.queue_id.is_queued() {
             return Ok(());
         }
         let tech = tech_id.index();
@@ -335,7 +344,7 @@ impl World {
                 "RESEARCH of the shared kind (FUN_1411c3fd0 over the packet's buildings)",
             ));
         }
-        let building_id = self.least_loaded(r, buildings)?;
+        let building_id = self.least_loaded(research_command, buildings)?;
         if self.model.linked_techs.contains_key(&tech_id) {
             return Err(GenieError::unsupported(
                 "RESEARCH of a linked technology (FUN_140f3a0f0, FUN_140f39e80)",
@@ -346,10 +355,12 @@ impl World {
         if state.state != ResearchState::Available && !repeatable {
             return Ok(());
         }
-        let Some(i) = self.researching_building(player, building_id, state)? else {
+        let Some(list_index) = self.researching_building(player, building_id, state)? else {
             return Ok(());
         };
-        if self.queue_research(player, i, tech_id, r.shift)? == QueueOutcome::Queued {
+        if self.queue_research(player, list_index, tech_id, research_command.shift)?
+            == QueueOutcome::Queued
+        {
             // Castle Age queued in game mode 16 marks the world's treaty monitor (`+0x820`, its
             // `+0x17`), which the slice does not hold; any other game mode leaves it
             if tech_id == TechId::CASTLE_AGE && self.settings.game_mode == GameMode::OneUnit {
@@ -357,7 +368,7 @@ impl World {
                     "RESEARCH of Castle Age in game mode 16 (the treaty monitor's +0x17)",
                 ));
             }
-            let building = self.players.live_mut(player, i)?;
+            let building = self.players.live_mut(player, list_index)?;
             if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
                 ai.set_action(Some(AiAction::Research));
             }
@@ -381,7 +392,7 @@ impl World {
         state: &TechState,
     ) -> GenieResult<Option<ListIndex>> {
         let owner = self.players.player(player)?;
-        let Some(i) = self.live_index(player, building_id) else {
+        let Some(list_index) = self.live_index(player, building_id) else {
             return if self.place(building_id).is_some() {
                 Err(GenieError::unsupported(
                     "RESEARCH at another player's object",
@@ -390,12 +401,12 @@ impl World {
                 Ok(None)
             };
         };
-        let building = owner.objects.checked(i)?;
+        let building = owner.objects.checked(list_index)?;
         let master = building.master(self.master_tables(), player)?;
         let at = state
             .locations
             .iter()
-            .any(|l| l.building == Some(building.life.master_id));
+            .any(|location| location.building == Some(building.life.master_id));
         if master.kind != MasterKind::BUILDING || building.life.state != ObjectState::Alive || !at {
             return Ok(None);
         }
@@ -410,27 +421,27 @@ impl World {
                 "RESEARCH at a building with an unmodelled action",
             ));
         }
-        if top.is_some_and(|k| BLOCKS_RESEARCH.contains(&k)) {
+        if top.is_some_and(|action_kind| BLOCKS_RESEARCH.contains(&action_kind)) {
             return Ok(None);
         }
-        Ok(Some(i))
+        Ok(Some(list_index))
     }
 
-    /// `FUN_1411d70f0` for the building at `i` of `player`: one research, five with `shift`
-    /// unless the technology allows only one at a time or its effect upgrades a unit, queued by
-    /// the building's part with no master and no button ([`World::queue_at`]). Queued when any
-    /// was queued. The game settings' instant technologies (`FUN_140f39f40`'s `+0x20`, which
-    /// `FUN_1413cdcd0` researches at once) are linked ones, which RESEARCH refuses before.
+    /// `FUN_1411d70f0` for the building at `list_index` of `player`: one research, five with
+    /// `shift` unless the technology allows only one at a time or its effect upgrades a unit,
+    /// queued by the building's part with no master and no button ([`World::queue_at`]). Queued
+    /// when any was queued. The game settings' instant technologies (`FUN_140f39f40`'s `+0x20`,
+    /// which `FUN_1413cdcd0` researches at once) are linked ones, which RESEARCH refuses before.
     pub(crate) fn queue_research(
         &mut self,
         player: PlayerId,
-        i: ListIndex,
+        list_index: ListIndex,
         tech: TechId,
         shift: bool,
     ) -> GenieResult<QueueOutcome> {
-        let t = tech.index();
-        let def = self.model.techs.checked(t)?;
-        let state = self.players.player(player)?.techs.checked(t)?;
+        let index = tech.index();
+        let def = self.model.techs.checked(index)?;
+        let state = self.players.player(player)?.techs.checked(index)?;
         let one = !state.allow_multiple
             || self
                 .model
@@ -438,7 +449,14 @@ impl World {
                 .get(def.effect_id)
                 .is_some_and(Effect::upgrades);
         let count: u16 = if !shift || one { 1 } else { 5 };
-        self.queue_at(player, i, None, count, Some(tech), QueueButton::NONE)
+        self.queue_at(
+            player,
+            list_index,
+            None,
+            count,
+            Some(tech),
+            QueueButton::NONE,
+        )
     }
 }
 
@@ -447,7 +465,7 @@ impl World {
 fn debit_listed(owner: &mut Player, listed: [(Option<AttributeId>, CostAmount); 3]) {
     let mut sums = [0i16; 4];
     for (attribute, amount) in listed {
-        if let Some(sum) = attribute.and_then(|k| sums.get_mut(k.index())) {
+        if let Some(sum) = attribute.and_then(|attribute_id| sums.get_mut(attribute_id.index())) {
             *sum = sum.wrapping_add(amount.get());
         }
     }

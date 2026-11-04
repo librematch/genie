@@ -17,12 +17,12 @@ use tracing_subscriber::fmt::MakeWriter;
 ///
 /// When the value does not parse as a filter: the message names `RUST_LOG` and the value.
 pub fn filter(rust_log: Option<&str>) -> Result<Option<EnvFilter>, String> {
-    let Some(value) = rust_log.filter(|v| !v.trim().is_empty()) else {
+    let Some(value) = rust_log.filter(|text| !text.trim().is_empty()) else {
         return Ok(None);
     };
     EnvFilter::try_new(value)
         .map(Some)
-        .map_err(|e| format!("RUST_LOG `{value}`: {e}"))
+        .map_err(|parse_error| format!("RUST_LOG `{value}`: {parse_error}"))
 }
 
 /// The subscriber that writes the events and spans `filter` lets through to `writer`.
@@ -49,5 +49,5 @@ pub fn install(rust_log: Option<&str>) -> Result<(), String> {
     let Some(filter) = filter(rust_log)? else {
         return Ok(());
     };
-    set_global_default(subscriber(filter, stderr)).map_err(|e| e.to_string())
+    set_global_default(subscriber(filter, stderr)).map_err(|error| error.to_string())
 }

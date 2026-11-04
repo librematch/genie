@@ -361,7 +361,7 @@ impl AttackReads {
         Self {
             standing: master
                 .standing_sprite
-                .and_then(|s| graphics.get(s))
+                .and_then(|sprite_id| graphics.get(sprite_id))
                 .copied(),
             flags: {
                 let mut flags = AttackerFlags::empty();
@@ -539,8 +539,8 @@ impl World {
 /// The unit's animation speed (`+0x7b8`) as the Attack sets it: a mover's; a building's stays
 /// (MISSING.md, "The Attack's animation speed of a building").
 pub(crate) fn set_walker_anim(mut motion: MotionMut<'_>, speed: Speed) {
-    if let Some(m) = motion.mover_mut() {
-        m.animated.speed = speed;
+    if let Some(mover) = motion.mover_mut() {
+        mover.animated.speed = speed;
     }
 }
 

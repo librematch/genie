@@ -113,7 +113,7 @@ impl UnitView<'_, '_> {
         owner: PlayerId,
         u: &Unit,
         actions: &Action,
-        m: &Master,
+        master: &Master,
         attacker: ObjectId,
         roles: &Roles,
     ) -> GenieResult<bool> {
@@ -141,14 +141,14 @@ impl UnitView<'_, '_> {
                 }
                 false
             }
-            Some(g) if g.patrols() => true,
+            Some(group) if group.patrols() => true,
             Some(_) => return Ok(false),
         };
         if let Some((tq, t)) = actions.top_target().and_then(find) {
             let tm = t.master(self.c.w.master_tables(), tq)?;
-            let gap = footprint_gap_squared(u.position(), m.radius, t.position(), tm.radius);
-            let in_range = gap <= m.combat_part().weapon_range.squared()
-                && m.combat_part().min_range.squared() <= gap;
+            let gap = footprint_gap_squared(u.position(), master.radius, t.position(), tm.radius);
+            let in_range = gap <= master.combat_part().weapon_range.squared()
+                && master.combat_part().min_range.squared() <= gap;
             let spared = patrolling
                 && tm.kind == MasterKind::BUILDING
                 && tm.combat_part().weapons.is_empty();
@@ -167,7 +167,7 @@ impl UnitView<'_, '_> {
             )?
             .players()
             .player(owner)
-            .map_or(PlayerKind::Phantom, |q| q.kind)
+            .map_or(PlayerKind::Phantom, |player| player.kind)
         };
         let capture = self
             .c
@@ -175,12 +175,12 @@ impl UnitView<'_, '_> {
             .spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(u.id))
-            .map_or(CaptureKind::None, |s| s.capture);
+            .and_then(|visibility| visibility.seer(u.id))
+            .map_or(CaptureKind::None, |seer| seer.capture);
         let me = u.attacker_of(
             actions,
             ai.ai_kind,
-            Some(m),
+            Some(master),
             (owner, player_kind),
             self.c.w.settings.game_mode,
             (
@@ -190,11 +190,11 @@ impl UnitView<'_, '_> {
                     .w
                     .parts
                     .mover_of(u.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
             ),
         );
         let target_master_kind = match ai.current_target.and_then(find) {
-            Some((q, o)) => Some(o.master(self.c.w.master_tables(), q)?.kind),
+            Some((player_id, unit)) => Some(unit.master(self.c.w.master_tables(), player_id)?.kind),
             None => None,
         };
         let picker = self.picker(None)?;
@@ -234,10 +234,10 @@ impl UnitView<'_, '_> {
             by,
         )?;
         self.torn_down((leaves, releases))?;
-        self.c
-            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                w.change_master(p, i, next)
-            })
+        self.c.lend_at(
+            (&mut *self.unit, &mut *self.actions),
+            |world, player_id, list_index| world.change_master(player_id, list_index, next),
+        )
     }
 }
 

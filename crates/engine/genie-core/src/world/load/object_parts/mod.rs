@@ -48,7 +48,7 @@ use genie_save::generated::world::{
 /// A saved state past 8.
 pub fn lifecycle(
     object: &genie_save::Object,
-    (s, master_id): (&RgeStaticObject, MasterId),
+    (rge_static_object, master_id): (&RgeStaticObject, MasterId),
     objects: &PlayerObjects,
     civ: CivId,
     masters: Option<&MasterTable>,
@@ -56,32 +56,38 @@ pub fn lifecycle(
     let pure_static = object
         .rge_object
         .as_deref()
-        .is_some_and(|r| r.rge_static_object.is_some());
-    let death_sprite = s.own_master().map_or_else(
+        .is_some_and(|rge_object| rge_object.rge_static_object.is_some());
+    let death_sprite = rge_static_object.own_master().map_or_else(
         || {
             objects
-                .master(s.master_obj)
+                .master(rge_static_object.master_obj)
                 .and_then(|m| m.static_part())
                 .and_then(|m| SpriteId::of_data(m.death_sprite_id))
         },
         |own| SpriteId::of_data(own.death_sprite_num),
     );
     // the sprite after the death: the dying one, else the current one
-    let after = death_sprite.or_else(|| SpriteId::of_data(s.sprite));
+    let after = death_sprite.or_else(|| SpriteId::of_data(rge_static_object.sprite));
     let death_facets = masters
         .zip(after)
-        .and_then(|(t, after)| t.graphics.get(after))
+        .and_then(|(after_master_table, after)| after_master_table.graphics.get(after))
         .filter(|g| {
             pure_static && g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several()
         })
-        .map(|g| g.facets);
-    let (dying_sprite, death_spawn, master) = s.own_master().map_or_else(
+        .map(|graphic| graphic.facets);
+    let (dying_sprite, death_spawn, master) = rge_static_object.own_master().map_or_else(
         || {
-            let player = objects.master(s.master_obj).and_then(|m| m.static_part());
+            let player = objects
+                .master(rge_static_object.master_obj)
+                .and_then(|m| m.static_part());
             (
                 player.and_then(|m| SpriteId::of_data(m.death_sprite_id)),
-                player.map_or(-1, |m| m.death_spawn_obj_id),
-                masters.and_then(|t| t.get(civ, dat_id(objects, s.master_obj)?)),
+                player.map_or(-1, |rge_master_static_object| {
+                    rge_master_static_object.death_spawn_obj_id
+                }),
+                masters.and_then(|master_table| {
+                    master_table.get(civ, dat_id(objects, rge_static_object.master_obj)?)
+                }),
             )
         },
         |own| {
@@ -101,15 +107,15 @@ pub fn lifecycle(
         } else {
             Class::Animated
         },
-        state: ObjectState::of_byte(s.object_state)?,
-        hp: HitPoints::new(s.hp),
-        attribute_kind: AttributeId::of_data(s.attribute_kind_held),
-        amount: Amount::new(s.attribute_amount_held),
+        state: ObjectState::of_byte(rge_static_object.object_state)?,
+        hp: HitPoints::new(rge_static_object.hp),
+        attribute_kind: AttributeId::of_data(rge_static_object.attribute_kind_held),
+        amount: Amount::new(rge_static_object.attribute_amount_held),
         dying_sprite,
         death_spawn: death_spawn >= 0,
         death_facets,
-        inside: ContainerId::of_field(s.inside_obj),
-        goto_sleep: s.goto_sleep_flag != 0,
+        inside: ContainerId::of_field(rge_static_object.inside_obj),
+        goto_sleep: rge_static_object.goto_sleep_flag != 0,
         master_id,
         master,
     })
@@ -126,7 +132,9 @@ pub fn unit_ai(
     own: ObjectId,
     players: usize,
 ) -> GenieResult<Option<UnitAi>> {
-    let Some((combat, ai)) = object.combat().and_then(|c| Some((c, c.unit_ai()?))) else {
+    let Some((combat, ai)) = object.combat().and_then(|tribe_combat_object| {
+        Some((tribe_combat_object, tribe_combat_object.unit_ai()?))
+    }) else {
         return Ok(None);
     };
     let ai_kind = UnitAiKind::try_from(combat.need_unit_ai as u32)?;
@@ -173,10 +181,10 @@ pub fn unit_ai(
         retries: ai
             .retarget_entries
             .iter()
-            .map(|e| {
+            .map(|entry| {
                 Ok((
-                    ObjectId::try_from(e.target_id)?,
-                    WorldTime::from_millis(e.timeout),
+                    ObjectId::try_from(entry.target_id)?,
+                    WorldTime::from_millis(entry.timeout),
                 ))
             })
             .collect::<GenieResult<_>>()?,
@@ -203,18 +211,18 @@ pub fn unit_ai(
 /// A patrol without points (`invalid_input`): the patrol's leash (`FUN_140f95e10`) runs its
 /// loop past an empty path's end.
 fn patrol_path(ai: &UnitAiModule) -> GenieResult<Option<PatrolPath>> {
-    let Some(p) = ai.patrol_path.as_deref() else {
+    let Some(path) = ai.patrol_path.as_deref() else {
         return Ok(None);
     };
-    if p.waypoints.is_empty() {
+    if path.waypoints.is_empty() {
         return Err(GenieError::invalid_input("a saved patrol without points"));
     }
     Ok(Some(PatrolPath {
         path: Path {
-            points: p.waypoints.iter().map(vec3).collect(),
-            length: Distance::new(p.path_length_value),
+            points: path.waypoints.iter().map(vec3).collect(),
+            length: Distance::new(path.path_length_value),
         },
-        flags: PathFlags::from_bits_retain(p.flags_bits),
+        flags: PathFlags::from_bits_retain(path.flags_bits),
     }))
 }
 
@@ -223,9 +231,13 @@ fn home(combat: &TribeCombatObject) -> Option<Home> {
     combat
         .tribe_elephant_unit_ai_module
         .as_deref()
-        .map(|e| Home {
-            origin: Position::new(e.origin_x, e.origin_y, e.origin_z),
-            furious: e.furious != 0,
+        .map(|tribe_elephant_unit_ai_module| Home {
+            origin: Position::new(
+                tribe_elephant_unit_ai_module.origin_x,
+                tribe_elephant_unit_ai_module.origin_y,
+                tribe_elephant_unit_ai_module.origin_z,
+            ),
+            furious: tribe_elephant_unit_ai_module.furious != 0,
             homeward: false,
         })
 }
@@ -239,16 +251,16 @@ fn home(combat: &TribeCombatObject) -> Option<Home> {
 fn order_history(ai: &UnitAiModule) -> GenieResult<Vec<OrderRecord>> {
     ai.oh
         .iter()
-        .map(|e| {
+        .map(|entry| {
             Ok(OrderRecord {
-                order: OrderKind::of_field(e.new_oh_order)?,
-                action: AiAction::of_field(e.new_oh_action)?,
-                time: WorldTime::from_millis(e.new_oh_time),
+                order: OrderKind::of_field(entry.new_oh_order)?,
+                action: AiAction::of_field(entry.new_oh_action)?,
+                time: WorldTime::from_millis(entry.new_oh_time),
                 // the save's 12 bytes are the game's vector, x, height, y
-                position: vec3(&e.new_oh_position),
-                target: ObjectId::of_field(e.new_oh_target_id),
-                category: AttackCategory::of_field(e.new_oh_target_attack_category)?,
-                target_position: vec3(&e.new_oh_target_position),
+                position: vec3(&entry.new_oh_position),
+                target: ObjectId::of_field(entry.new_oh_target_id),
+                category: AttackCategory::of_field(entry.new_oh_target_attack_category)?,
+                target_position: vec3(&entry.new_oh_target_position),
             })
         })
         .collect()
@@ -259,12 +271,12 @@ fn building_orders(combat: &TribeCombatObject) -> &[[u8; 52]] {
     combat
         .tribe_tower_unit_ai_module
         .as_deref()
-        .map(|t| &t.saved_order)
+        .map(|tribe_tower_unit_ai_module| &tribe_tower_unit_ai_module.saved_order)
         .or_else(|| {
             combat
                 .tribe_building_unit_ai_module
                 .as_deref()
-                .map(|b| &b.saved_order)
+                .map(|tribe_building_unit_ai_module| &tribe_building_unit_ai_module.saved_order)
         })
         .map_or(&[], Vec::as_slice)
 }

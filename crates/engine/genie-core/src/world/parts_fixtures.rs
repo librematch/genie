@@ -44,11 +44,11 @@ impl Parts {
 /// A test's table of the parts it lists, in their order.
 impl<T> FromIterator<(ObjectId, T)> for PartTable<T> {
     fn from_iter<I: IntoIterator<Item = (ObjectId, T)>>(parts: I) -> Self {
-        let mut t = Self::default();
+        let mut part_table = Self::default();
         for (id, part) in parts {
-            let _ = t.insert(id, part);
+            let _ = part_table.insert(id, part);
         }
-        t
+        part_table
     }
 }
 
@@ -56,17 +56,17 @@ impl Object {
     /// A test's object: row `unit` (or an object, keeping its parts) with the unit AI `ai` (a
     /// unit AI, or an `Option` of one).
     pub(crate) fn with_ai(unit: impl Into<Self>, ai: impl Into<Option<UnitAi>>) -> Self {
-        let mut o = unit.into();
-        o.parts.unit_ai = ai.into();
-        o
+        let mut object = unit.into();
+        object.parts.unit_ai = ai.into();
+        object
     }
 
     /// A test's object: row `unit` (or an object, keeping its other parts) with the combat
     /// layer `layer`.
     pub(crate) fn with_combat(unit: impl Into<Self>, layer: Combat) -> Self {
-        let mut o = unit.into();
-        o.parts.combat = layer;
-        o
+        let mut object = unit.into();
+        object.parts.combat = layer;
+        object
     }
 
     /// A test's object: row `unit` (or an object, keeping its other parts) with the moving
@@ -78,33 +78,33 @@ impl Object {
     /// A test's object: row `unit` (or an object, keeping its other parts) with the motion part
     /// `motion`.
     pub(crate) fn with_motion(unit: impl Into<Self>, motion: Motion) -> Self {
-        let mut o = unit.into();
-        o.parts.motion = Some(motion);
-        o
+        let mut object = unit.into();
+        object.parts.motion = Some(motion);
+        object
     }
 
     /// A test's object: row `unit` (or an object, keeping its other parts) with the action
     /// layer `layer`.
     pub(crate) fn with_actions(unit: impl Into<Self>, layer: Action) -> Self {
-        let mut o = unit.into();
-        o.parts.actions = layer;
-        o
+        let mut object = unit.into();
+        object.parts.actions = layer;
+        object
     }
 
     /// A test's object: row `unit` (or an object, keeping its other parts) the load could not
     /// read whole, for `why` ([`crate::world::Unread`]).
     pub(crate) fn unread(unit: impl Into<Self>, why: crate::GenieError) -> Self {
-        let mut o = unit.into();
-        o.parts.unread = Some(Unread::new(why));
-        o
+        let mut object = unit.into();
+        object.parts.unread = Some(Unread::new(why));
+        object
     }
 
     /// A test's object: row `unit` (or an object, keeping its other parts) with the building
     /// layer `layer`.
     pub(crate) fn with_building(unit: impl Into<Self>, layer: Building) -> Self {
-        let mut o = unit.into();
-        o.parts.building = layer;
-        o
+        let mut object = unit.into();
+        object.parts.building = layer;
+        object
     }
 }
 
@@ -123,7 +123,7 @@ impl World {
         self
     }
 
-    /// A test's live list of player `p`: `objects` with their parts; the old list's objects
+    /// A test's live list of player `player_id`: `objects` with their parts; the old list's objects
     /// leave the world with theirs.
     ///
     /// # Panics
@@ -131,23 +131,23 @@ impl World {
     /// A player the world does not hold.
     pub(crate) fn set_live_for_test(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         objects: impl IntoIterator<Item = Object>,
     ) {
         let list = &mut self
             .players
-            .get_mut(p.index())
+            .get_mut(player_id.index())
             .expect("a player the world holds")
             .objects;
-        let old: Vec<ObjectId> = list.iter().map(|u| u.id).collect();
+        let old: Vec<ObjectId> = list.iter().map(|unit| unit.id).collect();
         let mut units = Vec::new();
         for id in old {
             let _ = self.parts.take(id);
         }
         let mut parts = Vec::new();
-        for o in objects {
-            parts.push((o.unit.id, o.parts));
-            units.push(o.unit);
+        for object in objects {
+            parts.push((object.unit.id, object.parts));
+            units.push(object.unit);
         }
         *list = units.into();
         for (id, part) in parts {
@@ -163,9 +163,9 @@ impl World {
     ) -> (Vec<Unit>, Vec<(ObjectId, ObjectParts)>) {
         objects
             .into_iter()
-            .map(|o| {
-                let id = o.unit.id;
-                (o.unit, (id, o.parts))
+            .map(|object| {
+                let id = object.unit.id;
+                (object.unit, (id, object.parts))
             })
             .unzip()
     }

@@ -8,9 +8,9 @@ fn save_and_load(format: &ScxFormat, as_version: VersionBundle) -> GenieResult<S
     let mut out = vec![];
     format.write_to(&mut out, &as_version)?;
 
-    let mut f = Cursor::new(out);
-    let scx = ScxFormat::load_scenario(&mut f)?;
-    assert_consumed(f);
+    let mut cursor = Cursor::new(out);
+    let scx = ScxFormat::load_scenario(&mut cursor)?;
+    assert_consumed(cursor);
     Ok(scx)
 }
 
@@ -33,9 +33,9 @@ fn assert_consumed(mut input: impl Read) {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=42>
 #[test]
 fn oldest_aoe1_scn_on_aoeheaven() {
-    let mut f = File::open("test/scenarios/ The Destruction of Rome.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/ The Destruction of Rome.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -44,9 +44,9 @@ fn oldest_aoe1_scn_on_aoeheaven() {
 
 #[test]
 fn aoe1_beta_scn_reserialize() {
-    let mut f = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let format2 = save_and_load(&format, format.version()).expect("save-and-load failed");
 
     assert_eq!(
@@ -58,9 +58,9 @@ fn aoe1_beta_scn_reserialize() {
 
 #[test]
 fn aoe1_beta_scn_to_aoc() {
-    let mut f = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Dawn of a New Age.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let format2 = save_and_load(&format, VersionBundle::aoc()).expect("save-and-load failed");
 
     assert_eq!(
@@ -73,9 +73,9 @@ fn aoe1_beta_scn_to_aoc() {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1678>
 #[test]
 fn aoe1_trial_scn() {
-    let mut f = File::open("test/scenarios/Bronze Age Art of War.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Bronze Age Art of War.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -85,9 +85,9 @@ fn aoe1_trial_scn() {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=2409>
 #[test]
 fn aoe1_ppc_trial_scn() {
-    let mut f = File::open("test/scenarios/CEASAR.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/CEASAR.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -97,9 +97,9 @@ fn aoe1_ppc_trial_scn() {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1651>
 #[test]
 fn aoe1_scn() {
-    let mut f = File::open("test/scenarios/A New Emporer.scn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/A New Emporer.scn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -109,9 +109,9 @@ fn aoe1_scn() {
 /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=880>
 #[test]
 fn aoe1_ror_scx() {
-    let mut f = File::open("test/scenarios/Jeremiah Johnson (Update).scx").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Jeremiah Johnson (Update).scx").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -120,9 +120,9 @@ fn aoe1_ror_scx() {
 
 #[test]
 fn aoe1_ror_to_aoc() -> GenieResult<()> {
-    let mut f = File::open("test/scenarios/El advenimiento de los hunos_.scx")?;
-    let format = ScxFormat::load_scenario(&mut f)?;
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/El advenimiento de los hunos_.scx")?;
+    let format = ScxFormat::load_scenario(&mut file)?;
+    assert_consumed(file);
     let format2 = save_and_load(&format, VersionBundle::aoc())?;
 
     assert_eq!(
@@ -137,9 +137,9 @@ fn aoe1_ror_to_aoc() -> GenieResult<()> {
 /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=1271>
 #[test]
 fn oldest_aok_scn_on_aokheaven() {
-    let mut f = File::open("test/scenarios/CAMELOT.SCN").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/CAMELOT.SCN").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -148,9 +148,9 @@ fn oldest_aok_scn_on_aokheaven() {
 
 #[test]
 fn aoc_scx() {
-    let mut f = File::open("test/scenarios/Age of Heroes b1-3-5.scx").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Age of Heroes b1-3-5.scx").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -159,9 +159,9 @@ fn aoc_scx() {
 
 #[test]
 fn hd_aoe2scenario() {
-    let mut f = File::open("test/scenarios/Year_of_the_Pig.aoe2scenario").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Year_of_the_Pig.aoe2scenario").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let format2 = save_and_load(&format, format.version()).expect("save-and-load failed");
 
     assert_eq!(
@@ -173,9 +173,9 @@ fn hd_aoe2scenario() {
 
 #[test]
 fn hd_scx2() {
-    let mut f = File::open("test/scenarios/real_world_amazon.scx").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/real_world_amazon.scx").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -189,9 +189,9 @@ fn hd_scx2() {
 #[test]
 #[ignore = "Definitive Edition (AoE1) scenarios are not supported yet"]
 fn aoe_de_scn() {
-    let mut f = File::open("test/scenarios/Corlis.aoescn").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Corlis.aoescn").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let mut out = vec![];
     format
         .write_to(&mut out, &format.version())
@@ -203,9 +203,9 @@ fn aoe_de_scn() {
 /// Source: <https://www.ageofempires.com/mods/details/2015>/
 #[test]
 fn aoe_de2_1_36() {
-    let mut f = File::open("test/scenarios/Hotkey Trainer Buildings.aoe2scenario").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/Hotkey Trainer Buildings.aoe2scenario").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let format2 = save_and_load(&format, format.version()).expect("save-and-load failed");
     assert_eq!(
         format.hash(),
@@ -218,9 +218,9 @@ fn aoe_de2_1_36() {
 /// saved as a 1.37 format version with some layered terrain in the corners.
 #[test]
 fn aoe_de2_1_37() {
-    let mut f = File::open("test/scenarios/layertest.aoe2scenario").unwrap();
-    let format = ScxFormat::load_scenario(&mut f).expect("failed to read");
-    assert_consumed(f);
+    let mut file = File::open("test/scenarios/layertest.aoe2scenario").unwrap();
+    let format = ScxFormat::load_scenario(&mut file).expect("failed to read");
+    assert_consumed(file);
     let format2 = save_and_load(&format, format.version()).expect("save-and-load failed");
     assert_eq!(
         format.hash(),

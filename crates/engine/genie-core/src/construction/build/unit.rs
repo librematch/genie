@@ -47,16 +47,16 @@ impl Unit {
     pub(crate) fn build_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
     ) -> GenieResult<HeadCode> {
         let Some(mut build) = actions.list.build().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let reads = self.build_reads(c, build)?;
-        let built = build.update(c, self, actions, me, &reads);
-        if let Some(b) = actions.list.build_mut() {
-            *b = build;
+        let reads = self.build_reads(step, build)?;
+        let built = build.update(step, self, actions, me, &reads);
+        if let Some(build_action) = actions.list.build_mut() {
+            *build_action = build;
         }
         // its end's 1 deletes it; the destructor (FUN_140aadbf0) finds it out of the builders
         // (set_state left them) and lets go the foundation and the second target it still holds
@@ -68,90 +68,100 @@ impl Unit {
     /// in another state or at another foundation.
     fn clearing_looks(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         others: OthersRef<'_>,
         action: BuildAction,
     ) -> GenieResult<BTreeMap<ObjectId, ClearLook>> {
         let mut looks = BTreeMap::new();
-        if let Some(f) = Some(action)
+        if let Some(action_unit) = Some(action)
             .filter(|b| matches!(b.state, BuildState::Work | BuildState::Wait))
-            .and_then(|b| others.own(b.target))
+            .and_then(|build_action| others.own(build_action.target))
             .filter(|u| {
-                c.w.parts
+                step.w
+                    .parts
                     .building_of(u.id)
                     .construction
-                    .is_some_and(|k| k.desolid)
+                    .is_some_and(|construction| construction.desolid)
             })
         {
-            let (fx, fy) = (f.position().x(), f.position().y());
-            let reach = c.w.model.tuning.build.clearing_reach + 1.0;
-            for (id, _) in c.w.spatial.objects_within(Rect::new(
+            let (fx, fy) = (action_unit.position().x(), action_unit.position().y());
+            let reach = step.w.model.tuning.build.clearing_reach + 1.0;
+            for (id, _) in step.w.spatial.objects_within(Rect::new(
                 fx - reach,
                 fy - reach,
                 fx + reach,
                 fy + reach,
             )) {
-                let (owner, u) = if id == self.id {
-                    (c.player, self)
+                let (owner, unit) = if id == self.id {
+                    (step.player, self)
                 } else if let Some(found) = others.find(id) {
                     found
                 } else {
                     continue;
                 };
-                let l = clear_look_of(
-                    u,
-                    c.w.parts.building_of(id),
-                    OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(owner)),
+                let clear_look = clear_look_of(
+                    unit,
+                    step.w.parts.building_of(id),
+                    OwnerMasters::new(&step.w.parts.own_master, step.w.model.masters.of(owner)),
                 )?;
-                let _ = looks.insert(id, l);
+                let _ = looks.insert(id, clear_look);
             }
         }
         Ok(looks)
     }
 
     /// What the Build's update reads of the world as it starts ([`BuildReads`]).
-    pub(super) fn build_reads(&self, c: &Step<'_>, action: BuildAction) -> GenieResult<BuildReads> {
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
+    pub(super) fn build_reads(
+        &self,
+        step: &Step<'_>,
+        action: BuildAction,
+    ) -> GenieResult<BuildReads> {
+        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
         let target = action.target;
         let foundation = others.own(target);
         let site = foundation
-            .filter(|u| c.w.parts.building_of(u.id).construction.is_some())
+            .filter(|u| step.w.parts.building_of(u.id).construction.is_some())
             .map(|u| FoundationId::new(u.id));
         let built = foundation.map(|u| u.life.master_id);
-        let stack_made = foundation.and_then(|u| c.w.parts.building_of(u.id).stack_made);
-        let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> =
-            c.w.parts.unit_ai.get(self.id).map_or_else(Vec::new, |ai| {
+        let stack_made = foundation.and_then(|u| step.w.parts.building_of(u.id).stack_made);
+        let build_targets: Vec<(Option<ObjectId>, Option<ObjectState>)> = step
+            .w
+            .parts
+            .unit_ai
+            .get(self.id)
+            .map_or_else(Vec::new, |ai| {
                 ai.orders
                     .iter()
                     .filter(|o| o.order == OrderKind::Build)
-                    .map(|o| {
-                        let state = others.own(o.target).map(|u| u.life.state);
-                        (o.target, state)
+                    .map(|queued_order| {
+                        let state = others.own(queued_order.target).map(|unit| unit.life.state);
+                        (queued_order.target, state)
                     })
                     .collect()
             });
         let (deposit, gone_orders) = if matches!(action.state, BuildState::Drop { .. }) {
             (
-                self.build_deposit(c, others, action.site)?,
-                Self::gone_drop_orders(&c.w.spatial, c.w.parts.unit_ai.get(self.id)),
+                self.build_deposit(step, others, action.site)?,
+                Self::gone_drop_orders(&step.w.spatial, step.w.parts.unit_ai.get(self.id)),
             )
         } else {
             (None, Vec::new())
         };
-        let master = self.master(c.w.master_tables(), c.player);
+        let master = self.master(step.w.master_tables(), step.player);
         // FUN_140aadc50 drops only a kind the player has (FUN_140efe5b0)
-        let attributes = c.w.players.player(c.player)?.attributes.len();
-        let has_kind = (self.life.attribute_kind).is_some_and(|k| k.index() < attributes);
+        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let has_kind = (self.life.attribute_kind)
+            .is_some_and(|attribute_id| attribute_id.index() < attributes);
         Ok(BuildReads {
             site,
             stack_made,
             build_targets,
             deposit,
             gone_orders,
-            looks: self.clearing_looks(c, others, action)?,
+            looks: self.clearing_looks(step, others, action)?,
             class: master.as_ref().ok().map(|m| m.class),
-            drop_site: drop_site_master(c, built)? && has_kind,
-            by: self.releaser(c)?,
+            drop_site: drop_site_master(step, built)? && has_kind,
+            by: self.releaser(step)?,
         })
     }
 
@@ -159,41 +169,42 @@ impl Unit {
     /// what the builder carries and the gap between their footprints; none without the site.
     fn build_deposit(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         others: OthersRef<'_>,
         site: Option<DropSiteId>,
     ) -> GenieResult<Option<(ObjectState, DropOff)>> {
-        let Some(s) = c.w.spatial.get(site).filter(|_| site.is_some()) else {
+        let Some(placed) = step.w.spatial.get(site).filter(|_| site.is_some()) else {
             return Ok(None);
         };
-        let me_at =
-            c.w.spatial
-                .get_known(self.id)?
-                .ok_or(GenieError::unsupported("a builder without a place"))?;
-        let master = self.master(c.w.master_tables(), c.player)?;
+        let me_at = step
+            .w
+            .spatial
+            .get_known(self.id)?
+            .ok_or(GenieError::unsupported("a builder without a place"))?;
+        let master = self.master(step.w.master_tables(), step.player)?;
         let actor = Actor {
             id: self.id,
             master,
-            player: c.player,
+            player: step.player,
             held: self.life.held(),
-            attribute_95: c
+            attribute_95: step
                 .w
                 .players
-                .player(c.player)?
+                .player(step.player)?
                 .attributes
                 .get(95)
                 .copied()
                 .unwrap_or(Amount::ZERO),
-            civ: c.w.players.player(c.player)?.civ,
+            civ: step.w.players.player(step.player)?.civ,
         };
         Ok(state_of(site.map(DropSiteId::id), others).map(|state| {
             let drop = DropOff {
-                takes: drops_at(&c.w.model.drop_sites, s.master, &actor),
+                takes: drops_at(&step.w.model.drop_sites, placed.master, &actor),
                 gap_squared: footprint_gap_squared(
                     me_at.position,
                     me_at.radius,
-                    s.position,
-                    s.radius,
+                    placed.position,
+                    placed.radius,
                 ),
             };
             (state, drop)
@@ -208,15 +219,15 @@ impl Unit {
             Some(_) => spatial
                 .sight
                 .as_ref()
-                .and_then(|v| v.seer(t))
-                .is_some_and(|s| ObjectState::Dead < s.state),
+                .and_then(|visibility| visibility.seer(t))
+                .is_some_and(|seer| ObjectState::Dead < seer.state),
         };
         ai.map_or_else(Vec::new, |ai| {
             ai.orders
                 .iter()
                 .filter(|o| DROPPED_ORDERS.contains(&o.order))
-                .map(|o| o.target)
-                .filter(|&t| gone(t))
+                .map(|queued_order| queued_order.target)
+                .filter(|&object_id| gone(object_id))
                 .collect()
         })
     }
@@ -233,7 +244,7 @@ impl BuildAction {
     /// `f`'s and the lend's.
     pub(super) fn lend<R>(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         f: impl FnOnce(&mut World, PlayerId, ListIndex) -> GenieResult<R>,
@@ -241,9 +252,9 @@ impl BuildAction {
         if let Some(b) = actions.list.build_mut() {
             *b = *self;
         }
-        let answer = c.lend_at((&mut *builder, &mut *actions), f);
-        if let Some(b) = actions.list.build() {
-            *self = *b;
+        let answer = step.lend_at((&mut *builder, &mut *actions), f);
+        if let Some(build_action) = actions.list.build() {
+            *self = *build_action;
         }
         answer
     }
@@ -259,34 +270,36 @@ impl BuildAction {
     /// What the work, the starts and the completion do not model.
     pub(super) fn work_on(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         rate: Seconds,
     ) -> GenieResult<BuildProgress> {
         let target = self.target.ok_or(NOT_HELD)?;
-        self.lend(c, builder, actions, |w, _, _| w.work_building(target, rate))
+        self.lend(step, builder, actions, |world, _, _| {
+            world.work_building(target, rate)
+        })
     }
 }
 
 /// `FUN_140fde180`: the foundation's master `built` is a drop site (the masters 562, 584, 621,
 /// 68, 1808, 50, 1187 and 199, or one the drop-site table has for every civ or the builder's).
-fn drop_site_master(c: &Step<'_>, built: Option<MasterId>) -> GenieResult<bool> {
-    let Some(m) = built else {
+fn drop_site_master(step: &Step<'_>, built: Option<MasterId>) -> GenieResult<bool> {
+    let Some(master_id) = built else {
         return Ok(false);
     };
-    if c.w
+    if step
+        .w
         .model
         .roles
-        .of_master(m)
+        .of_master(master_id)
         .contains(MasterRoles::DROP_SITE)
     {
         return Ok(true);
     }
-    let civ = c.w.players.player(c.player)?.civ;
-    Ok(c.w
-        .model
-        .drop_sites
-        .iter()
-        .any(|d| d.building == m && (d.civs.is_empty() || d.civs.contains(&civ))))
+    let civ = step.w.players.player(step.player)?.civ;
+    Ok(step.w.model.drop_sites.iter().any(|drop_site| {
+        drop_site.building == master_id
+            && (drop_site.civs.is_empty() || drop_site.civs.contains(&civ))
+    }))
 }

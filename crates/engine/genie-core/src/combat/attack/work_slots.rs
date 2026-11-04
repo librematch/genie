@@ -86,22 +86,24 @@ impl Attack {
     pub(super) fn set_swing(
         &mut self,
         unit: &mut Unit,
-        g: &mut Ground<'_>,
-        f: &Fight,
-        r: &AttackReads,
+        ground: &mut Ground<'_>,
+        fight: &Fight,
+        attack_reads: &AttackReads,
     ) -> GenieResult<()> {
-        let sprite_tuning = g.by_id.tuning().sprite;
-        let roles = g.by_id.roles();
-        self.enter(AttackState::Swing, g.motion.reborrow())?;
-        let alternates = g.motion.mover().is_some_and(|m| {
-            m.stats
+        let sprite_tuning = ground.by_id.tuning().sprite;
+        let roles = ground.by_id.roles();
+        self.enter(AttackState::Swing, ground.motion.reborrow())?;
+        let alternates = ground.motion.mover().is_some_and(|mover| {
+            mover
+                .stats
                 .move_algorithm
                 .contains(MoveAlgorithm::ALTERNATES_SPRITES)
         });
-        let special = r.swing_sprites.special.filter(|_| {
-            MasterKind::COMBAT <= f.own.kind && charge_hit(&f.own.source, &f.victim, roles)
+        let special = attack_reads.swing_sprites.special.filter(|_| {
+            MasterKind::COMBAT <= fight.own.kind
+                && charge_hit(&fight.own.source, &fight.victim, roles)
         });
-        let chosen = if let Some(look) = r.swing_sprites.look {
+        let chosen = if let Some(look) = attack_reads.swing_sprites.look {
             Some(look)
         } else if let Some(special) = special {
             Some(special)
@@ -111,7 +113,7 @@ impl Attack {
                     "an attacker with a second attack sprite (its draw)",
                 ));
             }
-            let object = g.object_rng.as_deref_mut().ok_or(NO_OBJECT_STREAM)?;
+            let object = ground.object_rng.as_deref_mut().ok_or(NO_OBJECT_STREAM)?;
             if object.below_checked(2) == 0 {
                 self.arms.sprite
             } else {
@@ -120,14 +122,16 @@ impl Attack {
         } else {
             self.arms.sprite
         };
-        let shown = chosen.or(r.standing).ok_or(GenieError::unsupported(
-            "an attacker without an attack or standing sprite",
-        ))?;
+        let shown = chosen
+            .or(attack_reads.standing)
+            .ok_or(GenieError::unsupported(
+                "an attacker without an attack or standing sprite",
+            ))?;
         new_sprite(
             &mut unit.sprite,
-            g.motion.move_stats_mut(),
+            ground.motion.move_stats_mut(),
             shown,
-            g.sprite_rng,
+            ground.sprite_rng,
             sprite_tuning,
         );
         // FUN_1413b9f00 on the unit's sprite list with its sprite (`+0x140`)
@@ -136,11 +140,11 @@ impl Attack {
         }
         self.pending = true;
         let length = Seconds::new(shown.frames.as_f32() * shown.frame_duration.get());
-        self.rest = r.reload - length;
+        self.rest = attack_reads.reload - length;
         set_walker_anim(
-            g.motion.reborrow(),
-            if self.rest < Seconds::ZERO && Seconds::ZERO < r.reload {
-                Speed::new(length / r.reload)
+            ground.motion.reborrow(),
+            if self.rest < Seconds::ZERO && Seconds::ZERO < attack_reads.reload {
+                Speed::new(length / attack_reads.reload)
             } else {
                 Speed::new(1.0)
             },
@@ -185,9 +189,9 @@ impl Attack {
         };
         if Distance::ZERO < unit.area_effect
             && target.kind == MasterKind::BUILDING
-            && let Some(m) = main
+            && let Some(mark) = main
         {
-            target = m;
+            target = mark;
         }
         if self.target.map(AttackTargetId::id) == Some(target.id) && self.state.keeps_target() {
             return Worked {
@@ -233,9 +237,9 @@ impl Attack {
         }
         if self.target != new {
             self.target = match target {
-                Some(t) if t.state < ObjectState::Removed => {
+                Some(mark) if mark.state < ObjectState::Removed => {
                     if self.voice.is_loud() {
-                        worked.takes = Some(t.id);
+                        worked.takes = Some(mark.id);
                     }
                     new
                 }

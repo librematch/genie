@@ -51,7 +51,7 @@ pub fn map_terrain(header: &Header, terrain: &TerrainTable) -> Terrain {
     t.set_elevations(
         map.rows
             .iter()
-            .flat_map(|r| r.tiles.iter().map(|t| t.elevation))
+            .flat_map(|rge_map_row| rge_map_row.tiles.iter().map(|rge_tile| rge_tile.elevation))
             .collect(),
     );
     t
@@ -78,7 +78,12 @@ pub fn spatial(
     let classes = map
         .rows
         .iter()
-        .flat_map(|r| r.tiles.iter().map(|t| terrain.class(t.terrain_kind)))
+        .flat_map(|rge_map_row| {
+            rge_map_row
+                .tiles
+                .iter()
+                .map(|rge_tile| terrain.class(rge_tile.terrain_kind))
+        })
         .collect();
     let tiles = Tiles::new(GridSize::new(map.map_width, map.map_height), classes);
     let mut out = Spatial::with_tiles(GridSize::new(map.map_width, map.map_height), tiles);
@@ -88,8 +93,9 @@ pub fn spatial(
     out.unit_diplomacy = header
         .players()
         .iter()
-        .map(|p| {
-            p.world_player()
+        .map(|player_section| {
+            player_section
+                .world_player()
                 .base
                 .unit_diplomacy
                 .iter()
@@ -100,24 +106,26 @@ pub fn spatial(
     let mut sight = saved_sight(header)?;
     for (player, section) in PlayerId::each(header.players().len()).zip(header.players()) {
         let all = section.live_objects().chain(section.sleeping_objects());
-        for o in all {
-            let Some(s) = o.static_part() else { continue };
+        for object in all {
+            let Some(s) = object.static_part() else {
+                continue;
+            };
             let Some(m) = placement(s, section.objects()) else {
                 continue;
             };
             let master = MasterId::try_from(s.master_obj)?;
             let id = ObjectId::try_from(s.id)?;
-            let building = o.tribe_building_object.as_deref();
+            let building = object.tribe_building_object.as_deref();
             // a building's place links its tiles (FUN_1411e6780), an annex's does not, and a
             // foundation made desolid lost them (FUN_1411cf770); so do a combat unit's that does
             // not move and is more than a tile wide (FUN_14108c320). A building keeps its
             // footprint's UMV entry (+0x904)
             let place = Position::new(s.tx, s.ty, s.tz);
             let footprint = m.radius.ground();
-            let speed = moving_speed(o, s, section.objects());
+            let speed = moving_speed(object, s, section.objects());
             let links = building.map_or_else(
                 || {
-                    o.combat().is_some()
+                    object.combat().is_some()
                         && speed == 0.0
                         && (0.5 < m.radius.x() || 0.5 < m.radius.y())
                 },
@@ -145,12 +153,16 @@ pub fn spatial(
                     umv: umv as u8,
                     // the save's +0x924 (a map's objects keep what the map gave them, as
                     // 426048706's Gaia petards their 0); the setup's rule without a combat part
-                    capture: o.combat().map_or_else(
+                    capture: object.combat().map_or_else(
                         || Ok(capture_kind(player, m.class, master, roles)),
-                        |c| CaptureKind::try_from(c.rge_combat_object.capture_flag),
+                        |tribe_combat_object| {
+                            CaptureKind::try_from(
+                                tribe_combat_object.rge_combat_object.capture_flag,
+                            )
+                        },
                     )?,
                     // the object's type: the save's factory types 70 and 80, any other below
-                    kind: if o.tribe_combat_object.is_some() {
+                    kind: if object.tribe_combat_object.is_some() {
                         MasterKind::COMBAT
                     } else if building.is_some() {
                         MasterKind::BUILDING
@@ -159,10 +171,10 @@ pub fn spatial(
                     },
                 },
             );
-            let desolid = o
+            let desolid = object
                 .tribe_building_object
                 .as_deref()
-                .is_some_and(|b| b.desolid_flag != 0);
+                .is_some_and(|tribe_building_object| tribe_building_object.desolid_flag != 0);
             let solid = m.radius.sized() && !desolid;
             let obstruction =
                 (m.obstruction_kind != ObstructionKind::NONE && solid).then_some(Obstruction {
@@ -180,7 +192,7 @@ pub fn spatial(
                     obstruction_kind: m.obstruction_kind,
                     buildable_on: m.buildable_on,
                     tall: 0.0 < m.radius.z(),
-                    moves: 0.0 < moving_speed(o, s, section.objects()),
+                    moves: 0.0 < moving_speed(object, s, section.objects()),
                     unknown: None,
                     obstruction,
                 },
@@ -192,8 +204,15 @@ pub fn spatial(
             }
         }
         for ghost in section.objects().doppleganger_objects.objects() {
-            if let Some(s) = ghost.static_part() {
-                out.insert_ghost(ObjectId::try_from(s.id)?, Position::new(s.tx, s.ty, s.tz));
+            if let Some(rge_static_object) = ghost.static_part() {
+                out.insert_ghost(
+                    ObjectId::try_from(rge_static_object.id)?,
+                    Position::new(
+                        rge_static_object.tx,
+                        rge_static_object.ty,
+                        rge_static_object.tz,
+                    ),
+                );
             }
         }
     }
@@ -222,14 +241,14 @@ pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
         .umv_data_guid
         .iter()
         .zip(&umv.umv_data_list)
-        .map(|(&guid, e)| Extent {
+        .map(|(&guid, entry)| Extent {
             guid,
-            offsets: e
+            offsets: entry
                 .p
                 .iter()
                 .map(|&v| TileOffset::new(v as u32 as i32, (v >> 32) as u32 as i32))
                 .collect(),
-            capacity: e.n + 1,
+            capacity: entry.n + 1,
         })
         .collect();
     let kinds = players
@@ -258,33 +277,36 @@ pub fn saved_sight(header: &Header) -> GenieResult<Visibility> {
     );
     sight.resources = players
         .iter()
-        .map(|p| saved_resources(&p.objects().visible_resource_manager))
+        .map(|player_section| saved_resources(&player_section.objects().visible_resource_manager))
         .collect::<Result<_, _>>()?;
     Ok(sight)
 }
 
 /// A player's saved `Visible_Resource_Manager` as [`VisibleResources`] holds it.
-pub fn saved_resources(m: &VisibleResourceManager) -> GenieResult<VisibleResources> {
+pub fn saved_resources(
+    visible_resource_manager: &VisibleResourceManager,
+) -> GenieResult<VisibleResources> {
     Ok(VisibleResources {
-        capacities: m
+        capacities: visible_resource_manager
             .list_sizes
             .iter()
             .flatten()
-            .map(|s| s.vr_list_size)
+            .map(|visible_resource_list_size| visible_resource_list_size.vr_list_size)
             .collect(),
-        lists: m
+        lists: visible_resource_manager
             .lists
             .iter()
             .flatten()
-            .map(|l| {
-                l.visible_resource_rec
+            .map(|visible_resource_list| {
+                visible_resource_list
+                    .visible_resource_rec
                     .iter()
-                    .map(|r| {
+                    .map(|visible_resource_rec| {
                         Ok(VisibleResource {
-                            id: ObjectId::try_from(r.object_id)?,
-                            distance: Distance::new(r.distance),
-                            zone: r.zone,
-                            at: Point::new(r.pos_x, r.pos_y),
+                            id: ObjectId::try_from(visible_resource_rec.object_id)?,
+                            distance: Distance::new(visible_resource_rec.distance),
+                            zone: visible_resource_rec.zone,
+                            at: Point::new(visible_resource_rec.pos_x, visible_resource_rec.pos_y),
                         })
                     })
                     .collect::<GenieResult<Vec<_>>>()

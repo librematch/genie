@@ -63,8 +63,8 @@ impl UnitGroups {
             let Some(g) = self.get(id) else {
                 continue;
             };
-            for m in &g.members {
-                out.push(m.id);
+            for member in &g.members {
+                out.push(member.id);
                 if cap <= out.len() {
                     return out;
                 }
@@ -90,7 +90,7 @@ impl UnitGroups {
     /// before the call).
     #[must_use]
     pub fn get(&self, id: GroupId) -> Option<&UnitGroup> {
-        self.groups.iter().find(|g| g.id == id)
+        self.groups.iter().find(|group| group.id == id)
     }
 
     /// The group of id `id` that the caller holds: its layout reads it again where the world's
@@ -114,7 +114,7 @@ impl UnitGroups {
 
     /// The group of id `id`, to change (`FUN_14152ff40`).
     pub fn get_mut(&mut self, id: GroupId) -> Option<&mut UnitGroup> {
-        self.groups.iter_mut().find(|g| g.id == id)
+        self.groups.iter_mut().find(|group| group.id == id)
     }
 
     /// A new group at the world list's end with the next id (`FUN_14152efc0` with 1: the
@@ -124,9 +124,9 @@ impl UnitGroups {
     pub fn create(&mut self, owner: Option<PlayerId>) -> GroupId {
         let id = self.counter;
         self.counter = id.successor();
-        let mut g = UnitGroup::new(id);
-        g.owner = owner;
-        self.groups.push(g);
+        let mut group = UnitGroup::new(id);
+        group.owner = owner;
+        self.groups.push(group);
         id
     }
 }

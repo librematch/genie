@@ -31,10 +31,10 @@ pub struct ResearchCommand {
 impl ResearchCommand {
     /// `do_command`'s case checks the buildings first ([`World::research_check`]), then the
     /// research runs in those left ([`World::research`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(buildings) = w.research_check(self)? else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(buildings) = world.research_check(self)? else {
             return Ok(());
         };
-        w.research(self, &buildings)
+        world.research(self, &buildings)
     }
 }

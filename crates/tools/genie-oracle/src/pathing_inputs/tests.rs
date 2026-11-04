@@ -71,9 +71,9 @@ mod unit_terrain {
     /// of a master the save does not hold and unit 9 of a master without a restriction.
     fn save() -> Vec<u8> {
         let mut walker = combat_master(83);
-        let s = master_static_mut(&mut walker);
-        s.radius_x = 0.4;
-        s.terrain_restriction_mask_id = 7;
+        let rge_master_static_object = master_static_mut(&mut walker);
+        rge_master_static_object.radius_x = 0.4;
+        rge_master_static_object.terrain_restriction_mask_id = 7;
         let mut free = combat_master(84);
         master_static_mut(&mut free).terrain_restriction_mask_id = -1;
         let player = holding_masters(

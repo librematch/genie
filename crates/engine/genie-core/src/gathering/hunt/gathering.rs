@@ -63,10 +63,10 @@ impl HuntAction {
                 "a hunt's set_state 4 on a live target after its attack",
             ));
         }
-        let t = map
+        let placed = map
             .get_known(self.target)?
             .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
-        self.point = t.position;
+        self.point = placed.position;
         let range = if victim.state <= ObjectState::Alive {
             hunt_tuning.own_livestock_range
         } else {
@@ -74,10 +74,10 @@ impl HuntAction {
         };
         let mover = motion.mover().ok_or(HUNTER_UNMOVING)?;
         let ground = mover.stats.radius.ground();
-        let gap = footprint_gap(at, ground, t.position, t.radius);
+        let gap = footprint_gap(at, ground, placed.position, placed.radius);
         let to = WalkTo {
             id: self.target.map(HuntTargetId::id),
-            at: t.position,
+            at: placed.position,
             gap,
             state: Some(victim.state),
         };
@@ -99,29 +99,31 @@ impl HuntAction {
     /// hunt) is not modelled.
     pub(super) fn set_face(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         actions: &mut Action,
-        f: &Fight,
-        r: &HuntReads,
+        fight: &Fight,
+        hunt_reads: &HuntReads,
         roles: &Roles,
     ) -> GenieResult<HuntNext> {
         // another player's target of class 49 (a farm's or a pasture's livestock): only a building
         // changes hands (FUN_141185360, FUN_1411858f0), any other ends the hunt (set_state 1);
         // the hunter's own goes on to its sprite
-        if roles.of_class(f.victim.class).contains(ClassRoles::FARM)
-            && f.victim.player != f.own.player
+        if roles
+            .of_class(fight.victim.class)
+            .contains(ClassRoles::FARM)
+            && fight.victim.player != fight.own.player
         {
             return Err(GenieError::unsupported(
                 "a hunt facing a target of class 49 (set_state 6)",
             ));
         }
         if roles
-            .of_class(f.victim.class)
+            .of_class(fight.victim.class)
             .contains(ClassRoles::LIVESTOCK)
         {
-            if f.victim.state <= ObjectState::Alive {
-                let herd = r.herd.ok_or(GenieError::unsupported(
+            if fight.victim.state <= ObjectState::Alive {
+                let herd = hunt_reads.herd.ok_or(GenieError::unsupported(
                     "a hunt facing live livestock unprepared",
                 ))?;
                 // own livestock more than 3 tiles from its drop site is led there: once sent
@@ -130,52 +132,62 @@ impl HuntAction {
                 // once, the hunter in the world; either way `moved_sheep` and `set_state(10)`
                 if let (true, Some((site, gap_squared))) = (herd.own, herd.drop_site) {
                     self.drop_site = Some(site);
-                    if DistanceSquared::new(c.w.model.tuning.hunt.herd_reach) < gap_squared
+                    if DistanceSquared::new(step.w.model.tuning.hunt.herd_reach) < gap_squared
                         && (self.lead.moved || gap_squared < HERD_FAR)
                     {
                         if !self.lead.moved && herd.idle {
-                            let (player, sheep) = (c.player, self.target);
+                            let (player, sheep) = (step.player, self.target);
                             // the hunt faces its livestock target here
                             if let Some(sheep) = sheep {
-                                c.lend((&mut *unit, &mut *actions), |w| {
-                                    w.lead_herd(player, sheep.id(), site)
+                                step.lend((&mut *unit, &mut *actions), |world| {
+                                    world.lead_herd(player, sheep.id(), site)
                                 })?;
                             }
                         }
                         self.lead.moved = true;
-                        self.set_lead(c, unit, f, r, &herd)?;
+                        self.set_lead(step, unit, fight, hunt_reads, &herd)?;
                         return Ok(HuntNext::Stay);
                     }
                 }
-                self.start_attack(c, unit, &herd, roles)?;
+                self.start_attack(step, unit, &herd, roles)?;
                 return Ok(HuntNext::Stay);
             }
-            let t =
-                c.w.spatial
-                    .get_known(self.target)?
-                    .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
-            let ground =
-                c.w.parts
-                    .mover_of(unit.id)
-                    .map(|m| m.stats.radius.ground())
-                    .ok_or(HUNTER_UNMOVING)?;
-            if self.task.range + Distance::new(c.w.model.tuning.hunt.gap)
-                < footprint_gap(unit.place.position(), ground, t.position, t.radius)
+            let placed = step
+                .w
+                .spatial
+                .get_known(self.target)?
+                .ok_or(GenieError::unsupported("a hunt's target without a place"))?;
+            let ground = step
+                .w
+                .parts
+                .mover_of(unit.id)
+                .map(|mover| mover.stats.radius.ground())
+                .ok_or(HUNTER_UNMOVING)?;
+            if self.task.range + Distance::new(step.w.model.tuning.hunt.gap)
+                < footprint_gap(
+                    unit.place.position(),
+                    ground,
+                    placed.position,
+                    placed.radius,
+                )
             {
-                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let player = f.own.player;
+                let walks = hunt_reads.walks(
+                    &step.w.model.graphics,
+                    (unit, step.w.parts.mover_of(unit.id)),
+                );
+                let player = fight.own.player;
                 self.set_walk(
-                    (&c.w.spatial, unit.position()),
-                    c.w.parts.motion_mut(unit.id),
-                    &f.victim,
+                    (&step.w.spatial, unit.position()),
+                    step.w.parts.motion_mut(unit.id),
+                    &fight.victim,
                     player,
                     &walks,
-                    &c.w.model,
+                    &step.w.model,
                 )?;
                 return Ok(HuntNext::Stay);
             }
         }
-        self.begin_face(c, unit, r);
+        self.begin_face(step, unit, hunt_reads);
         Ok(HuntNext::Stay)
     }
 
@@ -183,24 +195,29 @@ impl HuntAction {
     /// clears and the unit takes the hunt's walking sprite (`FUN_140ac51d0`: the carrying one
     /// for a load of the task's resource of 1 or more, else the moving one; slot 0x68 takes the
     /// standing sprite for none).
-    pub(super) fn begin_face(&mut self, c: &mut Step<'_>, unit: &mut Unit, r: &HuntReads) {
+    pub(super) fn begin_face(
+        &mut self,
+        step: &mut Step<'_>,
+        unit: &mut Unit,
+        hunt_reads: &HuntReads,
+    ) {
         self.state = HuntState::Face;
         self.timer = Seconds::ZERO;
         let carrying = self.task.resource.is_some()
             && unit.life.attribute_kind == self.task.resource
             && 1 <= unit.life.amount.get() as i32;
-        let g = match (carrying, r.sprites.carrying) {
+        let g = match (carrying, hunt_reads.sprites.carrying) {
             (true, Some(g)) => Some(g),
-            _ => r.sprites.moving,
+            _ => hunt_reads.sprites.moving,
         }
-        .or(r.sprites.standing);
-        if let Some(g) = g {
+        .or(hunt_reads.sprites.standing);
+        if let Some(graphic) = g {
             new_sprite(
                 &mut unit.sprite,
-                c.w.parts.move_stats_mut(unit.id),
-                g,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.move_stats_mut(unit.id),
+                graphic,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             );
         }
     }
@@ -213,7 +230,7 @@ impl HuntAction {
         unit: &mut Unit,
         mut motion: MotionMut<'_>,
         sprite_rng: &mut Well512,
-        r: &HuntReads,
+        hunt_reads: &HuntReads,
         sprite_tuning: SpriteTuning,
     ) {
         self.state = HuntState::Gather;
@@ -227,11 +244,11 @@ impl HuntAction {
             };
             unit.life.attribute_kind = kind;
         }
-        if let Some(g) = r.sprites.working.or(r.sprites.standing) {
+        if let Some(graphic) = hunt_reads.sprites.working.or(hunt_reads.sprites.standing) {
             new_sprite(
                 &mut unit.sprite,
                 motion.move_stats_mut(),
-                g,
+                graphic,
                 sprite_rng,
                 sprite_tuning,
             );
@@ -250,18 +267,18 @@ impl HuntAction {
         dt: Seconds,
         unit: &mut Unit,
         victim: &mut Victim,
-        r: &HuntReads,
+        hunt_reads: &HuntReads,
         roles: &Roles,
     ) -> GenieResult<HuntGather> {
         let held = &mut unit.life.amount;
-        let work = Amount::new((r.work_rate * self.task.work_value) * dt);
+        let work = Amount::new((hunt_reads.work_rate * self.task.work_value) * dt);
         let take = if work <= victim.amount {
             work
         } else {
             victim.amount
         };
-        let mut gain = r.productivity.get() * take;
-        let capacity = r.capacity;
+        let mut gain = hunt_reads.productivity.get() * take;
+        let capacity = hunt_reads.capacity;
         // `<=` in the game: a NaN goes to the drop-off too
         let room = capacity - *held;
         if !matches!(

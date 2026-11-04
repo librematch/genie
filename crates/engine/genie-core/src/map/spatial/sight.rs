@@ -53,7 +53,7 @@ impl Spatial {
         roles: &Roles,
     ) -> GenieResult<Option<PlayerId>> {
         // a world without the players' sight (the unit tests') holds nobody near
-        let Some(v) = self.sight.as_ref() else {
+        let Some(visibility) = self.sight.as_ref() else {
             return Ok(None);
         };
         // an animal inside another object (in this update, its Artifact's Enter got it in)
@@ -88,7 +88,9 @@ impl Spatial {
         let area = Rect::new(x0 as f32, y0 as f32, (x1 + 1) as f32, (y1 + 1) as f32);
         let unsure = self.frozen().any(|(id, q)| {
             q.unknown.is_some_and(|u| {
-                let counts = v.seer(id).is_some_and(|s| s.kind == MasterKind::COMBAT)
+                let counts = visibility
+                    .seer(id)
+                    .is_some_and(|s| s.kind == MasterKind::COMBAT)
                     && !out(q.player.index())
                     && !roles
                         .of_class(q.class)
@@ -114,28 +116,34 @@ impl Spatial {
         // not met
         let on_tiles = (y0..=y1)
             .flat_map(|ty| (x0..=x1).flat_map(move |tx| self.objects_on(Tile::new(tx, ty))));
-        for (id, q) in on_tiles {
-            let Some(s) = v.seer(id) else { continue };
-            if s.kind != MasterKind::COMBAT
-                || s.state != ObjectState::Alive
+        for (id, placed) in on_tiles {
+            let Some(seer) = visibility.seer(id) else {
+                continue;
+            };
+            if seer.kind != MasterKind::COMBAT
+                || seer.state != ObjectState::Alive
                 || roles
-                    .of_class(q.class)
+                    .of_class(placed.class)
                     .contains(ClassRoles::CAPTURE_IGNORED)
             {
                 continue;
             }
-            if (q.player == PlayerId::GAIA && s.capture.any()) || out(q.player.index()) {
+            if (placed.player == PlayerId::GAIA && seer.capture.any()) || out(placed.player.index())
+            {
                 continue;
             }
-            let o = q.player;
-            let (Some(count), Some(near)) = (counts.get_mut(o.index()), nearest.get_mut(o.index()))
-            else {
+            let player = placed.player;
+            let (Some(count), Some(near)) = (
+                counts.get_mut(player.index()),
+                nearest.get_mut(player.index()),
+            ) else {
                 return Err(GenieError::unsupported(
                     "an owner search's unit of a player beyond the list",
                 ));
             };
-            let strong = livestock && attribute_97(o.index()).is_some_and(|a| Amount::ZERO < a);
-            if o == p.player {
+            let strong = livestock
+                && attribute_97(player.index()).is_some_and(|amount| Amount::ZERO < amount);
+            if player == p.player {
                 if strong {
                     return Ok(None);
                 }
@@ -148,7 +156,7 @@ impl Spatial {
                     *count += 100;
                 }
             }
-            let gap = footprint_gap_squared(q.position, q.radius, p.position, p.radius);
+            let gap = footprint_gap_squared(placed.position, placed.radius, p.position, p.radius);
             if gap < *near {
                 *near = gap;
             }
@@ -166,18 +174,20 @@ impl Spatial {
             [one] => Ok(Some(one)),
             _ if !taker => {
                 let mut best = (DistanceSquared::new(999.0), None);
-                for (o, &d) in PlayerId::each(nearest.len()).zip(&nearest) {
-                    if d < best.0 && !out(o.index()) {
-                        best = (d, Some(o));
+                for (nearest_player_id, &distance_squared) in
+                    PlayerId::each(nearest.len()).zip(&nearest)
+                {
+                    if distance_squared < best.0 && !out(nearest_player_id.index()) {
+                        best = (distance_squared, Some(nearest_player_id));
                     }
                 }
                 Ok(best.1.filter(|&o| o != PlayerId::GAIA))
             }
             _ => {
                 let mut best = (0, None);
-                for (o, &n) in PlayerId::each(counts.len()).zip(&counts) {
-                    if best.0 < n && !out(o.index()) {
-                        best = (n, Some(o));
+                for (player_id, &n) in PlayerId::each(counts.len()).zip(&counts) {
+                    if best.0 < n && !out(player_id.index()) {
+                        best = (n, Some(player_id));
                     }
                 }
                 Ok(best.1)
@@ -189,7 +199,7 @@ impl Spatial {
     pub fn records_owner(&mut self, id: ObjectId, new: PlayerId) -> GenieResult<()> {
         self.sight
             .as_mut()
-            .map_or(Ok(()), |v| v.records_owner(id, new))
+            .map_or(Ok(()), |visibility| visibility.records_owner(id, new))
     }
 
     /// An ownership change's world part (`FUN_14120f800`, once the new owner has the master): the
@@ -204,15 +214,15 @@ impl Spatial {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        let Some(p) = self.objects.get_mut(id) else {
+        let Some(placed) = self.objects.get_mut(id) else {
             return Err(GenieError::unsupported(
                 "an ownership change of an object the world does not hold",
             ));
         };
-        p.player = new;
-        let (position, radius) = (p.position, p.radius);
-        if let Some(v) = self.sight.as_mut() {
-            v.owner_changed(
+        placed.player = new;
+        let (position, radius) = (placed.position, placed.radius);
+        if let Some(visibility) = self.sight.as_mut() {
+            visibility.owner_changed(
                 id,
                 position,
                 radius,
@@ -242,15 +252,15 @@ impl Spatial {
     /// the player's masks (`+0x2a8`, `+0x2a0`) too.
     pub fn reveal_to(&mut self, player: PlayerId) {
         self.reveal_map(VisionBits::ENDED | VisionBits::ENDED_EXPLORED);
-        if let Some(m) = self.vision.get_mut(player) {
-            m.visible |= VisionBits::ENDED;
-            m.explored |= VisionBits::ENDED_EXPLORED;
+        if let Some(vision_masks) = self.vision.get_mut(player) {
+            vision_masks.visible |= VisionBits::ENDED;
+            vision_masks.explored |= VisionBits::ENDED_EXPLORED;
         }
     }
 
     /// The unified map's word (`+0x5e30`) at `tile`, none off the map.
-    pub(super) fn unified_word(v: &Visibility, tile: Tile) -> Option<VisionBits> {
-        Some(*v.unified.get(v.size.index(tile)?)?)
+    pub(super) fn unified_word(visibility: &Visibility, tile: Tile) -> Option<VisionBits> {
+        Some(*visibility.unified.get(visibility.size.index(tile)?)?)
     }
 
     /// `FUN_141663500`, the player's tile test: what player `player` knows of `tile`. 0xf when it
@@ -298,7 +308,7 @@ impl Spatial {
         position: Position,
         player: PlayerId,
     ) -> Option<TileSight> {
-        let Some(v) = self.sight.as_ref() else {
+        let Some(visibility) = self.sight.as_ref() else {
             return Some(TileSight::Unknown);
         };
         if self
@@ -307,12 +317,12 @@ impl Spatial {
         {
             return Some(TileSight::Seen);
         }
-        let umv = v.seer(id).is_some_and(|s| s.umv != 0);
-        let mask = v
+        let umv = visibility.seer(id).is_some_and(|seer| seer.umv != 0);
+        let mask = visibility
             .registry
             .as_ref()
-            .and_then(|r| r.entries.get(id))
-            .map_or(VisionBits::NONE, |e| e.mask);
+            .and_then(|registry| registry.entries.get(id))
+            .map_or(VisionBits::NONE, |entry| entry.mask);
         let VisionMasks { visible, explored } = self.vision(player);
         if umv && (visible.intersects(mask) || explored.intersects(mask)) {
             return Some(TileSight::Seen);
@@ -373,9 +383,9 @@ impl Spatial {
     /// of `mask` (the end of the game `0x4000000040000000`, a revealed map `0x2000000020000000`,
     /// both `0x6000000060000000`). Nothing without the players' sight.
     pub fn reveal_map(&mut self, mask: VisionBits) {
-        if let Some(v) = self.sight.as_mut() {
-            for w in &mut v.unified {
-                *w |= mask;
+        if let Some(visibility) = self.sight.as_mut() {
+            for vision_bits in &mut visibility.unified {
+                *vision_bits |= mask;
             }
         }
     }
@@ -413,14 +423,21 @@ impl Spatial {
         id: ObjectId,
         annex_of: Option<MainBuildingId>,
     ) -> GenieResult<Option<VisionBits>> {
-        let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) else {
+        let (Some(visibility), Some(placed)) = (self.sight.as_mut(), self.objects.get(id)) else {
             return Ok(None);
         };
         let main = annex_of.as_ref().and_then(|main| {
             let place = self.objects.get(main.id())?.position;
-            Some((place, v.seer(*main).map_or(0, |s| s.umv)))
+            Some((place, visibility.seer(*main).map_or(0, |seer| seer.umv)))
         });
-        v.combat_sight(id, p.player, p.position, p.radius, p.class, main)
+        visibility.combat_sight(
+            id,
+            placed.player,
+            placed.position,
+            placed.radius,
+            placed.class,
+            main,
+        )
     }
 
     /// The object's `set_state` to `state` ([`Visibility::state_changed`]).
@@ -431,8 +448,15 @@ impl Spatial {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
-            v.state_changed(id, p.position, p.radius, state, roles, visibility_tuning)?;
+        if let (Some(visibility), Some(placed)) = (self.sight.as_mut(), self.objects.get(id)) {
+            visibility.state_changed(
+                id,
+                placed.position,
+                placed.radius,
+                state,
+                roles,
+                visibility_tuning,
+            )?;
         }
         Ok(())
     }
@@ -454,19 +478,19 @@ impl Spatial {
             roles,
             visibility_tuning,
         } = sight;
-        if let (Some(v), Some(p)) = (self.sight.as_mut(), self.objects.get(id)) {
+        if let (Some(visibility), Some(placed)) = (self.sight.as_mut(), self.objects.get(id)) {
             let change = MasterChange {
                 master,
                 los,
-                old_radius: p.radius,
+                old_radius: placed.radius,
                 new_radius: radius,
             };
-            v.master_changed(id, p.position, change, roles, visibility_tuning)?;
-            v.registry_master(
+            visibility.master_changed(id, placed.position, change, roles, visibility_tuning)?;
+            visibility.registry_master(
                 id,
-                p.player,
-                p.position,
-                (p.radius, p.class),
+                placed.player,
+                placed.position,
+                (placed.radius, placed.class),
                 (radius, class),
             )?;
         }
@@ -488,7 +512,8 @@ impl Spatial {
     pub fn insert_ghost(&mut self, id: ObjectId, position: Position) {
         if let Some(i) = self.tiles.tile_of(position) {
             let objects = &self.objects;
-            self.tiles.append(i, id, |o| Self::is_tall(objects, o));
+            self.tiles
+                .append(i, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 
@@ -497,7 +522,8 @@ impl Spatial {
     pub fn remove_ghost(&mut self, id: ObjectId, position: Position) {
         if let Some(i) = self.tiles.tile_of(position) {
             let objects = &self.objects;
-            self.tiles.take_off(i, id, |o| Self::is_tall(objects, o));
+            self.tiles
+                .take_off(i, id, |object_id| Self::is_tall(objects, object_id));
         }
     }
 

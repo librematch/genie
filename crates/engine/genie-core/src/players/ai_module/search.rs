@@ -92,8 +92,8 @@ impl InfoModule {
     }
 
     /// `FUN_140b7d920`: the point held on the map (the module's size), and whether it moved.
-    const fn clamp(&self, p: Tile) -> (Tile, bool) {
-        let (mut x, mut y) = (p.x(), p.y());
+    const fn clamp(&self, tile: Tile) -> (Tile, bool) {
+        let (mut x, mut y) = (tile.x(), tile.y());
         let mut moved = false;
         if x < 0 {
             x = 0;
@@ -116,14 +116,14 @@ impl InfoModule {
     /// turn from 0, go onto the stack when they lie on the map.
     pub fn push_ring(&mut self, radius: Distance, centre: Point) {
         let (cx, cy) = (cvttss2si(centre.x()) as f32, cvttss2si(centre.y()) as f32);
-        for i in 0..8 {
-            let angle = i as f32 * QUARTER_PI;
-            let (p, moved) = self.clamp(Tile::new(
+        for index in 0..8 {
+            let angle = index as f32 * QUARTER_PI;
+            let (tile, moved) = self.clamp(Tile::new(
                 cvttss2si((cos(angle) * radius + Distance::new(cx)).get()),
                 cvttss2si((sin(angle) * radius + Distance::new(cy)).get()),
             ));
             if !moved {
-                self.search.push(p);
+                self.search.push(tile);
             }
         }
     }
@@ -146,7 +146,7 @@ impl InfoModule {
         let mut start = start;
         loop {
             match self.flood(unit, start, own, area, (map, &mut *rng))? {
-                Flood::Found(p) => return Ok(Some(p)),
+                Flood::Found(tile) => return Ok(Some(tile)),
                 Flood::Again => start = unit.position,
                 Flood::Exhausted => {
                     self.mark_dead_ends(own, area, map)?;
@@ -170,27 +170,27 @@ impl InfoModule {
         let mut visited = vec![false; (map.width().max(0) * map.height().max(0)) as usize];
         let mut queue = vec![first];
         let mut i = 0;
-        while let Some(&t) = queue.get(i) {
+        while let Some(&tile) = queue.get(i) {
             i += 1;
-            let cell = self.cell(t)?;
+            let cell = self.cell(tile)?;
             // a civilian takes a tile no search touched, another unit any that is not explored
             let wanted = if unit.civilian {
                 cell == UNEXPLORED
             } else {
                 cell != EXPLORED
             };
-            if area.visible_now(t) || !wanted {
-                push_neighbours(&mut queue, &mut visited, t, map);
+            if area.visible_now(tile) || !wanted {
+                push_neighbours(&mut queue, &mut visited, tile, map);
                 continue;
             }
-            if area.zone(t).byte() != own || !area.clear(t)? {
+            if area.zone(tile).byte() != own || !area.clear(tile)? {
                 continue;
             }
-            if area.reaches(t)? {
-                self.path_map.set(t, EXPLORED);
-                return Ok(Flood::Found(t));
+            if area.reaches(tile)? {
+                self.path_map.set(tile, EXPLORED);
+                return Ok(Flood::Found(tile));
             }
-            self.path_map.set(t, PUNTED);
+            self.path_map.set(tile, PUNTED);
             if differs(start.x(), unit.position.x()) || differs(start.y(), unit.position.y()) {
                 return Ok(Flood::Again);
             }
@@ -249,8 +249,8 @@ impl InfoModule {
 /// `FUN_140b6c2d0`: the tile's neighbours on the map that the flood has not met join the queue
 /// (left, right, up, down).
 fn push_neighbours(queue: &mut Vec<Tile>, visited: &mut [bool], at: Tile, map: GridSize) {
-    for n in at.beside() {
-        let (nx, ny) = (n.x(), n.y());
+    for tile in at.beside() {
+        let (nx, ny) = (tile.x(), tile.y());
         if nx < 0 || ny < 0 || map.width() <= nx || map.height() <= ny {
             continue;
         }
@@ -259,7 +259,7 @@ fn push_neighbours(queue: &mut Vec<Tile>, visited: &mut [bool], at: Tile, map: G
             && !*met
         {
             *met = true;
-            queue.push(n);
+            queue.push(tile);
         }
     }
 }

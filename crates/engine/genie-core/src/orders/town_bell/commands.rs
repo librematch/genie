@@ -58,7 +58,7 @@ impl World {
     /// slot 0x4c0, is not simulation); then [`crate::world::World::shelter`] with the reach
     /// (`param_6` 1), no transports, not through the unit AIs.
     pub(crate) fn ring_town_bell(&mut self, owner: PlayerId, tc: ObjectId) -> GenieResult<()> {
-        let Some((_, t)) = self.object(tc) else {
+        let Some((_, tc_unit)) = self.object(tc) else {
             return Ok(());
         };
         // The town centre, whose bell the command rings (`0x6109` raw).
@@ -68,7 +68,7 @@ impl World {
         if !self
             .model
             .roles
-            .of_master(t.life.master_id)
+            .of_master(tc_unit.life.master_id)
             .contains(MasterRoles::TOWN_CENTRE)
         {
             return Ok(());
@@ -76,26 +76,28 @@ impl World {
         let (at, radius) = self.ground(tc)?;
         let mut units = Vec::new();
         let mut shelters = Shelters::default();
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let here = k;
-            let o = &self.players.live(owner, here)?;
-            k = k.next();
-            if o.life.state != ObjectState::Alive || o.life.inside.is_some() {
+        let mut list_index = ListIndex::FIRST;
+        while self.players.player(owner)?.objects.holds(list_index) {
+            let here = list_index;
+            let unit = &self.players.live(owner, here)?;
+            list_index = list_index.next();
+            if unit.life.state != ObjectState::Alive || unit.life.inside.is_some() {
                 continue;
             }
-            let id = o.id;
-            let m = o.master(self.master_tables(), owner)?;
+            let id = unit.id;
+            let m = unit.master(self.master_tables(), owner)?;
             let (kind, class, master) = (m.kind, m.class, m.id);
-            let takes_villagers = m
-                .building
-                .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            let near = |t: &Self| -> GenieResult<bool> {
-                let (other_at, other_radius) = t.ground(id)?;
+            let takes_villagers = m.building.is_some_and(|building_master| {
+                building_master
+                    .garrison_kind
+                    .contains(GarrisonKinds::VILLAGERS)
+            });
+            let near = |world: &Self| -> GenieResult<bool> {
+                let (other_at, other_radius) = world.ground(id)?;
                 let gap = footprint_gap_squared(other_at, other_radius, at, radius);
                 // COMISS reach, gap; JC: a gap above it, or a NaN, is out
                 Ok(!below_or_unordered(
-                    t.model.tuning.garrison.town_bell_reach,
+                    world.model.tuning.garrison.town_bell_reach,
                     gap.get(),
                 ))
             };
@@ -139,35 +141,35 @@ impl World {
     /// (`FUN_14104f8f0`) and master 1808 (`FUN_14104f960`), in that order, not inside another
     /// (`+0x2f0`) goes back to work from where it is.
     pub(crate) fn end_town_bell(&mut self, owner: PlayerId, tc: ObjectId) -> GenieResult<()> {
-        let Some((_, t)) = self.object(tc) else {
+        let Some((_, tc_unit)) = self.object(tc) else {
             return Ok(());
         };
         if !self
             .model
             .roles
-            .of_master(t.life.master_id)
+            .of_master(tc_unit.life.master_id)
             .contains(MasterRoles::TOWN_CENTRE)
         {
             return Ok(());
         }
         let (at, radius) = self.ground(tc)?;
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let idx = k;
-            k = k.next();
-            let b = &self.players.live(owner, idx)?;
-            let m = b.master(self.master_tables(), owner)?;
-            let takes_villagers = m
+        let mut list_index = ListIndex::FIRST;
+        while self.players.player(owner)?.objects.holds(list_index) {
+            let idx = list_index;
+            list_index = list_index.next();
+            let unit = &self.players.live(owner, idx)?;
+            let master = unit.master(self.master_tables(), owner)?;
+            let takes_villagers = master
                 .building
                 .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            if m.kind != MasterKind::BUILDING
-                || ObjectState::Dying <= b.life.state
+            if master.kind != MasterKind::BUILDING
+                || ObjectState::Dying <= unit.life.state
                 || !takes_villagers
-                || !self.parts.town_bell_of(b.id).flag.is_sheltered()
+                || !self.parts.town_bell_of(unit.id).flag.is_sheltered()
             {
                 continue;
             }
-            let id = b.id;
+            let id = unit.id;
             self.parts.set_town_bell_flag(id, BellShelter::Free);
             let (building_at, building_radius) = self.ground(id)?;
             // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
@@ -198,23 +200,23 @@ impl World {
             return Ok(());
         }
         let (at, radius) = self.ground(id)?;
-        let mut k = ListIndex::FIRST;
-        while self.players.player(owner)?.objects.holds(k) {
-            let idx = k;
-            k = k.next();
-            let b = &self.players.live(owner, idx)?;
-            let m = b.master(self.master_tables(), owner)?;
-            let takes_villagers = m
+        let mut list_index = ListIndex::FIRST;
+        while self.players.player(owner)?.objects.holds(list_index) {
+            let idx = list_index;
+            list_index = list_index.next();
+            let unit = &self.players.live(owner, idx)?;
+            let master = unit.master(self.master_tables(), owner)?;
+            let takes_villagers = master
                 .building
                 .is_some_and(|x| x.garrison_kind.contains(GarrisonKinds::VILLAGERS));
-            if b.life.state != ObjectState::Alive
-                || b.life.inside.is_some()
-                || m.kind != MasterKind::BUILDING
+            if unit.life.state != ObjectState::Alive
+                || unit.life.inside.is_some()
+                || master.kind != MasterKind::BUILDING
                 || !takes_villagers
             {
                 continue;
             }
-            let (building_at, building_radius) = self.ground(b.id)?;
+            let (building_at, building_radius) = self.ground(unit.id)?;
             // COMISS reach, gap; JC: a gap above it, or a NaN, lets none out
             let gap = footprint_gap_squared(building_at, building_radius, at, radius);
             if below_or_unordered(self.model.tuning.garrison.town_bell_reach, gap.get()) {
@@ -229,17 +231,17 @@ impl World {
     /// villager (class 4) or of master 1808 back to work, from the last in
     /// ([`crate::world::World::back_to_work`]; its sound, slot 0x4c0, is not simulation).
     fn workers_out(&mut self, owner: PlayerId, idx: ListIndex) -> GenieResult<()> {
-        let mut i = self.players.live(owner, idx)?.garrison.len();
-        while 0 < i {
-            i -= 1;
-            let Some(&inside) = self.players.live(owner, idx)?.garrison.get(i) else {
+        let mut live = self.players.live(owner, idx)?.garrison.len();
+        while 0 < live {
+            live -= 1;
+            let Some(&inside) = self.players.live(owner, idx)?.garrison.get(live) else {
                 continue;
             };
             // any player's unit; an id the world no longer holds is a null entry
-            let Some((up, u)) = self.object(inside) else {
+            let Some((up, unit)) = self.object(inside) else {
                 continue;
             };
-            let um = u.master(self.master_tables(), up)?;
+            let um = unit.master(self.master_tables(), up)?;
             if MasterKind::COMBAT <= um.kind
                 && (self
                     .model
@@ -269,10 +271,10 @@ impl World {
         for id in ids.into_iter().flatten() {
             // the tracker's keepers follow every object its player gains and loses: the world
             // holds each (the game reads it without a test)
-            let Some((_, u)) = self.object(id) else {
+            let Some((_, unit)) = self.object(id) else {
                 continue;
             };
-            if u.life.inside.is_none() {
+            if unit.life.inside.is_none() {
                 let _ = self.back_to_work(None, id)?;
             }
         }

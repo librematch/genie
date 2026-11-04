@@ -99,7 +99,12 @@ impl RepairState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::Move { move_to: Some(m) } | Self::WalkPoint { move_to: Some(m) } => Some(m),
+            Self::Move {
+                move_to: Some(move_to_action),
+            }
+            | Self::WalkPoint {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -107,7 +112,7 @@ impl RepairState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -115,9 +120,9 @@ impl RepairState {
     /// The same state, its walk without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut repair_state = self;
+        let _ = repair_state.take_move_to();
+        repair_state
     }
 }
 
@@ -131,20 +136,23 @@ mod tests {
     /// `MoveTo` of a state that does not walk; the walks give theirs.
     #[test]
     fn repair_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match RepairState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 0 | 5 | 8 | 9 | 12 | 14..), "{b}"),
+        for index in 0..=255_u8 {
+            match RepairState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(matches!(index, 0 | 5 | 8 | 9 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(RepairState::Wait.to_string(), "10");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 11] {
-            let mut s = RepairState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut repair_state = RepairState::of_byte(b, Some(walk)).unwrap();
+            assert_eq!(
+                (repair_state.get(), repair_state.move_to()),
+                (b, Some(&walk))
+            );
+            assert_eq!(repair_state.bare().move_to(), None);
+            assert_eq!(repair_state.take_move_to(), Some(walk));
+            assert_eq!(repair_state.move_to(), None);
         }
         assert!(RepairState::of_byte(7, Some(walk)).is_err());
         assert_eq!(RepairState::Work.bare(), RepairState::Work);

@@ -82,8 +82,8 @@ impl Mul<WorkValue> for WorkRate {
 }
 
 impl genie_diff::Diff for WorkRate {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -102,9 +102,9 @@ mod tests {
         c += b;
         assert_eq!(c.get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
-        let mut d = a;
-        d *= 3.0;
-        assert_eq!(d, a * 3.0);
+        let mut work_rate = a;
+        work_rate *= 3.0;
+        assert_eq!(work_rate, a * 3.0);
         assert_eq!(
             ((a * 3.0) * Seconds::new(0.7)).to_bits(),
             ((0.1_f32 * 3.0) * 0.7).to_bits()

@@ -39,8 +39,8 @@ impl PlayerId {
 
 impl genie_diff::Diff for PlayerId {
     /// By equality: a player is one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -65,7 +65,7 @@ impl PlayerId {
     /// The value of a field that holds −1 for none.
     #[must_use]
     pub fn field(player: Option<Self>) -> i32 {
-        player.map_or(Self::NONE, |p| i32::from(p.0))
+        player.map_or(Self::NONE, |player_id| i32::from(player_id.0))
     }
 
     /// The player of number `number`, as a command's byte holds it (for a constant).
@@ -106,9 +106,12 @@ mod tests {
     #[test]
     fn player_index_is_its_number() {
         for number in [0, 8, u8::MAX] {
-            let p = PlayerId::from(number);
-            assert_eq!((p.get(), p.index()), (number, usize::from(number)));
-            assert_eq!(PlayerId::try_from(p.index()), Ok(p));
+            let player_id = PlayerId::from(number);
+            assert_eq!(
+                (player_id.get(), player_id.index()),
+                (number, usize::from(number))
+            );
+            assert_eq!(PlayerId::try_from(player_id.index()), Ok(player_id));
         }
     }
 
@@ -122,7 +125,7 @@ mod tests {
         assert_eq!(PlayerId::field(None), -1);
         for bad in [-2, 256] {
             assert_eq!(
-                PlayerId::of_field(bad).map_err(|e| e.kind()),
+                PlayerId::of_field(bad).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
@@ -152,7 +155,7 @@ mod tests {
     #[test]
     fn an_index_past_byte_is_no_player() {
         assert_eq!(
-            PlayerId::try_from(256_usize).map_err(|e| e.kind()),
+            PlayerId::try_from(256_usize).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }

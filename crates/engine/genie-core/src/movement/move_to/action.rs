@@ -129,7 +129,7 @@ pub fn object_range(
             && m.action_part()
                 .tasks
                 .iter()
-                .any(|t| t.action_kind == CART_TASK)
+                .any(|task| task.action_kind == CART_TASK)
     });
     if cart {
         Distance::new(order_tuning.cart_move_range)
@@ -247,9 +247,9 @@ impl MoveToAction {
         sprite: Option<Graphic>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<Self> {
-        let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
+        let placed = world.get_known(target)?.ok_or(TARGET_LACKING)?;
         let ground = mover.stats.radius.ground();
-        let state = if footprint_gap(me, ground, t.position, t.radius)
+        let state = if footprint_gap(me, ground, placed.position, placed.radius)
             <= Distance::new(move_to_tuning.arrived)
         {
             MoveTo::Arrived
@@ -260,7 +260,7 @@ impl MoveToAction {
         };
         Ok(Self {
             state,
-            point: t.position,
+            point: placed.position,
             target: Some(target),
             range,
             sprite,
@@ -293,15 +293,19 @@ impl MoveToAction {
     ) -> GenieResult<Self> {
         let (roles, artifact_tuning, move_to_tuning) =
             (&model.roles, model.tuning.artifact, &model.tuning.move_to);
-        let t = world.get_known(target)?.ok_or(TARGET_LACKING)?;
-        let at = t.position;
-        let goal = if livestock && roles.of_master(t.master).contains(MasterRoles::TOWN_CENTRE) {
+        let placed = world.get_known(target)?.ok_or(TARGET_LACKING)?;
+        let at = placed.position;
+        let goal = if livestock
+            && roles
+                .of_master(placed.master)
+                .contains(MasterRoles::TOWN_CENTRE)
+        {
             Position::new(
                 at.x() - artifact_tuning.town_centre_offset,
                 at.y() - artifact_tuning.town_centre_offset,
                 at.z(),
             )
-        } else if holds_object(livestock, t.master, state, roles) {
+        } else if holds_object(livestock, placed.master, state, roles) {
             return Self::to_target(world, me, mover, target, range, sprite, move_to_tuning);
         } else {
             at
@@ -378,11 +382,11 @@ impl MoveToAction {
     fn ended(&self, walk: &mut Walk<'_>, shows: &mut Shows<'_>) {
         let sprite_tuning = walk.by_id.tuning().sprite;
         if matches!(self.state, MoveTo::Arrived | MoveTo::Failed) {
-            if let Some(g) = shows.standing.or(shows.master_standing) {
+            if let Some(graphic) = shows.standing.or(shows.master_standing) {
                 new_sprite(
                     shows.sprite,
                     walk.move_stats_mut(),
-                    g,
+                    graphic,
                     shows.rng,
                     sprite_tuning,
                 );
@@ -473,7 +477,7 @@ impl MoveToAction {
                 self.target = None;
                 Ok(None)
             }
-            Some(s) if ObjectState::Undead < s => {
+            Some(object_state) if ObjectState::Undead < object_state => {
                 self.target = None;
                 if self.voice.is_quiet() {
                     return Ok(Some(UpdateCode::Code5));
@@ -502,10 +506,10 @@ impl MoveToAction {
         };
         let follow = target_left(walk, target, self.point, self.on_target_moved)?;
         match follow {
-            Follow::PathEnd(p) => {
+            Follow::PathEnd(position) => {
                 let mover = walk.mover_mut().ok_or(WALKER_UNMOVING)?;
-                mover.follow_path_end(p);
-                self.point = p;
+                mover.follow_path_end(position);
+                self.point = position;
             }
             Follow::Again | Follow::Blocked => self.state = MoveTo::Start,
             Follow::Stays => {}
@@ -625,7 +629,7 @@ mod tests {
 
         /// The id of the sprite the unit shows.
         fn shown(&self) -> Option<SpriteId> {
-            self.sprite.map(|s| s.graphic.id)
+            self.sprite.map(|active_sprite| active_sprite.graphic.id)
         }
     }
 
@@ -700,9 +704,10 @@ mod tests {
             .update(rig.walk(0), PathAsk::default(), looks.shows())
             .unwrap();
         assert_eq!((w.state, w.wait.timer), (MoveTo::Start, Seconds::ZERO));
-        let reason = |mut m: MoveToAction| {
+        let reason = |mut move_to_action: MoveToAction| {
             let mut rig = WalkRig::on_the_path();
-            m.update(rig.walk(0), PathAsk::default(), Looks::default().shows())
+            move_to_action
+                .update(rig.walk(0), PathAsk::default(), Looks::default().shows())
                 .unwrap_err()
                 .reason()
         };
@@ -723,11 +728,15 @@ mod tests {
         let started = |sprite: Option<Graphic>| {
             let mut rig = WalkRig::on_the_path();
             let mut looks = Looks::default();
-            let mut m = own_move_to(MoveTo::Start, sprite, -1);
-            let _ = m
+            let mut move_to_action = own_move_to(MoveTo::Start, sprite, -1);
+            let _ = move_to_action
                 .update(rig.walk(0), PathAsk::default(), looks.shows())
                 .unwrap();
-            (m.state, looks.shown(), rig.mover_mut().stats.speed)
+            (
+                move_to_action.state,
+                looks.shown(),
+                rig.mover_mut().stats.speed,
+            )
         };
         assert_eq!(
             started(Some(RUNNING)),
@@ -830,12 +839,12 @@ mod tests {
         let walked = |point: Position, waypoint| {
             let mut rig = WalkRig::on_the_path();
             rig.mover_mut().paths[0].waypoint = waypoint;
-            let mut m = own_move_to(MoveTo::Moving, Some(WALKING), 10028);
-            m.point = point;
-            let step = m
+            let mut move_to_action = own_move_to(MoveTo::Moving, Some(WALKING), 10028);
+            move_to_action.point = point;
+            let step = move_to_action
                 .update(rig.walk(0), PathAsk::default(), Looks::default().shows())
                 .unwrap();
-            (m.state, step.target_moved)
+            (move_to_action.state, step.target_moved)
         };
         assert_eq!(
             walked(Position::new(30.0, 88.0, 0.0), WaypointIndex::of_data(1)),
@@ -1017,9 +1026,9 @@ mod tests {
         let start = |speed: f32| {
             let mut walker = tests_walker();
             walker.stats.speed = Speed::new(speed);
-            let m =
+            let move_to_action =
                 MoveToAction::to_point(point, Distance::new(0.5), Some(RUNNING), Some(&mut walker));
-            (m, walker.stats.speed)
+            (move_to_action, walker.stats.speed)
         };
         let (moving, speed) = start(0.8);
         assert_eq!(

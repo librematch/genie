@@ -21,26 +21,26 @@ impl From<u8> for CivilizationId {
 }
 
 impl From<CivilizationId> for u8 {
-    fn from(n: CivilizationId) -> Self {
-        n.0
+    fn from(civilization_id: CivilizationId) -> Self {
+        civilization_id.0
     }
 }
 
 impl From<CivilizationId> for u16 {
-    fn from(n: CivilizationId) -> Self {
-        n.0.into()
+    fn from(civilization_id: CivilizationId) -> Self {
+        civilization_id.0.into()
     }
 }
 
 impl From<CivilizationId> for u32 {
-    fn from(n: CivilizationId) -> Self {
-        n.0.into()
+    fn from(civilization_id: CivilizationId) -> Self {
+        civilization_id.0.into()
     }
 }
 
 impl From<CivilizationId> for usize {
-    fn from(n: CivilizationId) -> Self {
-        n.0.into()
+    fn from(civilization_id: CivilizationId) -> Self {
+        civilization_id.0.into()
     }
 }
 

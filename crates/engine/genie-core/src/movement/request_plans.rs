@@ -91,7 +91,7 @@ impl Mover {
         (at, me): (Position, &Me),
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<AfterRequest>> {
@@ -102,23 +102,23 @@ impl Mover {
                 "a path request in game type 12 (its tile escape)",
             ));
         }
-        if w.level == WaypointLevel::Top && TILE_PATHER {
-            self.first_plan(me, world, plan, w, np, by_id)?;
+        if way.level == WaypointLevel::Top && TILE_PATHER {
+            self.first_plan(me, world, plan, way, np, by_id)?;
         }
-        let tail = match self.short_tail(me, world, plan, w, np, by_id)? {
+        let tail = match self.short_tail(me, world, plan, way, np, by_id)? {
             ControlFlow::Break(step) => return Ok(Some(step)),
             ControlFlow::Continue(tail) => tail,
         };
-        if tail && let Some(step) = self.long_tail((at, me), world, plan, w, np, by_id)? {
+        if tail && let Some(step) = self.long_tail((at, me), world, plan, way, np, by_id)? {
             return Ok(Some(step));
         }
         if (!np.flags.contains(PlanFlags::FOUND) || too_short(&np.path, movement_tuning))
-            && w.level == WaypointLevel::Top
+            && way.level == WaypointLevel::Top
             && TILE_PATHER
         {
-            self.tile_again(me, world, plan, w, np, by_id)?;
+            self.tile_again(me, world, plan, way, np, by_id)?;
         }
-        if !(np.path.length <= w.distance * DETOUR || np.path.length <= LONG) {
+        if !(np.path.length <= way.distance * DETOUR || np.path.length <= LONG) {
             np.new.repath_time = Seconds::new((plan.object.rand15() as f32 * 0.5) / 32767.0 + 2.0);
         }
         Ok(None)
@@ -133,17 +133,17 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<()> {
         if self.planner_exists(world, plan) {
-            if !self.near_target_path(me, world, plan, w, np, by_id)? {
-                self.first_tile_plan(me, world, plan, w, np, by_id)?;
+            if !self.near_target_path(me, world, plan, way, np, by_id)? {
+                self.first_tile_plan(me, world, plan, way, np, by_id)?;
             }
         } else {
-            let _ = np.path.insert(0, w.position);
-            let _ = np.path.push(w.waypoint);
+            let _ = np.path.insert(0, way.position);
+            let _ = np.path.push(way.waypoint);
             np.flags |= PlanFlags::PLANNED;
             np.flags |= PlanFlags::FOUND;
         }
@@ -160,24 +160,25 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
-        if w.goal.target.is_none()
-            || movement_tuning.target_short_reach < w.distance.get()
-            || w.distance.get().is_nan()
+        if way.goal.target.is_none()
+            || movement_tuning.target_short_reach < way.distance.get()
+            || way.distance.get().is_nan()
         {
             return Ok(false);
         }
-        let near = if self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)? {
-            GoalReach::Near
-        } else {
-            GoalReach::Far
-        };
-        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
-        if r != ShortFound::Reached || np.path.length.get() <= EPSILON {
+        let near =
+            if self.near_goal(way.distance, way.goal.gap, way.goal.to_end, movement_tuning)? {
+                GoalReach::Near
+            } else {
+                GoalReach::Far
+            };
+        let short_found = self.short_path_to(me, (world, by_id), plan, way, near, np)?;
+        if short_found != ShortFound::Reached || np.path.length.get() <= EPSILON {
             np.flags |= PlanFlags::SHORT_FAILED;
             np.path.points.clear();
             return Ok(false);
@@ -196,47 +197,48 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<()> {
-        let target_moves = w.goal.target.is_some_and(|(_, t)| t.moves);
-        let target_radius = w
+        let target_moves = way.goal.target.is_some_and(|(_, t)| t.moves);
+        let target_radius = way
             .goal
             .target
             .filter(|_| !target_moves)
             .map_or(0.0, |(_, t)| t.radius.x());
         let ask = TileAsk {
-            goal: w.waypoint,
-            radii: Distance::new(target_radius + w.radius.get()),
-            range: w.range,
-            target: w.goal.target.map(|(_, t)| t),
+            goal: way.waypoint,
+            radii: Distance::new(target_radius + way.radius.get()),
+            range: way.range,
+            target: way.goal.target.map(|(_, placed)| placed),
         };
         // `first_plan` tested the planner of the same restriction, and the restriction tables
         // never change
-        let r = self
+        let found = self
             .tile_plan(me, world, plan, ask, &mut np.path, by_id)?
             .ok_or(GenieError::unreachable(
                 "a plan without the planner it tested",
             ))?;
         // the game also tests for 4, which the planner never returns
-        if !r.leads() {
+        if !found.leads() {
             return Ok(());
         }
         let level = self.paths.walked_mut()?;
-        if r == Found::Nearest
+        if found == Found::Nearest
             && (level.level != WaypointLevel::Top || level.flags.contains(LevelFlags::NEAREST))
         {
             return Ok(());
         }
         np.flags |= PlanFlags::PLANNED;
         let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
-        let farther = w.distance < ground(w.waypoint, last);
+        let farther = way.distance < ground(way.waypoint, last);
         if farther {
             np.path.points.clear();
         }
         np.flags.set(PlanFlags::FOUND, !farther);
-        if !target_moves && !farther && level.level == WaypointLevel::Top && r == Found::Nearest {
+        if !target_moves && !farther && level.level == WaypointLevel::Top && found == Found::Nearest
+        {
             level.flags |= LevelFlags::NEAREST;
         }
         Ok(())
@@ -250,25 +252,25 @@ impl Mover {
         me: &Me,
         (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         near: GoalReach,
         np: &mut NewPath,
     ) -> GenieResult<ShortFound> {
         let movement_tuning = &by_id.tuning().movement;
-        let line = ground_line(self.moved_at, w.waypoint);
-        let ignore = self.ignore_list(me, world, plan, w.goal.target, line, by_id)?;
+        let line = ground_line(self.moved_at, way.waypoint);
+        let ignore = self.ignore_list(me, world, plan, way.goal.target, line, by_id)?;
         let ask = ShortAsk {
-            goal: w.waypoint,
-            range: short_range(near, w.range, movement_tuning),
-            target: w.target_id,
+            goal: way.waypoint,
+            range: short_range(near, way.range, movement_tuning),
+            target: way.target_id,
             ignore: &ignore,
-            include: w.include,
+            include: way.include,
         };
-        let r = self.short_path(me, world, plan, ask, &mut np.path, by_id)?;
+        let short_found = self.short_path(me, world, plan, ask, &mut np.path, by_id)?;
         np.path.measure();
         np.new.created = plan.now;
         self.give_ignored(&mut np.new, plan.now);
-        Ok(r)
+        Ok(short_found)
     }
 
     /// Without a path of three points: the short pather's, when it did not fail and the
@@ -282,36 +284,38 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<ControlFlow<AfterRequest, bool>> {
         let movement_tuning = &by_id.tuning().movement;
-        let near = if self.near_goal(w.distance, w.goal.gap, w.goal.to_end, movement_tuning)? {
-            GoalReach::Near
-        } else {
-            GoalReach::Far
-        };
+        let near =
+            if self.near_goal(way.distance, way.goal.gap, way.goal.to_end, movement_tuning)? {
+                GoalReach::Near
+            } else {
+                GoalReach::Far
+            };
         if np.flags.contains(PlanFlags::FOUND) && 3 <= np.path.points.len() {
             return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
         if SHORT_PATHER
             && !np.flags.contains(PlanFlags::SHORT_FAILED)
-            && (w.distance <= Distance::new(movement_tuning.short_reach) || near == GoalReach::Near)
-            && let Some(step) = self.short_try(me, (world, by_id), plan, w, near, np)?
+            && (way.distance <= Distance::new(movement_tuning.short_reach)
+                || near == GoalReach::Near)
+            && let Some(step) = self.short_try(me, (world, by_id), plan, way, near, np)?
         {
             return Ok(ControlFlow::Break(step));
         }
         if np.flags.contains(PlanFlags::FOUND) {
             return Ok(ControlFlow::Continue(too_short(&np.path, movement_tuning)));
         }
-        if (w.distance < Distance::new(movement_tuning.close)
-            || w.goal.gap < Distance::new(movement_tuning.close))
-            && self.close_in(me, w.waypoint, w.target_id, world, by_id)?
+        if (way.distance < Distance::new(movement_tuning.close)
+            || way.goal.gap < Distance::new(movement_tuning.close))
+            && self.close_in(me, way.waypoint, way.target_id, world, by_id)?
         {
             np.path.points.clear();
-            let _ = np.path.push(w.position);
-            let _ = np.path.push(w.waypoint);
+            let _ = np.path.push(way.position);
+            let _ = np.path.push(way.waypoint);
             np.path.measure();
             np.new.created = plan.now;
             np.flags |= PlanFlags::FOUND;
@@ -328,18 +332,19 @@ impl Mover {
         me: &Me,
         (world, by_id): (&mut Spatial, ObjectsRef<'_>),
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         near: GoalReach,
         np: &mut NewPath,
     ) -> GenieResult<Option<AfterRequest>> {
         let movement_tuning = &by_id.tuning().movement;
         np.flags &= !PlanFlags::PLANNED;
         np.path.points.clear();
-        let r = self.short_path_to(me, (world, by_id), plan, w, near, np)?;
+        let short_found = self.short_path_to(me, (world, by_id), plan, way, near, np)?;
         let length = np.path.length.get();
-        let blocked = r.fails()
+        let blocked = short_found.fails()
             || length <= EPSILON
-                && (r != ShortFound::InRange || (1 < np.path.points.len() && EPSILON <= length));
+                && (short_found != ShortFound::InRange
+                    || (1 < np.path.points.len() && EPSILON <= length));
         if blocked {
             // far from its end (LONG < to_end) the game tells the units ahead to make way
             // (FUN_140f8a230, FUN_140f88750), which return at once: their switch is a zeroed
@@ -348,13 +353,14 @@ impl Mover {
         }
         if length <= EPSILON {
             return self
-                .waypoint_in_range(w, plan.now, movement_tuning)
+                .waypoint_in_range(way, plan.now, movement_tuning)
                 .map(Some);
         }
         np.flags |= PlanFlags::FOUND;
-        np.flags.set(PlanFlags::PARTIAL, r == ShortFound::Partial);
+        np.flags
+            .set(PlanFlags::PARTIAL, short_found == ShortFound::Partial);
         let last = point_or_zero(&np.path, WaypointIndex::last_of(np.path.points.len()));
-        np.end_gap = ground(w.waypoint, last);
+        np.end_gap = ground(way.waypoint, last);
         Ok(None)
     }
 
@@ -364,17 +370,17 @@ impl Mover {
     /// gives up; short of it the level goes on (flag 1). Within it the level takes state 4.
     pub(super) fn waypoint_in_range(
         &mut self,
-        w: &Way<'_>,
+        way: &Way<'_>,
         now: WorldTime,
         movement_tuning: &MovementTuning,
     ) -> GenieResult<AfterRequest> {
-        let reach = if w.goal.target.is_none() || Distance::ZERO < w.range {
-            w.range
+        let reach = if way.goal.target.is_none() || Distance::ZERO < way.range {
+            way.range
         } else {
             Distance::new(movement_tuning.range_floor)
         };
         let level = self.paths.walked_mut()?;
-        if reach < w.goal.gap {
+        if reach < way.goal.gap {
             if level.waypoint == WaypointIndex::last_of(level.points.len()) && level.created == now
             {
                 self.stop()?;
@@ -397,24 +403,24 @@ impl Mover {
         (at, me): (Position, &Me),
         world: &mut Spatial,
         plan: &Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<AfterRequest>> {
         let movement_tuning = &by_id.tuning().movement;
         let roles = by_id.roles();
         if !(LONG_PATHER
-            && (w.class_roles.contains(ClassRoles::TRADE_CART)
-                || movement_tuning.short_reach < w.distance.get()))
+            && (way.class_roles.contains(ClassRoles::TRADE_CART)
+                || movement_tuning.short_reach < way.distance.get()))
         {
             return Ok(None);
         }
         let ground_radius = self.stats.radius.ground();
         let far = far_waypoint(
-            w.distance,
-            w.goal.target.map(|(_, t)| {
-                let gap = footprint_gap(at, ground_radius, t.position, t.radius);
-                (gap, t.master)
+            way.distance,
+            way.goal.target.map(|(_, placed)| {
+                let gap = footprint_gap(at, ground_radius, placed.position, placed.radius);
+                (gap, placed.master)
             }),
             roles,
             movement_tuning,
@@ -423,11 +429,11 @@ impl Mover {
             return Ok(None);
         }
         np.flags &= !PlanFlags::PLANNED;
-        let target = w.goal.target;
+        let target = way.goal.target;
         let ask = LongAsk {
-            waypoint: w.waypoint,
-            way: w.distance,
-            range: w.range,
+            waypoint: way.waypoint,
+            way: way.distance,
+            range: way.range,
             target,
         };
         let Some((reached, farther)) =
@@ -452,30 +458,30 @@ impl Mover {
         me: &Me,
         world: &mut Spatial,
         plan: &mut Planning<'_>,
-        w: &Way<'_>,
+        way: &Way<'_>,
         np: &mut NewPath,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<()> {
-        let target_radius = w
+        let target_radius = way
             .goal
             .target
             .filter(|(_, t)| !t.moves)
             .map_or(0.0, |(_, t)| t.radius.x());
         let mut other = Path::default();
         let ask = TileAsk {
-            goal: w.waypoint,
-            radii: Distance::new(target_radius + w.radius.get()),
-            range: w.range,
-            target: w.goal.target.map(|(_, t)| t),
+            goal: way.waypoint,
+            radii: Distance::new(target_radius + way.radius.get()),
+            range: way.range,
+            target: way.goal.target.map(|(_, placed)| placed),
         };
-        let Some(r) = self.tile_plan(me, world, plan, ask, &mut other, by_id)? else {
+        let Some(found) = self.tile_plan(me, world, plan, ask, &mut other, by_id)? else {
             return Ok(());
         };
         let last = point_or_zero(&other, WaypointIndex::last_of(other.points.len()));
-        let end = ground(w.waypoint, last);
-        if end <= w.distance {
+        let end = ground(way.waypoint, last);
+        if end <= way.distance {
             // the game's `result - 1 < 2 || 4 < result`: above 4 the planner never returns
-            if r.leads() && end < np.end_gap {
+            if found.leads() && end < np.end_gap {
                 np.path.points.clear();
                 for &p in &other.points {
                     let _ = np.path.push(p);

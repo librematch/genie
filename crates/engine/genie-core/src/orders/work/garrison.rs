@@ -49,13 +49,13 @@ impl World {
             players: &self.players,
             drop_sites: &self.model.drop_sites,
         };
-        let t = self.task_target(target, 1)?;
+        let task_target = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
         Ok(find_task(
             master,
             &actor,
             &TaskOn {
-                target: Some(&t),
+                target: Some(&task_target),
                 general: Some(&general),
                 terrain: self.task_terrain(point),
             },

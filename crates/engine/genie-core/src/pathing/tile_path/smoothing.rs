@@ -10,13 +10,13 @@ use crate::world::layer::generated::TilePathTuning;
 
 /// The obstruction manager as the smoothing asks it for a unit (`FUN_140f7dbb0`).
 pub trait SegmentTest<E> {
-    /// Whether the unit's straight walk from `a` to `b` (x, y) meets an obstruction
+    /// Whether the unit's straight walk from `point` to `point` (x, y) meets an obstruction
     /// (`FUN_141052b90`, then `FUN_141052350` with flags `0x100`).
     ///
     /// # Errors
     ///
     /// What the test cannot answer.
-    fn blocked(&mut self, a: Point, b: Point) -> Result<bool, E>;
+    fn blocked(&mut self, point: Point, point: Point) -> Result<bool, E>;
 
     /// A pass that tested walks ends (`FUN_1410561f0`): the temporary tile records its walks put
     /// go.
@@ -63,10 +63,10 @@ pub(super) fn straighten(
         }
     }
     let direction = BVector::new(d.x() / length, d.height() / length, d.y() / length);
-    for t in 1..=steps {
+    for index in 1..=steps {
         let step = length / (steps + 1) as f32 * direction;
-        let p = a + t as f32 * step;
-        if let Some(slot) = usize::try_from(first + t)
+        let p = a + index as f32 * step;
+        if let Some(slot) = usize::try_from(first + index)
             .ok()
             .and_then(|i| path.points.get_mut(i))
         {

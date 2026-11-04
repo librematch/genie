@@ -37,12 +37,12 @@ impl Master {
     /// layer.
     #[must_use]
     pub fn missile_stats(&self) -> Option<MissileStats> {
-        self.missile.map(|m| MissileStats {
-            projectile_kind: m.projectile_kind,
-            smart_mode: m.smart_mode,
-            hit_mode: m.hit_mode,
-            vanish_mode: m.vanish_mode,
-            arc: m.arc,
+        self.missile.map(|missile_part| MissileStats {
+            projectile_kind: missile_part.projectile_kind,
+            smart_mode: missile_part.smart_mode,
+            hit_mode: missile_part.hit_mode,
+            vanish_mode: missile_part.vanish_mode,
+            arc: missile_part.arc,
             speed: self.animated_part().max_speed,
             radius: self.radius.with_height(self.height.get()),
             fly_mode: self.fly_mode,
@@ -76,18 +76,21 @@ mod tests {
     /// an effect on the speed or the size reaches the flight with no copy to update.
     #[test]
     fn the_flight_reads_the_layer_and_the_masters_speed_and_size() {
-        let mut m = Master::of_kind(MasterKind::MISSILE);
+        let mut master = Master::of_kind(MasterKind::MISSILE);
         let layer = MissilePart {
             projectile_kind: ProjectileKind::of_data(1),
             arc: ArcRatio::new(0.25),
             ..MissilePart::default()
         };
-        m.missile = Some(layer);
-        m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(7.0);
-        (m.radius, m.height) = (Footprint::new(0.1, 0.2), Distance::new(0.3));
-        m.fly_mode = FlyMode::of_data(1);
+        master.missile = Some(layer);
+        master
+            .animated
+            .get_or_insert_with(Default::default)
+            .max_speed = Speed::new(7.0);
+        (master.radius, master.height) = (Footprint::new(0.1, 0.2), Distance::new(0.3));
+        master.fly_mode = FlyMode::of_data(1);
         assert_eq!(
-            m.missile_stats(),
+            master.missile_stats(),
             Some(MissileStats {
                 projectile_kind: layer.projectile_kind,
                 smart_mode: layer.smart_mode,

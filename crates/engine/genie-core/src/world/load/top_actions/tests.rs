@@ -104,16 +104,16 @@ fn by_kind(set: impl FnOnce(&mut RgeActionByKind)) -> Action {
     }
 }
 
-/// An Explore (its base alone) of `b`.
-fn explore(b: RgeAction) -> Action {
-    by_kind(|t| t.rge_action_explore = Some(Box::new(b)))
+/// An Explore (its base alone) of `rge_action`.
+fn explore(rge_action: RgeAction) -> Action {
+    by_kind(|rge_action_by_kind| rge_action_by_kind.rge_action_explore = Some(Box::new(rge_action)))
 }
 
 /// A `MoveTo` in state `state` to its base's point, its range `range`, asked again after its
 /// wait (wait state 2, timer 0.25, delay 0.5).
 fn move_to(state: u8, range: f32) -> Action {
-    by_kind(|t| {
-        t.rge_action_move_to = Some(Box::new(RgeActionMoveTo {
+    by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_move_to = Some(Box::new(RgeActionMoveTo {
             // no sprite (`+0x58` null)
             rge_action: RgeAction {
                 short_val_2: -1,
@@ -127,22 +127,22 @@ fn move_to(state: u8, range: f32) -> Action {
     })
 }
 
-/// `a`, a [`move_to`], quiet (`+0x60` 1): the sub-action `MoveTo` an action makes.
-fn quiet(mut a: Action) -> Action {
-    if let Some(m) = a
+/// `action`, a [`move_to`], quiet (`+0x60` 1): the sub-action `MoveTo` an action makes.
+fn quiet(mut action: Action) -> Action {
+    if let Some(rge_action_move_to) = action
         .rge_action_by_kind
         .as_mut()
-        .and_then(|t| t.rge_action_move_to.as_mut())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_mut())
     {
-        m.rge_action.sub_action_value = 1;
+        rge_action_move_to.rge_action.sub_action_value = 1;
     }
-    a
+    action
 }
 
-/// `b` with the sub-action `sub` of type `kind`.
-fn with_sub(mut b: RgeAction, kind: ActionKind, sub: Action) -> RgeAction {
-    b.sub_actions = action_list(vec![(kind, sub)]);
-    b
+/// `rge_action` with the sub-action `sub` of type `kind`.
+fn with_sub(mut rge_action: RgeAction, kind: ActionKind, sub: Action) -> RgeAction {
+    rge_action.sub_actions = action_list(vec![(kind, sub)]);
+    rge_action
 }
 
 /// Unit 5 (master 83) acting `action` of type `kind`.
@@ -168,10 +168,10 @@ fn import_drawn(
     graphics: Option<&Graphics>,
 ) -> GenieResult<layers::Action> {
     let mut actions = layers::Action::default();
-    let s = object.static_part().expect("a test object's static part");
+    let rge_static_object = object.static_part().expect("a test object's static part");
     saved_actions(
         object,
-        s,
+        rge_static_object,
         objects,
         |_| {
             Ok(BuildTask {
@@ -196,8 +196,8 @@ fn imported(kind: ActionKind, action: Action) -> GenieResult<layers::Action> {
     import(&acting(kind, action), &PlayerObjects::default())
 }
 
-fn bits3(v: Position) -> [u32; 3] {
-    v.get().map(f32::to_bits)
+fn bits3(position: Position) -> [u32; 3] {
+    position.get().map(f32::to_bits)
 }
 
 #[test]
@@ -212,10 +212,10 @@ fn an_action_without_its_base_is_unsupported() {
 /// refused.
 #[test]
 fn second_target_or_an_unknown_action_is_unsupported() {
-    let mut b = base(3);
-    b.target2_id = 9;
+    let mut rge_action = base(3);
+    rge_action.target2_id = 9;
     assert_eq!(
-        imported(EXPLORE, explore(b)).unwrap_err(),
+        imported(EXPLORE, explore(rge_action)).unwrap_err(),
         GenieError::unsupported("a saved action with a second target")
     );
     assert_eq!(
@@ -283,13 +283,13 @@ fn move_to_takes_its_state_point_range_and_wait() {
         (3, MoveTo::Start),
         (13, MoveTo::Failed),
     ] {
-        let m = imported(MOVE_TO, move_to(state, 0.5))
+        let move_to_action = imported(MOVE_TO, move_to(state, 0.5))
             .unwrap()
             .list
             .move_to()
             .copied()
             .unwrap();
-        assert_eq!(m.state, saved);
+        assert_eq!(move_to_action.state, saved);
     }
     assert_eq!(
         imported(MOVE_TO, move_to(7, 0.5)).unwrap_err(),
@@ -307,19 +307,19 @@ fn move_to_takes_its_state_point_range_and_wait() {
 /// makes, is refused; one to a point may be loud (the Fly's, the Artifact's walk to a point).
 #[test]
 fn saved_move_to_takes_its_voice_from_the_save() {
-    let voice = |a: &Action| saved_move_to(a, None).map(|m| m.voice);
+    let voice = |a: &Action| saved_move_to(a, None).map(|move_to_action| move_to_action.voice);
     assert_eq!(voice(&move_to(4, 0.5)), Ok(Voice::Loud));
     assert_eq!(voice(&quiet(move_to(4, 0.5))), Ok(Voice::Quiet));
     let to_object = |a: Action| {
-        let mut a = a;
-        if let Some(m) = a
+        let mut action = a;
+        if let Some(rge_action_move_to) = action
             .rge_action_by_kind
             .as_mut()
-            .and_then(|t| t.rge_action_move_to.as_mut())
+            .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_mut())
         {
-            m.rge_action.target_id = 9;
+            rge_action_move_to.rge_action.target_id = 9;
         }
-        a
+        action
     };
     let loud = saved_sub_move_to(&to_object(move_to(4, 0.5)), None).unwrap_err();
     assert_eq!(
@@ -341,12 +341,12 @@ fn saved_move_to_takes_its_voice_from_the_save() {
 #[test]
 fn move_to_wait_state_of_none_fails() {
     let mut walk = move_to(4, 0.5);
-    if let Some(m) = walk
+    if let Some(rge_action_move_to) = walk
         .rge_action_by_kind
         .as_deref_mut()
-        .and_then(|t| t.rge_action_move_to.as_deref_mut())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_deref_mut())
     {
-        m.movement_wait_state = 3;
+        rge_action_move_to.movement_wait_state = 3;
     }
     assert!(imported(MOVE_TO, walk).is_err());
 }
@@ -391,10 +391,10 @@ fn move_to_takes_its_sprite_from_the_sprites_table() {
     assert!(shown(5, None).is_err());
 }
 
-fn artifact(b: RgeAction) -> Action {
+fn artifact(rge_action: RgeAction) -> Action {
     Action {
         tribe_action_artifact: Some(Box::new(TribeActionArtifact {
-            rge_action: b,
+            rge_action,
             automove_livestock: 0,
         })),
         ..Action::default()
@@ -418,12 +418,16 @@ fn an_artifact_waits_or_walks_to_its_target() {
         (ArtifactState::Wait, None, None, None)
     );
     assert!(a.gaia);
-    let mut b = base(ArtifactState::Check.get());
-    b.target_id = 9;
-    b.target_x = 4.0;
+    let mut rge_action = base(ArtifactState::Check.get());
+    rge_action.target_id = 9;
+    rge_action.target_x = 4.0;
     let a = imported(
         ARTIFACT_KIND,
-        artifact(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
+        artifact(with_sub(
+            rge_action.clone(),
+            MOVE_TO,
+            quiet(move_to(4, 0.5)),
+        )),
     )
     .unwrap()
     .list
@@ -434,7 +438,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!((walk.state, walk.voice), (MoveTo::Moving, Voice::Quiet));
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(4.0, 2.0, 0.0))));
     assert!(
-        matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
+        matches!(walk.walks_to(), Goal::Point(position) if bits3(position) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(walk.range.get().to_bits(), 0.5_f32.to_bits());
     let mut to_object = quiet(move_to(4, 0.5));
@@ -449,7 +453,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .target_id = 9;
     let a = imported(
         ARTIFACT_KIND,
-        artifact(with_sub(b.clone(), MOVE_TO, to_object)),
+        artifact(with_sub(rge_action.clone(), MOVE_TO, to_object)),
     )
     .unwrap()
     .list
@@ -471,13 +475,13 @@ fn an_artifact_waits_or_walks_to_its_target() {
         .unwrap();
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
     near.target_x = -1.0;
-    let a = imported(ARTIFACT_KIND, artifact(near))
+    let near_artifact = imported(ARTIFACT_KIND, artifact(near))
         .unwrap()
         .list
         .artifact()
         .copied()
         .unwrap();
-    assert_eq!(a.goal, None);
+    assert_eq!(near_artifact.goal, None);
     // without a target the goal is the MoveTo's point, the action's own
     let a = imported(
         ARTIFACT_KIND,
@@ -494,11 +498,16 @@ fn an_artifact_waits_or_walks_to_its_target() {
     .unwrap();
     assert_eq!(a.goal.map(bits3), Some(bits3(Position::new(1.0, 2.0, 0.0))));
     // a move to the point: its MoveTo is not quiet, its AI hears the end
-    assert_eq!(a.move_to().copied().map(|m| m.voice), Some(Voice::Loud));
+    assert_eq!(
+        a.move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.voice),
+        Some(Voice::Loud)
+    );
     assert_eq!(
         imported(
             ARTIFACT_KIND,
-            artifact(with_sub(b.clone(), MOVE_TO, explore(base(4))))
+            artifact(with_sub(rge_action.clone(), MOVE_TO, explore(base(4))))
         )
         .unwrap_err(),
         GenieError::unsupported("a saved MoveTo without its range")
@@ -506,7 +515,7 @@ fn an_artifact_waits_or_walks_to_its_target() {
     assert_eq!(
         imported(
             ARTIFACT_KIND,
-            artifact(with_sub(b, EXPLORE, explore(base(3))))
+            artifact(with_sub(rge_action, EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
         GenieError::unsupported("a saved Artifact action with another sub-action")
@@ -520,11 +529,11 @@ fn missile() -> genie_save::Object {
 
 /// [`missile`] `distance` from its point, a charge projectile for `charge` 1.
 fn missile_of(distance: f32, charge: u8) -> genie_save::Object {
-    let mut b = base(MissileState::Flying.get());
-    b.target2_id = 900;
-    let action = by_kind(|t| {
-        t.rge_action_missile = Some(Box::new(RgeActionMissile {
-            rge_action: b,
+    let mut rge_action = base(MissileState::Flying.get());
+    rge_action.target2_id = 900;
+    let action = by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_missile = Some(Box::new(RgeActionMissile {
+            rge_action,
             distance,
             ballistic_velocity: 3.0,
             ..RgeActionMissile::default()
@@ -586,7 +595,8 @@ fn missile_flies_with_its_actions_course() {
         imported(MISSILE, explore(base(2))).unwrap_err(),
         GenieError::unsupported("a saved missile action without its part")
     );
-    let not_missile = by_kind(|t| t.rge_action_missile = Some(Box::default()));
+    let not_missile =
+        by_kind(|rge_action_by_kind| rge_action_by_kind.rge_action_missile = Some(Box::default()));
     assert_eq!(
         imported(MISSILE, not_missile).unwrap_err(),
         GenieError::unsupported("a missile action of an object that is not a missile")
@@ -597,24 +607,30 @@ fn missile_flies_with_its_actions_course() {
 fn farms_make_takes_its_timers_and_task() {
     use crate::gathering::make::{MAKE, MakeState};
     let make = |b: RgeAction| {
-        by_kind(|t| {
-            t.rge_action_make = Some(Box::new(RgeActionMake {
+        by_kind(|rge_action_by_kind| {
+            rge_action_by_kind.rge_action_make = Some(Box::new(RgeActionMake {
                 rge_action: b,
                 work_timer: 9.0,
             }));
         })
     };
-    let mut b = base(1);
-    b.short_val = 3;
-    let m = imported(MAKE, make(b))
+    let mut rge_action = base(1);
+    rge_action.short_val = 3;
+    let make_action = imported(MAKE, make(rge_action))
         .unwrap()
         .list
         .make()
         .copied()
         .unwrap();
-    assert_eq!((m.state, m.task.id), (MakeState::Done, TaskId::of_task(3)));
     assert_eq!(
-        (m.remaining.get().to_bits(), m.total.get().to_bits()),
+        (make_action.state, make_action.task.id),
+        (MakeState::Done, TaskId::of_task(3))
+    );
+    assert_eq!(
+        (
+            make_action.remaining.get().to_bits(),
+            make_action.total.get().to_bits()
+        ),
         (1.5_f32.to_bits(), 9.0_f32.to_bits())
     );
     assert_eq!(
@@ -634,7 +650,11 @@ fn farms_make_takes_its_timers_and_task() {
 #[test]
 fn birds_fly_takes_its_home_and_move_to() {
     use crate::movement::fly::{FLY, FlyState};
-    let bird = |b: RgeAction| by_kind(|t| t.rge_action_bird = Some(Box::new(b)));
+    let bird = |rge_action: RgeAction| {
+        by_kind(|rge_action_by_kind| {
+            rge_action_by_kind.rge_action_bird = Some(Box::new(rge_action));
+        })
+    };
     let f = imported(FLY, bird(base(3)))
         .unwrap()
         .list
@@ -649,13 +669,13 @@ fn birds_fly_takes_its_home_and_move_to() {
         f.home.get().map(f32::to_bits),
         [1.0_f32, 2.0].map(f32::to_bits)
     );
-    let f = imported(FLY, bird(with_sub(base(4), MOVE_TO, move_to(4, 0.5))))
+    let fly = imported(FLY, bird(with_sub(base(4), MOVE_TO, move_to(4, 0.5))))
         .unwrap()
         .list
         .fly()
         .copied()
         .unwrap();
-    let flight = f.state.move_to().copied().unwrap();
+    let flight = fly.state.move_to().copied().unwrap();
     assert_eq!((flight.state, flight.voice), (MoveTo::Moving, Voice::Loud));
     assert_eq!(
         (flight.target, bits3(flight.point)),
@@ -674,10 +694,10 @@ fn birds_fly_takes_its_home_and_move_to() {
     );
 }
 
-fn build(b: RgeAction) -> Action {
+fn build(rge_action: RgeAction) -> Action {
     Action {
         tribe_action_build: Some(Box::new(TribeActionBuild {
-            rge_action: b,
+            rge_action,
             added_to_num_builders: 1,
         })),
         ..Action::default()
@@ -689,20 +709,26 @@ fn build(b: RgeAction) -> Action {
 /// sprite) and its site.
 #[test]
 fn build_takes_its_task_move_to_and_site() {
-    let mut b = base(4);
-    b.target_id = 30;
-    b.target2_id = 31;
+    let mut rge_action = base(4);
+    rge_action.target_id = 30;
+    rge_action.target2_id = 31;
     let objects = PlayerObjects::default();
-    let walking = with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.75)));
-    let a = import(&acting(ActionKind::BUILD, build(walking)), &objects)
+    let walking = with_sub(rge_action.clone(), MOVE_TO, quiet(move_to(4, 0.75)));
+    let walking_build_action = import(&acting(ActionKind::BUILD, build(walking)), &objects)
         .unwrap()
         .list
         .build()
         .copied()
         .unwrap();
-    let walk = a.state.move_to().copied().unwrap();
+    let walk = walking_build_action.state.move_to().copied().unwrap();
     assert_eq!(
-        (a.target, a.site, walk.target, walk.state, walk.voice),
+        (
+            walking_build_action.target,
+            walking_build_action.site,
+            walk.target,
+            walk.state,
+            walk.voice
+        ),
         (
             Some(FoundationId::new(object_id(30))),
             Some(DropSiteId::new(object_id(31))),
@@ -711,21 +737,24 @@ fn build_takes_its_task_move_to_and_site() {
             Voice::Quiet
         )
     );
-    assert!(a.added);
-    assert_eq!(a.task.work_rate.get().to_bits(), 2.0_f32.to_bits());
+    assert!(walking_build_action.added);
+    assert_eq!(
+        walking_build_action.task.work_rate.get().to_bits(),
+        2.0_f32.to_bits()
+    );
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(bits3(walk.point), bits3(Position::new(1.0, 2.0, 0.0)));
     assert_eq!(walk.wait.state, MoveWaitState::AskedAgain);
     // a MoveTo without a sprite (−1) keeps none
     assert_eq!(walk.sprite, None);
-    let mut dropping = b.clone();
+    let mut dropping = rge_action.clone();
     dropping.state = BuildState::Drop { move_to: None }.get();
     // the drop-off's MoveTo with the carrying sprite 12 (its `+0x58`)
     let mut carrying = quiet(move_to(4, 0.75));
     carrying
         .rge_action_by_kind
         .as_mut()
-        .and_then(|t| t.rge_action_move_to.as_mut())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_mut())
         .expect("a MoveTo")
         .rge_action
         .short_val_2 = 12;
@@ -740,7 +769,7 @@ fn build_takes_its_task_move_to_and_site() {
         flags: SpriteFlags::ANIMATED,
     };
     let graphics = Graphics::from([(carried.id, carried)]);
-    let a = import_drawn(
+    let import_drawn = import_drawn(
         &acting(ActionKind::BUILD, build(dropping)),
         &objects,
         Some(&graphics),
@@ -750,32 +779,32 @@ fn build_takes_its_task_move_to_and_site() {
     .build()
     .copied()
     .unwrap();
-    let walk = a.state.move_to().copied().unwrap();
+    let walk = import_drawn.state.move_to().copied().unwrap();
     assert_eq!(walk.range.get().to_bits(), 0.75_f32.to_bits());
     assert_eq!(walk.sprite, Some(carried));
-    let a = imported(ActionKind::BUILD, build(b.clone()))
+    let build_action = imported(ActionKind::BUILD, build(rge_action.clone()))
         .unwrap()
         .list
         .build()
         .copied()
         .unwrap();
-    assert_eq!(a.state.move_to().copied(), None);
+    assert_eq!(build_action.state.move_to().copied(), None);
     // without a MoveTo, the task's moving sprite for the next
-    assert_eq!(a.task.moving, Some(SpriteId::named(9)));
+    assert_eq!(build_action.task.moving, Some(SpriteId::named(9)));
     assert_eq!(
         imported(
             ActionKind::BUILD,
-            build(with_sub(b, EXPLORE, explore(base(3))))
+            build(with_sub(rge_action, EXPLORE, explore(base(3))))
         )
         .unwrap_err(),
         OTHER_SUB_ACTION
     );
 }
 
-fn repair(b: RgeAction) -> Action {
+fn repair(rge_action: RgeAction) -> Action {
     Action {
         tribe_action_repair: Some(Box::new(TribeActionRepair {
-            rge_action: b,
+            rge_action,
             save_target_command_flag: 0,
             added_to_num_builders: 1,
         })),
@@ -786,12 +815,16 @@ fn repair(b: RgeAction) -> Action {
 #[test]
 fn repair_takes_its_task_and_counts_its_builder() {
     use crate::construction::repair::REPAIR;
-    let mut b = base(4);
-    b.short_val = 2;
-    b.sub_action_value = 1;
+    let mut rge_action = base(4);
+    rge_action.short_val = 2;
+    rge_action.sub_action_value = 1;
     let r = imported(
         REPAIR,
-        repair(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
+        repair(with_sub(
+            rge_action.clone(),
+            MOVE_TO,
+            quiet(move_to(4, 0.5)),
+        )),
     )
     .unwrap()
     .list
@@ -806,18 +839,22 @@ fn repair_takes_its_task_and_counts_its_builder() {
     assert!(r.counted && r.voice == Voice::Quiet);
     // a MoveTo without a target walks to its point, within its own range
     assert!(
-        matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
+        matches!(walk.walks_to(), Goal::Point(position) if bits3(position) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(walk.range.get().to_bits(), 0.5_f32.to_bits());
-    let r = imported(REPAIR, repair(b.clone()))
+    let repair_action = imported(REPAIR, repair(rge_action.clone()))
         .unwrap()
         .list
         .repair()
         .copied()
         .unwrap();
-    assert_eq!(r.state.move_to().copied(), None);
+    assert_eq!(repair_action.state.move_to().copied(), None);
     assert_eq!(
-        imported(REPAIR, repair(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
+        imported(
+            REPAIR,
+            repair(with_sub(rge_action, EXPLORE, explore(base(3))))
+        )
+        .unwrap_err(),
         OTHER_SUB_ACTION
     );
     assert_eq!(
@@ -826,10 +863,10 @@ fn repair_takes_its_task_and_counts_its_builder() {
     );
 }
 
-fn hunt(b: RgeAction) -> Action {
+fn hunt(rge_action: RgeAction) -> Action {
     Action {
         tribe_action_hunt: Some(Box::new(TribeActionHunt {
-            rge_action: b,
+            rge_action,
             target_kind: 4,
             moved_sheep: 1,
             sheep_still_time: 3,
@@ -867,7 +904,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
         h.lead.start.get().map(f32::to_bits),
         [6.0_f32, 7.0].map(f32::to_bits)
     );
-    let h = imported(
+    let hunt_action = imported(
         HUNT,
         hunt(with_sub(
             base(HuntState::Walk { move_to: None }.get()),
@@ -881,7 +918,7 @@ fn hunt_takes_its_task_lead_and_move_to() {
     .copied()
     .unwrap();
     // every MoveTo of the Hunt is quiet
-    let walk = h.state.move_to().copied().unwrap();
+    let walk = hunt_action.state.move_to().copied().unwrap();
     assert_eq!(
         (
             walk.state,
@@ -896,8 +933,8 @@ fn hunt_takes_its_task_lead_and_move_to() {
             MoveWaitState::AskedAgain
         )
     );
-    let attack = by_kind(|t| {
-        t.rge_action_attack = Some(Box::new(RgeActionAttack {
+    let attack = by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(4),
             ..RgeActionAttack::default()
         }));
@@ -946,10 +983,10 @@ fn hunt_takes_its_task_lead_and_move_to() {
     );
 }
 
-fn gather(b: RgeAction) -> Action {
-    by_kind(|t| {
-        t.rge_action_gather = Some(Box::new(RgeActionGather {
-            rge_action: b,
+fn gather(rge_action: RgeAction) -> Action {
+    by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_gather = Some(Box::new(RgeActionGather {
+            rge_action,
             target_kind: 5,
             number_stops: 2,
             farm_x: 3.0,
@@ -978,7 +1015,7 @@ fn gather_takes_its_stops_and_move_to() {
     );
     assert!(g.worked && g.state.move_to().copied().is_none());
     assert_eq!(g.farm.x().to_bits(), 3.0_f32.to_bits());
-    let g = imported(
+    let gather_action = imported(
         GATHER,
         gather(with_sub(
             base(GatherState::Walk { move_to: None }.get()),
@@ -991,12 +1028,12 @@ fn gather_takes_its_stops_and_move_to() {
     .gather()
     .copied()
     .unwrap();
-    assert!(!g.worked);
+    assert!(!gather_action.worked);
     // every MoveTo of the Gather is quiet; one without a target walks to its point
-    let walk = g.state.move_to().copied().unwrap();
+    let walk = gather_action.state.move_to().copied().unwrap();
     assert_eq!((walk.state, walk.voice), (MoveTo::Moving, Voice::Quiet));
     assert!(
-        matches!(walk.walks_to(), Goal::Point(p) if bits3(p) == bits3(Position::new(1.0, 2.0, 0.0)))
+        matches!(walk.walks_to(), Goal::Point(position) if bits3(position) == bits3(Position::new(1.0, 2.0, 0.0)))
     );
     assert_eq!(
         (walk.range.get().to_bits(), walk.wait.state),
@@ -1038,10 +1075,10 @@ fn gather_takes_its_stops_and_move_to() {
     );
 }
 
-fn enter(b: RgeAction) -> Action {
+fn enter(rge_action: RgeAction) -> Action {
     Action {
         rge_action_enter: Some(Box::new(RgeActionEnter {
-            rge_action: b,
+            rge_action,
             first_time_enter: 1,
         })),
         ..Action::default()
@@ -1052,29 +1089,45 @@ fn enter(b: RgeAction) -> Action {
 fn an_enter_takes_its_task_and_retry() {
     use crate::garrison::{ENTER, EnterState};
     let walking = EnterState::Walk { move_to: None };
-    let mut b = base(walking.get());
-    b.short_val = 1;
-    let e = imported(
+    let mut rge_action = base(walking.get());
+    rge_action.short_val = 1;
+    let enter_action = imported(
         ENTER,
-        enter(with_sub(b.clone(), MOVE_TO, quiet(move_to(4, 0.5)))),
+        enter(with_sub(
+            rge_action.clone(),
+            MOVE_TO,
+            quiet(move_to(4, 0.5)),
+        )),
     )
     .unwrap()
     .list
     .enter()
     .copied()
     .unwrap();
-    let m = e.state.move_to().copied().unwrap();
+    let move_to_action = enter_action.state.move_to().copied().unwrap();
     assert_eq!(
-        (e.state.bare(), m.state, m.voice, e.task_class),
+        (
+            enter_action.state.bare(),
+            move_to_action.state,
+            move_to_action.voice,
+            enter_action.task_class
+        ),
         (walking, MoveTo::Moving, Voice::Quiet, Some(class_id(3)))
     );
-    assert!(e.retry);
+    assert!(enter_action.retry);
     assert_eq!(
-        (e.range.get().to_bits(), m.wait.state),
+        (
+            enter_action.range.get().to_bits(),
+            move_to_action.wait.state
+        ),
         (2.0_f32.to_bits(), MoveWaitState::AskedAgain)
     );
     assert_eq!(
-        imported(ENTER, enter(with_sub(b, EXPLORE, explore(base(3))))).unwrap_err(),
+        imported(
+            ENTER,
+            enter(with_sub(rge_action, EXPLORE, explore(base(3))))
+        )
+        .unwrap_err(),
         GenieError::unsupported("a saved Enter with another sub-action")
     );
     assert_eq!(
@@ -1104,12 +1157,12 @@ fn an_enter_takes_its_task_and_retry() {
 #[test]
 fn transport_takes_its_base_alone() {
     use crate::garrison::transport::{TRANSPORT, TransportState};
-    let transport = |b: RgeAction| Action {
-        rge_action_transport: Some(Box::new(b)),
+    let transport = |rge_action: RgeAction| Action {
+        rge_action_transport: Some(Box::new(rge_action)),
         ..Action::default()
     };
     let sailing = TransportState::Sail { move_to: None };
-    let t = imported(
+    let transport_action = imported(
         TRANSPORT,
         transport(with_sub(
             base(sailing.get()),
@@ -1122,12 +1175,17 @@ fn transport_takes_its_base_alone() {
     .transport()
     .copied()
     .unwrap();
-    let m = t.state.move_to().copied().unwrap();
+    let move_to_action = transport_action.state.move_to().copied().unwrap();
     assert_eq!(
-        (t.state.bare(), t.mode, m.state, m.voice),
+        (
+            transport_action.state.bare(),
+            transport_action.mode,
+            move_to_action.state,
+            move_to_action.voice
+        ),
         (sailing, TransportMode::New, MoveTo::Moving, Voice::Quiet)
     );
-    assert!(!t.retarget);
+    assert!(!transport_action.retarget);
     assert_eq!(
         imported(
             TRANSPORT,
@@ -1161,7 +1219,7 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
         .copied()
         .unwrap();
     assert_eq!(e.state, ExploreState::Wait);
-    let e = imported(
+    let explore_action = imported(
         EXPLORE,
         explore(with_sub(
             base(ExploreState::Walk { move_to: None }.get()),
@@ -1175,9 +1233,13 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
     .copied()
     .unwrap();
     // a quiet MoveTo (its maker's `+0x60`, which the save does not hold) with the saved wait
-    let m = e.state.move_to().copied().unwrap();
+    let move_to_action = explore_action.state.move_to().copied().unwrap();
     assert_eq!(
-        (m.state, m.voice, m.wait.state),
+        (
+            move_to_action.state,
+            move_to_action.voice,
+            move_to_action.wait.state
+        ),
         (MoveTo::Moving, Voice::Quiet, MoveWaitState::AskedAgain)
     );
     assert_eq!(
@@ -1214,8 +1276,8 @@ fn an_explore_takes_its_quiet_move_to_with_its_wait() {
 
 #[test]
 fn an_attack_needs_the_sprites_table() {
-    let attack = by_kind(|t| {
-        t.rge_action_attack = Some(Box::new(RgeActionAttack {
+    let attack = by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(4),
             ..RgeActionAttack::default()
         }));
@@ -1236,16 +1298,20 @@ fn wait_solidify_waits_for_its_foundation() {
         })),
         ..Action::default()
     };
-    let mut b = base(2);
-    b.short_val = 1;
-    let w = imported(WAIT_SOLIDIFY, wait(b))
+    let mut rge_action = base(2);
+    rge_action.short_val = 1;
+    let wait_solidify = imported(WAIT_SOLIDIFY, wait(rge_action))
         .unwrap()
         .list
         .wait_solidify()
         .copied()
         .unwrap();
     assert_eq!(
-        (w.state, w.target.id(), w.task.id),
+        (
+            wait_solidify.state,
+            wait_solidify.target.id(),
+            wait_solidify.task.id
+        ),
         (
             WaitSolidifyState::Stopped,
             object_id(40),
@@ -1283,8 +1349,8 @@ fn swing_sprites() -> Graphics {
 /// An Attack in state `state` that walks with sprite `walk` (`short_val`) and swings sprite 21
 /// (`short_val_2`), with a hit to come (`need_to_attack`) for `pending`.
 fn attack(state: u8, walk: u16, pending: bool) -> Action {
-    by_kind(|t| {
-        t.rge_action_attack = Some(Box::new(RgeActionAttack {
+    by_kind(|rge_action_by_kind| {
+        rge_action_by_kind.rge_action_attack = Some(Box::new(RgeActionAttack {
             rge_action: base(state),
             short_val: walk,
             short_val_2: 21,
@@ -1303,13 +1369,14 @@ fn hunts_swing_past_its_hit_rests_the_reload_less_the_swing() {
     use crate::combat::attack::{ATTACK, AttackState};
     use crate::gathering::hunt::{HUNT, HuntState};
     let master = |reload: f32| {
-        let mut m = combat_master(83);
-        m.tribe_master_combat_object
+        let mut combat_master = combat_master(83);
+        combat_master
+            .tribe_master_combat_object
             .as_deref_mut()
             .unwrap()
             .rge_master_combat_object
             .speed_of_attack = reload;
-        with_masters(vec![m])
+        with_masters(vec![combat_master])
     };
     let sprites = swing_sprites();
     let swing = |state: AttackState, pending: bool, objects: &PlayerObjects| {

@@ -70,26 +70,26 @@ pub(super) fn reach(
 /// An object a placement test's scan found, with its tile.
 pub(super) type Found = (Tile, Near);
 
-/// The objects whose box overlaps a box of radii `r` at `p` among those `counts` lets through,
-/// with their tile, in the scan's order.
+/// The objects whose box overlaps a box of radii `footprint` at `point` among those `counts` lets
+/// through, with their tile, in the scan's order.
 pub(super) fn overlapping(
     map: &WorldMap<'_>,
-    p: Point,
-    r: Footprint,
+    point: Point,
+    footprint: Footprint,
     counts: &dyn Fn(&Near) -> Option<bool>,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Vec<Found>> {
     let mut out = Vec::new();
-    for t in reach(map.size(), p, spawn_tuning) {
-        for o in map.objects(t)? {
-            let Some(tall) = counts(&o) else { continue };
-            if !(0.0 < o.radius.x() && 0.0 < o.radius.y() && tall) {
+    for tile in reach(map.size(), point, spawn_tuning) {
+        for near in map.objects(tile)? {
+            let Some(tall) = counts(&near) else { continue };
+            if !(0.0 < near.radius.x() && 0.0 < near.radius.y() && tall) {
                 continue;
             }
-            let dx = (o.position.x() - p.x()).abs();
-            let dy = (o.position.y() - p.y()).abs();
-            if dx < o.radius.x() + r.x() && dy < o.radius.y() + r.y() {
-                out.push((t, o));
+            let dx = (near.position.x() - point.x()).abs();
+            let dy = (near.position.y() - point.y()).abs();
+            if dx < near.radius.x() + footprint.x() && dy < near.radius.y() + footprint.y() {
+                out.push((tile, near));
             }
         }
     }
@@ -98,14 +98,14 @@ pub(super) fn overlapping(
 
 /// BUILD's placement test (`FUN_140e7a400`'s call of the master's slot 0x50, the building master's
 /// `FUN_14123aee0` with BUILD's flags: `p6` human, `p7`, `p8`, `p9` 1, `p10` 0, `p11` 1, no object
-/// of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `p`, else the game's code. First
-/// the static test (`FUN_141123f80` through `FUN_141264db0`; their scans run only for the Build's
-/// test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile, columns
-/// then rows, a terrain the restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the spawn's); a
-/// human who explored none of the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then the building
-/// master's scan of the tiles within 8 (rows, then columns; each tile's objects in its list's
-/// order): an object the player sees, or on a tile it never explored (the test's explored flag
-/// `+0x730` is set by then), or in the fog with a fog visibility, and only its own in the fog
+/// of its own, `p13` 0, `p14` 1): 0 when the foundation may go to `point`, else the game's code.
+/// First the static test (`FUN_141123f80` through `FUN_141264db0`; their scans run only for the
+/// Build's test, [`SiteChecks::SCANS`]) over the box of the site's radii: off the map 7; per tile,
+/// columns then rows, a terrain the restriction forbids 2 (`DAT_142eb7e5c`'s threshold, the
+/// spawn's); a human who explored none of the tiles 5; a hill mode's tile ([`hill_fails`]) 3. Then
+/// the building master's scan of the tiles within 8 (rows, then columns; each tile's objects in its
+/// list's order): an object the player sees, or on a tile it never explored (the test's explored
+/// flag `+0x730` is set by then), or in the fog with a fog visibility, and only its own in the fog
 /// without one, that is below state 3 (another type below 7), standing (or the master obstructs, or
 /// it is below type 30), not a wall under its own gate, a desolid building only of an ally both
 /// ways, not a moving unit of the player, Gaia or a mutual ally, not a felled tree off a forest (at
@@ -116,15 +116,15 @@ pub(super) fn overlapping(
 pub(crate) fn build_placement(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    p: Point,
+    point: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<PlacementCode> {
-    if let Some(code) = build_static_test(site, map, p, spawn_tuning)? {
+    if let Some(code) = build_static_test(site, map, point, spawn_tuning)? {
         return Ok(code);
     }
     if site.checks.contains(SiteChecks::SCANS)
-        && static_scans_find(site, map, p, roles, spawn_tuning)?
+        && static_scans_find(site, map, point, roles, spawn_tuning)?
     {
         return Ok(PlacementCode::Blocked);
     }
@@ -132,19 +132,20 @@ pub(crate) fn build_placement(
     let size = map.size();
     let (w, h) = (size.width(), size.height());
     let ((x0, x1), (y0, y1)) = (
-        build_scan_range(p.x(), w, spawn_tuning),
-        build_scan_range(p.y(), h, spawn_tuning),
+        build_scan_range(point.x(), w, spawn_tuning),
+        build_scan_range(point.y(), h, spawn_tuning),
     );
     let player = site.player;
     for ty in y0..=y1 {
         for tx in x0..=x1 {
             let tile = Tile::new(tx, ty);
             let sight = (map.explored(player, tile), map.visible(player, tile));
-            for o in map.objects(tile)? {
-                if site.own.contains(&o.id) {
+            for near in map.objects(tile)? {
+                if site.own.contains(&near.id) {
                     continue;
                 }
-                if build_sees(site, map, &o, sight, roles)? && blocks_build(site, map, &o, p, roles)
+                if build_sees(site, map, &near, sight, roles)?
+                    && blocks_build(site, map, &near, point, roles)
                 {
                     return Ok(PlacementCode::Blocked);
                 }
@@ -165,7 +166,7 @@ pub(crate) fn build_placement(
 fn static_scans_find(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    p: Point,
+    point: Point,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<bool> {
@@ -184,40 +185,40 @@ fn static_scans_find(
             || (o.kind == MasterKind::BUILDING && o.obstruction_kind != ObstructionKind::NONE);
         listed.then_some(tall)
     };
-    if !overlapping(map, p, site.radius, &first, spawn_tuning)?.is_empty() {
+    if !overlapping(map, point, site.radius, &first, spawn_tuning)?.is_empty() {
         return Ok(true);
     }
-    let second = |o: &Near| {
-        let listed = !site.own.contains(&o.id)
-            && o.state < ObjectState::Removed
-            && !o.buildable_on.passed()
-            && o.kind != MasterKind::COMBAT
-            && (o.kind != MasterKind::BUILDING
+    let second = |near: &Near| {
+        let listed = !site.own.contains(&near.id)
+            && near.state < ObjectState::Removed
+            && !near.buildable_on.passed()
+            && near.kind != MasterKind::COMBAT
+            && (near.kind != MasterKind::BUILDING
                 || roles
-                    .of_class(o.class)
+                    .of_class(near.class)
                     .contains(ClassRoles::PACKED_TREBUCHET)
                 || roles
-                    .of_class(o.class)
+                    .of_class(near.class)
                     .contains(ClassRoles::UNPACKED_TREBUCHET)
-                || !o.flags.contains(NearFlags::DESOLID));
-        let tall = o.flags.contains(NearFlags::TALL)
-            || (o.kind == MasterKind::BUILDING && o.obstruction_kind.recorded());
+                || !near.flags.contains(NearFlags::DESOLID));
+        let tall = near.flags.contains(NearFlags::TALL)
+            || (near.kind == MasterKind::BUILDING && near.obstruction_kind.recorded());
         listed.then_some(tall)
     };
-    Ok(!overlapping(map, p, site.radius, &second, spawn_tuning)?.is_empty())
+    Ok(!overlapping(map, point, site.radius, &second, spawn_tuning)?.is_empty())
 }
 
-/// BUILD's static test (`FUN_141123f80` through `FUN_141264db0`) over the clearance box at `p`:
+/// BUILD's static test (`FUN_141123f80` through `FUN_141264db0`) over the clearance box at `point`:
 /// off the map 7; the placement terrains 1; per tile, columns then rows, a terrain the
 /// restriction forbids 2; a hill mode's tile 3; a human who explored none of the tiles 5. None
 /// when the box passes; a zone mode is not modelled.
 pub(super) fn build_static_test(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    p: Point,
+    point: Point,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Option<PlacementCode>> {
-    let (x, y) = (p.x(), p.y());
+    let (x, y) = (point.x(), point.y());
     let (rx, ry) = (site.radius.x(), site.radius.y());
     let size = map.size();
     let (w, h) = (size.width(), size.height());
@@ -230,7 +231,7 @@ pub(super) fn build_static_test(
     }
     let mut explored = false;
     let (x0, x1, y0, y1) = ((x - rx) as i32, far_x as i32, (y - ry) as i32, far_y as i32);
-    if !placement_terrains(site.placement, map, p, TileRect::new(x0, y0, x1, y1))? {
+    if !placement_terrains(site.placement, map, point, TileRect::new(x0, y0, x1, y1))? {
         return Ok(Some(PlacementCode::PlacementTerrain));
     }
     // hill mode 3 measures the box's edge against the elevation of its first column's last row
@@ -247,10 +248,13 @@ pub(super) fn build_static_test(
     for tx in x0..=x1 {
         for ty in y0..=y1 {
             let tile = Tile::new(tx, ty);
-            let t = map.terrain(tile)?;
-            let value = site.restriction.value(t).ok_or(GenieError::unsupported(
-                "a terrain its restriction does not list",
-            ))?;
+            let terrain_id = map.terrain(tile)?;
+            let value = site
+                .restriction
+                .value(terrain_id)
+                .ok_or(GenieError::unsupported(
+                    "a terrain its restriction does not list",
+                ))?;
             if value <= spawn_tuning.passable {
                 return Ok(Some(PlacementCode::Terrain));
             }
@@ -287,7 +291,7 @@ pub(super) fn build_scan_range(v: f32, size: i32, spawn_tuning: &SpawnTuning) ->
     )
 }
 
-/// Whether BUILD's scan counts the object `o` by what the player sees of its tile (`seen`
+/// Whether BUILD's scan counts the object `near` by what the player sees of its tile (`seen`
 /// explored, `visible`): in sight, any but one of fog visibility 3; in the fog, by its fog
 /// visibility (one of 0 only when it is the player's own or allied, or a building whose
 /// visibility mask meets both the player's masks); on a tile never explored, any. A fogged
@@ -295,14 +299,14 @@ pub(super) fn build_scan_range(v: f32, size: i32, spawn_tuning: &SpawnTuning) ->
 pub(super) fn build_sees(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    o: &Near,
+    near: &Near,
     (seen, visible): (bool, bool),
     roles: &Roles,
 ) -> GenieResult<bool> {
     let player = site.player;
     if !(seen && visible) {
         let fog = if seen {
-            o.fog_visibility
+            near.fog_visibility
         } else {
             FogVisibility::VISIBLE
         };
@@ -315,17 +319,19 @@ pub(super) fn build_sees(
         // building (not a farm) whose visibility mask meets both the player's masks
         if fog == FogVisibility::INVISIBLE {
             let masks = map.vision(player);
-            let shown = !roles.of_class(o.class).contains(ClassRoles::FARM)
-                && MasterKind::RGE_COMBAT <= o.kind
-                && o.fog_mask
-                    .is_some_and(|m| m.intersects(masks.explored) && m.intersects(masks.visible));
+            let shown = !roles.of_class(near.class).contains(ClassRoles::FARM)
+                && MasterKind::RGE_COMBAT <= near.kind
+                && near.fog_mask.is_some_and(|vision_bits| {
+                    vision_bits.intersects(masks.explored) && vision_bits.intersects(masks.visible)
+                });
             if !shown
-                && (o.player != player || !map.allied(o.player, player, AllyTest::WithRelation4))
+                && (near.player != player
+                    || !map.allied(near.player, player, AllyTest::WithRelation4))
             {
                 return Ok(false);
             }
         }
-    } else if o.fog_visibility == FogVisibility::ONLY_IN_FOG {
+    } else if near.fog_visibility == FogVisibility::ONLY_IN_FOG {
         return Ok(false);
     }
     Ok(true)
@@ -339,37 +345,38 @@ pub(super) fn build_sees(
 pub(super) fn blocks_build(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    o: &Near,
+    near: &Near,
     at: Point,
     roles: &Roles,
 ) -> bool {
     let (x, y) = (at.x(), at.y());
-    if build_ignores(site, map, o, roles) || build_passes(site, map, o, roles) {
+    if build_ignores(site, map, near, roles) || build_passes(site, map, near, roles) {
         return false;
     }
     let (or, tall) =
-        if (ObstructionKind::KIND_11..=ObstructionKind::KIND_13).contains(&o.obstruction_kind) {
-            let oz = o.outline.z();
+        if (ObstructionKind::KIND_11..=ObstructionKind::KIND_13).contains(&near.obstruction_kind) {
+            let oz = near.outline.z();
             (
-                o.outline.ground(),
+                near.outline.ground(),
                 0.0 < oz
                     || (oz == 0.0
-                        && (o.kind == MasterKind::BUILDING || o.flags.contains(NearFlags::HOLDS))),
+                        && (near.kind == MasterKind::BUILDING
+                            || near.flags.contains(NearFlags::HOLDS))),
             )
         } else {
             (
-                o.radius,
-                o.flags.contains(NearFlags::TALL)
-                    || o.kind == MasterKind::BUILDING
-                    || o.flags.contains(NearFlags::HOLDS),
+                near.radius,
+                near.flags.contains(NearFlags::TALL)
+                    || near.kind == MasterKind::BUILDING
+                    || near.flags.contains(NearFlags::HOLDS),
             )
         };
-    let r = site.radius;
+    let footprint = site.radius;
     0.0 < or.x()
         && 0.0 < or.y()
         && tall
-        && (o.position.x() - x).abs() < or.x() + r.x()
-        && (o.position.y() - y).abs() < or.y() + r.y()
+        && (near.position.x() - x).abs() < or.x() + footprint.x()
+        && (near.position.y() - y).abs() < or.y() + footprint.y()
 }
 
 /// The objects BUILD's scan ignores: one dead, a moving one where the site does not obstruct,
@@ -378,24 +385,24 @@ pub(super) fn blocks_build(
 pub(super) fn build_ignores(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    o: &Near,
+    near: &Near,
     roles: &Roles,
 ) -> bool {
     let player = site.player;
-    let alive = o.state < ObjectState::Dying
-        || (o.kind != MasterKind::BUILDING && o.state < ObjectState::Removed);
+    let alive = near.state < ObjectState::Dying
+        || (near.kind != MasterKind::BUILDING && near.state < ObjectState::Removed);
     let standing =
-        site.obstructs || o.kind < MasterKind::MOVING || !o.flags.contains(NearFlags::MOVING);
+        site.obstructs || near.kind < MasterKind::MOVING || !near.flags.contains(NearFlags::MOVING);
     let gate_wall = roles.of_class(site.class).contains(ClassRoles::GATE)
-        && roles.of_class(o.class).contains(ClassRoles::WALL)
-        && o.player == player;
-    let foundation = o.kind == MasterKind::BUILDING
+        && roles.of_class(near.class).contains(ClassRoles::WALL)
+        && near.player == player;
+    let foundation = near.kind == MasterKind::BUILDING
         && !roles
-            .of_class(o.class)
+            .of_class(near.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
-        && o.flags.contains(NearFlags::DESOLID)
-        && !(map.allied(player, o.player, AllyTest::WithRelation4)
-            && map.allied(o.player, player, AllyTest::WithRelation4));
+        && near.flags.contains(NearFlags::DESOLID)
+        && !(map.allied(player, near.player, AllyTest::WithRelation4)
+            && map.allied(near.player, player, AllyTest::WithRelation4));
     !alive || !standing || gate_wall || foundation
 }
 
@@ -404,33 +411,33 @@ pub(super) fn build_ignores(
 pub(super) fn build_passes(
     site: &BuildSite<'_>,
     map: &WorldMap<'_>,
-    o: &Near,
+    near: &Near,
     roles: &Roles,
 ) -> bool {
     let player = site.player;
     // a moving unit of the player, of Gaia or of a mutual ally passes (the game type
     // 7's own test of allies is not modelled)
-    let passes = MasterKind::MOVING <= o.kind
-        && o.state == ObjectState::Alive
-        && o.flags.contains(NearFlags::MOVING)
-        && (o.player == player
-            || o.player == PlayerId::GAIA
-            || (map.allied(player, o.player, AllyTest::AlliesOnly)
-                && map.allied(o.player, player, AllyTest::AlliesOnly)));
+    let passes = MasterKind::MOVING <= near.kind
+        && near.state == ObjectState::Alive
+        && near.flags.contains(NearFlags::MOVING)
+        && (near.player == player
+            || near.player == PlayerId::GAIA
+            || (map.allied(player, near.player, AllyTest::AlliesOnly)
+                && map.allied(near.player, player, AllyTest::AlliesOnly)));
     // a felled tree (at most 1 hit point) passes off a forest (`FUN_140f5efb0` on its
     // tile's terrain)
     passes
-        || o.buildable_on.passed()
-        || (roles.of_class(o.class).contains(ClassRoles::TREE)
-            && o.hp <= HitPoints::new(1.0)
-            && !o.flags.contains(NearFlags::FOREST_TILE))
+        || near.buildable_on.passed()
+        || (roles.of_class(near.class).contains(ClassRoles::TREE)
+            && near.hp <= HitPoints::new(1.0)
+            && !near.flags.contains(NearFlags::FOREST_TILE))
 }
 
 /// The first object of a scan, which the game reports as the blocker: the tiles row by row, each
 /// tile's objects in its list's order ([`crate::map::spatial::Spatial::objects_on`], the game's: the
 /// load files them in the save's order, as the game's load does).
 pub(super) fn first(found: &[Found]) -> Option<Near> {
-    found.first().map(|&(_, o)| o)
+    found.first().map(|&(_, near)| near)
 }
 
 /// Whether a placement runs the zone test (`FUN_1415c6400`, the world's `+0x820` mode 1).
@@ -451,12 +458,12 @@ pub enum ZoneTest {
 pub(crate) fn placement(
     me: &Placing<'_>,
     map: &WorldMap<'_>,
-    p: Point,
+    point: Point,
     zones: ZoneTest,
     roles: &Roles,
     spawn_tuning: &SpawnTuning,
 ) -> GenieResult<Tested> {
-    let (x, y) = (p.x(), p.y());
+    let (x, y) = (point.x(), point.y());
     let (rx, ry) = (me.radius.x(), me.radius.y());
     let size = map.size();
     let (w, h) = (size.width(), size.height());
@@ -471,7 +478,7 @@ pub(crate) fn placement(
         || !placement_terrains(
             me.placement,
             map,
-            p,
+            point,
             TileRect::new((x - rx) as i32, (y - ry) as i32, far_x as i32, far_y as i32),
         )? {
         false
@@ -482,10 +489,13 @@ pub(crate) fn placement(
         'tiles: for tx in x0..=x1 {
             for ty in y0..=y1 {
                 let tile = Tile::new(tx, ty);
-                let t = map.terrain(tile)?;
-                let value = me.restriction.value(t).ok_or(GenieError::unsupported(
-                    "a terrain its restriction does not list",
-                ))?;
+                let terrain_id = map.terrain(tile)?;
+                let value = me
+                    .restriction
+                    .value(terrain_id)
+                    .ok_or(GenieError::unsupported(
+                        "a terrain its restriction does not list",
+                    ))?;
                 if value <= spawn_tuning.passable {
                     passable = false;
                     break 'tiles;
@@ -514,7 +524,7 @@ pub(crate) fn placement(
                 listed.then_some(tall && me.tall)
             };
             let found = if me.tall {
-                overlapping(map, p, me.radius, &counts, spawn_tuning)?
+                overlapping(map, point, me.radius, &counts, spawn_tuning)?
             } else {
                 Vec::new()
             };
@@ -541,7 +551,7 @@ pub(crate) fn placement(
         listed.then_some(tall && me.tall)
     };
     let found = if me.tall && (0.0 < rx || 0.0 < ry) {
-        overlapping(map, p, me.radius, &counts, spawn_tuning)?
+        overlapping(map, point, me.radius, &counts, spawn_tuning)?
     } else {
         Vec::new()
     };
@@ -550,6 +560,6 @@ pub(crate) fn placement(
         return Ok(Tested::Free);
     }
     Ok(Tested::Blocked {
-        stays: blocker.is_some_and(|b| b.stays(roles)),
+        stays: blocker.is_some_and(|near| near.stays(roles)),
     })
 }

@@ -1061,8 +1061,8 @@ fn powf_takes_the_image_branches_and_exact_powers() {
 /// product: on these powf's double log2 and exp2 round as f32 multiplication does.
 #[test]
 fn powf_squares_the_radii_as_f32_multiplication_does() {
-    for i in 1..=300 {
-        for x in [i as f32 * 0.025, i as f32 * 0.1] {
+    for index in 1..=300 {
+        for x in [index as f32 * 0.025, index as f32 * 0.1] {
             assert_eq!(powf(x, 2.0).to_bits(), (x * x).to_bits(), "{x}");
         }
     }

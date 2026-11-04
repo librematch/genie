@@ -124,7 +124,7 @@ impl Master {
             }
             MasterAttribute::ROTATION_SPEED
                 if self.moving_part().turn_speed == Seconds::ZERO
-                    && moving.is_some_and(|m| m.turn_time != Seconds::ZERO) =>
+                    && moving.is_some_and(|move_stats| move_stats.turn_time != Seconds::ZERO) =>
             {
                 Some("a master's turn speed (+0x758) the loader did not fill")
             }
@@ -162,7 +162,9 @@ impl Master {
     /// The selected train location (`FUN_1412669d0`: `+0x940` sign-extended, below the count as
     /// an unsigned value, so a negative entry selects none).
     pub(super) fn train_location_mut(&mut self) -> Option<&mut TrainLocation> {
-        let p = self.creatable.as_mut()?;
-        p.train_locations.get_mut(p.train_location_entry.index()?)
+        let creatable_part = self.creatable.as_mut()?;
+        creatable_part
+            .train_locations
+            .get_mut(creatable_part.train_location_entry.index()?)
     }
 }

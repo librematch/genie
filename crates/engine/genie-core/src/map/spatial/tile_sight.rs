@@ -30,8 +30,8 @@ impl TileSight {
 }
 
 impl genie_diff::Diff for TileSight {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.get().diff(&other.get(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.get().diff(&other.get(), differ);
     }
 }
 

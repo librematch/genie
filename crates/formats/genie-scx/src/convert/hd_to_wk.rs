@@ -114,7 +114,7 @@ impl HdToWk {
             }
             if let Some(new_kind) = effect
                 .object_kind()
-                .and_then(|t| self.object_ids_map.get(&t.into()))
+                .and_then(|unit_kind_id| self.object_ids_map.get(&unit_kind_id.into()))
             {
                 effect.set_object_kind(*new_kind);
             }

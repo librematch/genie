@@ -81,8 +81,8 @@ impl ObjectId {
 }
 
 impl genie_diff::Diff for ObjectId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn minus_one_is_no_id() {
         assert_eq!(
-            ObjectId::try_from(-1).map_err(|e| e.kind()),
+            ObjectId::try_from(-1).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
         assert_eq!(id(-2).get(), -2);

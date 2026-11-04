@@ -82,8 +82,8 @@ impl Stand<'_> {
     /// The unit stands: [`new_sprite`] with the standing sprite, if any, its top speed `stats`
     /// read with it.
     fn show(self, stats: Option<&mut MoveStats>) {
-        if let Some(g) = self.graphic {
-            new_sprite(self.sprite, stats, g, self.rng, *self.sprite_tuning);
+        if let Some(graphic) = self.graphic {
+            new_sprite(self.sprite, stats, graphic, self.rng, *self.sprite_tuning);
         }
     }
 }
@@ -160,7 +160,7 @@ impl GatherAction {
                 None => None,
             },
             match self.carry_to {
-                Some(t) => Some(t.id()),
+                Some(role_id) => Some(role_id.id()),
                 None => None,
             },
         ]

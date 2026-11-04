@@ -141,7 +141,7 @@ impl TechState {
     pub fn location(&self, building: MasterId) -> Option<&Location> {
         self.locations
             .iter()
-            .find(|l| l.building == Some(building))
+            .find(|building_location| building_location.building == Some(building))
             .or_else(|| self.locations.first())
     }
 
@@ -173,18 +173,18 @@ impl TechState {
         ) {
             return Ok(out);
         }
-        for (j, slot) in out.iter_mut().enumerate() {
-            let o = *self.overrides.checked(j)?;
-            let c = *def.costs.checked(j)?;
-            let (attribute, base) = match o.used {
+        for (index, slot) in out.iter_mut().enumerate() {
+            let cost_override = *self.overrides.checked(index)?;
+            let cost = *def.costs.checked(index)?;
+            let (attribute, base) = match cost_override.used {
                 OverrideUse::NONE => continue,
-                OverrideUse::DAT if c.attribute.is_some() => (c.attribute, c.amount),
-                _ => (o.attribute, o.amount),
+                OverrideUse::DAT if cost.attribute.is_some() => (cost.attribute, cost.amount),
+                _ => (cost_override.attribute, cost_override.amount),
             };
             let Some(attribute) = attribute else {
                 continue;
             };
-            let adj = self.cost_adj.checked(j)?.get();
+            let adj = self.cost_adj.checked(index)?.get();
             let mut v = (i32::from(adj) * i32::from(scale) + i32::from(base.get())) as f32;
             if 0.0 < modifier {
                 v *= modifier;
@@ -206,33 +206,33 @@ impl TechState {
         attributes: &dyn Attributes,
     ) -> GenieResult<bool> {
         let (modifier, scale) = factors;
-        for j in 0..3 {
-            let o = *self.overrides.checked(j)?;
-            let c = *def.costs.checked(j)?;
-            let attr = if o.used == OverrideUse::OVERRIDE {
-                o.attribute
+        for index in 0..3 {
+            let cost_override = *self.overrides.checked(index)?;
+            let cost = *def.costs.checked(index)?;
+            let attr = if cost_override.used == OverrideUse::OVERRIDE {
+                cost_override.attribute
             } else {
-                c.attribute
+                cost.attribute
             };
-            let Some(attr) = attr.filter(|_| c.paid.is_paid()) else {
+            let Some(attr) = attr.filter(|_| cost.paid.is_paid()) else {
                 continue;
             };
-            let mut v = if o.used == OverrideUse::OVERRIDE {
-                o.amount.as_f32()
+            let mut v = if cost_override.used == OverrideUse::OVERRIDE {
+                cost_override.amount.as_f32()
             } else {
-                (i32::from(self.cost_adj.checked(j)?.get()) * i32::from(scale)) as f32
-                    + c.amount.as_f32()
+                (i32::from(self.cost_adj.checked(index)?.get()) * i32::from(scale)) as f32
+                    + cost.amount.as_f32()
             };
             if 0.0 < modifier {
                 v = f32::from((v * modifier) as i32 as i16);
             }
             let before = paid
                 .iter()
-                .filter(|&&(k, _)| k == Some(attr))
-                .map(|&(_, a)| a)
+                .filter(|&&(attribute_id, _)| attribute_id == Some(attr))
+                .map(|&(_, amount)| amount)
                 .sum::<Amount>()
                 .get();
-            if c.paid == CostPaid::BUILDING {
+            if cost.paid == CostPaid::BUILDING {
                 return Err(GenieError::unsupported(
                     "a research cost the building holds (FUN_141204310)",
                 ));
@@ -260,13 +260,13 @@ impl TechState {
         (modifier, scale): (f32, i16),
     ) -> GenieResult<[(Option<AttributeId>, CostAmount); 3]> {
         let mut out = [(None, 0i16); 3];
-        for (j, slot) in out.iter_mut().enumerate() {
-            let o = *self.overrides.checked(j)?;
-            let c = *def.costs.checked(j)?;
-            let (attribute, base) = match o.used {
+        for (index, slot) in out.iter_mut().enumerate() {
+            let cost_override = *self.overrides.checked(index)?;
+            let cost = *def.costs.checked(index)?;
+            let (attribute, base) = match cost_override.used {
                 OverrideUse::NONE => continue,
-                OverrideUse::DAT if c.paid.is_paid() => (c.attribute, c.amount),
-                _ => (o.attribute, o.amount),
+                OverrideUse::DAT if cost.paid.is_paid() => (cost.attribute, cost.amount),
+                _ => (cost_override.attribute, cost_override.amount),
             };
             slot.0 = attribute;
             if attribute.is_none() {
@@ -274,7 +274,7 @@ impl TechState {
             }
             let mut v = self
                 .cost_adj
-                .checked(j)?
+                .checked(index)?
                 .get()
                 .wrapping_mul(scale)
                 .wrapping_add(base.get());
@@ -288,7 +288,7 @@ impl TechState {
                 slot.0 = None;
             }
         }
-        Ok(out.map(|(a, n)| (a, CostAmount::of_data(n))))
+        Ok(out.map(|(attribute_id, n)| (attribute_id, CostAmount::of_data(n))))
     }
 
     /// A cost entry as the research test and the payment read it: the attribute (the
@@ -301,23 +301,25 @@ impl TechState {
         j: usize,
         (modifier, scale): (f32, i16),
     ) -> Option<(AttributeId, f32, CostPaid)> {
-        let o = *self.overrides.get(j)?;
-        let c = *def.costs.get(j)?;
-        let attribute = if o.used == OverrideUse::OVERRIDE {
-            o.attribute
+        let cost_override = *self.overrides.get(j)?;
+        let cost = *def.costs.get(j)?;
+        let attribute = if cost_override.used == OverrideUse::OVERRIDE {
+            cost_override.attribute
         } else {
-            c.attribute
+            cost.attribute
         };
-        let attribute = attribute.filter(|_| c.paid.is_paid() || o.used != OverrideUse::NONE)?;
-        let mut v = if o.used == OverrideUse::OVERRIDE {
-            o.amount.as_f32()
+        let attribute =
+            attribute.filter(|_| cost.paid.is_paid() || cost_override.used != OverrideUse::NONE)?;
+        let mut v = if cost_override.used == OverrideUse::OVERRIDE {
+            cost_override.amount.as_f32()
         } else {
-            (i32::from(self.cost_adj.get(j)?.get()) * i32::from(scale)) as f32 + c.amount.as_f32()
+            (i32::from(self.cost_adj.get(j)?.get()) * i32::from(scale)) as f32
+                + cost.amount.as_f32()
         };
         if 0.0 < modifier {
             v = f32::from((v * modifier) as i32 as i16);
         }
-        Some((attribute, v, c.paid))
+        Some((attribute, v, cost.paid))
     }
 
     /// The research test (`FUN_1413cd600` without a building's holdings, `param_4` and `param_5`
@@ -342,8 +344,8 @@ impl TechState {
         {
             return Ok(false);
         }
-        for j in 0..3 {
-            let Some((attr, amount, paid)) = self.payment(def, j, factors) else {
+        for index in 0..3 {
+            let Some((attr, amount, paid)) = self.payment(def, index, factors) else {
                 continue;
             };
             if paid == CostPaid::BUILDING {
@@ -376,8 +378,8 @@ impl TechState {
         if !self.can_research(def, factors, repeat, &*owner)? {
             return Ok(Payment::Unpaid);
         }
-        for j in 0..3 {
-            let Some((attr, amount, paid)) = self.payment(def, j, factors) else {
+        for index in 0..3 {
+            let Some((attr, amount, paid)) = self.payment(def, index, factors) else {
                 continue;
             };
             if paid == CostPaid::BUILDING {
@@ -446,18 +448,18 @@ pub enum RepeatLimit {
 /// ([`Player`]) or what a repair's payer holds (`PaidAttributes`). A refund and a technology's
 /// payment write a player's attributes ([`Player::set_attribute`]).
 pub trait Attributes {
-    /// Attribute `i`.
+    /// Attribute `attribute_id`.
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn get(&self, i: AttributeId) -> GenieResult<Amount>;
-    /// Attribute `i` less `amount` (a payment's `SUBSS`).
+    fn get(&self, attribute_id: AttributeId) -> GenieResult<Amount>;
+    /// Attribute `attribute_id` less `amount` (a payment's `SUBSS`).
     ///
     /// # Errors
     ///
     /// An attribute the player does not have.
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()>;
+    fn subtract(&mut self, attribute_id: AttributeId, amount: Amount) -> GenieResult<()>;
 }
 
 #[cfg(test)]
@@ -508,14 +510,15 @@ mod tests {
 
     #[test]
     fn loom_lists_its_gold_and_pays_it_once_queued() {
-        let (mut s, d) = loom();
+        let (mut tech_state, tech_def) = loom();
         assert_eq!(
-            s.listed_costs(&d, (0.0, 1))
+            tech_state
+                .listed_costs(&tech_def, (0.0, 1))
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(a, cost_amount)| (a, cost_amount.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
-        assert!(!s.repeatable(&d, RepeatLimit::Own));
+        assert!(!tech_state.repeatable(&tech_def, RepeatLimit::Own));
         // the game's attributes in 3842 (80 food, 157 wood, 200 stone, 100 gold) and after it
         let mut held = player_holding(vec![
             Amount::new(79.956_116),
@@ -524,8 +527,8 @@ mod tests {
             Amount::new(100.0),
         ]);
         assert_eq!(
-            s.pay(
-                &d,
+            tech_state.pay(
+                &tech_def,
                 (0.0, 1),
                 Repeat::Denied,
                 ids::TOWN_CENTRE,
@@ -539,13 +542,13 @@ mod tests {
             amounts([79.956_116, 157.05705, 200.0, 50.0])
         );
         assert_eq!(
-            (s.state, s.building_master),
+            (tech_state.state, tech_state.building_master),
             (ResearchState::Queued, Some(master_id(109)))
         );
         // queued, it may not be researched again
         assert_eq!(
-            s.pay(
-                &d,
+            tech_state.pay(
+                &tech_def,
                 (0.0, 1),
                 Repeat::Denied,
                 ids::TOWN_CENTRE,
@@ -555,28 +558,34 @@ mod tests {
             Ok(Payment::Unpaid)
         );
         // its queue entry records the 50 gold, which its start finds paid
-        let paid = s.entry_costs(&d, (0.0, 1)).unwrap();
+        let paid = tech_state.entry_costs(&tech_def, (0.0, 1)).unwrap();
         assert_eq!(
-            paid.map(|(a, n)| (a, n.get())),
+            paid.map(|(attribute_id, amount)| (attribute_id, amount.get())),
             [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, 0.0)]
         );
-        assert_eq!(s.start_test(&d, (0.0, 1), &paid, &held), Ok(true));
+        assert_eq!(
+            tech_state.start_test(&tech_def, (0.0, 1), &paid, &held),
+            Ok(true)
+        );
         // without the entry's payment the 50 gold left would do too, but that difference is
         // the game's FUN_1411c68b0
         assert!(
-            s.start_test(&d, (0.0, 1), &[(None, Amount::new(0.0)); 3], &held)
+            tech_state
+                .start_test(&tech_def, (0.0, 1), &[(None, Amount::new(0.0)); 3], &held)
                 .is_err()
         );
         assert_eq!(
-            s.location(ids::TOWN_CENTRE).map(|l| l.time),
+            tech_state
+                .location(ids::TOWN_CENTRE)
+                .map(|location| location.time),
             Some(WholeSeconds::of_data(25))
         );
     }
 
     #[test]
     fn cost_beyond_the_attribute_takes_the_rest_from_gold() {
-        let (mut s, mut d) = loom();
-        d.costs[0].attribute = Some(attribute::WOOD);
+        let (mut tech_state, mut tech_def) = loom();
+        tech_def.costs[0].attribute = Some(attribute::WOOD);
         let mut held = player_holding(vec![
             Amount::ZERO,
             Amount::new(30.0),
@@ -585,8 +594,8 @@ mod tests {
         ]);
         // the test asks for 50 wood: 30 is too little
         assert_eq!(
-            s.pay(
-                &d,
+            tech_state.pay(
+                &tech_def,
                 (0.0, 1),
                 Repeat::Denied,
                 ids::TOWN_CENTRE,
@@ -597,8 +606,8 @@ mod tests {
         );
         // the modifier scales the amount (truncated) before the test
         assert_eq!(
-            s.pay(
-                &d,
+            tech_state.pay(
+                &tech_def,
                 (0.5, 1),
                 Repeat::Denied,
                 ids::TOWN_CENTRE,
@@ -609,9 +618,10 @@ mod tests {
         );
         assert_eq!(held.attributes, amounts([0.0, 5.0, 0.0, 100.0]));
         assert_eq!(
-            s.listed_costs(&d, (0.5, 1))
+            tech_state
+                .listed_costs(&tech_def, (0.5, 1))
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [(Some(attribute::WOOD), 25), (None, 0), (None, 0)]
         );
     }

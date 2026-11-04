@@ -48,24 +48,24 @@ pub fn steps_from_save(
         .collect();
     let mut steps = Vec::new();
     let mut failed = None;
-    turns.tick_observed(frame.dt, &commands, &mut |w, step| {
+    turns.tick_observed(frame.dt, &commands, &mut |world, step| {
         let compared = game_at(step)
-            .map(|(save, globals)| step_report(w, start, (&save, globals.as_deref()), masters))
+            .map(|(save, globals)| step_report(world, start, (&save, globals.as_deref()), masters))
             .transpose();
         match compared {
             Ok(report) => steps.push((step, report)),
-            Err(e) => {
-                let _ = failed.get_or_insert(e);
+            Err(error) => {
+                let _ = failed.get_or_insert(error);
             }
         }
     });
     failed.map_or(Ok(steps), Err)
 }
 
-/// Genie's world `w` in the update after save `start` against the game's save at the same step
+/// Genie's world `world` in the update after save `start` against the game's save at the same step
 /// (`after`, with its globals).
 fn step_report(
-    w: &World,
+    world: &World,
     start: usize,
     (after, globals): (&[u8], Option<&str>),
     masters: Option<&MasterTable>,
@@ -76,10 +76,10 @@ fn step_report(
         ticks: 1,
         ..TickReport::default()
     };
-    compare_players(w, &saved, None, &mut report)?;
+    compare_players(world, &saved, None, &mut report)?;
     report
         .differences
-        .extend(owned_group_differences(w, &mut saved.game, globals));
+        .extend(owned_group_differences(world, &mut saved.game, globals));
     Ok(report)
 }
 

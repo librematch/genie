@@ -60,28 +60,28 @@ impl World {
         target: ObjectId,
         (master, world_time): (&Master, WorldTime),
     ) -> GenieResult<Option<ReadyReads>> {
-        let u = self.players.live(player, idx)?;
+        let unit = self.players.live(player, idx)?;
         let held = self.players.player(player)?;
         let reads = AttackReads::of(
-            self.parts.combat_of(u.id),
+            self.parts.combat_of(unit.id),
             master,
             (
                 OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player)),
                 &self.model.graphics,
             ),
-            self.parts.unit_ai.get(u.id),
+            self.parts.unit_ai.get(unit.id),
             (held.kind, world_time),
             &self.model.roles,
             &self.model.tuning.turn,
         );
         let own = victim_of(
             (
-                u,
-                self.parts.unit_ai.contains(u.id),
-                self.parts.building_of(u.id),
-                self.parts.combat_of(u.id),
-                self.parts.actions.of(u.id),
-                self.parts.unread.get(u.id),
+                unit,
+                self.parts.unit_ai.contains(unit.id),
+                self.parts.building_of(unit.id),
+                self.parts.combat_of(unit.id),
+                self.parts.actions.of(unit.id),
+                self.parts.unread.get(unit.id),
             ),
             master,
             &held.attributes,
@@ -153,8 +153,8 @@ impl World {
         let speed = self
             .parts
             .mover_of(self.players.live(player, idx)?.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed);
-        let e = engagement(
+            .map_or(Speed::ZERO, |mover| mover.stats.speed);
+        let engagement = engagement(
             self.parts.unit_ai.get(self.players.live(player, idx)?.id),
             speed,
             master,
@@ -180,7 +180,7 @@ impl World {
         );
         let cmd = AttackCommand {
             target,
-            engagement: &e,
+            engagement: &engagement,
             arms,
             visible,
             target_owner: aim.owner,
@@ -200,8 +200,8 @@ impl World {
         cmd: &AttackCommand<'_>,
     ) -> GenieResult<()> {
         let roles = self.model.roles.clone();
-        let (mut attack, posted) = self.run_on_step(player, idx, |unit, _, c| {
-            Attack::command(c, unit, cmd, &roles)
+        let (mut attack, posted) = self.run_on_step(player, idx, |unit, _, step| {
+            Attack::command(step, unit, cmd, &roles)
         })?;
         // the start's notifies go to the unit AI (the unit's slot 0x328 -> the AI's slot 0x38)
         let unit = self.players.live_mut(player, idx)?;
@@ -226,20 +226,20 @@ impl World {
     /// building, anything else at itself; with the target's owner, its master's class and fog
     /// visibility, and the aimed object's place and class.
     pub(super) fn attack_aim(&self, target: ObjectId) -> GenieResult<Aim> {
-        let (owner, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (owner, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "an attack task's target the slice does not hold",
         ))?;
-        let tm = t.master(self.master_tables(), owner)?;
+        let tm = target_unit.master(self.master_tables(), owner)?;
         // A building's master type (`'P'`); types below 30 do not move.
         let aimed = if tm.kind == MasterKind::BUILDING {
             self.parts
-                .building_of(t.id)
+                .building_of(target_unit.id)
                 .annex_of
                 .map_or(target, MainBuildingId::id)
         } else {
             target
         };
-        let (ap, a) = self.object(aimed).ok_or(GenieError::unsupported(
+        let (ap, unit) = self.object(aimed).ok_or(GenieError::unsupported(
             "an attack task's main building is gone",
         ))?;
         Ok(Aim {
@@ -247,8 +247,8 @@ impl World {
             class: tm.class,
             fog_visibility: tm.fog_visibility,
             aimed,
-            at: a.position(),
-            aimed_class: a.master(self.master_tables(), ap)?.class,
+            at: unit.position(),
+            aimed_class: unit.master(self.master_tables(), ap)?.class,
         })
     }
 
@@ -314,7 +314,9 @@ impl World {
             ))?;
         let arms = self.arms(player, idx, &task)?;
         // FUN_14109d4f0: the target's master is one of the unit's master's drop sites
-        let target_master = self.object(target).map(|(_, t)| t.life.master_id);
+        let target_master = self
+            .object(target)
+            .map(|(_, target_unit)| target_unit.life.master_id);
         let drops_here = self
             .players
             .live(player, idx)?
@@ -322,15 +324,15 @@ impl World {
             .action_part()
             .drop_sites
             .iter()
-            .any(|&d| Some(d) == target_master);
+            .any(|&master_id| Some(master_id) == target_master);
         let unit = self.players.live_mut(player, idx)?;
         let old = self
             .parts
             .actions_of(unit.id)
             .list
             .hunt()
-            .map(|h| h.target)
-            .filter(|&t| t.is_some());
+            .map(|hunt_action| hunt_action.target)
+            .filter(|&role_id| role_id.is_some());
         let walks = unit.move_walks(
             self.parts.mover_of(unit.id),
             MasterTables::new(&self.model.masters, &self.parts.own_master),
@@ -408,10 +410,10 @@ impl World {
             let by = self.releaser(player, idx)?;
             self.release(old, by)?;
         }
-        let Some((_, t)) = self.object(new) else {
+        let Some((_, unit)) = self.object(new) else {
             return Ok(None);
         };
-        if ObjectState::Removed <= t.life.state {
+        if ObjectState::Removed <= unit.life.state {
             return Ok(None);
         }
         if voice.is_loud() {

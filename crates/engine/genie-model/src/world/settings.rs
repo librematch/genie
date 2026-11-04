@@ -440,16 +440,16 @@ mod tests {
             resource_level: ResourceLevel::of_data(resource_level),
             ..mode(9)
         };
-        for n in 19..=25 {
+        for index in 19..=25 {
             assert_eq!(
-                level(i32::from(n) - 19).tech_mode_allows(TechMode::of_data(n)),
+                level(i32::from(index) - 19).tech_mode_allows(TechMode::of_data(index)),
                 Ok(true),
-                "{n}"
+                "{index}"
             );
             assert_eq!(
-                level(7).tech_mode_allows(TechMode::of_data(n)),
+                level(7).tech_mode_allows(TechMode::of_data(index)),
                 Ok(false),
-                "{n}"
+                "{index}"
             );
         }
         let antiquity = Settings {
@@ -472,29 +472,29 @@ mod tests {
     /// not listed for every game; 15 is the root's entry, not held.
     #[test]
     fn technology_mode_reads_the_game_options() {
-        let s = Settings {
+        let settings = Settings {
             game_mode: GameMode::of_data(2),
             ..Settings::default()
         };
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(0)), Ok(true));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(1)), Ok(true));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(99)), Ok(true));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(3)), Ok(true));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(-3)), Ok(false));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(2)), Ok(false));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(-2)), Ok(true));
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(13)), Ok(false));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(0)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(1)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(99)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(3)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(-3)), Ok(false));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(2)), Ok(false));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(-2)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(13)), Ok(false));
         assert!(
-            s.tech_mode_allows(TechMode::of_data(15)).is_err()
-                && s.tech_mode_allows(TechMode::of_data(-15)).is_err()
+            settings.tech_mode_allows(TechMode::of_data(15)).is_err()
+                && settings.tech_mode_allows(TechMode::of_data(-15)).is_err()
         );
         // mode 2 (death match) with the default age: at least Castle and Imperial and 5, not
         // Feudal (27) and not 28
         assert_eq!(
-            [27, 28, 32, 33, 34].map(|m| s.tech_mode_allows(TechMode::of_data(m))),
+            [27, 28, 32, 33, 34].map(|m| settings.tech_mode_allows(TechMode::of_data(m))),
             [Ok(false), Ok(false), Ok(true), Ok(true), Ok(true)]
         );
-        assert_eq!(s.tech_mode_allows(TechMode::of_data(-32)), Ok(true));
+        assert_eq!(settings.tech_mode_allows(TechMode::of_data(-32)), Ok(true));
         let feudal = Settings {
             starting_age: Age::of_data(2),
             ..Settings::default()

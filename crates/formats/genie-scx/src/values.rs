@@ -35,14 +35,14 @@ impl Default for ScxVersion {
 }
 
 impl Debug for ScxVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", String::from_utf8_lossy(&self.0))
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{:?}", String::from_utf8_lossy(&self.0))
     }
 }
 
 impl Display for ScxVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", String::from_utf8_lossy(&self.0))
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", String::from_utf8_lossy(&self.0))
     }
 }
 

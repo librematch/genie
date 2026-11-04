@@ -32,8 +32,8 @@ impl WorldMap<'_> {
             .spatial
             .terrain
             .as_ref()
-            .and_then(|m| m.terrains.get(t))
-            .map(|k| k.flags)
+            .and_then(|terrain| terrain.terrains.get(t))
+            .map(|terrain_kind| terrain_kind.flags)
     }
 
     /// How many terrains the map's table holds.
@@ -42,7 +42,7 @@ impl WorldMap<'_> {
             .spatial
             .terrain
             .as_ref()
-            .map_or(0, |m| m.terrains.len())
+            .map_or(0, |terrain| terrain.terrains.len())
     }
 
     /// The map's size in tiles.
@@ -87,28 +87,28 @@ impl WorldMap<'_> {
 
     /// A tile's elevation (`+0x14`), when the map holds it.
     pub(crate) fn elevation(&self, tile: Tile) -> Option<u8> {
-        let t = self.turns.spatial.terrain.as_ref()?;
-        let i = self.turns.spatial.map.index(tile)?;
-        t.elevations.get(i).copied()
+        let terrain = self.turns.spatial.terrain.as_ref()?;
+        let index = self.turns.spatial.map.index(tile)?;
+        terrain.elevations.get(index).copied()
     }
 
     /// A tile's shape (`+0x8`, [`crate::map::terrain::Terrain::set_elevations`]), when the map
     /// holds it.
     pub(crate) fn shape(&self, tile: Tile) -> Option<u8> {
-        let t = self.turns.spatial.terrain.as_ref()?;
-        let i = self.turns.spatial.map.index(tile)?;
-        t.shapes.get(i).copied()
+        let terrain = self.turns.spatial.terrain.as_ref()?;
+        let index = self.turns.spatial.map.index(tile)?;
+        terrain.shapes.get(index).copied()
     }
 
-    /// Player `a` counts player `b` as an ally (`FUN_141663dc0`): itself; never Gaia; relation 0,
-    /// or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
-    pub(crate) fn allied(&self, a: PlayerId, b: PlayerId, test: AllyTest) -> bool {
+    /// Player `first` counts player `second` as an ally (`FUN_141663dc0`): itself; never Gaia;
+    /// relation 0, or by `test` relation 4 too (the zone mode's relation 1 is not modelled).
+    pub(crate) fn allied(&self, first: PlayerId, second: PlayerId, test: AllyTest) -> bool {
         let relations = self
             .turns
             .players
-            .player(a)
-            .map_or(&NO_RELATIONS, |p| &p.relations);
-        task_finder_allied(relations, a, b, test)
+            .player(first)
+            .map_or(&NO_RELATIONS, |player| &player.relations);
+        task_finder_allied(relations, first, second, test)
     }
 
     /// The objects on `tile` (their centre there), in the tile list's order.
@@ -117,14 +117,15 @@ impl WorldMap<'_> {
     ///
     /// An object the slice does not update, or one without its master.
     pub(crate) fn objects(&self, tile: Tile) -> GenieResult<Vec<Near>> {
-        let t = self.turns;
-        t.spatial
+        let world = self.turns;
+        world
+            .spatial
             .objects_on(tile)
             .map(|(id, placed)| {
-                let (owner, unit) = t.object(id).ok_or(GenieError::unsupported(
+                let (owner, unit) = world.object(id).ok_or(GenieError::unsupported(
                     "an object near a spawn point the slice does not update",
                 ))?;
-                let master = unit.master(t.master_tables(), owner)?;
+                let master = unit.master(world.master_tables(), owner)?;
                 Ok(Near {
                     id,
                     position: placed.position,
@@ -135,35 +136,35 @@ impl WorldMap<'_> {
                         flags.set(NearFlags::AUTO_GATHER, master.auto_gather.is_on());
                         flags.set(
                             NearFlags::DESOLID,
-                            t.parts
+                            world
+                                .parts
                                 .building_of(id)
                                 .construction
-                                .is_some_and(|c| c.desolid),
+                                .is_some_and(|construction| construction.desolid),
                         );
                         flags.set(
                             NearFlags::MOVING,
                             master
                                 .move_stats
                                 .as_ref()
-                                .is_some_and(|m| Speed::ZERO < m.speed),
+                                .is_some_and(|move_stats| Speed::ZERO < move_stats.speed),
                         );
                         flags.set(
                             NearFlags::HOLDS,
                             Amount::ZERO < unit.life.amount
-                                && unit
-                                    .life
-                                    .attribute_kind
-                                    .is_some_and(|k| k.is_resource() || k.is_food_load()),
+                                && unit.life.attribute_kind.is_some_and(|attribute_id| {
+                                    attribute_id.is_resource() || attribute_id.is_food_load()
+                                }),
                         );
                         flags.set(
                             NearFlags::FOREST_TILE,
-                            t.spatial.terrain.as_ref().is_some_and(|ter| {
+                            world.spatial.terrain.as_ref().is_some_and(|ter| {
                                 ter.kind(Tile::new(
                                     placed.position.x() as i32,
                                     placed.position.y() as i32,
                                 ))
-                                .and_then(|k| ter.terrains.get(k.index()))
-                                .is_some_and(|k| k.forest)
+                                .and_then(|terrain_id| ter.terrains.get(terrain_id.index()))
+                                .is_some_and(|terrain_kind| terrain_kind.forest)
                             }),
                         );
                         flags
@@ -176,13 +177,14 @@ impl WorldMap<'_> {
                     state: unit.life.state,
                     player: owner,
                     fog_visibility: master.fog_visibility,
-                    fog_mask: t.spatial.sight.as_ref().and_then(|v| {
-                        let umv = v.seer(id).map_or(0, |s| s.umv);
+                    fog_mask: world.spatial.sight.as_ref().and_then(|visibility| {
+                        let umv = visibility.seer(id).map_or(0, |seer| seer.umv);
                         (MasterKind::RGE_COMBAT <= master.kind && umv != 0).then(|| {
-                            v.registry
+                            visibility
+                                .registry
                                 .as_ref()
-                                .and_then(|r| r.entry(id))
-                                .map_or(VisionBits::NONE, |e| e.mask)
+                                .and_then(|registry| registry.entry(id))
+                                .map_or(VisionBits::NONE, |entry| entry.mask)
                         })
                     }),
                     hp: unit.life.hp,

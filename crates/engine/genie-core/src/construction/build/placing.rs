@@ -58,25 +58,26 @@ impl BuildAction {
     /// [`Spatial::foreign_marks`]: crate::map::spatial::Spatial::foreign_marks
     pub(super) fn place(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let desolid =
-            c.w.parts
-                .building_of(Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?.id)
-                .construction
-                .is_some_and(|k| k.desolid);
+        let desolid = step
+            .w
+            .parts
+            .building_of(Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?.id)
+            .construction
+            .is_some_and(|construction| construction.desolid);
         // every set_state first takes the builder out of FUN_140aaddb0's building's builders
-        self.uncount(c)?;
+        self.uncount(step)?;
         self.state = BuildState::Place;
         if !desolid {
-            return self.join(c, builder, roles);
+            return self.join(step, builder, roles);
         }
         let site = self.target.ok_or(SITE_GONE)?;
-        let placed = *c.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
+        let placed = *step.w.spatial.get_known(site)?.ok_or(SITE_GONE)?;
         let clearing = ClearingSite {
             player: placed.player,
             master: placed.master,
@@ -86,29 +87,29 @@ impl BuildAction {
             by: Clearer::Builder,
         };
         let cleared = footprint_clearing(
-            &c.w.spatial,
+            &step.w.spatial,
             &clearing,
             &reads.looks,
             roles,
-            &c.w.model.tuning.build,
+            &step.w.model.tuning.build,
         )?;
         for cl in cleared.iter().filter(|cl| cl.record_goes) {
-            c.w.pathing.removed(cl.id);
-            c.w.spatial.drop_record(cl.id);
+            step.w.pathing.removed(cl.id);
+            step.w.spatial.drop_record(cl.id);
         }
-        c.w.pathing.tiles_changed(c.w.spatial.take_changes());
+        step.w.pathing.tiles_changed(step.w.spatial.take_changes());
         let cleared_ids: Vec<ObjectId> = cleared.iter().map(|cl| cl.id).collect();
-        let occupants = site_occupants(c, site, &placed, &cleared_ids, reads)?;
+        let occupants = site_occupants(step, site, &placed, &cleared_ids, reads)?;
         for cl in cleared {
-            c.w.clear_object(cl, RecordDrop::Dropped)?;
+            step.w.clear_object(cl, RecordDrop::Dropped)?;
         }
-        let parts = self.part_tests(c, builder, actions, (site.id(), &cleared_ids), reads)?;
+        let parts = self.part_tests(step, builder, actions, (site.id(), &cleared_ids), reads)?;
         // the foundation's placement test (its master's slot 0x50, FUN_14123aee0): one that may
         // not stay, or follows a part that may not, sends no unit off
-        let own = with_annexes(c, site.id());
+        let own = with_annexes(step, site.id());
         // the builder lent to its slot, where the tests' scans meet it (FD-045-D32)
-        let code = self.lend(c, builder, actions, |w, _, _| {
-            w.foundation_code(&placed, true, &own)
+        let code = self.lend(step, builder, actions, |world, _, _| {
+            world.foundation_code(&placed, true, &own)
         })?;
         let stays = parts.stay && code.is_allowed();
         let others: Vec<ObjectId> = occupants
@@ -117,40 +118,40 @@ impl BuildAction {
             .filter(|&id| id != builder.id)
             .collect();
         if stays && !others.is_empty() {
-            c.w.evacuate(site, &others)?;
+            step.w.evacuate(site, &others)?;
         }
-        if c.w.spatial.foreign_marks(&placed) {
+        if step.w.spatial.foreign_marks(&placed) {
             // FUN_1411d4b80: a human owner's foundation goes (FUN_1411ccbb0), the interface hears
             // of it (FUN_140c898a0 0x88, not held), and set_state(2) halts the Build: the
             // standing sprite, the foundation let go, no point
-            self.remove_marked(c)?;
-            return self.halt_placing(c, builder, reads);
+            self.remove_marked(step)?;
+            return self.halt_placing(step, builder, reads);
         }
         if !stays {
             // the interface hears of it (FUN_140c898a0 0x88, not held), and set_state(2) halts
             // the Build
-            return self.halt_placing(c, builder, reads);
+            return self.halt_placing(step, builder, reads);
         }
         // the foundation's FUN_14123bb20 found no unit: the builder joins, or waits while units
         // stand on a part
         if occupants.is_empty() {
             if parts.occupied {
-                return self.wait_or_halt(c, builder, reads);
+                return self.wait_or_halt(step, builder, reads);
             }
-            return self.join(c, builder, roles);
+            return self.join(step, builder, roles);
         }
         let (bx, by) = (builder.position().x(), builder.position().y());
         let (sx, sy) = (placed.position.x(), placed.position.y());
         let inside = (bx - sx).abs() <= placed.radius.x() && (by - sy).abs() <= placed.radius.y();
         if inside {
-            return self.clear(c, builder, site.id(), roles);
+            return self.clear(step, builder, site.id(), roles);
         }
-        if let Some(annex) = self.annex_beneath(c, builder, placed.radius)? {
+        if let Some(annex) = self.annex_beneath(step, builder, placed.radius)? {
             // set_state(223) with the annex as the target, which the foundation replaces again
             // after it: the walk off the annex's footprint
-            return self.clear(c, builder, annex, roles);
+            return self.clear(step, builder, annex, roles);
         }
-        self.wait_or_halt(c, builder, reads)
+        self.wait_or_halt(step, builder, reads)
     }
 
     /// The tests before the foundation's own in `0x140aae200` case 7: its main building's
@@ -166,14 +167,14 @@ impl BuildAction {
     /// A part gone from the map, and what the test and the send-off do not model.
     fn part_tests(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         (site, cleared): (ObjectId, &[ObjectId]),
         reads: &BuildReads,
     ) -> GenieResult<PartTests> {
         let mut parts = Vec::new();
-        let by_id = c.w.objects();
+        let by_id = step.w.objects();
         if let Some(main) = by_id.annex_of(site) {
             parts.push(main.id());
             parts.extend(by_id.annexes(main.id()).ids());
@@ -184,27 +185,28 @@ impl BuildAction {
             occupied: false,
         };
         for part in parts {
-            let placed = *c.w.spatial.get_known(part)?.ok_or(SITE_GONE)?;
-            let own = with_annexes(c, part);
-            let (_, unit) = c.w.object(part).ok_or(SITE_GONE)?;
-            let desolid =
-                c.w.parts
-                    .building_of(unit.id)
-                    .construction
-                    .is_some_and(|k| k.desolid);
-            let code = self.lend(c, builder, actions, |w, _, _| {
-                w.foundation_code(&placed, desolid, &own)
+            let placed = *step.w.spatial.get_known(part)?.ok_or(SITE_GONE)?;
+            let own = with_annexes(step, part);
+            let (_, unit) = step.w.object(part).ok_or(SITE_GONE)?;
+            let desolid = step
+                .w
+                .parts
+                .building_of(unit.id)
+                .construction
+                .is_some_and(|construction| construction.desolid);
+            let code = self.lend(step, builder, actions, |world, _, _| {
+                world.foundation_code(&placed, desolid, &own)
             })?;
             if !code.is_allowed() {
                 tests.stay = false;
             } else if tests.stay {
                 let others: Vec<ObjectId> =
-                    site_occupants(c, FoundationId::new(part), &placed, cleared, reads)?
+                    site_occupants(step, FoundationId::new(part), &placed, cleared, reads)?
                         .into_iter()
                         .filter(|&id| id != builder.id)
                         .collect();
                 if !others.is_empty() {
-                    c.w.evacuate(FoundationId::new(part), &others)?;
+                    step.w.evacuate(FoundationId::new(part), &others)?;
                     tests.occupied = true;
                 }
             }
@@ -221,7 +223,7 @@ impl BuildAction {
     /// An annex gone from the map.
     fn annex_beneath(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         builder: &Unit,
         radius: Footprint,
     ) -> GenieResult<Option<ObjectId>> {
@@ -230,9 +232,9 @@ impl BuildAction {
         let Some(site) = self.target else {
             return Ok(None);
         };
-        let annexes = c.w.objects().annexes(site);
+        let annexes = step.w.objects().annexes(site);
         for annex in annexes.ids() {
-            let placed = c.w.spatial.get_known(annex)?.ok_or(SITE_GONE)?;
+            let placed = step.w.spatial.get_known(annex)?.ok_or(SITE_GONE)?;
             let (ax, ay) = (placed.position.x(), placed.position.y());
             let sized = EPSILON < placed.radius.x() && EPSILON < placed.radius.y();
             if sized && (bx - ax).abs() < radius.x() && (by - ay).abs() < radius.y() {
@@ -251,13 +253,13 @@ impl BuildAction {
     /// The halt's.
     fn wait_or_halt(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
         if FootprintWaits::MOST <= builder.footprint_waits {
             builder.footprint_waits = FootprintWaits::NONE;
-            return self.halt_placing(c, builder, reads);
+            return self.halt_placing(step, builder, reads);
         }
         builder.footprint_waits = builder.footprint_waits.plus_one();
         self.state = BuildState::Wait;
@@ -274,13 +276,13 @@ impl BuildAction {
     /// The sprite's and the release's.
     fn halt_placing(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        Self::stand(c, builder)?;
+        Self::stand(step, builder)?;
         let target = self.target.take();
-        release(c, builder, target, reads.by)?;
+        release(step, builder, target, reads.by)?;
         self.point = Position::from([-1.0; 3]);
         self.state = BuildState::Halted;
         Ok(())
@@ -296,11 +298,11 @@ impl BuildAction {
     /// A foundation gone from the map, the walls beside a diagonal builder, and the count's.
     pub(super) fn join(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let placed = *c.w.spatial.get(self.target).ok_or(SITE_GONE)?;
+        let placed = *step.w.spatial.get(self.target).ok_or(SITE_GONE)?;
         let [bx, by] = [builder.position().x() as i32, builder.position().y() as i32];
         let [tx, mut ty] = [placed.position.x() as i32, placed.position.y() as i32];
         let (rx, ry) = (placed.radius.x(), placed.radius.y());
@@ -317,8 +319,8 @@ impl BuildAction {
         if dx.abs() == dy.abs() {
             let (a, b) = beside_diagonal(bx, by, dx, dy);
             let player = placed.player;
-            let walled = |t: Tile| {
-                c.w.spatial.object_on_tile(t, |o| {
+            let walled = |tile: Tile| {
+                step.w.spatial.object_on_tile(tile, |o| {
                     roles.of_class(o.class).contains(ClassRoles::WALL) && o.player != player
                 })
             };
@@ -329,7 +331,7 @@ impl BuildAction {
             }
         }
         if !self.added {
-            Self::count(c, self.target, 1)?;
+            Self::count(step, self.target, 1)?;
             self.added = true;
         }
         Ok(())
@@ -347,41 +349,43 @@ impl BuildAction {
     /// Another player's foundation, and what the work and its end do not model.
     pub(super) fn work(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
     ) -> GenieResult<()> {
-        let site = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
-        let mut rate = self.task.work_rate * self.task.work_value * c.dt.seconds();
-        let mut factor =
-            c.w.players
-                .player(c.player)?
-                .construction_rate(c.w.model.slots)
-                .get();
-        if c.w
+        let site = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
+        let mut rate = self.task.work_rate * self.task.work_value * step.dt.seconds();
+        let mut factor = step
+            .w
+            .players
+            .player(step.player)?
+            .construction_rate(step.w.model.slots)
+            .get();
+        if step
+            .w
             .model
             .roles
             .of_master(site.life.master_id)
             .contains(MasterRoles::WONDER)
-            && c.w.model.tuning.build.wonder_rate < factor
+            && step.w.model.tuning.build.wonder_rate < factor
         {
-            factor = c.w.model.tuning.build.wonder_rate;
+            factor = step.w.model.tuning.build.wonder_rate;
         }
         if 0.0 < factor {
             rate *= factor;
         }
-        let n = Self::builders(c, self.target)?.as_f32();
+        let n = Self::builders(step, self.target)?.as_f32();
         if 1.0 < n {
-            rate *= ((n - 1.0) * c.w.model.tuning.build.extra_builder + 1.0) / n;
+            rate *= ((n - 1.0) * step.w.model.tuning.build.extra_builder + 1.0) / n;
         }
-        if self.work_on(c, builder, actions, Seconds::new(rate))? == BuildProgress::Ongoing {
+        if self.work_on(step, builder, actions, Seconds::new(rate))? == BuildProgress::Ongoing {
             return Ok(());
         }
         // a finished foundation with hit points ends the work (its `+0x278`, decoded); one
         // without (deleted, it dies in its own update) leaves the Build as it is
-        if Self::site_unit(c, reads)?.is_some_and(|u| HitPoints::ZERO < u.life.hp) {
-            self.finish(c, builder, reads)?;
+        if Self::site_unit(step, reads)?.is_some_and(|unit| HitPoints::ZERO < unit.life.hp) {
+            self.finish(step, builder, reads)?;
         }
         Ok(())
     }
@@ -401,43 +405,44 @@ impl BuildAction {
     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
     pub(super) fn clear(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &Unit,
         footprint: ObjectId,
         roles: &Roles,
     ) -> GenieResult<()> {
         let by_id = ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.model.masters,
-            &c.w.parts,
-            &c.w.model.roles,
-            &c.w.model.tuning,
+            &step.w.players,
+            &step.w.index,
+            &step.w.model.masters,
+            &step.w.parts,
+            &step.w.model.roles,
+            &step.w.model.tuning,
         );
-        let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
-        let site = c.w.spatial.get(footprint).ok_or(SITE_GONE)?;
+        let mover = step.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
+        let site = step.w.spatial.get(footprint).ok_or(SITE_GONE)?;
         let site = (site.position, site.radius);
         let at = builder.position();
-        let spot =
-            c.w.spatial
-                .spot_beside(
-                    at,
-                    (builder.id, mover.stats.radius.x()),
-                    mover.stats.restriction_mask,
-                    site,
-                    by_id,
-                )?
-                .ok_or(GenieError::unsupported(
-                    "no free tile beside the footprint (set_state 2)",
-                ))?;
+        let spot = step
+            .w
+            .spatial
+            .spot_beside(
+                at,
+                (builder.id, mover.stats.radius.x()),
+                mover.stats.restriction_mask,
+                site,
+                by_id,
+            )?
+            .ok_or(GenieError::unsupported(
+                "no free tile beside the footprint (set_state 2)",
+            ))?;
         self.state = BuildState::Clear { move_to: None };
         let move_reads = builder.move_to_reads(
-            c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.motion.mover(builder.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -446,7 +451,7 @@ impl BuildAction {
                 spot.with_height(at.z()),
                 Distance::ZERO,
                 self.task.moving,
-                &c.w.model.tuning.move_to,
+                &step.w.model.tuning.move_to,
             )?,
         };
         Ok(())
@@ -463,11 +468,11 @@ struct PartTests {
 
 /// The objects a placement test of building `id` passes over (`p12`): the building and its
 /// annexes, theirs too (`FUN_14123d090`, through the four slots `+0xbc0` to `+0xbe0`).
-fn with_annexes(c: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
+fn with_annexes(step: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
     let mut own = vec![id];
     let mut next = 0;
     while let Some(&part) = own.get(next) {
-        own.extend(c.w.objects().annexes(part).ids());
+        own.extend(step.w.objects().annexes(part).ids());
         next += 1;
     }
     own
@@ -482,13 +487,14 @@ fn with_annexes(c: &Step<'_>, id: ObjectId) -> Vec<ObjectId> {
 ///
 /// [`Spatial::footprint_occupants`]: crate::map::spatial::Spatial::footprint_occupants
 fn site_occupants(
-    c: &Step<'_>,
+    step: &Step<'_>,
     site: FoundationId,
     placed: &Placed,
     cleared: &[ObjectId],
     reads: &BuildReads,
 ) -> GenieResult<Vec<ObjectId>> {
-    Ok(c.w
+    Ok(step
+        .w
         .spatial
         .footprint_occupants(site, placed, &reads.looks)?
         .into_iter()

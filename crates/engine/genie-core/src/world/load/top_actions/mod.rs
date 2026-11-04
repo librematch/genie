@@ -64,7 +64,7 @@ const NO_ACTIONS: GenieError =
 #[allow(clippy::too_many_arguments)]
 pub fn saved_actions(
     object: &genie_save::Object,
-    s: &RgeStaticObject,
+    rge_static_object: &RgeStaticObject,
     objects: &PlayerObjects,
     work: impl Fn(i16) -> GenieResult<BuildTask>,
     fly_task: impl Fn(i16) -> GenieResult<Task>,
@@ -91,7 +91,7 @@ pub fn saved_actions(
     }
     let saved = Saved {
         object,
-        s,
+        s: rge_static_object,
         objects,
         action,
         base,
@@ -196,8 +196,12 @@ fn sub_range(sub: &Action) -> GenieResult<f32> {
 }
 
 /// The point of an action without a target.
-fn target_point(b: &RgeAction) -> Option<Position> {
-    (b.target_id == -1).then_some(Position::new(b.target_x, b.target_y, b.target_z))
+fn target_point(rge_action: &RgeAction) -> Option<Position> {
+    (rge_action.target_id == -1).then_some(Position::new(
+        rge_action.target_x,
+        rge_action.target_y,
+        rge_action.target_z,
+    ))
 }
 
 /// The Artifact action (107): its state and timer, its `MoveTo` to its target and its task's
@@ -220,7 +224,7 @@ fn import_artifact(
     // a move to an object (set_state 5) holds the target and a quiet MoveTo (to the target,
     // or to a town centre's point); a move to a point (set_state 4) a MoveTo that is not quiet
     let move_to = sub
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
     actions.list.set_artifact(Some(Artifact {
         state: ArtifactState::of_byte(base.state)?,
@@ -323,7 +327,7 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
         .action
         .rge_action_by_kind
         .as_deref()
-        .and_then(|t| t.rge_action_missile.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_missile.as_deref())
         .ok_or(GenieError::unsupported(
             "a saved missile action without its part",
         ))?;
@@ -340,10 +344,10 @@ fn import_missile(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
     let hit_mode = saved
         .objects
         .master(saved.s.master_obj)
-        .and_then(|m| m.rge_master.as_deref())
-        .and_then(|r| r.rge_master_missile_object.as_deref())
-        .map_or(HitMode::TARGET_ALONE, |m| {
-            HitMode::of_data(m.missile_hit_info)
+        .and_then(|master| master.rge_master.as_deref())
+        .and_then(|rge_master| rge_master.rge_master_missile_object.as_deref())
+        .map_or(HitMode::TARGET_ALONE, |rge_master_missile_object| {
+            HitMode::of_data(rge_master_missile_object.missile_hit_info)
         });
     actions.list.set_missile(Some(MissileAction {
         state: MissileState::of_byte(base.state)?,
@@ -375,7 +379,7 @@ fn import_fly(
         .move_to_sub(GenieError::unsupported(
             "a saved Fly action with another sub-action",
         ))?
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
     actions.list.set_fly(Some(Fly {
         state: FlyState::of_byte(base.state, move_to)?,
@@ -396,7 +400,7 @@ fn import_build(
     // its quiet MoveTo (FUN_140a7a170 with 1)
     let move_to = saved
         .move_to_sub(OTHER_SUB_ACTION)?
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
     let task = work(saved.s.master_obj)?;
     actions.list.set_build(Some(BuildAction {
@@ -408,7 +412,7 @@ fn import_build(
             .action
             .tribe_action_build
             .as_deref()
-            .is_some_and(|b| b.added_to_num_builders != 0),
+            .is_some_and(|tribe_action_build| tribe_action_build.added_to_num_builders != 0),
         timer: Seconds::new(base.timer),
         site: DropSiteId::of_field(base.target2_id),
     }));
@@ -430,20 +434,22 @@ fn import_repair(
     // every MoveTo of the Repair is quiet: to the target, or to a point without one
     let move_to = saved
         .move_to_sub(OTHER_SUB_ACTION)?
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
-    let t = saved.task(task_at)?;
+    let task = saved.task(task_at)?;
     actions.list.set_repair(Some(RepairAction {
         target: RepairTargetId::of_field(base.target_id),
         state: RepairState::of_byte(base.state, move_to)?,
         point: saved.point(),
         timer: Seconds::new(base.timer),
-        task: RepairTask::of(&t),
+        task: RepairTask::of(&task),
         range: saved
             .objects
             .master(saved.s.master_obj)
             .and_then(combat_master)
-            .map_or(Distance::ZERO, |c| Distance::new(c.weapon_range)),
+            .map_or(Distance::ZERO, |rge_master_combat_object| {
+                Distance::new(rge_master_combat_object.weapon_range)
+            }),
         counted: part.added_to_num_builders != 0,
         voice: Voice::of_byte(base.sub_action_value),
     }));
@@ -472,11 +478,11 @@ fn import_enter(
     ))?;
     // its quiet MoveTo to the target (`FUN_140a87320` case 4: `FUN_140a7a170` with 1)
     let move_to = sub
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
     // the states the slice models: all but the walk to the meeting point (11)
     if !EnterState::of_byte(base.state, None)
-        .is_ok_and(|s| !matches!(s, EnterState::WalkPoint { .. }))
+        .is_ok_and(|enter_state| !matches!(enter_state, EnterState::WalkPoint { .. }))
     {
         return Err(GenieError::unsupported(
             "a saved Enter in a state the slice does not model",
@@ -510,7 +516,7 @@ fn import_transport(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieRes
         // its quiet MoveTo to the point (`0x140aa42a0`: `FUN_140a7a170` with 1)
         state: TransportState::of_byte(
             base.state,
-            sub.map(|s| saved_sub_move_to(s, saved.graphics))
+            sub.map(|action| saved_sub_move_to(action, saved.graphics))
                 .transpose()?,
         )?,
         mode: TransportMode::try_from(base.target2_id)?,
@@ -531,7 +537,7 @@ fn import_explore(saved: &Saved<'_>, actions: &mut layers::Action) -> GenieResul
     ))?;
     // its quiet MoveTo to the point (`0x140a87e30`: `FUN_140a7a170` with 1)
     let move_to = sub
-        .map(|s| saved_sub_move_to(s, saved.graphics))
+        .map(|action| saved_sub_move_to(action, saved.graphics))
         .transpose()?;
     let state = ExploreState::of_byte(base.state, move_to)?;
     if !matches!(state, ExploreState::Wait | ExploreState::Walk { .. }) {
@@ -590,14 +596,14 @@ pub fn saved_move_wait(sub: &Action) -> GenieResult<MoveWait> {
     use crate::movement::move_to::MoveWaitState;
     sub.rge_action_by_kind
         .as_deref()
-        .and_then(|t| t.rge_action_move_to.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_deref())
         .map_or_else(
             || Ok(MoveWait::default()),
-            |m| {
+            |rge_action_move_to| {
                 Ok(MoveWait {
-                    state: MoveWaitState::of_byte(m.movement_wait_state)?,
-                    timer: Seconds::new(m.timer),
-                    delay: Seconds::new(f32::from_bits(m.default_wait_time)),
+                    state: MoveWaitState::of_byte(rge_action_move_to.movement_wait_state)?,
+                    timer: Seconds::new(rge_action_move_to.timer),
+                    delay: Seconds::new(f32::from_bits(rge_action_move_to.default_wait_time)),
                 })
             },
         )

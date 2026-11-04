@@ -27,7 +27,7 @@ use crate::{GenieError, GenieResult};
 /// master's special graphic.
 #[must_use]
 pub fn swing_sprites(look: Option<&Look>, master: &Master, graphics: &Graphics) -> SwingSprites {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     SwingSprites {
         look: g(look.and_then(|l| l.attacking)),
         special: g(master.creatable_part().special_sprite),
@@ -51,17 +51,17 @@ pub struct SwingSprites {
     pub(crate) special: Option<Graphic>,
 }
 
-/// `FUN_141089820`: the attack timer of a unit's combat layer `combat` becomes `t` and its reload world time the world's
-/// time `now` plus `t` in whole milliseconds (slot 0x248).
+/// `FUN_141089820`: the attack timer of a unit's combat layer `combat` becomes `seconds` and its
+/// reload world time the world's time `now` plus `seconds` in whole milliseconds (slot 0x248).
 pub(super) fn set_attack_timer(
     combat: &mut Combat,
     now: WorldTime,
-    t: Seconds,
+    seconds: Seconds,
     attack_tuning: &AttackTuning,
 ) {
-    combat.attack_timer = t;
+    combat.attack_timer = seconds;
     combat.reload_worldtime = now.after(Millis::new(
-        (t.get() * attack_tuning.reload_ms) as i64 as u32,
+        (seconds.get() * attack_tuning.reload_ms) as i64 as u32,
     ));
 }
 
@@ -72,10 +72,10 @@ pub(crate) fn volleys(master: &Master, masters: &Masters) -> bool {
     has(master.creatable_part().volley_missile) || has(master.creatable_part().charge_projectile)
 }
 
-/// Slot 0x68 (`FUN_141217000`): the unit's sprite becomes `g` unless it is already; a new sprite
-/// starts a new instance (`FUN_1413b2ef0`).
-/// [`Attack::arrived_sprite`] for a caller that holds the unit's sprite and body: the idle sprite
-/// of `arms` (slot 0x68), the animation speed `+0x7b8` cleared.
+/// Slot 0x68 (`FUN_141217000`): the unit's sprite becomes `graphic` unless it is already; a new
+/// sprite starts a new instance (`FUN_1413b2ef0`). [`Attack::arrived_sprite`] for a caller that
+/// holds the unit's sprite and body: the idle sprite of `arms` (slot 0x68), the animation speed
+/// `+0x7b8` cleared.
 ///
 /// [`Attack::arrived_sprite`]: crate::combat::attack::Attack::arrived_sprite
 pub(crate) fn show_arrived(
@@ -85,8 +85,8 @@ pub(crate) fn show_arrived(
     rng: &mut Well512,
     sprite_tuning: SpriteTuning,
 ) -> GenieResult<()> {
-    let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
-    new_sprite(sprite, motion.move_stats_mut(), g, rng, sprite_tuning);
+    let graphic = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
+    new_sprite(sprite, motion.move_stats_mut(), graphic, rng, sprite_tuning);
     motion.set_anim_speed(Speed::ZERO);
     Ok(())
 }
@@ -112,11 +112,12 @@ pub(crate) enum Aim {
 }
 
 /// `FUN_1413b9f00` on the object's sprite list (`+0x148`, genie's: the unit's one sprite): the
-/// first instance of graphic `g` (a node's `+0x8`) goes back to its first frame (its slot 9 with
-/// `0x7fff`, [`ActiveSprite::reset_frame`]); [`SpriteReset::NoInstance`] when the list holds none.
-pub(crate) fn reset_sprite(sprite: &mut Option<ActiveSprite>, g: Graphic) -> SpriteReset {
+/// first instance of graphic `graphic` (a node's `+0x8`) goes back to its first frame (its slot 9
+/// with `0x7fff`, [`ActiveSprite::reset_frame`]); [`SpriteReset::NoInstance`] when the list holds
+/// none.
+pub(crate) fn reset_sprite(sprite: &mut Option<ActiveSprite>, graphic: Graphic) -> SpriteReset {
     match sprite.as_mut() {
-        Some(sp) if sp.graphic.id == g.id => {
+        Some(sp) if sp.graphic.id == graphic.id => {
             sp.reset_frame();
             SpriteReset::Reset
         }

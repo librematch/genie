@@ -48,7 +48,7 @@ fn the_frames_hold_their_dt_checkpoint_and_commands() {
     ]);
     let all = frames(&chapter(&bytes), 10).unwrap();
     assert_eq!(
-        all.iter().map(|f| f.dt.get()).collect::<Vec<_>>(),
+        all.iter().map(|frame| frame.dt.get()).collect::<Vec<_>>(),
         [50, 60, 70]
     );
     assert_eq!(all[0].commands, [&[3, 1, 0, 0][..], &[3, 2, 0, 0][..]]);
@@ -64,7 +64,7 @@ fn command_before_the_first_sync_is_an_error() {
         packet: &[3, 1],
         world_time: 0,
     }]);
-    assert!(frames(&chapter(&bytes), 10).is_err_and(|e| e == command_before_first_sync()));
+    assert!(frames(&chapter(&bytes), 10).is_err_and(|error| error == command_before_first_sync()));
 }
 
 /// An op the body cannot read ends the frames with its error.
@@ -72,7 +72,9 @@ fn command_before_the_first_sync_is_an_error() {
 fn an_unreadable_op_is_an_error() {
     let bytes = [9, 0, 0, 0];
     assert_eq!(
-        frames(&chapter(&bytes), 10).err().map(|e| e.reason()),
+        frames(&chapter(&bytes), 10)
+            .err()
+            .map(|error| error.reason()),
         Some("an op this reader does not know")
     );
 }

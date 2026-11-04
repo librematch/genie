@@ -63,7 +63,10 @@ impl World {
         }
         let loose = self
             .split(units, Kept::All, ControlKey::Up)
-            .and_then(|mut s| self.interact_groups(&mut s, order).map(|()| s.loose));
+            .and_then(|mut split| {
+                self.interact_groups(&mut split, order)
+                    .map(|()| split.loose)
+            });
         self.groups.count_command();
         let loose = loose?;
         self.leave_groups(player, &loose, order.target)?;
@@ -78,12 +81,12 @@ impl World {
         } else {
             None
         };
-        for (i, &id) in loose.iter().enumerate() {
+        for (index, &id) in loose.iter().enumerate() {
             let others: Vec<ObjectId> = loose
                 .iter()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, &u)| u)
+                .filter(|&(j, _)| j != index)
+                .map(|(_, &object_id)| object_id)
                 .collect();
             self.interact_unit(player, id, &others, centroid, order)?;
         }
@@ -150,9 +153,9 @@ impl World {
         let mut sorted: Vec<Option<ObjectId>> =
             units.iter().map(|&id| self.object(id).and(id)).collect();
         sorted.sort_unstable_by_key(|u| u.map_or(-1, ObjectId::get));
-        for u in &mut sorted {
-            if u.is_some_and(|id| !kept.keeps(id)) {
-                *u = None;
+        for object_id in &mut sorted {
+            if object_id.is_some_and(|id| !kept.keeps(id)) {
+                *object_id = None;
             }
         }
         let mut split = Split {
@@ -221,9 +224,9 @@ impl World {
         // then the unit with the most others that join it, the first of equals, with them
         while !left.is_empty() {
             let mut best = (0, 0);
-            for (i, a) in left.iter().enumerate() {
+            for (index, a) in left.iter().enumerate() {
                 let mut n = 1;
-                for b in left.iter().filter(|b| b.id != a.id) {
+                for b in left.iter().filter(|splittable| splittable.id != a.id) {
                     let joins = splits_together(
                         a,
                         b,
@@ -236,7 +239,7 @@ impl World {
                     n += usize::from(joins);
                 }
                 if best.1 < n {
-                    best = (i, n);
+                    best = (index, n);
                 }
             }
             let chosen = left.remove(best.0);
@@ -272,35 +275,38 @@ impl World {
     /// holds: a null entry and one the run's next entry repeats are left out.
     fn splittables(&self, run: &[Option<ObjectId>]) -> GenieResult<Vec<Splittable>> {
         let mut left: Vec<Splittable> = Vec::with_capacity(run.len());
-        for (i, &u) in run.iter().enumerate() {
-            let Some(id) = u else {
+        for (index, &object_id) in run.iter().enumerate() {
+            let Some(id) = object_id else {
                 continue;
             };
-            if run.get(i + 1).copied().flatten() == Some(id) {
+            if run.get(index + 1).copied().flatten() == Some(id) {
                 continue;
             }
-            let Some((p, u)) = self.object(id) else {
+            let Some((player_id, unit)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(self.master_tables(), p)?;
+            let master = unit.master(self.master_tables(), player_id)?;
             left.push(Splittable {
                 id,
-                group: u.group.id,
+                group: unit.group.id,
                 kind: master.kind,
                 grouped: master.creatable_part().formation_category.grouped(),
                 turns: master.object_flags.contains(ObjectFlags::SHIP),
                 speed: self
                     .parts
-                    .mover_of(u.id)
+                    .mover_of(unit.id)
                     .map_or(Speed::ZERO, |m| m.stats.speed),
-                position: u.position(),
+                position: unit.position(),
                 moved_at: self
                     .parts
-                    .mover_of(u.id)
-                    .map_or_else(|| u.position().ground(), |m| m.moved_at.ground()),
-                state: u.life.state,
+                    .mover_of(unit.id)
+                    .map_or_else(|| unit.position().ground(), |m| m.moved_at.ground()),
+                state: unit.life.state,
                 radius: Distance::new(master.radius.x()),
-                restriction: self.parts.mover_of(u.id).map(|m| m.stats.restriction),
+                restriction: self
+                    .parts
+                    .mover_of(unit.id)
+                    .map(|mover| mover.stats.restriction),
             });
         }
         Ok(left)
@@ -324,10 +330,10 @@ impl World {
             };
             *taken.checked_mut(i)? = true;
             let mut members = vec![first.id];
-            for (j, u) in left.iter().enumerate() {
-                if !*taken.checked(j)? && group.has(u.id) {
+            for (index, u) in left.iter().enumerate() {
+                if !*taken.checked(index)? && group.has(u.id) {
                     members.push(u.id);
-                    *taken.checked_mut(j)? = true;
+                    *taken.checked_mut(index)? = true;
                 }
             }
             match members[..] {
@@ -338,7 +344,7 @@ impl World {
         let left: Vec<Splittable> = left
             .into_iter()
             .zip(taken)
-            .filter_map(|(u, taken)| (!taken).then_some(u))
+            .filter_map(|(splittable, taken)| (!taken).then_some(splittable))
             .collect();
         Ok(left)
     }
@@ -358,7 +364,8 @@ impl World {
         let target = if 1 < loose.len() && !self.players.player(player)?.kind.is_computer() {
             None
         } else {
-            self.world_object(target).map(|t| t.id())
+            self.world_object(target)
+                .map(|world_object| world_object.id())
         };
         for &id in loose {
             self.leave_group_of(id, target)?;
@@ -375,13 +382,16 @@ impl World {
     ) -> GenieResult<Option<Point>> {
         let mut points = Vec::with_capacity(loose.len());
         for &id in loose {
-            let Some((p, u)) = self.object(id) else {
+            let Some((player_id, unit)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(self.master_tables(), p)?;
-            let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
+            let master = unit.master(self.master_tables(), player_id)?;
+            let speed = master
+                .move_stats
+                .as_ref()
+                .map_or(Speed::ZERO, |move_stats| move_stats.speed);
             if (MasterKind::MOVING <= master.kind && Speed::ZERO < speed) || queued {
-                points.push(u.position().ground());
+                points.push(unit.position().ground());
             }
         }
         Ok(centroid(&points, &self.model.tuning.order))
@@ -418,7 +428,7 @@ pub(super) enum JoinTest {
 pub(super) fn splits_together(
     a: &Splittable,
     b: &Splittable,
-    f: Formations,
+    formations: Formations,
     test: JoinTest,
     path: &mut SplitPath<'_>,
     far: &mut BTreeSet<ObjectId>,
@@ -430,7 +440,7 @@ pub(super) fn splits_together(
     if a.grouped != b.grouped || a.turns != b.turns {
         return Ok(false);
     }
-    if f.by_speed && order_tuning.split_speed_gap < (a.speed - b.speed).get().abs() {
+    if formations.by_speed && order_tuning.split_speed_gap < (a.speed - b.speed).get().abs() {
         return Ok(false);
     }
     if test == JoinTest::Group && b.state < ObjectState::Alive {
@@ -445,11 +455,12 @@ pub(super) fn splits_together(
         && d < order_tuning.split_path_reach
         && let Some((found, length)) = path(a, b)?
     {
-        let joins = found == Found::Goal && at_most_or_unordered(length.get(), f.influence.get());
+        let joins =
+            found == Found::Goal && at_most_or_unordered(length.get(), formations.influence.get());
         if !joins {
             let _ = far.insert(b.id);
         }
         return Ok(joins);
     }
-    Ok(at_most_or_unordered(d, f.influence.get()))
+    Ok(at_most_or_unordered(d, formations.influence.get()))
 }

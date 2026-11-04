@@ -69,10 +69,14 @@ fn the_record_cells_answer_as_the_full_scan_does() {
             class: ObstructionClass::NONE,
         }),
     };
-    let scan = |s: &Spatial, rect: Rect| -> Vec<ObjectId> {
-        s.objects
+    let scan = |spatial: &Spatial, rect: Rect| -> Vec<ObjectId> {
+        spatial
+            .objects
             .iter()
-            .filter(|(_, p)| p.obstruction.is_some_and(|o| s.visits(p, o.kind, rect)))
+            .filter(|(_, p)| {
+                p.obstruction
+                    .is_some_and(|obstruction| spatial.visits(p, obstruction.kind, rect))
+            })
             .map(|(id, _)| id)
             .collect()
     };
@@ -126,20 +130,26 @@ fn the_record_cells_answer_as_the_full_scan_does() {
 fn query_takes_its_kinds_of_players_from_the_save() {
     // player 2's +0x278 as loaded: itself 1, Gaia 0, player 1 an ally (2) whatever its
     // diplomacy byte (2 here, which no derivation knew)
-    let mut s = Spatial::new(GridSize::new(10, 10));
-    s.relations = ByPlayer::new(vec![
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
+    spatial.relations = ByPlayer::new(vec![
         relation_row([1, 4, 4]),
         relation_row([1, 0, 4]),
         relation_row([1, 2, 0]),
     ]);
-    s.unit_diplomacy = ByPlayer::new(vec![
+    spatial.unit_diplomacy = ByPlayer::new(vec![
         relations([1, 4, 4]),
         relations([0, 1, 4]),
         relations([0, 2, 1]),
     ]);
-    assert_eq!(s.query_kinds(PlayerId::new(2), 3), Ok(relations([0, 2, 1])));
-    assert_eq!(s.query_kinds(PlayerId::new(2), 2), Ok(relations([0, 2])));
-    assert!(s.query_kinds(PlayerId::new(3), 3).is_err());
+    assert_eq!(
+        spatial.query_kinds(PlayerId::new(2), 3),
+        Ok(relations([0, 2, 1]))
+    );
+    assert_eq!(
+        spatial.query_kinds(PlayerId::new(2), 2),
+        Ok(relations([0, 2]))
+    );
+    assert!(spatial.query_kinds(PlayerId::new(3), 3).is_err());
 }
 
 /// `FUN_1410576a0`: counter-clockwise 1, clockwise -1, on the segment 0, beyond its end 1;
@@ -208,19 +218,19 @@ const fn walk(x0: f32, y0: f32, x1: f32, y1: f32) -> Segment {
 /// 0 for a NaN, so the segments meet); a walk inside it meets it; one past it does not.
 #[test]
 fn walk_meets_box_by_its_sides_or_from_inside() {
-    let b = Rect::new(0.0, 0.0, 1.0, 1.0);
+    let rect = Rect::new(0.0, 0.0, 1.0, 1.0);
     assert!(box_meets_segment(
-        b,
+        rect,
         Distance::ZERO,
         walk(f32::NAN, 0.5, 5.0, 5.0)
     ));
     assert!(box_meets_segment(
-        b,
+        rect,
         Distance::ZERO,
         walk(0.5, 0.5, 0.6, 0.6)
     ));
     assert!(!box_meets_segment(
-        b,
+        rect,
         Distance::ZERO,
         walk(3.0, 3.0, 5.0, 5.0)
     ));
@@ -230,17 +240,17 @@ fn walk_meets_box_by_its_sides_or_from_inside() {
 /// box whose x1 lies below its x0 holds no walk inside it; `FUN_1410512f0` orders it first.
 #[test]
 fn circle_record_box_is_read_unordered_and_another_ordered() {
-    let b = Rect::new(2.0, 0.0, 1.0, 1.0);
+    let rect = Rect::new(2.0, 0.0, 1.0, 1.0);
     let inside = walk(1.4, 0.4, 1.6, 0.6);
     assert!(record_meets_segment(
         ObstructionKind::KIND_2,
-        b,
+        rect,
         Distance::ZERO,
         inside
     ));
     assert!(!record_meets_segment(
         ObstructionKind::CIRCLE,
-        b,
+        rect,
         Distance::ZERO,
         inside
     ));
@@ -254,19 +264,19 @@ fn circle_record_box_is_read_unordered_and_another_ordered() {
     // edges then run at x 1.25 and 1.75, the inside tests hold nothing
     assert!(!record_meets_segment(
         ObstructionKind::CIRCLE,
-        b,
+        rect,
         Distance::new(0.25),
         inside
     ));
     assert!(record_meets_segment(
         ObstructionKind::CIRCLE,
-        b,
+        rect,
         Distance::new(0.25),
         walk(1.0, 0.5, 1.5, 0.5)
     ));
     assert!(record_meets_segment(
         ObstructionKind::KIND_2,
-        b,
+        rect,
         Distance::new(0.25),
         inside
     ));
@@ -307,19 +317,20 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
         relations([0, 1, 4]),
         relations([0, 4, 1]),
     ]);
-    let mut r = Registry::new(3, 65);
+    let mut registry = Registry::new(3, 65);
     // a villager of player 1 at (12, 10), which player 2 sees
-    r.update_unit(UnitUpdate {
-        id: object_id(1),
-        owner: PlayerId::new(1),
-        position: Point::new(12.0, 10.0),
-        radii: Footprint::new(0.2, 0.2),
-        class: class::VILLAGER,
-        old: VisionBits::NONE,
-        new: VisionBits::from_bits_retain(1 << 2),
-    })
-    .unwrap();
-    let mut v = Visibility::new(
+    registry
+        .update_unit(UnitUpdate {
+            id: object_id(1),
+            owner: PlayerId::new(1),
+            position: Point::new(12.0, 10.0),
+            radii: Footprint::new(0.2, 0.2),
+            class: class::VILLAGER,
+            old: VisionBits::NONE,
+            new: VisionBits::from_bits_retain(1 << 2),
+        })
+        .unwrap();
+    let mut visibility = Visibility::new(
         GridSize::new(120, 120),
         Vec::new(),
         Vec::new(),
@@ -327,8 +338,8 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
         0,
         Vec::new(),
     );
-    v.registry = Some(r);
-    s.sight = Some(v);
+    visibility.registry = Some(registry);
+    s.sight = Some(visibility);
     let villagers = [class::VILLAGER];
     let look = |at| Search {
         at,
@@ -339,8 +350,8 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
         memory: Memory::default(),
     };
     let mut reach = |_: &mut Spatial, _: ObjectId, _: Distance| Ok(true);
-    let mut search = |s: &mut Spatial, at| {
-        let f = s
+    let mut search = |spatial: &mut Spatial, at| {
+        let found = spatial
             .search(
                 SearchQuery {
                     searcher: object_id(9),
@@ -356,7 +367,7 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
                 tuning().registry,
             )
             .unwrap();
-        (f.enemies, f.fresh)
+        (found.enemies, found.fresh)
     };
     assert_eq!(search(&mut s, Point::new(10.0, 10.0)), (true, true));
     // 4 tiles on (16 squared, within 25) the query is skipped: the enemy stays found
@@ -370,28 +381,28 @@ fn search_near_the_last_reads_its_answer_until_unit_ai_lets_it_go() {
 
 #[test]
 fn rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses() {
-    let mut s = Spatial::new(GridSize::new(120, 120));
+    let mut spatial = Spatial::new(GridSize::new(120, 120));
     assert_eq!(
-        s.edge_records(Rect::new(0.0, 0.0, 120.0, 120.0), 25),
+        spatial.edge_records(Rect::new(0.0, 0.0, 120.0, 120.0), 25),
         Vec::<Hit>::new()
     );
     // the diagonal (-0.3, 50) -> (0.3, 50.6) crosses x 0 at y 50.3: the left edge's tile (0, 50)
-    let left = s.edge_records(Rect::new(-0.3, 50.0, 0.3, 50.6), 25);
+    let left = spatial.edge_records(Rect::new(-0.3, 50.0, 0.3, 50.6), 25);
     assert_eq!(left.len(), 1);
     assert_eq!(left[0].id.value() as u32, 0xff00_0000 | 0x32);
     assert_eq!(left[0].bounds, Rect::new(0.0, 50.0, 1.0, 51.0));
     // past the bottom right corner: (119.5, 119.7) -> (120.5, 120.7) crosses x 120 at y 120.2
     // and y 120 at x 119.8
-    let corner = s.edge_records(Rect::new(119.5, 119.7, 120.5, 120.7), 25);
-    let ids: Vec<u32> = corner.iter().map(|h| h.id.value() as u32).collect();
+    let corner = spatial.edge_records(Rect::new(119.5, 119.7, 120.5, 120.7), 25);
+    let ids: Vec<u32> = corner.iter().map(|hit| hit.id.value() as u32).collect();
     assert_eq!(ids, [0xff07_8078, 0xff07_7078]);
     // a list with room for one stops after the first edge
     assert_eq!(
-        s.edge_records(Rect::new(119.5, 119.7, 120.5, 120.7), 1),
+        spatial.edge_records(Rect::new(119.5, 119.7, 120.5, 120.7), 1),
         corner[..1]
     );
     // an infinite end: the crossing's terms give NaN, which CVTTSS2SI makes i32::MIN
-    let far = s.edge_records(Rect::new(-0.5, 10.0, f32::INFINITY, 10.5), 25);
+    let far = spatial.edge_records(Rect::new(-0.5, 10.0, f32::INFINITY, 10.5), 25);
     assert_eq!(far.len(), 2);
     assert_eq!(far[0].id.value() as u32, 0xff00_000a);
     assert_eq!(
@@ -400,24 +411,26 @@ fn rectangle_leaving_the_map_meets_the_edge_records_where_its_diagonal_crosses()
     );
     // a unit of radius 0.3 cannot stand 0.2 from the edge
     assert!(
-        !s.point_clear(
-            object_id(1),
-            Point::new(0.2, 50.0),
-            Distance::new(0.3),
-            TerrainMask::ALL,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear(
+                object_id(1),
+                Point::new(0.2, 50.0),
+                Distance::new(0.3),
+                TerrainMask::ALL,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        s.point_clear(
-            object_id(1),
-            Point::new(0.4, 50.0),
-            Distance::new(0.3),
-            TerrainMask::ALL,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear(
+                object_id(1),
+                Point::new(0.4, 50.0),
+                Distance::new(0.3),
+                TerrainMask::ALL,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
 }
 
@@ -494,30 +507,32 @@ fn still_line_meets_standing_records_and_the_temporary_tiles() {
         .unwrap()
     );
     // a line 0.3 beside the standing villager (radius 0.2): met only with a buffer of 0.2
-    let mut t = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(10, 10),
         Tiles::new(GridSize::new(10, 10), vec![1; 100]),
     );
-    t.insert(object_id(8), villager(4.0, 5.0));
+    spatial.insert(object_id(8), villager(4.0, 5.0));
     assert!(
-        !t.still_line_hit(
-            Point::new(1.0, 5.3),
-            Point::new(8.0, 5.3),
-            Distance::ZERO,
-            &[],
-            objects.view()
-        )
-        .unwrap()
+        !spatial
+            .still_line_hit(
+                Point::new(1.0, 5.3),
+                Point::new(8.0, 5.3),
+                Distance::ZERO,
+                &[],
+                objects.view()
+            )
+            .unwrap()
     );
     assert!(
-        t.still_line_hit(
-            Point::new(1.0, 5.3),
-            Point::new(8.0, 5.3),
-            Distance::new(0.2),
-            &[],
-            objects.view()
-        )
-        .unwrap()
+        spatial
+            .still_line_hit(
+                Point::new(1.0, 5.3),
+                Point::new(8.0, 5.3),
+                Distance::new(0.2),
+                &[],
+                objects.view()
+            )
+            .unwrap()
     );
 }
 
@@ -528,100 +543,108 @@ fn still_line_meets_standing_records_and_the_temporary_tiles() {
 fn point_is_clear_among_the_ignored_objects() {
     let mut classes = vec![1u8; 100];
     classes[5 * 10 + 4] = 2;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(10, 10),
         Tiles::new(GridSize::new(10, 10), classes),
     );
-    s.insert(object_id(7), villager(4.0, 6.5));
+    spatial.insert(object_id(7), villager(4.0, 6.5));
     assert!(
-        !s.point_clear_among(
-            object_id(1),
-            Point::new(4.0, 6.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(1),
+                Point::new(4.0, 6.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        s.point_clear_among(
-            object_id(1),
-            Point::new(4.0, 6.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[object_id(3), object_id(7)],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear_among(
+                object_id(1),
+                Point::new(4.0, 6.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[object_id(3), object_id(7)],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        s.point_clear_among(
-            object_id(7),
-            Point::new(4.0, 6.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(4.0, 6.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        !s.point_clear_among(
-            object_id(7),
-            Point::new(4.0, 6.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[object_id(3)],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(4.0, 6.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[object_id(3)],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     // the class-2 tile (4, 5) and a point off the map
     assert!(
-        !s.point_clear_among(
-            object_id(7),
-            Point::new(4.5, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(4.5, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        s.point_clear_among(
-            object_id(7),
-            Point::new(4.5, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(3),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(4.5, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(3),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        !s.point_clear_among(
-            object_id(7),
-            Point::new(-0.5, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(3),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(-0.5, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(3),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     // CVTTSS2SI: a NaN coordinate is i32::MIN, off the map, not tile 0
     assert!(
-        !s.point_clear_among(
-            object_id(7),
-            Point::new(f32::NAN, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(7),
+                Point::new(f32::NAN, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
 }
 
@@ -634,13 +657,13 @@ fn point_is_clear_among_the_ignored_objects() {
 fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
     let mut classes = vec![1u8; 100];
     classes[5 * 10 + 5] = 2;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(10, 10),
         Tiles::new(GridSize::new(10, 10), classes),
     );
-    s.insert(object_id(7), villager(4.0, 5.5));
-    s.set_manager_buffer(Some(Distance::new(0.2)));
-    let hits = s
+    spatial.insert(object_id(7), villager(4.0, 5.5));
+    spatial.set_manager_buffer(Some(Distance::new(0.2)));
+    let hits = spatial
         .line_query(
             Point::new(2.0, 5.5),
             Point::new(8.0, 5.5),
@@ -657,10 +680,10 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
         ]
     );
     // the routine sets the ignore list, resets the buffer and removes its records
-    assert_eq!(s.manager_ignore(), Vec::<RecordId>::new());
-    assert_eq!(s.manager_buffer(), None);
-    assert_eq!(s.tile_records(), Vec::<Tile>::new());
-    let none = s
+    assert_eq!(spatial.manager_ignore(), Vec::<RecordId>::new());
+    assert_eq!(spatial.manager_buffer(), None);
+    assert_eq!(spatial.tile_records(), Vec::<Tile>::new());
+    let none = spatial
         .line_query(
             Point::new(2.0, 5.5),
             Point::new(8.0, 5.5),
@@ -670,15 +693,15 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
         )
         .unwrap();
     assert_eq!(none, Vec::<RecordId>::new());
-    assert_eq!(s.manager_ignore(), [RecordId::from(object_id(7))]);
+    assert_eq!(spatial.manager_ignore(), [RecordId::from(object_id(7))]);
     // a record still put counts without the routine's own; the pather's test leaves them out
-    s.put_tile_records(
+    spatial.put_tile_records(
         Point::new(5.5, 5.5),
         Point::new(5.5, 5.5),
         Distance::ZERO,
         TerrainMask::of_bits(1),
     );
-    let kept = s
+    let kept = spatial
         .line_query(
             Point::new(2.0, 5.5),
             Point::new(8.0, 5.5),
@@ -688,7 +711,7 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
         )
         .unwrap();
     assert_eq!(kept, [tile_record_id(Tile::new(5, 5))]);
-    let movers = s
+    let movers = spatial
         .line_hits(
             Point::new(2.0, 5.5),
             Point::new(8.0, 5.5),
@@ -698,8 +721,8 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
         )
         .unwrap();
     assert_eq!(movers, Vec::<RecordId>::new());
-    s.clear_tile_records();
-    let edge = s
+    spatial.clear_tile_records();
+    let edge = spatial
         .line_query(
             Point::new(0.1, 5.5),
             Point::new(3.0, 5.5),
@@ -719,29 +742,30 @@ fn line_meets_the_records_and_the_tiles_its_mask_lacks() {
 fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
     let mut classes = vec![1u8; 100];
     classes[5 * 10 + 4] = 2;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(10, 10),
         Tiles::new(GridSize::new(10, 10), classes),
     );
     assert_eq!(
-        (s.manager_buffer(), s.manager_grow()),
+        (spatial.manager_buffer(), spatial.manager_grow()),
         (None, Distance::ZERO)
     );
-    s.set_manager_buffer(Some(Distance::new(0.1)));
-    assert_eq!(s.manager_grow(), Distance::new(0.1));
+    spatial.set_manager_buffer(Some(Distance::new(0.1)));
+    assert_eq!(spatial.manager_grow(), Distance::new(0.1));
     assert!(
-        s.point_clear(
-            object_id(1),
-            Point::new(6.5, 6.5),
-            Distance::new(0.2),
-            TerrainMask::of_bits(1),
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear(
+                object_id(1),
+                Point::new(6.5, 6.5),
+                Distance::new(0.2),
+                TerrainMask::of_bits(1),
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    assert_eq!(s.manager_buffer(), None);
-    s.set_manager_buffer(Some(Distance::new(0.1)));
-    let _ = s
+    assert_eq!(spatial.manager_buffer(), None);
+    spatial.set_manager_buffer(Some(Distance::new(0.1)));
+    let _ = spatial
         .walk_hits(WalkQuery {
             objects: ObjectsRef::empty(),
             start: Point::new(2.0, 2.0),
@@ -753,77 +777,83 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
             ignore: &[],
         })
         .unwrap();
-    assert_eq!(s.manager_buffer(), None);
+    assert_eq!(spatial.manager_buffer(), None);
     // a point query near tile (4, 5) meets its record once it is put, within the grow
     assert!(
-        !s.point_hit(
-            Point::new(3.95, 5.5),
-            Distance::new(0.1),
-            &[],
-            Movers::LeftOut,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_hit(
+                Point::new(3.95, 5.5),
+                Distance::new(0.1),
+                &[],
+                Movers::LeftOut,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    s.put_tile_records(
+    spatial.put_tile_records(
         Point::new(4.5, 5.5),
         Point::new(4.5, 5.5),
         Distance::ZERO,
         TerrainMask::of_bits(1),
     );
     assert!(
-        s.point_hit(
-            Point::new(3.95, 5.5),
-            Distance::new(0.1),
-            &[],
-            Movers::LeftOut,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_hit(
+                Point::new(3.95, 5.5),
+                Distance::new(0.1),
+                &[],
+                Movers::LeftOut,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        !s.point_hit(
-            Point::new(3.85, 5.5),
-            Distance::new(0.1),
-            &[],
-            Movers::LeftOut,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_hit(
+                Point::new(3.85, 5.5),
+                Distance::new(0.1),
+                &[],
+                Movers::LeftOut,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        !s.point_hit(
-            Point::new(3.95, 5.5),
-            Distance::new(0.1),
-            &[tile_record_id(Tile::new(4, 5))],
-            Movers::LeftOut,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_hit(
+                Point::new(3.95, 5.5),
+                Distance::new(0.1),
+                &[tile_record_id(Tile::new(4, 5))],
+                Movers::LeftOut,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     // a stand test counts it too
     assert!(
-        !s.point_clear_among(
-            object_id(1),
-            Point::new(3.95, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear_among(
+                object_id(1),
+                Point::new(3.95, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    s.clear_tile_records();
+    spatial.clear_tile_records();
     assert!(
-        s.point_clear_among(
-            object_id(1),
-            Point::new(3.95, 5.5),
-            Distance::new(0.1),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear_among(
+                object_id(1),
+                Point::new(3.95, 5.5),
+                Distance::new(0.1),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
 }
 
@@ -831,11 +861,11 @@ fn the_manager_keeps_its_buffer_and_point_queries_meet_tile_records() {
 /// then the objects as before.
 #[test]
 fn walk_past_the_maps_edge_meets_its_record_first() {
-    let mut s = Spatial::new(GridSize::new(10, 10));
-    s.insert(object_id(7), villager(1.0, 5.5));
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
+    spatial.insert(object_id(7), villager(1.0, 5.5));
     let (from, to) = (Point::new(0.1, 5.5), Point::new(2.0, 5.5));
     let rect = Rect::new(0.1, 5.5, 2.0, 5.5);
-    let hits = s
+    let hits = spatial
         .walk_hits(WalkQuery {
             objects: ObjectsRef::empty(),
             start: from,
@@ -863,27 +893,31 @@ fn units_box_is_its_position_plus_and_minus_its_radii() {
 
 #[test]
 fn query_finds_the_boxes_its_rectangle_meets_but_not_the_ignored_or_unobstructing() {
-    let mut s = Spatial::new(GridSize::new(120, 120));
-    s.insert(object_id(9177), villager(28.0, 89.0));
-    s.insert(object_id(9175), villager(30.0, 89.0));
+    let mut spatial = Spatial::new(GridSize::new(120, 120));
+    spatial.insert(object_id(9177), villager(28.0, 89.0));
+    spatial.insert(object_id(9175), villager(30.0, 89.0));
     let mut foundation = villager(30.0, 88.0);
     foundation.radius = Footprint::new(1.0, 1.0);
     foundation.obstruction = None;
     foundation.class = class::BUILDING;
-    s.insert(object_id(10028), foundation);
+    spatial.insert(object_id(10028), foundation);
     // 9177's first step: from (28, 89) toward (28.0143, 88.9928), grown by its radius
     let step = Rect::new(28.0, 88.99284, 28.01431, 89.0);
     assert_eq!(
-        s.obstruction_candidates(step, Distance::new(0.2), &[RecordId::from(object_id(9177))]),
+        spatial.obstruction_candidates(
+            step,
+            Distance::new(0.2),
+            &[RecordId::from(object_id(9177))]
+        ),
         Vec::new()
     );
     assert_eq!(
-        s.obstruction_candidates(step, Distance::new(0.2), &[]),
+        spatial.obstruction_candidates(step, Distance::new(0.2), &[]),
         vec![object_id(9177)]
     );
     // 9175's box grown by 0.2 starts at x 29.6
     assert_eq!(
-        s.obstruction_candidates(
+        spatial.obstruction_candidates(
             Rect::new(29.0, 89.0, 29.59, 89.0),
             Distance::new(0.2),
             &[RecordId::from(object_id(9177))]
@@ -891,7 +925,7 @@ fn query_finds_the_boxes_its_rectangle_meets_but_not_the_ignored_or_unobstructin
         Vec::new()
     );
     assert_eq!(
-        s.obstruction_candidates(
+        spatial.obstruction_candidates(
             Rect::new(29.0, 89.0, 29.61, 89.0),
             Distance::new(0.2),
             &[RecordId::from(object_id(9177))]
@@ -906,11 +940,11 @@ fn record_filed_in_cell_the_query_does_not_visit_is_not_found() {
     // (32.25, 154.59375) -> (32.5, 151.5); bush 13594's box (31, 154)-(32, 155) grown by 0.25
     // touches the start, but it is filed in level 5's cell (3, 19) (tiles 24..31) and the
     // query's tiles are 32..32
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(220, 220),
         Tiles::new(GridSize::new(220, 220), vec![1; 220 * 220]),
     );
-    assert_eq!(s.grid, Grid { levels: 6 });
+    assert_eq!(spatial.grid, Grid { levels: 6 });
     let mut bush = villager(31.5, 154.5);
     bush.radius = Footprint::new(0.5, 0.5);
     bush.player = PlayerId::new(0);
@@ -918,12 +952,12 @@ fn record_filed_in_cell_the_query_does_not_visit_is_not_found() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::RESOURCE,
     });
-    s.insert(object_id(13594), bush);
-    assert_eq!(s.filed(&bush, ObstructionKind::KIND_2), (5, 3, 19));
+    spatial.insert(object_id(13594), bush);
+    assert_eq!(spatial.filed(&bush, ObstructionKind::KIND_2), (5, 3, 19));
     let (from, to) = (Point::new(32.25, 154.59375), Point::new(32.5, 151.5));
-    assert!(!s.segment_blocked(from, to, Distance::new(0.25), TerrainMask::ALL));
+    assert!(!spatial.segment_blocked(from, to, Distance::new(0.25), TerrainMask::ALL));
     // a start a hair to the left visits tile 31's cell: the box blocks
-    assert!(s.segment_blocked(
+    assert!(spatial.segment_blocked(
         Point::new(32.2, 154.59375),
         to,
         Distance::new(0.25),
@@ -932,7 +966,7 @@ fn record_filed_in_cell_the_query_does_not_visit_is_not_found() {
     // off a half tile, the box's far edge is its tile: (31.6 ± 0.5) spans tiles 31 and 32,
     // which share only level 2's cells of 64 tiles
     bush.position = Position::new(31.6, 154.5, 0.0);
-    assert_eq!(s.filed(&bush, ObstructionKind::KIND_2), (2, 0, 2));
+    assert_eq!(spatial.filed(&bush, ObstructionKind::KIND_2), (2, 0, 2));
 }
 
 #[test]
@@ -940,7 +974,7 @@ fn record_leaving_tile_another_static_record_stands_on_leaves_its_marks() {
     // records/425906646: Gaia's state-8 bush 0 shares tile (140, 3) with bush 808; its
     // removal (FUN_141055980) stops at the tile, which stays marked, and the planners hear
     // nothing
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(220, 220),
         Tiles::new(GridSize::new(220, 220), vec![1; 220 * 220]),
     );
@@ -951,20 +985,21 @@ fn record_leaving_tile_another_static_record_stands_on_leaves_its_marks() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::RESOURCE,
     });
-    s.insert(object_id(808), bush);
-    s.insert(object_id(0), bush);
-    let _ = s.take_changes();
-    s.remove(object_id(0));
+    spatial.insert(object_id(808), bush);
+    spatial.insert(object_id(0), bush);
+    let _ = spatial.take_changes();
+    spatial.remove(object_id(0));
     assert!(
-        s.tiles()
+        spatial
+            .tiles()
             .word(Tile::new(140, 3))
             .is_some_and(|w| w & BLOCKED != 0)
     );
-    assert_eq!(s.take_changes(), Vec::<PlanRect>::new());
+    assert_eq!(spatial.take_changes(), Vec::<PlanRect>::new());
     // alone, it clears its tile
-    s.remove(object_id(808));
-    assert_eq!(s.tiles().word(Tile::new(140, 3)), Some(1));
-    assert_eq!(s.take_changes(), vec![PlanRect::new(140, 3, 140, 3)]);
+    spatial.remove(object_id(808));
+    assert_eq!(spatial.tiles().word(Tile::new(140, 3)), Some(1));
+    assert_eq!(spatial.take_changes(), vec![PlanRect::new(140, 3, 140, 3)]);
 }
 
 /// `FUN_141055b40` by the master's obstruction type: type 12 keeps all (false); type 1 clears
@@ -972,7 +1007,7 @@ fn record_leaving_tile_another_static_record_stands_on_leaves_its_marks() {
 /// its player's marks (false); a unit (type 5) drops its record (true).
 #[test]
 fn record_goes_by_its_master_obstruction_kind() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(20, 20),
         Tiles::new(GridSize::new(20, 20), vec![1; 400]),
     );
@@ -983,25 +1018,27 @@ fn record_goes_by_its_master_obstruction_kind() {
         kind: ObstructionKind::KIND_1,
         class: ObstructionClass::RESOURCE,
     });
-    s.insert(object_id(1), rock);
+    spatial.insert(object_id(1), rock);
     assert!(
-        s.tiles()
+        spatial
+            .tiles()
             .word(Tile::new(5, 5))
             .is_some_and(|w| w & BLOCKED != 0)
     );
-    assert!(s.dropped_record(object_id(1)));
-    assert_eq!(s.tiles().word(Tile::new(5, 5)), Some(1));
+    assert!(spatial.dropped_record(object_id(1)));
+    assert_eq!(spatial.tiles().word(Tile::new(5, 5)), Some(1));
     assert_eq!(
-        s.get(object_id(1)).and_then(|p| p.obstruction),
+        spatial.get(object_id(1)).and_then(|p| p.obstruction),
         rock.obstruction
     );
     let mut other = rock;
     other.obstruction_kind = ObstructionKind::KIND_12;
     other.position = Position::new(8.5, 8.5, 0.0);
-    s.insert(object_id(2), other);
-    assert!(!s.dropped_record(object_id(2)));
+    spatial.insert(object_id(2), other);
+    assert!(!spatial.dropped_record(object_id(2)));
     assert!(
-        s.tiles()
+        spatial
+            .tiles()
             .word(Tile::new(8, 8))
             .is_some_and(|w| w & BLOCKED != 0)
     );
@@ -1013,37 +1050,42 @@ fn record_goes_by_its_master_obstruction_kind() {
         class: ObstructionClass::RESOURCE,
     });
     wall.position = Position::new(12.5, 12.5, 0.0);
-    s.insert(object_id(3), wall);
+    spatial.insert(object_id(3), wall);
     let mut site = wall;
     site.obstruction = None;
-    s.insert(object_id(4), site);
-    s.objects.get_mut(object_id(3)).unwrap().obstruction = None;
-    assert!(!s.dropped_record(object_id(4)));
-    assert_eq!(s.tiles().word(Tile::new(12, 12)), Some(1));
+    spatial.insert(object_id(4), site);
+    spatial.objects.get_mut(object_id(3)).unwrap().obstruction = None;
+    assert!(!spatial.dropped_record(object_id(4)));
+    assert_eq!(spatial.tiles().word(Tile::new(12, 12)), Some(1));
     let unit = villager(15.5, 15.5);
     let mut unit5 = unit;
     unit5.obstruction_kind = ObstructionKind::CIRCLE;
-    s.insert(object_id(5), unit5);
-    assert!(s.dropped_record(object_id(5)));
-    assert_eq!(s.get(object_id(5)).and_then(|p| p.obstruction), None);
-    assert!(!s.dropped_record(object_id(5)));
+    spatial.insert(object_id(5), unit5);
+    assert!(spatial.dropped_record(object_id(5)));
+    assert_eq!(
+        spatial
+            .get(object_id(5))
+            .and_then(|placed| placed.obstruction),
+        None
+    );
+    assert!(!spatial.dropped_record(object_id(5)));
 }
 
 #[test]
 fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
     let mut objects = TestObjects::default();
-    let mut s = Spatial::new(GridSize::new(120, 120));
-    s.relations = ByPlayer::new(vec![
+    let mut spatial = Spatial::new(GridSize::new(120, 120));
+    spatial.relations = ByPlayer::new(vec![
         relation_row([1, 4, 4]),
         relation_row([1, 0, 4]),
         relation_row([1, 4, 0]),
     ]);
-    s.insert(object_id(9175), villager(30.0, 89.0));
+    spatial.insert(object_id(9175), villager(30.0, 89.0));
     let (from, to) = (Point::new(29.5, 88.0), Point::new(29.5, 88.3));
     let rect = Rect::new(29.5, 88.0, 29.5, 88.3);
     // the box (29.8..30.2, 88.8..89.2) grown by 0.25 reaches 88.55, past the step's end
     assert_eq!(
-        s.walk_hits(WalkQuery {
+        spatial.walk_hits(WalkQuery {
             objects: objects.view(),
             start: from,
             end: to,
@@ -1059,7 +1101,7 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
     let longer = (Point::new(29.5, 88.0), Point::new(29.5, 88.5));
     let rect = Rect::new(29.5, 88.0, 29.5, 88.5);
     assert_eq!(
-        s.walk_hits(WalkQuery {
+        spatial.walk_hits(WalkQuery {
             objects: objects.view(),
             start: longer.0,
             end: longer.1,
@@ -1072,7 +1114,7 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
         Ok(vec![RecordId::from(object_id(9175))])
     );
     assert_eq!(
-        s.walk_hits(WalkQuery {
+        spatial.walk_hits(WalkQuery {
             objects: objects.view(),
             start: longer.0,
             end: longer.1,
@@ -1093,7 +1135,7 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
         }),
     );
     assert_eq!(
-        s.walk_hits(WalkQuery {
+        spatial.walk_hits(WalkQuery {
             objects: objects.view(),
             start: longer.0,
             end: longer.1,
@@ -1106,9 +1148,9 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
         Ok(vec![])
     );
     // an enemy's moving box grows in full
-    set_relation(&mut s, (2, 1), Relation::Enemy);
+    set_relation(&mut spatial, (2, 1), Relation::Enemy);
     assert_eq!(
-        s.walk_hits(WalkQuery {
+        spatial.walk_hits(WalkQuery {
             objects: objects.view(),
             start: longer.0,
             end: longer.1,
@@ -1126,7 +1168,7 @@ fn walk_hits_the_boxes_its_step_crosses_and_moving_ally_box_shrinks() {
 /// with the words the game's obstruction manager holds for their tiles.
 #[test]
 fn static_record_marks_its_tiles_with_its_class_and_player() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(GridSize::new(4, 4), vec![4; 16]),
     );
@@ -1146,7 +1188,7 @@ fn static_record_marks_its_tiles_with_its_class_and_player() {
             class: ObstructionClass::BUILDING,
         }),
     };
-    s.insert(object_id(9157), centre);
+    spatial.insert(object_id(9157), centre);
     let tree = Placed {
         position: Position::new(0.5, 0.5, 0.0),
         radius: Footprint::new(0.5, 0.5),
@@ -1163,117 +1205,124 @@ fn static_record_marks_its_tiles_with_its_class_and_player() {
             class: ObstructionClass::RESOURCE,
         }),
     };
-    s.insert(object_id(48), tree);
-    let t = s.tiles();
-    assert_eq!(t.word(Tile::new(1, 1)), Some(0x202_4304));
-    assert_eq!(t.word(Tile::new(2, 2)), Some(0x202_4304));
-    assert_eq!(t.word(Tile::new(3, 3)), Some(4));
-    assert_eq!(t.word(Tile::new(0, 0)), Some(0x80_4104));
+    spatial.insert(object_id(48), tree);
+    let tiles = spatial.tiles();
+    assert_eq!(tiles.word(Tile::new(1, 1)), Some(0x202_4304));
+    assert_eq!(tiles.word(Tile::new(2, 2)), Some(0x202_4304));
+    assert_eq!(tiles.word(Tile::new(3, 3)), Some(4));
+    assert_eq!(tiles.word(Tile::new(0, 0)), Some(0x80_4104));
     assert_eq!(
-        (t.objects(Tile::new(2, 2)), t.tall(Tile::new(2, 2))),
+        (tiles.objects(Tile::new(2, 2)), tiles.tall(Tile::new(2, 2))),
         (Some(1), Some(1))
     );
-    s.remove(object_id(9157));
-    assert_eq!(s.tiles().word(Tile::new(1, 1)), Some(4));
-    assert_eq!(s.tiles().objects(Tile::new(2, 2)), Some(0));
+    spatial.remove(object_id(9157));
+    assert_eq!(spatial.tiles().word(Tile::new(1, 1)), Some(4));
+    assert_eq!(spatial.tiles().objects(Tile::new(2, 2)), Some(0));
 }
 
 #[test]
 fn unit_counts_on_the_tile_its_centre_is_on_and_marks_nothing() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(GridSize::new(4, 4), vec![4; 16]),
     );
-    s.insert(object_id(9177), villager(1.9, 1.0));
-    assert_eq!(s.tiles().objects(Tile::new(1, 1)), Some(1));
-    assert_eq!(s.tiles().word(Tile::new(1, 1)), Some(4));
-    s.set_position(
-        object_id(9177),
-        Position::new(2.05, 1.0, 0.0),
-        &roles(),
-        tuning().visibility,
-    )
-    .unwrap();
+    spatial.insert(object_id(9177), villager(1.9, 1.0));
+    assert_eq!(spatial.tiles().objects(Tile::new(1, 1)), Some(1));
+    assert_eq!(spatial.tiles().word(Tile::new(1, 1)), Some(4));
+    spatial
+        .set_position(
+            object_id(9177),
+            Position::new(2.05, 1.0, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
+        .unwrap();
     assert_eq!(
         (
-            s.tiles().objects(Tile::new(1, 1)),
-            s.tiles().objects(Tile::new(2, 1))
+            spatial.tiles().objects(Tile::new(1, 1)),
+            spatial.tiles().objects(Tile::new(2, 1))
         ),
         (Some(0), Some(1))
     );
-    assert_eq!(s.tiles().tall(Tile::new(2, 1)), Some(1));
+    assert_eq!(spatial.tiles().tall(Tile::new(2, 1)), Some(1));
 }
 
 #[test]
 fn tile_list_keeps_the_game_order() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(GridSize::new(4, 4), vec![4; 16]),
     );
     for (id, x) in [(9171, 1.1), (10029, 1.5), (9173, 1.9)] {
-        s.insert(object_id(id), villager(x, 1.0));
+        spatial.insert(object_id(id), villager(x, 1.0));
     }
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(9171), object_id(10029), object_id(9173)]
     );
-    assert_eq!(s.tile_place(object_id(9173)), 2);
+    assert_eq!(spatial.tile_place(object_id(9173)), 2);
     // the leaving object's slot goes to the last
-    s.set_position(
-        object_id(9171),
-        Position::new(2.1, 1.0, 0.0),
-        &roles(),
-        tuning().visibility,
-    )
-    .unwrap();
+    spatial
+        .set_position(
+            object_id(9171),
+            Position::new(2.1, 1.0, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
+        .unwrap();
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029)]
     );
     assert_eq!(
-        (s.tile_place(object_id(9173)), s.tile_place(object_id(9171))),
+        (
+            spatial.tile_place(object_id(9173)),
+            spatial.tile_place(object_id(9171))
+        ),
         (0, 0)
     );
     // a move within the tile and a master change keep the slot
-    s.set_position(
-        object_id(9173),
-        Position::new(1.2, 1.0, 0.0),
-        &roles(),
-        tuning().visibility,
-    )
-    .unwrap();
-    s.change_master(object_id(9173), villager(1.2, 1.0));
+    spatial
+        .set_position(
+            object_id(9173),
+            Position::new(1.2, 1.0, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
+        .unwrap();
+    spatial.change_master(object_id(9173), villager(1.2, 1.0));
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029)]
     );
-    s.set_position(
-        object_id(9171),
-        Position::new(1.0, 1.0, 0.0),
-        &roles(),
-        tuning().visibility,
-    )
-    .unwrap();
+    spatial
+        .set_position(
+            object_id(9171),
+            Position::new(1.0, 1.0, 0.0),
+            &roles(),
+            tuning().visibility,
+        )
+        .unwrap();
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(9173), object_id(10029), object_id(9171)]
     );
     assert_eq!(
         (
-            s.tiles().objects(Tile::new(1, 1)),
-            s.tiles().tall(Tile::new(1, 1))
+            spatial.tiles().objects(Tile::new(1, 1)),
+            spatial.tiles().tall(Tile::new(1, 1))
         ),
         (Some(3), Some(3))
     );
     assert_eq!(
-        s.force_tile_lists(&[(
+        spatial.force_tile_lists(&[(
             Tile::new(1, 1),
             vec![object_id(9171), object_id(9173), object_id(10029)]
         )]),
         Vec::new()
     );
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(9171), object_id(9173), object_id(10029)]
     );
 }
@@ -1282,75 +1331,80 @@ fn tile_list_keeps_the_game_order() {
 /// `FUN_140f5f560`: an object not on the list leaves nothing changed (no recount).
 #[test]
 fn full_tile_takes_no_object_and_one_not_on_it_leaves_its_count() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(GridSize::new(4, 4), vec![4; 16]),
     );
     for id in 0..250 {
-        s.insert(object_id(id), villager(1.5, 1.5));
+        spatial.insert(object_id(id), villager(1.5, 1.5));
     }
-    assert_eq!(s.tiles().objects(Tile::new(1, 1)), Some(250));
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(250));
+    assert_eq!(spatial.tiles().objects(Tile::new(1, 1)), Some(250));
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(250));
     // object 0 is no longer tall; the game does not redo the count
-    s.set_tall(object_id(0), false);
-    s.insert(object_id(250), villager(1.5, 1.5));
-    assert_eq!(s.tiles().objects(Tile::new(1, 1)), Some(250));
-    assert!(!s.tiles().list(Tile::new(1, 1)).contains(&object_id(250)));
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(250));
+    spatial.set_tall(object_id(0), false);
+    spatial.insert(object_id(250), villager(1.5, 1.5));
+    assert_eq!(spatial.tiles().objects(Tile::new(1, 1)), Some(250));
+    assert!(
+        !spatial
+            .tiles()
+            .list(Tile::new(1, 1))
+            .contains(&object_id(250))
+    );
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(250));
     // 250 leaves a tile whose list never held it: no recount
-    s.remove(object_id(250));
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(250));
+    spatial.remove(object_id(250));
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(250));
     // one that is on it leaves: the count is redone over the list, 0 not tall
-    s.remove(object_id(249));
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(248));
+    spatial.remove(object_id(249));
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(248));
 }
 
 /// A ghost enters and leaves a tile's list as any object does (`FUN_140f5f0a0`,
 /// `FUN_140f5f560`): the tile's tall count is redone over the list.
 #[test]
 fn ghost_entering_or_leaving_tile_redoes_its_tall_count() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(4, 4),
         Tiles::new(GridSize::new(4, 4), vec![4; 16]),
     );
-    s.insert(object_id(1), villager(1.5, 1.5));
-    s.insert(object_id(2), villager(1.5, 1.5));
-    s.set_tall(object_id(1), false);
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(2));
-    s.insert_ghost(object_id(-5), Position::new(1.5, 1.5, 0.0));
+    spatial.insert(object_id(1), villager(1.5, 1.5));
+    spatial.insert(object_id(2), villager(1.5, 1.5));
+    spatial.set_tall(object_id(1), false);
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(2));
+    spatial.insert_ghost(object_id(-5), Position::new(1.5, 1.5, 0.0));
     assert_eq!(
-        s.tiles().list(Tile::new(1, 1)),
+        spatial.tiles().list(Tile::new(1, 1)),
         [object_id(1), object_id(2), object_id(-5)]
     );
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(1));
-    s.set_tall(object_id(2), false);
-    s.remove_ghost(object_id(-5), Position::new(1.5, 1.5, 0.0));
-    assert_eq!(s.tiles().tall(Tile::new(1, 1)), Some(0));
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(1));
+    spatial.set_tall(object_id(2), false);
+    spatial.remove_ghost(object_id(-5), Position::new(1.5, 1.5, 0.0));
+    assert_eq!(spatial.tiles().tall(Tile::new(1, 1)), Some(0));
 }
 
 /// The house foundation 10028 at (30, 88) of MarvinBlue/426048731 with its builder 9175 on its
 /// footprint at (30, 89), on open land (class 4) and a villager's mask (restriction 7: 6).
 fn site() -> (Spatial, Placed) {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(40, 120),
         Tiles::new(GridSize::new(40, 120), vec![4; 40 * 120]),
     );
-    s.insert(object_id(9175), villager(30.0, 89.0));
+    spatial.insert(object_id(9175), villager(30.0, 89.0));
     let mut house = villager(30.0, 88.0);
     house.radius = Footprint::new(1.0, 1.0);
     house.class = class::BUILDING;
     house.master = ids::HOUSE;
     house.obstruction_kind = ObstructionKind::KIND_2;
     house.obstruction = None;
-    s.insert(object_id(10028), house);
-    (s, house)
+    spatial.insert(object_id(10028), house);
+    (spatial, house)
 }
 
 #[test]
 fn tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
-    let (mut s, _) = site();
+    let (mut spatial, _) = site();
     assert_eq!(
-        s.passable(
+        spatial.passable(
             Tile::new(29, 89),
             TerrainMask::of_bits(6),
             object_id(1),
@@ -1360,7 +1414,7 @@ fn tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
         Ok(true)
     );
     assert_eq!(
-        s.passable(
+        spatial.passable(
             Tile::new(29, 89),
             TerrainMask::of_bits(1),
             object_id(1),
@@ -1370,7 +1424,7 @@ fn tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
         Ok(false)
     );
     assert_eq!(
-        s.passable(
+        spatial.passable(
             Tile::new(-1, 89),
             TerrainMask::of_bits(6),
             object_id(1),
@@ -1385,9 +1439,9 @@ fn tile_is_passable_when_its_class_is_in_the_mask_and_nothing_blocks_it() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::RESOURCE,
     });
-    s.insert(object_id(48), tree);
+    spatial.insert(object_id(48), tree);
     assert_eq!(
-        s.passable(
+        spatial.passable(
             Tile::new(29, 90),
             TerrainMask::of_bits(6),
             object_id(1),
@@ -1412,54 +1466,55 @@ fn revealing_the_map_sets_the_mask_in_every_word() {
         s.sight.as_ref().unwrap().unified,
         words.map(|w| w | revealed)
     );
-    let mut s = sighted(vec![VisionBits::NONE; 2]);
-    s.reveal_to(PlayerId::new(1));
+    let mut spatial = sighted(vec![VisionBits::NONE; 2]);
+    spatial.reveal_to(PlayerId::new(1));
     assert!(
-        s.sight
+        spatial
+            .sight
             .as_ref()
             .unwrap()
             .unified
             .iter()
-            .all(|&w| w == VisionBits::ENDED | VisionBits::ENDED_EXPLORED)
+            .all(|&vision_bits| vision_bits == VisionBits::ENDED | VisionBits::ENDED_EXPLORED)
     );
     // player 1 lost: its masks take the ended bits; the tile tests mask them out
     // (OBJECT_MASK holds neither ENDED nor ENDED_EXPLORED)
     assert_eq!(
-        s.vision.get(PlayerId::new(1)),
+        spatial.vision.get(PlayerId::new(1)),
         Some(&own_masks(PlayerId::new(1), GameStatus::Won))
     );
     assert_eq!(
-        s.tile_sight(PlayerId::new(1), Tile::new(0, 0)),
+        spatial.tile_sight(PlayerId::new(1), Tile::new(0, 0)),
         Some(TileSight::Unknown)
     );
 }
 
 #[test]
 fn revealed_map_gives_the_player_the_ended_bits() {
-    let mut s = Spatial {
+    let mut spatial = Spatial {
         vision: ByPlayer::new(vec![
             own_masks(PlayerId::new(0), GameStatus::Playing),
             own_masks(PlayerId::new(1), GameStatus::Playing),
         ]),
         ..Spatial::default()
     };
-    s.reveal_to(PlayerId::new(1));
+    spatial.reveal_to(PlayerId::new(1));
     assert_eq!(
-        s.vision.get(PlayerId::new(1)),
+        spatial.vision.get(PlayerId::new(1)),
         Some(&own_masks(PlayerId::new(1), GameStatus::Won))
     );
     assert_eq!(
-        s.vision.get(PlayerId::new(0)),
+        spatial.vision.get(PlayerId::new(0)),
         Some(&own_masks(PlayerId::new(0), GameStatus::Playing))
     );
 }
 
 /// A map of two tiles holding `words`, which players 0 and 1 see with their own masks.
 fn sighted(words: Vec<VisionBits>) -> Spatial {
-    let n = words.len() as i32;
+    let count = words.len() as i32;
     Spatial {
         sight: Some(Visibility::new(
-            GridSize::new(n, 1),
+            GridSize::new(count, 1),
             Vec::new(),
             words,
             Vec::new(),
@@ -1482,7 +1537,7 @@ fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits
         VisionBits::from_bits_retain(1 << 1),
         VisionBits::from_bits_retain(1 << 33),
     );
-    let s = sighted(vec![
+    let spatial = sighted(vec![
         seen,
         explored,
         VisionBits::NO_TILE_EXPLORED,
@@ -1490,9 +1545,13 @@ fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits
         VisionBits::NO_TILE,
         VisionBits::NO_TILE | explored,
     ]);
-    let answers = |p: PlayerId| {
+    let answers = |player_id: PlayerId| {
         (0..7)
-            .map(|x| s.tile_sight(p, Tile::new(x, 0)).map(TileSight::get))
+            .map(|x| {
+                spatial
+                    .tile_sight(player_id, Tile::new(x, 0))
+                    .map(TileSight::get)
+            })
             .collect::<Vec<_>>()
     };
     let some = |v: [u8; 7]| v.map(Some).to_vec();
@@ -1502,11 +1561,11 @@ fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits
     );
     assert_eq!(answers(PlayerId::new(0)), some([0, 0, 0x80, 0xf, 0, 0, 0]));
     assert_eq!(
-        s.tile_sight(PlayerId::new(1), Tile::new(-1, 0)),
+        spatial.tile_sight(PlayerId::new(1), Tile::new(-1, 0)),
         Some(TileSight::Unknown)
     );
     assert_eq!(
-        s.tile_sight(PlayerId::new(1), Tile::new(0, 1)),
+        spatial.tile_sight(PlayerId::new(1), Tile::new(0, 1)),
         Some(TileSight::Unknown)
     );
     assert_eq!(
@@ -1515,11 +1574,17 @@ fn player_tile_test_answers_seen_explored_or_neither_and_reads_the_revealed_bits
     );
     // sees_tile is its 0xf, explored any answer
     assert!(
-        s.sees_tile(PlayerId::new(0), Tile::new(3, 0))
-            && !s.sees_tile(PlayerId::new(0), Tile::new(2, 0))
+        spatial.sees_tile(PlayerId::new(0), Tile::new(3, 0))
+            && !spatial.sees_tile(PlayerId::new(0), Tile::new(2, 0))
     );
-    assert_eq!(s.explored(PlayerId::new(0), Tile::new(2, 0)), Ok(true));
-    assert_eq!(s.explored(PlayerId::new(0), Tile::new(4, 0)), Ok(false));
+    assert_eq!(
+        spatial.explored(PlayerId::new(0), Tile::new(2, 0)),
+        Ok(true)
+    );
+    assert_eq!(
+        spatial.explored(PlayerId::new(0), Tile::new(4, 0)),
+        Ok(false)
+    );
 }
 
 /// `FUN_141285350` and `FUN_140c68a00`: the word under the registry's mask only, so the
@@ -1530,7 +1595,7 @@ fn the_visible_map_tile_test_reads_only_the_players_bits() {
         VisionBits::from_bits_retain(1 << 1),
         VisionBits::from_bits_retain(1 << 33),
     );
-    let s = sighted(vec![
+    let spatial = sighted(vec![
         seen,
         explored,
         VisionBits::NO_TILE | VisionBits::NO_TILE_EXPLORED,
@@ -1538,21 +1603,23 @@ fn the_visible_map_tile_test_reads_only_the_players_bits() {
     ]);
     let scout = (0..5)
         .map(|x| {
-            s.scout_sight(PlayerId::new(1), Tile::new(x, 0))
+            spatial
+                .scout_sight(PlayerId::new(1), Tile::new(x, 0))
                 .map(TileSight::get)
         })
         .collect::<Vec<_>>();
     assert_eq!(scout, [0xf, 0x80, 0, 0, 0].map(Some).to_vec());
     let seen_now = (0..4)
         .map(|x| {
-            s.visibility(PlayerId::new(1), Tile::new(x, 0))
+            spatial
+                .visibility(PlayerId::new(1), Tile::new(x, 0))
                 .map(TileSight::get)
         })
         .collect::<Vec<_>>();
     assert_eq!(seen_now, [0xf, 0x80, 0, 0].map(Some).to_vec());
     assert!(
-        s.visible(PlayerId::new(1), Tile::new(0, 0))
-            && !s.visible(PlayerId::new(1), Tile::new(1, 0))
+        spatial.visible(PlayerId::new(1), Tile::new(0, 0))
+            && !spatial.visible(PlayerId::new(1), Tile::new(1, 0))
     );
     assert_eq!(
         Spatial::default().scout_sight(PlayerId::new(1), Tile::new(0, 0)),
@@ -1567,9 +1634,9 @@ fn the_visible_map_tile_test_reads_only_the_players_bits() {
 #[test]
 fn the_free_spot_beside_footprint_is_the_closest_empty_tile_around_it() {
     // the game sends 9175 to (29.5, 89.5): (30, 89) is as close but holds 9175 itself
-    let (mut s, house) = site();
+    let (mut spatial, house) = site();
     assert_eq!(
-        s.spot_beside(
+        spatial.spot_beside(
             Position::new(30.0, 89.0, 0.0),
             (object_id(1), 0.2),
             TerrainMask::of_bits(6),
@@ -1582,25 +1649,25 @@ fn the_free_spot_beside_footprint_is_the_closest_empty_tile_around_it() {
 
 #[test]
 fn the_footprint_occupants_are_the_objects_whose_centre_is_on_it() {
-    let (mut s, house) = site();
+    let (mut spatial, house) = site();
     assert_eq!(
-        s.footprint_occupants(
+        spatial.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
             &BTreeMap::new()
         ),
         Ok(vec![object_id(9175)])
     );
-    s.insert(object_id(9177), villager(28.0, 89.0));
+    spatial.insert(object_id(9177), villager(28.0, 89.0));
     assert_eq!(
-        s.footprint_occupants(
+        spatial.footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
             &BTreeMap::new()
         ),
         Ok(vec![object_id(9175)])
     );
-    assert!(!s.foreign_marks(&house));
+    assert!(!spatial.foreign_marks(&house));
 }
 
 /// `FUN_14123bb20` passes over an object in state 7 or later, a building from state 3 on, and
@@ -1641,8 +1708,8 @@ fn foundation_not_allied_both_ways_or_dead_object_occupies_no_footprint() {
             (object_id(33990), wall),
         ])
     };
-    let occupants = |s: &Spatial, wall| {
-        s.footprint_occupants(FoundationId::new(object_id(10028)), &house, &looks(wall))
+    let occupants = |spatial: &Spatial, wall| {
+        spatial.footprint_occupants(FoundationId::new(object_id(10028)), &house, &looks(wall))
     };
     assert_eq!(
         occupants(
@@ -1697,9 +1764,9 @@ fn foreign_marks_read_the_players_in_32_bits_and_skip_nan_place() {
     // player 2 of 30.0, 88.0: tile (29, 87) marked by player 3, then a bit past 32 players
     s.tiles.mark_for_test(Tile::new(29, 87), 0x80_0000 << 3);
     assert!(s.foreign_marks(&house));
-    let (mut t, _) = site();
-    t.tiles.mark_for_test(Tile::new(29, 87), 1 << 60);
-    assert!(!t.foreign_marks(&house));
+    let (mut spatial, _) = site();
+    spatial.tiles.mark_for_test(Tile::new(29, 87), 1 << 60);
+    assert!(!spatial.foreign_marks(&house));
     // a NaN place reads nothing, not tile 0 (here marked by player 3)
     s.tiles.mark_for_test(Tile::new(0, 0), 0x80_0000 << 3);
     house.position = Position::new(f32::NAN, f32::NAN, 0.0);
@@ -1709,7 +1776,7 @@ fn foreign_marks_read_the_players_in_32_bits_and_skip_nan_place() {
 #[test]
 fn walk_meets_static_box_in_its_way_but_not_one_beside_it() {
     // tiles of class 1 everywhere: a unit with mask 1 crosses them all
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(16, 16),
         Tiles::new(GridSize::new(16, 16), vec![1; 256]),
     );
@@ -1719,37 +1786,37 @@ fn walk_meets_static_box_in_its_way_but_not_one_beside_it() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::BUILDING,
     });
-    s.insert(object_id(7), house);
-    assert!(s.segment_blocked(
+    spatial.insert(object_id(7), house);
+    assert!(spatial.segment_blocked(
         Point::new(4.0, 8.0),
         Point::new(12.0, 8.0),
         Distance::new(0.2),
         TerrainMask::of_bits(1)
     ));
-    assert!(!s.segment_blocked(
+    assert!(!spatial.segment_blocked(
         Point::new(4.0, 11.0),
         Point::new(12.0, 11.0),
         Distance::new(0.2),
         TerrainMask::of_bits(1)
     ));
     // within its radius of the box, and the box ignored
-    assert!(s.segment_blocked(
+    assert!(spatial.segment_blocked(
         Point::new(4.0, 9.1),
         Point::new(12.0, 9.1),
         Distance::new(0.2),
         TerrainMask::of_bits(1)
     ));
-    s.set_manager_ignore(&[RecordId::from(object_id(7))]);
-    assert!(!s.segment_blocked(
+    spatial.set_manager_ignore(&[RecordId::from(object_id(7))]);
+    assert!(!spatial.segment_blocked(
         Point::new(4.0, 8.0),
         Point::new(12.0, 8.0),
         Distance::new(0.2),
         TerrainMask::of_bits(1),
     ));
-    s.set_manager_ignore(&[]);
+    spatial.set_manager_ignore(&[]);
     // a moving unit's record never blocks the walk
-    s.insert(object_id(8), villager(6.0, 3.0));
-    assert!(!s.segment_blocked(
+    spatial.insert(object_id(8), villager(6.0, 3.0));
+    assert!(!spatial.segment_blocked(
         Point::new(4.0, 3.0),
         Point::new(12.0, 3.0),
         Distance::new(0.2),
@@ -1761,24 +1828,24 @@ fn walk_meets_static_box_in_its_way_but_not_one_beside_it() {
 fn walk_meets_tile_whose_terrain_the_unit_cannot_cross() {
     let mut classes = vec![1; 256];
     classes[5 * 16 + 9] = 2;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(16, 16),
         Tiles::new(GridSize::new(16, 16), classes),
     );
-    assert!(s.segment_blocked(
+    assert!(spatial.segment_blocked(
         Point::new(2.0, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
         TerrainMask::of_bits(1)
     ));
-    assert!(!s.segment_blocked(
+    assert!(!spatial.segment_blocked(
         Point::new(2.0, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
         TerrainMask::of_bits(3)
     ));
     // a walk whose grown box leaves the map
-    assert!(s.segment_blocked(
+    assert!(spatial.segment_blocked(
         Point::new(0.1, 5.5),
         Point::new(14.0, 5.5),
         Distance::new(0.2),
@@ -1793,36 +1860,38 @@ fn walk_meets_tile_whose_terrain_the_unit_cannot_cross() {
 fn pather_walk_meets_the_tile_records_of_earlier_walks() {
     let mut classes = vec![1; 64 * 64];
     classes[5 * 64 + 5] = 0;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(64, 64),
         Tiles::new(GridSize::new(64, 64), classes),
     );
     let (a, b) = (Point::new(6.5, 6.5), Point::new(7.5, 7.5));
     assert!(
-        !s.pather_blocked(
-            a,
-            b,
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .pather_blocked(
+                a,
+                b,
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    s.clear_tile_records();
+    spatial.clear_tile_records();
     assert!(
-        s.pather_blocked(
-            Point::new(5.5, 4.0),
-            Point::new(5.5, 7.0),
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .pather_blocked(
+                Point::new(5.5, 4.0),
+                Point::new(5.5, 7.0),
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    assert_eq!(s.tile_records(), vec![Tile::new(5, 5)]);
-    let hits = s
+    assert_eq!(spatial.tile_records(), vec![Tile::new(5, 5)]);
+    let hits = spatial
         .pather_hits(
             a,
             b,
@@ -1841,27 +1910,29 @@ fn pather_walk_meets_the_tile_records_of_earlier_walks() {
     );
     // the pather's ignore list holds tiles by their record's id
     assert!(
-        !s.pather_blocked(
-            a,
-            b,
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[tile_record_id(Tile::new(5, 5))],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .pather_blocked(
+                a,
+                b,
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[tile_record_id(Tile::new(5, 5))],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    s.clear_tile_records();
+    spatial.clear_tile_records();
     assert!(
-        !s.pather_blocked(
-            a,
-            b,
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .pather_blocked(
+                a,
+                b,
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
 }
 
@@ -1871,7 +1942,7 @@ fn pather_walk_meets_the_tile_records_of_earlier_walks() {
 /// modelled.
 #[test]
 fn pather_walk_off_the_map_meets_its_edge_first() {
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(16, 16),
         Tiles::new(GridSize::new(16, 16), vec![1; 256]),
     );
@@ -1881,29 +1952,30 @@ fn pather_walk_off_the_map_meets_its_edge_first() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::BUILDING,
     });
-    s.insert(object_id(7), house);
+    spatial.insert(object_id(7), house);
     let mut beside = villager(12.0, 2.0);
     beside.obstruction = Some(Obstruction {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::BUILDING,
     });
-    s.insert(object_id(8), beside);
+    spatial.insert(object_id(8), beside);
     let (a, b) = (Point::new(0.2, 8.0), Point::new(6.0, 8.0));
-    let edge = s.edge_records(Rect::new(-0.3, 7.5, 6.5, 8.5), QUERY_HITS);
+    let edge = spatial.edge_records(Rect::new(-0.3, 7.5, 6.5, 8.5), QUERY_HITS);
     assert_ne!(edge.len(), 0);
     assert!(
-        s.pather_blocked(
-            a,
-            b,
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .pather_blocked(
+                a,
+                b,
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    s.clear_tile_records();
-    let hits = s
+    spatial.clear_tile_records();
+    let hits = spatial
         .pather_hits(
             a,
             b,
@@ -1916,9 +1988,9 @@ fn pather_walk_off_the_map_meets_its_edge_first() {
     assert_eq!(hits.len(), edge.len() + 1);
     assert_eq!(hits[..edge.len()], edge[..]);
     assert_eq!(hits[edge.len()].id, RecordId::from(object_id(7)));
-    s.clear_tile_records();
+    spatial.clear_tile_records();
     // within the map, the house alone; the box at (12, 2) is passed by
-    let hits = s
+    let hits = spatial
         .pather_hits(
             Point::new(1.0, 8.0),
             Point::new(6.0, 8.0),
@@ -1929,26 +2001,27 @@ fn pather_walk_off_the_map_meets_its_edge_first() {
         )
         .unwrap();
     assert_eq!(
-        hits.iter().map(|h| h.id).collect::<Vec<_>>(),
+        hits.iter().map(|hit| hit.id).collect::<Vec<_>>(),
         [RecordId::from(object_id(7))]
     );
-    s.clear_tile_records();
+    spatial.clear_tile_records();
     let mut own = villager(4.0, 8.0);
     own.obstruction = Some(Obstruction {
         kind: ObstructionKind::KIND_11,
         class: ObstructionClass::BUILDING,
     });
-    s.insert(object_id(7), own);
+    spatial.insert(object_id(7), own);
     assert!(
-        s.pather_hits(
-            Point::new(1.0, 8.0),
-            Point::new(6.0, 8.0),
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .is_err()
+        spatial
+            .pather_hits(
+                Point::new(1.0, 8.0),
+                Point::new(6.0, 8.0),
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .is_err()
     );
     let mut gate = villager(4.0, 8.0);
     gate.class = class::GATE;
@@ -1956,17 +2029,18 @@ fn pather_walk_off_the_map_meets_its_edge_first() {
         kind: ObstructionKind::KIND_2,
         class: ObstructionClass::BUILDING,
     });
-    s.insert(object_id(7), gate);
+    spatial.insert(object_id(7), gate);
     assert!(
-        s.pather_hits(
-            Point::new(1.0, 8.0),
-            Point::new(6.0, 8.0),
-            Some(Distance::new(0.5)),
-            TerrainMask::of_bits(1),
-            &[],
-            ObjectsRef::empty()
-        )
-        .is_err()
+        spatial
+            .pather_hits(
+                Point::new(1.0, 8.0),
+                Point::new(6.0, 8.0),
+                Some(Distance::new(0.5)),
+                TerrainMask::of_bits(1),
+                &[],
+                ObjectsRef::empty()
+            )
+            .is_err()
     );
 }
 
@@ -1977,7 +2051,7 @@ fn tile_record_blocks_later_walks_until_the_records_are_cleared() {
     let mut classes = vec![1; 128 * 128];
     classes[90 * 128 + 78] = 0;
     classes[87 * 128 + 78] = 0;
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(128, 128),
         Tiles::new(GridSize::new(128, 128), classes),
     );
@@ -1986,94 +2060,96 @@ fn tile_record_blocks_later_walks_until_the_records_are_cleared() {
         (Point::new(77.5, 91.5), Point::new(76.5, 92.5)),
     );
     // alone, the second walk's tiles stop at y = 91 and its test removes its records
-    assert!(!s.segment_blocked(
+    assert!(!spatial.segment_blocked(
         second.0,
         second.1,
         Distance::new(0.5),
         TerrainMask::of_bits(1)
     ));
-    assert_eq!(s.tile_records(), Vec::<Tile>::new());
-    s.put_tile_records(
+    assert_eq!(spatial.tile_records(), Vec::<Tile>::new());
+    spatial.put_tile_records(
         first.0,
         first.1,
         Distance::new(0.5),
         TerrainMask::of_bits(1),
     );
-    assert_eq!(s.tile_records(), vec![Tile::new(78, 90)]);
-    assert!(s.segment_meets(second.0, second.1, Distance::new(0.5), &[]));
+    assert_eq!(spatial.tile_records(), vec![Tile::new(78, 90)]);
+    assert!(spatial.segment_meets(second.0, second.1, Distance::new(0.5), &[]));
     // the record's id in the ignore list leaves it out
-    assert!(!s.segment_meets(
+    assert!(!spatial.segment_meets(
         second.0,
         second.1,
         Distance::new(0.5),
         &[tile_record_id(Tile::new(78, 90))]
     ));
     // a tile that holds a record takes no second
-    s.put_tile_records(
+    spatial.put_tile_records(
         second.0,
         Point::new(79.0, 89.0),
         Distance::new(0.5),
         TerrainMask::of_bits(1),
     );
-    assert_eq!(s.tile_records(), vec![Tile::new(78, 90)]);
-    s.clear_tile_records();
-    assert!(!s.segment_meets(second.0, second.1, Distance::new(0.5), &[]));
+    assert_eq!(spatial.tile_records(), vec![Tile::new(78, 90)]);
+    spatial.clear_tile_records();
+    assert!(!spatial.segment_meets(second.0, second.1, Distance::new(0.5), &[]));
     // tile (78, 87)'s grown box touches (77.5, 88.5), but its cell (y 80..87) is not one the
     // walk from y 88.5 visits (y from 88)
-    s.put_tile_records(
+    spatial.put_tile_records(
         Point::new(78.5, 86.5),
         Point::new(78.5, 87.5),
         Distance::ZERO,
         TerrainMask::of_bits(1),
     );
-    assert_eq!(s.tile_records(), vec![Tile::new(78, 87)]);
-    assert!(!s.segment_meets(
+    assert_eq!(spatial.tile_records(), vec![Tile::new(78, 87)]);
+    assert!(!spatial.segment_meets(
         Point::new(77.5, 88.5),
         Point::new(76.5, 89.5),
         Distance::new(0.5),
         &[]
     ));
-    assert!(s.segment_meets(
+    assert!(spatial.segment_meets(
         Point::new(77.5, 88.0),
         Point::new(76.5, 89.5),
         Distance::new(0.5),
         &[]
     ));
-    s.clear_tile_records();
-    assert_eq!(s.tile_records(), Vec::<Tile>::new());
+    spatial.clear_tile_records();
+    assert_eq!(spatial.tile_records(), Vec::<Tile>::new());
 }
 
 #[test]
 fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
-    let (mut s, house) = site();
+    let (mut spatial, house) = site();
     let mut deer = villager(34.0, 88.0);
     deer.moves = true;
     // its master's speed, a tile a second
     let deer_speed = |_, _| Speed::new(1.0);
-    s.insert(object_id(9656), deer);
-    s.freeze(object_id(9656));
+    spatial.insert(object_id(9656), deer);
+    spatial.freeze(object_id(9656));
     // frozen at once, the deer is where the save has it
     assert!(
-        s.footprint_occupants(
-            FoundationId::new(object_id(10028)),
-            &house,
-            &BTreeMap::new()
-        )
-        .is_ok()
+        spatial
+            .footprint_occupants(
+                FoundationId::new(object_id(10028)),
+                &house,
+                &BTreeMap::new()
+            )
+            .is_ok()
     );
-    assert!(s.get_known(object_id(9656)).is_ok());
+    assert!(spatial.get_known(object_id(9656)).is_ok());
     // its box reaches x 33.8; 3 s later it may stand on the footprint, which ends at 31
-    s.grow_unknown(Seconds::new(2.5), deer_speed);
+    spatial.grow_unknown(Seconds::new(2.5), deer_speed);
     assert!(
-        s.footprint_occupants(
-            FoundationId::new(object_id(10028)),
-            &house,
-            &BTreeMap::new()
-        )
-        .is_ok()
+        spatial
+            .footprint_occupants(
+                FoundationId::new(object_id(10028)),
+                &house,
+                &BTreeMap::new()
+            )
+            .is_ok()
     );
-    s.grow_unknown(Seconds::new(0.5), deer_speed);
-    let e = s
+    spatial.grow_unknown(Seconds::new(0.5), deer_speed);
+    let e = spatial
         .footprint_occupants(
             FoundationId::new(object_id(10028)),
             &house,
@@ -2081,37 +2157,37 @@ fn frozen_object_may_be_anywhere_its_speed_could_take_it() {
         )
         .unwrap_err();
     assert_eq!(e.context().next(), Some(("object", "9656")));
-    let e = s.get_known(object_id(9656)).unwrap_err();
+    let error = spatial.get_known(object_id(9656)).unwrap_err();
     // the error names the object and its player
-    let context: Vec<_> = e.context().take(2).collect();
+    let context: Vec<_> = error.context().take(2).collect();
     assert_eq!(context, [("object", "9656"), ("player", "2")]);
 }
 
 #[test]
 fn frozen_object_that_does_not_move_is_known_unless_stopped_unit_may_reach_it() {
-    let mut s = Spatial::new(GridSize::new(64, 64));
+    let mut spatial = Spatial::new(GridSize::new(64, 64));
     let tree = Placed {
         player: PlayerId::new(0),
         moves: false,
         ..villager(24.5, 97.5 - 60.0)
     };
-    s.insert(object_id(9365), tree);
-    s.freeze(object_id(9365));
-    s.reach = Distance::new(1.0);
+    spatial.insert(object_id(9365), tree);
+    spatial.freeze(object_id(9365));
+    spatial.reach = Distance::new(1.0);
     let near = Rect::new(24.0, 37.0, 24.6, 38.0);
-    assert!(s.check_known(near).is_ok());
+    assert!(spatial.check_known(near).is_ok());
     // a stopped villager 10 tiles off, 0.8 tiles a second (every master's speed here: the tree
     // does not move, so its place stays known)
     let villager_speed = |_, _| Speed::new(0.8);
     let mut walker = villager(34.5, 37.5);
     walker.player = PlayerId::new(1);
     walker.moves = true;
-    s.insert(object_id(9200), walker);
-    s.freeze(object_id(9200));
-    s.grow_unknown(Seconds::new(10.0), villager_speed);
-    assert!(s.check_known(near).is_ok());
-    s.grow_unknown(Seconds::new(2.0), villager_speed);
-    assert!(s.check_known(near).is_err());
+    spatial.insert(object_id(9200), walker);
+    spatial.freeze(object_id(9200));
+    spatial.grow_unknown(Seconds::new(10.0), villager_speed);
+    assert!(spatial.check_known(near).is_ok());
+    spatial.grow_unknown(Seconds::new(2.0), villager_speed);
+    assert!(spatial.check_known(near).is_err());
 }
 
 /// `FUN_1410562e0`'s list stays with the obstruction manager: the walk's query and the stand
@@ -2119,10 +2195,10 @@ fn frozen_object_that_does_not_move_is_known_unless_stopped_unit_may_reach_it() 
 /// next set; the objects' part of the point query leaves the edge's records out.
 #[test]
 fn the_manager_keeps_the_last_ignore_list_set() {
-    let mut s = Spatial::new(GridSize::new(10, 10));
-    assert_eq!(s.manager_ignore(), Vec::<RecordId>::new());
+    let mut spatial = Spatial::new(GridSize::new(10, 10));
+    assert_eq!(spatial.manager_ignore(), Vec::<RecordId>::new());
     let rect = Rect::new(2.0, 5.0, 3.0, 5.0);
-    let _ = s
+    let _ = spatial
         .walk_hits(WalkQuery {
             objects: ObjectsRef::empty(),
             start: Point::new(2.0, 5.0),
@@ -2135,65 +2211,70 @@ fn the_manager_keeps_the_last_ignore_list_set() {
         })
         .unwrap();
     assert_eq!(
-        s.manager_ignore(),
+        spatial.manager_ignore(),
         [RecordId::from(object_id(7)), RecordId::from(object_id(8))]
     );
     assert!(
-        s.point_clear(
-            object_id(3),
-            Point::new(4.5, 4.5),
-            Distance::new(0.1),
-            TerrainMask::ALL,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear(
+                object_id(3),
+                Point::new(4.5, 4.5),
+                Distance::new(0.1),
+                TerrainMask::ALL,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    assert_eq!(s.manager_ignore(), [RecordId::from(object_id(3))]);
+    assert_eq!(spatial.manager_ignore(), [RecordId::from(object_id(3))]);
     assert!(
-        s.point_clear_among(
-            object_id(4),
-            Point::new(4.5, 4.5),
-            Distance::new(0.1),
-            TerrainMask::ALL,
-            &[],
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_clear_among(
+                object_id(4),
+                Point::new(4.5, 4.5),
+                Distance::new(0.1),
+                TerrainMask::ALL,
+                &[],
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    assert_eq!(s.manager_ignore(), [RecordId::from(object_id(4))]);
+    assert_eq!(spatial.manager_ignore(), [RecordId::from(object_id(4))]);
     // a point off the map's tiles sets nothing
     assert!(
-        !s.point_clear(
-            object_id(5),
-            Point::new(-1.0, 4.5),
-            Distance::new(0.1),
-            TerrainMask::ALL,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .point_clear(
+                object_id(5),
+                Point::new(-1.0, 4.5),
+                Distance::new(0.1),
+                TerrainMask::ALL,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
-    assert_eq!(s.manager_ignore(), [RecordId::from(object_id(4))]);
-    s.set_manager_ignore(&[]);
-    assert_eq!(s.manager_ignore(), Vec::<RecordId>::new());
+    assert_eq!(spatial.manager_ignore(), [RecordId::from(object_id(4))]);
+    spatial.set_manager_ignore(&[]);
+    assert_eq!(spatial.manager_ignore(), Vec::<RecordId>::new());
     assert!(
-        s.point_hit(
-            Point::new(0.05, 4.5),
-            Distance::new(0.1),
-            &[],
-            Movers::Counted,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        spatial
+            .point_hit(
+                Point::new(0.05, 4.5),
+                Distance::new(0.1),
+                &[],
+                Movers::Counted,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
     assert!(
-        !s.object_holds(
-            Point::new(0.05, 4.5),
-            Distance::new(0.1),
-            &[],
-            Movers::Counted,
-            ObjectsRef::empty()
-        )
-        .unwrap()
+        !spatial
+            .object_holds(
+                Point::new(0.05, 4.5),
+                Distance::new(0.1),
+                &[],
+                Movers::Counted,
+                ObjectsRef::empty()
+            )
+            .unwrap()
     );
 }
 
@@ -2230,7 +2311,7 @@ const fn seer_in(state: ObjectState) -> Seer {
 /// id.
 #[test]
 fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
-    use crate::map::spatial::search::nearer;
+    use crate::map::spatial::closest::nearer;
     let record = |id, distance| Record {
         id,
         distance,
@@ -2285,22 +2366,26 @@ fn closest_object_keeps_the_nearest_record_and_on_tie_the_lower_id() {
 /// class 10 passes what it shuns.
 #[test]
 fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
-    use crate::map::spatial::search::{Searcher, closest_kept};
-    let p = villager(1.0, 1.0);
+    use crate::map::spatial::closest::{Searcher, closest_kept};
+    let villager = villager(1.0, 1.0);
     // the found object 7 as its world holds it: its master in its player's table, without the
     // scout's object flag; herded, its top action the Artifact with a point; shunned, with the flag
     let found = Master {
-        id: p.master,
-        class: p.class,
+        id: villager.master,
+        class: villager.class,
         ..Master::default()
     };
-    let plain_world = found_world(vec![placed_object(&p, found.clone(), None)]);
-    let herded_world = found_world(vec![placed_object(&p, found.clone(), Some(herding()))]);
+    let plain_world = found_world(vec![placed_object(&villager, found.clone(), None)]);
+    let herded_world = found_world(vec![placed_object(
+        &villager,
+        found.clone(),
+        Some(herding()),
+    )]);
     let scout = Master {
         object_flags: ObjectFlags::SCOUT,
         ..found
     };
-    let scout_world = found_world(vec![placed_object(&p, scout, None)]);
+    let scout_world = found_world(vec![placed_object(&villager, scout, None)]);
     let empty_world = found_world(Vec::new());
     let roles = roles();
     let checks = ClosestChecks {
@@ -2309,10 +2394,10 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
     };
-    let kept = |filter, p: &Placed, state, searcher, checks| {
+    let kept = |filter, placed: &Placed, state, searcher, checks| {
         closest_kept(
             object_id(7),
-            (&seer_in(state), p),
+            (&seer_in(state), placed),
             filter,
             (PlayerId::new(1), searcher),
             checks,
@@ -2324,11 +2409,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         f(&mut filter);
         filter
     };
-    assert!(kept(any_filter(), &p, ObjectState::Alive, plain, checks).unwrap());
+    assert!(kept(any_filter(), &villager, ObjectState::Alive, plain, checks).unwrap());
     assert!(
         kept(
             with(|f| f.group = Some(class_id(4))),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             checks
@@ -2338,7 +2423,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert!(
         !kept(
             with(|f| f.group = Some(class_id(3))),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             checks
@@ -2348,7 +2433,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert!(
         !kept(
             with(|f| f.master = Some(master_id(5))),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             checks
@@ -2358,7 +2443,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert!(
         !kept(
             with(|f| f.state = Some(ObjectState::Dying)),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             checks
@@ -2368,7 +2453,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert_eq!(
         kept(
             with(|f| f.workers = WorkerCount::of_data(1)),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             checks
@@ -2380,7 +2465,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert_eq!(
         kept(
             with(|f| f.state = Some(ObjectState::Foundation)),
-            &p,
+            &villager,
             ObjectState::Foundation,
             plain,
             checks
@@ -2392,7 +2477,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     let livestock = with(|f| f.group = Some(class_id(58)));
     let mut sheep = Placed {
         class: class::LIVESTOCK,
-        ..p
+        ..villager
     };
     assert!(!kept(livestock, &sheep, ObjectState::Alive, plain, checks).unwrap());
     assert!(kept(livestock, &sheep, ObjectState::Unfinished, plain, checks).unwrap());
@@ -2415,11 +2500,11 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
         class_10: true,
         ..plain
     };
-    assert!(kept(any_filter(), &p, ObjectState::Alive, wolf, checks).unwrap());
+    assert!(kept(any_filter(), &villager, ObjectState::Alive, wolf, checks).unwrap());
     assert!(
         !kept(
             any_filter(),
-            &p,
+            &villager,
             ObjectState::Alive,
             wolf,
             ClosestChecks {
@@ -2432,7 +2517,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert!(
         kept(
             any_filter(),
-            &p,
+            &villager,
             ObjectState::Alive,
             plain,
             ClosestChecks {
@@ -2445,7 +2530,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
     assert!(
         kept(
             any_filter(),
-            &p,
+            &villager,
             ObjectState::Alive,
             wolf,
             ClosestChecks {
@@ -2462,7 +2547,7 @@ fn closest_object_keeps_what_its_filter_and_its_searcher_take() {
 /// a pasture's livestock never; a pasture and a farm the caller does not hold fail.
 #[test]
 fn closest_object_takes_free_farm_its_searcher_gathers_from() {
-    use crate::map::spatial::search::{Searcher, closest_kept, farm_kept};
+    use crate::map::spatial::closest::{Searcher, closest_kept, farm_kept};
     let filter = Filter {
         group: Some(class_id(49)),
         ..any_filter()
@@ -2556,11 +2641,11 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
         best_target_tuning: &tuning().best_target,
         spatial_tuning: &tuning().spatial,
     };
-    let s = seer_in(ObjectState::Alive);
+    let seer = seer_in(ObjectState::Alive);
     assert!(
         closest_kept(
             object_id(1),
-            (&s, &farm),
+            (&seer, &farm),
             filter,
             (PlayerId::new(1), farmer),
             checks,
@@ -2570,7 +2655,7 @@ fn closest_object_takes_free_farm_its_searcher_gathers_from() {
     assert!(
         !closest_kept(
             object_id(2),
-            (&s, &farm),
+            (&seer, &farm),
             filter,
             (PlayerId::new(1), farmer),
             checks,
@@ -2588,11 +2673,11 @@ fn found_world(objects: Vec<SceneObject>) -> World {
         .build()
 }
 
-/// The object 7 that `p` places, of `master`, with the action layer `actions`.
-fn placed_object(p: &Placed, master: Master, actions: Option<Action>) -> SceneObject {
+/// The object 7 that `placed` places, of `master`, with the action layer `actions`.
+fn placed_object(placed: &Placed, master: Master, actions: Option<Action>) -> SceneObject {
     SceneObject {
         actions,
-        ..SceneObject::new(7, p.player, master, p.position)
+        ..SceneObject::new(7, placed.player, master, placed.position)
     }
 }
 
@@ -2607,10 +2692,11 @@ fn herding() -> Action {
     }
 }
 
-/// Player `p`'s relation toward `q` in the spatial copy becomes `r`.
-fn set_relation(s: &mut Spatial, (p, q): (u8, u8), r: Relation) {
-    s.relations
+/// Player `p`'s relation toward `q` in the spatial copy becomes `relation`.
+fn set_relation(spatial: &mut Spatial, (p, q): (u8, u8), relation: Relation) {
+    spatial
+        .relations
         .get_mut(PlayerId::new(p))
         .unwrap()
-        .set(PlayerId::new(q), r);
+        .set(PlayerId::new(q), relation);
 }

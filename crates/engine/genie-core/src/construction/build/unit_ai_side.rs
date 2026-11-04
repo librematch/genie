@@ -86,7 +86,7 @@ impl UnitView<'_, '_> {
         let Some((_, f)) = find(foundation.id()) else {
             return Ok(false);
         };
-        let (Some(t), Some(general)) = (
+        let (Some(task_target), Some(general)) = (
             task_target_with(
                 foundation.id(),
                 1,
@@ -147,7 +147,7 @@ impl UnitView<'_, '_> {
             masters,
             &actor,
             &TaskOn {
-                target: Some(&t),
+                target: Some(&task_target),
                 general: Some(&general),
                 terrain,
             },
@@ -185,8 +185,8 @@ impl UnitView<'_, '_> {
             &self.c.w.spatial,
         );
         let foundation_on = |tile: Tile| -> GenieResult<Option<ObjectId>> {
-            for (id, p) in spatial.objects_on(tile) {
-                if p.player != player {
+            for (id, placed) in spatial.objects_on(tile) {
+                if placed.player != player {
                     continue;
                 }
                 let Some(u) = others.own(id) else {
@@ -240,10 +240,10 @@ impl UnitView<'_, '_> {
             } else {
                 others.find(id)
             };
-            found.map(|(p, u)| Named {
+            found.map(|(player_id, u)| Named {
                 id,
                 master: u.life.master_id,
-                owner: p,
+                owner: player_id,
                 vector: Point::new(u.position().x(), u.position().z()),
             })
         };

@@ -7,7 +7,7 @@ share their sight. This folder holds all of it:
 - `mod.rs` holds the vision masks: which players' sight each player shares.
 - `registry.rs` holds the objects-in-sight registry, which the unit AIs search.
 - `ghost.rs` holds the fog's ghosts: what a player still sees of an object after it lost sight of
-  it.
+  it. `watched.rs` holds the watched lists: the objects that leave a ghost when lost sight of.
 - `explored.rs` holds the tiles that a player explored in a tick, and the resources it finds there.
 - `los_tables.rs` holds the line-of-sight tables. A script generates it.
 
@@ -38,6 +38,7 @@ loop, the ghosts update and the vision masks are rebuilt.
 | [`sight_tiles.rs`](sight_tiles.rs) | A line of sight in whole tiles (`SightTiles`), as the visible map's routines and the resource search take it. |
 | [`tile_count.rs`](tile_count.rs) | A count of tiles a player explored (`TileCount`). |
 | [`vision_bits.rs`](vision_bits.rs) | The vision's player bits (`VisionBits`) and a player's two masks (`VisionMasks`). |
+| [`watched.rs`](watched.rs) | The watched lists (`RGE_Player::watched`): the objects of other players each player watches, so that one it loses sight of leaves a ghost (`Ghost`). |
 | [`visibility/`](visibility/) | What each player sees: the players' `RGE_Visible_Map`s and the map's `RGE_Unified_Visible_Map` (both saved), which the objects' lines of sight keep. |
 <!-- /files -->
 

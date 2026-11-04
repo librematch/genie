@@ -283,8 +283,8 @@ impl Tech {
                 None => output.write_i16::<LE>(-1)?,
             }
         }
-        for i in 0..3 {
-            match self.effects.get(i) {
+        for index in 0..3 {
+            match self.effects.get(index) {
                 Some(effect) => effect.write_to(&mut output)?,
                 None => TechEffectRef {
                     effect_kind: 0xFFFF,
@@ -331,8 +331,8 @@ mod tests {
     /// A named string key has no place in a data file.
     #[test]
     fn named_string_key_cannot_be_written() {
-        let e = dll_id_u16(Some(&StringKey::from("NAME"))).unwrap_err();
-        assert_eq!(e.kind(), genie_error::ErrorKind::InvalidInput);
+        let error = dll_id_u16(Some(&StringKey::from("NAME"))).unwrap_err();
+        assert_eq!(error.kind(), genie_error::ErrorKind::InvalidInput);
     }
 
     /// The requirements: six tech slots (-1 for none), three effect slots (type 0xFFFF for

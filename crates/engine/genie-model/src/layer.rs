@@ -82,7 +82,7 @@ impl Roles {
     /// The roles of an optional class: its class's, none for none.
     #[must_use]
     pub fn of_some_class(&self, class: Option<ClassId>) -> ClassRoles {
-        class.map_or_else(ClassRoles::empty, |c| self.of_class(c))
+        class.map_or_else(ClassRoles::empty, |class_id| self.of_class(class_id))
     }
 
     /// The roles of a master; none for one beyond the table.
@@ -97,7 +97,7 @@ impl Roles {
     /// The roles of an optional master: its master's, none for none.
     #[must_use]
     pub fn of_some_master(&self, master: Option<MasterId>) -> MasterRoles {
-        master.map_or_else(MasterRoles::empty, |m| self.of_master(m))
+        master.map_or_else(MasterRoles::empty, |master_id| self.of_master(master_id))
     }
 
     /// The roles of a technology; none for one beyond the table.
@@ -118,7 +118,9 @@ impl Roles {
     /// The roles of an optional attribute (a load, a storage): its attribute's, none for none.
     #[must_use]
     pub fn of_some_attribute(&self, attribute: Option<AttributeId>) -> AttributeRoles {
-        attribute.map_or_else(AttributeRoles::empty, |a| self.of_attribute(a))
+        attribute.map_or_else(AttributeRoles::empty, |attribute_id| {
+            self.of_attribute(attribute_id)
+        })
     }
 }
 

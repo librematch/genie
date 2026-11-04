@@ -47,29 +47,29 @@ impl WorldPicker<'_> {
         let seeker = self.seeker.ok_or(GenieError::unsupported(
             "an attack test outside bestUnitToAttack",
         ))?;
-        let a = self.attacker;
+        let attacker = self.attacker;
         Ok(Searcher {
             id: self.me,
             target: seeker.target,
             target_classes: [seeker.target_class, seeker.last_target_class],
             order: seeker.order,
             action: seeker.action,
-            master: a.master,
-            class: a.class,
-            kind: a.kind,
-            attack_priority: a.attack_priority,
-            player_kind: a.player_kind,
+            master: attacker.master,
+            class: attacker.class,
+            kind: attacker.kind,
+            attack_priority: attacker.attack_priority,
+            player_kind: attacker.player_kind,
             walls_allowed: self
                 .ai_settings
                 .switches
                 .contains(AiSwitches::MAY_ATTACK_WALLS),
             can_move: seeker.can_move(),
-            sight: attack_sight(a)?,
-            range: a.range_against()?,
-            weapon_range: a.range,
-            min_range: a.min_range,
-            speed: a.speed,
-            scenario: a.scenario,
+            sight: attack_sight(attacker)?,
+            range: attacker.range_against()?,
+            weapon_range: attacker.range,
+            min_range: attacker.min_range,
+            speed: attacker.speed,
+            scenario: attacker.scenario,
             targeting: (
                 self.ai_settings.local_targeting_mode,
                 self.ai_settings.targeting_factor_scalar,
@@ -90,7 +90,7 @@ impl WorldPicker<'_> {
         spatial: &Spatial,
         id: ObjectId,
     ) -> GenieResult<Option<FoundObject>> {
-        let Some((owner, t, _, m)) = self.held(id)? else {
+        let Some((owner, unit, _, master)) = self.held(id)? else {
             return Ok(None);
         };
         let placed = spatial
@@ -99,9 +99,9 @@ impl WorldPicker<'_> {
         let capture = spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(id))
-            .map_or(CaptureKind::None, |s| s.capture);
-        let a = self.attacker;
+            .and_then(|visibility| visibility.seer(id))
+            .map_or(CaptureKind::None, |seer| seer.capture);
+        let attacker = self.attacker;
         Ok(Some(FoundObject {
             owner,
             flags: {
@@ -110,28 +110,33 @@ impl WorldPicker<'_> {
                     FoundFlags::ALLIED,
                     allied(self.relations, self.player, owner, AllyTest::WithRelation4),
                 );
-                flags.set(FoundFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
-                flags.set(FoundFlags::INSIDE, t.life.inside.is_some());
+                flags.set(FoundFlags::HAS_AI, self.parts.unit_ai.contains(unit.id));
+                flags.set(FoundFlags::INSIDE, unit.life.inside.is_some());
                 flags.set(
                     FoundFlags::TARGETABLE,
-                    !t.flags.contains(UnitFlags::UNTARGETABLE),
+                    !unit.flags.contains(UnitFlags::UNTARGETABLE),
                 );
                 flags.set(
                     FoundFlags::ATTACKABLE,
-                    t.flags.contains(UnitFlags::ATTACKABLE),
+                    unit.flags.contains(UnitFlags::ATTACKABLE),
                 );
                 flags
             },
-            state: t.life.state,
-            master: t.life.master_id,
-            class: m.class,
-            kind: m.kind,
+            state: unit.life.state,
+            master: unit.life.master_id,
+            class: master.class,
+            kind: master.kind,
             capture,
-            held: t.life.amount,
-            distance: footprint_gap(a.position, a.radius, placed.position, placed.radius),
+            held: unit.life.amount,
+            distance: footprint_gap(
+                attacker.position,
+                attacker.radius,
+                placed.position,
+                placed.radius,
+            ),
             speed: self
                 .parts
-                .mover_of(t.id)
+                .mover_of(unit.id)
                 .map_or(Speed::ZERO, |mv| mv.stats.speed),
         }))
     }
@@ -193,30 +198,30 @@ impl WorldPicker<'_> {
         let damage_tuning = &self.by_id.tuning().damage;
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
         let roles = self.by_id.roles();
-        let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
+        let (_, unit, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
         let (_, me, _, mm) = self.held(self.me)?.ok_or(GenieError::unsupported(
             "a searching unit of a master the slice does not have",
         ))?;
         let damage = self.damage(spatial, self.me, id, roles, damage_tuning)?;
-        let armed = 0.0 < attacks(m)
+        let armed = 0.0 < attacks(master)
             || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?;
         Ok(Candidate {
             id,
             distance,
             category,
-            class: m.class,
+            class: master.class,
             speed: self
                 .parts
-                .mover_of(t.id)
+                .mover_of(unit.id)
                 .map_or(Speed::ZERO, |mv| mv.stats.speed),
             armed,
             reach: self.attacker.range_against()?,
             damage,
-            hp: t.life.hp,
+            hp: unit.life.hp,
             reload: self.parts.combat_of(me.id).reload_stinger
                 + (mm.combat_part().reload - self.parts.combat_of(me.id).reload_powerup),
             workable: self.converts(self.me, id, TargetRules::Own, roles, unit_ai_tuning)?,
-            current: self.seeker.is_some_and(|s| s.target == Some(id)),
+            current: self.seeker.is_some_and(|seeker| seeker.target == Some(id)),
         })
     }
 
@@ -228,8 +233,8 @@ impl WorldPicker<'_> {
     ///
     /// What the read does not model.
     pub(crate) fn armored(&self, id: ObjectId) -> GenieResult<bool> {
-        let (_, t, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        let class3 = m
+        let (_, unit, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
+        let class3 = master
             .combat_part()
             .armors
             .iter()
@@ -237,14 +242,19 @@ impl WorldPicker<'_> {
             .map(|a| a.amount)
             .max();
         let armor = class3.unwrap_or_else(|| {
-            m.combat_part()
-                .armors
-                .iter()
-                .fold(m.combat_part().base_armor, |best, a| {
-                    if best < a.amount { a.amount } else { best }
-                })
+            master.combat_part().armors.iter().fold(
+                master.combat_part().base_armor,
+                |best, class_amount| {
+                    if best < class_amount.amount {
+                        class_amount.amount
+                    } else {
+                        best
+                    }
+                },
+            )
         });
-        Ok(DamageAmount::new(100) <= armor.plus(self.parts.combat_of(t.id).armor_powerups.pierce))
+        Ok(DamageAmount::new(100)
+            <= armor.plus(self.parts.combat_of(unit.id).armor_powerups.pierce))
     }
 
     /// Object `id`'s weapon range (slot 0x230: a combat object's master's, else 0).
@@ -253,9 +263,9 @@ impl WorldPicker<'_> {
     ///
     /// What the read does not model.
     pub(crate) fn weapon_range(&self, id: ObjectId) -> GenieResult<Distance> {
-        let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(if MasterKind::RGE_COMBAT <= m.kind {
-            m.combat_part().weapon_range
+        let (_, _, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
+        Ok(if MasterKind::RGE_COMBAT <= master.kind {
+            master.combat_part().weapon_range
         } else {
             Distance::ZERO
         })
@@ -270,8 +280,8 @@ impl WorldPicker<'_> {
     pub(crate) fn engages(&self, id: ObjectId) -> GenieResult<bool> {
         let roles = self.by_id.roles();
         let unit_ai_tuning = &self.by_id.tuning().unit_ai;
-        let (_, _, _, m) = self.held(id)?.ok_or(NOT_HELD)?;
-        Ok(0.0 < attacks(m)
+        let (_, _, _, master) = self.held(id)?.ok_or(NOT_HELD)?;
+        Ok(0.0 < attacks(master)
             || self.converts(id, self.me, TargetRules::Any, roles, unit_ai_tuning)?)
     }
 

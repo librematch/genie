@@ -19,7 +19,7 @@ pub struct TributeCommand {
 
 impl TributeCommand {
     /// Its handler ([`World::tribute`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        w.tribute(self.player, self.to, &self.gifts)
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        world.tribute(self.player, self.to, &self.gifts)
     }
 }

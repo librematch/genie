@@ -28,7 +28,7 @@ fn quiet_update_parts_at_no_step() {
     let (save, rec) = (quiet(), syncs(3));
     let game_at = |_| Some((quiet(), None));
     let steps = steps_from_save(&save, &rec, 0, None, Dumps::default(), &game_at).unwrap();
-    let names: Vec<UpdateStep> = steps.iter().map(|(s, _)| *s).collect();
+    let names: Vec<UpdateStep> = steps.iter().map(|(update_step, _)| *update_step).collect();
     let players = 2 * EACH_PLAYER.len();
     assert_eq!(
         names.len(),
@@ -52,8 +52,8 @@ fn step_without_the_game_save_is_not_compared() {
     let steps = steps_from_save(&save, &rec, 1, None, Dumps::default(), &game_at).unwrap();
     let compared: Vec<String> = steps
         .iter()
-        .filter(|(_, r)| r.is_some())
-        .map(|(s, _)| s.to_string())
+        .filter(|(_, tick_report)| tick_report.is_some())
+        .map(|(update_step, _)| update_step.to_string())
         .collect();
     assert_eq!(compared, ["Objects of player 0", "Objects of player 1"]);
 }

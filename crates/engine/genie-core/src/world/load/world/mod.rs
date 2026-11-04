@@ -27,16 +27,16 @@ use crate::{GenieError, GenieResult};
 use genie_model::layer::BuildLayer;
 use std::sync::Arc;
 
+pub mod garrisons;
 pub mod loaded;
 pub mod market;
+pub mod options;
 pub mod players;
 
 use crate::world::load::world::players::ai_settings;
 use crate::world::load::world::players::tech_state;
 use crate::world::load::world::players::{ai_module, history};
 
-use crate::combat::Firepower;
-use crate::garrison::{attack_rate, share as garrison_share};
 use crate::map::Position;
 use crate::map::{Restriction, TerrainId};
 use crate::movement::explore::InfluenceMap;
@@ -54,28 +54,24 @@ use crate::players::world_player::VictoryTimes;
 use crate::players::{PlayerKind, PlayerSet, Posture, Relations, Stance};
 use crate::vision::VisionBits;
 use crate::vision::ghost::Ghost;
+use crate::world::Formations;
 use crate::world::load::groups::unit_groups;
 use crate::world::load::map::spatial;
 use crate::world::load::object::object;
+use crate::world::load::world::garrisons::garrison_firepower;
 use crate::world::load::world::market::market;
+use crate::world::load::world::options::settings;
 use crate::world::parts::ObjectParts;
-use crate::world::parts::Part;
-use crate::world::settings::{FarmMode, OptionFlags, Settings};
-use crate::world::{
-    Age, ContentMode, Formations, GameMode, ResourceLevel, SubModeFlags, TreatyLength, Unread,
-    Visibility,
-};
 use crate::world::{Player, World};
 use genie_import::dat::{MasterTable, TerrainTable};
 use genie_import::save::work_masters;
-use genie_save::generated::world::GameOptions;
 use genie_save::{Header, PlayerSection};
 use std::mem::take;
 
 /// The world as the save `header` holds it, with the masters `masters` and the build layer
 /// `build`: every player's live objects in their saved order, and `BaseWorld`'s fields before
 /// the map, the frame seed (`mCurrentFrameRandomSeed`, world+0x7d0) and the turn order
-/// (`player_turn`, `player_time_delta[i]`).
+/// (`player_turn`, `player_time_delta[player_id]`).
 ///
 /// Only for a save whose run-time state then comes from elsewhere (the tick oracle's dumps of a
 /// per-tick save: the registry, tiles, mesh owners …). A run from a recording's header takes
@@ -222,7 +218,11 @@ pub fn saved_world(
                 // mTCFlared bit is set; the saved map then already holds the revealed tiles
                 tc_flared: p.world_player().tc_flared.iter().map(|&b| b != 0).collect(),
                 commodity_volume: LotVolume::of_data(p.world_player().commodity_volumn_delta),
-                victory: VictoryState::of_data(victory.get(i).map_or(0, |v| v.victory)),
+                victory: VictoryState::of_data(
+                    victory
+                        .get(i)
+                        .map_or(0, |rge_victory_conditions| rge_victory_conditions.victory),
+                ),
                 fealty: Fealty::of_data(p.world_player().fealty as i16),
                 // the load sets it 0 (`FUN_14163e970`)
                 posture: Posture::Aggressive,
@@ -240,9 +240,13 @@ pub fn saved_world(
                 // +0x1378 is not saved
                 one_military_queued: false,
                 update_time: Seconds::new(p.world_player().update_time),
-                gaia_update_time: p.player.gaia_player.as_deref().map_or(Seconds::ZERO, |g| {
-                    Seconds::new(g.world_player_gaia.update_time)
-                }),
+                gaia_update_time: p
+                    .player
+                    .gaia_player
+                    .as_deref()
+                    .map_or(Seconds::ZERO, |gaia_player| {
+                        Seconds::new(gaia_player.world_player_gaia.update_time)
+                    }),
                 escrow: p.world_player().base.escrow.map(Amount::new),
                 escrow_percentage: p
                     .world_player()
@@ -304,12 +308,12 @@ pub fn saved_world(
     turns.local_player = PlayerId::try_from(usize::try_from(world.local_player_index).unwrap_or(0))
         .unwrap_or_default();
     turns.alliance_locked = world.alliance_locked;
-    // the world's teams (+0x984, `playerTeams[i]`, saved as bytes)
+    // the world's teams (+0x984, `playerTeams[player_id]`, saved as bytes)
     for (team, &saved) in turns.teams.iter_mut().zip(&header.world.player_teams) {
         *team = Team::of_data(i32::from(saved));
     }
     let none = TerrainTable::default();
-    let terrain = masters.map_or(&none, |t| &t.terrain);
+    let terrain = masters.map_or(&none, |master_table| &master_table.terrain);
     match spatial(header, terrain, build) {
         Ok(s) => turns.spatial = s,
         Err(e) => stop_all(&mut turns, &e),
@@ -320,31 +324,39 @@ pub fn saved_world(
         if wp.is_scout_map_enabled.unwrap_or_default() == 0 {
             continue;
         }
-        if let Some(m) = wp.scout_map.as_deref() {
-            let width = m.xsize_value.max(0) as usize;
-            let cells = m
+        if let Some(tribe_information_ai_module) = wp.scout_map.as_deref() {
+            let width = tribe_information_ai_module.xsize_value.max(0) as usize;
+            let cells = tribe_information_ai_module
                 .row_value
                 .iter()
-                .flat_map(|r| {
-                    let row = r.row_value.as_deref().unwrap_or(&[]);
+                .flat_map(|entry| {
+                    let row = entry.row_value.as_deref().unwrap_or(&[]);
                     (0..width).map(move |x| row.get(x).copied().unwrap_or(0))
                 })
                 .collect();
             turns.spatial.set_scout_map(
                 i,
                 InfluenceMap {
-                    size: GridSize::new(m.xsize_value, m.ysize_value),
-                    origin: Tile::new(m.xreference_point_value, m.yreference_point_value),
-                    limit: m.unchangeable_limit_value,
+                    size: GridSize::new(
+                        tribe_information_ai_module.xsize_value,
+                        tribe_information_ai_module.ysize_value,
+                    ),
+                    origin: Tile::new(
+                        tribe_information_ai_module.xreference_point_value,
+                        tribe_information_ai_module.yreference_point_value,
+                    ),
+                    limit: tribe_information_ai_module.unchangeable_limit_value,
                     cells,
                 },
             );
         }
     }
     // the computer players' AI modules (player+0x7a8, saved only where the AI was created)
-    for (i, p) in PlayerId::each(header.players().len()).zip(header.players()) {
-        if let Some(m) = p.world_player().tribe_main_decision_ai_module.as_deref() {
-            turns.ai.set(i, ai_module(m));
+    for (player_id, p) in PlayerId::each(header.players().len()).zip(header.players()) {
+        if let Some(tribe_main_decision_ai) =
+            p.world_player().tribe_main_decision_ai_module.as_deref()
+        {
+            turns.ai.set(player_id, ai_module(tribe_main_decision_ai));
         }
     }
     let map = &world.map;
@@ -352,7 +364,12 @@ pub fn saved_world(
         GridSize::new(map.map_width, map.map_height),
         map.rows
             .iter()
-            .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_kind)))
+            .flat_map(|rge_map_row| {
+                rge_map_row
+                    .tiles
+                    .iter()
+                    .map(|rge_tile| TerrainId::named(rge_tile.terrain_kind))
+            })
             .collect(),
         terrain.passable().to_vec(),
         header.world.game_kind,
@@ -378,10 +395,10 @@ pub fn saved_world(
         .players()
         .iter()
         .map(|p| {
-            let b = &p.world_player().base;
+            let world_player_base = &p.world_player().base;
             PlanBudget {
-                attempt_cap: PlanCap::of_data(b.pathing_attempt_cap_value),
-                delay_cap: PlanCap::of_data(b.pathing_delay_cap_value),
+                attempt_cap: PlanCap::of_data(world_player_base.pathing_attempt_cap_value),
+                delay_cap: PlanCap::of_data(world_player_base.pathing_delay_cap_value),
                 plans: PlanCount::ZERO,
             }
         })
@@ -393,7 +410,7 @@ pub fn saved_world(
     turns.game_state = PlayState::of_data(u32::from(world.temp_game_state));
     turns.victory_conquest = world.tribe_scenario.base_scenario.victory_conquest != 0;
     match unit_groups(world) {
-        Ok(g) => turns.groups = g,
+        Ok(groups) => turns.groups = groups,
         Err(e) => stop_all(&mut turns, &e),
     }
     if let Some(table) = masters {
@@ -407,9 +424,13 @@ pub fn saved_world(
         let masters = header
             .players()
             .iter()
-            .map(|p| {
-                work_masters(p.objects(), CivId::new(p.world_player().base.civ_id), table)
-                    .map(Arc::new)
+            .map(|player_section| {
+                work_masters(
+                    player_section.objects(),
+                    CivId::new(player_section.world_player().base.civ_id),
+                    table,
+                )
+                .map(Arc::new)
             })
             .collect::<Result<_, _>>()
             .unwrap_or_else(|e| {
@@ -439,16 +460,21 @@ pub fn saved_world(
                 .filter(|m| m.kind == MasterKind::COMBAT)
         };
         turns.spatial.fastest = all()
-            .filter_map(|m| m.move_stats.as_ref().map(|s| s.speed.get()))
+            .filter_map(|m| {
+                m.move_stats
+                    .as_ref()
+                    .map(|move_stats| move_stats.speed.get())
+            })
             .fold(0.0, f32::max);
         turns.spatial.reach = Distance::new(
             all()
-                .flat_map(|m| {
-                    m.action_part()
+                .flat_map(|master| {
+                    master
+                        .action_part()
                         .tasks
                         .iter()
-                        .map(|t| t.work_range)
-                        .chain([m.combat_part().weapon_range])
+                        .map(|task| task.work_range)
+                        .chain([master.combat_part().weapon_range])
                 })
                 .map(Distance::get)
                 .fold(0.0, f32::max),
@@ -465,9 +491,9 @@ pub fn saved_world(
     // the players' vision masks, which the world's load rebuilds (its slot 0x78)
     // (both read the objects' masters: without the masters' table there is nothing to rebuild)
     if masters.is_some()
-        && let Err(e) = turns.load_trackers().and_then(|()| turns.rebuild_vision())
+        && let Err(error) = turns.load_trackers().and_then(|()| turns.rebuild_vision())
     {
-        stop_all(&mut turns, &e);
+        stop_all(&mut turns, &error);
     }
     // the spatial index's views of the loaded annexes, relations and task 0x99 masters
     turns.sync_world();
@@ -477,21 +503,21 @@ pub fn saved_world(
 /// The saved objects' parts into the world's tables ([`World::load_parts`]); a part of an object
 /// the world does not hold stops every player.
 fn file_parts(turns: &mut World, parts: Vec<(ObjectId, ObjectParts)>) {
-    if let Err(e) = parts
+    if let Err(error) = parts
         .into_iter()
         .try_for_each(|(id, part)| turns.load_parts(id, part))
     {
-        stop_all(turns, &e);
+        stop_all(turns, &error);
     }
 }
 
-/// Every player stops on `e`, which the world does not model of the save.
-fn stop_all(turns: &mut World, e: &GenieError) {
-    for p in &mut turns.players {
-        let _ = p
+/// Every player stops on `error`, which the world does not model of the save.
+fn stop_all(turns: &mut World, error: &GenieError) {
+    for player in &mut turns.players {
+        let _ = player
             .unsupported
-            .get_or_insert_with(|| (Tick::ZERO, ListIndex::new(0), e.clone()));
-        p.stopped = true;
+            .get_or_insert_with(|| (Tick::ZERO, ListIndex::new(0), error.clone()));
+        player.stopped = true;
     }
 }
 
@@ -501,63 +527,27 @@ fn stop_all(turns: &mut World, e: &GenieError) {
 /// (`FUN_140ae8fa0`) when in state 7 sets its timer (`mTimer`, `+0x44`) where it is less or the
 /// countdown below 0 (`FUN_140c91500`).
 #[must_use]
-pub fn wonder_time(p: &PlayerSection<'_>) -> Seconds {
+pub fn wonder_time(player_section: &PlayerSection<'_>) -> Seconds {
     let mut countdown = -1.0;
-    for o in p.live_objects().chain(p.sleeping_objects()) {
-        let Some(actions) = o.actions() else {
+    for object in player_section
+        .live_objects()
+        .chain(player_section.sleeping_objects())
+    {
+        let Some(actions) = object.actions() else {
             continue;
         };
-        for (_, a) in actions.entries() {
-            if let Some(w) = a.tribe_action_wonder.as_deref()
-                && w.rge_action.state == 7
+        for (_, action) in actions.entries() {
+            if let Some(tribe_action_wonder) = action.tribe_action_wonder.as_deref()
+                && tribe_action_wonder.rge_action.state == 7
             {
-                let t = w.rge_action.timer;
-                if t < countdown || countdown < 0.0 {
-                    countdown = t;
+                let timer = tribe_action_wonder.rge_action.timer;
+                if timer < countdown || countdown < 0.0 {
+                    countdown = timer;
                 }
             }
         }
     }
     Seconds::new(countdown)
-}
-
-/// The game options the simulation reads ([`Settings`]) from the header's
-/// `GameOptions`, as `FUN_141305310` loads them.
-#[must_use]
-pub const fn settings(o: &GameOptions) -> Settings {
-    Settings {
-        game_mode: GameMode::of_data(o.game_mode),
-        ending_age: Age::of_data(o.ending_age),
-        visibility_kind: Visibility::of_data(o.visibility_kind),
-        sub_game_mode_flag: SubModeFlags::from_bits_retain(o.sub_game_mode_flag),
-        farm_mode: FarmMode::of_option(o.walkable_farms),
-        selected_content_mode: ContentMode::of_data(o.selected_content_mode),
-        treaty_length: TreatyLength::of_minutes(o.treaty_length),
-        starting_age: Age::of_data(o.starting_age),
-        resource_level: ResourceLevel::of_data(o.resource_level),
-        flags: option(OptionFlags::FULL_TECH_TREE, o.full_tech_tree_enabled)
-            .union(option(
-                OptionFlags::VILLAGER_FORCE_DROP,
-                o.villager_force_drop,
-            ))
-            .union(option(OptionFlags::CHEATS_ENABLED, o.cheats_enabled))
-            .union(option(OptionFlags::TEAMS_LOCKED, o.teams_locked))
-            .union(option(OptionFlags::TURBO, o.turbo_enabled))
-            .union(option(
-                OptionFlags::SHARED_EXPLORATION,
-                o.shared_exploration,
-            ))
-            .union(option(OptionFlags::ANTIQUITY, o.antiquity_mode)),
-    }
-}
-
-/// `flag` when the option's byte is not 0.
-const fn option(flag: OptionFlags, byte: u8) -> OptionFlags {
-    if byte != 0 {
-        flag
-    } else {
-        OptionFlags::empty()
-    }
 }
 
 /// A player's ghosts (its doppelganger list) as saved: each one's id, place, state, the original's
@@ -574,122 +564,37 @@ pub fn saved_ghosts(section: &PlayerSection<'_>) -> GenieResult<Vec<Ghost>> {
         .objects()
         .doppleganger_objects
         .objects()
-        .filter_map(|o| {
-            let d = o
+        .filter_map(|object| {
+            let d = object
                 .rge_object
                 .as_deref()?
                 .rge_doppleganger_object
                 .as_deref()?;
-            Some((o.static_part()?, d))
+            Some((object.static_part()?, d))
         })
-        .map(|(s, d)| {
-            let original = ObjectId::of_field(d.long_val as i32);
+        .map(|(rge_static_object, rge_doppleganger_object)| {
+            let original = ObjectId::of_field(rge_doppleganger_object.long_val as i32);
             Ok(Ghost {
-                id: ObjectId::try_from(s.id)?,
+                id: ObjectId::try_from(rge_static_object.id)?,
                 original,
                 original_id: original,
-                original_master: MasterId::of_data(d.long_val_2 as i16),
-                original_owner: u8::try_from(d.doppled_player)
+                original_master: MasterId::of_data(rge_doppleganger_object.long_val_2 as i16),
+                original_owner: u8::try_from(rge_doppleganger_object.doppled_player)
                     .map_or(PlayerId::GAIA, PlayerId::from),
-                position: Position::new(s.tx, s.ty, s.tz),
-                tile: Tile::new(s.tx as i32, s.ty as i32),
-                footprint: d.multi_unified_points,
+                position: Position::new(
+                    rge_static_object.tx,
+                    rge_static_object.ty,
+                    rge_static_object.tz,
+                ),
+                tile: Tile::new(rge_static_object.tx as i32, rge_static_object.ty as i32),
+                footprint: rge_doppleganger_object.multi_unified_points,
                 bits: VisionBits::NONE,
-                cant_see: PlayerSet::from_bits_retain(d.cant_see_bits),
+                cant_see: PlayerSet::from_bits_retain(rge_doppleganger_object.cant_see_bits),
                 seen: false,
-                state: ObjectState::of_byte(s.object_state)?,
+                state: ObjectState::of_byte(rge_static_object.object_state)?,
             })
         })
         .collect()
-}
-
-/// The garrisons of the running game: each object inside another of its player is in that one's
-/// list (`+0x2f8`), in the order the objects are listed (the game's is the order they came in,
-/// which no save holds); and each unit (type 70) added its share to a combat object's volleys at
-/// its enter (`FUN_14120b790`, [`share`](crate::garrison::share)), which the load does not restore
-/// (`FUN_14121ec90` sets the master's volley fire). A share the world does not model leaves the
-/// building unmodelled.
-pub fn garrison_firepower(turns: &mut World) {
-    for p in 0..turns.players.len() {
-        let entered = entered_shares(turns, p);
-        file_garrisons(turns, p, entered);
-    }
-}
-
-/// A unit inside a building, the building, and the unit's share of its volleys (none for a
-/// unit that is not of type 70 or a building whose master the table lacks).
-type Entered = (ObjectId, ObjectId, Option<GenieResult<Firepower>>);
-
-/// Player `p`'s units inside a building of its own, in list order, each with its building and
-/// its share ([`garrison_firepower`]).
-fn entered_shares(turns: &World, p: usize) -> Vec<Entered> {
-    let (Some(masters), Some(player)) = (turns.model.masters.get(p), turns.players.get(p)) else {
-        return Vec::new();
-    };
-    let lists = || player.objects.iter().chain(&player.sleeping);
-    let mut entered = Vec::new();
-    for u in lists() {
-        let Some(building) = u.life.inside else {
-            continue;
-        };
-        let Some(b) = lists().find(|b| b.id == building.id()) else {
-            continue;
-        };
-        let share = masters
-            .get(u.life.master_id)
-            .filter(|m| m.kind == MasterKind::COMBAT)
-            .and_then(|me| {
-                let bm = masters.get(b.life.master_id)?;
-                let rate = attack_rate(
-                    bm,
-                    masters,
-                    turns.parts.combat_of(b.id).reload_powerup,
-                    &turns.model.roles,
-                    &turns.model.tuning.garrison,
-                );
-                Some(garrison_share(
-                    me,
-                    masters,
-                    turns.parts.combat_of(u.id).reload_powerup,
-                    rate,
-                    &turns.model.roles,
-                ))
-            });
-        entered.push((b.id, u.id, share));
-    }
-    entered
-}
-
-/// Each building of player `p` lists the units `entered` inside it and adds their shares to
-/// its volleys; a share the world does not model leaves the building unmodelled.
-fn file_garrisons(turns: &mut World, p: usize, entered: Vec<Entered>) {
-    for (b, id, share) in entered {
-        let unmodelled = match share {
-            Some(Ok(share)) => {
-                let mut combat = turns.parts.combat_of(b).clone();
-                combat.firepower += share;
-                turns.set_part(b, Part::Combat(Box::new(combat))).err()
-            }
-            Some(Err(e)) => Some(e),
-            None => None,
-        };
-        let Some(building) = turns.players.get_mut(p).and_then(|q| {
-            q.objects
-                .iter_mut()
-                .chain(&mut q.sleeping)
-                .find(|u| u.id == b)
-        }) else {
-            continue;
-        };
-        building.garrison.push(id);
-        if let Some(e) = unmodelled {
-            let unread = Part::Unread(Some(Unread::new(e)));
-            // the world holds the building (it is in its player's lists): the write cannot fail
-            if let Err(e) = turns.set_part(b, unread) {
-                stop_all(turns, &e);
-            }
-        }
-    }
 }
 
 #[cfg(test)]

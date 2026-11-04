@@ -16,11 +16,11 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::{CheckedIndex, PlayerSlots};
 
 impl World {
-    /// `FUN_14160ffb0`: player `p` has a castle (0x52; 0xd1 with the loaded world's content mode
-    /// `+0x6b4` at 1, which a load leaves at the game's, [`World::mode_680`]): a master it has
+    /// `FUN_14160ffb0`: player `player_id` has a castle (0x52; 0xd1 with the loaded world's content
+    /// mode `+0x6b4` at 1, which a load leaves at the game's, [`World::mode_680`]): a master it has
     /// (`FUN_140b26630`) with at least one in its tracker's done list (`FUN_14104eea0`).
     #[must_use]
-    pub fn has_treason_building(&self, p: PlayerId) -> bool {
+    pub fn has_treason_building(&self, player_id: PlayerId) -> bool {
         let castle = if self.mode_680.is_one() {
             self.model.slots.master.castle_mode_1
         } else {
@@ -28,15 +28,15 @@ impl World {
         };
         self.model
             .masters
-            .get(p.index())
+            .get(player_id.index())
             .is_some_and(|ms| ms.get(castle).is_some())
             && self
                 .players
-                .get(p.index())
+                .get(player_id.index())
                 .is_some_and(|pl| !pl.tracker.list(ListKey::master(castle)).is_empty())
     }
 
-    /// `FUN_141620400`: player `p`'s treason. It costs 400 gold, 200 with attribute 197 above 0
+    /// `FUN_141620400`: player `buyer`'s treason. It costs 400 gold, 200 with attribute 197 above 0
     /// (`COMISS`, `JBE`: a NaN costs 400); with less gold (`COMISS`, `JA`: a NaN gold passes)
     /// or outside the regicide rule ([`crate::world::settings::Settings::regicide`]) it fails with the
     /// interface's error. Else the gold goes straight off attribute 3 (the local player's
@@ -46,10 +46,10 @@ impl World {
     /// player from 1 the player counts as its own or allied a flare at its place (that player's
     /// slot 0x1c0 with master 697, [`World::remains`]); the sound and the minimap's mark
     /// (`FUN_140c7d6c0`, the game's `+0xa78`) are the interface's, as the local player's message.
-    pub(crate) fn treason(&mut self, p: PlayerId) -> GenieResult<()> {
+    pub(crate) fn treason(&mut self, buyer: PlayerId) -> GenieResult<()> {
         let discount = self
             .players
-            .player(p)?
+            .player(buyer)?
             .attribute(self.model.slots.attribute.treason_discount)
             .unwrap_or(Amount::ZERO);
         let cost = if Amount::ZERO < discount {
@@ -59,7 +59,7 @@ impl World {
         };
         let gold = *self
             .players
-            .player(p)?
+            .player(buyer)?
             .attributes
             .checked(self.model.slots.attribute.gold.index())?;
         if cost > gold.get() || !self.settings.regicide() {
@@ -67,14 +67,14 @@ impl World {
         }
         *self
             .players
-            .player_mut(p)?
+            .player_mut(buyer)?
             .attributes
             .checked_mut(self.model.slots.attribute.gold.index())? = gold - Amount::new(cost);
-        let n = self.players.len();
-        for i in PlayerId::each(n).skip(1) {
+        let count = self.players.len();
+        for i in PlayerId::each(count).skip(1) {
             if allied(
-                &self.players.player(p)?.relations,
-                p,
+                &self.players.player(buyer)?.relations,
+                buyer,
                 i,
                 AllyTest::AlliesOnly,
             ) {
@@ -86,28 +86,28 @@ impl World {
                 .objects
                 .iter()
                 // The king (`0x1b2`), whom the treason reveals.
-                .find(|u| {
+                .find(|unit| {
                     self.model
                         .roles
-                        .of_master(u.life.master_id)
+                        .of_master(unit.life.master_id)
                         .contains(MasterRoles::KING)
                 })
             else {
                 continue;
             };
-            let at = match king.life.inside.and_then(|h| self.object(h)) {
+            let at = match king.life.inside.and_then(|role_id| self.object(role_id)) {
                 Some((_, holder)) => holder.position(),
                 None => king.position(),
             };
-            for j in PlayerId::each(n).skip(1) {
+            for player_id in PlayerId::each(count).skip(1) {
                 if allied(
-                    &self.players.player(p)?.relations,
-                    p,
-                    j,
+                    &self.players.player(buyer)?.relations,
+                    buyer,
+                    player_id,
                     AllyTest::AlliesOnly,
                 ) {
-                    self.remains(j, self.model.slots.master.flare_4, at, None)?;
-                    self.made_new_object(j)?;
+                    self.remains(player_id, self.model.slots.master.flare_4, at, None)?;
+                    self.made_new_object(player_id)?;
                 }
             }
         }
@@ -166,23 +166,23 @@ mod tests {
     /// Without the regicide rule, or with too little gold, nothing happens.
     #[test]
     fn treason_needs_the_regicide_rule_and_the_gold() {
-        let mut t = world();
-        t.treason(PlayerId::new(1)).unwrap();
+        let mut world = world();
+        world.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
-            t.players[1].attributes[attribute::GOLD.index()],
+            world.players[1].attributes[attribute::GOLD.index()],
             Amount::new(500.0)
         );
-        t.settings.game_mode = GameMode::of_data(1);
-        t.players[1].attributes[attribute::GOLD.index()] = Amount::new(399.0);
-        t.treason(PlayerId::new(1)).unwrap();
+        world.settings.game_mode = GameMode::of_data(1);
+        world.players[1].attributes[attribute::GOLD.index()] = Amount::new(399.0);
+        world.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
-            t.players[1].attributes[attribute::GOLD.index()],
+            world.players[1].attributes[attribute::GOLD.index()],
             Amount::new(399.0)
         );
-        t.players[1].attributes[attribute::TREASON_DISCOUNT.index()] = Amount::new(1.0);
-        t.treason(PlayerId::new(1)).unwrap();
+        world.players[1].attributes[attribute::TREASON_DISCOUNT.index()] = Amount::new(1.0);
+        world.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
-            t.players[1].attributes[attribute::GOLD.index()],
+            world.players[1].attributes[attribute::GOLD.index()],
             Amount::new(199.0)
         );
     }
@@ -190,26 +190,26 @@ mod tests {
     /// The treason pays 400 gold; without a king anywhere it flares nothing.
     #[test]
     fn treason_without_kings_only_pays() {
-        let mut t = world();
-        t.settings.game_mode = GameMode::of_data(1);
-        let before = t.players[3].objects.len();
-        t.treason(PlayerId::new(1)).unwrap();
+        let mut world = world();
+        world.settings.game_mode = GameMode::of_data(1);
+        let before = world.players[3].objects.len();
+        world.treason(PlayerId::new(1)).unwrap();
         assert_eq!(
-            t.players[1].attributes[attribute::GOLD.index()],
+            world.players[1].attributes[attribute::GOLD.index()],
             Amount::new(100.0)
         );
-        assert_eq!(t.players[3].objects.len(), before);
+        assert_eq!(world.players[3].objects.len(), before);
     }
 
     /// The flare's master (697, animated, no hit points) for every player.
-    fn with_flares(t: &mut World) {
+    fn with_flares(world: &mut World) {
         let flare = Master {
             id: ids::FLARE_4,
             kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
         };
-        t.model.masters = (0..t.players.len())
+        world.model.masters = (0..world.players.len())
             .map(|_| Masters::new([flare.clone()]))
             .map(Arc::new)
             .collect();
@@ -250,7 +250,7 @@ mod tests {
                 .objects
                 .iter()
                 .filter(|u| u.life.master_id == ids::FLARE_4)
-                .map(|u| (u.id.get(), u.position()))
+                .map(|unit| (unit.id.get(), unit.position()))
                 .collect()
         };
         assert_eq!(flares(&t, 1), [(100, Position::new(5.0, 6.0, 0.0))]);
@@ -275,7 +275,7 @@ mod tests {
     /// The castle test asks the player's masters and its tracker.
     #[test]
     fn player_without_castle_has_no_treason() {
-        let t = world();
-        assert!(!t.has_treason_building(PlayerId::new(1)));
+        let world = world();
+        assert!(!world.has_treason_building(PlayerId::new(1)));
     }
 }

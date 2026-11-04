@@ -96,8 +96,8 @@ mod tests {
                 "disabled buildings in a version without them",
             ),
         ];
-        for (e, kind, reason) in cases {
-            assert_eq!((e.kind(), e.reason()), (kind, reason));
+        for (error, kind, reason) in cases {
+            assert_eq!((error.kind(), error.reason()), (kind, reason));
         }
     }
 }

@@ -40,12 +40,12 @@ impl Visibility {
             let x1 = (x + i32::from(dx1)).min(self.size.width() - 1);
             for tx in x0..=x1 {
                 let tile = Tile::new(tx, ty);
-                let i = self.index(tile);
+                let index = self.index(tile);
                 let mut c = self
                     .maps
                     .checked(player.index())?
                     .counts
-                    .checked(i)?
+                    .checked(index)?
                     .wrapping_add(1);
                 if c == 0 {
                     newly += TileCount::ONE;
@@ -54,24 +54,24 @@ impl Visibility {
                     if self
                         .player_kinds
                         .get(player.index())
-                        .is_some_and(|t| t.is_computer())
+                        .is_some_and(|player_kind| player_kind.is_computer())
                     {
                         self.ai_tiles.push((player, tile));
                     }
-                    if self.links.checked(i)?.0 & (LINKED | ANCHOR) != 0 {
+                    if self.links.checked(index)?.0 & (LINKED | ANCHOR) != 0 {
                         self.reveal_building(player, tile)?;
                     }
                     c = 1;
-                    *self.unified.checked_mut(i)? |= seen;
+                    *self.unified.checked_mut(index)? |= seen;
                 }
                 if c == 1 {
-                    *self.unified.checked_mut(i)? |= visible;
+                    *self.unified.checked_mut(index)? |= visible;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(i)? = c.min(MOST);
+                    .checked_mut(index)? = c.min(MOST);
             }
         }
         Ok(newly)
@@ -96,12 +96,12 @@ impl Visibility {
         let Some(rect) = self.extent_of(tile) else {
             return Ok(());
         };
-        let i = self.index(tile);
+        let index = self.index(tile);
         *self
             .maps
             .checked_mut(player.index())?
             .counts
-            .checked_mut(i)? = 1;
+            .checked_mut(index)? = 1;
         let _ = self.reveal_rect(player, rect)?;
         Ok(())
     }
@@ -126,17 +126,21 @@ impl Visibility {
             let x0 = (x + i32::from(dx0)).max(0);
             let x1 = (x + i32::from(dx1)).min(self.size.width() - 1);
             for tx in x0..=x1 {
-                let i = self.index(Tile::new(tx, ty));
-                let c = *self.maps.checked(player.index())?.counts.checked(i)?;
-                let c = if c != 0 { c.wrapping_sub(1) } else { 0 };
+                let index = self.index(Tile::new(tx, ty));
+                let checked = *self.maps.checked(player.index())?.counts.checked(index)?;
+                let c = if checked != 0 {
+                    checked.wrapping_sub(1)
+                } else {
+                    0
+                };
                 if c == 0 {
-                    *self.unified.checked_mut(i)? &= hidden;
+                    *self.unified.checked_mut(index)? &= hidden;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(i)? = c;
+                    .checked_mut(index)? = c;
             }
         }
         Ok(())
@@ -162,28 +166,28 @@ impl Visibility {
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
-                let i = self.index(tile);
+                let index = self.index(tile);
                 let mut c = self
                     .maps
                     .checked(player.index())?
                     .counts
-                    .checked(i)?
+                    .checked(index)?
                     .wrapping_add(1);
                 if c == 0 {
                     newly += TileCount::ONE;
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     self.new_tile(player, tile);
                     c = 1;
-                    *self.unified.checked_mut(i)? |= seen;
+                    *self.unified.checked_mut(index)? |= seen;
                 }
                 if c == 1 {
-                    *self.unified.checked_mut(i)? |= visible;
+                    *self.unified.checked_mut(index)? |= visible;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(i)? = c.min(MOST);
+                    .checked_mut(index)? = c.min(MOST);
             }
         }
         Ok(newly)
@@ -199,17 +203,21 @@ impl Visibility {
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
-                let i = self.index(tile);
-                let c = *self.maps.checked(player.index())?.counts.checked(i)?;
-                let c = if c != 0 { c.wrapping_sub(1) } else { 0 };
+                let index = self.index(tile);
+                let checked = *self.maps.checked(player.index())?.counts.checked(index)?;
+                let c = if checked != 0 {
+                    checked.wrapping_sub(1)
+                } else {
+                    0
+                };
                 if c == 0 {
-                    *self.unified.checked_mut(i)? &= hidden;
+                    *self.unified.checked_mut(index)? &= hidden;
                 }
                 *self
                     .maps
                     .checked_mut(player.index())?
                     .counts
-                    .checked_mut(i)? = c;
+                    .checked_mut(index)? = c;
             }
         }
         Ok(())
@@ -227,17 +235,17 @@ impl Visibility {
         for y in y0..=y1 {
             for x in x0..=x1 {
                 let tile = Tile::new(x, y);
-                let i = self.index(tile);
-                if *self.maps.checked(player.index())?.counts.checked(i)? == -1 {
+                let index = self.index(tile);
+                if *self.maps.checked(player.index())?.counts.checked(index)? == -1 {
                     self.maps.checked_mut(player.index())?.explored += TileCount::ONE;
                     newly += TileCount::ONE;
                     self.new_tile(player, tile);
-                    *self.unified.checked_mut(i)? |= seen;
+                    *self.unified.checked_mut(index)? |= seen;
                     *self
                         .maps
                         .checked_mut(player.index())?
                         .counts
-                        .checked_mut(i)? = 0;
+                        .checked_mut(index)? = 0;
                 }
             }
         }

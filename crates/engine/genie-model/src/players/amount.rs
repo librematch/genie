@@ -74,8 +74,8 @@ impl Mul<Amount> for f32 {
     type Output = Amount;
 
     /// The amount scaled by `self` (one `f32` product, the factor first).
-    fn mul(self, a: Amount) -> Amount {
-        Amount(self * a.0)
+    fn mul(self, amount: Amount) -> Amount {
+        Amount(self * amount.0)
     }
 }
 
@@ -106,8 +106,8 @@ impl Sum for Amount {
 }
 
 impl genie_diff::Diff for Amount {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

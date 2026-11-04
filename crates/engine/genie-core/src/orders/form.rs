@@ -58,7 +58,9 @@ impl World {
             if group_units.is_empty() {
                 continue;
             }
-            let common = common_group(group_units, |id| self.object(id).map(|(_, u)| u.group));
+            let common = common_group(group_units, |id| {
+                self.object(id).map(|(_, unit)| unit.group)
+            });
             let id = if let Some(common) = common {
                 match self.groups.get(common) {
                     None => continue,
@@ -83,8 +85,8 @@ impl World {
             self.lock_formation(id, formation)?;
         }
         for &id in &listed {
-            if let Some(g) = self.groups.get_mut(id) {
-                set_differentiator_groups(g, &listed);
+            if let Some(group) = self.groups.get_mut(id) {
+                set_differentiator_groups(group, &listed);
             }
         }
         self.groups.count_command();
@@ -127,7 +129,7 @@ impl World {
     ///
     /// What the stop does not model.
     fn stop_marcher(&mut self, id: ObjectId) -> GenieResult<()> {
-        let Some(Place::Live(p, idx)) = self.place(id) else {
+        let Some(Place::Live(player_id, idx)) = self.place(id) else {
             return Ok(());
         };
         let marching = self.parts.unit_ai.get(id).is_some_and(|ai| {
@@ -139,16 +141,16 @@ impl World {
         if !marching {
             return Ok(());
         }
-        if self.live_object(p, id).is_some()
+        if self.live_object(player_id, id).is_some()
             && let Some(m) = self.parts.mover_mut(id)
         {
             m.ignore_units.clear();
         }
-        self.object_stop(p, idx)?;
-        if self.live_object(p, id).is_some()
-            && let Some(m) = self.parts.mover_mut(id)
+        self.object_stop(player_id, idx)?;
+        if self.live_object(player_id, id).is_some()
+            && let Some(mover) = self.parts.mover_mut(id)
         {
-            m.stand()?;
+            mover.stand()?;
         }
         Ok(())
     }

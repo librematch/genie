@@ -37,43 +37,53 @@ use genie_save::generated::world::{History as WorldHistory, TribeMainDecisionAi,
 /// A player's AI settings as saved (`WorldPlayerBase::save`, `FUN_14166b820`), which GAME's
 /// sub-command 0xb sets.
 #[must_use]
-pub fn ai_settings(b: &WorldPlayerBase) -> AiSettings {
+pub fn ai_settings(world_player_base: &WorldPlayerBase) -> AiSettings {
     AiSettings {
-        easiest_reaction_percentage: Percent::new(b.easiest_reaction_percentage),
-        easier_reaction_percentage: Percent::new(b.easier_reaction_percentage),
-        task_ungrouped_soldiers: b.task_ungrouped_soldiers,
+        easiest_reaction_percentage: Percent::new(world_player_base.easiest_reaction_percentage),
+        easier_reaction_percentage: Percent::new(world_player_base.easier_reaction_percentage),
+        task_ungrouped_soldiers: world_player_base.task_ungrouped_soldiers,
         switches: {
             let mut flags = AiSwitches::empty();
-            flags.set(AiSwitches::MAY_ATTACK_WALLS, b.may_attack_walls != 0);
+            flags.set(
+                AiSwitches::MAY_ATTACK_WALLS,
+                world_player_base.may_attack_walls != 0,
+            );
             flags.set(
                 AiSwitches::LIVESTOCK_ONLY_TO_TC,
-                b.livestock_only_to_tc != 0,
+                world_player_base.livestock_only_to_tc != 0,
             );
-            flags.set(AiSwitches::DISABLE_BUILD_HELP, b.disable_build_help != 0);
+            flags.set(
+                AiSwitches::DISABLE_BUILD_HELP,
+                world_player_base.disable_build_help != 0,
+            );
             flags.set(
                 AiSwitches::DISABLE_TOWER_PRIORITY,
-                b.disable_tower_priority != 0,
+                world_player_base.disable_tower_priority != 0,
             );
             flags.set(
                 AiSwitches::TRADE_ATTACK_EVASION,
-                b.trade_attack_evasion != 0,
+                world_player_base.trade_attack_evasion != 0,
             );
             flags.set(
                 AiSwitches::VILLAGER_ATTACK_RESET,
-                b.villager_attack_reset != 0,
+                world_player_base.villager_attack_reset != 0,
             );
             flags.set(
                 AiSwitches::ALLOW_SERJEANT_BUILDING,
-                b.allow_serjeant_building != 0,
+                world_player_base.allow_serjeant_building != 0,
             );
             flags
         },
-        local_targeting_mode: TargetingMode::of_data(b.local_targeting_mode),
-        targeting_factor_scalar: Percent::new(b.targeting_factor_scalar),
-        preferred_trade_distance: Distance::new(b.preferred_trade_distance),
-        boar_lure_destination: LureDestination::of_data(b.boar_lure_destination),
-        attack_move_max_distance: WholeDistance::of_data(b.attack_move_max_distance),
-        disable_villager_garrison: VillagerGarrison::of_data(b.disable_villager_garrison),
+        local_targeting_mode: TargetingMode::of_data(world_player_base.local_targeting_mode),
+        targeting_factor_scalar: Percent::new(world_player_base.targeting_factor_scalar),
+        preferred_trade_distance: Distance::new(world_player_base.preferred_trade_distance),
+        boar_lure_destination: LureDestination::of_data(world_player_base.boar_lure_destination),
+        attack_move_max_distance: WholeDistance::of_data(
+            world_player_base.attack_move_max_distance,
+        ),
+        disable_villager_garrison: VillagerGarrison::of_data(
+            world_player_base.disable_villager_garrison,
+        ),
     }
 }
 
@@ -86,22 +96,22 @@ pub fn history(h: &WorldHistory) -> History {
         entries: h
             .history
             .iter()
-            .map(|e| HistoryEntry {
-                civilian: Population::of_data(e.history_civilian_pop),
-                military: Population::of_data(e.history_military_pop),
+            .map(|history_entry| HistoryEntry {
+                civilian: Population::of_data(history_entry.history_civilian_pop),
+                military: Population::of_data(history_entry.history_military_pop),
             })
             .collect(),
         max_entries: TimeSlice::of_data(h.max_number_of_entries),
         events: h
             .events
             .iter()
-            .map(|e| Event {
-                kind: EventKind::from(e.temp_event),
-                time_slice: TimeSlice::of_data(e.temp_time_slice),
-                world_time: WorldTime::from_millis(e.temp_world_time),
-                data1: e.temp_data1,
-                data2: e.temp_data2,
-                data3: e.temp_data3,
+            .map(|history_event| Event {
+                kind: EventKind::from(history_event.temp_event),
+                time_slice: TimeSlice::of_data(history_event.temp_time_slice),
+                world_time: WorldTime::from_millis(history_event.temp_world_time),
+                data1: history_event.temp_data1,
+                data2: history_event.temp_data2,
+                data3: history_event.temp_data3,
             })
             .collect(),
         number_of_events: h.number_of_events,
@@ -146,16 +156,16 @@ pub fn history(h: &WorldHistory) -> History {
 /// ([`crate::players::ai_module`]). The explorer and its search points are not saved; the
 /// load makes them none and empty.
 #[must_use]
-pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
+pub fn ai_module(tribe_main_decision_ai: &TribeMainDecisionAi) -> AiModule {
     use crate::players::ai_module::{AiModule, InfoModule, TacticalModule};
-    let info = &m.tribe_information_ai_module;
+    let info = &tribe_main_decision_ai.tribe_information_ai_module;
     let grid = &info.tribe_information_ai_module;
     let width = grid.xsize_value.max(0) as usize;
     let cells = grid
         .row_value
         .iter()
-        .flat_map(|r| {
-            let row = r.row_value.as_deref().unwrap_or(&[]);
+        .flat_map(|entry| {
+            let row = entry.row_value.as_deref().unwrap_or(&[]);
             (0..width).map(move |x| row.get(x).copied().unwrap_or(0))
         })
         .collect();
@@ -173,7 +183,10 @@ pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
             search: Vec::new(),
         },
         tactical: TacticalModule {
-            slot_times: m.tribe_tactical_ai_module.slot_times.clone(),
+            slot_times: tribe_main_decision_ai
+                .tribe_tactical_ai_module
+                .slot_times
+                .clone(),
         },
     }
 }
@@ -183,9 +196,10 @@ pub fn ai_module(m: &TribeMainDecisionAi) -> AiModule {
 /// # Errors
 ///
 /// A saved state that names none.
-pub fn tech_state(t: &TechPlayerTree) -> GenieResult<TechState> {
+pub fn tech_state(tech_player_tree: &TechPlayerTree) -> GenieResult<TechState> {
     let o = |j: usize| {
-        t.cost_override
+        tech_player_tree
+            .cost_override
             .get(j)
             .map_or(CostOverride::UNSET, |e| CostOverride {
                 amount: CostAmount::of_data(e.tech_player_tree_cost_amount_override as i16),
@@ -196,27 +210,34 @@ pub fn tech_state(t: &TechPlayerTree) -> GenieResult<TechState> {
             })
     };
     Ok(TechState {
-        research_done: Seconds::new(t.research_done),
-        state: ResearchState::of_int(t.state)?,
-        cost_adj: [0, 1, 2].map(|j| CostAmount::of_data(t.cost_adj.get(j).copied().unwrap_or(0))),
-        times_researched: ResearchCount::of_data(t.tech_player_tree_times_researched as i16),
-        allow_multiple: t.tech_player_tree_allow_multiple_research != 0,
-        stack: t.tech_player_tree_stack_tech != 0,
+        research_done: Seconds::new(tech_player_tree.research_done),
+        state: ResearchState::of_int(tech_player_tree.state)?,
+        cost_adj: [0, 1, 2]
+            .map(|j| CostAmount::of_data(tech_player_tree.cost_adj.get(j).copied().unwrap_or(0))),
+        times_researched: ResearchCount::of_data(
+            tech_player_tree.tech_player_tree_times_researched as i16,
+        ),
+        allow_multiple: tech_player_tree.tech_player_tree_allow_multiple_research != 0,
+        stack: tech_player_tree.tech_player_tree_stack_tech != 0,
         overrides: [o(0), o(1), o(2)],
-        research_cap: ResearchCap::of_data(t.tech_player_tree_research_cap as i16),
-        pending: ResearchCount::of_data(t.tech_player_tree_pending_count as i16),
-        enabled: t.tech_player_tree_enabled_tech != 0,
-        effect_override: EffectId::of_data(t.tech_player_tree_effect_override as i16),
-        building_master: MasterId::of_data(t.tech_player_tree_research_building_master_id as i16),
-        locations: t
+        research_cap: ResearchCap::of_data(tech_player_tree.tech_player_tree_research_cap as i16),
+        pending: ResearchCount::of_data(tech_player_tree.tech_player_tree_pending_count as i16),
+        enabled: tech_player_tree.tech_player_tree_enabled_tech != 0,
+        effect_override: EffectId::of_data(
+            tech_player_tree.tech_player_tree_effect_override as i16,
+        ),
+        building_master: MasterId::of_data(
+            tech_player_tree.tech_player_tree_research_building_master_id as i16,
+        ),
+        locations: tech_player_tree
             .location
             .iter()
             .flatten()
-            .map(|l| Location {
-                building: MasterId::of_data(l.location_research_location_id as i16),
-                time: WholeSeconds::of_data(l.location_research_time.cast_signed()),
-                button: LocationButton::of_data(l.location_button_location_id),
-                adjustment: Seconds::new(f32::from_bits(l.location_research_adjustment)),
+            .map(|entry| Location {
+                building: MasterId::of_data(entry.location_research_location_id as i16),
+                time: WholeSeconds::of_data(entry.location_research_time.cast_signed()),
+                button: LocationButton::of_data(entry.location_button_location_id),
+                adjustment: Seconds::new(f32::from_bits(entry.location_research_adjustment)),
             })
             .collect(),
     })

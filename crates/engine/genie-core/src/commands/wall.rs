@@ -78,14 +78,14 @@ impl BuildWallCommand {
     /// `do_command`'s case checks the builders as BUILD's (a count past the packet's ids
     /// refuses it, [`World::read_units`]), then the wall's line is placed
     /// ([`World::build_wall`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(listed) = w.read_units(self.player, &self.builders) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(listed) = world.read_units(self.player, &self.builders) else {
             return Ok(());
         };
-        let Some(builders) = w.command_check(self.player, listed)? else {
+        let Some(builders) = world.command_check(self.player, listed)? else {
             return Ok(());
         };
-        w.build_wall(self, &builders)
+        world.build_wall(self, &builders)
     }
 }
 
@@ -228,11 +228,11 @@ impl World {
     /// insertion sort takes.
     pub(crate) fn build_wall(
         &mut self,
-        w: &BuildWallCommand,
+        build_wall_command: &BuildWallCommand,
         builders: &[Option<ObjectId>],
     ) -> GenieResult<()> {
-        let (player, master) = (w.player, w.master);
-        if w.queue_id.is_queued() {
+        let (player, master) = (build_wall_command.player, build_wall_command.master);
+        if build_wall_command.queue_id.is_queued() {
             return Ok(());
         }
         let Some(site) = player_master(&self.model.masters, player, master) else {
@@ -259,18 +259,18 @@ impl World {
         if !player_kind.is_computer() && capable == 0 {
             return Ok(());
         }
-        let placed = self.wall_foundations(w, radius)?;
+        let placed = self.wall_foundations(build_wall_command, radius)?;
         // the builders, the farthest from the line's last tile first
-        let sorted = self.builders_by_gap(w, builders)?;
+        let sorted = self.builders_by_gap(build_wall_command, builders)?;
         if placed.is_empty() || capable == 0 {
             return Ok(());
         }
-        for (i, &(id, _)) in sorted.iter().enumerate() {
-            let k = share(i, capable, placed.len()).ok_or(GenieError::unsupported(
+        for (index, &(id, _)) in sorted.iter().enumerate() {
+            let share = share(index, capable, placed.len()).ok_or(GenieError::unsupported(
                 "a wall builder past the foundations the game shares out",
             ))?;
-            let site = *placed.checked(k)?;
-            self.wall_builder_takes(w, id, &placed, site)?;
+            let site = *placed.checked(share)?;
+            self.wall_builder_takes(build_wall_command, id, &placed, site)?;
         }
         Ok(())
     }
@@ -285,17 +285,17 @@ impl World {
     /// What the placement test, the payment and the foundation do not model.
     fn wall_foundations(
         &mut self,
-        w: &BuildWallCommand,
+        build_wall_command: &BuildWallCommand,
         radius: Footprint,
     ) -> GenieResult<Vec<(FoundationId, Position)>> {
-        let (player, master) = (w.player, w.master);
+        let (player, master) = (build_wall_command.player, build_wall_command.master);
         let mut placed: Vec<(FoundationId, Position)> = Vec::new();
-        for (a, b) in segments(w.from, w.to) {
-            for t in tiles(a, b)? {
+        for (a, b) in segments(build_wall_command.from, build_wall_command.to) {
+            for tile in tiles(a, b)? {
                 let at = snap(
                     radius,
                     self.spatial.map,
-                    Point::new(t.x() as f32, t.y() as f32),
+                    Point::new(tile.x() as f32, tile.y() as f32),
                     self.model.tuning.wall,
                 );
                 if !self.placement_code(player, master, at, true)?.is_allowed() {
@@ -319,22 +319,34 @@ impl World {
     /// takes.
     fn builders_by_gap(
         &self,
-        w: &BuildWallCommand,
+        build_wall_command: &BuildWallCommand,
         builders: &[Option<ObjectId>],
     ) -> GenieResult<Vec<(ObjectId, f32)>> {
         let mut sorted = Vec::new();
-        for id in self.checked_units(w.player, builders).into_iter().flatten() {
-            let Some((owner, u)) = self.object(id) else {
+        for id in self
+            .checked_units(build_wall_command.player, builders)
+            .into_iter()
+            .flatten()
+        {
+            let Some((owner, unit)) = self.object(id) else {
                 continue;
             };
-            let r = u.master(self.master_tables(), owner)?.radius;
+            let footprint = unit.master(self.master_tables(), owner)?.radius;
             // the packet's word converted (`CVTSI2SS` of a word: exact)
             let gap = |end: i32, at: f32, r: f32| {
                 let g = ((end as f32 + HALF) - at).abs() - r;
                 if 0.0 <= g { g } else { 0.0 }
             };
-            let gx = gap(w.to.x(), u.position().x(), r.x());
-            let gy = gap(w.to.y(), u.position().y(), r.y());
+            let gx = gap(
+                build_wall_command.to.x(),
+                unit.position().x(),
+                footprint.x(),
+            );
+            let gy = gap(
+                build_wall_command.to.y(),
+                unit.position().y(),
+                footprint.y(),
+            );
             sorted.push((id, gy * gy + gx * gx));
         }
         if INSERTION_SORT_MAX < sorted.len() {
@@ -357,13 +369,13 @@ impl World {
     /// A builder the slice does not have, and what the build does not model.
     fn wall_builder_takes(
         &mut self,
-        w: &BuildWallCommand,
+        build_wall_command: &BuildWallCommand,
         id: ObjectId,
         placed: &[(FoundationId, Position)],
         (foundation, at): (FoundationId, Position),
     ) -> GenieResult<()> {
-        let (player, master) = (w.player, w.master);
-        let Some(Place::Live(q, idx)) = self.place(id) else {
+        let (player, master) = (build_wall_command.player, build_wall_command.master);
+        let Some(Place::Live(player_id, idx)) = self.place(id) else {
             return Err(GenieError::unsupported(
                 "a wall builder the slice does not have",
             ));
@@ -371,18 +383,24 @@ impl World {
         let direct = self
             .parts
             .unit_ai
-            .get(self.players.live(q, idx)?.id)
-            .is_none_or(|ai| !w.queued && (!w.commits || !ai.has_unready_order()));
+            .get(self.players.live(player_id, idx)?.id)
+            .is_none_or(|ai| {
+                !build_wall_command.queued
+                    && (!build_wall_command.commits || !ai.has_unready_order())
+            });
         if direct {
             let task: (MasterId, BuildAction) =
-                self.build_task(q, id, (player, foundation, master), at)?;
-            self.build_directly(q, idx, task, (player, foundation, master), at)?;
+                self.build_task(player_id, id, (player, foundation, master), at)?;
+            self.build_directly(player_id, idx, task, (player, foundation, master), at)?;
         } else {
-            for &(f, p) in placed {
-                self.queue_build(q, idx, (player, f, master), p)?;
+            for &(role_id, position) in placed {
+                self.queue_build(player_id, idx, (player, role_id, master), position)?;
             }
-            if w.commits
-                && let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, idx)?.id)
+            if build_wall_command.commits
+                && let Some(ai) = self
+                    .parts
+                    .unit_ai
+                    .get_mut(self.players.live(player_id, idx)?.id)
             {
                 // the readiness pass with 0: every queued order is ready
                 readiness(&mut ai.orders, ReadyOrders::Keep);
@@ -401,29 +419,32 @@ impl World {
         (building, trained_at): (MasterId, &[MasterId]),
         id: ObjectId,
     ) -> GenieResult<bool> {
-        let Some((owner, u)) = self.object(id) else {
+        let Some((owner, unit)) = self.object(id) else {
             return Ok(false);
         };
-        let m = u.master(self.master_tables(), owner)?;
-        if m.kind <= BUILDER_KIND {
+        let master = unit.master(self.master_tables(), owner)?;
+        if master.kind <= BUILDER_KIND {
             return Ok(false);
         }
         if !self
             .model
             .roles
-            .of_class(m.class)
+            .of_class(master.class)
             .contains(ClassRoles::WALL_BUILDER)
         {
-            return Ok(m
+            return Ok(master
                 .action_part()
                 .tasks
                 .iter()
                 // The builder the train locations name for every villager (`FUN_141262270`: `0x76`).
                 // The action type of the task another unit builds with (`FUN_141262270`: `0x65`).
                 .find(|t| t.action_kind == ActionKind::BUILD)
-                .is_some_and(|t| t.object_id == Some(building)));
+                .is_some_and(|task| task.object_id == Some(building)));
         }
-        Ok(trained_at.contains(&self.model.slots.master.builder) || trained_at.contains(&m.id))
+        Ok(
+            trained_at.contains(&self.model.slots.master.builder)
+                || trained_at.contains(&master.id),
+        )
     }
 }
 

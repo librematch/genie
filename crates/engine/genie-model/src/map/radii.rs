@@ -76,8 +76,8 @@ impl From<[f32; 3]> for Radii {
 }
 
 impl genie_diff::Diff for Radii {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -152,8 +152,8 @@ impl From<[f32; 2]> for Footprint {
 }
 
 impl genie_diff::Diff for Footprint {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -164,17 +164,17 @@ mod tests {
     /// Radii keep their components' bits in the map's order, and their ground part is x and y.
     #[test]
     fn radii_keep_their_bits_and_their_ground_part_is_both_axes() {
-        let r = Radii::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
+        let radii = Radii::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
-            r.get().map(f32::to_bits),
+            radii.get().map(f32::to_bits),
             [0x8000_0000, 2.0f32.to_bits(), 0x7fc0_0001]
         );
         assert_eq!(
-            (r.x().to_bits(), r.y(), r.z().to_bits()),
+            (radii.x().to_bits(), radii.y(), radii.z().to_bits()),
             (0x8000_0000, 2.0, 0x7fc0_0001)
         );
         assert_eq!(
-            r.ground().get().map(f32::to_bits),
+            radii.ground().get().map(f32::to_bits),
             [0x8000_0000, 2.0f32.to_bits()]
         );
         assert_eq!(Radii::from([1.0, 2.0, 3.0]), Radii::new(1.0, 2.0, 3.0));
@@ -196,15 +196,18 @@ mod tests {
     /// A footprint keeps its components' bits and takes a height to three radii.
     #[test]
     fn footprint_keeps_its_bits_and_takes_height() {
-        let f = Footprint::new(-0.0, 0.5);
-        assert_eq!(f.get().map(f32::to_bits), [0x8000_0000, 0.5f32.to_bits()]);
-        assert_eq!((f.x().to_bits(), f.y()), (0x8000_0000, 0.5));
+        let footprint = Footprint::new(-0.0, 0.5);
+        assert_eq!(
+            footprint.get().map(f32::to_bits),
+            [0x8000_0000, 0.5f32.to_bits()]
+        );
+        assert_eq!((footprint.x().to_bits(), footprint.y()), (0x8000_0000, 0.5));
         assert_eq!(Footprint::from([1.0, 2.0]), Footprint::new(1.0, 2.0));
         assert_eq!(
             Footprint::ZERO.with_x(1.0).with_y(2.0),
             Footprint::new(1.0, 2.0)
         );
-        assert_eq!(f.with_height(2.0), Radii::new(-0.0, 0.5, 2.0));
+        assert_eq!(footprint.with_height(2.0), Radii::new(-0.0, 0.5, 2.0));
         assert_eq!(
             Radii::new(1.0, 2.0, 3.0).ground().with_height(3.0),
             Radii::new(1.0, 2.0, 3.0)

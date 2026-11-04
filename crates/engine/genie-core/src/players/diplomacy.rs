@@ -91,9 +91,9 @@ impl World {
         {
             self.set_stance(p, q, stance)?;
             self.rebuild_vision()?;
-            if let Some(v) = self.spatial.sight.as_mut() {
-                v.clear_new_tiles(p);
-                v.clear_new_tiles(q);
+            if let Some(visibility) = self.spatial.sight.as_mut() {
+                visibility.clear_new_tiles(p);
+                visibility.clear_new_tiles(q);
             }
             self.refill_tiles(p);
             self.refill_tiles(q);
@@ -133,11 +133,11 @@ impl World {
         if let Some(row) = self.spatial.unit_diplomacy.get_mut(p) {
             row.set(q, Some(unit_kind(p, q, relation)));
         }
-        let mut i = ListIndex::FIRST;
-        while self.players.player(p)?.objects.holds(i) {
-            let id = self.players.live(p, i)?.id;
+        let mut list_index = ListIndex::FIRST;
+        while self.players.player(p)?.objects.holds(list_index) {
+            let id = self.players.live(p, list_index)?.id;
             self.notify_of_relation(p, id, q, relation)?;
-            i = i.next();
+            list_index = list_index.next();
         }
         Ok(())
     }
@@ -162,16 +162,16 @@ impl World {
         q: PlayerId,
         relation: Relation,
     ) -> GenieResult<()> {
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, unit)) = self.object(id) else {
             return Ok(());
         };
-        let master = u.master(self.master_tables(), p)?;
+        let master = unit.master(self.master_tables(), p)?;
         let (kind, class, master_id) = (master.kind, master.class, master.id);
         if kind != MasterKind::COMBAT && kind != MasterKind::BUILDING {
             return Ok(());
         }
-        let inside = u.life.inside;
-        let (position, garrison) = (u.position(), u.garrison.clone());
+        let inside = unit.life.inside;
+        let (position, garrison) = (unit.position(), unit.garrison.clone());
         if relation != Relation::Ally {
             self.leave_foreign_holder(p, id, q, inside)?;
             // The market (master 84), whose owner's diplomacy change toward a computer player shows it to
@@ -180,7 +180,7 @@ impl World {
             if self.model.roles.of_class(class).contains(ClassRoles::SIEGE)
                 && garrison
                     .iter()
-                    .any(|&g| self.object(g).is_some_and(|(gp, _)| gp == q))
+                    .any(|&object_id| self.object(object_id).is_some_and(|(gp, _)| gp == q))
             {
                 return Err(SIEGE_UNLOAD);
             }
@@ -216,13 +216,13 @@ impl World {
         let Some(holder) = inside else {
             return Ok(());
         };
-        let Some((hp, h)) = self.object(holder) else {
+        let Some((hp, unit)) = self.object(holder) else {
             return Ok(());
         };
         if hp != q {
             return Ok(());
         }
-        let holder_master = h.master(self.master_tables(), hp)?;
+        let holder_master = unit.master(self.master_tables(), hp)?;
         if holder_master.kind == MasterKind::BUILDING {
             let hi = self.housed_index(hp, holder.id())?;
             if self.let_out(hp, hi, id, Point::from([NO_POINT; 2]), (None, true))? == LetOut::Stayed
@@ -259,9 +259,9 @@ impl World {
         {
             return Ok(());
         }
-        if let Some(v) = self.spatial.sight.as_mut() {
+        if let Some(visibility) = self.spatial.sight.as_mut() {
             let tile = position.tile();
-            if let Some(list) = v.new_tiles.get_mut(q.index()) {
+            if let Some(list) = visibility.new_tiles.get_mut(q.index()) {
                 list.push(tile);
             }
         }
@@ -279,29 +279,30 @@ impl World {
         garrison: &[ObjectId],
     ) -> GenieResult<()> {
         let bi = self.housed_index(p, id)?;
-        for &g in garrison.iter().rev() {
-            if self.object(g).is_some_and(|(gp, _)| gp == q)
-                && self.let_out(p, bi, g, Point::from([NO_POINT; 2]), (None, true))?
+        for &object_id in garrison.iter().rev() {
+            if self.object(object_id).is_some_and(|(gp, _)| gp == q)
+                && self.let_out(p, bi, object_id, Point::from([NO_POINT; 2]), (None, true))?
                     == LetOut::Stayed
             {
-                self.destroy(q, g)?;
+                self.destroy(q, object_id)?;
             }
         }
         Ok(())
     }
 
-    /// The index of the unit `id` inside a building in player `p`'s live list.
-    fn housed_index(&self, p: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
-        self.live_index(p, id).ok_or(GenieError::unsupported(
-            "a unit inside a building outside the live lists",
-        ))
+    /// The index of the unit `id` inside a building in player `player_id`'s live list.
+    fn housed_index(&self, player_id: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
+        self.live_index(player_id, id)
+            .ok_or(GenieError::unsupported(
+                "a unit inside a building outside the live lists",
+            ))
     }
 
-    /// `FUN_141285cb0` on player `p`'s map: each tile of the map (rows, then columns) whose
+    /// `FUN_141285cb0` on player `player_id`'s map: each tile of the map (rows, then columns) whose
     /// unified word has a player bit of the player's visible or explored mask joins its tile
     /// list (`FUN_14165d500`).
-    pub(crate) fn refill_tiles(&mut self, p: PlayerId) {
-        let masks = self.spatial.vision(p);
+    pub(crate) fn refill_tiles(&mut self, player_id: PlayerId) {
+        let masks = self.spatial.vision(player_id);
         if let Some(sight) = self.spatial.sight.as_mut() {
             let (w, h) = (sight.size.width(), sight.size.height());
             let rows = sight.unified.chunks(usize::try_from(w).unwrap_or(0).max(1));
@@ -310,7 +311,7 @@ impl World {
                     // the bits the masks name players by (`0x1ffffff01ffffff`)
                     let word = word & VisionBits::OBJECT_MASK;
                     let seen = masks.visible.intersects(word) || masks.explored.intersects(word);
-                    if seen && let Some(list) = sight.new_tiles.get_mut(p.index()) {
+                    if seen && let Some(list) = sight.new_tiles.get_mut(player_id.index()) {
                         list.push(Tile::new(x, y));
                     }
                 }
@@ -357,16 +358,16 @@ impl World {
         }
     }
 
-    /// Player `i`'s team (`+0x984` at `i − 1`), 1 for a player past the eight.
-    fn team(&self, i: PlayerId) -> Team {
+    /// Player `player_id`'s team (`+0x984` at `player_id − 1`), 1 for a player past the eight.
+    fn team(&self, player_id: PlayerId) -> Team {
         self.teams
-            .get(i.index() - 1)
+            .get(player_id.index() - 1)
             .copied()
             .unwrap_or(Team::ALONE)
     }
 
-    fn set_team(&mut self, i: PlayerId, team: Team) {
-        if let Some(t) = self.teams.get_mut(i.index() - 1) {
+    fn set_team(&mut self, player_id: PlayerId, team: Team) {
+        if let Some(t) = self.teams.get_mut(player_id.index() - 1) {
             *t = team;
         }
     }
@@ -375,10 +376,11 @@ impl World {
     /// player with attribute 204 (`+0x660`, truncated, `CVTTSS2SI`) not 0 reveals its units of
     /// that kind to the others: not modelled ([`REVEAL_UNITS`]); without one nothing happens.
     pub(crate) fn reveal_units(&self) -> GenieResult<()> {
-        let reveals = self.players.iter().any(|q| {
-            q.attributes
+        let reveals = self.players.iter().any(|player| {
+            player
+                .attributes
                 .get(REVEAL_UNIT)
-                .is_some_and(|&v| cvttss2si(v.get()) != 0)
+                .is_some_and(|&amount| cvttss2si(amount.get()) != 0)
         });
         if reveals {
             return Err(REVEAL_UNITS);
@@ -473,101 +475,114 @@ mod tests {
     /// player outside the world changes nothing.
     #[test]
     fn diplomacy_change_sets_the_stance_and_the_relation() {
-        let mut t = world();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally)
+        let mut world = world();
+        world
+            .set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally)
             .unwrap();
         assert_eq!(
-            t.players[1].diplomacy.get(PlayerId::new(2)),
+            world.players[1].diplomacy.get(PlayerId::new(2)),
             Some(&Stance::Ally)
         );
         assert_eq!(
-            t.players[1].relations.get(PlayerId::new(2)),
+            world.players[1].relations.get(PlayerId::new(2)),
             Some(&Relation::Ally)
         );
         assert_eq!(
-            t.players[2].relations.get(PlayerId::new(1)),
+            world.players[2].relations.get(PlayerId::new(1)),
             Some(&Relation::Enemy)
         );
         assert_eq!(
-            t.spatial
+            world
+                .spatial
                 .relations
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
             Some(&Relation::Ally)
         );
         assert_eq!(
-            t.spatial
+            world
+                .spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
             Some(&Some(UnitRelation::Ally))
         );
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Neutral)
+        world
+            .set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Neutral)
             .unwrap();
         assert_eq!(
-            t.players[1].diplomacy.get(PlayerId::new(2)),
+            world.players[1].diplomacy.get(PlayerId::new(2)),
             Some(&Stance::Neutral)
         );
         assert_eq!(
-            t.spatial
+            world
+                .spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
                 .and_then(|r| r.get(PlayerId::new(2))),
             Some(&Some(UnitRelation::Neutral))
         );
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Enemy)
+        world
+            .set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Enemy)
             .unwrap();
         assert_eq!(
-            t.players[1].diplomacy.get(PlayerId::new(2)),
+            world.players[1].diplomacy.get(PlayerId::new(2)),
             Some(&Stance::Enemy)
         );
         assert_eq!(
-            t.players[1].relations.get(PlayerId::new(2)),
+            world.players[1].relations.get(PlayerId::new(2)),
             Some(&Relation::Enemy)
         );
         assert_eq!(
-            t.spatial
+            world
+                .spatial
                 .unit_diplomacy
                 .get(PlayerId::new(1))
-                .and_then(|r| r.get(PlayerId::new(2))),
+                .and_then(|by_player| by_player.get(PlayerId::new(2))),
             Some(&Some(UnitRelation::Enemy))
         );
-        let before = t.players.clone();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(9), Stance::Ally)
+        let before = world.players.clone();
+        world
+            .set_diplomacy(PlayerId::new(1), PlayerId::new(9), Stance::Ally)
             .unwrap();
-        assert_eq!(t.players, before);
+        assert_eq!(world.players, before);
     }
 
     /// The world's teams: two players allied both ways with allied victory at 1 form team 2;
     /// one way, or without allied victory, they stay alone; locked teams stay.
     #[test]
     fn mutual_allies_with_allied_victory_form_team() {
-        let mut t = world();
-        t.set_diplomacy(PlayerId::new(1), PlayerId::new(3), Stance::Ally)
+        let mut world = world();
+        world
+            .set_diplomacy(PlayerId::new(1), PlayerId::new(3), Stance::Ally)
             .unwrap();
-        t.set_diplomacy(PlayerId::new(3), PlayerId::new(1), Stance::Ally)
+        world
+            .set_diplomacy(PlayerId::new(3), PlayerId::new(1), Stance::Ally)
             .unwrap();
-        assert_eq!(t.teams.map(Team::get), [1; 8]);
-        t.players[1].allied_victory = 1;
-        t.players[3].allied_victory = 2;
-        t.resolve_teams();
-        assert_eq!(t.teams.map(Team::get), [1; 8]);
-        t.players[3].allied_victory = 1;
-        t.resolve_teams();
+        assert_eq!(world.teams.map(Team::get), [1; 8]);
+        world.players[1].allied_victory = 1;
+        world.players[3].allied_victory = 2;
+        world.resolve_teams();
+        assert_eq!(world.teams.map(Team::get), [1; 8]);
+        world.players[3].allied_victory = 1;
+        world.resolve_teams();
         assert_eq!(
-            t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
+            world.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
             [2, 1, 2]
         );
-        t.settings.flags.set(OptionFlags::TEAMS_LOCKED, true);
-        t.players[3].allied_victory = 0;
-        t.resolve_teams();
+        world.settings.flags.set(OptionFlags::TEAMS_LOCKED, true);
+        world.players[3].allied_victory = 0;
+        world.resolve_teams();
         assert_eq!(
-            t.teams[..3].iter().map(|t| t.get()).collect::<Vec<_>>(),
+            world.teams[..3]
+                .iter()
+                .map(|team| team.get())
+                .collect::<Vec<_>>(),
             [2, 1, 2]
         );
-        t.settings.flags.set(OptionFlags::TEAMS_LOCKED, false);
-        t.resolve_teams();
-        assert_eq!(t.teams.map(Team::get), [1; 8]);
+        world.settings.flags.set(OptionFlags::TEAMS_LOCKED, false);
+        world.resolve_teams();
+        assert_eq!(world.teams.map(Team::get), [1; 8]);
     }
 
     /// Teams run out past 5: the players after the fourth team stay alone.
@@ -577,7 +592,7 @@ mod tests {
             allied_victory: 1,
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -587,27 +602,27 @@ mod tests {
         // pairs (1, 2), (3, 4), (5, 6), (7, 8), each allied both ways
         for (a, b) in [(1, 2), (3, 4), (5, 6), (7, 8)] {
             for (x, y) in [(a, b), (b, a)] {
-                let row = &mut t.players[usize::from(x)].relations;
+                let row = &mut world.players[usize::from(x)].relations;
                 *row = ByPlayer::new(vec![Relation::Enemy; 9]);
                 row.set(PlayerId::new(x), Relation::Ally);
                 row.set(PlayerId::new(y), Relation::Ally);
             }
         }
-        t.resolve_teams();
-        assert_eq!(t.teams.map(Team::get), [2, 2, 3, 3, 4, 4, 5, 5]);
+        world.resolve_teams();
+        assert_eq!(world.teams.map(Team::get), [2, 2, 3, 3, 4, 4, 5, 5]);
     }
 
     /// Attribute 204 truncated to 0 reveals nothing; 1 or more is not modelled.
     #[test]
     fn player_attribute_204_reveals_its_units() {
-        let mut t = world();
-        assert_eq!(t.reveal_units(), Ok(()));
-        t.players[2].attributes[REVEAL_UNIT] = Amount::new(0.5);
-        assert_eq!(t.reveal_units(), Ok(()));
-        t.players[2].attributes[REVEAL_UNIT] = Amount::new(-1.0);
-        assert_eq!(t.reveal_units(), Err(REVEAL_UNITS));
+        let mut world = world();
+        assert_eq!(world.reveal_units(), Ok(()));
+        world.players[2].attributes[REVEAL_UNIT] = Amount::new(0.5);
+        assert_eq!(world.reveal_units(), Ok(()));
+        world.players[2].attributes[REVEAL_UNIT] = Amount::new(-1.0);
+        assert_eq!(world.reveal_units(), Err(REVEAL_UNITS));
         assert_eq!(
-            t.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally),
+            world.set_diplomacy(PlayerId::new(1), PlayerId::new(2), Stance::Ally),
             Err(REVEAL_UNITS)
         );
     }

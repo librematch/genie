@@ -173,8 +173,8 @@ impl HotkeyInfo {
             return Err(no_group(group_index, self.num_groups()));
         }
         let mut groups = Vec::with_capacity(self.num_groups());
-        for (i, grp) in self.groups.iter().enumerate() {
-            let append = if i == group_index {
+        for (index, grp) in self.groups.iter().enumerate() {
+            let append = if index == group_index {
                 grp.bind(key_index, key, ctrl, alt, shift)?
             } else {
                 grp.clone()
@@ -223,14 +223,14 @@ impl HotkeyInfo {
 }
 
 impl fmt::Display for HotkeyInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let group_string = if self.groups.is_empty() {
             String::new()
         } else {
             let groups: Vec<String> = self.groups.iter().map(ToString::to_string).collect();
             format!("\n{}", groups.join("\n"))
         };
-        write!(f, "Version: {}{}", self.version, group_string)
+        write!(formatter, "Version: {}{}", self.version, group_string)
     }
 }
 

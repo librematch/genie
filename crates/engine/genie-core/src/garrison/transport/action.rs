@@ -254,14 +254,14 @@ impl TransportAction {
     /// What the map reads, the `MoveTo` and the state's effects give.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         actions: &mut Action,
         me: Me,
-        r: &TransportReads,
+        transport_reads: &TransportReads,
     ) -> GenieResult<UpdateCode> {
-        let walked = self.walk(c, unit, me)?;
-        let player_kind = c.w.players.player(c.player)?.kind;
+        let walked = self.walk(step, unit, me)?;
+        let player_kind = step.w.players.player(step.player)?.kind;
         let World {
             spatial,
             zones,
@@ -272,22 +272,28 @@ impl TransportAction {
                 graphics, tuning, ..
             },
             ..
-        } = &mut *c.w;
+        } = &mut *step.w;
         let sprites = SpriteReads {
-            defaults: r.defaults,
+            defaults: transport_reads.defaults,
             graphics,
         };
         let walk = MoveToReads::with_sprites(sprites, (unit, parts.motion.mover(unit.id)));
-        let ship = Ship::of(unit, r.radius, spatial.map, walk, r.given);
+        let ship = Ship::of(
+            unit,
+            transport_reads.radius,
+            spatial.map,
+            walk,
+            transport_reads.given,
+        );
         let mut shore = MapShore::new(
             spatial,
             zones,
             pathing,
-            r.restriction,
+            transport_reads.restriction,
             ship.position,
             &tuning.tile_path,
         )?;
-        let look = (r.standing, streams.get(Stream::Sprite));
+        let look = (transport_reads.standing, streams.get(Stream::Sprite));
         let id = unit.id;
         let posts = (&mut *unit, parts.motion.layer_mut(id), &mut parts.unit_ai);
         match self.state_update(
@@ -300,7 +306,7 @@ impl TransportAction {
         )? {
             Updated::Code(code) => Ok(code),
             Updated::Unload => {
-                self.unload(c, unit, actions)?;
+                self.unload(step, unit, actions)?;
                 Ok(UpdateCode::UnderWay)
             }
         }
@@ -315,14 +321,14 @@ impl TransportAction {
     /// The unload's and the lend's, or a unit whose Transport the unload took.
     fn unload(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         actions: &mut Action,
     ) -> GenieResult<()> {
         if let Some(own) = actions.list.transport_mut() {
             *own = *self;
         }
-        c.lend_at((&mut *unit, &mut *actions), World::transport_unload)?;
+        step.lend_at((&mut *unit, &mut *actions), World::transport_unload)?;
         // the unload changes the lent Transport (`TransportAction::unloaded`) and never takes it
         *self = *actions.list.transport().ok_or(NO_TRANSPORT)?;
         Ok(())
@@ -491,21 +497,25 @@ impl TransportAction {
     /// What the motion step does not model, and the notify's.
     pub(crate) fn walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
     ) -> GenieResult<SubCode> {
-        let Some(state) = self.state.move_to().map(|m| m.state) else {
+        let Some(state) = self
+            .state
+            .move_to()
+            .map(|move_to_action| move_to_action.state)
+        else {
             return Ok(SubCode::Done);
         };
         let start = state == MoveTo::Start;
         let walks = start || state == MoveTo::Moving;
         let ask = if start {
             UnitAi::path_ask(
-                c.w.parts.unit_ai.get_mut(unit.id),
+                step.w.parts.unit_ai.get_mut(unit.id),
                 unit.place.position().ground(),
                 self.point.ground(),
-                &c.w.model.tuning.unit_ai,
+                &step.w.model.tuning.unit_ai,
             )
         } else {
             PathAsk::default()
@@ -515,12 +525,15 @@ impl TransportAction {
             ..ListUpdate::default()
         };
         let code = match self.state.walk_mut() {
-            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            Some(move_to) => update_sub_actions(move_to, step, unit, me, how)?,
             // a state that does not sail has no sub-action: its list's update is the empty one's
-            None => update_sub_actions(&mut None, c, unit, me, how)?,
+            None => update_sub_actions(&mut None, step, unit, me, how)?,
         };
         if walks {
-            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(
+                step.w.parts.motion.mover_mut(unit.id),
+                &mut step.w.parts.unit_ai,
+            )?;
         }
         Ok(code)
     }
@@ -593,8 +606,8 @@ pub(crate) fn stand(
     if !changed.stands {
         return Ok(());
     }
-    if let Some(m) = motion.mover_mut() {
-        m.shows(standing.as_ref());
+    if let Some(mover) = motion.mover_mut() {
+        mover.shows(standing.as_ref());
     }
     if unit.sprite.is_some() {
         let standing = standing.ok_or(GenieError::unsupported(

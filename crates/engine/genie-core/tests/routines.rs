@@ -15,9 +15,9 @@ fn fixture(text: &str) -> (String, Vec<Call>) {
     let header = lines.next().expect("a header line").to_owned();
     let calls = lines
         .map(|l| {
-            let mut v: Vec<&str> = l.split(' ').collect();
-            let result = v.pop().expect("a result");
-            let args = v
+            let mut texts: Vec<&str> = l.split(' ').collect();
+            let result = texts.pop().expect("a result");
+            let args = texts
                 .iter()
                 .map(|s| u32::from_str_radix(s, 16).expect("hex bits"))
                 .collect();
@@ -46,21 +46,21 @@ fn mismatches(text: &str, header: &str, ours: impl Fn(&[f32]) -> f32) -> Vec<Str
 /// `facing::modulo`, `FUN_141158f20`, with the CRT's fmodf inside.
 #[test]
 fn modulo_matches_the_game_bit_for_bit() {
-    let m = mismatches(
+    let texts = mismatches(
         include_str!("fixtures/fuzz_modulo_158041.txt"),
         "fuzz 0x141158f20 f32,f32->f32",
         |a| modulo(a[0], a[1]),
     );
-    assert_eq!(m, Vec::<String>::new());
+    assert_eq!(texts, Vec::<String>::new());
 }
 
 /// `fmath::atan`, the game's atanf `0x14099e2f0`.
 #[test]
 fn atan_matches_the_game_bit_for_bit() {
-    let m = mismatches(
+    let texts = mismatches(
         include_str!("fixtures/fuzz_atanf_158041.txt"),
         "fuzz 0x14099e2f0 f32->f32",
         |a| atan(a[0]),
     );
-    assert_eq!(m, Vec::<String>::new());
+    assert_eq!(texts, Vec::<String>::new());
 }

@@ -97,8 +97,8 @@ impl BellShelter {
 }
 
 impl Diff for BellShelter {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -171,18 +171,18 @@ impl RecordTarget {
     ///
     /// An object whose master its owner's table does not hold.
     pub fn of(objects: ObjectsRef<'_>, id: ObjectId) -> GenieResult<Option<Self>> {
-        let Some((_, _, m)) = objects.with_master(id)? else {
+        let Some((_, _, master)) = objects.with_master(id)? else {
             return Ok(None);
         };
-        let build_time = Seconds::of_master(m.creatable_part().build_time);
+        let build_time = Seconds::of_master(master.creatable_part().build_time);
         Ok(Some(Self {
             id,
-            building: m.kind == MasterKind::BUILDING,
-            class: m.class,
+            building: master.kind == MasterKind::BUILDING,
+            class: master.class,
             built: objects
                 .building(id)
-                .and_then(|b| b.construction.as_ref())
-                .is_some_and(|c| build_time <= c.progress),
+                .and_then(|building| building.construction.as_ref())
+                .is_some_and(|construction| build_time <= construction.progress),
         }))
     }
 }
@@ -199,7 +199,7 @@ fn record_object(
     let mut out = record;
     let named = |id: Option<ObjectId>| id.filter(|id| !id.is_recyclable());
     let mut found = match named(record.target) {
-        Some(t) => RecordTarget::of(objects, t)?,
+        Some(object_id) => RecordTarget::of(objects, object_id)?,
         None => None,
     };
     if found.is_none() {
@@ -208,14 +208,14 @@ fn record_object(
         };
         found = RecordTarget::of(objects, t2)?;
     }
-    if let Some(o) = found
+    if let Some(record_target) = found
         && record
             .action
-            .is_some_and(|a| ENDED_ON_BUILDING.contains(&a))
-        && o.building
+            .is_some_and(|ai_action| ENDED_ON_BUILDING.contains(&ai_action))
+        && record_target.building
         // The farms' class, whose records a built farm does not end.
-        && !roles.of_class(o.class).contains(ClassRoles::FARM)
-        && o.built
+        && !roles.of_class(record_target.class).contains(ClassRoles::FARM)
+        && record_target.built
     {
         out.target = None;
         out.target2 = None;
@@ -343,21 +343,23 @@ impl World {
         {
             return Ok(());
         }
-        let Some((tp, t)) = self.object(target) else {
+        let Some((tp, target_unit)) = self.object(target) else {
             return Ok(());
         };
         let takes = if filter == Some(GARRISON) {
-            let tm = t.master(self.master_tables(), tp)?;
+            let tm = target_unit.master(self.master_tables(), tp)?;
             let world = TaskWorld {
                 players: &self.players,
                 drop_sites: &self.model.drop_sites,
             };
             (tm.kind == MasterKind::BUILDING
-                && t.life.state == ObjectState::Alive
+                && target_unit.life.state == ObjectState::Alive
                 && world.allied(player, tp, AllyTest::WithRelation4)
-                && tm
-                    .building
-                    .is_some_and(|b| b.garrison_kind.contains(GarrisonKinds::VILLAGERS)))
+                && tm.building.is_some_and(|building_master| {
+                    building_master
+                        .garrison_kind
+                        .contains(GarrisonKinds::VILLAGERS)
+                }))
             .then_some(BellShelter::Sheltered)
         } else {
             Some(BellShelter::Free)
@@ -407,7 +409,7 @@ impl World {
                 .unit_ai
                 .get(unit.id)
                 .and_then(|ai| own_order_target(ai, unit.id));
-            found = own.and_then(held).map(|(_, t)| t);
+            found = own.and_then(held).map(|(_, held_unit)| held_unit);
         }
         let (target, point) = found.map_or_else(
             || (None, unit.position().ground()),
@@ -415,8 +417,14 @@ impl World {
         );
         let actions = &self.parts.actions_of(unit.id);
         let target_class = match actions.top_action_kind() {
-            Some(HUNT) => actions.list.hunt().and_then(|h| h.target_class),
-            Some(GATHER) => actions.list.gather().and_then(|g| g.target_class),
+            Some(HUNT) => actions
+                .list
+                .hunt()
+                .and_then(|hunt_action| hunt_action.target_class),
+            Some(GATHER) => actions
+                .list
+                .gather()
+                .and_then(|gather_action| gather_action.target_class),
             _ => None,
         };
         let ai = self
@@ -469,16 +477,16 @@ mod tests {
 
     use super::*;
 
-    /// Object `id`'s town bell in `t`.
-    fn bell(t: &World, id: i32) -> TownBell {
-        t.parts.town_bell_of(object_id(id))
+    /// Object `id`'s town bell in `world`.
+    fn bell(world: &World, id: i32) -> TownBell {
+        world.parts.town_bell_of(object_id(id))
     }
 
-    /// Object `id`'s town bell in `t` changed by `change`.
-    fn set_bell(t: &mut World, id: i32, change: impl FnOnce(&mut TownBell)) {
-        let mut b = bell(t, id);
-        change(&mut b);
-        t.parts.set_town_bell(object_id(id), b);
+    /// Object `id`'s town bell in `world` changed by `change`.
+    fn set_bell(world: &mut World, id: i32, change: impl FnOnce(&mut TownBell)) {
+        let mut town_bell = bell(world, id);
+        change(&mut town_bell);
+        world.parts.set_town_bell(object_id(id), town_bell);
     }
 
     fn work(target: Option<ObjectId>, action: Option<AiAction>, point: Point) -> BackToWork {
@@ -555,7 +563,7 @@ mod tests {
             class: class::LIVESTOCK,
             ..Master::default()
         };
-        let mut w = Scene::open(GridSize::new(16, 16))
+        let mut world = Scene::open(GridSize::new(16, 16))
             .object(SceneObject::new(
                 7,
                 PlayerId::GAIA,
@@ -582,7 +590,11 @@ mod tests {
             ))
             .build();
         for (id, progress) in [(7, 25.0), (8, 10.0), (9, 25.0)] {
-            w.parts.building_mut(object_id(id)).unwrap().construction = Some(Construction {
+            world
+                .parts
+                .building_mut(object_id(id))
+                .unwrap()
+                .construction = Some(Construction {
                 progress: Seconds::new(progress),
                 desolid: false,
                 builders: BuilderCount::of_data(0),
@@ -596,7 +608,7 @@ mod tests {
                 sprite_override: false,
             });
         }
-        w
+        world
     }
 
     /// The records' objects as the world holds them, each what [`object`] names.
@@ -714,10 +726,10 @@ mod tests {
             );
             // a house not built yet and a built farm stay
             for kept in [8, 9] {
-                let r = work(Some(object_id(kept)), action, Point::new(5.0, 6.0));
+                let kept_back_to_work = work(Some(object_id(kept)), action, Point::new(5.0, 6.0));
                 assert_eq!(
-                    record_object(r, records.objects(), &roles()).unwrap(),
-                    (object(object_id(kept)), r)
+                    record_object(kept_back_to_work, records.objects(), &roles()).unwrap(),
+                    (object(object_id(kept)), kept_back_to_work)
                 );
             }
         }
@@ -730,10 +742,10 @@ mod tests {
             Some(AiAction::Defend),
             None,
         ] {
-            let r = work(Some(object_id(7)), action, Point::new(5.0, 6.0));
+            let back_to_work = work(Some(object_id(7)), action, Point::new(5.0, 6.0));
             assert_eq!(
-                record_object(r, records.objects(), &roles()).unwrap(),
-                (object(object_id(7)), r)
+                record_object(back_to_work, records.objects(), &roles()).unwrap(),
+                (object(object_id(7)), back_to_work)
             );
         }
     }
@@ -757,12 +769,13 @@ mod tests {
         use crate::world::World;
         use crate::world::settings::OptionFlags;
 
-        fn enter(t: &World, id: i32) -> Option<ObjectId> {
-            t.parts
+        fn enter(world: &World, id: i32) -> Option<ObjectId> {
+            world
+                .parts
                 .actions_of(object_id(id))
                 .list
                 .enter()
-                .and_then(|e| e.target)
+                .and_then(|enter_action| enter_action.target)
                 .map(ContainerId::id)
         }
 
@@ -770,29 +783,36 @@ mod tests {
         fn the_bell_sends_the_villagers_in_reach_to_the_buildings_in_reach_and_flags_them() {
             // FUN_14163a650: villager 1000 is within 25 tiles of town centre 100, 1001 is not,
             // archer 1002 is no villager; the centre takes villagers and is in reach of itself
-            let mut t = sized_world(60, 60);
+            let mut world = sized_world(60, 60);
             walker(
-                &mut t,
+                &mut world,
                 PlayerId::new(1),
                 1000,
                 VILLAGER,
                 Point::new(5.5, 5.5),
             );
             walker(
-                &mut t,
+                &mut world,
                 PlayerId::new(1),
                 1001,
                 VILLAGER,
                 Point::new(45.5, 45.5),
             );
-            walker(&mut t, PlayerId::new(1), 1002, ARCHER, Point::new(6.5, 5.5));
-            t.town_bell(player_id(1), object_id(100), Bell::Ring)
+            walker(
+                &mut world,
+                PlayerId::new(1),
+                1002,
+                ARCHER,
+                Point::new(6.5, 5.5),
+            );
+            world
+                .town_bell(player_id(1), object_id(100), Bell::Ring)
                 .unwrap();
             assert_eq!(
-                [1000, 1001, 1002].map(|id| enter(&t, id)),
+                [1000, 1001, 1002].map(|id| enter(&world, id)),
                 [Some(object_id(100)), None, None]
             );
-            assert!(bell(&t, 100).flag.is_sheltered());
+            assert!(bell(&world, 100).flag.is_sheltered());
         }
 
         #[test]
@@ -814,19 +834,21 @@ mod tests {
                 .unwrap();
             assert_eq!(enter(&t, 1000), Some(object_id(100)));
             // an object that is no town centre rings nothing; nor does an id the world lacks
-            let mut t = let_out_world();
+            let mut world = let_out_world();
             walker(
-                &mut t,
+                &mut world,
                 PlayerId::new(1),
                 1000,
                 VILLAGER,
                 Point::new(5.5, 5.5),
             );
-            t.town_bell(player_id(1), object_id(1000), Bell::Ring)
+            world
+                .town_bell(player_id(1), object_id(1000), Bell::Ring)
                 .unwrap();
-            t.town_bell(player_id(1), object_id(4242), Bell::Ring)
+            world
+                .town_bell(player_id(1), object_id(4242), Bell::Ring)
                 .unwrap();
-            assert_eq!(enter(&t, 1000), None);
+            assert_eq!(enter(&world, 1000), None);
         }
 
         #[test]
@@ -881,46 +903,47 @@ mod tests {
             t.town_bell(player_id(1), object_id(100), Bell::End)
                 .unwrap();
             assert!(!bell(&t, 100).flag.is_sheltered());
-            let v = t.object(object_id(1000)).unwrap().1;
+            let object = t.object(object_id(1000)).unwrap().1;
             assert_eq!(
                 (
-                    v.life.inside,
-                    t.parts.town_bell_of(v.id).flag.is_sheltered()
+                    object.life.inside,
+                    t.parts.town_bell_of(object.id).flag.is_sheltered()
                 ),
                 (None, false)
             );
             let goal = |t: &World, id: i32| {
-                let u = t.object(object_id(id)).unwrap().1;
+                let unit = t.object(object_id(id)).unwrap().1;
                 (
                     t.parts
                         .actions_of(object_id(id))
                         .list
                         .move_to()
                         .copied()
-                        .and_then(|m| m.goal()),
-                    t.parts.town_bell_of(u.id).flag.is_sheltered(),
+                        .and_then(|move_to_action| move_to_action.goal()),
+                    t.parts.town_bell_of(unit.id).flag.is_sheltered(),
                 )
             };
             assert_eq!(goal(&t, 1001), (Some(Position::new(3.5, 3.5, 0.0)), false));
             assert_eq!(goal(&t, 1002), (None, false));
             assert_eq!(goal(&t, 1003), (None, true));
             // a record without a point on an axis (an exact -1) keeps the unit and its flag
-            let mut t = let_out_world();
+            let mut world = let_out_world();
             walker(
-                &mut t,
+                &mut world,
                 PlayerId::new(1),
                 1001,
                 VILLAGER,
                 Point::new(5.5, 5.5),
             );
-            set_bell(&mut t, 1001, |v| {
-                v.flag = BellShelter::Sheltered;
-                v.work.point = Point::new(3.5, -1.0);
+            set_bell(&mut world, 1001, |town_bell| {
+                town_bell.flag = BellShelter::Sheltered;
+                town_bell.work.point = Point::new(3.5, -1.0);
             });
-            tracked(&mut t, VILLAGER, &[1001]);
-            t.town_bell(player_id(1), object_id(100), Bell::End)
+            tracked(&mut world, VILLAGER, &[1001]);
+            world
+                .town_bell(player_id(1), object_id(100), Bell::End)
                 .unwrap();
-            assert_eq!(goal(&t, 1001), (None, true));
+            assert_eq!(goal(&world, 1001), (None, true));
         }
         #[test]
         fn all_back_to_work_lets_the_villagers_out_and_sends_the_others_back_leaving_the_flag() {
@@ -928,40 +951,40 @@ mod tests {
             // bell flag to test or drop: villager 1000 comes out of the centre toward its
             // record, 1001 outside, filed under class 4, walks back to its record's point
             let world = || {
-                let mut t = let_out_world();
-                set_bell(&mut t, 100, |b| b.flag = BellShelter::Sheltered);
-                inside_tc(&mut t, PlayerId::new(1), 1000, VILLAGER);
+                let mut let_out_world = let_out_world();
+                set_bell(&mut let_out_world, 100, |b| b.flag = BellShelter::Sheltered);
+                inside_tc(&mut let_out_world, PlayerId::new(1), 1000, VILLAGER);
                 walker(
-                    &mut t,
+                    &mut let_out_world,
                     PlayerId::new(1),
                     1001,
                     VILLAGER,
                     Point::new(5.5, 5.5),
                 );
                 for (id, point) in [(1000, Point::new(4.5, 4.5)), (1001, Point::new(3.5, 3.5))] {
-                    set_bell(&mut t, id, |v| {
-                        v.flag = BellShelter::Sheltered;
-                        v.work = TownBellBackToWork {
+                    set_bell(&mut let_out_world, id, |town_bell| {
+                        town_bell.flag = BellShelter::Sheltered;
+                        town_bell.work = TownBellBackToWork {
                             point,
                             ..TownBellBackToWork::NONE
                         };
                     });
                 }
-                tracked(&mut t, VILLAGER, &[1000, 1001]);
-                t
+                tracked(&mut let_out_world, VILLAGER, &[1000, 1001]);
+                let_out_world
             };
             let mut t = world();
             t.all_back_to_work(player_id(1), object_id(100)).unwrap();
             assert!(bell(&t, 100).flag.is_sheltered());
-            let v = t.object(object_id(1000)).unwrap().1;
+            let object = t.object(object_id(1000)).unwrap().1;
             assert_eq!(
                 (
-                    v.life.inside,
-                    t.parts.town_bell_of(v.id).flag.is_sheltered()
+                    object.life.inside,
+                    t.parts.town_bell_of(object.id).flag.is_sheltered()
                 ),
                 (None, false)
             );
-            let u = t.object(object_id(1001)).unwrap().1;
+            let unit = t.object(object_id(1001)).unwrap().1;
             assert_eq!(
                 (
                     t.parts
@@ -969,8 +992,8 @@ mod tests {
                         .list
                         .move_to()
                         .copied()
-                        .and_then(|m| m.goal()),
-                    t.parts.town_bell_of(u.id).flag.is_sheltered()
+                        .and_then(|move_to_action| move_to_action.goal()),
+                    t.parts.town_bell_of(unit.id).flag.is_sheltered()
                 ),
                 (Some(Position::new(3.5, 3.5, 0.0)), false)
             );

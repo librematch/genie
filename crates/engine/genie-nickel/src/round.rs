@@ -63,27 +63,29 @@ pub fn round_to_f64(numerator: &str, denominator: &str) -> GenieResult<f64> {
 /// The rational's sign, significand (its hidden bit included) and biased exponent field in
 /// `format`, rounded once to nearest, ties to even.
 fn round(numerator: &str, denominator: &str, format: &Format) -> GenieResult<(bool, u64, u64)> {
-    let (Ok(n), Ok(d)) = (numerator.parse::<BigInt>(), denominator.parse::<BigUint>()) else {
+    let (Ok(numerator_value), Ok(denominator_value)) =
+        (numerator.parse::<BigInt>(), denominator.parse::<BigUint>())
+    else {
         return Err(invalid_rational(numerator, denominator));
     };
-    if d == BigUint::ZERO {
+    if denominator_value == BigUint::ZERO {
         return Err(invalid_rational(numerator, denominator));
     }
-    let negative = n.sign() == Sign::Minus;
-    let magnitude = n.magnitude();
+    let negative = numerator_value.sign() == Sign::Minus;
+    let magnitude = numerator_value.magnitude();
     if *magnitude == BigUint::ZERO {
         return Ok((negative, 0, 0));
     }
     // the scale e with 2^(p-1) <= magnitude / (denominator * 2^e) < 2^p, no lower than the least
     let bits = |x: &BigUint| i64::try_from(x.bits()).unwrap_or(i64::MAX);
     let significand_bits = i64::try_from(format.significand).unwrap_or(0);
-    let estimate = bits(magnitude) - bits(&d) - significand_bits;
+    let estimate = bits(magnitude) - bits(&denominator_value) - significand_bits;
     let mut scale = estimate.max(format.least_scale);
     // the estimate leaves a quotient of p or p + 1 bits (fewer only at the least scale)
-    let (mut quotient, mut remainder, mut divisor) = divide(magnitude, &d, scale);
+    let (mut quotient, mut remainder, mut divisor) = divide(magnitude, &denominator_value, scale);
     if quotient.bits() > format.significand {
         scale += 1;
-        (quotient, remainder, divisor) = divide(magnitude, &d, scale);
+        (quotient, remainder, divisor) = divide(magnitude, &denominator_value, scale);
     }
     let twice = remainder << 1usize;
     if twice > divisor || (twice == divisor && quotient.bit(0)) {

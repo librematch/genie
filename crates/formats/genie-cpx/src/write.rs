@@ -235,8 +235,8 @@ impl<W: Write> CampaignWriter<W> {
     /// Get the size in bytes of all metadata for a `AoE1`: DE campaign file.
     fn meta_size_de(&self) -> usize {
         // Length of a single variable string is (4 + byte length)
-        const fn strlen(s: &str) -> usize {
-            s.len() + 4
+        const fn strlen(text: &str) -> usize {
+            text.len() + 4
         }
         let header_size = size_of::<CpxVersion>()
             + size_of::<u32>() // number of scenarios
@@ -249,8 +249,8 @@ impl<W: Write> CampaignWriter<W> {
     /// Get the size in bytes of all metadata for a `AoE2`: DE campaign file.
     fn meta_size_de2(&self) -> usize {
         // Length of a single variable string is (4 + byte length)
-        const fn strlen(s: &str) -> usize {
-            s.len() + 4
+        const fn strlen(text: &str) -> usize {
+            text.len() + 4
         }
         let header_size = size_of::<CpxVersion>()
             + 7 * size_of::<i32>() // DLC dependencies
@@ -326,8 +326,8 @@ impl<W: Write> CampaignWriter<W> {
 mod limit_tests {
     use super::*;
 
-    fn invalid(e: &GenieError) -> bool {
-        e.kind() == genie_error::ErrorKind::InvalidInput
+    fn invalid(error: &GenieError) -> bool {
+        error.kind() == genie_error::ErrorKind::InvalidInput
     }
 
     /// A value at its limit is an error, one below it converts.

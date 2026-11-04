@@ -106,7 +106,7 @@ pub fn missile_part(object: &genie_save::Object) -> Option<&RgeMissileObject> {
     object
         .rge_object
         .as_deref()
-        .and_then(|r| r.rge_missile_object.as_deref())
+        .and_then(|rge_object| rge_object.rge_missile_object.as_deref())
 }
 
 /// A saved missile's own fields (`+0x990`..`+0x99c`, its step `+0x7dc`), its object's part:
@@ -119,15 +119,21 @@ pub fn saved_missile(
     missile_tuning: &MissileTuning,
 ) -> Option<Missile> {
     let mo = missile_part(object)?;
-    let step = object.moving_part().map_or(Offset::ZERO, |m| {
-        Offset::new(m.velocity_x, m.velocity_y, m.velocity_z)
-    });
+    let step = object
+        .moving_part()
+        .map_or(Offset::ZERO, |rge_moving_object| {
+            Offset::new(
+                rge_moving_object.velocity_x,
+                rge_moving_object.velocity_y,
+                rge_moving_object.velocity_z,
+            )
+        });
     let distance = object
         .actions()
-        .and_then(|a| a.entries().next())
+        .and_then(|action_list| action_list.entries().next())
         .filter(|&(kind, _)| ActionKind::try_from(kind).ok() == Some(MISSILE))
         .and_then(|(_, action)| action.rge_action_by_kind.as_deref())
-        .and_then(|t| t.rge_action_missile.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_missile.as_deref())
         .map(|ma| ma.distance);
     Some(Missile {
         max_range: Distance::new(mo.max_range),
@@ -164,7 +170,7 @@ fn row(
 ) -> (Unit, ObjectParts) {
     let saved = object.static_part();
     let named = saved.and_then(|s| ObjectId::try_from(s.id).ok());
-    let (Some(s), Some(id)) = (saved, named) else {
+    let (Some(rge_static_object), Some(id)) = (saved, named) else {
         let unit = Unit {
             id: ObjectId::UNSAVED,
             ..Unit::default()
@@ -174,7 +180,7 @@ fn row(
             unmodelled(GenieError::unsupported("an object without a static part")),
         );
     };
-    let Ok(master) = MasterId::try_from(s.master_obj) else {
+    let Ok(master) = MasterId::try_from(rge_static_object.master_obj) else {
         let unit = Unit {
             id,
             ..Unit::default()
@@ -186,16 +192,17 @@ fn row(
     };
     let saved = object
         .actions()
-        .is_some_and(|a| a.entries().next().is_some());
+        .is_some_and(|action_list| action_list.entries().next().is_some());
     // an order or action value no order or action holds: the object's first unmodelled part
     let ((ai, town_bell), ai_read) = match ai_parts(object, id, players) {
         Ok(parts) => (parts, Ok(())),
         Err(e) => ((None, TownBell::default()), Err(e)),
     };
-    let (life, life_read) = match lifecycle(object, (s, master), objects, civ, masters) {
-        Ok(life) => (life, Ok(())),
-        Err(e) => (Lifecycle::default(), Err(e)),
-    };
+    let (life, life_read) =
+        match lifecycle(object, (rge_static_object, master), objects, civ, masters) {
+            Ok(life) => (life, Ok(())),
+            Err(e) => (Lifecycle::default(), Err(e)),
+        };
     let (lists, lists_read) = match building_lists(object) {
         Ok(lists) => (lists, Ok(())),
         Err(e) => (BuildingLists::default(), Err(e)),
@@ -206,10 +213,10 @@ fn row(
         CaptureKind::try_from(c.rge_combat_object.capture_flag)
     });
     let (capture_flag, capture_read) = match capture {
-        Ok(k) => (k, Ok(())),
+        Ok(capture_kind) => (capture_kind, Ok(())),
         Err(e) => (CaptureKind::None, Err(e)),
     };
-    let (construction, construction_read) = match construction(object, s, objects) {
+    let (construction, construction_read) = match construction(object, rge_static_object, objects) {
         Ok(c) => (c, Ok(())),
         Err(e) => (None, Err(e)),
     };
@@ -254,7 +261,7 @@ fn row(
         rice: object
             .tribe_building_object
             .as_deref()
-            .and_then(|b| b.is_on_mangrove_shallows)
+            .and_then(|tribe_building_object| tribe_building_object.is_on_mangrove_shallows)
             .is_some_and(|v| v != 0),
         ..Default::default()
     };
@@ -294,15 +301,19 @@ fn row(
         // the load's (FUN_14121ec90): the master's volley fire; the shares of the units inside
         // follow in `garrison_firepower`
         firepower: objects
-            .master(s.master_obj)
+            .master(rge_static_object.master_obj)
             .and_then(|m| {
                 m.tribe_master_combat_object.as_deref().or_else(|| {
                     m.tribe_master_building_object
                         .as_deref()
-                        .map(|b| &b.tribe_master_combat_object)
+                        .map(|tribe_master_building_object| {
+                            &tribe_master_building_object.tribe_master_combat_object
+                        })
                 })
             })
-            .map_or(Firepower::ZERO, |c| Firepower::new(c.volley_fire_amount)),
+            .map_or(Firepower::ZERO, |tribe_master_combat_object| {
+                Firepower::new(tribe_master_combat_object.volley_fire_amount)
+            }),
         attack_timer: object.combat().map_or(Seconds::ZERO, |c| {
             Seconds::new(c.rge_combat_object.attack_timer)
         }),
@@ -343,20 +354,23 @@ fn row(
                 object
                     .rge_object
                     .as_deref()
-                    .and_then(|r| r.rge_missile_object.as_deref())
-                    .map(|m| &m.rge_combat_object)
+                    .and_then(|rge_object| rge_object.rge_missile_object.as_deref())
+                    .map(|rge_missile_object| &rge_missile_object.rge_combat_object)
             })
-            .map_or(AttackCount::ZERO, |c| AttackCount::of_data(c.attack_count)),
+            .map_or(AttackCount::ZERO, |rge_combat_object| {
+                AttackCount::of_data(rge_combat_object.attack_count)
+            }),
         // the combat object's localResourceStore (+0xae0), a map by attribute saved in its order
         store: object
             .combat()
-            .map(|c| {
-                c.local_resource_store
+            .map(|tribe_combat_object| {
+                tribe_combat_object
+                    .local_resource_store
                     .iter()
-                    .filter_map(|e| {
+                    .filter_map(|entry| {
                         Some((
-                            AttributeId::of_index(usize::from(e.attribute_idx))?,
-                            Amount::new(e.value),
+                            AttributeId::of_index(usize::from(entry.attribute_idx))?,
+                            Amount::new(entry.value),
                         ))
                     })
                     .collect()
@@ -366,36 +380,55 @@ fn row(
     // the animated layer (types 20 and up); a moving object's mover takes it below
     let animated = object
         .animated_part()
-        .map(|a| Animated::new(Speed::new(a.current_speed)));
+        .map(|rge_animated_object| Animated::new(Speed::new(rge_animated_object.current_speed)));
     let unit = Unit {
         id,
         life,
         flags: {
             let mut flags = UnitFlags::empty();
-            flags.set(UnitFlags::ATTACKABLE, s.unit_attackable_flag != 0);
-            flags.set(UnitFlags::UNTARGETABLE, s.unit_targeting_flag == 0);
-            flags.set(UnitFlags::UNDER_ATTACK, s.under_attack_value != 0);
-            flags.set(UnitFlags::UNDELETABLE, s.deletion_enabled == 0);
-            flags.set(UnitFlags::ROO_CALLED, s.roo_already_called != 0);
+            flags.set(
+                UnitFlags::ATTACKABLE,
+                rge_static_object.unit_attackable_flag != 0,
+            );
+            flags.set(
+                UnitFlags::UNTARGETABLE,
+                rge_static_object.unit_targeting_flag == 0,
+            );
+            flags.set(
+                UnitFlags::UNDER_ATTACK,
+                rge_static_object.under_attack_value != 0,
+            );
+            flags.set(
+                UnitFlags::UNDELETABLE,
+                rge_static_object.deletion_enabled == 0,
+            );
+            flags.set(
+                UnitFlags::ROO_CALLED,
+                rge_static_object.roo_already_called != 0,
+            );
             flags
         },
-        pasture: PastureId::of_field(s.parent_pasture_id),
-        my_pasture: PastureId::of_field(s.my_pasture_id),
-        group: group_link(s),
-        workers: WorkerCount::of_data(s.worker_num),
-        last_human_order: WorldTime::from_millis(s.last_human_order_time),
-        damaged_lately: DamagedTimer::of_data(s.damaged_lately_timer as u8),
-        place: Static::at(Position::new(s.tx, s.ty, s.tz)),
+        pasture: PastureId::of_field(rge_static_object.parent_pasture_id),
+        my_pasture: PastureId::of_field(rge_static_object.my_pasture_id),
+        group: group_link(rge_static_object),
+        workers: WorkerCount::of_data(rge_static_object.worker_num),
+        last_human_order: WorldTime::from_millis(rge_static_object.last_human_order_time),
+        damaged_lately: DamagedTimer::of_data(rge_static_object.damaged_lately_timer as u8),
+        place: Static::at(Position::new(
+            rge_static_object.tx,
+            rge_static_object.ty,
+            rge_static_object.tz,
+        )),
         // every animated object's current sprite, which slot 0x68 and the sprite list read
-        sprite: masters.and_then(|t| saved_sprite(s, &t.graphics)),
+        sprite: masters.and_then(|t| saved_sprite(rge_static_object, &t.graphics)),
         ..Unit::default()
     };
     let mut actions = Action::default();
-    let default = default_task(object, s, objects, civ, masters);
+    let default = default_task(object, rge_static_object, objects, civ, masters);
     let imported = if saved {
         saved_actions(
             object,
-            s,
+            rge_static_object,
             objects,
             // the Build's task with the builder's powerup (its combat layer's)
             |m| {
@@ -406,26 +439,26 @@ fn row(
             },
             |m| fly_task(objects, civ, masters, m),
             |m, i| task_at(objects, civ, masters, m, i),
-            masters.map(|t| &t.graphics),
+            masters.map(|master_table| &master_table.graphics),
             &mut actions,
         )
     } else {
         // an object without actions in a save: its default task's action (an Artifact exists
         // from the load on; a Fly starts in its first update)
         match &default {
-            Ok(Some(DefaultStart::Artifact(a))) => {
-                actions.list.set_artifact(Some(**a));
+            Ok(Some(DefaultStart::Artifact(artifact))) => {
+                actions.list.set_artifact(Some(**artifact));
                 Ok(())
             }
             Ok(_) => Ok(()),
-            Err(f) => Err(f.error()),
+            Err(unstartable) => Err(unstartable.error()),
         }
     };
     actions.default_task = default_start(default, saved);
     let production = production(object).map(|_| ());
-    let (mover, moving) = match mover(object, s, objects, paths, civ, masters) {
+    let (mover, moving) = match mover(object, rge_static_object, objects, paths, civ, masters) {
         Ok(m) => (m, Ok(())),
-        Err(e) => (None, Err(e)),
+        Err(error) => (None, Err(error)),
     };
     let unread = life_read
         .and(ai_read)
@@ -465,7 +498,7 @@ fn default_start(default: Result<Option<DefaultStart>, Unstartable>, saved: bool
         Ok(Some(DefaultStart::Fly)) => DefaultTask::Fly,
         Ok(Some(DefaultStart::Make)) => DefaultTask::Make,
         Ok(Some(DefaultStart::Artifact(_))) => DefaultTask::Artifact,
-        Err(f) => DefaultTask::Fails(f),
+        Err(unstartable) => DefaultTask::Fails(unstartable),
     }
 }
 
@@ -496,14 +529,18 @@ fn annexes(ids: &[i32]) -> Annexes {
 ///
 /// An entry of −1, which names no object.
 fn building_lists(object: &genie_save::Object) -> GenieResult<BuildingLists> {
-    let Some(b) = object.tribe_building_object.as_deref() else {
+    let Some(tribe_building_object) = object.tribe_building_object.as_deref() else {
         return Ok(BuildingLists::default());
     };
-    let workers: Vec<i32> = b.pasture_worker_id.iter().map(|&w| w as i32).collect();
+    let workers: Vec<i32> = tribe_building_object
+        .pasture_worker_id
+        .iter()
+        .map(|&w| w as i32)
+        .collect();
     Ok(BuildingLists {
-        livestock: object_ids(&b.livestock_id)?,
+        livestock: object_ids(&tribe_building_object.livestock_id)?,
         pasture_workers: object_ids(&workers)?,
-        attacking_units: object_ids(&b.unit_id)?,
+        attacking_units: object_ids(&tribe_building_object.unit_id)?,
     })
 }
 
@@ -527,28 +564,32 @@ fn ai_parts(
 /// # Errors
 ///
 /// A record's action value no action holds ([`AiAction::try_from`]).
-pub fn town_bell(c: &TribeCombatObject) -> GenieResult<TownBell> {
+pub fn town_bell(tribe_combat_object: &TribeCombatObject) -> GenieResult<TownBell> {
     use crate::orders::town_bell::BackToWork;
     Ok(TownBell {
-        flag: BellShelter::of_byte(c.town_bell_flag),
+        flag: BellShelter::of_byte(tribe_combat_object.town_bell_flag),
         work: BackToWork {
-            target: ObjectId::of_field(c.back_to_work1_town_bell_target_id),
-            target_class: ClassId::of_param(c.back_to_work1_town_bell_target_kind)?,
-            action: AiAction::of_field(c.back_to_work1_town_bell_action)?,
-            target2: ObjectId::of_field(c.back_to_work1_town_bell_target_id2),
+            target: ObjectId::of_field(tribe_combat_object.back_to_work1_town_bell_target_id),
+            target_class: ClassId::of_param(
+                tribe_combat_object.back_to_work1_town_bell_target_kind,
+            )?,
+            action: AiAction::of_field(tribe_combat_object.back_to_work1_town_bell_action)?,
+            target2: ObjectId::of_field(tribe_combat_object.back_to_work1_town_bell_target_id2),
             point: Point::new(
-                c.back_to_work1_town_bell_target_x,
-                c.back_to_work1_town_bell_target_y,
+                tribe_combat_object.back_to_work1_town_bell_target_x,
+                tribe_combat_object.back_to_work1_town_bell_target_y,
             ),
         },
         before_building: BackToWork {
-            target: ObjectId::of_field(c.back_to_work2_town_bell_target_id),
-            target_class: ClassId::of_param(c.back_to_work2_town_bell_target_kind)?,
-            action: AiAction::of_field(c.back_to_work2_town_bell_action)?,
-            target2: ObjectId::of_field(c.back_to_work2_town_bell_target_id2),
+            target: ObjectId::of_field(tribe_combat_object.back_to_work2_town_bell_target_id),
+            target_class: ClassId::of_param(
+                tribe_combat_object.back_to_work2_town_bell_target_kind,
+            )?,
+            action: AiAction::of_field(tribe_combat_object.back_to_work2_town_bell_action)?,
+            target2: ObjectId::of_field(tribe_combat_object.back_to_work2_town_bell_target_id2),
             point: Point::new(
-                c.back_to_work2_town_bell_target_x,
-                c.back_to_work2_town_bell_target_y,
+                tribe_combat_object.back_to_work2_town_bell_target_x,
+                tribe_combat_object.back_to_work2_town_bell_target_y,
             ),
         },
     })
@@ -559,12 +600,13 @@ pub fn town_bell(c: &TribeCombatObject) -> GenieResult<TownBell> {
 /// toggle.
 #[must_use]
 pub fn saved_gate(object: &genie_save::Object) -> Option<Gate> {
-    let b = object.tribe_building_object.as_deref()?;
+    let tribe_building_object = object.tribe_building_object.as_deref()?;
     Some(Gate {
-        locked: b.gate_locked != 0,
-        first_update: b.first_update != 0,
-        close_timer: Seconds::new(b.close_timer),
-        other_masters: b.has_open_closed_master_object != 0 || b.original_owner != -1,
+        locked: tribe_building_object.gate_locked != 0,
+        first_update: tribe_building_object.first_update != 0,
+        close_timer: Seconds::new(tribe_building_object.close_timer),
+        other_masters: tribe_building_object.has_open_closed_master_object != 0
+            || tribe_building_object.original_owner != -1,
     })
 }
 
@@ -581,46 +623,50 @@ pub const OTHER_SUB_ACTION: GenieError =
 /// A snow flag that is not the game's (above 2).
 pub fn construction(
     object: &genie_save::Object,
-    s: &RgeStaticObject,
+    rge_static_object: &RgeStaticObject,
     objects: &PlayerObjects,
 ) -> GenieResult<Option<Construction>> {
-    let Some(b) = object.tribe_building_object.as_deref() else {
+    let Some(tribe_building_object) = object.tribe_building_object.as_deref() else {
         return Ok(None);
     };
-    let Some(m) = objects.master(s.master_obj) else {
+    let Some(master) = objects.master(rge_static_object.master_obj) else {
         return Ok(None);
     };
-    let Some(ms) = m.static_part() else {
+    let Some(ms) = master.static_part() else {
         return Ok(None);
     };
-    let build_time = m
+    let build_time = master
         .tribe_master_building_object
         .as_deref()
-        .map(|b| &b.tribe_master_combat_object)
-        .or(m.tribe_master_combat_object.as_deref())
-        .and_then(|c| c.train_location.first())
-        .map_or(WholeSeconds::ZERO, |t| WholeSeconds::of_data(t.train_time));
+        .map(|tribe_master_building_object| {
+            &tribe_master_building_object.tribe_master_combat_object
+        })
+        .or(master.tribe_master_combat_object.as_deref())
+        .and_then(|tribe_master_combat_object| tribe_master_combat_object.train_location.first())
+        .map_or(WholeSeconds::ZERO, |entry| {
+            WholeSeconds::of_data(entry.train_time)
+        });
     Ok(Some(Construction {
-        progress: Seconds::new(b.build_pts),
-        desolid: b.desolid_flag != 0,
-        builders: BuilderCount::of_data(b.tribe_combat_object.num_builders),
+        progress: Seconds::new(tribe_building_object.build_pts),
+        desolid: tribe_building_object.desolid_flag != 0,
+        builders: BuilderCount::of_data(tribe_building_object.tribe_combat_object.num_builders),
         hit_points: MasterHitPoints::of_data(ms.read_temp_6),
         build_time,
         record: Obstruction {
             kind: ObstructionKind::from(ms.obstruction_kind),
             class: ObstructionClass::from(ms.obstruction_class),
         },
-        snow: Snow::of_byte(b.snow_flag)?,
-        sprite_override: s.sprite_override_id != -1,
+        snow: Snow::of_byte(tribe_building_object.snow_flag)?,
+        sprite_override: rge_static_object.sprite_override_id != -1,
     }))
 }
 
 /// An object's unit group link as saved (`mGroupID`, `mGroupFlag`).
 #[must_use]
-pub const fn group_link(s: &RgeStaticObject) -> GroupLink {
+pub const fn group_link(rge_static_object: &RgeStaticObject) -> GroupLink {
     GroupLink {
-        id: GroupId::of_field(s.group_id),
-        flag: s.group_flag,
+        id: GroupId::of_field(rge_static_object.group_id),
+        flag: rge_static_object.group_flag,
     }
 }
 

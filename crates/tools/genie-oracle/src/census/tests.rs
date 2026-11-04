@@ -127,13 +127,15 @@ fn player_leaves_where_its_objects_first_differ() {
     let rec = recording(&save, &syncs(3));
     let game = header(vec![gaia(Vec::new()), human(vec![combat_object(7, 83)])]);
     let mut games = |u: usize| (u == 3).then(|| recording(&game, &[]));
-    let Followed::Leaves(d) = header_divergence(&rec, None, 1, (1, 3), &mut games).unwrap() else {
+    let Followed::Leaves(divergence) =
+        header_divergence(&rec, None, 1, (1, 3), &mut games).unwrap()
+    else {
         panic!("the player's objects differ at update 3");
     };
-    assert_eq!(d.update, 3);
-    assert_ne!(d.differences.len(), 0);
+    assert_eq!(divergence.update, 3);
+    assert_ne!(divergence.differences.len(), 0);
     let missing = header_divergences(&rec, None, &[2], (1, 3), &mut same(&save));
-    assert!(missing.is_err_and(|e| e == no_such_player(2)));
+    assert!(missing.is_err_and(|error| error == no_such_player(2)));
 }
 
 /// A player that stops says nothing more: the run ends once every player has.
@@ -143,7 +145,7 @@ fn stopped_player_says_nothing_more() {
     let rec = recording(&save, &syncs(3));
     let mut never = |_: usize| -> Option<Vec<u8>> { panic!("no save is read after the stop") };
     let followed = header_divergence(&rec, None, 1, (1, 3), &mut never).unwrap();
-    assert!(matches!(followed, Followed::Stops(s) if s.update == 0));
+    assert!(matches!(followed, Followed::Stops(census_stop) if census_stop.update == 0));
 }
 
 /// The first update after which the world's next object id differs from the game's save, with

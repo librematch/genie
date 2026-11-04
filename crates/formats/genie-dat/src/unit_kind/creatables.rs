@@ -139,8 +139,8 @@ impl CombatUnitKindAttributes {
     ///
     /// Returns an error if writing to `output` fails.
     pub fn write_to(&self, mut output: impl Write, _version: f32) -> GenieResult<()> {
-        for i in 0..3 {
-            match self.costs.get(i) {
+        for index in 0..3 {
+            match self.costs.get(index) {
                 Some(cost) => cost.write_to(&mut output)?,
                 None => AttributeCost {
                     attribute_kind: -1,
@@ -329,8 +329,8 @@ impl BuildingUnitKindAttributes {
         output.write_i16::<LE>(self.on_build_make_overlay)?;
         output.write_u16::<LE>(self.on_build_make_tech.map_into().unwrap_or(0xFFFF))?;
         output.write_u8(u8::from(self.can_burn))?;
-        for i in 0..self.linked_buildings.capacity() {
-            match self.linked_buildings.get(i) {
+        for index in 0..self.linked_buildings.capacity() {
+            match self.linked_buildings.get(index) {
                 Some(link) => link.write_to(&mut output)?,
                 None => LinkedBuilding::write_empty(&mut output)?,
             }

@@ -108,7 +108,7 @@ impl Visibility {
             byte(hi_y - ay),
         ]);
         if 0 < self.extents_capacity
-            && let Some(k) = self.extents.iter().position(|e| e.guid == guid)
+            && let Some(k) = self.extents.iter().position(|extent| extent.guid == guid)
         {
             return k as i32 + 1;
         }
@@ -135,9 +135,12 @@ impl Visibility {
         let capacity = slots + 1;
         let mut offsets: Vec<TileOffset> = Vec::new();
         let push = |offsets: &mut Vec<TileOffset>, dx: i32, dy: i32| {
-            let o = TileOffset::new(dx, dy);
-            if (dx != 0 || dy != 0) && (offsets.len() as i32) < capacity && !offsets.contains(&o) {
-                offsets.push(o);
+            let tile_offset = TileOffset::new(dx, dy);
+            if (dx != 0 || dy != 0)
+                && (offsets.len() as i32) < capacity
+                && !offsets.contains(&tile_offset)
+            {
+                offsets.push(tile_offset);
             }
         };
         let (dx0, dx1) = (lo_x - ax, hi_x - ax);
@@ -200,17 +203,17 @@ impl Visibility {
             let dy = y - ay;
             for x in x0..=x1 {
                 let dx = x - ax;
-                let i = self.index(Tile::new(x, y));
+                let index = self.index(Tile::new(x, y));
                 if dx == 0 && dy == 0 {
                     entry = self.extent_entry(anchor, rect);
-                    *self.links.checked_mut(i)? = (
-                        (self.links.checked_mut(i)?.0 & !LINKED) | ANCHOR,
+                    *self.links.checked_mut(index)? = (
+                        (self.links.checked_mut(index)?.0 & !LINKED) | ANCHOR,
                         entry as u8,
                     );
                 } else {
                     let byte = nibble(dx) | nibble(dy) << 4;
-                    *self.links.checked_mut(i)? =
-                        ((self.links.checked_mut(i)?.0 & !ANCHOR) | LINKED, byte);
+                    *self.links.checked_mut(index)? =
+                        ((self.links.checked_mut(index)?.0 & !ANCHOR) | LINKED, byte);
                 }
             }
         }
@@ -231,9 +234,9 @@ impl Visibility {
         let [x0, y0, x1, y1] = held.get();
         for y in y0..=y1 {
             for x in x0..=x1 {
-                let i = self.index(Tile::new(x, y));
-                *self.links.checked_mut(i)? =
-                    (self.links.checked_mut(i)?.0 & !(LINKED | ANCHOR), 0);
+                let index = self.index(Tile::new(x, y));
+                *self.links.checked_mut(index)? =
+                    (self.links.checked_mut(index)?.0 & !(LINKED | ANCHOR), 0);
             }
         }
         Ok(())

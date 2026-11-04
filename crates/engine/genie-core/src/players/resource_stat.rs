@@ -71,7 +71,8 @@ mod tests {
     /// in neither.
     #[test]
     fn stat_byte_names_its_counters() {
-        let counts = |s: ResourceStat| (s.gathered(), s.counts_gold());
+        let counts =
+            |resource_stat: ResourceStat| (resource_stat.gathered(), resource_stat.counts_gold());
         assert_eq!(counts(ResourceStat::Gathered), (true, true));
         assert_eq!(counts(ResourceStat::of_data(2)), (false, true));
         assert_eq!(counts(ResourceStat::None), (false, false));

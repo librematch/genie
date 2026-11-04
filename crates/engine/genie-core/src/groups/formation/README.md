@@ -8,7 +8,7 @@ where the slots are and which member goes to which slot.
 - `slots.rs` gives the slots their units: by unit category, by the closest unit and by the
   variance of the assignment.
 - `passability.rs` checks that a unit can reach its slot over the terrain under the formation's
-  box.
+  box; `unreachable.rs` moves the slots no unit can reach.
 
 The other layouts (a horde, a phalanx, a box, a user-defined formation) are in
 `groups/layout.rs`.
@@ -29,6 +29,7 @@ The other layouts (a horde, a phalanx, a box, a user-defined formation) are in
 | [`passability.rs`](passability.rs) | `FormationTransform` (`FUN_14103a1f0`) and its passability: the grid over the box, the slots' reach and the search for an unreachable slot's unit. |
 | [`slots.rs`](slots.rs) | The slots' units: the unit categories, `ClosestUnit`, the assignment by variance, the population in order and a line after a column. |
 | [`tests.rs`](tests.rs) | Tests. |
+| [`unreachable.rs`](unreachable.rs) | The formation's slots their units cannot reach (`move_unreachable`): each one's place moves to the cell its unit can reach. |
 <!-- /files -->
 
 ## How it connects

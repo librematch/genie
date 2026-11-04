@@ -61,8 +61,8 @@ impl SlotState {
 }
 
 impl genie_diff::Diff for SlotState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -75,8 +75,8 @@ mod tests {
     /// values without a state are errors.
     #[test]
     fn its_states_read_back_from_their_values() {
-        for v in 0..=3 {
-            assert_eq!(SlotState::of_int(v).map(SlotState::get), Ok(v));
+        for index in 0..=3 {
+            assert_eq!(SlotState::of_int(index).map(SlotState::get), Ok(index));
         }
         for v in [i32::MIN, -1, 4, 256] {
             assert!(SlotState::of_int(v).is_err(), "{v}");

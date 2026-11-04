@@ -63,8 +63,8 @@ bitflags::bitflags! {
 
 impl Diff for UnitFlags {
     /// By equality: the flags are one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -137,7 +137,7 @@ impl Unit {
         player: PlayerId,
     ) -> GenieResult<&'a Master> {
         self.master_in(tables.of(player))
-            .map_err(|e| e.with("player", player))
+            .map_err(|error| error.with("player", player))
     }
 
     /// [`Unit::master`] for a caller that holds its owner's masters ([`OwnerMasters`]) rather
@@ -222,7 +222,7 @@ pub(crate) fn second_target_checked(
         return (None, None);
     }
     match state {
-        Some(s) if ObjectState::Undead < s => (None, Some(site)),
+        Some(object_state) if ObjectState::Undead < object_state => (None, Some(site)),
         _ => (Some(site), None),
     }
 }
@@ -268,16 +268,16 @@ pub(crate) const TAKEN_OUT: ObjectId = ObjectId::TAKEN_OUT;
 /// own player or a missile, an ally's, and, when it is not the `target`, Gaia's of a type above
 /// 15 or one of a blast defence below the missile's (`blast_level`).
 pub(crate) fn missed_passes(
-    c: &Step<'_>,
+    step: &Step<'_>,
     (id, player, kind, level): (ObjectId, PlayerId, MasterKind, BlastDefense),
     target: Option<ObjectId>,
     blast_level: BlastLevel,
 ) -> bool {
-    if player == c.player || kind == MasterKind::MISSILE {
+    if player == step.player || kind == MasterKind::MISSILE {
         return true;
     }
     let other = Some(id) != target;
-    c.w.spatial.allied_with(c.player, player)
+    step.w.spatial.allied_with(step.player, player)
         || (other && player == PlayerId::new(0) && MasterKind::TREE < kind)
         || (other && !blast_level.reaches(level))
 }

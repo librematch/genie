@@ -86,7 +86,7 @@ impl World {
         .unwrap_or(FormationCategory::ANY))
     }
 
-    /// `ClosestUnit` (`FUN_14100e370`) of group `g` to `point`: of the members the world holds
+    /// `ClosestUnit` (`FUN_14100e370`) of group `group` to `point`: of the members the world holds
     /// of sub-formation `category` and master `sub_category` (-1 for any) that `used` does not
     /// hold, the one nearest the point (3D, `FUN_14087e980`, where it last moved to), the first
     /// of equals; none for none.
@@ -96,7 +96,7 @@ impl World {
     /// A member of a master the slice does not have.
     pub fn closest_unit(
         &self,
-        g: &UnitGroup,
+        group: &UnitGroup,
         point: BVector,
         category: FormationCategory,
         sub_category: UnitKind,
@@ -104,8 +104,8 @@ impl World {
     ) -> GenieResult<Option<ObjectId>> {
         let mut best = FARTHEST;
         let mut closest = None;
-        for m in &g.members {
-            let Some(object) = self.world_object(m.id) else {
+        for member in &group.members {
+            let Some(object) = self.world_object(member.id) else {
                 continue;
             };
             if category != FormationCategory::ANY && self.unit_category(Some(object))? != category {
@@ -119,7 +119,7 @@ impl World {
             {
                 continue;
             }
-            if used.contains(&Some(m.id)) {
+            if used.contains(&Some(member.id)) {
                 continue;
             }
             let at = object.moved_vector();
@@ -127,7 +127,7 @@ impl World {
                 + (point.x() - at.x()) * (point.x() - at.x())
                 + (point.y() - at.y()) * (point.y() - at.y());
             if d < best {
-                closest = Some(m.id);
+                closest = Some(member.id);
                 best = d;
             }
         }
@@ -143,7 +143,7 @@ impl World {
         Some(Distance::new(sqrt(d.x() * d.x() + 0.0 + d.y() * d.y())))
     }
 
-    /// `FUN_141009760` of `formation` for group `g` without the settings' flag `DAT_143f01834`
+    /// `FUN_141009760` of `formation` for group `group` without the settings' flag `DAT_143f01834`
     /// (the world's saved `mUseFeatureFlags` being 1, which `World::load_world` hands to
     /// `FUN_140ecabe0`; 0 in every recording of this build), with which the game takes the
     /// feature's assignment instead ([`World::assign_slots_by_variance`]; the slice holds
@@ -158,7 +158,7 @@ impl World {
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn populate_slots(&self, formation: &mut Formation, g: &UnitGroup) -> GenieResult<()> {
+    pub fn populate_slots(&self, formation: &mut Formation, group: &UnitGroup) -> GenieResult<()> {
         // what the slots ask for (the assignments change only their units)
         let asks: Vec<(BVector, FormationCategory, UnitKind)> = formation
             .slots
@@ -175,12 +175,12 @@ impl World {
             .slots
             .iter()
             .enumerate()
-            .filter(|(_, s)| s.transformed != 0 && s.active != 0)
+            .filter(|(_, slot)| slot.transformed != 0 && slot.active != 0)
             .map(|(i, _)| i)
             .collect();
         let ask = |i: usize, used: &[Option<ObjectId>]| {
             let (at, category, sub_category) = *asks.checked(i)?;
-            self.closest_unit(g, at, category, sub_category, used)
+            self.closest_unit(group, at, category, sub_category, used)
         };
         let dist = |i: usize, id: ObjectId| self.slot_distance(asks.get(i)?.0, id);
         let pick = Picker {
@@ -203,7 +203,7 @@ impl World {
     }
 
     /// The feature's assignment (`FUN_14100a0c0`, [`World::populate_slots`] with the settings'
-    /// flag) of `formation`'s slots in use to group `g`'s members, `n` of them:
+    /// flag) of `formation`'s slots in use to group `group`'s members, `n` of them:
     ///
     /// - The costs (`costs`, the process global `DAT_143f161e0` of 70 × 70 floats that only this
     ///   routine reads and writes, all 0 as the process starts; grown to that when shorter): for
@@ -240,24 +240,24 @@ impl World {
     pub fn assign_slots_by_variance(
         &self,
         formation: &mut Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
         costs: &mut Vec<f32>,
     ) -> GenieResult<()> {
-        let n = g.members.len();
-        let s = formation.slots.len();
+        let n = group.members.len();
+        let count = formation.slots.len();
         if costs.len() < ASSIGNMENT_CELLS {
             costs.resize(ASSIGNMENT_CELLS, 0.0);
         }
-        self.member_costs(formation, g, costs)?;
-        let preferences = slot_preferences(costs, n, s)?;
-        let kept = best_assignment(&preferences, costs, (n, s))?;
+        self.member_costs(formation, group, costs)?;
+        let preferences = slot_preferences(costs, n, count)?;
+        let kept = best_assignment(&preferences, costs, (n, count))?;
         for (&r, &c) in kept.0.head(n)?.iter().zip(kept.1.head(n)?) {
             if r == -1 {
                 continue;
             }
             let slot = formation.slots.checked_mut(c as usize)?;
             slot.position_filled = 1;
-            slot.unit_id = Some(g.members.checked(r as usize)?.id);
+            slot.unit_id = Some(group.members.checked(r as usize)?.id);
         }
         Ok(())
     }
@@ -268,22 +268,22 @@ impl World {
     fn member_costs(
         &self,
         formation: &Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
         costs: &mut [f32],
     ) -> GenieResult<()> {
-        let n = g.members.len();
-        let s = formation.slots.len();
-        for (i, m) in g.members.iter().enumerate() {
-            let Some(object) = self.world_object(m.id) else {
+        let n = group.members.len();
+        let count = formation.slots.len();
+        for (i, member) in group.members.iter().enumerate() {
+            let Some(object) = self.world_object(member.id) else {
                 continue;
             };
-            if s == 0 {
+            if count == 0 {
                 continue;
             }
             let category = self.unit_category(Some(object))?;
             let master = UnitKind::of(object.master_id(self.model.slots));
             let at = object.moved_vector();
-            for (j, slot) in formation.slots.iter().enumerate() {
+            for (index, slot) in formation.slots.iter().enumerate() {
                 let mut skip = slot.transformed == 0 || slot.active == 0;
                 if slot.desired_category != FormationCategory::ANY
                     && category != slot.desired_category
@@ -292,7 +292,7 @@ impl World {
                 }
                 let other_master =
                     !slot.desired_sub_category.is_none() && master != slot.desired_sub_category;
-                *costs.checked_mut(i * n + j)? = if other_master || skip {
+                *costs.checked_mut(i * n + index)? = if other_master || skip {
                     FARTHEST
                 } else {
                     let d = at - slot.transform_position;
@@ -303,7 +303,7 @@ impl World {
         Ok(())
     }
 
-    /// `populateSlotsWithUnits` (`FUN_14102b230`) of group `g` over the first `n` slots of
+    /// `populateSlotsWithUnits` (`FUN_14102b230`) of group `group` over the first `n` slots of
     /// `formation` (at most the members), `order` their places in the line order: the members
     /// whose index has a transformed active slot (and that the world holds) form a list in
     /// member order; then, for each `k` of the list, the slot whose place in `order` holds `k`
@@ -319,19 +319,19 @@ impl World {
     pub(super) fn populate_in_order(
         &self,
         formation: &mut Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
         n: usize,
         order: &[i32],
     ) -> GenieResult<()> {
-        let n = n.min(g.members.len());
+        let n = n.min(group.members.len());
         let mut list: Vec<Option<ObjectId>> = Vec::new();
         for i in 0..n {
             let s = formation.slot_mut(i)?;
             if s.transformed != 0
                 && s.active != 0
-                && self.world_object(g.members.checked(i)?.id).is_some()
+                && self.world_object(group.members.checked(i)?.id).is_some()
             {
-                list.push(Some(g.members.checked(i)?.id));
+                list.push(Some(group.members.checked(i)?.id));
             }
         }
         for k in 0..list.len() {
@@ -343,11 +343,15 @@ impl World {
                 let s = formation.slot_mut(at)?;
                 (s.desired_category, s.desired_sub_category)
             };
-            for (u, taken) in list.iter_mut().enumerate() {
+            for (index, taken) in list.iter_mut().enumerate() {
                 if taken.is_none() {
                     continue;
                 }
-                let Some(object) = g.members.get(u).and_then(|m| self.world_object(m.id)) else {
+                let Some(object) = group
+                    .members
+                    .get(index)
+                    .and_then(|member| self.world_object(member.id))
+                else {
                     continue;
                 };
                 if category != FormationCategory::ANY
@@ -363,9 +367,9 @@ impl World {
                 {
                     continue;
                 }
-                let s = formation.slot_mut(at)?;
-                s.unit_id = taken.take();
-                s.position_filled = 1;
+                let slot = formation.slot_mut(at)?;
+                slot.unit_id = taken.take();
+                slot.position_filled = 1;
                 break;
             }
         }
@@ -388,9 +392,9 @@ impl World {
     pub fn from_previous_column(
         &self,
         formation: &mut Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
     ) -> GenieResult<()> {
-        let previous_column = g
+        let previous_column = group
             .previous_formation
             .as_ref()
             .is_some_and(|p| p.kind == FormationKind::Column);
@@ -400,7 +404,7 @@ impl World {
         }
         let width = formation.maximum_width;
         if formation.number_transformed_slots % width != 0 {
-            return self.populate_slots(formation, g);
+            return self.populate_slots(formation, group);
         }
         let depth = formation.maximum_depth;
         let mut order = vec![0i32; (width * depth).max(0) as usize];
@@ -414,10 +418,10 @@ impl World {
             }
             *order.checked_mut(base)? = start;
             let mut uses = 0;
-            for k in 1..width {
-                let v = *order.checked(base)? + magnitude;
-                *order.checked_mut(base + k as usize)? = v;
-                if (line + 1) * width - 1 < v || v < width * line {
+            for index in 1..width {
+                let checked = *order.checked(base)? + magnitude;
+                *order.checked_mut(base + index as usize)? = checked;
+                if (line + 1) * width - 1 < checked || checked < width * line {
                     break;
                 }
                 magnitude = -magnitude;
@@ -428,7 +432,7 @@ impl World {
                 }
             }
         }
-        self.populate_in_order(formation, g, (depth * width).max(0) as usize, &order)
+        self.populate_in_order(formation, group, (depth * width).max(0) as usize, &order)
     }
 
     /// createColumnLine's end (`FUN_141012280` after its layout), and the phalanx's and the
@@ -451,14 +455,14 @@ impl World {
             return Ok(());
         }
         formation.clear_units();
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         if formation.number_transformed_slots < 1
-            || g.previous_formation.is_none()
+            || held.previous_formation.is_none()
             || order == SlotOrder::Closest
         {
-            self.populate_slots(formation, g)
+            self.populate_slots(formation, held)
         } else {
-            self.from_previous_column(formation, g)
+            self.from_previous_column(formation, held)
         }
     }
 }
@@ -487,10 +491,10 @@ impl Picker<'_> {
             let Some(id) = (self.ask)(i, used.head(count)?)? else {
                 continue;
             };
-            let Some(d) = (self.dist)(i, id) else {
+            let Some(distance) = (self.dist)(i, id) else {
                 continue;
             };
-            sum += d.get();
+            sum += distance.get();
             if leading {
                 leading = false;
                 *used.checked_mut(0)? = Some(id);
@@ -616,7 +620,7 @@ pub(super) fn slot_preferences(costs: &[f32], n: usize, s: usize) -> GenieResult
     for i in 0..n {
         let row = i * n;
         taken.head_mut(s)?.fill(false);
-        for k in 0..s {
+        for index in 0..s {
             let first = taken.head(s)?.iter().position(|&t| !t).unwrap_or(s);
             let mut best = first;
             for j in first + 1..s {
@@ -624,7 +628,7 @@ pub(super) fn slot_preferences(costs: &[f32], n: usize, s: usize) -> GenieResult
                     best = j;
                 }
             }
-            *preferences.checked_mut(row + k)? = best as i32;
+            *preferences.checked_mut(row + index)? = best as i32;
             *taken.checked_mut(best)? = true;
         }
     }
@@ -645,8 +649,8 @@ pub(super) fn pairs_variance(
     for (&r, &c) in members.iter().zip(slots) {
         if r != -1 && c != -1 {
             count += 1;
-            let d = *costs.checked(r as usize * n + c as usize)? - mean;
-            variance += d * d;
+            let checked = *costs.checked(r as usize * n + c as usize)? - mean;
+            variance += checked * checked;
         }
     }
     Ok(variance / count as f32)

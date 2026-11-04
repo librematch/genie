@@ -169,27 +169,33 @@ pub fn charge_works(
 /// Slot 0x300 (`FUN_141203e30`): the charge is ready, at least `max_charge` for charge types 1
 /// and 3, else at least 1.
 #[must_use]
-pub fn charged(a: &Attacker) -> bool {
-    if a.charge_kind.adds_to_attack() {
-        a.max_charge <= a.charge
+pub fn charged(attacker: &Attacker) -> bool {
+    if attacker.charge_kind.adds_to_attack() {
+        attacker.max_charge <= attacker.charge
     } else {
-        Charge::new(1.0) <= a.charge
+        Charge::new(1.0) <= attacker.charge
     }
 }
 
 /// Slot 0x2f0 of a combat object of type 70 or 80 (`FUN_14120e920`): a charge of type 1 or 3
-/// that works on `v` ([`charge_works`]) and is ready.
+/// that works on `victim` ([`charge_works`]) and is ready.
 #[must_use]
-pub fn charge_hit(a: &Attacker, v: &Victim, roles: &Roles) -> bool {
-    a.charge_kind.adds_to_attack()
-        && charge_works(a.charge_target, a.charge_kind, v.class, v.kind, roles)
-        && charged(a)
+pub fn charge_hit(attacker: &Attacker, victim: &Victim, roles: &Roles) -> bool {
+    attacker.charge_kind.adds_to_attack()
+        && charge_works(
+            attacker.charge_target,
+            attacker.charge_kind,
+            victim.class,
+            victim.kind,
+            roles,
+        )
+        && charged(attacker)
 }
 
 /// `FUN_1412161b0`: a master of special attack 3 whose charge is ready on its unit AI's (or
 /// group's) target in reach; false for other masters. Special attack 3 is not modelled.
-pub(super) const fn special_charge_ready(a: &Attacker) -> GenieResult<bool> {
-    if a.special_attack.get() == SpecialAttack::CHARGE.get() {
+pub(super) const fn special_charge_ready(attacker: &Attacker) -> GenieResult<bool> {
+    if attacker.special_attack.get() == SpecialAttack::CHARGE.get() {
         return Err(SPECIAL_CHARGE_GAP);
     }
     Ok(false)
@@ -202,18 +208,24 @@ pub(crate) const SPECIAL_CHARGE_GAP: GenieError =
 
 /// `FUN_141202580`: the damage a ready charge adds, the charge itself; a master of special
 /// attack 3 adds it only while [`special_charge_ready`] holds.
-pub(super) fn charge_damage(a: &Attacker) -> GenieResult<f32> {
-    if a.special_attack == SpecialAttack::CHARGE && !special_charge_ready(a)? {
+pub(super) fn charge_damage(attacker: &Attacker) -> GenieResult<f32> {
+    if attacker.special_attack == SpecialAttack::CHARGE && !special_charge_ready(attacker)? {
         return Ok(0.0);
     }
-    Ok(a.charge.get())
+    Ok(attacker.charge.get())
 }
 
 /// Slot 0x2f8 of a combat unit or building (`FUN_14120f510`): a charge of type 6 or 7 (slot
-/// 0x308, `FUN_141203b50`) that works on `t` ([`charge_works`]) and is ready ([`charged`]).
+/// 0x308, `FUN_141203b50`) that works on `victim` ([`charge_works`]) and is ready ([`charged`]).
 #[must_use]
-pub fn range_charge_hit(a: &Attacker, t: &Victim, roles: &Roles) -> bool {
-    a.charge_kind.ranged()
-        && charge_works(a.charge_target, a.charge_kind, t.class, t.kind, roles)
-        && charged(a)
+pub fn range_charge_hit(attacker: &Attacker, victim: &Victim, roles: &Roles) -> bool {
+    attacker.charge_kind.ranged()
+        && charge_works(
+            attacker.charge_target,
+            attacker.charge_kind,
+            victim.class,
+            victim.kind,
+            roles,
+        )
+        && charged(attacker)
 }

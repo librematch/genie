@@ -178,8 +178,9 @@ impl VisibleResources {
     /// are 0 to 4 and every manager holds 5 lists; the game writes past its lists for a group out
     /// of range.
     pub fn add(&mut self, id: ObjectId, group: GatherGroup, at: Point) {
-        let g = group.index();
-        let (Some(list), Some(capacity)) = (self.lists.get_mut(g), self.capacities.get_mut(g))
+        let index = group.index();
+        let (Some(list), Some(capacity)) =
+            (self.lists.get_mut(index), self.capacities.get_mut(index))
         else {
             return;
         };
@@ -204,7 +205,10 @@ impl VisibleResources {
         if list.is_empty() {
             return 0;
         }
-        let Some(i) = list.iter().position(|r| r.id == id) else {
+        let Some(i) = list
+            .iter()
+            .position(|visible_resource| visible_resource.id == id)
+        else {
             return -1;
         };
         let _ = list.swap_remove(i);
@@ -227,11 +231,14 @@ impl VisibleResources {
         };
         let mut best = None;
         let mut nearest = f32::MAX;
-        for (i, r) in list.iter().enumerate() {
-            let (dx, dy) = (gap(r.at.x(), x), gap(r.at.y(), y));
+        for (index, visible_resource) in list.iter().enumerate() {
+            let (dx, dy) = (
+                gap(visible_resource.at.x(), x),
+                gap(visible_resource.at.y(), y),
+            );
             let d = dy * dy + dx * dx;
-            if d < nearest && !skip.contains(&r.id) {
-                best = Some(i);
+            if d < nearest && !skip.contains(&visible_resource.id) {
+                best = Some(index);
                 nearest = d;
             }
         }
@@ -405,9 +412,11 @@ impl Visibility {
             return Ok(());
         }
         let word = *self.unified.checked(self.index(tile))? & VisionBits::OBJECT_MASK;
-        for (p, r) in PlayerId::each(self.resources.len()).zip(&mut self.resources) {
-            if word.intersects(VisionBits::explored(p)) {
-                let _ = r.remove(id, group);
+        for (player_id, visible_resources) in
+            PlayerId::each(self.resources.len()).zip(&mut self.resources)
+        {
+            if word.intersects(VisionBits::explored(player_id)) {
+                let _ = visible_resources.remove(id, group);
             }
         }
         Ok(())

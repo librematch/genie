@@ -46,8 +46,8 @@ impl Mul<Seconds> for AmountRate {
 }
 
 impl genie_diff::Diff for AmountRate {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -60,16 +60,22 @@ mod tests {
     /// negation flips the sign bit alone, a NaN's too.
     #[test]
     fn an_amount_rate_over_seconds_is_an_amount() {
-        let (r, dt) = (AmountRate::new(0.7), Seconds::new(0.3));
-        assert_eq!((r * dt).get().to_bits(), (0.7_f32 * 0.3).to_bits());
-        assert_eq!((-r).get().to_bits(), 0.7_f32.to_bits() ^ 0x8000_0000);
+        let (amount_rate, dt) = (AmountRate::new(0.7), Seconds::new(0.3));
+        assert_eq!(
+            (amount_rate * dt).get().to_bits(),
+            (0.7_f32 * 0.3).to_bits()
+        );
+        assert_eq!(
+            (-amount_rate).get().to_bits(),
+            0.7_f32.to_bits() ^ 0x8000_0000
+        );
         let nan = f32::from_bits(0x7fc0_0001);
         assert_eq!(
             (-AmountRate::new(nan)).get().to_bits(),
             0x7fc0_0001 ^ 0x8000_0000
         );
-        assert!(AmountRate::ZERO < r);
-        assert_eq!(AmountRate::new(f32::NAN).partial_cmp(&r), None);
+        assert!(AmountRate::ZERO < amount_rate);
+        assert_eq!(AmountRate::new(f32::NAN).partial_cmp(&amount_rate), None);
         assert_eq!(AmountRate::new(1.5).to_string(), "1.5");
     }
 }

@@ -76,9 +76,9 @@ pub fn generates(
         && let Some(top) = top
         && WORKING_ACTIONS.contains(&top.kind)
         && top.state == WORKING
-        && let Some(t) = top.target
-        && (HitPoints::ZERO < t.hp || Amount::ZERO < t.storage)
-        && task.for_class(t.class)
+        && let Some(work_target) = top.target
+        && (HitPoints::ZERO < work_target.hp || Amount::ZERO < work_target.storage)
+        && task.for_class(work_target.class)
     {
         return true;
     }
@@ -114,11 +114,12 @@ pub fn store(amount: Amount, out: AttributeId, stores: &mut [Amount]) -> Option<
 }
 
 impl World {
-    /// A generation task of the object at `(p, i)` as `owner`'s ([`generates`], [`generated`],
-    /// [`store`]): what reaches the store's threshold goes to the player (slot 0xf8 with 1 and 1,
-    /// as a load's, [`crate::gathering::gather::unit::give_load`]); the statistics (`FUN_14097daf0`, the local
-    /// player's, and `FUN_140a4c020`'s telemetry) are not held. The top action's target is read
-    /// as the world holds it after the update (its hits wrote their victims back where they ran).
+    /// A generation task of the object at `(player_id, list_index)` as `owner`'s ([`generates`],
+    /// [`generated`], [`store`]): what reaches the store's threshold goes to the player (slot 0xf8
+    /// with 1 and 1, as a load's, [`crate::gathering::gather::unit::give_load`]); the statistics
+    /// (`FUN_14097daf0`, the local player's, and `FUN_140a4c020`'s telemetry) are not held. The top
+    /// action's target is read as the world holds it after the update (its hits wrote their victims
+    /// back where they ran).
     ///
     /// # Errors
     ///
@@ -126,12 +127,12 @@ impl World {
     /// who shares with allies ([`crate::gathering::gather::unit::give_load`]).
     pub(super) fn generate(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         owner: PlayerId,
         master: Own,
         task: &Task,
     ) -> GenieResult<()> {
-        let unit = self.players.live(p, i)?;
+        let unit = self.players.live(player_id, list_index)?;
         let flags = task.combat_level_flag;
         let short_cut = match master.kind {
             MasterKind::COMBAT => flags.contains(TaskFlags::UNITS_ALWAYS),
@@ -140,26 +141,27 @@ impl World {
         let top = if short_cut || master.kind != MasterKind::COMBAT {
             None
         } else {
-            if let Some(e) = self.parts.unread.get(unit.id).map(Unread::error) {
-                return Err(e);
+            if let Some(error) = self.parts.unread.get(unit.id).map(Unread::error) {
+                return Err(error);
             }
             match self.parts.actions_of(unit.id).top_action() {
-                Some(a) => {
+                Some(top_action) => {
                     // FUN_140a78450: an id below 0 names no object; the target only matters
                     // to an action of the test's at work
-                    let works = WORKING_ACTIONS.contains(&a.kind) && a.state == WORKING;
+                    let works =
+                        WORKING_ACTIONS.contains(&top_action.kind) && top_action.state == WORKING;
                     let target = match self
                         .parts
                         .actions_of(unit.id)
                         .top_target()
                         .filter(|t| works && !t.is_recyclable())
                     {
-                        Some(t) => self.work_target(t)?,
+                        Some(object_id) => self.work_target(object_id)?,
                         None => None,
                     };
                     Some(TopWork {
-                        kind: a.kind,
-                        state: a.state,
+                        kind: top_action.kind,
+                        state: top_action.state,
                         target,
                     })
                 }
@@ -171,14 +173,14 @@ impl World {
             .spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(unit.id))
-            .and_then(|s| s.building);
+            .and_then(|visibility| visibility.seer(unit.id))
+            .and_then(|seer| seer.building);
         if !generates(task, master.kind, master.kind, top, building) {
             return Ok(());
         }
         let player = self.players.player_mut(owner)?;
         let multiplier = (task.attribute_kind2)
-            .and_then(|a| player.attribute(a))
+            .and_then(|attribute_id| player.attribute(attribute_id))
             .unwrap_or(Amount::ZERO);
         let amount = generated(self.dt_seconds, task, multiplier);
         // no store without the task's attribute: nothing reaches the player
@@ -210,14 +212,14 @@ impl World {
     /// What a generation task's test reads of the object `id` its top action works on, as the
     /// world holds it; None for an object the world does not hold.
     pub(super) fn work_target(&self, id: ObjectId) -> GenieResult<Option<WorkTarget>> {
-        let Some((q, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(None);
         };
-        let m = u.master(self.master_tables(), q)?;
+        let master = unit.master(self.master_tables(), player_id)?;
         Ok(Some(WorkTarget {
-            hp: u.life.hp,
-            storage: m.storage.first().map_or(Amount::ZERO, |s| s.1),
-            class: m.class,
+            hp: unit.life.hp,
+            storage: master.storage.first().map_or(Amount::ZERO, |s| s.1),
+            class: master.class,
         }))
     }
 }

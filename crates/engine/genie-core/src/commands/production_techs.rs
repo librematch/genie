@@ -36,17 +36,17 @@ impl World {
     pub(super) fn queue_techs(
         &mut self,
         player: PlayerId,
-        i: ListIndex,
+        list_index: ListIndex,
         (master, tech): (Option<MasterId>, TechId),
         count: QueuedUnits,
         button: QueueButton,
     ) -> GenieResult<QueueOutcome> {
-        let t = tech.index();
-        let def = self.model.techs.get(t).ok_or(GenieError::unsupported(
+        let index = tech.index();
+        let def = self.model.techs.get(index).ok_or(GenieError::unsupported(
             "a technology the data file has not got",
         ))?;
         let owner = self.players.player_mut(player)?;
-        let state = owner.techs.checked(t)?;
+        let state = owner.techs.checked(index)?;
         let done = state
             .pending
             .get()
@@ -62,26 +62,26 @@ impl World {
         } else {
             Repeat::Denied
         };
-        let building = owner.objects.checked(i)?.life.master_id;
+        let building = owner.objects.checked(list_index)?.life.master_id;
         n = pay_researches(owner, (def, tech), repeat, building, n, self.model.slots)?;
         if n <= 0 {
             return Ok(QueueOutcome::NoneQueued);
         }
         let listed = owner
             .techs
-            .checked(t)?
+            .checked(index)?
             .listed_costs(def, factors(tech, &*owner, self.model.slots)?)?;
         let costs = as_entry_costs(listed);
-        let id = owner.objects.checked(i)?.id;
+        let id = owner.objects.checked(list_index)?.id;
         let production = self.production_or_new(id)?;
         if join_last(&mut production.queue, tech, &costs, n)? == EntryJoin::Joined {
-            let state = self.players.player_mut(player)?.techs.checked_mut(t)?;
+            let state = self.players.player_mut(player)?.techs.checked_mut(index)?;
             state.pending = state.pending.plus(n);
             return Ok(QueueOutcome::Queued);
         }
         self.new_entry(
             player,
-            i,
+            list_index,
             (master, Some(tech)),
             QueuedUnits::of_data(n),
             button,
@@ -91,7 +91,7 @@ impl World {
             .players
             .player_mut(player)?
             .techs
-            .checked_mut(t)?
+            .checked_mut(index)?
             .pending;
         *pending = pending.plus(n);
         Ok(QueueOutcome::Queued)
@@ -109,13 +109,13 @@ fn pay_researches(
     n: i16,
     slots: Slots,
 ) -> GenieResult<i16> {
-    let t = tech.index();
+    let index = tech.index();
     let mut paid = 0i16;
     while paid < n {
         let factors = factors(tech, &*owner, slots)?;
-        let mut state = take(owner.techs.checked_mut(t)?);
+        let mut state = take(owner.techs.checked_mut(index)?);
         let ok = state.pay(def, factors, repeat, building, owner, slots);
-        *owner.techs.checked_mut(t)? = state;
+        *owner.techs.checked_mut(index)? = state;
         if ok? == Payment::Unpaid {
             return Ok(paid);
         }

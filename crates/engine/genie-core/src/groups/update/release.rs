@@ -62,12 +62,12 @@ impl World {
             return Ok(());
         }
         let top = self.top_target_object(unit.id);
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         let (retarget, certain) = (
-            g.current_target.disable_retargeting,
-            g.current_target.certain_action,
+            held.current_target.disable_retargeting,
+            held.current_target.certain_action,
         );
-        if !self.member_idle(id)? && top.is_some() && top == g.current_target.target.key() {
+        if !self.member_idle(id)? && top.is_some() && top == held.current_target.target.key() {
             return Ok(());
         }
         let part = self.gate_part(id, target)?;
@@ -112,7 +112,7 @@ impl World {
             .held_mut(group)?
             .members
             .iter_mut()
-            .find(|m| m.id == id)
+            .find(|member| member.id == id)
             .ok_or_else(|| {
                 GenieError::unreachable("a released unit's move record before the member array")
                     .with("group", group)

@@ -69,8 +69,8 @@ impl World {
     pub(crate) fn keep_apart(&mut self, group: GroupId) -> GenieResult<()> {
         let mut i = 0;
         loop {
-            let g = self.groups.held(group)?;
-            let Some(&id) = g.objects.get(i) else {
+            let held = self.groups.held(group)?;
+            let Some(&id) = held.objects.get(i) else {
                 break;
             };
             let Some(object) = self.world_object(id) else {
@@ -81,14 +81,14 @@ impl World {
                 i += 1;
                 continue;
             }
-            if let WorldObject::Unit(p, u, _) = object
+            if let WorldObject::Unit(player_id, unit, _) = object
                 && self
                     .parts
                     .unit_ai
-                    .get(u.id)
+                    .get(unit.id)
                     .is_some_and(|ai| ai.current_action == Some(AiAction::Attack))
             {
-                let master = u.master(self.master_tables(), p)?;
+                let master = unit.master(self.master_tables(), player_id)?;
                 // The relics' master class (`FUN_141017c70`'s test of the target's class).
                 // The monastery's master id (`FUN_141017850`'s test of the target's master).
                 // The master types from which an object moves (`RGE_Moving_Object`), acts
@@ -103,8 +103,8 @@ impl World {
                 let reach = reach * reach;
                 let mut nearest = FARTHEST;
                 let mut found = false;
-                for m in &g.members {
-                    let Some(other) = self.world_object(m.id) else {
+                for member in &held.members {
+                    let Some(other) = self.world_object(member.id) else {
                         continue;
                     };
                     if other.id() == object.id() {
@@ -146,13 +146,13 @@ impl World {
     /// An object of a master the slice does not have, and what
     /// [`Action::interruptible`](crate::objects::layers::Action::interruptible) does not model.
     pub(super) fn may_interrupt(&self, object: WorldObject<'_>) -> GenieResult<bool> {
-        let WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(player_id, unit, _) = object else {
             return Ok(false);
         };
-        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
+        if unit.master(self.master_tables(), player_id)?.kind < MasterKind::ACTION {
             return Ok(false);
         }
-        if let Some(group) = u.group.id
+        if let Some(group) = unit.group.id
             && self.groups.get(group).is_some()
             && !self.at_rest(group)
         {
@@ -161,14 +161,14 @@ impl World {
         if self
             .parts
             .unit_ai
-            .get(u.id)
+            .get(unit.id)
             .is_some_and(|ai| !ai.orders.is_empty())
         {
             return Ok(false);
         }
         self.parts
-            .actions_of(u.id)
-            .interruptible(self.parts.unread.get(u.id))
+            .actions_of(unit.id)
+            .interruptible(self.parts.unread.get(unit.id))
     }
 
     /// `FUN_141007a50` of group `group`: at rest without a command (-1), its motion not moving
@@ -183,9 +183,9 @@ impl World {
         if g.current_command != NO_COMMAND || g.motion.moving() {
             return false;
         }
-        !g.members.iter().any(|m| {
-            matches!(self.world_object(m.id), Some(WorldObject::Unit(_, u, _))
-                if self.parts.mover_of(u.id).is_some_and(Mover::is_moving))
+        !g.members.iter().any(|member| {
+            matches!(self.world_object(member.id), Some(WorldObject::Unit(_, unit, _))
+                if self.parts.mover_of(unit.id).is_some_and(Mover::is_moving))
         })
     }
 
@@ -201,21 +201,21 @@ impl World {
         &self,
         object: WorldObject<'_>,
     ) -> GenieResult<Option<WorldObject<'_>>> {
-        let WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(player_id, unit, _) = object else {
             return Ok(None);
         };
-        if u.master(self.master_tables(), p)?.kind < MasterKind::ACTION {
+        if unit.master(self.master_tables(), player_id)?.kind < MasterKind::ACTION {
             return Ok(None);
         }
-        if let Some(e) = self.parts.unread.get(u.id).map(Unread::error) {
-            return Err(e);
+        if let Some(error) = self.parts.unread.get(unit.id).map(Unread::error) {
+            return Err(error);
         }
         Ok(self
             .parts
-            .actions_of(u.id)
+            .actions_of(unit.id)
             .top_target()
             .filter(|&t| !t.is_recyclable())
-            .and_then(|t| self.world_object(t)))
+            .and_then(|object_id| self.world_object(object_id)))
     }
 
     /// `FUN_14118f8c0` of `a` and `b`: the squared gap of their footprints (their masters'
@@ -310,30 +310,33 @@ impl World {
     /// ([`World::has_task`]) pick up relics (132) and its target (the unit AI's, `+0x48`) is a
     /// relic (its master's class `0x2a`), or deliver them (136) and its target is a relic or
     /// none the world holds.
-    pub(super) fn relic_pickup_pending(&self, g: &UnitGroup) -> GenieResult<bool> {
-        let owner = g.owner_player()?;
-        for m in &g.members {
-            let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
+    pub(super) fn relic_pickup_pending(&self, group: &UnitGroup) -> GenieResult<bool> {
+        let owner = group.owner_player()?;
+        for member in &group.members {
+            let Some(WorldObject::Unit(_, unit, _)) = self.world_object(member.id) else {
                 continue;
             };
-            let Some(ai) = self.parts.unit_ai.get(u.id) else {
+            let Some(ai) = self.parts.unit_ai.get(unit.id) else {
                 continue;
             };
-            let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
-            let delivers = self.has_task(owner, u.life.master_id, RELIC_DELIVERY_ACTION)?;
+            let picks = self.has_task(owner, unit.life.master_id, RELIC_PICKUP_ACTION)?;
+            let delivers = self.has_task(owner, unit.life.master_id, RELIC_DELIVERY_ACTION)?;
             let target = self.world_object(ai.current_target);
             let relic = match target {
-                Some(t) => self
+                Some(world_object) => self
                     .model
                     .roles
                     .of_class(
-                        self.master(t.player(), t.master_id(self.model.slots))?
-                            .class,
+                        self.master(
+                            world_object.player(),
+                            world_object.master_id(self.model.slots),
+                        )?
+                        .class,
                     )
                     .contains(ClassRoles::RELIC),
                 None => false,
             };
-            if g.current_command == PICK_UP_RELIC
+            if group.current_command == PICK_UP_RELIC
                 && (ai.current_order == Some(OrderKind::OnTarget)
                     || ai.current_action == Some(AiAction::OnTarget))
                 && ((picks && relic) || (delivers && (relic || target.is_none())))
@@ -347,24 +350,26 @@ impl World {
     /// `FUN_141017850`: as [`World::relic_pickup_pending`], on a group still delivering a relic
     /// (136): the target is a monastery (master 104) and the member's master's tasks deliver or
     /// pick up relics.
-    pub(super) fn relic_delivery_pending(&self, g: &UnitGroup) -> GenieResult<bool> {
-        let owner = g.owner_player()?;
-        for m in &g.members {
-            let Some(WorldObject::Unit(_, u, _)) = self.world_object(m.id) else {
+    pub(super) fn relic_delivery_pending(&self, group: &UnitGroup) -> GenieResult<bool> {
+        let owner = group.owner_player()?;
+        for member in &group.members {
+            let Some(WorldObject::Unit(_, unit, _)) = self.world_object(member.id) else {
                 continue;
             };
-            let Some(ai) = self.parts.unit_ai.get(u.id) else {
+            let Some(ai) = self.parts.unit_ai.get(unit.id) else {
                 continue;
             };
-            let picks = self.has_task(owner, u.life.master_id, RELIC_PICKUP_ACTION)?;
-            let delivers = self.has_task(owner, u.life.master_id, RELIC_DELIVERY_ACTION)?;
-            let monastery = self.world_object(ai.current_target).is_some_and(|t| {
-                self.model
-                    .roles
-                    .of_master(t.master_id(self.model.slots))
-                    .contains(MasterRoles::MONASTERY)
-            });
-            if g.current_command == DELIVER_RELIC
+            let picks = self.has_task(owner, unit.life.master_id, RELIC_PICKUP_ACTION)?;
+            let delivers = self.has_task(owner, unit.life.master_id, RELIC_DELIVERY_ACTION)?;
+            let monastery = self
+                .world_object(ai.current_target)
+                .is_some_and(|world_object| {
+                    self.model
+                        .roles
+                        .of_master(world_object.master_id(self.model.slots))
+                        .contains(MasterRoles::MONASTERY)
+                });
+            if group.current_command == DELIVER_RELIC
                 && (ai.current_order == Some(OrderKind::OnTarget)
                     || ai.current_action == Some(AiAction::OnTarget))
                 && monastery
@@ -396,7 +401,7 @@ impl World {
                 && m.action_part()
                     .tasks
                     .iter()
-                    .any(|t| t.action_kind == action)
+                    .any(|task| task.action_kind == action)
         }))
     }
 
@@ -440,13 +445,13 @@ impl World {
         let Some(object) = self.world_object(id) else {
             return Ok(false);
         };
-        let WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(player_id, unit, _) = object else {
             return Ok(true);
         };
-        self.parts.actions_of(u.id).free_for_group(
-            self.parts.unread.get(u.id),
-            u.master(self.master_tables(), p)?,
-            self.parts.unit_ai.get(u.id),
+        self.parts.actions_of(unit.id).free_for_group(
+            self.parts.unread.get(unit.id),
+            unit.master(self.master_tables(), player_id)?,
+            self.parts.unit_ai.get(unit.id),
             &self.model.roles,
         )
     }
@@ -506,10 +511,10 @@ impl World {
     ///
     /// A trade cart, or an action the slice does not model ([`World::show_sprite`]).
     fn sprite_to_show(&self, id: ObjectId, shown: Shown) -> GenieResult<Option<SpriteId>> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(None);
         };
-        let master = u.master(self.master_tables(), p)?;
+        let master = unit.master(self.master_tables(), player_id)?;
         if master.kind < MasterKind::MOVING {
             return Ok(None);
         }
@@ -536,13 +541,13 @@ impl World {
             return Err(TRADE_CART_SPRITES);
         }
         if MasterKind::ACTION <= master.kind
-            && let Some(e) = self.parts.unread.get(u.id).map(Unread::error)
+            && let Some(error) = self.parts.unread.get(unit.id).map(Unread::error)
         {
-            return Err(e);
+            return Err(error);
         }
         // the slots of a combat object read its terrain look ([`crate::objects::sprite::standing`]); a
         // trade cart's goods are passed above
-        let look = self.parts.combat_of(u.id).abilities.look.as_ref();
+        let look = self.parts.combat_of(unit.id).abilities.look.as_ref();
         let sprite = match shown {
             Shown::Standing => standing(master, look, Cargo::Empty, &self.model.roles),
             Shown::Walking => walking(master, look, Cargo::Empty, &self.model.roles),
@@ -558,16 +563,18 @@ impl World {
         };
         let graphic = self.model.graphics.get(sprite).copied();
         let place = self.place(id).ok_or_else(|| member_gone(id))?;
-        let u = match place {
+        let unit = match place {
             Place::Live(p, i) => self.players.live_mut(p, i).ok(),
-            Place::Sleeping(p, i) => self.players.asleep_mut(p, i).ok(),
+            Place::Sleeping(player_id, list_index) => {
+                self.players.asleep_mut(player_id, list_index).ok()
+            }
         }
         .ok_or_else(|| member_gone(id))?;
-        let mut motion = self.parts.motion.layer_mut(u.id);
-        if let Some(m) = motion.mover_mut() {
-            m.shows(graphic.as_ref());
+        let mut motion = self.parts.motion.layer_mut(unit.id);
+        if let Some(mover) = motion.mover_mut() {
+            mover.shows(graphic.as_ref());
         }
-        if u.sprite.is_none() {
+        if unit.sprite.is_none() {
             return Ok(SpriteShow::Shown);
         }
         let g = graphic.ok_or(GenieError::unsupported(
@@ -575,7 +582,7 @@ impl World {
         ))?;
         let rng = self.streams.get(Stream::Sprite);
         new_sprite(
-            &mut u.sprite,
+            &mut unit.sprite,
             motion.move_stats_mut(),
             g,
             rng,
@@ -593,15 +600,17 @@ impl World {
         let to = g.current_target.original_position;
         let mut best = f32::MAX;
         let mut lead = None;
-        for m in &g.members {
-            let Some((_, u)) = self.object(m.id) else {
+        for member in &g.members {
+            let Some((_, unit)) = self.object(member.id) else {
                 continue;
             };
             // slot 0x520: the game's vector of where it last moved to
-            let d = moved_place(u, self.parts.mover_of(u.id)) - to;
-            let squared = d.x() * d.x() + d.height() * d.height() + d.y() * d.y();
+            let moved_place = moved_place(unit, self.parts.mover_of(unit.id)) - to;
+            let squared = moved_place.x() * moved_place.x()
+                + moved_place.height() * moved_place.height()
+                + moved_place.y() * moved_place.y();
             if squared < best {
-                lead = Some(m.id);
+                lead = Some(member.id);
                 best = squared;
             }
         }
@@ -634,7 +643,7 @@ impl Action {
             }
             actions
                 .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state)
+                .map_or(ActionState::NO_ACTION, |top_action| top_action.state)
         }
         .get();
         if 1 < state {

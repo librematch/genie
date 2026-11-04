@@ -189,8 +189,8 @@ fn generic_kind_compares_its_parameter() {
         value: T,
     }
     let a = Held { value: Id(1) };
-    let b = Held { value: Id(2) };
-    assert_eq!(found(&a, &b, Scope::Saved), [row("value", "1", "2")]);
+    let held = Held { value: Id(2) };
+    assert_eq!(found(&a, &held, Scope::Saved), [row("value", "1", "2")]);
 }
 
 /// An object's parts that moved off its row, each at the place it had.

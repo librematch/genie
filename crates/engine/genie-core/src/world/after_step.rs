@@ -39,8 +39,8 @@ impl World {
         timing: (Millis, Option<Millis>, bool),
         f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<Outcome>,
     ) -> GenieResult<Stepped> {
-        self.step_answering(at, timing, |unit, actions, c| {
-            f(unit, actions, c).map(|outcome| (outcome, ()))
+        self.step_answering(at, timing, |unit, actions, step| {
+            f(unit, actions, step).map(|outcome| (outcome, ()))
         })
         .map(|(stepped, ())| stepped)
     }
@@ -53,32 +53,32 @@ impl World {
     /// As [`World::step_object`]'s.
     pub(super) fn step_answering<R>(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         (dt, turn, full): (Millis, Option<Millis>, bool),
         f: impl FnOnce(&mut Unit, &mut Action, &mut Step<'_>) -> GenieResult<(Outcome, R)>,
     ) -> GenieResult<(Stepped, R)> {
-        let id = self.players.live(p, i)?.id;
-        let (outcome, answer) = self.run_object((p, i), (dt, turn), f)?;
-        let at = (p, self.slot_of(p, id)?, id);
+        let id = self.players.live(player_id, list_index)?.id;
+        let (outcome, answer) = self.run_object((player_id, list_index), (dt, turn), f)?;
+        let at = (player_id, self.slot_of(player_id, id)?, id);
         self.finish_own_update(at, (dt, full), &outcome)?;
         self.hand_changed_tiles();
         let stepped = Stepped {
             outcome,
-            slot: self.slot_of(p, id)?,
+            slot: self.slot_of(player_id, id)?,
         };
         Ok((stepped, answer))
     }
 
-    /// The slot of object `id` in player `p`'s live list, after its step.
+    /// The slot of object `id` in player `player_id`'s live list, after its step.
     ///
     /// # Errors
     ///
     /// The object left the list in its own step.
-    fn slot_of(&self, p: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
-        let _ = self.players.player(p)?;
+    fn slot_of(&self, player_id: PlayerId, id: ObjectId) -> GenieResult<ListIndex> {
+        let _ = self.players.player(player_id)?;
         // the step can move the object (another's removal), and its own removal waits for
         // `World::file_step`
-        self.live_index(p, id).ok_or_else(|| {
+        self.live_index(player_id, id).ok_or_else(|| {
             GenieError::unreachable("a stepped object left its list in its outcome")
                 .with("object", id)
         })
@@ -89,29 +89,29 @@ impl World {
     /// check, and a building's production.
     fn finish_own_update(
         &mut self,
-        (p, i, id): (PlayerId, ListIndex, ObjectId),
+        (player_id, list_index, id): (PlayerId, ListIndex, ObjectId),
         (dt, own_update): (Millis, bool),
         outcome: &Outcome,
     ) -> GenieResult<()> {
         // TRIBE_Combat_Object::update's regeneration after RGE_Combat_Object::update
         if own_update {
-            self.regenerate_object((p, i, id), dt.seconds())?;
+            self.regenerate_object((player_id, list_index, id), dt.seconds())?;
         }
         // TRIBE_Combat_Object::update's passive abilities (FUN_1412072f0) as the object's owner
         // after its update; a removal reward's command comes back as the recording's own
         if own_update {
             let (owner, leaves) = match outcome {
-                Outcome::Captured(k) if k.main => (k.new, false),
-                Outcome::Leave => (p, true),
-                _ => (p, false),
+                Outcome::Captured(captured) if captured.main => (captured.new, false),
+                Outcome::Leave => (player_id, true),
+                _ => (player_id, false),
             };
-            let _ = self.abilities((id, p, i), owner, leaves)?;
+            let _ = self.abilities((id, player_id, list_index), owner, leaves)?;
             // then its hit point powerup check
-            self.clamp_object_powerup((p, i, id))?;
+            self.clamp_object_powerup((player_id, list_index, id))?;
         }
         // TRIBE_Building_Object::update: the production after the combat update
         if matches!(outcome, Outcome::Stay) && own_update {
-            self.building_production(p, i, dt.seconds())?;
+            self.building_production(player_id, list_index, dt.seconds())?;
         }
         Ok(())
     }

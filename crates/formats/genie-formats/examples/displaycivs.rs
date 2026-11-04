@@ -16,8 +16,8 @@ struct DisplayCivs {
 /// Executes the CLI.
 fn main() -> anyhow::Result<()> {
     let cli_input = DisplayCivs::from_args();
-    let mut f = File::open(&cli_input.file_name)?;
-    let dat = DatFile::read_from(&mut f)?;
+    let mut file = File::open(&cli_input.file_name)?;
+    let dat = DatFile::read_from(&mut file)?;
     for civ in &dat.civilizations {
         println!("{}", civ.name());
     }

@@ -110,11 +110,11 @@ impl World {
         // an Attack whose MoveTo started arrived: the unit shows the idle sprite (slot 0x68) and
         // its `+0x7b8` clears (`Attack::arrived_sprite`)
         if move_start == MoveStart::Arrived {
-            let g = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
+            let graphic = arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
             new_sprite(
                 &mut unit.sprite,
                 self.parts.move_stats_mut(unit.id),
-                g,
+                graphic,
                 self.streams.get(Stream::Sprite),
                 self.model.tuning.sprite,
             );

@@ -59,8 +59,8 @@ impl TriggerCondition {
                 output.write_i32::<LE>(*value)?;
             }
         } else {
-            for i in 0..13 {
-                output.write_i32::<LE>(*self.properties.get(i).unwrap_or(&0))?;
+            for index in 0..13 {
+                output.write_i32::<LE>(*self.properties.get(index).unwrap_or(&0))?;
             }
         }
 

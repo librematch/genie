@@ -75,7 +75,7 @@ mod tests {
     fn the_unturned_kinds_are_2_and_3() {
         let unturned: Vec<i32> = (0..5)
             .map(TransformKind::of_data)
-            .filter(|t| t.unturned())
+            .filter(|transform_kind| transform_kind.unturned())
             .map(TransformKind::get)
             .collect();
         assert_eq!(unturned, [2, 3]);

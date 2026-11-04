@@ -17,16 +17,17 @@ impl PlayerSet {
     /// No player.
     pub const NONE: Self = Self::empty();
 
-    /// The set of player `p` alone (`1 << p`, the shift's count taken mod 32 as the game's).
+    /// The set of player `player_id` alone (`1 << player_id`, the shift's count taken mod 32 as the
+    /// game's).
     #[must_use]
-    pub fn of(p: PlayerId) -> Self {
-        Self::from_bits_retain(1u32.wrapping_shl(u32::from(p.get())))
+    pub fn of(player_id: PlayerId) -> Self {
+        Self::from_bits_retain(1u32.wrapping_shl(u32::from(player_id.get())))
     }
 
-    /// The set holds player `p` (its bit, the count mod 32).
+    /// The set holds player `player_id` (its bit, the count mod 32).
     #[must_use]
-    pub fn holds(self, p: PlayerId) -> bool {
-        self.intersects(Self::of(p))
+    pub fn holds(self, player_id: PlayerId) -> bool {
+        self.intersects(Self::of(player_id))
     }
 }
 
@@ -41,8 +42,8 @@ impl FromIterator<PlayerId> for PlayerSet {
 
 impl genie_diff::Diff for PlayerSet {
     /// By equality: a set is one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

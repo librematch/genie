@@ -19,7 +19,9 @@ impl TaskIndex {
     /// The short a field holds for `index`, −1 for none.
     #[must_use]
     pub fn field(index: Option<Self>) -> i16 {
-        index.map_or(-1, |i| i16::try_from(i.0).unwrap_or(i16::MAX))
+        index.map_or(-1, |task_index| {
+            i16::try_from(task_index.0).unwrap_or(i16::MAX)
+        })
     }
 
     /// Its place in the list.
@@ -30,8 +32,8 @@ impl TaskIndex {
 }
 
 impl genie_diff::Diff for TaskIndex {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

@@ -50,9 +50,14 @@ mod tests {
     /// The four ids keep their order; −1 is none.
     #[test]
     fn task_sprites_keep_their_order() {
-        let s = TaskSprites::of_data([1, -1, 3, 4]);
+        let task_sprites = TaskSprites::of_data([1, -1, 3, 4]);
         assert_eq!(
-            (s.moving, s.proceeding, s.working, s.carrying),
+            (
+                task_sprites.moving,
+                task_sprites.proceeding,
+                task_sprites.working,
+                task_sprites.carrying
+            ),
             (
                 Some(SpriteId::named(1)),
                 None,
@@ -63,8 +68,13 @@ mod tests {
         assert_eq!(TaskSprites::of_data([-1; 4]), TaskSprites::default());
         assert_eq!(TaskSprites::NONE, TaskSprites::default());
         assert_eq!(
-            s.ids(),
-            [s.moving, s.proceeding, s.working, s.carrying],
+            task_sprites.ids(),
+            [
+                task_sprites.moving,
+                task_sprites.proceeding,
+                task_sprites.working,
+                task_sprites.carrying
+            ],
             "the data's order"
         );
     }

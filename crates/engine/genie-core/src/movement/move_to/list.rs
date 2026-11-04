@@ -29,7 +29,7 @@ pub struct ListUpdate {
 /// The walk's and the notifies'.
 pub(crate) fn update_sub_actions(
     list: &mut Option<MoveToAction>,
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     unit: &mut Unit,
     me: Me,
     how: ListUpdate,
@@ -37,8 +37,8 @@ pub(crate) fn update_sub_actions(
     let Some(move_to) = list else {
         return Ok(SubCode::Done);
     };
-    let held = c.w.object_state(move_to.target);
-    let (mut walk, beside) = c.w.walk_beside(c.pace()?, &mut unit.place, me);
+    let held = step.w.object_state(move_to.target);
+    let (mut walk, beside) = step.w.walk_beside(step.pace()?, &mut unit.place, me);
     let shown = (move_to.state == MoveTo::Start).then_some(Shown {
         sprite: &mut unit.sprite,
         rng: beside.sprite_rng,

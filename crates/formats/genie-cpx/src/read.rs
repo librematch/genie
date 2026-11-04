@@ -234,7 +234,7 @@ where
     /// cannot be parsed.
     pub fn by_name(&mut self, filename: &str) -> GenieResult<Scenario> {
         let bytes = self.by_name_raw(filename)?;
-        Scenario::read_from(Cursor::new(bytes)).map_err(|e| e.with("scenario", filename))
+        Scenario::read_from(Cursor::new(bytes)).map_err(|error| error.with("scenario", filename))
     }
 
     /// Get a scenario by its campaign index.
@@ -245,7 +245,7 @@ where
     /// be parsed.
     pub fn by_index(&mut self, index: usize) -> GenieResult<Scenario> {
         let bytes = self.by_index_raw(index)?;
-        Scenario::read_from(Cursor::new(bytes)).map_err(|e| e.with("index", index))
+        Scenario::read_from(Cursor::new(bytes)).map_err(|error| error.with("index", index))
     }
 
     /// Get a scenario file buffer by its file name.
@@ -307,14 +307,14 @@ mod tests {
     /// A scenario the campaign does not hold, by index or by name, is missing data.
     #[test]
     fn scenario_the_campaign_does_not_hold_is_missing() -> anyhow::Result<()> {
-        let f = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
-        let mut c = Campaign::read_from(f)?;
-        for e in [
-            c.by_index_raw(1).unwrap_err(),
-            c.by_name_raw("none.scn").unwrap_err(),
+        let file = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
+        let mut campaign = Campaign::read_from(file)?;
+        for error in [
+            campaign.by_index_raw(1).unwrap_err(),
+            campaign.by_name_raw("none.scn").unwrap_err(),
         ] {
             assert_eq!(
-                (e.kind(), e.reason()),
+                (error.kind(), error.reason()),
                 (
                     genie_error::ErrorKind::MissingData,
                     "a scenario the campaign does not hold"
@@ -328,15 +328,18 @@ mod tests {
     /// Source: <http://aok.heavengames.com/blacksmith/showfile.php?fileid=884>
     #[test]
     fn detect_encoding() -> anyhow::Result<()> {
-        let f = File::open("./test/campaigns/DER FALL VON SACSAHUAMAN - TEIL I.cpx")?;
-        let cpx = Campaign::read_from(f)?;
+        let file = File::open("./test/campaigns/DER FALL VON SACSAHUAMAN - TEIL I.cpx")?;
+        let cpx = Campaign::read_from(file)?;
         assert_eq!(cpx.version(), AOE_AOK);
         assert_eq!(cpx.name(), "DER FALL VON SACSAHUAMÁN - TEIL I");
         assert_eq!(cpx.len(), 1);
 
         let names: Vec<_> = cpx.entries().map(|e| &e.name).collect();
         assert_eq!(names, vec!["Der Weg nach Sacsahuamán"]);
-        let filenames: Vec<_> = cpx.entries().map(|e| &e.filename).collect();
+        let filenames: Vec<_> = cpx
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(filenames, vec!["Der Weg nach Sacsahuamán.scx"]);
         Ok(())
     }
@@ -344,19 +347,24 @@ mod tests {
     /// Source: <http://aoe.heavengames.com/dl-php/showfile.php?fileid=1678>
     #[test]
     fn aoe1_trial_cpn() -> anyhow::Result<()> {
-        let f = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
-        let mut c = Campaign::read_from(f).context("could not read meta")?;
+        let file = File::open("test/campaigns/Armies at War A Combat Showcase.cpn")?;
+        let mut campaign = Campaign::read_from(file).context("could not read meta")?;
 
-        assert_eq!(c.version(), AOE_AOK);
-        assert_eq!(c.name(), "Armies at War, A Combat Showcase");
-        assert_eq!(c.len(), 1);
-        let names: Vec<_> = c.entries().map(|e| &e.name).collect();
+        assert_eq!(campaign.version(), AOE_AOK);
+        assert_eq!(campaign.name(), "Armies at War, A Combat Showcase");
+        assert_eq!(campaign.len(), 1);
+        let names: Vec<_> = campaign.entries().map(|e| &e.name).collect();
         assert_eq!(names, vec!["Bronze Age Art of War"]);
-        let filenames: Vec<_> = c.entries().map(|e| &e.filename).collect();
+        let filenames: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(filenames, vec!["Bronze Age Art of War.scn"]);
 
-        let by_index = c.by_index_raw(0).context("could not read raw file")?;
-        let by_name = c
+        let by_index = campaign
+            .by_index_raw(0)
+            .context("could not read raw file")?;
+        let by_name = campaign
             .by_name_raw("Bronze Age Art of War.scn")
             .context("could not read raw file")?;
         assert_eq!(by_index, by_name);
@@ -365,13 +373,16 @@ mod tests {
 
     #[test]
     fn aoe1_beta_cpn() -> anyhow::Result<()> {
-        let f = File::open("test/campaigns/Rise of Egypt Learning Campaign.cpn")?;
-        let c = Campaign::read_from(f).context("could not read meta")?;
+        let file = File::open("test/campaigns/Rise of Egypt Learning Campaign.cpn")?;
+        let campaign = Campaign::read_from(file).context("could not read meta")?;
 
-        assert_eq!(c.version(), AOE_AOK);
-        assert_eq!(c.name(), "Rise of Egypt Learning Campaign");
-        assert_eq!(c.len(), 12);
-        let filenames: Vec<_> = c.entries().map(|e| &e.filename).collect();
+        assert_eq!(campaign.version(), AOE_AOK);
+        assert_eq!(campaign.name(), "Rise of Egypt Learning Campaign");
+        assert_eq!(campaign.len(), 12);
+        let filenames: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(
             filenames,
             vec![
@@ -394,13 +405,16 @@ mod tests {
 
     #[test]
     fn aoe_de() -> anyhow::Result<()> {
-        let f = File::open("test/campaigns/10 The First Punic War.aoecpn")?;
-        let c = Campaign::read_from(f)?;
+        let file = File::open("test/campaigns/10 The First Punic War.aoecpn")?;
+        let campaign = Campaign::read_from(file)?;
 
-        assert_eq!(c.version(), AOE1_DE);
-        assert_eq!(c.name(), "10 The First Punic War");
-        assert_eq!(c.len(), 3);
-        let filenames: Vec<_> = c.entries().map(|e| &e.filename).collect();
+        assert_eq!(campaign.version(), AOE1_DE);
+        assert_eq!(campaign.name(), "10 The First Punic War");
+        assert_eq!(campaign.len(), 3);
+        let filenames: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(
             filenames,
             vec![
@@ -440,13 +454,16 @@ mod tests {
             ]
         );
 
-        let f = File::open("test/campaigns/rcam3.aoe2campaign")?;
-        let c = Campaign::read_from(f)?;
+        let file = File::open("test/campaigns/rcam3.aoe2campaign")?;
+        let campaign = Campaign::read_from(file)?;
 
-        assert_eq!(c.version(), AOE2_DE);
-        assert_eq!(c.name(), "rcam3");
-        assert_eq!(c.len(), 5);
-        let filenames: Vec<_> = c.entries().map(|e| &e.filename).collect();
+        assert_eq!(campaign.version(), AOE2_DE);
+        assert_eq!(campaign.name(), "rcam3");
+        assert_eq!(campaign.len(), 5);
+        let filenames: Vec<_> = campaign
+            .entries()
+            .map(|scenario_meta| &scenario_meta.filename)
+            .collect();
         assert_eq!(
             filenames,
             vec![

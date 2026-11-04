@@ -62,17 +62,17 @@ impl Unit {
     pub(crate) fn repair_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let Some(mut repair) = actions.list.repair().copied() else {
             return Ok(HeadCode::Keeps);
         };
-        let reads = self.repair_reads(c, repair.target, roles)?;
-        let repaired = repair.update(c, self, me, &reads, roles);
-        if let Some(r) = actions.list.repair_mut() {
-            *r = repair;
+        let reads = self.repair_reads(step, repair.target, roles)?;
+        let repaired = repair.update(step, self, me, &reads, roles);
+        if let Some(repair_action) = actions.list.repair_mut() {
+            *repair_action = repair;
         }
         // its end's 1 deletes it; the destructor (FUN_140ad8fd0) finds it out of the repairers
         // (set_state left them) and lets the target it still holds go
@@ -85,34 +85,34 @@ impl Unit {
     /// game mode, the owner's type and the unit AI's stance.
     pub(crate) fn repair_reads(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         target: Option<RepairTargetId>,
         roles: &Roles,
     ) -> GenieResult<RepairReads> {
         let own = repair_master(
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             self,
         )?;
         let (repairee, counted_in) = repairee_of(
-            c,
-            OthersRef::of(&c.w.players, &c.w.index, c.player)?,
+            step,
+            OthersRef::of(&step.w.players, &step.w.index, step.player)?,
             target.map(RepairTargetId::id),
         )?;
         Ok(RepairReads {
             target: repairee,
             counted_in,
             radius: own.radius,
-            scenario: c.w.settings.game_mode.scenario(),
-            rate: c.w.parts.combat_of(self.id).work_rate_powerup + own.action_part().work_rate,
+            scenario: step.w.settings.game_mode.scenario(),
+            rate: step.w.parts.combat_of(self.id).work_rate_powerup + own.action_part().work_rate,
             patience: if roles.of_class(own.class).contains(ClassRoles::VILLAGER)
-                && !c.w.players.player(c.player)?.kind.is_computer()
+                && !step.w.players.player(step.player)?.kind.is_computer()
             {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
-            stance: c
+            stance: step
                 .w
                 .parts
                 .unit_ai
@@ -200,36 +200,36 @@ impl Unit {
     }
 }
 
-/// Object `u`'s master: its own (`+0x6c0`), else player `q`'s of its id.
-fn repair_master(every: MasterTables<'_>, q: PlayerId, u: &Unit) -> GenieResult<Master> {
-    Ok(u.master(every, q)?.clone())
+/// Object `unit`'s master: its own (`+0x6c0`), else player `player_id`'s of its id.
+fn repair_master(every: MasterTables<'_>, player_id: PlayerId, unit: &Unit) -> GenieResult<Master> {
+    Ok(unit.master(every, player_id)?.clone())
 }
 
 /// The Repair's `target` as its update reads it ([`Repairee`]) and the object `FUN_140ad9050`
 /// counts its repairers in (the target, an annex's main building) with their count: none for a
 /// target the world does not hold.
 fn repairee_of(
-    c: &Step<'_>,
+    step: &Step<'_>,
     others: OthersRef<'_>,
     target: Option<ObjectId>,
 ) -> GenieResult<(Option<Repairee>, CountedIn)> {
     let held = |id: ObjectId| others.find(id);
-    let Some((target, (q, t))) = target.and_then(|id| Some((id, held(id)?))) else {
+    let Some((target, (player_id, t))) = target.and_then(|id| Some((id, held(id)?))) else {
         return Ok((None, None));
     };
     let tm = repair_master(
-        MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-        q,
+        MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+        player_id,
         t,
     )?;
     let repairee = Repairee {
         state: t.life.state,
         hp: t.life.hp,
-        owner: q,
+        owner: player_id,
         allied: allied(
-            &c.w.players.player(c.player)?.relations,
-            c.player,
-            q,
+            &step.w.players.player(step.player)?.relations,
+            step.player,
+            player_id,
             AllyTest::WithRelation4,
         ),
         position: t.position(),
@@ -239,17 +239,18 @@ fn repairee_of(
             && tm
                 .move_stats
                 .as_ref()
-                .is_some_and(|m| Speed::ZERO < m.speed),
+                .is_some_and(|move_stats| Speed::ZERO < move_stats.speed),
     };
     let counting = if tm.kind == MasterKind::BUILDING {
-        c.w.parts
+        step.w
+            .parts
             .building_of(t.id)
             .annex_of
             .map_or(target, MainBuildingId::id)
     } else {
         target
     };
-    let counted_in = held(counting).map(|(_, k)| (counting, c.w.parts.repairers_of(k.id)));
+    let counted_in = held(counting).map(|(_, unit)| (counting, step.w.parts.repairers_of(unit.id)));
     Ok((Some(repairee), counted_in))
 }
 
@@ -267,27 +268,27 @@ fn repairee_of(
 /// A target the world does not hold, one of class 51 or 54 below type 70, an object of a master
 /// the slice lacks, and an attribute the player has not got.
 pub(crate) fn repair_target(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     target: Option<RepairTargetId>,
     amount: HitPoints,
     roles: &Roles,
 ) -> GenieResult<(RepairOutcome, MasterKind)> {
-    let player = c.player;
+    let player = step.player;
     let mut set = Vec::new();
-    let others = OthersRef::of(&c.w.players, &c.w.index, player)?;
+    let others = OthersRef::of(&step.w.players, &step.w.index, player)?;
     if let Some(target) = target.map(RoleId::id)
-        && let Some((q, t)) = others.find(target)
+        && let Some((player_id, unit)) = others.find(target)
     {
         let tm = repair_master(
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            q,
-            t,
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            player_id,
+            unit,
         )?;
-        for id in reached_ids(c.w.objects(), target, tm.kind == MasterKind::BUILDING) {
+        for id in reached_ids(step.w.objects(), target, tm.kind == MasterKind::BUILDING) {
             let Some(o) = others.find(id) else {
                 continue;
             };
-            set.push(repaired(c, others, o, id)?);
+            set.push(repaired(step, others, o, id)?);
         }
     }
     let original = set.clone();
@@ -298,13 +299,14 @@ pub(crate) fn repair_target(
         ));
     };
     let (kind, kind_class) = (first.kind, first.class);
-    let masters =
-        c.w.model
-            .masters
-            .get(player.index())
-            .ok_or(GenieError::missing_data("a repairer's player's masters"))?;
+    let masters = step
+        .w
+        .model
+        .masters
+        .get(player.index())
+        .ok_or(GenieError::missing_data("a repairer's player's masters"))?;
     // what the owner holds now: the update may have paid or gained before the repair
-    let owner = c.w.players.player(player)?;
+    let owner = step.w.players.player(player)?;
     let mut paid = PaidAttributes::new(&owner.attributes);
     let mut payer = Payer {
         masters,
@@ -318,9 +320,11 @@ pub(crate) fn repair_target(
             RepairFrom::Repairer,
             &mut payer,
             roles,
-            c.w.model.slots,
+            step.w.model.slots,
         ),
-        MasterKind::COMBAT => repair_unit(&mut set, 0, amount, &mut payer, roles, c.w.model.slots),
+        MasterKind::COMBAT => {
+            repair_unit(&mut set, 0, amount, &mut payer, roles, step.w.model.slots)
+        }
         // the packed and the unpacked trebuchet's classes take slot 0x8c8 of any type: below 70
         // its class's table has no such slot
         _ if roles
@@ -341,8 +345,11 @@ pub(crate) fn repair_target(
             })
         }
     }?;
-    c.w.players.player_mut(player)?.add_attributes(paid.adds)?;
-    repair_write_back(c.w, &set, &original)?;
+    step.w
+        .players
+        .player_mut(player)?
+        .add_attributes(paid.adds)?;
+    repair_write_back(step.w, &set, &original)?;
     Ok((answer, kind))
 }
 
@@ -365,52 +372,59 @@ fn reached_ids(by_id: ObjectsRef<'_>, target: ObjectId, building: bool) -> Vec<O
             by_id.annexes(head.id()).ids().collect()
         };
         annexes.sort_unstable();
-        ids.extend(annexes.iter().copied().filter(|&a| a != target));
+        ids.extend(
+            annexes
+                .iter()
+                .copied()
+                .filter(|&object_id| object_id != target),
+        );
     }
     ids
 }
 
-/// Object `o` of player `oq` (id `id`) as the repair reads and changes it: its master's type,
+/// Object `unit` of player `oq` (id `id`) as the repair reads and changes it: its master's type,
 /// class, id and hit points, its hit points and powerups, a building's main building or annexes
 /// (sorted), and its owner's repair cost rates.
 fn repaired(
-    c: &Step<'_>,
+    step: &Step<'_>,
     others: OthersRef<'_>,
-    (oq, o): (PlayerId, &Unit),
+    (oq, unit): (PlayerId, &Unit),
     id: ObjectId,
 ) -> GenieResult<Repaired> {
     let om = repair_master(
-        MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
+        MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
         oq,
-        o,
+        unit,
     )?;
-    let attributes: &[Amount] = if oq == c.player {
-        &c.w.players.player(c.player)?.attributes
+    let attributes: &[Amount] = if oq == step.player {
+        &step.w.players.player(step.player)?.attributes
     } else {
         others
             .players()
             .player(oq)
-            .map_or(&[][..], |p| &p.attributes[..])
+            .map_or(&[][..], |player| &player.attributes[..])
     };
     let rate = |k: usize| attributes.get(k).copied().unwrap_or(Amount::ZERO);
-    let annexes =
-        if om.kind == MasterKind::BUILDING && c.w.parts.building_of(o.id).annex_of.is_none() {
-            let mut a: Vec<ObjectId> = c.w.parts.building_of(o.id).annexes.ids().collect();
-            a.sort_unstable();
-            a
-        } else {
-            Vec::new()
-        };
+    let annexes = if om.kind == MasterKind::BUILDING
+        && step.w.parts.building_of(unit.id).annex_of.is_none()
+    {
+        let mut object_ids: Vec<ObjectId> =
+            step.w.parts.building_of(unit.id).annexes.ids().collect();
+        object_ids.sort_unstable();
+        object_ids
+    } else {
+        Vec::new()
+    };
     Ok(Repaired {
         id,
         kind: om.kind,
         class: om.class,
         master: om.id,
         master_hp: om.hit_points,
-        hp: o.life.hp,
-        hp_powerup: c.w.parts.combat_of(o.id).hp_powerup,
+        hp: unit.life.hp,
+        hp_powerup: step.w.parts.combat_of(unit.id).hp_powerup,
         main: if om.kind == MasterKind::BUILDING {
-            c.w.parts.building_of(o.id).annex_of
+            step.w.parts.building_of(unit.id).annex_of
         } else {
             None
         },
@@ -426,14 +440,18 @@ fn repaired(
 /// # Errors
 ///
 /// None (an unreachable error where a table lost the part it took).
-fn repair_write_back(w: &mut World, set: &[Repaired], original: &[Repaired]) -> GenieResult<()> {
+fn repair_write_back(
+    world: &mut World,
+    set: &[Repaired],
+    original: &[Repaired],
+) -> GenieResult<()> {
     for (now, was) in set.iter().zip(original) {
         if now == was {
             continue;
         }
-        if let Some((_, u)) = w.object_mut(now.id) {
-            u.life.hp = now.hp;
-            w.parts.combat_mut(now.id)?.hp_powerup = now.hp_powerup;
+        if let Some((_, unit)) = world.object_mut(now.id) {
+            unit.life.hp = now.hp;
+            world.parts.combat_mut(now.id)?.hp_powerup = now.hp_powerup;
         }
     }
     Ok(())
@@ -445,21 +463,21 @@ impl Action {
     /// type, place and its master's radii; None without one.
     pub(crate) fn top_target_seen(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         others: OthersRef<'_>,
     ) -> GenieResult<Option<TopTarget>> {
         let Some(id) = self.top_target() else {
             return Ok(None);
         };
-        let Some((owner, u)) = others.find(id) else {
+        let Some((owner, unit)) = others.find(id) else {
             return Ok(None);
         };
-        let m = u.master(c.w.master_tables(), owner)?;
+        let master = unit.master(step.w.master_tables(), owner)?;
         Ok(Some(TopTarget {
             id,
-            kind: m.kind,
-            position: u.position(),
-            radius: m.radius,
+            kind: master.kind,
+            position: unit.position(),
+            radius: master.radius,
         }))
     }
 }

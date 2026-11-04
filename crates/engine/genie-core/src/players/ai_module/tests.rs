@@ -38,56 +38,56 @@ fn module() -> AiModule {
 
 #[test]
 fn an_explored_tile_on_the_map_writes_zero_into_the_path_map() {
-    let mut m = module();
-    m.explored_tile(Tile::new(2, 1));
-    assert_eq!(m.info.path_map.get(Tile::new(2, 1)), Some(0));
-    assert_eq!(m.info.path_map.get(Tile::new(1, 1)), Some(0xff));
+    let mut ai_module = module();
+    ai_module.explored_tile(Tile::new(2, 1));
+    assert_eq!(ai_module.info.path_map.get(Tile::new(2, 1)), Some(0));
+    assert_eq!(ai_module.info.path_map.get(Tile::new(1, 1)), Some(0xff));
 }
 
 #[test]
 fn an_explored_tile_off_the_map_changes_nothing() {
-    let mut m = module();
-    let before = m.clone();
+    let mut ai_module = module();
+    let before = ai_module.clone();
     for (x, y) in [(-1, 0), (0, -1), (4, 0), (0, 3)] {
-        m.explored_tile(Tile::new(x, y));
+        ai_module.explored_tile(Tile::new(x, y));
     }
-    assert_eq!(m, before);
+    assert_eq!(ai_module, before);
 }
 
 #[test]
 fn the_hooks_bound_is_the_modules_size_not_the_path_maps() {
     // FUN_140b8ab60 tests +0x10518/+0x1051c, then the grid lets a tile off its own size be
-    let mut m = module();
-    m.info.size = GridSize::new(10, 10);
-    let before = m.info.path_map.clone();
-    m.explored_tile(Tile::new(8, 8));
-    assert_eq!(m.info.path_map, before);
+    let mut ai_module = module();
+    ai_module.info.size = GridSize::new(10, 10);
+    let before = ai_module.info.path_map.clone();
+    ai_module.explored_tile(Tile::new(8, 8));
+    assert_eq!(ai_module.info.path_map, before);
 }
 
 #[test]
 fn slot_past_the_saved_words_or_the_slots_is_minus_one() {
-    let t = module().tactical;
-    assert_eq!(t.slot(0), 7);
-    assert_eq!(t.slot(1), 8);
-    assert_eq!(t.slot(2), -1);
-    assert_eq!(t.slot(SLOTS as u32), -1);
-    assert_eq!(t.slot(u32::MAX), -1);
+    let tactical_module = module().tactical;
+    assert_eq!(tactical_module.slot(0), 7);
+    assert_eq!(tactical_module.slot(1), 8);
+    assert_eq!(tactical_module.slot(2), -1);
+    assert_eq!(tactical_module.slot(SLOTS as u32), -1);
+    assert_eq!(tactical_module.slot(u32::MAX), -1);
 }
 
 #[test]
 fn the_table_holds_module_by_player() {
-    let mut t = AiModules::default();
-    assert!(t.get(PlayerId::new(3)).is_none());
-    t.set(PlayerId::new(3), module());
-    assert!(t.get(PlayerId::new(3)).is_some());
-    assert!(t.get(PlayerId::new(2)).is_none());
-    t.get_mut(PlayerId::new(3)).unwrap().info.explorer = None;
+    let mut ai_modules = AiModules::default();
+    assert!(ai_modules.get(PlayerId::new(3)).is_none());
+    ai_modules.set(PlayerId::new(3), module());
+    assert!(ai_modules.get(PlayerId::new(3)).is_some());
+    assert!(ai_modules.get(PlayerId::new(2)).is_none());
+    ai_modules.get_mut(PlayerId::new(3)).unwrap().info.explorer = None;
 }
 
 #[test]
 fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
     use crate::vision::visibility::{Visibility, VisibleMap};
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -95,7 +95,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         Vec::new(),
     );
     let n = 16 * 16;
-    let mut v = Visibility::new(
+    let mut visibility = Visibility::new(
         GridSize::new(16, 16),
         vec![
             VisibleMap {
@@ -110,7 +110,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         vec![PlayerKind::Human, PlayerKind::Computer, PlayerKind::Human],
     );
     assert_eq!(
-        v.explore(
+        visibility.explore(
             PlayerId::new(1),
             Tile::new(3, 2),
             SightTiles::new(0),
@@ -119,7 +119,7 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         Ok(TileCount::ONE)
     );
     assert_eq!(
-        v.explore(
+        visibility.explore(
             PlayerId::new(2),
             Tile::new(5, 5),
             SightTiles::new(0),
@@ -127,14 +127,16 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         ),
         Ok(TileCount::ONE)
     );
-    t.spatial.sight = Some(v);
-    let mut m = module();
-    m.info.size = GridSize::new(16, 16);
-    m.info.path_map = InfluenceMap::new(GridSize::new(16, 16), 0xff);
-    t.ai.set(PlayerId::new(1), m);
-    assert!(t.take_sight_unsupported().is_none());
+    world.spatial.sight = Some(visibility);
+    let mut ai_module = module();
+    ai_module.info.size = GridSize::new(16, 16);
+    ai_module.info.path_map = InfluenceMap::new(GridSize::new(16, 16), 0xff);
+    world.ai.set(PlayerId::new(1), ai_module);
+    assert!(world.take_sight_unsupported().is_none());
     assert_eq!(
-        t.ai.get(PlayerId::new(1))
+        world
+            .ai
+            .get(PlayerId::new(1))
             .unwrap()
             .info
             .path_map
@@ -142,7 +144,9 @@ fn the_worlds_sight_hands_its_explored_tiles_to_the_players_module() {
         Some(0)
     );
     assert_eq!(
-        t.ai.get(PlayerId::new(1))
+        world
+            .ai
+            .get(PlayerId::new(1))
             .unwrap()
             .info
             .path_map
@@ -179,16 +183,17 @@ fn searched(scene: Scene, seen: &[Tile], at: Point, sight: f32) -> World {
         .build()
 }
 
-/// The search from `start` on `w`'s scout for `unit`, with module `m`.
+/// The search from `start` on `world`'s scout for `unit`, with module `info_module`.
 fn search(
-    m: &mut InfoModule,
-    w: &mut World,
+    info_module: &mut InfoModule,
+    world: &mut World,
     unit: &SearchUnit,
     start: Point,
     rng: &mut Well512,
 ) -> Option<Tile> {
-    let (mut area, size, _) = scout_area(w);
-    m.closest_unexplored_tile(unit, start, &mut area, (size, rng))
+    let (mut area, size, _) = scout_area(world);
+    info_module
+        .closest_unexplored_tile(unit, start, &mut area, (size, rng))
         .unwrap()
 }
 
@@ -212,19 +217,19 @@ const CORNER: Point = Point::new(0.5, 0.5);
 #[test]
 fn civilians_flood_picks_the_first_tile_no_search_touched() {
     let size = GridSize::new(6, 6);
-    let mut m = info(size, EXPLORED);
-    m.path_map.set(Tile::new(3, 1), UNEXPLORED);
-    m.path_map.set(Tile::new(1, 3), UNEXPLORED);
-    let mut w = searched(Scene::open(size), &[], CORNER, 2.0);
+    let mut info_module = info(size, EXPLORED);
+    info_module.path_map.set(Tile::new(3, 1), UNEXPLORED);
+    info_module.path_map.set(Tile::new(1, 3), UNEXPLORED);
+    let mut world = searched(Scene::open(size), &[], CORNER, 2.0);
     let picked = search(
-        &mut m,
-        &mut w,
+        &mut info_module,
+        &mut world,
         &unit(true, CORNER),
         CORNER,
         &mut Well512::default(),
     );
     assert_eq!(picked, Some(Tile::new(3, 1)));
-    assert_eq!(m.path_map.get(Tile::new(3, 1)), Some(EXPLORED));
+    assert_eq!(info_module.path_map.get(Tile::new(3, 1)), Some(EXPLORED));
 }
 
 /// Another unit takes a tile that is not explored: a punted tile (1) counts for it, not for a
@@ -232,15 +237,27 @@ fn civilians_flood_picks_the_first_tile_no_search_touched() {
 #[test]
 fn another_units_flood_takes_punted_tile_civilian_passes() {
     let size = GridSize::new(6, 6);
-    let mut m = info(size, EXPLORED);
-    m.path_map.set(Tile::new(2, 1), PUNTED);
-    let mut w = searched(Scene::open(size), &[], CORNER, 2.0);
+    let mut info_module = info(size, EXPLORED);
+    info_module.path_map.set(Tile::new(2, 1), PUNTED);
+    let mut world = searched(Scene::open(size), &[], CORNER, 2.0);
     let mut rng = Well512::default();
-    let picked = search(&mut m, &mut w, &unit(false, CORNER), CORNER, &mut rng);
+    let picked = search(
+        &mut info_module,
+        &mut world,
+        &unit(false, CORNER),
+        CORNER,
+        &mut rng,
+    );
     assert_eq!(picked, Some(Tile::new(2, 1)));
     let mut civilian = info(size, EXPLORED);
     civilian.path_map.set(Tile::new(2, 1), PUNTED);
-    let none = search(&mut civilian, &mut w, &unit(true, CORNER), CORNER, &mut rng);
+    let none = search(
+        &mut civilian,
+        &mut world,
+        &unit(true, CORNER),
+        CORNER,
+        &mut rng,
+    );
     assert_eq!(none, None);
 }
 
@@ -251,12 +268,18 @@ fn seen_tile_is_passed_through_but_another_zone_ends_the_branch() {
     let at = Point::new(0.5, 1.5);
     let row = |middle: &str| {
         let scene = Scene::rows(&["~~~~", middle, "~~~~", "~~~~"]);
-        let mut m = info(GridSize::new(4, 4), UNEXPLORED);
+        let mut info_module = info(GridSize::new(4, 4), UNEXPLORED);
         for x in 0..3 {
-            m.path_map.set(Tile::new(x, 1), EXPLORED);
+            info_module.path_map.set(Tile::new(x, 1), EXPLORED);
         }
-        let mut w = searched(scene, &[Tile::new(0, 1), Tile::new(1, 1)], at, 4.0);
-        search(&mut m, &mut w, &unit(true, at), at, &mut Well512::default())
+        let mut world = searched(scene, &[Tile::new(0, 1), Tile::new(1, 1)], at, 4.0);
+        search(
+            &mut info_module,
+            &mut world,
+            &unit(true, at),
+            at,
+            &mut Well512::default(),
+        )
     };
     assert_eq!(row("...."), Some(Tile::new(3, 1)));
     assert_eq!(row("...~"), None);
@@ -271,12 +294,12 @@ fn another_zone_ends_the_branch_only_where_the_tile_is_wanted() {
     let at = Point::new(0.5, 1.5);
     let size = GridSize::new(4, 4);
     let module = |water: u8| {
-        let mut m = info(size, UNEXPLORED);
+        let mut info = info(size, UNEXPLORED);
         for t in [[0, 1], [1, 1], [3, 2], [0, 3], [1, 3], [2, 3], [3, 3]] {
-            m.path_map.set(Tile::new(t[0], t[1]), EXPLORED);
+            info.path_map.set(Tile::new(t[0], t[1]), EXPLORED);
         }
-        m.path_map.set(Tile::new(2, 1), water);
-        m
+        info.path_map.set(Tile::new(2, 1), water);
+        info
     };
     let seen = [Tile::new(0, 1), Tile::new(1, 1)];
     let scene = || Scene::rows(&["~~~~", "..~.", "###.", "...."]);
@@ -284,9 +307,15 @@ fn another_zone_ends_the_branch_only_where_the_tile_is_wanted() {
     let mut m = module(EXPLORED);
     let picked = search(&mut m, &mut w, &unit(true, at), at, &mut Well512::default());
     assert_eq!(picked, Some(Tile::new(3, 1)));
-    let mut w = searched(scene(), &seen, at, 4.0);
-    let mut m = module(UNEXPLORED);
-    let picked = search(&mut m, &mut w, &unit(true, at), at, &mut Well512::default());
+    let mut world = searched(scene(), &seen, at, 4.0);
+    let mut info_module = module(UNEXPLORED);
+    let picked = search(
+        &mut info_module,
+        &mut world,
+        &unit(true, at),
+        at,
+        &mut Well512::default(),
+    );
     assert_eq!(picked, None);
 }
 
@@ -300,9 +329,9 @@ fn the_flood_compares_the_zones_low_bytes() {
     let scene = || Scene::rows(&["....", "~~~~", "~.~~", "~~~~", "....", "...."]);
     let size = GridSize::new(4, 6);
     let module = |open: Tile| {
-        let mut m = info(size, EXPLORED);
-        m.path_map.set(open, UNEXPLORED);
-        m
+        let mut info = info(size, EXPLORED);
+        info.path_map.set(open, UNEXPLORED);
+        info
     };
     let mut w = searched(scene(), &[], CORNER, 5.0);
     {
@@ -320,11 +349,11 @@ fn the_flood_compares_the_zones_low_bytes() {
         &mut Well512::default(),
     );
     assert_eq!(picked, Some(Tile::new(1, 4)));
-    let mut m = module(Tile::new(1, 2));
-    let mut w = searched(scene(), &[], CORNER, 5.0);
+    let mut info_module = module(Tile::new(1, 2));
+    let mut world = searched(scene(), &[], CORNER, 5.0);
     let picked = search(
-        &mut m,
-        &mut w,
+        &mut info_module,
+        &mut world,
         &unit(true, CORNER),
         CORNER,
         &mut Well512::default(),
@@ -338,22 +367,22 @@ fn the_flood_compares_the_zones_low_bytes() {
 #[test]
 fn an_unreachable_tile_is_punted_and_the_search_starts_from_the_unit() {
     let size = GridSize::new(12, 12);
-    let mut m = info(size, EXPLORED);
-    m.path_map.set(Tile::new(4, 4), UNEXPLORED);
-    m.path_map.set(Tile::new(11, 1), UNEXPLORED);
+    let mut info_module = info(size, EXPLORED);
+    info_module.path_map.set(Tile::new(4, 4), UNEXPLORED);
+    info_module.path_map.set(Tile::new(11, 1), UNEXPLORED);
     let scene = walled(Scene::open(size), Tile::new(3, 3), Tile::new(5, 5));
-    let mut w = searched(scene, &[], CORNER, 2.0);
+    let mut world = searched(scene, &[], CORNER, 2.0);
     // from (8, 8) the flood meets (4, 4) first, then (11, 1) after the restart from (0, 0)
     let picked = search(
-        &mut m,
-        &mut w,
+        &mut info_module,
+        &mut world,
         &unit(true, CORNER),
         Point::new(8.5, 8.5),
         &mut Well512::default(),
     );
-    assert_eq!(m.path_map.get(Tile::new(4, 4)), Some(PUNTED));
+    assert_eq!(info_module.path_map.get(Tile::new(4, 4)), Some(PUNTED));
     assert_eq!(picked, Some(Tile::new(11, 1)));
-    assert_eq!(m.path_map.get(Tile::new(11, 1)), Some(EXPLORED));
+    assert_eq!(info_module.path_map.get(Tile::new(11, 1)), Some(EXPLORED));
 }
 
 /// A search that already starts at the unit's place punts to a corner of the best quadrant: 16
@@ -361,17 +390,24 @@ fn an_unreachable_tile_is_punted_and_the_search_starts_from_the_unit() {
 #[test]
 fn punt_from_the_units_place_picks_corner_of_the_lowest_scored_quadrant() {
     let size = GridSize::new(8, 8);
-    let mut m = info(size, EXPLORED);
-    m.path_map.set(Tile::new(4, 4), UNEXPLORED);
+    let mut info_module = info(size, EXPLORED);
+    info_module.path_map.set(Tile::new(4, 4), UNEXPLORED);
     // quadrant 6 (column 1, row 2) scores far below the others
-    for (i, q) in m.quadrants.iter_mut().enumerate() {
-        q[0] = if i == 6 { 0 } else { 1000 };
+    for (index, q) in info_module.quadrants.iter_mut().enumerate() {
+        q[0] = if index == 6 { 0 } else { 1000 };
     }
     let scene = walled(Scene::open(size), Tile::new(3, 3), Tile::new(5, 5));
-    let mut w = searched(scene, &[], CORNER, 2.0);
+    let mut world = searched(scene, &[], CORNER, 2.0);
     let mut rng = Well512::default();
     let mut shadow = rng.clone();
-    let picked = search(&mut m, &mut w, &unit(true, CORNER), CORNER, &mut rng).unwrap();
+    let picked = search(
+        &mut info_module,
+        &mut world,
+        &unit(true, CORNER),
+        CORNER,
+        &mut rng,
+    )
+    .unwrap();
     for _ in 0..16 {
         let _ = shadow.rand15();
     }
@@ -393,42 +429,42 @@ fn punt_from_the_units_place_picks_corner_of_the_lowest_scored_quadrant() {
 #[test]
 fn an_exhausted_flood_marks_the_dead_ends() {
     let size = GridSize::new(3, 3);
-    let mut m = info(size, EXPLORED);
-    m.path_map.set(Tile::new(1, 1), PUNTED);
-    m.path_map.set(Tile::new(2, 2), UNEXPLORED);
-    let mut w = searched(
+    let mut info_module = info(size, EXPLORED);
+    info_module.path_map.set(Tile::new(1, 1), PUNTED);
+    info_module.path_map.set(Tile::new(2, 2), UNEXPLORED);
+    let mut world = searched(
         Scene::rows(&[".~.", "...", "..#"]),
         &[Tile::new(0, 1)],
         CORNER,
         2.0,
     );
     let picked = search(
-        &mut m,
-        &mut w,
+        &mut info_module,
+        &mut world,
         &unit(true, CORNER),
         CORNER,
         &mut Well512::default(),
     );
     assert_eq!(picked, None);
-    assert_eq!(m.path_map.get(Tile::new(0, 1)), Some(EXPLORED));
-    assert_eq!(m.path_map.get(Tile::new(1, 0)), Some(EXPLORED));
-    assert_eq!(m.path_map.get(Tile::new(2, 2)), Some(UNEXPLORED));
-    assert_eq!(m.path_map.get(Tile::new(0, 0)), Some(DEAD_END));
-    assert_eq!(m.path_map.get(Tile::new(1, 1)), Some(DEAD_END));
+    assert_eq!(info_module.path_map.get(Tile::new(0, 1)), Some(EXPLORED));
+    assert_eq!(info_module.path_map.get(Tile::new(1, 0)), Some(EXPLORED));
+    assert_eq!(info_module.path_map.get(Tile::new(2, 2)), Some(UNEXPLORED));
+    assert_eq!(info_module.path_map.get(Tile::new(0, 0)), Some(DEAD_END));
+    assert_eq!(info_module.path_map.get(Tile::new(1, 1)), Some(DEAD_END));
 }
 
 #[test]
 fn tile_uncovered_is_false_off_the_map_and_for_unexplored_and_dead_ends() {
-    let mut m = info(GridSize::new(3, 3), EXPLORED);
-    m.path_map.set(Tile::new(0, 0), UNEXPLORED);
-    m.path_map.set(Tile::new(1, 0), DEAD_END);
-    m.path_map.set(Tile::new(2, 0), PUNTED);
-    assert!(!m.tile_uncovered(Tile::new(0, 0)).unwrap());
-    assert!(!m.tile_uncovered(Tile::new(1, 0)).unwrap());
-    assert!(m.tile_uncovered(Tile::new(2, 0)).unwrap());
-    assert!(m.tile_uncovered(Tile::new(0, 1)).unwrap());
+    let mut info_module = info(GridSize::new(3, 3), EXPLORED);
+    info_module.path_map.set(Tile::new(0, 0), UNEXPLORED);
+    info_module.path_map.set(Tile::new(1, 0), DEAD_END);
+    info_module.path_map.set(Tile::new(2, 0), PUNTED);
+    assert!(!info_module.tile_uncovered(Tile::new(0, 0)).unwrap());
+    assert!(!info_module.tile_uncovered(Tile::new(1, 0)).unwrap());
+    assert!(info_module.tile_uncovered(Tile::new(2, 0)).unwrap());
+    assert!(info_module.tile_uncovered(Tile::new(0, 1)).unwrap());
     for (x, y) in [(-1, 0), (0, -1), (3, 0), (0, 3)] {
-        assert!(!m.tile_uncovered(Tile::new(x, y)).unwrap());
+        assert!(!info_module.tile_uncovered(Tile::new(x, y)).unwrap());
     }
 }
 
@@ -436,21 +472,26 @@ fn tile_uncovered_is_false_off_the_map_and_for_unexplored_and_dead_ends() {
 /// empty stack and its pop are (-1, -1).
 #[test]
 fn ring_pushes_the_points_on_the_map_and_the_stack_gives_minus_one_when_empty() {
-    let mut m = info(GridSize::new(20, 20), UNEXPLORED);
-    assert_eq!(m.top_point(), Tile::new(-1, -1));
-    assert_eq!(m.pop_point(), Tile::new(-1, -1));
-    m.push_ring(Distance::new(5.0), Point::new(10.7, 10.2));
-    assert_eq!(m.search.len(), 8);
+    let mut info_module = info(GridSize::new(20, 20), UNEXPLORED);
+    assert_eq!(info_module.top_point(), Tile::new(-1, -1));
+    assert_eq!(info_module.pop_point(), Tile::new(-1, -1));
+    info_module.push_ring(Distance::new(5.0), Point::new(10.7, 10.2));
+    assert_eq!(info_module.search.len(), 8);
     // the centre truncates to (10, 10); angle 0 is 5 east, π/2's sine is 1
-    assert_eq!(m.search[0], Tile::new(15, 10));
-    assert_eq!(m.search[2], Tile::new(10, 15));
-    assert_eq!(m.top_point(), m.search[7]);
-    let top = m.pop_point();
-    assert_eq!(m.search.len(), 7);
+    assert_eq!(info_module.search[0], Tile::new(15, 10));
+    assert_eq!(info_module.search[2], Tile::new(10, 15));
+    assert_eq!(info_module.top_point(), info_module.search[7]);
+    let top = info_module.pop_point();
+    assert_eq!(info_module.search.len(), 7);
     assert_ne!(top, Tile::new(-1, -1));
     // a ring at a corner keeps only the points on the map
     let mut corner = info(GridSize::new(20, 20), UNEXPLORED);
     corner.push_ring(Distance::new(5.0), Point::new(1.0, 1.0));
     assert!(corner.search.len() < 8);
-    assert!(corner.search.iter().all(|p| 0 <= p.x() && 0 <= p.y()));
+    assert!(
+        corner
+            .search
+            .iter()
+            .all(|tile| 0 <= tile.x() && 0 <= tile.y())
+    );
 }

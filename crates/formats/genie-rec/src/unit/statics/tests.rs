@@ -112,6 +112,6 @@ fn the_old_format_units_are_read_only() {
     let unit: Unit = OptionalReadableElement::read_from(&mut header_reader(&bytes, 11.58))
         .unwrap()
         .unwrap();
-    let e = unit.write_to(&mut vec![]).unwrap_err();
-    assert_eq!(e, not_written());
+    let error = unit.write_to(&mut vec![]).unwrap_err();
+    assert_eq!(error, not_written());
 }

@@ -57,7 +57,7 @@ impl TaskId {
     /// The value of a field that holds −1 for none.
     #[must_use]
     pub fn field(task: Option<Self>) -> i16 {
-        task.map_or(Self::NONE, |t| t.0)
+        task.map_or(Self::NONE, |task_id| task_id.0)
     }
 }
 
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(TaskId::of_field(-1), Ok(None));
         for value in [0, 85, i16::MAX] {
             let task = TaskId::of_field(value).unwrap();
-            assert_eq!(task.map(|t| t.get()), Some(value));
+            assert_eq!(task.map(|task_id| task_id.get()), Some(value));
             assert_eq!(TaskId::field(task), value);
         }
         assert_eq!(TaskId::field(None), -1);
@@ -102,12 +102,12 @@ mod tests {
     fn negative_value_is_no_task() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
-                TaskId::try_from(value).map_err(|e| e.kind()),
+                TaskId::try_from(value).map_err(|value_error| value_error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
         assert_eq!(
-            TaskId::of_field(-2).map_err(|e| e.kind()),
+            TaskId::of_field(-2).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }

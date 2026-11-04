@@ -19,45 +19,48 @@ impl<T> ByPlayer<T> {
         Self(values)
     }
 
-    /// Player `p`'s value, none past the row.
+    /// Player `player_id`'s value, none past the row.
     #[must_use]
-    pub fn get(&self, p: PlayerId) -> Option<&T> {
-        self.0.get(p.index())
+    pub fn get(&self, player_id: PlayerId) -> Option<&T> {
+        self.0.get(player_id.index())
     }
 
-    /// Player `p`'s value to change, none past the row.
-    pub fn get_mut(&mut self, p: PlayerId) -> Option<&mut T> {
-        self.0.get_mut(p.index())
+    /// Player `player_id`'s value to change, none past the row.
+    pub fn get_mut(&mut self, player_id: PlayerId) -> Option<&mut T> {
+        self.0.get_mut(player_id.index())
     }
 
-    /// Player `p`'s value, as an error where the caller's own loop names a player past the row.
+    /// Player `player_id`'s value, as an error where the caller's own loop names a player past the
+    /// row.
     ///
     /// # Errors
     ///
     /// A player the row does not hold.
-    pub fn checked(&self, p: PlayerId) -> GenieResult<&T> {
-        self.get(p).ok_or_else(|| NO_PLAYER.with("player", p))
+    pub fn checked(&self, player_id: PlayerId) -> GenieResult<&T> {
+        self.get(player_id)
+            .ok_or_else(|| NO_PLAYER.with("player", player_id))
     }
 
-    /// Player `p`'s value to change, as an error past the row.
+    /// Player `player_id`'s value to change, as an error past the row.
     ///
     /// # Errors
     ///
     /// A player the row does not hold.
-    pub fn checked_mut(&mut self, p: PlayerId) -> GenieResult<&mut T> {
-        self.get_mut(p).ok_or_else(|| NO_PLAYER.with("player", p))
+    pub fn checked_mut(&mut self, player_id: PlayerId) -> GenieResult<&mut T> {
+        self.get_mut(player_id)
+            .ok_or_else(|| NO_PLAYER.with("player", player_id))
     }
 
-    /// Player `p`'s value becomes `value`; a row shorter than `p` grows first, with the
-    /// default value for the players between.
-    pub fn set(&mut self, p: PlayerId, value: T)
+    /// Player `player_id`'s value becomes `value`; a row shorter than `player_id` grows first, with
+    /// the default value for the players between.
+    pub fn set(&mut self, player_id: PlayerId, value: T)
     where
         T: Clone + Default,
     {
-        if let Some(slot) = self.0.get_mut(p.index()) {
+        if let Some(slot) = self.0.get_mut(player_id.index()) {
             *slot = value;
         } else {
-            self.0.resize(p.index(), T::default());
+            self.0.resize(player_id.index(), T::default());
             self.0.push(value);
         }
     }
@@ -94,8 +97,8 @@ impl<T> FromIterator<T> for ByPlayer<T> {
 }
 
 impl<T: genie_diff::Diff> genie_diff::Diff for ByPlayer<T> {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -120,7 +123,10 @@ mod tests {
         grown.set(PlayerId::new(0), 2);
         assert_eq!(grown.values(), &[2, 8, 4, 0, 0, 1]);
         assert_eq!((row.len(), row.is_empty()), (3, false));
-        let each: Vec<(u8, u8)> = row.iter().map(|(p, &v)| (p.get(), v)).collect();
+        let each: Vec<(u8, u8)> = row
+            .iter()
+            .map(|(player_id, &v)| (player_id.get(), v))
+            .collect();
         assert_eq!(each, [(0, 7), (1, 8), (2, 4)]);
         assert_eq!(row, ByPlayer::new(vec![7, 8, 4]));
         assert!(ByPlayer::<u8>::default().is_empty());

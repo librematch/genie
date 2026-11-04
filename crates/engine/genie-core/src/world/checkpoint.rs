@@ -80,19 +80,18 @@ pub struct PlayerState {
 pub fn player_block(player: &PlayerState) -> [u32; 11] {
     let mut w = [0u32; 11];
     w[0] = player.sleeping_count;
-    w[1] = player
-        .resources
-        .iter()
-        .fold(0u32, |acc, r| acc.wrapping_add(cvttss2si(r.get()) as u32));
-    for o in &player.live {
-        w[2] = w[2].wrapping_add(i32::from(o.main_id.get()) as u32);
-        w[3] = w[3].wrapping_add(u32::from(o.state.get()));
-        w[4] = w[4].wrapping_add(cvttss2si(o.amount_held.get()) as u32);
-        for axis in o.position.get() {
+    w[1] = player.resources.iter().fold(0u32, |acc, amount| {
+        acc.wrapping_add(cvttss2si(amount.get()) as u32)
+    });
+    for checkpoint_object in &player.live {
+        w[2] = w[2].wrapping_add(i32::from(checkpoint_object.main_id.get()) as u32);
+        w[3] = w[3].wrapping_add(u32::from(checkpoint_object.state.get()));
+        w[4] = w[4].wrapping_add(cvttss2si(checkpoint_object.amount_held.get()) as u32);
+        for axis in checkpoint_object.position.get() {
             w[7] = w[7].wrapping_add(cvttss2si(axis * 100.0) as u32);
         }
-        w[9] = w[9].wrapping_add(action_checksum(o));
-        w[10] = w[10].wrapping_add(o.id.get() as u32);
+        w[9] = w[9].wrapping_add(action_checksum(checkpoint_object));
+        w[10] = w[10].wrapping_add(checkpoint_object.id.get() as u32);
     }
     // w[5] (ObjectWaypoints) stays 0: the engine zeroes it and never writes it.
     w[6] = player.live.len() as u32;
@@ -102,13 +101,13 @@ pub fn player_block(player: &PlayerState) -> [u32; 11] {
 
 /// Word 9's term for one object: action type + action state byte + unit-AI retarget timer. An
 /// object without an action list reports type -1 and state 0.
-fn action_checksum(o: &CheckpointObject) -> u32 {
-    let (kind, state) = o
-        .top_action
-        .map_or((-1, 0), |t| (ActionKind::field(t.kind), t.state.get()));
+fn action_checksum(checkpoint_object: &CheckpointObject) -> u32 {
+    let (kind, state) = checkpoint_object.top_action.map_or((-1, 0), |action_term| {
+        (ActionKind::field(action_term.kind), action_term.state.get())
+    });
     (i32::from(kind) as u32)
         .wrapping_add(u32::from(state))
-        .wrapping_add(o.retarget_timer.map_or(0, Millis::get))
+        .wrapping_add(checkpoint_object.retarget_timer.map_or(0, Millis::get))
 }
 
 #[cfg(test)]
@@ -139,7 +138,7 @@ mod tests {
 
     #[test]
     fn empty_player_carries_sleeping_count_resources_and_id() {
-        let p = PlayerState {
+        let player_state = PlayerState {
             id: 7,
             resources: [
                 Amount::new(200.0),
@@ -150,21 +149,24 @@ mod tests {
             sleeping_count: 5,
             live: vec![],
         };
-        assert_eq!(player_block(&p), [5, 700, 0, 0, 0, 0, 0, 0, 7, 0, 0]);
+        assert_eq!(
+            player_block(&player_state),
+            [5, 700, 0, 0, 0, 0, 0, 0, 7, 0, 0]
+        );
     }
 
     #[test]
     fn resources_are_truncated_one_by_one() {
-        let p = PlayerState {
+        let player_state = PlayerState {
             resources: [Amount::new(1.9); 4],
             ..PlayerState::default()
         };
-        assert_eq!(player_block(&p)[1], 4);
+        assert_eq!(player_block(&player_state)[1], 4);
     }
 
     #[test]
     fn main_ids_add_as_ints() {
-        let p = player(vec![
+        let player_state = player(vec![
             CheckpointObject {
                 main_id: master_id(0x7fff),
                 ..object()
@@ -174,28 +176,28 @@ mod tests {
                 ..object()
             },
         ]);
-        assert_eq!(player_block(&p)[2], 0x8002);
+        assert_eq!(player_block(&player_state)[2], 0x8002);
     }
 
     #[test]
     fn positions_are_scaled_in_f32_before_truncation() {
         // f32: 0.57 * 100 rounds to 57.0; the same product in f64 is 56.99999928 and truncates to 56
-        let p = player(vec![CheckpointObject {
+        let player_state = player(vec![CheckpointObject {
             position: Position::new(0.57, 0.0, 0.0),
             ..object()
         }]);
-        assert_eq!(player_block(&p)[7], 57);
+        assert_eq!(player_block(&player_state)[7], 57);
     }
 
     #[test]
     fn object_without_action_or_unit_ai_contributes_minus_one_to_word_9() {
-        let p = player(vec![object()]);
-        assert_eq!(player_block(&p)[9], u32::MAX);
+        let player_state = player(vec![object()]);
+        assert_eq!(player_block(&player_state)[9], u32::MAX);
     }
 
     #[test]
     fn word_9_adds_action_kind_state_byte_and_retarget_timer() {
-        let o = CheckpointObject {
+        let checkpoint_object = CheckpointObject {
             top_action: Some(ActionTerm {
                 kind: Some(GATHER),
                 state: ActionState::new(3),
@@ -203,12 +205,12 @@ mod tests {
             retarget_timer: Some(Millis::new(100)),
             ..object()
         };
-        assert_eq!(player_block(&player(vec![o]))[9], 108);
+        assert_eq!(player_block(&player(vec![checkpoint_object]))[9], 108);
     }
 
     #[test]
     fn sums_wrap_in_32_bits() {
-        let p = player(vec![
+        let player_state = player(vec![
             CheckpointObject {
                 id: object_id(i32::MAX),
                 ..object()
@@ -218,19 +220,27 @@ mod tests {
                 ..object()
             },
         ]);
-        assert_eq!(player_block(&p)[10], 0xFFFF_FFFE);
+        assert_eq!(player_block(&player_state)[10], 0xFFFF_FFFE);
     }
 
     #[test]
     fn words_count_state_amount_live_list_and_zero_waypoints() {
-        let p = player(vec![
+        let player_state = player(vec![
             CheckpointObject {
                 amount_held: Amount::new(150.7),
                 ..object()
             },
             object(),
         ]);
-        let b = player_block(&p);
-        assert_eq!((b[3], b[4], b[5], b[6]), (4, 150, 0, 2));
+        let player_block = player_block(&player_state);
+        assert_eq!(
+            (
+                player_block[3],
+                player_block[4],
+                player_block[5],
+                player_block[6]
+            ),
+            (4, 150, 0, 2)
+        );
     }
 }

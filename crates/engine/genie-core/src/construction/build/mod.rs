@@ -229,7 +229,7 @@ impl Completion<'_> {
     /// # Errors
     ///
     /// What it does not model.
-    pub fn first_part(&self, c: &Construction, roles: &Roles) -> GenieResult<FirstPart> {
+    pub fn first_part(&self, construction: &Construction, roles: &Roles) -> GenieResult<FirstPart> {
         use crate::math::conversions::cvttss2si;
         let master = self.master.ok_or(GenieError::unsupported(
             "a completion of a master the slice does not have",
@@ -239,14 +239,14 @@ impl Completion<'_> {
                 "a computer player's building part (FUN_1411e7ca0)",
             ));
         }
-        if c.sprite_override {
+        if construction.sprite_override {
             return Err(GenieError::unsupported(
                 "a completion of an overridden sprite",
             ));
         }
         let mut part = FirstPart::default();
         if roles.of_class(master.class).contains(ClassRoles::FARM)
-            && Seconds::of_master(c.build_time) <= c.progress
+            && Seconds::of_master(construction.build_time) <= construction.progress
         {
             let FarmBonus {
                 amount,
@@ -258,7 +258,7 @@ impl Completion<'_> {
                 let has = i16::try_from(near)
                     .ok()
                     .and_then(MasterId::of_data)
-                    .and_then(|m| self.masters?.get(m))
+                    .and_then(|master_id| self.masters?.get(master_id))
                     .is_some();
                 if has {
                     return Err(GenieError::unsupported(
@@ -281,7 +281,7 @@ impl Completion<'_> {
                 .action_part()
                 .tasks
                 .iter()
-                .any(|t| t.action_kind == CART_TASK);
+                .any(|task| task.action_kind == CART_TASK);
         Ok(part)
     }
 }
@@ -318,10 +318,13 @@ pub(crate) fn show_built(
 ) {
     let standing = master
         .standing_sprite
-        .and_then(|s| graphics.get(s).copied());
-    if let Some(g) = standing {
-        new_sprite(sprite, stats, g, sprite_rng, sprite_tuning);
-        if let Some(s) = sprite.as_mut().filter(|s| s.graphic.id == g.id) {
+        .and_then(|sprite_id| graphics.get(sprite_id).copied());
+    if let Some(graphic) = standing {
+        new_sprite(sprite, stats, graphic, sprite_rng, sprite_tuning);
+        if let Some(s) = sprite
+            .as_mut()
+            .filter(|active_sprite| active_sprite.graphic.id == graphic.id)
+        {
             s.set_frame(frame);
         }
     }
@@ -401,7 +404,7 @@ mod built_sprite_tests {
             tuning().sprite,
         );
         assert_eq!(
-            none.map(|s| (s.graphic.id, s.frame)),
+            none.map(|active_sprite| (active_sprite.graphic.id, active_sprite.frame)),
             Some((SpriteId::named(11), Frame::of_data(3)))
         );
     }
@@ -512,9 +515,9 @@ mod stack_tests {
     ) -> Master {
         let mut slots = [None; 4];
         let mut offsets = [GroundOffset::ZERO; 4];
-        for (k, &(a, o)) in annexes.iter().enumerate() {
-            slots[k] = opt_master(a);
-            offsets[k] = o;
+        for (k, &(index, ground_offset)) in annexes.iter().enumerate() {
+            slots[k] = opt_master(index);
+            offsets[k] = ground_offset;
         }
         Master {
             id: master_id(id),
@@ -557,9 +560,9 @@ mod stack_tests {
             -1,
             &[],
         );
-        if let Some(b) = foundation.building.as_mut() {
-            b.stack_unit = Some(ids::TOWN_CENTRE);
-            b.disappears_when_built = BuiltMode::DISAPPEARS;
+        if let Some(building_master) = foundation.building.as_mut() {
+            building_master.stack_unit = Some(ids::TOWN_CENTRE);
+            building_master.disappears_when_built = BuiltMode::DISAPPEARS;
         }
         let mut tc = building(
             109,
@@ -578,8 +581,8 @@ mod stack_tests {
             (Some(AttributeId::named(506)), Amount::new(1.0), 16),
             (None, Amount::ZERO, 0),
         ];
-        if let Some(p) = tc.creatable.as_mut() {
-            p.volley_missile = Some(master_id(54));
+        if let Some(creatable_part) = tc.creatable.as_mut() {
+            creatable_part.volley_missile = Some(master_id(54));
         }
         let mut empty = building(
             890,
@@ -716,14 +719,14 @@ mod stack_tests {
     /// `FUN_141560ae0` on `+0xdb8` with `(float)+0x718`, 0 and 0), then counts it.
     #[test]
     fn castle_completion_records_its_owner_id_in_its_history() {
-        let mut t = world();
-        t.world_time = WorldTime::from_millis(912_000);
-        t.players[1].history.add_entry(
+        let mut world = world();
+        world.world_time = WorldTime::from_millis(912_000);
+        world.players[1].history.add_entry(
             EntryKind::POPULATION,
             Population::of_data(3),
             Population::ZERO,
         );
-        for ms in &mut t.model.masters {
+        for ms in &mut world.model.masters {
             let castle = building(
                 82,
                 (2.0, 4.0, ObstructionKind::KIND_2),
@@ -733,13 +736,13 @@ mod stack_tests {
             );
             *ms = Arc::new(Masters::new(ms.iter().cloned().chain([castle])));
         }
-        t.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
+        world.players[1].objects[ListIndex::new(0)].life.master_id = ids::CASTLE;
         assert_eq!(
-            t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
+            world.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Ok(BuildProgress::Ended)
         );
         assert_eq!(
-            t.players[1].history.events,
+            world.players[1].history.events,
             [Event {
                 kind: EventKind::CastleBuilt,
                 time_slice: TimeSlice::of_data(1),
@@ -749,7 +752,7 @@ mod stack_tests {
                 data3: 0.0,
             }]
         );
-        assert_eq!(t.players[1].attributes[134], Amount::new(1.0));
+        assert_eq!(world.players[1].attributes[134], Amount::new(1.0));
     }
 
     /// census v5's 273 stops "a completion of a stack unit or a vanishing building" (records/
@@ -763,12 +766,12 @@ mod stack_tests {
     /// attributes 98 and 165.
     #[test]
     fn town_centre_foundation_completes_into_the_town_centre_and_its_annexes() {
-        let mut t = world();
+        let mut world = world();
         assert_eq!(
-            t.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
+            world.work_building(FoundationId::new(object_id(8759)), Seconds::new(1.0)),
             Ok(BuildProgress::Ended)
         );
-        let ids: Vec<(i32, i16, ObjectState)> = t.players[1]
+        let ids: Vec<(i32, i16, ObjectState)> = world.players[1]
             .objects
             .iter()
             .map(|u| (u.id.get(), u.life.master_id.get(), u.life.state))
@@ -785,7 +788,7 @@ mod stack_tests {
                 (8773, 890, ObjectState::Alive),
             ]
         );
-        let at = |id: ObjectId| t.spatial.get(id).unwrap().position;
+        let at = |id: ObjectId| world.spatial.get(id).unwrap().position;
         assert_eq!(
             [
                 at(object_id(8769)),
@@ -801,7 +804,7 @@ mod stack_tests {
             ]
         );
         assert_eq!(
-            [8769, 8770, 8771, 8772, 8773].map(|a| t
+            [8769, 8770, 8771, 8772, 8773].map(|a| world
                 .parts
                 .building_of(object_id(a))
                 .annex_of
@@ -816,28 +819,36 @@ mod stack_tests {
         );
         // the tower's unit AI for the town centre, the building's for the annexes
         assert_eq!(
-            t.parts.unit_ai.get(object_id(8768)).map(|ai| ai.ai_kind),
+            world
+                .parts
+                .unit_ai
+                .get(object_id(8768))
+                .map(|ai| ai.ai_kind),
             Some(UnitAiKind::Tower)
         );
         assert_eq!(
-            t.parts.unit_ai.get(object_id(8769)).map(|ai| ai.ai_kind),
+            world
+                .parts
+                .unit_ai
+                .get(object_id(8769))
+                .map(|ai| ai.ai_kind),
             Some(UnitAiKind::Building)
         );
         // the foundation lacked 0.84 of its 2400 hit points after its last work: the town
         // centre lacks them too
         let lacked = 2400.0 - (2399.0 + (0.01_f32 * 2400.0) / 150.0);
-        let unit = |id: ObjectId| t.players[1].objects.by_id(id).unwrap();
+        let unit = |id: ObjectId| world.players[1].objects.by_id(id).unwrap();
         assert_eq!(
             (
                 unit(object_id(8768)).life.hp,
-                t.parts.combat_of(object_id(8768)).store.clone()
+                world.parts.combat_of(object_id(8768)).store.clone()
             ),
             (
                 HitPoints::new(2400.0 - lacked),
                 vec![(AttributeId::named(506), Amount::new(1.0))]
             )
         );
-        let attributes = &t.players[1].attributes;
+        let attributes = &world.players[1].attributes;
         assert_eq!(
             (attributes[4], attributes[98], attributes[165]),
             (Amount::new(5.0), Amount::ZERO, Amount::ZERO)
@@ -847,7 +858,10 @@ mod stack_tests {
             (gone.life.hp, gone.flags.contains(UnitFlags::ROO_CALLED)),
             (HitPoints::ZERO, true)
         );
-        assert_eq!(t.spatial.get(object_id(8759)).unwrap().obstruction, None);
+        assert_eq!(
+            world.spatial.get(object_id(8759)).unwrap().obstruction,
+            None
+        );
     }
 
     /// A new building's record (`FUN_14118c540` from its place): a master without a height (a
@@ -859,18 +873,18 @@ mod stack_tests {
             (0.0, None),
             (1.0, Some((ObstructionKind::CIRCLE, ObstructionClass::UNIT))),
         ] {
-            let mut t = world();
-            for ms in &mut t.model.masters {
-                let m = Arc::make_mut(ms).get_mut(ids::TOWN_CENTRE).unwrap();
-                if let Some(p) = m.creatable.as_mut() {
-                    p.build_time = WholeSeconds::ZERO;
+            let mut world = world();
+            for ms in &mut world.model.masters {
+                let master = Arc::make_mut(ms).get_mut(ids::TOWN_CENTRE).unwrap();
+                if let Some(creatable_part) = master.creatable.as_mut() {
+                    creatable_part.build_time = WholeSeconds::ZERO;
                 }
-                m.obstruction_kind = ObstructionKind::CIRCLE;
-                m.obstruction_class = ObstructionClass::UNIT;
-                m.height = Distance::new(height);
-                m.building.as_mut().unwrap().annexes = [None; 4];
+                master.obstruction_kind = ObstructionKind::CIRCLE;
+                master.obstruction_class = ObstructionClass::UNIT;
+                master.height = Distance::new(height);
+                master.building.as_mut().unwrap().annexes = [None; 4];
             }
-            let (id, _) = t
+            let (id, _) = world
                 .make_building(
                     PlayerId::new(1),
                     ids::TOWN_CENTRE,
@@ -878,8 +892,12 @@ mod stack_tests {
                     Position::new(80.0, 80.0, 0.0),
                 )
                 .unwrap();
-            let placed = t.spatial.get(id).unwrap().obstruction;
-            assert_eq!(placed.map(|o| (o.kind, o.class)), record, "height {height}");
+            let placed = world.spatial.get(id).unwrap().obstruction;
+            assert_eq!(
+                placed.map(|obstruction| (obstruction.kind, obstruction.class)),
+                record,
+                "height {height}"
+            );
         }
     }
 
@@ -889,18 +907,18 @@ mod stack_tests {
     #[test]
     fn gate_stack_gate_takes_the_foundation_lock() {
         for locked in [true, false] {
-            let mut t = world();
-            t.world_time = WorldTime::from_millis(5000);
-            for ms in &mut t.model.masters {
+            let mut world = world();
+            world.world_time = WorldTime::from_millis(5000);
+            for ms in &mut world.model.masters {
                 for id in [621, 109] {
-                    let m = Arc::make_mut(ms).get_mut(master_id(id)).unwrap();
-                    m.class = class::GATE;
-                    m.storage.clear();
-                    if let Some(p) = m.creatable.as_mut() {
-                        p.volley_missile = None;
+                    let master = Arc::make_mut(ms).get_mut(master_id(id)).unwrap();
+                    master.class = class::GATE;
+                    master.storage.clear();
+                    if let Some(creatable_part) = master.creatable.as_mut() {
+                        creatable_part.volley_missile = None;
                     }
                     // every building holds its movement state
-                    m.move_stats = Some(MoveStats {
+                    master.move_stats = Some(MoveStats {
                         fly_mode: FlyMode::GROUND,
                         speed: Speed::ZERO,
                         base: Speed::ZERO,
@@ -917,34 +935,36 @@ mod stack_tests {
                         facets: None,
                         weapon_range: Distance::ZERO,
                     });
-                    if let Some(b) = m.building.as_mut() {
-                        b.annexes = [None; 4];
+                    if let Some(building_master) = master.building.as_mut() {
+                        building_master.annexes = [None; 4];
                     }
                 }
             }
-            t.parts
-                .building_mut(t.players[1].objects[ListIndex::new(0)].id)
+            world
+                .parts
+                .building_mut(world.players[1].objects[ListIndex::new(0)].id)
                 .unwrap()
                 .gate = Some(Gate {
                 locked,
                 ..Gate::default()
             });
-            t.stack_unit(
-                PlayerId::new(1),
-                object_id(8759),
-                StackUnit {
-                    master: ids::TOWN_CENTRE,
-                    at: Position::new(54.0, 147.0, 0.0),
-                    hp_lost: HitPoints::ZERO,
-                },
-            )
-            .unwrap();
-            let gate = t.players[1].objects.by_id(object_id(8768)).unwrap();
+            world
+                .stack_unit(
+                    PlayerId::new(1),
+                    object_id(8759),
+                    StackUnit {
+                        master: ids::TOWN_CENTRE,
+                        at: Position::new(54.0, 147.0, 0.0),
+                        hp_lost: HitPoints::ZERO,
+                    },
+                )
+                .unwrap();
+            let gate = world.players[1].objects.by_id(object_id(8768)).unwrap();
             assert_eq!(
-                t.parts.building_of(gate.id).gate.map(|g| g.locked),
+                world.parts.building_of(gate.id).gate.map(|g| g.locked),
                 Some(locked)
             );
-            let last_move = t.parts.mover_of(gate.id).map(|m| m.last_move);
+            let last_move = world.parts.mover_of(gate.id).map(|mover| mover.last_move);
             assert_eq!(
                 last_move,
                 Some(WorldTime::from_millis(if locked { 5001 } else { 5000 })),

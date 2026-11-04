@@ -264,7 +264,10 @@ impl Scene {
     #[must_use]
     pub fn rows(rows: &[&str]) -> Self {
         let width = rows.first().map_or(0, |r| r.len());
-        assert!(rows.iter().all(|r| r.len() == width), "rows of one length");
+        assert!(
+            rows.iter().all(|text| text.len() == width),
+            "rows of one length"
+        );
         let mut scene = Self::open(GridSize::new(width as i32, rows.len() as i32));
         for (y, row) in rows.iter().enumerate() {
             for (x, c) in row.chars().enumerate() {
@@ -297,9 +300,9 @@ impl Scene {
     /// The tiles `tiles` are of terrain `terrain`.
     #[must_use]
     pub fn terrain_on(mut self, tiles: impl IntoIterator<Item = Tile>, terrain: TerrainId) -> Self {
-        for t in tiles {
-            let i = self.index(t);
-            self.terrain[i] = terrain;
+        for tile in tiles {
+            let index = self.index(tile);
+            self.terrain[index] = terrain;
         }
         self
     }
@@ -308,9 +311,9 @@ impl Scene {
     /// tiles about them ([`Terrain::set_elevations`]).
     #[must_use]
     pub fn elevation_on(mut self, tiles: impl IntoIterator<Item = Tile>, elevation: u8) -> Self {
-        for t in tiles {
-            let i = self.index(t);
-            self.elevation[i] = elevation;
+        for tile in tiles {
+            let index = self.index(tile);
+            self.elevation[index] = elevation;
         }
         self
     }
@@ -340,9 +343,9 @@ impl Scene {
     /// [`PLAYER`] sees each of `tiles` as `sight`.
     #[must_use]
     pub fn sight_on(mut self, tiles: impl IntoIterator<Item = Tile>, sight: TileSight) -> Self {
-        for t in tiles {
-            let i = self.index(t);
-            self.sight[i] = sight;
+        for tile in tiles {
+            let index = self.index(tile);
+            self.sight[index] = sight;
         }
         self
     }
@@ -404,7 +407,7 @@ impl Scene {
     pub fn build(self) -> World {
         let size = self.size;
         let players = usize::from(self.players) + 1;
-        let mut w = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(0),
             PLAYER,
@@ -422,9 +425,9 @@ impl Scene {
             .terrain
             .iter()
             .map(|t| if wet(t) { WATER_CLASS } else { LAND_CLASS });
-        w.spatial = Spatial::with_tiles(size, Tiles::new(size, classes.collect()));
-        let values = self.terrains.iter().map(|f| {
-            if f.contains(TerrainFlags::WATER) {
+        world.spatial = Spatial::with_tiles(size, Tiles::new(size, classes.collect()));
+        let values = self.terrains.iter().map(|terrain_flags| {
+            if terrain_flags.contains(TerrainFlags::WATER) {
                 0.0
             } else {
                 1.0
@@ -440,65 +443,73 @@ impl Scene {
             size,
             self.terrain
                 .iter()
-                .map(|k| TileTerrain::of_save(k.get(), 255, -1))
+                .map(|terrain_id| TileTerrain::of_save(terrain_id.get(), 255, -1))
                 .collect(),
             kinds.collect(),
             restrictions.clone(),
         );
         terrain.set_elevations(self.elevation.clone());
-        w.spatial.terrain = Some(terrain);
-        w.pathing = Pathing::new(size, self.terrain.clone(), restrictions, 0);
-        w.pathing.start_mesh(size.width() as u32);
-        w.spatial.sight = Some(sight(size, &self.sight, players));
-        w.spatial.relations =
-            ByPlayer::new(w.players.iter().map(|q| q.relations.clone()).collect());
-        w.spatial.unit_diplomacy = ByPlayer::new(
-            w.players
+        world.spatial.terrain = Some(terrain);
+        world.pathing = Pathing::new(size, self.terrain.clone(), restrictions, 0);
+        world.pathing.start_mesh(size.width() as u32);
+        world.spatial.sight = Some(sight(size, &self.sight, players));
+        world.spatial.relations =
+            ByPlayer::new(world.players.iter().map(|q| q.relations.clone()).collect());
+        world.spatial.unit_diplomacy = ByPlayer::new(
+            world
+                .players
                 .iter()
                 .enumerate()
                 .map(|(p, q)| unit_diplomacy(p, &q.relations))
                 .collect(),
         );
-        for (i, &t) in self.rocks.iter().enumerate() {
-            let id = ObjectId::try_from(FIRST_ROCK + i as i32).expect("a valid id");
-            w.spatial.insert(id, rock(t));
+        for (index, &tile) in self.rocks.iter().enumerate() {
+            let id = ObjectId::try_from(FIRST_ROCK + index as i32).expect("a valid id");
+            world.spatial.insert(id, rock(tile));
         }
         if !self.graphics.is_empty() {
-            w.model.graphics = Arc::new(self.graphics.iter().map(|g| (g.id, *g)).collect());
+            world.model.graphics = Arc::new(
+                self.graphics
+                    .iter()
+                    .map(|graphic| (graphic.id, *graphic))
+                    .collect(),
+            );
         }
         if self.scout.is_some() || !self.objects.is_empty() {
             let masters = self.masters();
-            w.model.masters = (0..players).map(|_| Arc::new(masters.clone())).collect();
+            world.model.masters = (0..players).map(|_| Arc::new(masters.clone())).collect();
         }
         if let Some(scout) = self.scout {
-            place_scout(&mut w, scout);
+            place_scout(&mut world, scout);
         }
         let annexes: Vec<(ObjectId, MainBuildingId)> = self
             .objects
             .iter()
-            .filter_map(|t| Some((t.id, t.annex_of?)))
+            .filter_map(|scene_object| Some((scene_object.id, scene_object.annex_of?)))
             .collect();
         for object in self.objects {
-            place_object(&mut w, object);
+            place_object(&mut world, object);
         }
-        link_annexes(&mut w, &annexes);
-        w.reindex();
-        w
+        link_annexes(&mut world, &annexes);
+        world.reindex();
+        world
     }
 
     /// The masters every player's table holds: the scout's and the objects'.
     fn masters(&self) -> Masters {
         let scout = self.scout.map(|s| scout_master(s.line_of_sight));
         Masters::new(
-            scout
-                .into_iter()
-                .chain(self.objects.iter().map(|t| t.master.clone())),
+            scout.into_iter().chain(
+                self.objects
+                    .iter()
+                    .map(|scene_object| scene_object.master.clone()),
+            ),
         )
     }
 
     /// The tile's index in the scene's rows.
-    fn index(&self, t: Tile) -> usize {
-        self.size.index(t).expect("a tile of the scene")
+    fn index(&self, tile: Tile) -> usize {
+        self.size.index(tile).expect("a tile of the scene")
     }
 }
 
@@ -527,7 +538,7 @@ fn player(
     let kind = kinds
         .iter()
         .rev()
-        .find(|(q, _)| q.index() == p)
+        .find(|(player_id, _)| player_id.index() == p)
         .map_or_else(PlayerKind::default, |&(_, kind)| kind);
     Player {
         kind,
@@ -543,11 +554,11 @@ fn unit_diplomacy(p: usize, relations: &Relations) -> UnitRelations {
         .values()
         .iter()
         .enumerate()
-        .map(|(q, &r)| {
+        .map(|(q, &relation)| {
             if q == p {
                 return Some(UnitRelation::Own);
             }
-            match r {
+            match relation {
                 Relation::Ally | Relation::Relation4 => Some(UnitRelation::Ally),
                 Relation::Neutral => Some(UnitRelation::Neutral),
                 Relation::Enemy => Some(UnitRelation::Enemy),
@@ -560,12 +571,12 @@ fn unit_diplomacy(p: usize, relations: &Relations) -> UnitRelations {
 /// The unified map's words for [`PLAYER`]'s `sight` of each tile, in a world of `players`,
 /// with the objects-in-sight registry, empty; the others see nothing.
 fn sight(size: GridSize, sight: &[TileSight], players: usize) -> Visibility {
-    let word = |s: &TileSight| match s {
+    let word = |tile_sight: &TileSight| match tile_sight {
         TileSight::Unknown => VisionBits::empty(),
         TileSight::Explored => VisionBits::explored(PLAYER),
         TileSight::Seen => VisionBits::explored(PLAYER) | VisionBits::visible(PLAYER),
     };
-    let mut v = Visibility::new(
+    let mut visibility = Visibility::new(
         size,
         (0..players)
             .map(|_| VisibleMap {
@@ -578,14 +589,14 @@ fn sight(size: GridSize, sight: &[TileSight], players: usize) -> Visibility {
         0,
         vec![PlayerKind::Human; players],
     );
-    v.registry = Some(Registry::new(players, CLASSES));
-    v
+    visibility.registry = Some(Registry::new(players, CLASSES));
+    visibility
 }
 
-/// A rock's record on tile `t`.
-fn rock(t: Tile) -> Placed {
+/// A rock's record on tile `tile`.
+fn rock(tile: Tile) -> Placed {
     Placed {
-        position: Position::new(t.x() as f32 + 0.5, t.y() as f32 + 0.5, 0.0),
+        position: Position::new(tile.x() as f32 + 0.5, tile.y() as f32 + 0.5, 0.0),
         radius: Footprint::new(0.5, 0.5),
         class: class::CLASS_7,
         player: PlayerId::new(0),
@@ -645,7 +656,7 @@ fn scout_master(line_of_sight: Distance) -> Master {
 }
 
 /// The scout and its standing mover, last moved at its place.
-fn place_scout(w: &mut World, scout: Scout) {
+fn place_scout(world: &mut World, scout: Scout) {
     let unit = Unit {
         id: scout_id(),
         place: Static::at(scout.at),
@@ -657,7 +668,7 @@ fn place_scout(w: &mut World, scout: Scout) {
         },
         ..Unit::default()
     };
-    let _ = w
+    let _ = world
         .push_live(
             PLAYER,
             Object::moving(unit, standing(walk_stats(), scout.at)),
@@ -695,7 +706,7 @@ fn standing(stats: MoveStats, at: Position) -> Mover {
 /// owner's list, a foundation's construction, its record on its tile (one with radii and a
 /// height whose master obstructs, a desolid foundation none), the path planners' standing
 /// object, and in the sight registry its seer, its UMV entry and its entry.
-fn place_object(w: &mut World, scene_object: SceneObject) {
+fn place_object(world: &mut World, scene_object: SceneObject) {
     let SceneObject {
         id,
         player,
@@ -717,8 +728,8 @@ fn place_object(w: &mut World, scene_object: SceneObject) {
         workers,
     } = scene_object;
     let sprite = sprite.map(|id| {
-        let graphic = *w.model.graphics.get(id).expect("the scene's graphic");
-        ActiveSprite::start(graphic, &mut Well512::default(), w.model.tuning.sprite)
+        let graphic = *world.model.graphics.get(id).expect("the scene's graphic");
+        ActiveSprite::start(graphic, &mut Well512::default(), world.model.tuning.sprite)
     });
     let unit = Unit {
         id,
@@ -752,11 +763,12 @@ fn place_object(w: &mut World, scene_object: SceneObject) {
     if let Some(layer) = actions {
         object = Object::with_actions(object, layer.clone());
     }
-    let _ = w
+    let _ = world
         .push_live(player, object)
         .expect("the object joins its player");
     if capture != CaptureKind::None {
-        w.parts
+        world
+            .parts
             .combat_mut(id)
             .expect("the object's combat layer")
             .capture_flag = capture;
@@ -779,24 +791,29 @@ fn place_object(w: &mut World, scene_object: SceneObject) {
                 class: master.obstruction_class,
             }),
     };
-    w.spatial.insert(id, placed);
-    w.pathing.moved(id, &placed, MoveState::Standing);
-    w.pathing.tiles_changed(w.spatial.take_changes());
+    world.spatial.insert(id, placed);
+    world.pathing.moved(id, &placed, MoveState::Standing);
+    world.pathing.tiles_changed(world.spatial.take_changes());
     if let Some(mask) = seen_by {
-        register(w, &scene_object, mask);
+        register(world, &scene_object, mask);
     }
 }
 
 /// Each annex `(id, main)` names its main building, which holds it in its next free slot, in
 /// the scene's order.
-fn link_annexes(w: &mut World, annexes: &[(ObjectId, MainBuildingId)]) {
-    for (n, &(id, main)) in annexes.iter().enumerate() {
-        w.parts
+fn link_annexes(world: &mut World, annexes: &[(ObjectId, MainBuildingId)]) {
+    for (index, &(id, main)) in annexes.iter().enumerate() {
+        world
+            .parts
             .building_mut(id)
             .expect("an annex's building layer")
             .annex_of = Some(main);
-        let slot = annexes[..n].iter().filter(|&&(_, m)| m == main).count();
-        w.parts
+        let slot = annexes[..index]
+            .iter()
+            .filter(|&&(_, role_id)| role_id == main)
+            .count();
+        world
+            .parts
             .building_mut(main.id())
             .expect("a main building's layer")
             .annexes
@@ -829,7 +846,7 @@ fn foundation(master: &Master) -> Building {
 /// entry ([`Visibility::link_building`]), then what its sight update writes when it finds `mask`
 /// ([`Visibility::combat_sight`]): the entry's mask and the records in the lists of the players of
 /// `mask` ([`Registry::update_unit`]).
-fn register(w: &mut World, object: &SceneObject, mask: VisionBits) {
+fn register(world: &mut World, object: &SceneObject, mask: VisionBits) {
     let SceneObject {
         id,
         player,
@@ -841,16 +858,17 @@ fn register(w: &mut World, object: &SceneObject, mask: VisionBits) {
         ..
     } = *object;
     let building = master.kind == MasterKind::BUILDING;
-    let players = w.players.len();
-    let tuning = w.model.tuning.visibility;
-    let v = w.spatial.sight.as_mut().expect("the scene's sight");
+    let players = world.players.len();
+    let tuning = world.model.tuning.visibility;
+    let visibility = world.spatial.sight.as_mut().expect("the scene's sight");
     let umv = if building {
-        v.link_building(at, master.radius, tuning)
+        visibility
+            .link_building(at, master.radius, tuning)
             .expect("a footprint on the map")
     } else {
         0
     };
-    v.add_seer(
+    visibility.add_seer(
         id,
         Seer {
             player,
@@ -868,7 +886,7 @@ fn register(w: &mut World, object: &SceneObject, mask: VisionBits) {
             kind: master.kind,
         },
     );
-    let registry = v
+    let registry = visibility
         .registry
         .get_or_insert_with(|| Registry::new(players, CLASSES));
     registry
@@ -895,8 +913,8 @@ fn register(w: &mut World, object: &SceneObject, mask: VisionBits) {
 /// # Panics
 ///
 /// A world without the scene's scout.
-pub(crate) fn scout_area(w: &mut World) -> (ScoutArea<'_>, GridSize, Distance) {
-    let (_, unit) = w.object(scout_id()).expect("the scene's scout");
+pub(crate) fn scout_area(world: &mut World) -> (ScoutArea<'_>, GridSize, Distance) {
+    let (_, unit) = world.object(scout_id()).expect("the scene's scout");
     let unit = unit.clone();
     let me = Me {
         human_order: WorldTime::ZERO,
@@ -904,5 +922,5 @@ pub(crate) fn scout_area(w: &mut World) -> (ScoutArea<'_>, GridSize, Distance) {
         group: None,
         action_state: ActionState::NO_ACTION,
     };
-    ScoutArea::of(w, &unit, me, PLAYER, PlayerKind::Human).expect("the scout's reads")
+    ScoutArea::of(world, &unit, me, PLAYER, PlayerKind::Human).expect("the scout's reads")
 }

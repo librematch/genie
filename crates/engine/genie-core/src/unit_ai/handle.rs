@@ -25,7 +25,7 @@ impl UnitAi {
     /// the notify on to the base handler ([`UnitAi::base_notify`]).
     pub(super) fn handle(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -33,21 +33,29 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         match self.ai_kind {
-            UnitAiKind::Hunted => self.hunted_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Boar => self.boar_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Lion => self.lion_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Civilian => self.villager_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Transport | UnitAiKind::SiegeTower => {
-                self.transport_notify(n, time, at, player_kind, ai_rng, side)
+            UnitAiKind::Hunted => self.hunted_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Boar => self.boar_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Lion => self.lion_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Civilian => {
+                self.villager_notify(notify, time, at, player_kind, ai_rng, side)
             }
-            UnitAiKind::Trade => self.trader_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Fishing => self.fishing_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Siege => self.siege_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Soldier => self.soldier_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Tower => self.tower_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Building => self.building_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Livestock => self.livestock_notify(n, time, at, player_kind, ai_rng, side),
-            UnitAiKind::Artifact => self.artifact_notify(n, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Transport | UnitAiKind::SiegeTower => {
+                self.transport_notify(notify, time, at, player_kind, ai_rng, side)
+            }
+            UnitAiKind::Trade => self.trader_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Fishing => self.fishing_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Siege => self.siege_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Soldier => self.soldier_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Tower => self.tower_notify(notify, time, at, player_kind, ai_rng, side),
+            UnitAiKind::Building => {
+                self.building_notify(notify, time, at, player_kind, ai_rng, side)
+            }
+            UnitAiKind::Livestock => {
+                self.livestock_notify(notify, time, at, player_kind, ai_rng, side)
+            }
+            UnitAiKind::Artifact => {
+                self.artifact_notify(notify, time, at, player_kind, ai_rng, side)
+            }
             UnitAiKind::Predator
             | UnitAiKind::Ranged
             | UnitAiKind::Ranged2
@@ -69,14 +77,14 @@ impl UnitAi {
     /// 0x48 hands the notify to the owner (its alerts, not held). Each answers 2.
     pub(super) fn artifact_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let stops = match n.kind {
+        let stops = match notify.kind {
             NotifyKind::DAMAGED
             | NotifyKind(
                 0x1f6..=0x1f8 | 0x1fd..=0x200 | 0x259..=0x262 | 0x265..=0x269 | 0x278 | 0x2be,
@@ -89,18 +97,18 @@ impl UnitAi {
             NotifyKind::ACTION_FAILED
             | NotifyKind::ACTION_COMPLETED
             | NotifyKind::ACTION_INVALIDATED => self.current_order.map_or_else(
-                || AiAction::field(self.current_action) == n.p[0],
-                |o| o.owns(self.current_action),
+                || AiAction::field(self.current_action) == notify.p[0],
+                |order_kind| order_kind.owns(self.current_action),
             ),
             // "Target is still visible.": the world holds the target, which its owner sees
             NotifyKind::TARGET_MOVED => !at
                 .target
-                .is_some_and(|t| self.current_target.is_some() && t.sight.seen()),
+                .is_some_and(|seen| self.current_target.is_some() && seen.sight.seen()),
             NotifyKind::SENT_OFF | NotifyKind::SENT_OFF_GROUP => {
-                return self.base_notify(n, time, at, player_kind, ai_rng, side);
+                return self.base_notify(notify, time, at, player_kind, ai_rng, side);
             }
             NotifyKind::ATTACKED => {
-                let _ = self.attackers.add(n.caller);
+                let _ = self.attackers.add(notify.caller);
                 side.set_under_attack(true);
                 false
             }
@@ -148,10 +156,10 @@ impl UnitAi {
         self.alert(found, at.dt_seconds);
         if found.players < 2
             && let Some(id) = found.id
-            && let Some(u) = side.seen_unit(id)?
-            && u.owner != at.player
+            && let Some(unit_seen) = side.seen_unit(id)?
+            && unit_seen.owner != at.player
         {
-            side.effect_now(Effect::ChangeOwner(u.owner), self, rng)?;
+            side.effect_now(Effect::ChangeOwner(unit_seen.owner), self, rng)?;
             return Ok(IdleOutcome::Acted);
         }
         Ok(IdleOutcome::Idle)
@@ -181,7 +189,7 @@ impl UnitAi {
     /// ignores; anything else is not modelled.
     pub(super) fn base_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -190,14 +198,16 @@ impl UnitAi {
     ) -> GenieResult<u32> {
         let unit_ai_tuning = &at.unit_ai_tuning;
         let roles = &at.roles;
-        match n.kind {
-            NotifyKind::ACTION_COMPLETED => self.action_completed(n, at, player_kind, ai_rng, side),
-            NotifyKind::ACTION_FAILED => self.action_failed(n, at, player_kind, ai_rng, side),
+        match notify.kind {
+            NotifyKind::ACTION_COMPLETED => {
+                self.action_completed(notify, at, player_kind, ai_rng, side)
+            }
+            NotifyKind::ACTION_FAILED => self.action_failed(notify, at, player_kind, ai_rng, side),
             NotifyKind::ACTION_INVALIDATED => {
-                self.action_invalidated(n, at, player_kind, ai_rng, side)
+                self.action_invalidated(notify, at, player_kind, ai_rng, side)
             }
             NotifyKind::REQUIRES_SEARCH if self.explorer() => {
-                self.seek_unexplored(n, at, player_kind, ai_rng, side)
+                self.seek_unexplored(notify, at, player_kind, ai_rng, side)
             }
             NotifyKind::OWNER_CHANGED => {
                 side.effect_now(Effect::Stop, self, ai_rng)?;
@@ -229,10 +239,10 @@ impl UnitAi {
                 Ok(GO_ON)
             }
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.damaged(n, time, at, player_kind, ai_rng, side)
+                self.damaged(notify, time, at, player_kind, ai_rng, side)
             }
-            NotifyKind::IN_THE_WAY => self.in_the_way(n, at, side, ai_rng),
-            NotifyKind::SENT_OFF => self.sent_off(n, side, ai_rng, roles, unit_ai_tuning),
+            NotifyKind::IN_THE_WAY => self.in_the_way(notify, at, side, ai_rng),
+            NotifyKind::SENT_OFF => self.sent_off(notify, side, ai_rng, roles, unit_ai_tuning),
             // a unit of a group sent off a footprint: the action value 0x2c0
             NotifyKind::SENT_OFF_GROUP => {
                 self.set_action(Some(AiAction::GroupAside));
@@ -240,13 +250,13 @@ impl UnitAi {
             }
             // "Unit #%d is no longer doing an action on me.": an attacker leaves the set
             NotifyKind::NO_LONGER_ON_ME => {
-                self.attackers.remove(n.caller);
+                self.attackers.remove(notify.caller);
                 Ok(GO_ON)
             }
             _ => Err(
                 GenieError::unsupported("a notify kind the base handler does not model")
-                    .with("notify", format_args!("{:#x}", n.kind))
-                    .with("caller", ObjectId::field(n.caller)),
+                    .with("notify", format_args!("{:#x}", notify.kind))
+                    .with("caller", ObjectId::field(notify.caller)),
             ),
         }
     }

@@ -29,7 +29,7 @@ pub fn import_make(
         .action
         .rge_action_by_kind
         .as_deref()
-        .and_then(|t| t.rge_action_make.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_make.as_deref())
         .ok_or(GenieError::unsupported("a saved Make without its part"))?;
     if base.sub_actions.entries().next().is_some() {
         return Err(GenieError::unsupported("a saved Make with a sub-action"));
@@ -44,15 +44,15 @@ pub fn import_make(
 }
 
 /// A Hunt's or a Gather's task.
-const fn hunt_task(t: &Task) -> HuntTask {
+const fn hunt_task(task: &Task) -> HuntTask {
     HuntTask {
-        id: t.id,
-        range: t.work_range,
-        resource: t.attribute_kind,
-        sprites: t.sprites,
-        work_value: t.work_val1,
-        productivity: t.attribute_kind2,
-        kind4: t.attribute_kind4,
+        id: task.id,
+        range: task.work_range,
+        resource: task.attribute_kind,
+        sprites: task.sprites,
+        work_value: task.work_val1,
+        productivity: task.attribute_kind2,
+        kind4: task.attribute_kind4,
     }
 }
 
@@ -71,9 +71,9 @@ pub fn import_hunt(
         .as_deref()
         .ok_or(GenieError::unsupported("a saved Hunt without its own part"))?;
     // the states the slice models
-    if !HuntState::of_byte(base.state, None, None).is_ok_and(|s| {
+    if !HuntState::of_byte(base.state, None, None).is_ok_and(|hunt_state| {
         matches!(
-            s,
+            hunt_state,
             HuntState::Idle
                 | HuntState::Search
                 | HuntState::Walk { .. }
@@ -133,10 +133,10 @@ fn hunt_attack(saved: &Saved<'_>, sub: &Action) -> GenieResult<Attack> {
         let reload = saved_reload(saved.object, saved.s, saved.objects).ok_or(
             GenieError::unsupported("a saved swing without its unit's reload"),
         )?;
-        let g = attack.arms.sprite.ok_or(GenieError::unsupported(
+        let graphic = attack.arms.sprite.ok_or(GenieError::unsupported(
             "a saved swing without its attack sprite",
         ))?;
-        let rest = reload - g.frames.as_f32() * g.frame_duration;
+        let rest = reload - graphic.frames.as_f32() * graphic.frame_duration;
         attack.swing = Seconds::new(rest);
         attack.rest = Seconds::new(rest.max(0.0));
     }
@@ -155,14 +155,14 @@ pub fn import_gather(
         .action
         .rge_action_by_kind
         .as_deref()
-        .and_then(|b| b.rge_action_gather.as_deref())
+        .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_gather.as_deref())
         .ok_or(GenieError::unsupported(
             "a saved Gather without its own part",
         ))?;
     // the states the slice models
-    if !GatherState::of_byte(base.state, None).is_ok_and(|s| {
+    if !GatherState::of_byte(base.state, None).is_ok_and(|gather_state| {
         matches!(
-            s,
+            gather_state,
             GatherState::Walk { .. }
                 | GatherState::Face
                 | GatherState::Work

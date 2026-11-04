@@ -21,8 +21,8 @@ pub use genie_diff_derive::Diff;
 /// A value compared field by field ([`differences`]). Derive it (`#[derive(Diff)]`); its
 /// `Debug` text shows a value where it differs.
 pub trait Diff: Debug {
-    /// Records in `d` where `self` and `other` differ, under `d`'s current path.
-    fn diff(&self, other: &Self, d: &mut Differ);
+    /// Records in `differ` where `self` and `other` differ, under `differ`'s current path.
+    fn diff(&self, other: &Self, differ: &mut Differ);
 }
 
 /// Which fields a comparison reads.
@@ -55,9 +55,9 @@ pub const ABSENT: &str = "absent";
 /// Where two values differ, in the order of their fields.
 #[must_use]
 pub fn differences<T: Diff + ?Sized>(left: &T, right: &T, scope: Scope) -> Vec<Difference> {
-    let mut d = Differ::new(scope);
-    left.diff(right, &mut d);
-    d.found
+    let mut differ = Differ::new(scope);
+    left.diff(right, &mut differ);
+    differ.found
 }
 
 /// One step of a path.
@@ -107,7 +107,7 @@ impl Differ {
 
     /// Compares the field `name`.
     pub fn field<T: Diff + ?Sized>(&mut self, name: &'static str, left: &T, right: &T) {
-        self.under(Step::Field(name), |d| left.diff(right, d));
+        self.under(Step::Field(name), |differ| left.diff(right, differ));
     }
 
     /// Compares the field `name` by its equality, as one value.
@@ -118,7 +118,7 @@ impl Differ {
         right: &T,
     ) {
         if left != right {
-            self.under(Step::Field(name), |d| d.differs(left, right));
+            self.under(Step::Field(name), |differ| differ.differs(left, right));
         }
     }
 
@@ -150,10 +150,10 @@ impl Differ {
         if lengths.0 != lengths.1 {
             self.field("len", &lengths.0, &lengths.1);
         }
-        for i in 0..lengths.0.max(lengths.1) {
+        for index in 0..lengths.0.max(lengths.1) {
             match (left.next(), right.next()) {
-                (Some(a), Some(b)) => self.under(Step::Index(i), |d| a.diff(b, d)),
-                (a, b) => self.under(Step::Index(i), |d| d.one_side(a, b)),
+                (Some(a), Some(b)) => self.under(Step::Index(index), |d| a.diff(b, d)),
+                (a, b) => self.under(Step::Index(index), |differ| differ.one_side(a, b)),
             }
         }
     }
@@ -166,7 +166,7 @@ impl Differ {
             let step = Step::Key(format!("{k:?}"));
             match (left.get(k), right.get(k)) {
                 (Some(a), Some(b)) => self.under(step, |d| a.diff(b, d)),
-                (a, b) => self.under(step, |d| d.one_side(a, b)),
+                (a, b) => self.under(step, |differ| differ.one_side(a, b)),
             }
         }
     }
@@ -256,57 +256,57 @@ macro_rules! by_bits {
 by_bits!(f32: 10, f64: 18);
 
 impl<T: Diff> Diff for Option<T> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
+    fn diff(&self, other: &Self, differ: &mut Differ) {
         match (self, other) {
-            (Some(a), Some(b)) => a.diff(b, d),
+            (Some(a), Some(b)) => a.diff(b, differ),
             (None, None) => {}
-            _ => d.differs(self, other),
+            _ => differ.differs(self, other),
         }
     }
 }
 
 impl<T: Diff + ?Sized> Diff for Box<T> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        (**self).diff(other, d);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        (**self).diff(other, differ);
     }
 }
 
 impl<T: Diff> Diff for [T] {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.sequence(self.iter(), other.iter());
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.sequence(self.iter(), other.iter());
     }
 }
 
 impl<T: Diff, const N: usize> Diff for [T; N] {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.sequence(self.iter(), other.iter());
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.sequence(self.iter(), other.iter());
     }
 }
 
 impl<T: Diff> Diff for Vec<T> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.sequence(self.iter(), other.iter());
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.sequence(self.iter(), other.iter());
     }
 }
 
 impl<T: Diff> Diff for VecDeque<T> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.sequence(self.iter(), other.iter());
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.sequence(self.iter(), other.iter());
     }
 }
 
 impl<K: Ord + Debug, V: Diff> Diff for BTreeMap<K, V> {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.map(self, other);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.map(self, other);
     }
 }
 
 impl<T: Ord + Debug> Diff for BTreeSet<T> {
     fn diff(&self, other: &Self, d: &mut Differ) {
-        for v in self.symmetric_difference(other) {
-            let step = Step::Key(format!("{v:?}"));
-            let (left, right) = (self.get(v), other.get(v));
-            d.under(step, |d| d.one_side(left, right));
+        for value in self.symmetric_difference(other) {
+            let step = Step::Key(format!("{value:?}"));
+            let (left, right) = (self.get(value), other.get(value));
+            d.under(step, |differ| differ.one_side(left, right));
         }
     }
 }

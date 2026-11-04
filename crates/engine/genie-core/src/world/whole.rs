@@ -86,8 +86,8 @@ pub struct Object {
 
 impl Diff for Object {
     /// As its view ([`ObjectView`]).
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        self.view().diff(&other.view(), d);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        self.view().diff(&other.view(), differ);
     }
 }
 
@@ -111,17 +111,17 @@ pub struct ObjectView<'a> {
 
 impl Diff for ObjectView<'_> {
     /// The row's fields, then the parts', each at the path it had on the object.
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        self.unit.diff(other.unit, d);
-        self.parts.as_ref().diff(other.parts.as_ref(), d);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        self.unit.diff(other.unit, differ);
+        self.parts.as_ref().diff(other.parts.as_ref(), differ);
     }
 }
 
 impl<'a> From<&'a Object> for ObjectView<'a> {
-    fn from(o: &'a Object) -> Self {
+    fn from(object: &'a Object) -> Self {
         ObjectView {
-            unit: &o.unit,
-            parts: Cow::Borrowed(&o.parts),
+            unit: &object.unit,
+            parts: Cow::Borrowed(&object.parts),
         }
     }
 }

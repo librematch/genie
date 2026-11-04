@@ -36,7 +36,7 @@ fn fixture() -> Vec<(String, Vec<Vec<u32>>)> {
 fn mismatches(name: &str, ours: impl Fn(&[f32]) -> f32) -> Vec<String> {
     let (_, calls) = fixture()
         .into_iter()
-        .find(|(n, _)| n == name)
+        .find(|(text, _)| text == name)
         .expect("the routine is in the fixture");
     assert!(calls.len() > 4000, "{name}: {} calls", calls.len());
     calls
@@ -89,8 +89,8 @@ fn sweep(ours: fn(f32) -> f32, oracle: fn(f32) -> f32) -> Vec<u32> {
     let span = u32::MAX / threads + 1;
     scope(|s| {
         let mut workers = Vec::new();
-        for t in 0..threads {
-            let start = t * span;
+        for index in 0..threads {
+            let start = index * span;
             let end = start.saturating_add(span - 1);
             workers.push(s.spawn(move || {
                 (start..=end)
@@ -132,10 +132,10 @@ fn atan2_agrees_with_libm_on_random_pairs() {
     let threads = 16u64;
     let bad: Vec<(u32, u32)> = scope(|s| {
         let mut workers = Vec::new();
-        for t in 0..threads {
+        for index in 0..threads {
             workers.push(s.spawn(move || {
                 // a 64-bit LCG per thread, its high words the two arguments' bits
-                let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ t;
+                let mut state = 0x9e37_79b9_7f4a_7c15_u64 ^ index;
                 let mut bad = Vec::new();
                 for _ in 0..(1u64 << 30) / threads {
                     state = state
@@ -154,7 +154,7 @@ fn atan2_agrees_with_libm_on_random_pairs() {
         }
         workers
             .into_iter()
-            .flat_map(|w| w.join().expect("a sweep thread"))
+            .flat_map(|sweep| sweep.join().expect("a sweep thread"))
             .collect()
     });
     assert_eq!(bad, Vec::new());
@@ -194,7 +194,7 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
             workers.push(s.spawn(move || {
                 let mut state = 0x2545_f491_4f6c_dd1d_u64 ^ t;
                 let mut bad = Vec::new();
-                for k in 0..(1u64 << 30) / threads {
+                for index in 0..(1u64 << 30) / threads {
                     state = state
                         .wrapping_mul(6_364_136_223_846_793_005)
                         .wrapping_add(1_442_695_040_888_963_407);
@@ -202,11 +202,11 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
                         (state >> 32) as u32,
                         u32::try_from(state & 0xffff_ffff).expect("a word"),
                     );
-                    if k % 2 == 0 {
+                    if index % 2 == 0 {
                         // exponents close together, where the subtraction loop runs long
                         y = (y & 0x807f_ffff)
                             | (x & 0x7f80_0000)
-                                .saturating_sub(u32::try_from(k % 30).expect("below 30") << 23);
+                                .saturating_sub(u32::try_from(index % 30).expect("below 30") << 23);
                         x &= 0xff7f_ffff;
                     }
                     if differ(f32::from_bits(x), f32::from_bits(y)) && bad.len() < 16 {
@@ -218,7 +218,7 @@ fn fmod_is_the_exact_remainder_on_random_pairs() {
         }
         workers
             .into_iter()
-            .flat_map(|w| w.join().expect("a sweep thread"))
+            .flat_map(|sweep| sweep.join().expect("a sweep thread"))
             .collect()
     });
     assert_eq!(bad, Vec::new());

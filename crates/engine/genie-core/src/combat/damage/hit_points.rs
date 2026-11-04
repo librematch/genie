@@ -35,13 +35,13 @@ pub enum ShieldBlock {
 /// `JA` past: a NaN charge blocks too). The type-5 shield's local-player statistics
 /// (`FUN_140a497f0`) change no simulation state (FD-037-D20). A target without combat values has
 /// charge type 0.
-pub fn shield(v: &mut Victim, hit: HitKind) -> ShieldBlock {
+pub fn shield(victim: &mut Victim, hit: HitKind) -> ShieldBlock {
     let kind = match hit {
         HitKind::Melee => ChargeKind::MELEE_SHIELD,
         HitKind::Missile => ChargeKind::MISSILE_SHIELD,
     };
-    if v.source.charge_kind == kind && at_most_or_unordered(1.0, v.source.charge.get()) {
-        v.source.charge -= Charge::new(1.0);
+    if victim.source.charge_kind == kind && at_most_or_unordered(1.0, victim.source.charge.get()) {
+        victim.source.charge -= Charge::new(1.0);
         return ShieldBlock::Blocked;
     }
     ShieldBlock::Passes
@@ -49,34 +49,36 @@ pub fn shield(v: &mut Victim, hit: HitKind) -> ShieldBlock {
 
 /// `FUN_141202a80`: the hit points the master's `invulnerability_level` keeps (a share of its hit
 /// points when above 0, the level itself when below), 0 for none.
-pub(super) fn hp_floor(a: &Armored, master_hp: MasterHitPoints) -> HitPoints {
-    a.invulnerability.floor(master_hp)
+pub(super) fn hp_floor(armored: &Armored, master_hp: MasterHitPoints) -> HitPoints {
+    armored.invulnerability.floor(master_hp)
 }
 
 /// Slot 0xc0: the hit points with the powerups' room.
-pub(super) fn effective(v: &Victim) -> HitPoints {
-    let pu = v.armored.as_ref().map_or(HpPowerup::NONE, |a| a.hp_powerup);
-    pu.room() + v.hp
+pub(super) fn effective(victim: &Victim) -> HitPoints {
+    let pu = victim
+        .armored
+        .as_ref()
+        .map_or(HpPowerup::NONE, |armored| armored.hp_powerup);
+    pu.room() + victim.hp
 }
 
-/// Slot 0xb0, the loss of `d` hit points: a combat object of type 70 or 80 (`FUN_141205c80`)
-/// takes it on its hit point powerups' room first, and its hit points stay above its
-/// `invulnerability_level` floor; another object (`FUN_141189160`) just loses it. Not modelled
+/// Slot 0xb0, the loss of `hit_points` hit points: a combat object of type 70 or 80
+/// (`FUN_141205c80`) takes it on its hit point powerups' room first, and its hit points stay above
+/// its `invulnerability_level` floor; another object (`FUN_141189160`) just loses it. Not modelled
 /// (no update of this recording fills either list): the kill credits of a dying object's active
-/// stingers (`+0xb58`) and a surviving object's hit point transforms (`+0xb20`,
-/// `FUN_141204450`).
-pub fn lose(t: &mut Victim, d: HitPoints) {
-    let unit = matches!(t.kind, MasterKind::COMBAT | MasterKind::BUILDING);
-    let Some(a) = t.armored.as_mut().filter(|_| unit) else {
-        t.hp -= d;
+/// stingers (`+0xb58`) and a surviving object's hit point transforms (`+0xb20`, `FUN_141204450`).
+pub fn lose(victim: &mut Victim, d: HitPoints) {
+    let unit = matches!(victim.kind, MasterKind::COMBAT | MasterKind::BUILDING);
+    let Some(armored) = victim.armored.as_mut().filter(|_| unit) else {
+        victim.hp -= d;
         return;
     };
-    let Some(d) = a.hp_powerup.absorb(d) else {
+    let Some(hit_points) = armored.hp_powerup.absorb(d) else {
         return;
     };
-    let floor = hp_floor(a, t.master_hp);
-    let left = t.hp - d;
-    t.hp = if floor == HitPoints::ZERO || floor <= left {
+    let floor = hp_floor(armored, victim.master_hp);
+    let left = victim.hp - hit_points;
+    victim.hp = if floor == HitPoints::ZERO || floor <= left {
         left
     } else {
         floor

@@ -1,36 +1,25 @@
-//! The unit AI's part of the update: its surroundings, its side and its run.
+//! The unit AI's part of the update: its side and its run, on what it reads of its surroundings
+//! ([`Unit::surroundings`]).
 
-use crate::construction::build::CART_TASK;
-use crate::groups::GroupCommandKind;
-use crate::map::Distance;
-use crate::map::Footprint;
 use crate::math::rng::{Stream, Well512};
 use crate::movement::Speed;
 use crate::movement::{Mover, footprint_gap_squared};
-use crate::objects::ActionState;
 use crate::objects::ObjectId;
 use crate::objects::layers::Action;
-use crate::objects::masters::ActionKind;
-use crate::objects::masters::AttackPriority;
-use crate::objects::masters::ClassId;
-use crate::objects::masters::CombatLevel;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::PlayersMasters;
-use crate::objects::unit::{Outcome, Unit, UnitFlags, object_master};
+use crate::objects::unit::{Outcome, Unit, object_master};
 use crate::ownership::CaptureKind;
 use crate::ownership::capture::Captured;
 use crate::players::AllyTest;
-use crate::players::Chance;
 use crate::players::PlayerId;
 use crate::players::PlayerKind;
-use crate::unit_ai::SurroundingFlags;
 use crate::unit_ai::task_finder::allied;
-use crate::unit_ai::world_view::{OwnerView, UnitView, changed_view};
+use crate::unit_ai::world_view::{OwnerView, UnitView};
 use crate::unit_ai::{AfterOrder, Surroundings, UnitAi};
-use crate::unit_ai::{Attacker, GroupState, NotifyKind, Seen, UnitSeen};
+use crate::unit_ai::{Attacker, NotifyKind, Seen, UnitSeen};
 use crate::vision::visibility::sight_taker;
-use crate::world::AiSwitches;
 use crate::world::UNIT_AI_MASTER;
 use crate::world::layer::Roles;
 use crate::world::others::OthersRef;
@@ -54,234 +43,59 @@ impl Unit {
     pub(crate) fn ai_part(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         (captured, leaves): (Option<Captured>, Outcome),
         roles: &Roles,
     ) -> GenieResult<Outcome> {
-        self.refresh_pathing(c)?;
+        self.refresh_pathing(step)?;
         // RGE_Combat_Object::update after the actions: the object's sight mask; a changed mask of
         // an object others take over by seeing it (`+0x924` 1) gives it to the first player that
         // sees it ([`crate::vision::visibility::sight_taker`]) when that one has its master
         let mut captured = captured;
-        let combat = MasterKind::COMBAT <= self.master(c.w.master_tables(), c.player)?.kind;
+        let combat = MasterKind::COMBAT <= self.master(step.w.master_tables(), step.player)?.kind;
         if combat
-            && let Some(mask) =
-                c.w.spatial
-                    .combat_sight(self.id, c.w.parts.building_of(self.id).annex_of)?
-            && let Some(q) = sight_taker(
+            && let Some(mask) = step
+                .w
+                .spatial
+                .combat_sight(self.id, step.w.parts.building_of(self.id).annex_of)?
+            && let Some(player_id) = sight_taker(
                 mask,
-                c.player,
-                c.w.settings.game_mode,
-                &c.w.players,
-                &c.w.allow_gaia_capture,
+                step.player,
+                step.w.settings.game_mode,
+                &step.w.players,
+                &step.w.allow_gaia_capture,
             )
-            && c.w
+            && step
+                .w
                 .model
                 .masters
-                .get(q.index())
-                .is_some_and(|m| m.get(self.life.master_id).is_some())
+                .get(player_id.index())
+                .is_some_and(|masters| masters.get(self.life.master_id).is_some())
         {
-            self.take_by_sight(actions, c, q, roles)?;
+            self.take_by_sight(actions, step, player_id, roles)?;
             captured = Some(Captured {
-                new: q,
+                new: player_id,
                 main: true,
                 also: Vec::new(),
-                building: take(&mut c.building_handover),
+                building: take(&mut step.building_handover),
             });
         }
-        let mut after = self.ai_run(actions, c, captured.as_ref(), None)?;
+        let mut after = self.ai_run(actions, step, captured.as_ref(), None)?;
         while let Some(tail) = after {
-            after = self.ai_run(actions, c, captured.as_ref(), Some(tail))?;
+            after = self.ai_run(actions, step, captured.as_ref(), Some(tail))?;
         }
-        if let Some((new, main)) = c.taken_over.take() {
+        if let Some((new, main)) = step.taken_over.take() {
             captured = Some(Captured {
                 new,
                 main,
                 also: Vec::new(),
-                building: take(&mut c.building_handover),
+                building: take(&mut step.building_handover),
             });
         }
         if let Some(k) = captured {
             return Ok(Outcome::Captured(k));
         }
         Ok(leaves)
-    }
-
-    /// What the unit's AI reads of it and the world as it runs ([`Surroundings`]): the unit,
-    /// its master (`master`, its class `class`), its owner `player` (a captured unit's new one,
-    /// whose map sees the AI's target), `busy` (an action of its own) and `interruptible` (slot
-    /// 0x2d0), through `view` (the owner's side).
-    ///
-    /// # Errors
-    ///
-    /// A busy unit of a master the slice does not have, and what the target's block and the
-    /// named units do not model.
-    #[allow(clippy::too_many_lines)]
-    pub(crate) fn surroundings(
-        &self,
-        actions: &Action,
-        c: &Step<'_>,
-        view: &OwnerView,
-        (master, class): (Option<&Master>, Option<ClassId>),
-        (player, busy, interruptible): (PlayerId, bool, bool),
-    ) -> GenieResult<Surroundings> {
-        Ok(Surroundings {
-            position: self.position(),
-            hp: self.life.hp,
-            speed: c
-                .w
-                .parts
-                .mover_of(self.id)
-                .map_or(Speed::ZERO, |m| m.stats.speed),
-            map: c.w.spatial.map,
-            dt_seconds: c.dt.seconds(),
-            flags: {
-                let mut flags = SurroundingFlags::empty();
-                flags.set(SurroundingFlags::MODE_1, c.w.mode_680.is_one());
-                flags.set(SurroundingFlags::BUSY, busy);
-                flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
-                flags.set(
-                    SurroundingFlags::TASK_0X99,
-                    master.is_some_and(|m| {
-                        m.action_part()
-                            .tasks
-                            .iter()
-                            .any(|t| t.action_kind == CART_TASK)
-                    }),
-                );
-                flags.set(SurroundingFlags::GARRISONED, self.life.inside.is_some());
-                flags.set(
-                    SurroundingFlags::RANGED,
-                    master.is_some_and(|m| m.combat_part().missile.master().is_some()),
-                );
-                flags.set(
-                    SurroundingFlags::SCENARIO,
-                    c.w.settings.game_mode.scenario(),
-                );
-                flags.set(
-                    SurroundingFlags::TASK_0X69,
-                    master.is_some_and(|m| {
-                        m.action_part()
-                            .tasks
-                            .iter()
-                            .any(|t| t.action_kind == ActionKind::HEAL)
-                    }),
-                );
-                flags.set(
-                    SurroundingFlags::UNDER_ATTACK,
-                    self.flags.contains(UnitFlags::UNDER_ATTACK),
-                );
-                flags.set(
-                    SurroundingFlags::ATTACK_LISTED,
-                    actions.list.attack().is_some(),
-                );
-                flags.set(
-                    SurroundingFlags::ATTACK_MOVING,
-                    c.w.parts.mover_of(self.id).is_some_and(|m| m.attack_moving),
-                );
-                flags.set(
-                    SurroundingFlags::DISABLE_TOWER_PRIORITY,
-                    view.ai_settings
-                        .switches
-                        .contains(AiSwitches::DISABLE_TOWER_PRIORITY),
-                );
-                flags.set(
-                    SurroundingFlags::GUEST_COMPUTER,
-                    self.garrison.iter().any(|&g| {
-                        c.w.spatial.get(g).is_some_and(|p| {
-                            p.player != player
-                                && c.w
-                                    .players
-                                    .get(p.player.index())
-                                    .is_some_and(|q| q.kind.is_computer())
-                        })
-                    }),
-                );
-                flags
-            },
-            player,
-            class: match class {
-                Some(class) => Some(class),
-                None if busy => {
-                    return Err(GenieError::unsupported(
-                        "a busy unit of a master the slice does not have",
-                    ));
-                }
-                None => None,
-            },
-            combat_level: master.map_or(CombatLevel::NONE, |m| m.combat_level),
-            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| {
-                m.creatable_part().attack_priority
-            }),
-            size: master.map_or(Footprint::ZERO, |m| m.radius),
-            los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
-            search_radius: master.map_or(Distance::ZERO, |m| m.action_part().search_radius),
-            weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
-            state: self.life.state,
-            kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
-            firepower: c.w.parts.combat_of(self.id).firepower,
-            capture: self.capture_kind(c),
-            master: self.life.master_id,
-            // a new owner sees the target with its own map
-            target: self.ai_target(c, view.player)?,
-            id: self.id,
-            anim_speed: c.w.parts.anim_speed_of(self.id),
-            action_state: if c.w.parts.unread.contains(self.id) {
-                None
-            } else {
-                Some(
-                    actions
-                        .top_action()
-                        .map_or(ActionState::NO_ACTION, |a| a.state),
-                )
-            },
-            units: self.named_units(
-                c,
-                changed_view(
-                    OthersRef::of(&c.w.players, &c.w.index, c.player)?,
-                    view.new_owner,
-                ),
-                view,
-                master,
-            )?,
-            group: (self.group.id).and_then(|id| c.w.groups.get(id)).map(|g| {
-                let mut flags = GroupState::empty();
-                flags.set(
-                    GroupState::COMMANDED,
-                    g.current_command != GroupCommandKind::NONE,
-                );
-                flags.set(GroupState::IDLE, g.is_idle());
-                flags.set(GroupState::PATROL, g.patrols());
-                flags.set(GroupState::MOVING, g.motion.moving());
-                flags.set(
-                    GroupState::MEMBER_MOVING,
-                    c.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
-                );
-                flags
-            }),
-            top_target: actions
-                .top_target_seen(c, OthersRef::of(&c.w.players, &c.w.index, c.player)?)?,
-            min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
-            moved_at: c
-                .w
-                .parts
-                .mover_of(self.id)
-                .map_or_else(|| self.position(), |m| m.moved_at)
-                .vector(),
-            dodge_chance: c
-                .w
-                .players
-                .get(player.index())
-                .map_or(Chance::NONE, |q| q.dodge_chance),
-            keep_distance_chance: c
-                .w
-                .players
-                .get(player.index())
-                .map_or(Chance::NONE, |q| q.keep_distance_chance),
-            roles: c.w.model.roles.clone(),
-            slots: c.w.model.slots,
-            unit_ai_tuning: c.w.model.tuning.unit_ai,
-        })
     }
 
     /// Runs `f` on the unit's AI with its side ([`UnitView`]: the unit without its AI, on the
@@ -300,19 +114,19 @@ impl Unit {
     pub(crate) fn with_side<R>(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         view: &OwnerView,
         attacker: Attacker,
         (player, player_kind): (PlayerId, PlayerKind),
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
     ) -> GenieResult<R> {
-        let mut ai = c.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
+        let mut ai = step.w.lend_unit_ai(self.id).ok_or(NO_UNIT_AI)?;
         // the AI stream is the AI's while it runs: no world routine the side calls draws from it
-        let held = c.w.streams.get(Stream::Ai).clone();
+        let held = step.w.streams.get(Stream::Ai).clone();
         let mut ai_stream = held.clone();
-        let outer = c.side_notifies.replace(Vec::new());
+        let outer = step.side_notifies.replace(Vec::new());
         let mut side = UnitView {
-            c: &mut *c,
+            c: &mut *step,
             unit: self,
             actions,
             attacker,
@@ -323,10 +137,12 @@ impl Unit {
             ai_settings: view.ai_settings,
         };
         let result = f(&mut ai, &mut side, &mut ai_stream);
-        let own = replace(&mut c.side_notifies, outer).unwrap_or_default();
-        let posted = own.into_iter().try_for_each(|(n, state)| ai.post(n, state));
-        c.w.return_unit_ai(self.id, ai);
-        let stream = c.w.streams.get(Stream::Ai);
+        let own = replace(&mut step.side_notifies, outer).unwrap_or_default();
+        let posted = own
+            .into_iter()
+            .try_for_each(|(notify, state)| ai.post(notify, state));
+        step.w.return_unit_ai(self.id, ai);
+        let stream = step.w.streams.get(Stream::Ai);
         if *stream != held {
             return Err(GenieError::unreachable(
                 "a world routine drew from the AI stream while the unit AI held it",
@@ -350,7 +166,7 @@ impl Unit {
     pub(crate) fn run_ai(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         f: impl FnOnce(
             &mut UnitAi,
             &Surroundings,
@@ -361,20 +177,20 @@ impl Unit {
     ) -> GenieResult<()> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
-        let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
+        let Some(ai_kind) = step.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
-        let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
-        let master = Some(self.master(c.w.master_tables(), c.player)?);
+        let busy = actions.top_action_kind().is_some() || step.w.parts.unread.contains(self.id);
+        let master = Some(self.master(step.w.master_tables(), step.player)?);
         let class = master.map(|ms| ms.class);
-        let (player, player_kind) = (c.player, c.w.players.player(c.player)?.kind);
-        let view = OwnerView::of(c, None)?;
-        let interruptible = actions.interruptible(c.w.parts.unread.get(self.id))?;
+        let (player, player_kind) = (step.player, step.w.players.player(step.player)?.kind);
+        let view = OwnerView::of(step, None)?;
+        let interruptible = actions.interruptible(step.w.parts.unread.get(self.id))?;
         let at = self.surroundings(
             actions,
-            c,
+            step,
             &view,
             (master, class),
             (player, busy, interruptible),
@@ -384,18 +200,19 @@ impl Unit {
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode,
+            step.w.settings.game_mode,
             (
                 at.capture,
-                c.w.parts.combat_of(self.id).firepower,
-                c.w.parts
+                step.w.parts.combat_of(self.id).firepower,
+                step.w
+                    .parts
                     .mover_of(self.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
             ),
         );
         self.with_side(
             actions,
-            c,
+            step,
             &view,
             attacker,
             (player, player_kind),
@@ -414,36 +231,37 @@ impl Unit {
     pub(crate) fn run_calls<R>(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         f: impl FnOnce(&mut UnitAi, &mut UnitView<'_, '_>, &mut Well512) -> GenieResult<R>,
     ) -> GenieResult<R> {
         // every caller tests the unit for its unit AI first (`World::run_ai_calls`'s and
         // `World::run_unit_ai`'s callers, the capture's stop)
-        let Some(ai_kind) = c.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
+        let Some(ai_kind) = step.w.parts.unit_ai.get(self.id).map(|ai| ai.ai_kind) else {
             return Err(GenieError::unreachable(
                 "a unit AI's run of a unit without one (its callers test for one)",
             ));
         };
-        let master = Some(self.master(c.w.master_tables(), c.player)?);
-        let (player, player_kind) = (c.player, c.w.players.player(c.player)?.kind);
-        let view = OwnerView::of(c, None)?;
+        let master = Some(self.master(step.w.master_tables(), step.player)?);
+        let (player, player_kind) = (step.player, step.w.players.player(step.player)?.kind);
+        let view = OwnerView::of(step, None)?;
         let attacker = self.attacker_of(
             actions,
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode,
+            step.w.settings.game_mode,
             (
-                self.capture_kind(c),
-                c.w.parts.combat_of(self.id).firepower,
-                c.w.parts
+                self.capture_kind(step),
+                step.w.parts.combat_of(self.id).firepower,
+                step.w
+                    .parts
                     .mover_of(self.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
             ),
         );
         self.with_side(
             actions,
-            c,
+            step,
             &view,
             attacker,
             (player, player_kind),
@@ -452,12 +270,13 @@ impl Unit {
     }
 
     /// The capture kind its seer has in the players' sight (0 without one).
-    fn capture_kind(&self, c: &Step<'_>) -> CaptureKind {
-        c.w.spatial
+    pub(super) fn capture_kind(&self, step: &Step<'_>) -> CaptureKind {
+        step.w
+            .spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(self.id))
-            .map_or(CaptureKind::None, |s| s.capture)
+            .and_then(|visibility| visibility.seer(self.id))
+            .map_or(CaptureKind::None, |seer| seer.capture)
     }
 
     /// One pass of the unit AI ([`Unit::ai_part`]) as the player `captured` names (its new
@@ -472,16 +291,16 @@ impl Unit {
     fn ai_run(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         captured: Option<&Captured>,
         after: Option<AfterOrder>,
     ) -> GenieResult<Option<AfterOrder>> {
-        let busy = actions.top_action_kind().is_some() || c.w.parts.unread.contains(self.id);
+        let busy = actions.top_action_kind().is_some() || step.w.parts.unread.contains(self.id);
         // the unit's master: its own (a captured unit's copy), else its owner's
         let master = object_master(
-            c.w.parts.own_master.get(self.id),
+            step.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )
         .ok();
         let class = master.map(|ms| ms.class);
@@ -489,73 +308,80 @@ impl Unit {
         // owner then): on that player's turn, with its time as it stands
         let (turn, player, player_kind) = match captured {
             Some(k) if k.main => (
-                (k.new == c.w.player_turn)
-                    .then(|| c.w.player_time.get(k.new.index()).copied())
+                (k.new == step.w.player_turn)
+                    .then(|| step.w.player_time.get(k.new.index()).copied())
                     .flatten(),
                 k.new,
-                c.w.players
+                step.w
+                    .players
                     .get(k.new.index())
                     .map_or(PlayerKind::Phantom, |q| q.kind),
             ),
-            _ => (c.turn, c.player, c.w.players.player(c.player)?.kind),
+            _ => (
+                step.turn,
+                step.player,
+                step.w.players.player(step.player)?.kind,
+            ),
         };
-        let view = OwnerView::of(c, captured.filter(|k| k.main).map(|k| k.new))?;
+        let view = OwnerView::of(step, captured.filter(|k| k.main).map(|k| k.new))?;
         // RGE_Combat_Object::update: on the owner's turn the full update (slot 4), else
         // FUN_140c68980 for a unit not inside another; a dead unit's full update only adds the
         // world's dt to its time since the last enemy sighting (`+0x1b4`) before it returns
-        if turn.is_some() && c.w.parts.unit_ai.contains(self.id) && after.is_none() {
+        if turn.is_some() && step.w.parts.unit_ai.contains(self.id) && after.is_none() {
             // the full update's start lets the unit AIs' search cache go
-            c.w.spatial.forget_search();
+            step.w.spatial.forget_search();
         }
         if turn.is_some()
             && after.is_none()
             && !self.life.is_alive()
-            && let Some(ai) = c.w.parts.unit_ai.get_mut(self.id)
+            && let Some(ai) = step.w.parts.unit_ai.get_mut(self.id)
         {
-            ai.time_since_enemy += c.dt.seconds();
+            ai.time_since_enemy += step.dt.seconds();
         }
         let runs = turn.is_some() || self.life.inside.is_none();
-        let Some((orders, ai_kind)) =
-            c.w.parts
-                .unit_ai
-                .get(self.id)
-                .filter(|_| self.life.is_alive() && runs)
-                .map(|ai| (!ai.orders.is_empty(), ai.ai_kind))
+        let Some((orders, ai_kind)) = step
+            .w
+            .parts
+            .unit_ai
+            .get(self.id)
+            .filter(|_| self.life.is_alive() && runs)
+            .map(|ai| (!ai.orders.is_empty(), ai.ai_kind))
         else {
             return Ok(None);
         };
         // slot 0x2d0 matters only to a queue with orders
-        let interruptible = match actions.interruptible(c.w.parts.unread.get(self.id)) {
+        let interruptible = match actions.interruptible(step.w.parts.unread.get(self.id)) {
             Ok(i) => i,
-            Err(e) if orders => return Err(e),
+            Err(error) if orders => return Err(error),
             Err(_) => false,
         };
         let at = self.surroundings(
             actions,
-            c,
+            step,
             &view,
             (master, class),
             (player, busy, interruptible),
         )?;
         // the unit AI runs on its own; what it asks of its unit comes back through `UnitView`
-        let world_time = c.w.world_time;
+        let world_time = step.w.world_time;
         let attacker = self.attacker_of(
             actions,
             ai_kind,
             master,
             (player, player_kind),
-            c.w.settings.game_mode,
+            step.w.settings.game_mode,
             (
                 at.capture,
-                c.w.parts.combat_of(self.id).firepower,
-                c.w.parts
+                step.w.parts.combat_of(self.id).firepower,
+                step.w
+                    .parts
                     .mover_of(self.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed),
+                    .map_or(Speed::ZERO, |mover| mover.stats.speed),
             ),
         );
         self.with_side(
             actions,
-            c,
+            step,
             &view,
             attacker,
             (player, player_kind),
@@ -580,8 +406,8 @@ impl Unit {
     /// player `viewer`'s map ([`crate::world::World::seen`]): none without one, the unit itself
     /// (out of its slot) when it is its own target (an unload's). The unit's update may have
     /// changed the target before (the Build's work order on a resource).
-    fn ai_target(&self, c: &Step<'_>, viewer: PlayerId) -> GenieResult<Option<Seen>> {
-        match c
+    pub(super) fn ai_target(&self, step: &Step<'_>, viewer: PlayerId) -> GenieResult<Option<Seen>> {
+        match step
             .w
             .parts
             .unit_ai
@@ -589,8 +415,8 @@ impl Unit {
             .and_then(|ai| ai.current_target)
         {
             None => Ok(None),
-            Some(t) if t == self.id => c.w.seen_of(self, c.player, viewer).map(Some),
-            Some(t) => c.w.seen(Some(t), viewer),
+            Some(t) if t == self.id => step.w.seen_of(self, step.player, viewer).map(Some),
+            Some(object_id) => step.w.seen(Some(object_id), viewer),
         }
     }
 
@@ -602,12 +428,12 @@ impl Unit {
     /// unit AI's target and its footprint's squared gap to the unit's (`FUN_14118f8c0`).
     pub(crate) fn named_units(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         others: OthersRef<'_>,
         view: &OwnerView,
         master: Option<&Master>,
     ) -> GenieResult<Vec<UnitSeen>> {
-        let Some(ai) = c.w.parts.unit_ai.get(self.id) else {
+        let Some(ai) = step.w.parts.unit_ai.get(self.id) else {
             return Ok(Vec::new());
         };
         let damaged = ai
@@ -619,7 +445,7 @@ impl Unit {
             .notifies
             .iter()
             .filter(|n| n.kind == NotifyKind::IN_THE_WAY)
-            .map(|n| ObjectId::of_field(n.p[0]));
+            .map(|notify| ObjectId::of_field(notify.p[0]));
         // none (−1) names no object the world holds
         let mut ids: Vec<ObjectId> = ai
             .attackers
@@ -633,31 +459,36 @@ impl Unit {
         let mut seen = Vec::new();
         for id in ids {
             let found = others.find(id);
-            let (Some((owner, u)), Some(p)) = (found, c.w.spatial.get(id)) else {
+            let (Some((owner, unit)), Some(placed)) = (found, step.w.spatial.get(id)) else {
                 continue;
             };
-            let m = u.master(c.w.master_tables(), owner)?;
+            let m = unit.master(step.w.master_tables(), owner)?;
             let me = master.ok_or(UNIT_AI_MASTER)?;
             seen.push(UnitSeen {
                 id,
                 class: m.class,
                 owner,
                 combat_level: m.combat_level,
-                state: u.life.state,
-                target: c.w.parts.unit_ai.get(u.id).and_then(|a| a.current_target),
+                state: unit.life.state,
+                target: step
+                    .w
+                    .parts
+                    .unit_ai
+                    .get(unit.id)
+                    .and_then(|unit_ai| unit_ai.current_target),
                 gap_squared: footprint_gap_squared(
                     self.position(),
                     me.radius,
-                    p.position,
-                    p.radius,
+                    placed.position,
+                    placed.radius,
                 ),
-                position: p.position,
-                hp: u.life.hp,
-                master: u.life.master_id,
+                position: placed.position,
+                hp: unit.life.hp,
+                master: unit.life.master_id,
                 kind: m.kind,
-                main: c.w.parts.building_of(u.id).annex_of,
+                main: step.w.parts.building_of(unit.id).annex_of,
                 allied: allied(
-                    view.relations(c.w)?,
+                    view.relations(step.w)?,
                     view.player,
                     owner,
                     AllyTest::WithRelation4,

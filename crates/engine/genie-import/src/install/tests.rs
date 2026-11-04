@@ -11,9 +11,9 @@ use std::path::Path;
 
 /// A table the stand-in import returns: the default one with a technology.
 fn imported() -> MasterTable {
-    let mut t = MasterTable::default();
-    t.techs = vec![TechDef::default()];
-    t
+    let mut master_table = MasterTable::default();
+    master_table.techs = vec![TechDef::default()];
+    master_table
 }
 
 /// The files of a `.dat` of `bytes` without the tables beside it.
@@ -92,7 +92,7 @@ fn missing_or_foreign_dats_fail_with_their_path_or_their_reason() {
         assert!(
             error
                 .context()
-                .any(|(k, v)| k == "path" && v == dat.display().to_string())
+                .any(|(k, text)| k == "path" && text == dat.display().to_string())
         );
     }
     write(&dat, b"not a dat").unwrap();
@@ -109,9 +109,9 @@ fn the_files_are_the_dat_and_the_tables_beside_it_that_are_there() {
     let dat = dir.join("empires2_x2_p1.dat");
     write(&dat, b"dat").unwrap();
     write(dir.join(BESIDE[1]), "{}").unwrap();
-    let f = Files::read(&dat).unwrap();
+    let files = Files::read(&dat).unwrap();
     assert_eq!(
-        (f.dat.as_slice(), f.beside),
+        (files.dat.as_slice(), files.beside),
         (&b"dat"[..], [None, Some("{}".to_owned()), None])
     );
     remove_dir_all(&dir).unwrap();
@@ -150,7 +150,7 @@ fn the_tables_beside_replace_their_own_where_they_are() {
         let error = with_beside(MasterTable::default(), beside).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidInput);
         assert!(
-            error.context().any(|(k, v)| k == "file" && v == file),
+            error.context().any(|(k, text)| k == "file" && text == file),
             "{file}"
         );
     }

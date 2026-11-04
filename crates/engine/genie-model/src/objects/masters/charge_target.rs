@@ -44,8 +44,8 @@ impl ChargeTarget {
 }
 
 impl genie_diff::Diff for ChargeTarget {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -59,8 +59,8 @@ mod tests {
         assert_eq!(ChargeTarget::EVERY.bits(), 0xffff);
         assert!((0..16).all(|g| ChargeTarget::EVERY.holds(g)));
         assert!(!(0..16).any(|g| ChargeTarget::ALL_BUT_BUILDINGS.holds(g)));
-        let t = ChargeTarget::of_data(0b1010_0000);
-        assert!(t.holds(5) && t.holds(7) && !t.holds(6));
-        assert_eq!(t.get(), 0xa0);
+        let charge_target = ChargeTarget::of_data(0b1010_0000);
+        assert!(charge_target.holds(5) && charge_target.holds(7) && !charge_target.holds(6));
+        assert_eq!(charge_target.get(), 0xa0);
     }
 }

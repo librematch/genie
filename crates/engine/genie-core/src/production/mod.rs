@@ -178,8 +178,8 @@ impl Queue {
     /// The entries (the first `+0xbf2` slots).
     #[must_use]
     pub fn entries(&self) -> &[Entry] {
-        let n = self.count.slots().min(self.slots.len());
-        self.slots.get(..n).unwrap_or_default()
+        let slots = self.count.slots().min(self.slots.len());
+        self.slots.get(..slots).unwrap_or_default()
     }
 
     /// The first entry, if any.
@@ -277,8 +277,8 @@ impl Queue {
         tech: Option<TechId>,
         button: QueueButton,
     ) -> GenieResult<usize> {
-        let i = self.count.slots();
-        let slot = self.slots.checked_mut(i)?;
+        let slots = self.count.slots();
+        let slot = self.slots.checked_mut(slots)?;
         let serial = self.next_serial;
         self.next_serial = serial.next();
         slot.master = master;
@@ -287,7 +287,7 @@ impl Queue {
         slot.button = button;
         slot.serial = serial;
         slot.costs = NO_COSTS;
-        Ok(i)
+        Ok(slots)
     }
 
     /// `FUN_1411e7dc0`'s release of the first entry's unit or research once its action is done
@@ -330,8 +330,11 @@ pub fn train_time(
     }
     locations
         .iter()
-        .find(|l| l.location == Some(building) && button.names(l.button))
-        .map_or(first, |l| l.time)
+        .find(|building_train_location| {
+            building_train_location.location == Some(building)
+                && button.names(building_train_location.button)
+        })
+        .map_or(first, |train_location| train_location.time)
 }
 
 /// `TRIBE_Action_Make_Obj` (type 0x66, 0x80 bytes): the make action of a building's first
@@ -422,8 +425,8 @@ impl Making {
     #[must_use]
     pub const fn state(&self) -> ActionState {
         ActionState::new(match self {
-            Self::Unit(m) => m.state.get(),
-            Self::Research(r) => r.state.get(),
+            Self::Unit(make_obj) => make_obj.state.get(),
+            Self::Research(make_tech) => make_tech.state.get(),
         })
     }
 }
@@ -451,7 +454,7 @@ impl Production {
     /// `FUN_1411c5250`: technology `tech` leaves the building's disabled list, every time it
     /// is there (`std::remove` and `erase`, the order of the rest kept).
     pub fn enable_tech(&mut self, tech: TechId) {
-        self.disabled_techs.retain(|&t| t != tech);
+        self.disabled_techs.retain(|&tech_id| tech_id != tech);
     }
 
     /// `FUN_1411e7dc0` after a research of the shared kind: the technology joins the
@@ -489,7 +492,12 @@ pub fn population(storage: &[(Option<AttributeId>, Amount, u8)], roles: &Roles) 
 /// production and this one stays within the cap (`COMISS`, `JBE`: a NaN passes), and the
 /// headroom covers them. A building that fails it waits (housed).
 pub fn housed(attributes: &[Amount], pop: Amount, slots: Slots) -> GenieResult<bool> {
-    let a = |i: AttributeId| attributes.get(i.index()).copied().ok_or(NO_ATTRIBUTE);
+    let a = |attribute_id: AttributeId| {
+        attributes
+            .get(attribute_id.index())
+            .copied()
+            .ok_or(NO_ATTRIBUTE)
+    };
     let in_production = a(slots.attribute.in_production)?;
     Ok(
         a(slots.attribute.population_cap)? < a(slots.attribute.population)? + in_production + pop
@@ -542,17 +550,17 @@ mod tests {
     /// game's save writes a slot past the entries: not the −1 of a research's master.
     #[test]
     fn zeroed_slot_holds_master_0() {
-        let e = Entry::default();
+        let entry = Entry::default();
         assert_eq!(
             (
-                MasterId::field(e.master),
-                e.count.get(),
-                TechId::field(e.tech)
+                MasterId::field(entry.master),
+                entry.count.get(),
+                TechId::field(entry.tech)
             ),
             (0, 0, 0)
         );
         assert_eq!(
-            (e.costs, e.button, e.train_time),
+            (entry.costs, entry.button, entry.train_time),
             (
                 [(Some(attribute::FOOD), Amount::ZERO); 3],
                 QueueButton::default(),
@@ -564,13 +572,13 @@ mod tests {
     fn queue(entries: &[Entry]) -> Queue {
         let mut slots = vec![Entry::default(); 10];
         slots[..entries.len()].copy_from_slice(entries);
-        for (k, s) in slots.iter_mut().enumerate() {
-            s.serial = EntrySerial::new(k as i64);
+        for (index, s) in slots.iter_mut().enumerate() {
+            s.serial = EntrySerial::new(index as i64);
         }
         Queue {
             slots,
             count: QueueLength::of_data(entries.len() as i16),
-            total: entries.iter().map(|e| e.count).sum(),
+            total: entries.iter().map(|entry| entry.count).sum(),
             next_serial: EntrySerial::new(10),
             ..Queue::default()
         }
@@ -580,12 +588,12 @@ mod tests {
     /// the second villager, index 5 none.
     #[test]
     fn unit_index_walks_the_entries_counts() {
-        let q = queue(&[
+        let queue = queue(&[
             unit(master_id(4), 3, 25.0),
             unit(ids::VILLAGER_MALE, 2, 50.0),
         ]);
         let at: Vec<_> = (0..6)
-            .map(|i| q.entry_of_unit(UnitIndex::of_data(i)))
+            .map(|i| queue.entry_of_unit(UnitIndex::of_data(i)))
             .collect();
         assert_eq!(at, [Some(0), Some(0), Some(0), Some(1), Some(1), None]);
         assert_eq!(Queue::default().entry_of_unit(UnitIndex::of_data(0)), None);
@@ -606,7 +614,12 @@ mod tests {
         assert_eq!(
             q.slots[..3]
                 .iter()
-                .map(|s| (s.master, s.count.get(), s.serial.get(), s.train_time.get()))
+                .map(|entry| (
+                    entry.master,
+                    entry.count.get(),
+                    entry.serial.get(),
+                    entry.train_time.get()
+                ))
                 .collect::<Vec<_>>(),
             [
                 (Some(ids::VILLAGER_MALE), 2, 0, 25),
@@ -630,11 +643,11 @@ mod tests {
     /// The regrowth by ten keeps every old slot but its costs, which it fills anew.
     #[test]
     fn full_buffer_grows_by_ten_and_fills_the_old_costs_anew() {
-        let mut q = queue(&[unit(ids::VILLAGER_MALE, 1, 50.0)]);
-        q.slots[3] = unit(ids::ID_7, 0, 9.0);
-        assert!(!q.full());
+        let mut queue = queue(&[unit(ids::VILLAGER_MALE, 1, 50.0)]);
+        queue.slots[3] = unit(ids::ID_7, 0, 9.0);
+        assert!(!queue.full());
         // each old slot's own costs: its place's attribute, its place as the amount
-        let refill: Vec<_> = (0..q.slots.len())
+        let refill: Vec<_> = (0..queue.slots.len())
             .map(|i| {
                 [
                     (AttributeId::of_index(i), Amount::new(i as f32)),
@@ -643,16 +656,19 @@ mod tests {
                 ]
             })
             .collect();
-        q.grow(&refill);
-        assert_eq!(q.slots.len(), 20);
-        assert_eq!(q.slots[0].costs[0], (Some(attribute::FOOD), Amount::ZERO));
+        queue.grow(&refill);
+        assert_eq!(queue.slots.len(), 20);
         assert_eq!(
-            (q.slots[3].master, q.slots[3].costs[0]),
+            queue.slots[0].costs[0],
+            (Some(attribute::FOOD), Amount::ZERO)
+        );
+        assert_eq!(
+            (queue.slots[3].master, queue.slots[3].costs[0]),
             (Some(ids::ID_7), (Some(attribute::GOLD), Amount::new(3.0)))
         );
-        assert_eq!(q.slots[15], Entry::default());
+        assert_eq!(queue.slots[15], Entry::default());
         // a new entry takes the next serial and no costs
-        let i = q
+        let i = queue
             .open(
                 Some(master_id(5)),
                 QueuedUnits::of_data(2),
@@ -661,35 +677,35 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            (i, q.slots[1].serial.get(), q.slots[1].costs),
+            (i, queue.slots[1].serial.get(), queue.slots[1].costs),
             (1, 10, NO_COSTS)
         );
-        assert_eq!(q.next_serial, EntrySerial::new(11));
+        assert_eq!(queue.next_serial, EntrySerial::new(11));
     }
 
     #[test]
     fn the_first_entry_lets_one_unit_go_and_then_itself() {
-        let mut q = queue(&[
+        let mut queue = queue(&[
             unit(ids::VILLAGER_MALE, 2, 50.0),
             unit(master_id(4), 1, 25.0),
         ]);
-        q.release_first().unwrap();
+        queue.release_first().unwrap();
         assert_eq!(
             (
-                q.count.get(),
-                q.total.get(),
-                q.changes.get(),
-                q.slots[0].count.get()
+                queue.count.get(),
+                queue.total.get(),
+                queue.changes.get(),
+                queue.slots[0].count.get()
             ),
             (2, 2, 1, 1)
         );
-        q.release_first().unwrap();
+        queue.release_first().unwrap();
         assert_eq!(
             (
-                q.count.get(),
-                q.total.get(),
-                q.changes.get(),
-                q.slots[0].master
+                queue.count.get(),
+                queue.total.get(),
+                queue.changes.get(),
+                queue.slots[0].master
             ),
             (1, 1, 2, Some(master_id(4)))
         );
@@ -762,7 +778,7 @@ mod tests {
             train_time(&[], ids::TOWN_CENTRE, QueueButton::of_data(1)),
             WholeSeconds::ZERO
         );
-        let mut m = Master {
+        let mut master = Master {
             kind: MasterKind::COMBAT,
             creatable: Some(CreatablePart {
                 train_locations: locations.to_vec(),
@@ -777,16 +793,19 @@ mod tests {
             ..Entry::default()
         });
         assert_eq!(
-            make.time(Some(&m), ids::TOWN_CENTRE),
+            make.time(Some(&master), ids::TOWN_CENTRE),
             WholeSeconds::of_data(25)
         );
-        m.object_flags = ObjectFlags::OWN_TRAIN_TIME;
+        master.object_flags = ObjectFlags::OWN_TRAIN_TIME;
         assert_eq!(
-            make.time(Some(&m), ids::TOWN_CENTRE),
+            make.time(Some(&master), ids::TOWN_CENTRE),
             WholeSeconds::of_data(99)
         );
-        m.kind = MasterKind::MISSILE;
-        assert_eq!(make.time(Some(&m), ids::TOWN_CENTRE), WholeSeconds::ZERO);
+        master.kind = MasterKind::MISSILE;
+        assert_eq!(
+            make.time(Some(&master), ids::TOWN_CENTRE),
+            WholeSeconds::ZERO
+        );
         make.button = QueueButton::NONE;
         assert_eq!(
             (make.time(None, ids::TOWN_CENTRE), make.paid, make.unique_id),
@@ -808,19 +827,19 @@ mod tests {
             ),
             Amount::new(1.0)
         );
-        let mut a = vec![Amount::ZERO; 82];
-        (a[4], a[11], a[32], a[81]) = (
+        let mut amounts = vec![Amount::ZERO; 82];
+        (amounts[4], amounts[11], amounts[32], amounts[81]) = (
             Amount::new(6.0),
             Amount::new(4.0),
             Amount::new(5.0),
             Amount::ZERO,
         );
-        assert!(!housed(&a, Amount::new(1.0), slots()).unwrap());
-        a[81] = Amount::new(1.0);
-        assert!(housed(&a, Amount::new(1.0), slots()).unwrap());
-        a[32] = Amount::new(f32::NAN);
-        a[4] = Amount::new(10.0);
-        assert!(!housed(&a, Amount::new(1.0), slots()).unwrap());
+        assert!(!housed(&amounts, Amount::new(1.0), slots()).unwrap());
+        amounts[81] = Amount::new(1.0);
+        assert!(housed(&amounts, Amount::new(1.0), slots()).unwrap());
+        amounts[32] = Amount::new(f32::NAN);
+        amounts[4] = Amount::new(10.0);
+        assert!(!housed(&amounts, Amount::new(1.0), slots()).unwrap());
     }
 
     /// `FUN_1413ccc00` with `param_3` 1: a technology in state 2 or 4 gives back each paid cost
@@ -859,8 +878,8 @@ mod tests {
         let refunded = |state: &mut TechState, tech, modifier| {
             let mut held = player_holding(vec![Amount::ZERO; 90]);
             held.attributes[attribute::RESEARCH_COST_MODIFIER.index()] = modifier;
-            let r = refund_tech(state, &def, tech, &mut held, slots());
-            (r, held.attributes[0], held.attributes[1])
+            let refund = refund_tech(state, &def, tech, &mut held, slots());
+            (refund, held.attributes[0], held.attributes[1])
         };
         let mut s = state(ResearchState::Researching);
         assert_eq!(
@@ -894,13 +913,13 @@ mod tests {
             refunded(&mut s, tech_id(22), Amount::new(2.0)),
             (Ok(Refund::Refunded), Amount::new(-25_536.0), Amount::ZERO)
         );
-        let mut s = state(ResearchState::Researched);
+        let mut tech_state = state(ResearchState::Researched);
         assert_eq!(
-            refunded(&mut s, tech_id(22), Amount::ZERO),
+            refunded(&mut tech_state, tech_id(22), Amount::ZERO),
             (Ok(Refund::NoneQueued), Amount::ZERO, Amount::ZERO)
         );
         assert_eq!(
-            (s.state, s.research_done),
+            (tech_state.state, tech_state.research_done),
             (ResearchState::Researched, Seconds::new(7.5))
         );
     }
@@ -910,7 +929,7 @@ mod tests {
     /// nothing.
     #[test]
     fn refund_gives_back_what_the_entry_paid() {
-        let m = Master {
+        let master = Master {
             kind: MasterKind::COMBAT,
             creatable: Some(CreatablePart {
                 cost: costs(&[
@@ -924,7 +943,7 @@ mod tests {
         };
         let mut held = player_holding(vec![Amount::new(1.0); 5]);
         refund(
-            &m,
+            &master,
             &[
                 (Some(attribute::FOOD), Amount::new(50.0)),
                 (Some(attribute::FOOD), Amount::new(45.0)),
@@ -936,7 +955,7 @@ mod tests {
         assert_eq!(held.attributes, amounts([46.0, 1.0, 1.0, 1.0, 1.0]));
         let low = Master {
             kind: MasterKind::MISSILE,
-            ..m.clone()
+            ..master.clone()
         };
         refund(
             &low,
@@ -963,7 +982,7 @@ mod tests {
             (held.attributes[3], held.attributes[0]),
             (Amount::new(151.0), Amount::new(47.5))
         );
-        refund_master(&m, QueueCount::ONE, &mut held).unwrap();
+        refund_master(&master, QueueCount::ONE, &mut held).unwrap();
         assert_eq!(
             (held.attributes[0], held.attributes[3], held.attributes[4]),
             (Amount::new(107.5), Amount::new(171.0), Amount::new(1.0))
@@ -984,14 +1003,14 @@ mod tests {
 
     /// 100 food, headroom 5, population 4, cap 10, nothing queued.
     fn held() -> Player {
-        let mut a = vec![Amount::ZERO; 82];
-        (a[0], a[4], a[11], a[32]) = (
+        let mut amounts = vec![Amount::ZERO; 82];
+        (amounts[0], amounts[4], amounts[11], amounts[32]) = (
             Amount::new(100.0),
             Amount::new(5.0),
             Amount::new(4.0),
             Amount::new(10.0),
         );
-        player_holding(a)
+        player_holding(amounts)
     }
 
     /// The game's villager costs food, an empty slot and the population (the `.dat`'s
@@ -999,19 +1018,19 @@ mod tests {
     /// (MarvinBlue/426048731's 9149 at update 25: (0, 50), (−1, 0), (4, 1)).
     #[test]
     fn queue_entry_keeps_the_empty_cost_slot_in_its_place() {
-        let mut m = villager(&[]);
-        if let Some(p) = m.creatable.as_mut() {
-            p.cost = [
+        let mut master = villager(&[]);
+        if let Some(creatable_part) = master.creatable.as_mut() {
+            creatable_part.cost = [
                 CostSlot::new(attribute::FOOD, CostAmount::of_data(50), true),
                 CostSlot::default(),
                 CostSlot::new(attribute::HEADROOM, CostAmount::of_data(1), false),
             ];
         }
-        let ms = Masters::new([m]);
+        let ms = Masters::new([master]);
         assert_eq!(
             master_costs(&ms, ids::VILLAGER_MALE, &held(), &roles(), slots())
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(attribute_id, cost_amount)| (attribute_id, cost_amount.get())),
             [
                 (Some(attribute::FOOD), 50),
                 (None, 0),
@@ -1094,15 +1113,15 @@ mod tests {
             .unwrap()
         );
         // a population at the cap
-        let mut h = held();
-        h.attributes[32] = Amount::new(4.0);
+        let mut player = held();
+        player.attributes[32] = Amount::new(4.0);
         assert!(
             !cost_test(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
                 PopulationTest::Tested,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1115,7 +1134,7 @@ mod tests {
                 ids::VILLAGER_MALE,
                 CostCount::new(f32::NAN),
                 PopulationTest::Skipped,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1127,7 +1146,7 @@ mod tests {
                 ids::MARKET,
                 CostCount::ONE,
                 PopulationTest::Skipped,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1143,7 +1162,7 @@ mod tests {
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
                 PopulationTest::Skipped,
-                &h,
+                &player,
                 &roles(),
                 slots()
             )
@@ -1159,14 +1178,14 @@ mod tests {
             (attribute::HEADROOM, 1, false),
             (attribute::WOOD, 7, true),
         ])]);
-        let mut h = held();
-        h.attributes[1] = Amount::new(30.0);
+        let mut player = held();
+        player.attributes[1] = Amount::new(30.0);
         assert_eq!(
             pay(
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::new(2.0),
-                &mut h,
+                &mut player,
                 &roles(),
                 slots()
             )
@@ -1174,7 +1193,11 @@ mod tests {
             Payment::Paid
         );
         assert_eq!(
-            (h.attributes[0], h.attributes[1], h.attributes[4]),
+            (
+                player.attributes[0],
+                player.attributes[1],
+                player.attributes[4]
+            ),
             (Amount::ZERO, Amount::new(16.0), Amount::new(5.0))
         );
         assert_eq!(
@@ -1182,14 +1205,14 @@ mod tests {
                 &ms,
                 ids::VILLAGER_MALE,
                 CostCount::ONE,
-                &mut h,
+                &mut player,
                 &roles(),
                 slots()
             )
             .unwrap(),
             Payment::Unpaid
         );
-        assert_eq!(h.attributes[0], Amount::ZERO);
+        assert_eq!(player.attributes[0], Amount::ZERO);
     }
 
     /// An annex (master 2, head 3 whose stack unit is 4) is tested by its stack unit's paid
@@ -1228,15 +1251,18 @@ mod tests {
                 &[(attribute::WOOD, 10, true), (attribute::FOOD, 500, false)],
             ),
         ]);
-        let mut h = held();
-        (h.attributes[0], h.attributes[1], h.attributes[2]) =
-            (Amount::new(20.0), Amount::new(100.0), Amount::new(5.5));
+        let mut player = held();
+        (
+            player.attributes[0],
+            player.attributes[1],
+            player.attributes[2],
+        ) = (Amount::new(20.0), Amount::new(100.0), Amount::new(5.5));
         assert_eq!(
             costed(&ms, ms.get(master_id(2)).unwrap()).0.id,
             master_id(4)
         );
         assert_eq!(
-            master_costs(&ms, master_id(2), &h, &roles(), slots())
+            master_costs(&ms, master_id(2), &player, &roles(), slots())
                 .unwrap()
                 .map(|(a, n)| (a, n.get())),
             [
@@ -1260,9 +1286,9 @@ mod tests {
             building(3, -1, 4, &[]),
             building(4, -1, -1, &[(attribute::WOOD, 10, true)]),
         ]);
-        (h.attributes[3], h.attributes[0]) = (Amount::new(20.0), Amount::new(10.0));
+        (player.attributes[3], player.attributes[0]) = (Amount::new(20.0), Amount::new(10.0));
         assert_eq!(
-            master_costs(&ms, master_id(2), &h, &roles(), slots())
+            master_costs(&ms, master_id(2), &player, &roles(), slots())
                 .unwrap()
                 .map(|(a, n)| (a, n.get())),
             [
@@ -1274,15 +1300,15 @@ mod tests {
         // a unit the player cannot pay for one more of moves nothing
         let ms = Masters::new([villager(&[(attribute::GOLD, 50, true)])]);
         assert_eq!(
-            master_costs(&ms, ids::VILLAGER_MALE, &h, &roles(), slots())
+            master_costs(&ms, ids::VILLAGER_MALE, &player, &roles(), slots())
                 .unwrap()
                 .map(|(a, n)| (a, n.get())),
             [(Some(attribute::GOLD), 50), (None, 0), (None, 0)]
         );
         assert_eq!(
-            master_costs(&ms, ids::ID_7, &h, &roles(), slots())
+            master_costs(&ms, ids::ID_7, &player, &roles(), slots())
                 .unwrap()
-                .map(|(a, n)| (a, n.get())),
+                .map(|(a, cost_amount)| (a, cost_amount.get())),
             [(None, 0); 3]
         );
         assert_eq!(
@@ -1291,23 +1317,26 @@ mod tests {
                 (None, CostAmount::of_data(0)),
                 (None, CostAmount::of_data(-2))
             ])
-            .map(|(a, n)| (a, n.get())),
+            .map(|(attribute_id, amount)| (attribute_id, amount.get())),
             [(Some(attribute::GOLD), 50.0), (None, 0.0), (None, -2.0)]
         );
     }
 
     #[test]
     fn shared_research_joins_both_lists_once_and_cancel_drops_it() {
-        let mut p = Production::default();
-        p.note_shared_research(tech_id(7));
-        p.note_shared_research(tech_id(7));
+        let mut production = Production::default();
+        production.note_shared_research(tech_id(7));
+        production.note_shared_research(tech_id(7));
         assert_eq!(
-            (p.researched_techs.as_slice(), p.disabled_techs.as_slice()),
+            (
+                production.researched_techs.as_slice(),
+                production.disabled_techs.as_slice()
+            ),
             (&[tech_id(7)][..], &[tech_id(7)][..])
         );
-        p.disabled_techs.extend([tech_id(3), tech_id(7)]);
-        p.enable_tech(tech_id(7));
-        assert_eq!(p.disabled_techs, [tech_id(3)]);
-        assert!(p.queue.enabled);
+        production.disabled_techs.extend([tech_id(3), tech_id(7)]);
+        production.enable_tech(tech_id(7));
+        assert_eq!(production.disabled_techs, [tech_id(3)]);
+        assert!(production.queue.enabled);
     }
 }

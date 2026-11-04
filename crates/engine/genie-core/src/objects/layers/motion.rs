@@ -72,7 +72,7 @@ impl Motion {
     /// The moving layer to change, if the object moves.
     pub const fn mover_mut(&mut self) -> Option<&mut Mover> {
         match self {
-            Self::Moving(m) => Some(m),
+            Self::Moving(mover) => Some(mover),
             Self::Animated(_) => None,
         }
     }
@@ -88,7 +88,7 @@ impl Motion {
     /// The animated layer to change.
     pub const fn animated_mut(&mut self) -> &mut Animated {
         match self {
-            Self::Animated(a) | Self::Moving(Mover { animated: a, .. }) => a,
+            Self::Animated(animated) | Self::Moving(Mover { animated, .. }) => animated,
         }
     }
 }
@@ -127,19 +127,19 @@ impl<'a> MotionMut<'a> {
 
     /// The movement's values to change (its top speed among them), if the object moves.
     pub fn move_stats_mut(&mut self) -> Option<&mut MoveStats> {
-        self.mover_mut().map(|m| &mut m.stats)
+        self.mover_mut().map(|mover| &mut mover.stats)
     }
 
     /// The animation speed (`+0x7b8`), none for a static object.
     #[must_use]
     pub fn anim_speed(&self) -> Option<Speed> {
-        self.0.as_deref().map(|m| m.animated().speed)
+        self.0.as_deref().map(|motion| motion.animated().speed)
     }
 
     /// Sets the animation speed (`+0x7b8`) of an object that has one; a static object has none.
     pub fn set_anim_speed(&mut self, speed: Speed) {
-        if let Some(m) = self.0.as_deref_mut() {
-            m.animated_mut().speed = speed;
+        if let Some(motion) = self.0.as_deref_mut() {
+            motion.animated_mut().speed = speed;
         }
     }
 
@@ -167,13 +167,13 @@ mod tests {
 
     #[test]
     fn motion_holds_the_layers_its_kind_has() {
-        let a = Animated::new(Speed::new(0.5));
+        let animated = Animated::new(Speed::new(0.5));
         assert_eq!(Motion::of(None, None), None, "a static object has none");
         assert_eq!(
-            Motion::of(Some(a), None).map(|m| m.animated().speed),
+            Motion::of(Some(animated), None).map(|m| m.animated().speed),
             Some(Speed::new(0.5))
         );
-        let moving = Motion::of(Some(a), Some(mover())).unwrap();
+        let moving = Motion::of(Some(animated), Some(mover())).unwrap();
         assert_eq!(
             moving.mover().map(|m| m.animated.speed),
             Some(Speed::new(0.5))
@@ -182,7 +182,7 @@ mod tests {
         let mut own = mover();
         own.animated.speed = Speed::new(0.25);
         assert_eq!(
-            Motion::of(None, Some(own)).map(|m| m.animated().speed),
+            Motion::of(None, Some(own)).map(|motion| motion.animated().speed),
             Some(Speed::new(0.25)),
             "a mover always has an animated layer, its own without another"
         );

@@ -111,7 +111,7 @@ fn the_statistics_count_bound_and_time_each_object() {
     assert_eq!(st.closest_moving, (Distance::new(3.0), Some(object_id(1))));
     let kill: Vec<f32> = st.entries.iter().map(|e| e.kill_time.get()).collect();
     assert_eq!(kill, [5.0, 5.0, f32::MAX]);
-    let fixed: Vec<bool> = st.entries.iter().map(|e| e.fixed).collect();
+    let fixed: Vec<bool> = st.entries.iter().map(|entry| entry.fixed).collect();
     assert_eq!(fixed, [false, true, false]);
     assert_eq!(st.entries[1].bonus, TargetScore::new(5.0));
 }
@@ -177,8 +177,8 @@ fn the_scores_rank_and_sort_the_entries() {
     let ids: Vec<ObjectId> = st.order.iter().map(|&i| st.entries[i].id).collect();
     assert_eq!(ids, [object_id(9), object_id(5), object_id(4)]);
     // equal ranks go to the lower id
-    for e in &mut st.entries {
-        e.rank = TargetScore::new(1.0);
+    for entry in &mut st.entries {
+        entry.rank = TargetScore::new(1.0);
     }
     st.order = vec![0, 1, 2];
     st.sort().unwrap();
@@ -195,7 +195,7 @@ fn the_order_history_weighs_the_last_minute_categories() {
         category: attack_category(category),
         ..OrderRecord::default()
     };
-    let w = order_weights(
+    let by_category = order_weights(
         &[
             record(WorldTime::from_millis(100_000), 1),
             record(WorldTime::from_millis(70_000), 1),
@@ -205,9 +205,9 @@ fn the_order_history_weighs_the_last_minute_categories() {
         WorldTime::from_millis(100_000),
         &tuning().best_target,
     );
-    assert_eq!(w[category_of(1)].get(), 1.0 + 30_000.0 / 60_000.0);
-    assert_eq!(w[category_of(3)], OrderWeight::ZERO);
-    assert_eq!(w[category_of(2)], OrderWeight::ZERO);
+    assert_eq!(by_category[category_of(1)].get(), 1.0 + 30_000.0 / 60_000.0);
+    assert_eq!(by_category[category_of(3)], OrderWeight::ZERO);
+    assert_eq!(by_category[category_of(2)], OrderWeight::ZERO);
 }
 
 /// The soldier's master (74): a walking melee unit of class 6 and radius 0.25 on land
@@ -312,16 +312,16 @@ fn battle(
         .players(3)
         .relation(PlayerId::new(1), PlayerId::new(3), Relation::Ally)
         .object(soldier);
-    for e in enemies {
-        if walled.contains(&e.id.get()) {
-            let tile = e.at.tile();
+    for scene_object in enemies {
+        if walled.contains(&scene_object.id.get()) {
+            let tile = scene_object.at.tile();
             let ring = (-1..=1)
                 .flat_map(|dy| (-1..=1).map(move |dx| (dx, dy)))
                 .filter(|&d| d != (0, 0))
                 .map(|(dx, dy)| Tile::new(tile.x() + dx, tile.y() + dy));
             scene = scene.rocks(ring);
         }
-        scene = scene.object(e);
+        scene = scene.object(scene_object);
     }
     scene.build()
 }
@@ -349,10 +349,10 @@ fn fielded<R>(
     (answer, asked)
 }
 
-/// `bestUnitToAttack` of searcher `me` over `w`'s soldier's field ([`fielded`]) and the lists
+/// `bestUnitToAttack` of searcher `me` over `world`'s soldier's field ([`fielded`]) and the lists
 /// of relation 4 (enemies) `enemies`: the choice and the paths asked.
 fn best(
-    w: &mut World,
+    world: &mut World,
     me: &Searcher,
     ask: &Ask,
     enemies: &[i32],
@@ -365,10 +365,10 @@ fn best(
         vec![],
         object_id_list(enemies.iter().copied()),
     ]);
-    let (c, asked) = fielded(w, open, |field| {
+    let (choice, asked) = fielded(world, open, |field| {
         best_unit_to_attack(me, ask, &lists, field, &roles(), &tuning().best_target)
     });
-    (c.unwrap(), asked)
+    (choice.unwrap(), asked)
 }
 
 /// An idle check with path checks over every class.
@@ -433,11 +433,14 @@ fn the_best_unit_to_attack_ranks_then_takes_the_first_quick_path() {
         (Some(object_id(9)), vec![], vec![])
     );
     // without a quick path the paths follow; 7's fails (a moving object: ignored for 1 s)
-    let mut w = battle(melee(None), three_enemies(), &[7, 8, 9]);
-    let (c, asked) = best(&mut w, &soldier(), &idle_ask(), &[8, 7, 9], &[9]);
-    assert_eq!(c.target, Some(object_id(9)));
+    let mut world = battle(melee(None), three_enemies(), &[7, 8, 9]);
+    let (choice, asked) = best(&mut world, &soldier(), &idle_ask(), &[8, 7, 9], &[9]);
+    assert_eq!(choice.target, Some(object_id(9)));
     assert_eq!(asked, [object_id(7), object_id(9)]);
-    assert_eq!(c.retries, [(object_id(7), WorldTime::from_millis(11_000))]);
+    assert_eq!(
+        choice.retries,
+        [(object_id(7), WorldTime::from_millis(11_000))]
+    );
 }
 
 /// Each of the first three whose path fails is ignored for 1 s (a moving object) or 2 s
@@ -454,12 +457,12 @@ fn failed_paths_become_retarget_entries() {
             (Side::North, 5.0),
         )
     };
-    let mut w = battle(
+    let mut world = battle(
         melee(None),
         vec![enemy(7, walker(), (Side::East, 3.0)), still],
         &[7],
     );
-    let (c, asked) = best(&mut w, &soldier(), &idle_ask(), &[7, 9], &[]);
+    let (c, asked) = best(&mut world, &soldier(), &idle_ask(), &[7, 9], &[]);
     assert_eq!(c.target, None);
     assert_eq!(asked, [object_id(7), object_id(9)]);
     let mut retries = c.retries;
@@ -475,15 +478,15 @@ fn failed_paths_become_retarget_entries() {
         retries: vec![object_id(9)],
         ..soldier()
     };
-    let (c, asked) = best(&mut w, &me, &idle_ask(), &[7, 9], &[]);
+    let (c, asked) = best(&mut world, &me, &idle_ask(), &[7, 9], &[]);
     assert_eq!((c.target, asked), (None, vec![object_id(7)]));
     // with 7 a retarget entry too, the retry walk takes both
     let me = Searcher {
         retries: vec![object_id(9), object_id(7)],
         ..soldier()
     };
-    let (c, _) = best(&mut w, &me, &idle_ask(), &[7, 9], &[9]);
-    assert_eq!(c.target, Some(object_id(9)));
+    let (choice, _) = best(&mut world, &me, &idle_ask(), &[7, 9], &[9]);
+    assert_eq!(choice.target, Some(object_id(9)));
 }
 
 /// The lists' records pass the objects without a unit AI, inside another, dead or allied
@@ -512,14 +515,14 @@ fn the_lists_pass_over_what_the_unit_may_not_attack() {
         enemy(35, walker(), (Side::West, 0.125)),
         enemy(36, walker(), (Side::East, 11.875)),
     ];
-    let mut w = battle(melee(None), enemies, &[]);
+    let mut world = battle(melee(None), enemies, &[]);
     let me = Searcher {
         min_range: Distance::new(0.2),
         ..soldier()
     };
     let ids: Vec<i32> = (30..=36).collect();
-    let (c, asked) = best(&mut w, &me, &idle_ask(), &ids, &[]);
-    assert_eq!((c.target, asked), (Some(object_id(36)), vec![]));
+    let (choice, asked) = best(&mut world, &me, &idle_ask(), &ids, &[]);
+    assert_eq!((choice.target, asked), (Some(object_id(36)), vec![]));
 }
 
 /// Walls (class 27) and gates (class 39): still objects of 100 hit points.
@@ -534,7 +537,7 @@ fn wall(id: i32, master: i16, class: ClassId, (side, gap): (Side, f32)) -> Scene
 /// the closest gate; one that does not passes them over.
 #[test]
 fn walls_and_gates_count_for_unit_that_attacks_walls() {
-    let mut w = battle(
+    let mut world = battle(
         melee(None),
         vec![
             wall(20, 27, class::WALL, (Side::East, 2.0)),
@@ -547,10 +550,10 @@ fn walls_and_gates_count_for_unit_that_attacks_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let (c, _) = best(&mut w, &me, &idle_ask(), &[20, 21, 22], &[]);
+    let (c, _) = best(&mut world, &me, &idle_ask(), &[20, 21, 22], &[]);
     assert_eq!(c.target, Some(object_id(22)));
-    let (c, _) = best(&mut w, &soldier(), &idle_ask(), &[20, 21, 22], &[]);
-    assert_eq!(c.target, None);
+    let (choice, _) = best(&mut world, &soldier(), &idle_ask(), &[20, 21, 22], &[]);
+    assert_eq!(choice.target, None);
 }
 
 /// `FUN_140c4c8e0`'s switch: the archers' class 0 is 3, but masters 6 and 7 (the crossbowman
@@ -613,7 +616,7 @@ fn the_categories_follow_the_classes_and_their_exceptions() {
 /// not move.
 #[test]
 fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
-    let mut w = battle(
+    let mut world = battle(
         melee(Some(42)),
         vec![
             enemy(40, walker(), (Side::East, 3.0)),
@@ -633,14 +636,14 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
     };
     let mut counted = |me: &Searcher| {
         let mut st = Statistics::default();
-        fielded(&mut w, &[], |field| {
+        fielded(&mut world, &[], |field| {
             add_extra(me, &ask, &mut st, field, &roles(), &tuning().best_target)
         })
         .0
         .unwrap();
         st.entries
             .iter()
-            .map(|e| (e.id, e.distance.get()))
+            .map(|entry| (entry.id, entry.distance.get()))
             .collect::<Vec<_>>()
     };
     assert_eq!(
@@ -658,7 +661,7 @@ fn an_extra_object_under_the_least_range_counts_beyond_the_weapon_range() {
 /// them the choice goes on to the quick paths, which take the moving enemy.
 #[test]
 fn gate_answers_at_once_only_among_walls() {
-    let mut w = battle(
+    let mut world = battle(
         melee(None),
         vec![
             wall(20, 27, class::WALL, (Side::East, 2.0)),
@@ -671,8 +674,8 @@ fn gate_answers_at_once_only_among_walls() {
         target_classes: [None, Some(class::WALL)],
         ..soldier()
     };
-    let (c, asked) = best(&mut w, &me, &idle_ask(), &[20, 22, 7], &[]);
-    assert_eq!((c.target, asked), (Some(object_id(7)), vec![]));
+    let (choice, asked) = best(&mut world, &me, &idle_ask(), &[20, 22, 7], &[]);
+    assert_eq!((choice.target, asked), (Some(object_id(7)), vec![]));
 }
 
 /// Outside an idle check the current target answers by its path when it moves and engages
@@ -680,7 +683,7 @@ fn gate_answers_at_once_only_among_walls() {
 /// walled in, 9's answers). An idle check takes no such shortcut.
 #[test]
 fn the_current_target_answers_by_its_path_outside_an_idle_check() {
-    let mut w = battle(
+    let mut world = battle(
         melee(Some(7)),
         vec![
             enemy(7, walker(), (Side::East, 3.0)),
@@ -697,19 +700,19 @@ fn the_current_target_answers_by_its_path_outside_an_idle_check() {
         target: Some(object_id(7)),
         ..soldier()
     };
-    let (c, asked) = best(&mut w, &me, &ask, &[7, 9], &[7]);
+    let (c, asked) = best(&mut world, &me, &ask, &[7, 9], &[7]);
     assert_eq!((c.target, asked), (Some(object_id(7)), vec![object_id(7)]));
     let at_once = Ask {
         paths: 0,
         ..ask.clone()
     };
-    let (c, asked) = best(&mut w, &me, &at_once, &[7, 9], &[]);
+    let (c, asked) = best(&mut world, &me, &at_once, &[7, 9], &[]);
     assert_eq!((c.target, asked), (Some(object_id(7)), vec![]));
-    let (c, asked) = best(&mut w, &me, &ask, &[7, 9], &[]);
+    let (c, asked) = best(&mut world, &me, &ask, &[7, 9], &[]);
     assert_eq!((c.target, asked[0]), (Some(object_id(9)), object_id(7)));
     let idle = Ask { idle: true, ..ask };
-    let (c, asked) = best(&mut w, &me, &idle, &[7, 9], &[7]);
-    assert_eq!(c.target, Some(object_id(9)));
+    let (choice, asked) = best(&mut world, &me, &idle, &[7, 9], &[7]);
+    assert_eq!(choice.target, Some(object_id(9)));
     assert!(!asked.contains(&object_id(7)));
 }
 
@@ -748,8 +751,8 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     };
     let checked = |w: &mut World, me: &Searcher, id: i32, relation| {
         fielded(w, &[], |field| {
-            let t = field.found_object(object_id(id))?.expect("a held object");
-            may_attack(me, (object_id(id), &t), relation, field)
+            let found_object = field.found_object(object_id(id))?.expect("a held object");
+            may_attack(me, (object_id(id), &found_object), relation, field)
         })
         .0
     };
@@ -764,13 +767,13 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
     ] {
         assert_eq!(checked(&mut w, &me, id, relation), Ok(pass), "{id}");
     }
-    let mut w = battle((soldier_master(4.0, 1.0), None), enemies(), &[]);
-    assert!(checked(&mut w, &me, 7, UnitRelation::Enemy).is_err());
-    assert!(checked(&mut w, &me, 10, UnitRelation::Neutral).is_err());
-    assert_eq!(checked(&mut w, &me, 8, UnitRelation::Enemy), Ok(false));
+    let mut world = battle((soldier_master(4.0, 1.0), None), enemies(), &[]);
+    assert!(checked(&mut world, &me, 7, UnitRelation::Enemy).is_err());
+    assert!(checked(&mut world, &me, 10, UnitRelation::Neutral).is_err());
+    assert_eq!(checked(&mut world, &me, 8, UnitRelation::Enemy), Ok(false));
     for id in 11..=14 {
         assert_eq!(
-            checked(&mut w, &me, id, UnitRelation::Enemy),
+            checked(&mut world, &me, id, UnitRelation::Enemy),
             Ok(false),
             "{id}"
         );
@@ -780,11 +783,11 @@ fn candidate_passes_the_attack_check_the_friends_scan_and_the_neutral_test_in_or
         ..soldier()
     };
     assert_eq!(
-        checked(&mut w, &building, 7, UnitRelation::Neutral),
+        checked(&mut world, &building, 7, UnitRelation::Neutral),
         Ok(true)
     );
     assert_eq!(
-        checked(&mut w, &building, 10, UnitRelation::Neutral),
+        checked(&mut world, &building, 10, UnitRelation::Neutral),
         Ok(false)
     );
 }
@@ -850,9 +853,19 @@ fn computer_unit_passes_over_gaia_holdings_and_boats() {
         held: Amount::new(f32::NAN),
         ..gaia
     };
-    for t in [holding, taken, unordered] {
-        assert!(!kept_by_owner_and_class(&computer, &any, &t, &roles()));
-        assert!(kept_by_owner_and_class(&human, &any, &t, &roles()));
+    for found_object in [holding, taken, unordered] {
+        assert!(!kept_by_owner_and_class(
+            &computer,
+            &any,
+            &found_object,
+            &roles()
+        ));
+        assert!(kept_by_owner_and_class(
+            &human,
+            &any,
+            &found_object,
+            &roles()
+        ));
     }
     let boat = FoundObject {
         class: class::WARSHIP,

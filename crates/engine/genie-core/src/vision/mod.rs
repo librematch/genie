@@ -31,6 +31,7 @@ mod sight_tiles;
 mod tile_count;
 pub mod visibility;
 mod vision_bits;
+mod watched;
 
 pub use self::sight_layer::SightLayer;
 pub use self::sight_shape::{SightCentre, SightShape};
@@ -52,13 +53,13 @@ const REVEAL_CENTRES: usize = 209;
 /// The attributes that add a scenario's masks of visible and explored players, not modelled.
 const SHARED_MASKS: [usize; 2] = [285, 286];
 
-/// The masks of player `p` of `status` before any sharing: its own bits and the bits no tile
-/// has, with the ended ones for a player who won or lost.
+/// The masks of player `player_id` of `status` before any sharing: its own bits and the bits no
+/// tile has, with the ended ones for a player who won or lost.
 #[must_use]
-pub fn own_masks(p: PlayerId, status: GameStatus) -> VisionMasks {
+pub fn own_masks(player_id: PlayerId, status: GameStatus) -> VisionMasks {
     let mut masks = VisionMasks {
-        visible: VisionBits::visible(p) | VisionBits::NO_TILE,
-        explored: VisionBits::explored(p) | VisionBits::NO_TILE_EXPLORED,
+        visible: VisionBits::visible(player_id) | VisionBits::NO_TILE,
+        explored: VisionBits::explored(player_id) | VisionBits::NO_TILE_EXPLORED,
     };
     if status.ended() {
         masks.visible |= VisionBits::ENDED;
@@ -74,7 +75,7 @@ impl World {
     /// 0), and with attribute 183 not 0 the bits of every player past Gaia. The players' share
     /// flags (`+0x290`) and the third parties' table (`+0x2b0`, `+0x2b8`) are not held.
     pub fn rebuild_vision(&mut self) -> GenieResult<()> {
-        let n = self.players.len();
+        let count = self.players.len();
         let mut masks: ByPlayer<VisionMasks> = PlayerId::each(self.players.len())
             .zip(&self.players)
             .map(|(p, player)| own_masks(p, player.game_status))
@@ -92,7 +93,7 @@ impl World {
             };
             let mine = masks.checked_mut(p)?;
             if me.ally_sharing.contains(AllySharing::VISION) {
-                for q in PlayerId::each(n).skip(1) {
+                for q in PlayerId::each(count).skip(1) {
                     if q != p && allies(q) {
                         mine.visible |= VisionBits::visible(q);
                         mine.explored |= VisionBits::explored(q);
@@ -100,7 +101,7 @@ impl World {
                 }
             }
             if attribute(REVEAL_ALL) != Amount::ZERO {
-                for q in PlayerId::each(n).skip(1) {
+                for q in PlayerId::each(count).skip(1) {
                     mine.visible |= VisionBits::visible(q);
                     mine.explored |= VisionBits::explored(q);
                 }
@@ -110,7 +111,7 @@ impl World {
             // (`mTCFlared`), unless the screen's mode is 4 (`FUN_140c87f20`, the editor's: a
             // playback has no such screen, the probe reads 0)
             if REVEAL_CENTRES < me.attributes.len() && Amount::ZERO < attribute(REVEAL_CENTRES) {
-                for q in PlayerId::each(n).skip(1) {
+                for q in PlayerId::each(count).skip(1) {
                     if allies(q) || me.tc_flared.get(q.index()).copied().unwrap_or(false) {
                         continue;
                     }
@@ -126,7 +127,7 @@ impl World {
                                     .of_master(u.life.master_id)
                                     .contains(MasterRoles::TOWN_CENTRE)
                             })
-                            .map(|u| (p, q, u.position())),
+                            .map(|unit| (p, q, unit.position())),
                     );
                 }
             }
@@ -217,51 +218,53 @@ mod tests {
 
     #[test]
     fn mutual_allies_share_their_sight() {
-        let mut t = teams();
-        t.rebuild_vision().unwrap();
+        let mut world = teams();
+        world.rebuild_vision().unwrap();
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(0)),
+            world.spatial.vision.get(PlayerId::new(0)),
             Some(&own_masks(PlayerId::new(0), GameStatus::Playing))
         );
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(1)),
+            world.spatial.vision.get(PlayerId::new(1)),
             Some(&masks(0x2000_000a, 0x2000_000a_0000_0000))
         );
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(2)),
+            world.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
     }
 
     #[test]
     fn an_ally_one_way_or_the_vision_off_shares_nothing() {
-        let mut t = teams();
-        t.players[3]
+        let mut world = teams();
+        world.players[3]
             .relations
             .set(PlayerId::new(1), Relation::Enemy);
-        t.players[2].ally_sharing.set(AllySharing::VISION, false);
-        t.rebuild_vision().unwrap();
+        world.players[2]
+            .ally_sharing
+            .set(AllySharing::VISION, false);
+        world.rebuild_vision().unwrap();
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(1)),
+            world.spatial.vision.get(PlayerId::new(1)),
             Some(&own_masks(PlayerId::new(1), GameStatus::Playing))
         );
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(2)),
+            world.spatial.vision.get(PlayerId::new(2)),
             Some(&own_masks(PlayerId::new(2), GameStatus::Playing))
         );
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(4)),
+            world.spatial.vision.get(PlayerId::new(4)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
     }
 
     #[test]
     fn attribute_183_shares_every_players_sight() {
-        let mut t = teams();
-        t.players[2].attributes[REVEAL_ALL] = Amount::new(1.0);
-        t.rebuild_vision().unwrap();
+        let mut world = teams();
+        world.players[2].attributes[REVEAL_ALL] = Amount::new(1.0);
+        world.rebuild_vision().unwrap();
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(2)),
+            world.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_001e, 0x2000_001e_0000_0000))
         );
     }
@@ -282,14 +285,14 @@ mod tests {
     /// exactly the allies' sharing, and without a town centre to flare records no player.
     #[test]
     fn attribute_209_leaves_the_masks_and_flares_only_town_centres() {
-        let mut t = teams();
-        t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
-        t.rebuild_vision().unwrap();
+        let mut world = teams();
+        world.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
+        world.rebuild_vision().unwrap();
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(2)),
+            world.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
-        assert!(!t.players[2].tc_flared.iter().any(|&f| f));
+        assert!(!world.players[2].tc_flared.iter().any(|&f| f));
     }
 
     /// `World::update` ends with the world's slot 0x78 (`FUN_1415e92b0`, at `0x1415e9266`) after
@@ -297,35 +300,35 @@ mod tests {
     /// (430876787's flare 12577 in update 2630, whose id the game's later objects count on).
     #[test]
     fn every_update_ends_with_the_masks_rebuilt_and_new_town_centres_flared() {
-        let mut t = teams();
-        t.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
+        let mut teams = teams();
+        teams.players[2].attributes[REVEAL_CENTRES] = Amount::new(5.0);
         let flare = Master {
             id: ids::FLARE_4,
             kind: MasterKind::ANIMATED,
             standing_sprite: None,
             ..Master::default()
         };
-        t.model.masters = (0..t.players.len())
+        teams.model.masters = (0..teams.players.len())
             .map(|_| Masters::new([flare.clone()]))
             .map(Arc::new)
             .collect();
-        t.next_object_id = object_id(100);
-        let flares = |t: &World| -> Vec<(i32, Position)> {
-            t.players[2]
+        teams.next_object_id = object_id(100);
+        let flares = |world: &World| -> Vec<(i32, Position)> {
+            world.players[2]
                 .objects
                 .iter()
                 .filter(|u| u.life.master_id == ids::FLARE_4)
-                .map(|u| (u.id.get(), u.position()))
+                .map(|unit| (unit.id.get(), unit.position()))
                 .collect()
         };
-        t.tick_with(Millis::new(50), &[]);
-        assert_eq!(flares(&t), []);
+        teams.tick_with(Millis::new(50), &[]);
+        assert_eq!(flares(&teams), []);
         // the masks are the rebuilt ones even where they were not
         assert_eq!(
-            t.spatial.vision.get(PlayerId::new(2)),
+            teams.spatial.vision.get(PlayerId::new(2)),
             Some(&masks(0x2000_0014, 0x2000_0014_0000_0000))
         );
-        let _ = t
+        let _ = teams
             .push_live(
                 PlayerId::new(1),
                 Unit {
@@ -340,10 +343,10 @@ mod tests {
                 },
             )
             .unwrap();
-        t.tick_with(Millis::new(50), &[]);
-        assert_eq!(flares(&t), [(100, Position::new(7.0, 8.0, 0.0))]);
-        assert_eq!(t.players[2].tc_flared.get(1), Some(&true));
-        t.tick_with(Millis::new(50), &[]);
-        assert_eq!(flares(&t).len(), 1);
+        teams.tick_with(Millis::new(50), &[]);
+        assert_eq!(flares(&teams), [(100, Position::new(7.0, 8.0, 0.0))]);
+        assert_eq!(teams.players[2].tc_flared.get(1), Some(&true));
+        teams.tick_with(Millis::new(50), &[]);
+        assert_eq!(flares(&teams).len(), 1);
     }
 }

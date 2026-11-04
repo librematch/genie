@@ -89,15 +89,15 @@ impl TechId {
     #[must_use]
     pub const fn field(tech: Option<Self>) -> i16 {
         match tech {
-            Some(t) => t.0,
+            Some(tech_id) => tech_id.0,
             None => Self::NONE,
         }
     }
 }
 
 impl genie_diff::Diff for TechId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -138,7 +138,7 @@ mod tests {
         assert_eq!(TechId::of_field(-1), Ok(None));
         for value in [0, 101, i16::MAX] {
             let tech = TechId::of_field(value).unwrap();
-            assert_eq!(tech.map(|t| t.get()), Some(value));
+            assert_eq!(tech.map(|tech_id| tech_id.get()), Some(value));
             assert_eq!(TechId::field(tech), value);
         }
         assert_eq!(TechId::field(None), -1);
@@ -149,12 +149,12 @@ mod tests {
     fn negative_value_is_no_technology() {
         for value in [-1, -2, i16::MIN] {
             assert_eq!(
-                TechId::try_from(value).map_err(|e| e.kind()),
+                TechId::try_from(value).map_err(|value_error| value_error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
         assert_eq!(
-            TechId::of_field(-2).map_err(|e| e.kind()),
+            TechId::of_field(-2).map_err(|error| error.kind()),
             Err(ErrorKind::InvalidInput)
         );
     }

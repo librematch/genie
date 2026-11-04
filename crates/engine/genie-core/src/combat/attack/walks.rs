@@ -21,21 +21,21 @@ use crate::world::Seconds;
 use crate::world::layer::generated::MoveToTuning;
 use crate::world::step::Step;
 
-/// What a new `MoveTo` of `unit` with its mover `mover` reads as `set_state` makes it: the
-/// sprites' defaults of its master (`r`), the sprites' table `graphics`, and the unit's state
-/// and top speed now.
+/// What a new `MoveTo` of `unit` with its mover `mover` reads as `set_state` makes it: the sprites'
+/// defaults of its master (`attack_reads`), the sprites' table `graphics`, and the unit's state and
+/// top speed now.
 ///
 /// # Errors
 ///
 /// A unit that does not move.
 pub(super) fn move_reads<'g>(
     (unit, mover): (&Unit, Option<&Mover>),
-    r: &AttackReads,
+    attack_reads: &AttackReads,
     graphics: &'g Graphics,
 ) -> GenieResult<MoveToReads<'g>> {
     let _ = speed_of(mover)?;
     let sprites = SpriteReads {
-        defaults: r.move_defaults,
+        defaults: attack_reads.move_defaults,
         graphics,
     };
     Ok(MoveToReads::with_sprites(sprites, (unit, mover)))
@@ -55,7 +55,7 @@ impl Attack {
     /// master's running or walking one; none leaves the `MoveTo` constructor's default.
     const fn given_sprite(&self) -> Option<SpriteId> {
         match self.arms.move_sprite {
-            Some(g) => Some(g.id),
+            Some(graphic) => Some(graphic.id),
             None => None,
         }
     }
@@ -95,11 +95,13 @@ impl Attack {
         )?;
         self.state = AttackState::Move { move_to };
         self.timer = Seconds::ZERO;
-        Ok(if move_to.is_some_and(|m| m.arrived()) {
-            MoveStart::Arrived
-        } else {
-            MoveStart::UnderWay
-        })
+        Ok(
+            if move_to.is_some_and(|move_to_action| move_to_action.arrived()) {
+                MoveStart::Arrived
+            } else {
+                MoveStart::UnderWay
+            },
+        )
     }
 
     /// The `MoveTo` to a point of states 5 and 11 (`FUN_140aa0d30` to where the target was seen,
@@ -124,9 +126,9 @@ impl Attack {
             self.range
         };
         let to = reads.to_point(self.seen, range, self.given_sprite(), move_to_tuning)?;
-        self.state = walk(to.map(|m| MoveToAction {
+        self.state = walk(to.map(|move_to_action| MoveToAction {
             on_target_moved: self.on_target_moved,
-            ..m
+            ..move_to_action
         }));
         self.timer = Seconds::ZERO;
         Ok(())
@@ -144,25 +146,31 @@ impl Attack {
     /// The walk's and the notifies'.
     pub(super) fn update_list(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-        r: &AttackReads,
+        attack_reads: &AttackReads,
         gives_up: GiveUp,
     ) -> GenieResult<SubCode> {
-        let state = self.state.move_to().map(|m| m.state);
+        let state = self
+            .state
+            .move_to()
+            .map(|move_to_action| move_to_action.state);
         let how = ListUpdate {
             gives_up,
-            otherwise: r.standing,
+            otherwise: attack_reads.standing,
             ..ListUpdate::default()
         };
         let code = match self.state.walk_mut() {
-            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            Some(move_to) => update_sub_actions(move_to, step, unit, me, how)?,
             // a state that does not walk has no sub-action: its list's update is the empty one's
-            None => update_sub_actions(&mut None, c, unit, me, how)?,
+            None => update_sub_actions(&mut None, step, unit, me, how)?,
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(
+                step.w.parts.motion.mover_mut(unit.id),
+                &mut step.w.parts.unit_ai,
+            )?;
         }
         Ok(code)
     }

@@ -83,7 +83,12 @@ impl EnterState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::Walk { move_to: Some(m) } | Self::WalkPoint { move_to: Some(m) } => Some(m),
+            Self::Walk {
+                move_to: Some(move_to_action),
+            }
+            | Self::WalkPoint {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -91,7 +96,7 @@ impl EnterState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -99,9 +104,9 @@ impl EnterState {
     /// The same state, its walk without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut enter_state = self;
+        let _ = enter_state.take_move_to();
+        enter_state
     }
 }
 
@@ -115,20 +120,20 @@ mod tests {
     /// `MoveTo` of a state that does not walk; the walks give theirs.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match EnterState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 0 | 3 | 5..=10 | 12 | 14..), "{b}"),
+        for index in 0..=255_u8 {
+            match EnterState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(matches!(index, 0 | 3 | 5..=10 | 12 | 14..), "{index}"),
             }
         }
         assert_eq!(EnterState::Failed.to_string(), "13");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 11] {
-            let mut s = EnterState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut enter_state = EnterState::of_byte(b, Some(walk)).unwrap();
+            assert_eq!((enter_state.get(), enter_state.move_to()), (b, Some(&walk)));
+            assert_eq!(enter_state.bare().move_to(), None);
+            assert_eq!(enter_state.take_move_to(), Some(walk));
+            assert_eq!(enter_state.move_to(), None);
         }
         assert!(EnterState::of_byte(2, Some(walk)).is_err());
         assert_eq!(EnterState::Wait.bare(), EnterState::Wait);

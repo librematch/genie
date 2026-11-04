@@ -34,9 +34,9 @@ pub fn mesh_from_dump(text: &str) -> Option<Mesh> {
             Some("mesh") => {
                 let width = words.get(2)?.parse().ok()?;
                 let free = u32::from_str_radix(words.get(6)?.trim_start_matches("0x"), 16).ok()?;
-                let mut m = Mesh::new(width);
-                m.free = ShapeId::of_link(free as i32);
-                mesh = Some(m);
+                let mut width_mesh = Mesh::new(width);
+                width_mesh.free = ShapeId::of_link(free as i32);
+                mesh = Some(width_mesh);
             }
             Some("shape") => {
                 let m = mesh.as_mut()?;
@@ -99,11 +99,11 @@ fn contact_from_words(w: &[u32]) -> Option<Contact> {
 pub fn mesh_owners_from_dump(text: &str) -> Vec<(ObjectId, ShapeId)> {
     text.lines()
         .filter_map(|line| {
-            let mut w = line.split_whitespace();
-            (w.next()? == "owner").then_some(())?;
+            let mut fields = line.split_whitespace();
+            (fields.next()? == "owner").then_some(())?;
             Some((
-                ObjectId::of_field(w.next()?.parse().ok()?)?,
-                ShapeId::new(w.next()?.parse().ok()?),
+                ObjectId::of_field(fields.next()?.parse().ok()?)?,
+                ShapeId::new(fields.next()?.parse().ok()?),
             ))
         })
         .collect()
@@ -115,20 +115,21 @@ pub fn unit_terrain(save: &[u8], id: i32) -> GenieResult<Option<(f32, Restrictio
     let chapter = chapters(save)?[0];
     let header = chapter.header()?;
     for section in header.players() {
-        for (_, s) in live(&section) {
-            if s.id != id {
+        for (_, rge_static_object) in live(&section) {
+            if rge_static_object.id != id {
                 continue;
             }
-            let Some(m) = section
+            let Some(rge_master_static_object) = section
                 .objects()
-                .master(s.master_obj)
-                .and_then(|m| m.static_part())
+                .master(rge_static_object.master_obj)
+                .and_then(|master| master.static_part())
             else {
                 return Ok(None);
             };
-            return Ok(
-                RestrictionId::of_data(m.terrain_restriction_mask_id).map(|r| (m.radius_x, r))
-            );
+            return Ok(RestrictionId::of_data(
+                rge_master_static_object.terrain_restriction_mask_id,
+            )
+            .map(|restriction_id| (rge_master_static_object.radius_x, restriction_id)));
         }
     }
     Ok(None)
@@ -148,7 +149,12 @@ pub fn planner_from_save(
     let terrain_ids: Vec<TerrainId> = map
         .rows
         .iter()
-        .flat_map(|r| r.tiles.iter().map(|t| TerrainId::named(t.terrain_kind)))
+        .flat_map(|rge_map_row| {
+            rge_map_row
+                .tiles
+                .iter()
+                .map(|rge_tile| TerrainId::named(rge_tile.terrain_kind))
+        })
         .collect();
     let layer = layer()?;
     let spatial = spatial(&header, terrain, layer)?;

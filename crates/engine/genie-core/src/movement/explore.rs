@@ -122,17 +122,17 @@ impl ExploreAction {
         walk: &ExploreMove<'_>,
         move_to_tuning: &MoveToTuning,
     ) -> GenieResult<(Self, Owner)> {
-        let mut a = Self {
+        let mut explore_action = Self {
             state: ExploreState::New,
             point,
         };
-        let state = if a.point.x() == NO_POINT {
+        let state = if explore_action.point.x() == NO_POINT {
             ExploreState::Wait
         } else {
             ExploreState::Walk { move_to: None }
         };
-        let owner = a.set_state(state, walk, move_to_tuning)?;
-        Ok((a, owner))
+        let owner = explore_action.set_state(state, walk, move_to_tuning)?;
+        Ok((explore_action, owner))
     }
 
     /// `Set_state` (slot 0x80, `0x140a87e30`): its sub-actions go (`FUN_140a98620`), then by state:
@@ -231,7 +231,7 @@ impl ExploreAction {
     /// The states and codes the slice does not model, and the walk's.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         explorer: &mut Unit,
         me: Me,
         roles: &Roles,
@@ -245,7 +245,7 @@ impl ExploreAction {
             ExploreState::Failed => Err(GenieError::unsupported(
                 "a failed Explore (notify 0x1f9, set_state 2)",
             )),
-            ExploreState::Walk { .. } => self.walk(c, explorer, me, roles),
+            ExploreState::Walk { .. } => self.walk(step, explorer, me, roles),
             _ => Ok(()),
         }
     }
@@ -255,26 +255,26 @@ impl ExploreAction {
     /// wait once and fails any other unit's `MoveTo` (`LAB_140aa320c`).
     fn walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         explorer: &mut Unit,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<()> {
         let master = object_master(
-            c.w.parts.own_master.get(explorer.id),
+            step.w.parts.own_master.get(explorer.id),
             (explorer.id, explorer.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )
         .ok();
         let villager =
             master.is_some_and(|m| roles.of_class(m.class).contains(ClassRoles::VILLAGER));
         let gives_up = GiveUp {
-            patience: if villager && !c.w.players.player(c.player)?.kind.is_computer() {
+            patience: if villager && !step.w.players.player(step.player)?.kind.is_computer() {
                 Patience::WaitsOnce
             } else {
                 Patience::Fails
             },
-            stance: c
+            stance: step
                 .w
                 .parts
                 .unit_ai
@@ -286,14 +286,14 @@ impl ExploreAction {
             ..ListUpdate::default()
         };
         let mut move_to = self.state.move_to().copied();
-        let code = update_sub_actions(&mut move_to, c, explorer, me, how)?;
+        let code = update_sub_actions(&mut move_to, step, explorer, me, how)?;
         self.state = ExploreState::Walk { move_to };
         let walked = move_to.is_some();
         let owner = self.after_walk(code);
         if walked && self.state.move_to().is_none() {
-            stop_mover(c.w.parts.mover_mut(explorer.id))?;
+            stop_mover(step.w.parts.mover_mut(explorer.id))?;
         }
-        explorer.explore_owner(owner, c)
+        explorer.explore_owner(owner, step)
     }
 }
 
@@ -386,8 +386,8 @@ pub(crate) fn unexplored_area(
     let own = area.own_zone();
     let mut best: Option<(Tile, f32)> = None;
     for ring in RINGS {
-        for a in AROUND {
-            let tile = Tile::new(cx + a.dx() * ring, cy + a.dy() * ring);
+        for tile_offset in AROUND {
+            let tile = Tile::new(cx + tile_offset.dx() * ring, cy + tile_offset.dy() * ring);
             if !map.holds(tile) || area.explored(tile)? {
                 continue;
             }
@@ -395,9 +395,9 @@ pub(crate) fn unexplored_area(
             if area.zone(tile).byte() != own.byte() || !area.clear(tile)? || !area.reaches(tile)? {
                 continue;
             }
-            let d = area.distance(tile);
-            if best.is_none_or(|(_, b)| d < b) {
-                best = Some((tile, d));
+            let distance = area.distance(tile);
+            if best.is_none_or(|(_, b)| distance < b) {
+                best = Some((tile, distance));
             }
         }
     }
@@ -570,57 +570,58 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         point: Point,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
         let at = Position::new(point.x(), point.y(), self.position().z());
-        let walk = self.explore_move(c, roles);
+        let walk = self.explore_move(step, roles);
         let owner = if let Some(e) = actions.list.explore_mut() {
             let walked = e.state.move_to().is_some();
-            let owner = e.take_point(at, &walk, &c.w.model.tuning.move_to)?;
+            let owner = e.take_point(at, &walk, &step.w.model.tuning.move_to)?;
             if walked {
-                stop_mover(c.w.parts.mover_mut(self.id))?;
+                stop_mover(step.w.parts.mover_mut(self.id))?;
             }
             owner
         } else {
-            if actions.top_action().is_some() || c.w.parts.unread.contains(self.id) {
+            if actions.top_action().is_some() || step.w.parts.unread.contains(self.id) {
                 return Err(GenieError::unsupported(
                     "an Explore replacing another action",
                 ));
             }
-            let (e, owner) = ExploreAction::new(at, &walk, &c.w.model.tuning.move_to)?;
-            actions.list.set_explore(Some(e));
+            let (explore_action, owner) =
+                ExploreAction::new(at, &walk, &step.w.model.tuning.move_to)?;
+            actions.list.set_explore(Some(explore_action));
             owner
         };
-        self.explore_owner(owner, c)
+        self.explore_owner(owner, step)
     }
 
     /// What an Explore's `MoveTo` reads of this unit ([`ExploreMove`]); a unit whose master the world
     /// lacks reads no sprite defaults and gives none.
-    fn explore_move<'g>(&self, c: &'g Step<'_>, roles: &Roles) -> ExploreMove<'g> {
+    fn explore_move<'g>(&self, step: &'g Step<'_>, roles: &Roles) -> ExploreMove<'g> {
         let master = object_master(
-            c.w.parts.own_master.get(self.id),
+            step.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         );
         master.map_or_else(
             |_| ExploreMove {
                 reads: MoveToReads::with_sprites(
                     SpriteReads {
                         defaults: MoveDefaults::default(),
-                        graphics: &c.w.model.graphics,
+                        graphics: &step.w.model.graphics,
                     },
-                    (self, c.w.parts.mover_of(self.id)),
+                    (self, step.w.parts.mover_of(self.id)),
                 ),
                 given: None,
             },
             |master| {
                 ExploreMove::of(
-                    (self, c.w.parts.mover_of(self.id)),
+                    (self, step.w.parts.mover_of(self.id)),
                     master,
                     (
-                        &c.w.model.graphics,
-                        c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                        &step.w.model.graphics,
+                        step.w.parts.combat_of(self.id).abilities.look.as_ref(),
                     ),
                     roles,
                 )
@@ -632,7 +633,7 @@ impl Unit {
     /// with the explore's action value to the unit AI, and the standing sprite (slot 0x68 with
     /// the master's `+0x470`) where the slice holds the unit's sprite. `Set_state` 2's slots are
     /// not modelled.
-    pub(crate) fn explore_owner(&mut self, owner: Owner, c: &mut Step<'_>) -> GenieResult<()> {
+    pub(crate) fn explore_owner(&mut self, owner: Owner, step: &mut Step<'_>) -> GenieResult<()> {
         use crate::movement::explore::Owner;
         match owner {
             Owner::Nothing => return Ok(()),
@@ -642,19 +643,19 @@ impl Unit {
                 ));
             }
             Owner::WantsPoint => self.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::REQUIRES_SEARCH,
                 [AiAction::Explore.value(), 0, 0],
             )?,
             Owner::Standing => {}
         }
         let standing = self
-            .master(c.w.master_tables(), c.player)?
+            .master(step.w.master_tables(), step.player)?
             .standing_sprite
-            .and_then(|s| c.w.model.graphics.get(s))
+            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id))
             .copied();
-        if let Some(m) = c.w.parts.mover_mut(self.id) {
-            m.shows(standing.as_ref());
+        if let Some(mover) = step.w.parts.mover_mut(self.id) {
+            mover.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
             let standing = standing.ok_or(GenieError::unsupported(
@@ -662,10 +663,10 @@ impl Unit {
             ))?;
             new_sprite(
                 &mut self.sprite,
-                c.w.parts.move_stats_mut(self.id),
+                step.w.parts.move_stats_mut(self.id),
                 standing,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             );
         }
         Ok(())
@@ -757,9 +758,13 @@ mod tests {
         let table = Graphics::from([(SpriteId::named(7), WALKING), (SpriteId::named(20), other)]);
         let sprite = |given| {
             let walk = walk_of(&table, given);
-            let (a, _) =
+            let (explore_action, _) =
                 ExploreAction::new(Position::new(5.0, 5.0, 0.0), &walk, &tuning().move_to).unwrap();
-            a.state.move_to().and_then(|m| m.sprite).map(|g| g.id)
+            explore_action
+                .state
+                .move_to()
+                .and_then(|move_to_action| move_to_action.sprite)
+                .map(|graphic| graphic.id)
         };
         assert_eq!(sprite(Some(SpriteId::named(7))), Some(SpriteId::named(7)));
         assert_eq!(sprite(None), Some(SpriteId::named(20)));
@@ -769,23 +774,33 @@ mod tests {
     /// byte the fill; a set off the map is let be, a read off it is none.
     #[test]
     fn an_influence_map_holds_byte_per_tile_from_its_reference_point() {
-        let mut m = InfluenceMap::new(GridSize::new(SCOUT_MAP_SIZE, SCOUT_MAP_SIZE), 0);
+        let mut influence_map = InfluenceMap::new(GridSize::new(SCOUT_MAP_SIZE, SCOUT_MAP_SIZE), 0);
         assert_eq!(
             (
-                m.get(Tile::new(0, 0)),
-                m.get(Tile::new(479, 479)),
-                m.get(Tile::new(480, 0))
+                influence_map.get(Tile::new(0, 0)),
+                influence_map.get(Tile::new(479, 479)),
+                influence_map.get(Tile::new(480, 0))
             ),
             (Some(0), Some(0), None)
         );
-        m.set(Tile::new(12, 34), 1);
-        m.set(Tile::new(-1, 3), 1);
-        m.set(Tile::new(3, 480), 1);
+        influence_map.set(Tile::new(12, 34), 1);
+        influence_map.set(Tile::new(-1, 3), 1);
+        influence_map.set(Tile::new(3, 480), 1);
         assert_eq!(
-            (m.get(Tile::new(12, 34)), m.get(Tile::new(34, 12))),
+            (
+                influence_map.get(Tile::new(12, 34)),
+                influence_map.get(Tile::new(34, 12))
+            ),
             (Some(1), Some(0))
         );
-        assert_eq!(m.cells.iter().map(|&c| u32::from(c)).sum::<u32>(), 1);
+        assert_eq!(
+            influence_map
+                .cells
+                .iter()
+                .map(|&c| u32::from(c))
+                .sum::<u32>(),
+            1
+        );
         // a reference point shifts the grid
         let shifted = InfluenceMap {
             origin: Tile::new(10, 20),
@@ -843,11 +858,14 @@ mod tests {
         stuck.reads.speed = Speed::ZERO;
         let (b, _) =
             ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to).unwrap();
-        assert_eq!(b.state.move_to().map(|m| m.state), Some(MoveTo::Failed));
+        assert_eq!(
+            b.state.move_to().map(|move_to_action| move_to_action.state),
+            Some(MoveTo::Failed)
+        );
         stuck.reads.state = ObjectState::Dying;
-        let (b, _) =
+        let (explore_action, _) =
             ExploreAction::new(Position::new(5.0, 5.0, 0.0), &stuck, &tuning().move_to).unwrap();
-        assert_eq!(b.state, ExploreState::Walk { move_to: None });
+        assert_eq!(explore_action.state, ExploreState::Walk { move_to: None });
     }
 
     fn rng() -> Well512 {
@@ -892,7 +910,10 @@ mod tests {
         let square: Vec<Tile> = (16..=24)
             .flat_map(|x| (88..=96).map(move |y| Tile::new(x, y)))
             .collect();
-        let edge_but_one = square.iter().copied().filter(|&t| t != Tile::new(24, 90));
+        let edge_but_one = square
+            .iter()
+            .copied()
+            .filter(|&tile| tile != Tile::new(24, 90));
         let mut w = scouting(
             map(TileSight::Unknown).sight_on(edge_but_one, TileSight::Explored),
             2.0,
@@ -907,11 +928,11 @@ mod tests {
         );
         assert_eq!(found, Ok(Some(Tile::new(24, 90))));
         // all of the square explored: the flood leaves it left first, at (15, 92)
-        let mut w = scouting(
+        let mut world = scouting(
             map(TileSight::Unknown).sight_on(square, TileSight::Explored),
             2.0,
         );
-        let (mut area, map_size, _) = scout_area(&mut w);
+        let (mut area, map_size, _) = scout_area(&mut world);
         let found = beyond_sight(
             &mut area,
             Position::new(20.5, 92.5, 0.0),
@@ -950,8 +971,8 @@ mod tests {
         let scene = map(TileSight::Unknown)
             .sight_on(explored, TileSight::Explored)
             .sight_on([Tile::new(14, 94)], TileSight::Explored);
-        let mut w = scouting(walled(scene, Tile::new(15, 80), Tile::new(23, 88)), 4.0);
-        let (mut area, _, _) = scout_area(&mut w);
+        let mut world = scouting(walled(scene, Tile::new(15, 80), Tile::new(23, 88)), 4.0);
+        let (mut area, _, _) = scout_area(&mut world);
         assert_eq!(
             unexplored_area(tc, size, &mut area),
             Ok(Some(Tile::new(9, 94)))
@@ -969,7 +990,7 @@ mod tests {
         let row = (0..40).map(|x| Tile::new(x, 39));
         let pond = (22..=28)
             .flat_map(|x| (27..=33).map(move |y| Tile::new(x, y)))
-            .filter(|t| t.x() == 22 || t.x() == 28 || t.y() == 27 || t.y() == 33);
+            .filter(|tile| tile.x() == 22 || tile.x() == 28 || tile.y() == 27 || tile.y() == 33);
         Scene::open(size)
             .water(row.chain(pond))
             .sight(TileSight::Explored)
@@ -1005,8 +1026,8 @@ mod tests {
             closest_undiscovered(&mut area, seeker, map_size, &mut rng()),
             Ok(None)
         );
-        let mut w = below_the_water(Tile::new(25, 30));
-        let (mut area, map_size, _) = scout_area(&mut w);
+        let mut world = below_the_water(Tile::new(25, 30));
+        let (mut area, map_size, _) = scout_area(&mut world);
         assert_eq!(unexplored_area(tc, map_size, &mut area), Ok(None));
     }
 
@@ -1048,8 +1069,8 @@ mod tests {
             player_kind: PlayerKind::Computer,
             ..seeker
         };
-        let mut w = scouting(scene, 2.0);
-        let (mut area, size, _) = scout_area(&mut w);
+        let mut world = scouting(scene, 2.0);
+        let (mut area, size, _) = scout_area(&mut world);
         let mut untouched = rng();
         assert_eq!(
             closest_undiscovered(&mut area, computer, size, &mut untouched),

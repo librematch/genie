@@ -141,14 +141,14 @@ impl HotkeyGroup {
 }
 
 impl fmt::Display for HotkeyGroup {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let group_string = if self.hotkeys.is_empty() {
             String::from(" no hotkeys")
         } else {
             let hotkeys: Vec<String> = self.hotkeys.iter().map(ToString::to_string).collect();
             format!("\n  {}", hotkeys.join("\n  "))
         };
-        write!(f, "Group:{group_string}")
+        write!(formatter, "Group:{group_string}")
     }
 }
 

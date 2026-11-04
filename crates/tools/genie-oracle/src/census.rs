@@ -51,7 +51,10 @@ impl CensusStop {
             object,
             reason: why.reason(),
             at: why.location().to_string(),
-            context: why.context().map(|(k, v)| (k, v.to_owned())).collect(),
+            context: why
+                .context()
+                .map(|(k, text)| (k, text.to_owned()))
+                .collect(),
         }
     }
 }
@@ -190,10 +193,12 @@ impl Census {
     /// after it (an earlier one, passed by a run that started later, is skipped).
     fn update(&mut self, turns: &World, sections: &[PlayerSection<'_>]) {
         self.updates += 1;
-        for (p, player) in self.players.iter_mut().enumerate() {
+        for (index, player) in self.players.iter_mut().enumerate() {
             if player.stop.is_none()
-                && let Some((tick, object, why)) =
-                    turns.players.get(p).and_then(|q| q.unsupported.as_ref())
+                && let Some((tick, object, why)) = turns
+                    .players
+                    .get(index)
+                    .and_then(|q| q.unsupported.as_ref())
             {
                 player.stop = Some(CensusStop::of(tick.get(), *object, why));
             }
@@ -308,8 +313,8 @@ pub fn header_divergences(
         };
         let saved = chapters(&game)?[0];
         let saved = saved.header()?;
-        for (k, &p) in players.iter().enumerate() {
-            if done[k] {
+        for (index, &p) in players.iter().enumerate() {
+            if done[index] {
                 continue;
             }
             let differences = crate::object_field_differences(
@@ -317,11 +322,11 @@ pub fn header_divergences(
                 &crate::header_objects(&saved, p, masters)?,
             );
             if !differences.is_empty() {
-                out[k] = Followed::Leaves(Divergence {
+                out[index] = Followed::Leaves(Divergence {
                     update,
                     differences,
                 });
-                done[k] = true;
+                done[index] = true;
             }
         }
     }
@@ -354,9 +359,9 @@ pub fn next_id_divergence(
     let header = chapter.header()?;
     let mut turns = header_slice(&header, masters)?;
     let mut decoder = Decoder::default();
-    for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
+    for (index, frame) in frames(&chapter, last)?.iter().enumerate() {
         run(&mut turns, &mut decoder, from_ref(frame));
-        let update = i + 1;
+        let update = index + 1;
         if update < first {
             continue;
         }
@@ -392,8 +397,8 @@ pub fn header_run(
         chapter, mut turns, ..
     } = open(recording, masters)?;
     let mut decoder = Decoder::default();
-    for (i, frame) in frames(&chapter, last)?.iter().enumerate() {
-        before(i + 1);
+    for (index, frame) in frames(&chapter, last)?.iter().enumerate() {
+        before(index + 1);
         run(&mut turns, &mut decoder, from_ref(frame));
     }
     Ok(turns)

@@ -176,8 +176,8 @@ mod tests {
         let moving = Master::of_kind(MasterKind::MOVING);
         assert_eq!(moving.creatable_part(), &CreatablePart::default());
         let mut combat = Master::of_kind(MasterKind::COMBAT);
-        if let Some(p) = combat.creatable.as_mut() {
-            p.max_volley = MissileCount::of_data(3);
+        if let Some(creatable_part) = combat.creatable.as_mut() {
+            creatable_part.max_volley = MissileCount::of_data(3);
         }
         assert_eq!(combat.creatable_part().max_volley.get(), 3);
     }

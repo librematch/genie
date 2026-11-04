@@ -16,7 +16,7 @@ use crate::world::WholeSeconds;
 /// it when above 0, else the master's speed (as the masters' loader derives
 /// [`MoveStats`]' speeds).
 fn sprite_speed(base: Speed, sprite: Option<SpriteId>, graphics: &Graphics) -> Speed {
-    top_speed(base, sprite.and_then(|s| graphics.get(s)))
+    top_speed(base, sprite.and_then(|sprite_id| graphics.get(sprite_id)))
 }
 
 /// What a unit moving with master `master` reads after attribute `attribute` changed
@@ -49,10 +49,10 @@ pub fn follow_moving(
         MasterAttribute::ROTATION_SPEED => stats.turn_time = master.moving_part().turn_speed,
         MasterAttribute::TERRAIN_RESTRICTION_ID => {
             // a restriction below 0 has no mask; the stats keep theirs
-            if let Some(r) = master.terrain_restriction {
-                stats.restriction = r;
+            if let Some(restriction_id) = master.terrain_restriction {
+                stats.restriction = restriction_id;
                 if let Some(t) = terrain {
-                    stats.restriction_mask = t.restriction_mask(r);
+                    stats.restriction_mask = t.restriction_mask(restriction_id);
                 }
             }
         }
@@ -91,16 +91,16 @@ pub fn follow(
         | MasterAttribute::TRAIN_TIME
         | MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD
         | MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM => {
-            if let Some(p) = master.creatable.as_mut() {
-                p.trained_at = p
+            if let Some(creatable_part) = master.creatable.as_mut() {
+                creatable_part.trained_at = creatable_part
                     .train_locations
                     .iter()
                     .filter_map(|t| t.location)
                     .collect();
-                p.build_time = p
+                creatable_part.build_time = creatable_part
                     .train_locations
                     .first()
-                    .map_or(WholeSeconds::ZERO, |t| t.time);
+                    .map_or(WholeSeconds::ZERO, |train_location| train_location.time);
             }
         }
         _ => {}

@@ -91,7 +91,7 @@ impl Seeker<'_, '_> {
             .contains(ClassRoles::FISHING_SHIP)
     }
 
-    /// What `FUN_1411671e0` measures to the drop site `o` (of `master`, its centre `squared`
+    /// What `FUN_1411671e0` measures to the drop site `unit` (of `master`, its centre `squared`
     /// away), or none when the planner passes it over: the planner's result decides whether it
     /// counts ([`counted`]); by path its path's length, within `TurnTuning::short_drop_reach` the shorter
     /// of that and the short path (`TurnTuning::drop_reach`), kept in `last`; without a planner `last`;
@@ -102,7 +102,7 @@ impl Seeker<'_, '_> {
     /// The planner's and the short path's.
     fn measure(
         &mut self,
-        o: &Unit,
+        unit: &Unit,
         master: &Master,
         nearest: DropMeasure,
         squared: f32,
@@ -113,10 +113,10 @@ impl Seeker<'_, '_> {
         let turn_tuning = &by_id.tuning().turn;
         let roles = by_id.roles();
         let radii = Distance::new(self.mover.stats.radius.x() + master.radius.x());
-        let to = o.position().ground();
+        let to = unit.position().ground();
         let ground = self.mover.stats.radius.ground();
         let near = || {
-            footprint_gap_squared(self.unit.position(), ground, o.position(), master.radius)
+            footprint_gap_squared(self.unit.position(), ground, unit.position(), master.radius)
                 <= DistanceSquared::new(turn_tuning.fishing_reach)
         };
         let planned = self.mover.plan_length(
@@ -138,7 +138,7 @@ impl Seeker<'_, '_> {
                         self.unit.position(),
                         &self.me,
                         self.spatial,
-                        o.id,
+                        unit.id,
                         Distance::new(turn_tuning.drop_reach),
                         by_id,
                     )?
@@ -172,7 +172,7 @@ impl Seeker<'_, '_> {
             .spatial
             .get_known(target)?
             .filter(|p| roles.of_class(p.class).contains(ClassRoles::FARM))
-            .map(|p| p.position.ground()))
+            .map(|placed| placed.position.ground()))
     }
 }
 
@@ -235,55 +235,57 @@ pub(crate) fn drop_site_search<'u>(
     let mut best: Option<DropSiteId> = None;
     let mut best_d = NO_DROP_DISTANCE;
     let mut last = NO_DROP_DISTANCE;
-    for o in units {
-        if !sites.contains(&o.life.master_id) || o.life.state != ObjectState::Alive {
+    for unit in units {
+        if !sites.contains(&unit.life.master_id) || unit.life.state != ObjectState::Alive {
             continue;
         }
         if x == NO_POINT && y == NO_POINT {
-            return Ok(Some(DropSiteId::new(o.id)));
+            return Ok(Some(DropSiteId::new(unit.id)));
         }
-        let master = o.master_in(masters)?;
-        if let (Some(s), Some(zone)) = (seeker.as_ref(), own_zone)
-            && s.zones
-                .zone(Tile::new(o.position().x() as i32, o.position().y() as i32))
-                != zone
+        let master = unit.master_in(masters)?;
+        if let (Some(zone_seeker), Some(zone)) = (seeker.as_ref(), own_zone)
+            && zone_seeker.zones.zone(Tile::new(
+                unit.position().x() as i32,
+                unit.position().y() as i32,
+            )) != zone
         {
             continue;
         }
         let busy = at_work.is_some_and(|at_work| {
             MasterKind::ACTION <= master.kind
                 && by_id
-                    .actions(o.id)
+                    .actions(unit.id)
                     .and_then(Action::top_action_kind)
-                    .is_some_and(|k| {
+                    .is_some_and(|action_kind| {
                         // The action types the Gather's drop-site searches pass over (`FUN_1411671e0`'s
                         // argument 8 `0x7d`, which takes `0x7c` with it).
-                        k == at_work || (at_work == ActionKind::UNPACK && k == ActionKind::PACK)
+                        action_kind == at_work
+                            || (at_work == ActionKind::UNPACK && action_kind == ActionKind::PACK)
                     })
         });
-        if busy || (place == SitePlace::Outside && o.life.inside.is_some()) {
+        if busy || (place == SitePlace::Outside && unit.life.inside.is_some()) {
             continue;
         }
         if let Some(farm) = seeker
             .as_ref()
-            .map(|s| s.farm_worked(roles))
+            .map(|roles_seeker| roles_seeker.farm_worked(roles))
             .transpose()?
             .flatten()
         {
             (x, y) = (farm.x(), farm.y());
             nearest = DropMeasure::ByDistance;
         }
-        let (dx, dy) = (x - o.position().x(), y - o.position().y());
+        let (dx, dy) = (x - unit.position().x(), y - unit.position().y());
         let squared = dy * dy + dx * dx;
         let d = match seeker.as_mut() {
-            Some(s) => match s.measure(o, master, nearest, squared, &mut last, by_id)? {
+            Some(s) => match s.measure(unit, master, nearest, squared, &mut last, by_id)? {
                 Some(d) => d,
                 None => continue,
             },
             None => squared,
         };
         if d < best_d {
-            best = Some(DropSiteId::new(o.id));
+            best = Some(DropSiteId::new(unit.id));
             best_d = d;
         }
     }
@@ -302,15 +304,15 @@ pub(crate) fn nearest_drop_site(
     at: Position,
 ) -> Option<(DropSiteId, DistanceSquared)> {
     let mut best: Option<(DropSiteId, DistanceSquared)> = None;
-    for o in others.own_iter() {
-        if !sites.contains(&o.life.master_id) || o.life.state != ObjectState::Alive {
+    for unit in others.own_iter() {
+        if !sites.contains(&unit.life.master_id) || unit.life.state != ObjectState::Alive {
             continue;
         }
         let (x, y) = (at.x(), at.y());
-        let (dx, dy) = (x - o.position().x(), y - o.position().y());
+        let (dx, dy) = (x - unit.position().x(), y - unit.position().y());
         let d = DistanceSquared::new(dy * dy + dx * dx);
-        if best.is_none_or(|(_, b)| d < b) {
-            best = Some((DropSiteId::new(o.id), d));
+        if best.is_none_or(|(_, distance_squared)| d < distance_squared) {
+            best = Some((DropSiteId::new(unit.id), d));
         }
     }
     best

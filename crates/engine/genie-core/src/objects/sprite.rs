@@ -41,10 +41,10 @@ use genie_diff::Diff;
 const EPSILON: f32 = SPRITE_EPSILON;
 
 /// Slot 0x68, `new_sprite` (a combat object's `FUN_141217000`, the moving object's
-/// `FUN_141158620`, the static object's `FUN_141196580`): the object shows `g`. The sprite it
+/// `FUN_141158620`, the static object's `FUN_141196580`): the object shows `graphic`. The sprite it
 /// shows already stays as it runs; another starts a new instance (`FUN_1413b2ef0`, which draws
 /// from the Sprite stream `rng`). A moving object's top speed (`stats`) is the one it reads with
-/// `g` from then on ([`top_speed`]): the game reads the current sprite at each read. The one
+/// `graphic` from then on ([`top_speed`]): the game reads the current sprite at each read. The one
 /// writer of a sprite change and of [`MoveStats::speed`], besides a change of the base.
 ///
 /// The combat object's own steps are the renderer's (its overlay sprite `+0xa05`, the hero
@@ -53,15 +53,15 @@ const EPSILON: f32 = SPRITE_EPSILON;
 pub(crate) fn new_sprite(
     sprite: &mut Option<ActiveSprite>,
     stats: Option<&mut MoveStats>,
-    g: Graphic,
+    graphic: Graphic,
     rng: &mut Well512,
     sprite_tuning: SpriteTuning,
 ) {
-    if !sprite.is_some_and(|s| s.graphic.id == g.id) {
-        *sprite = Some(ActiveSprite::start(g, rng, sprite_tuning));
+    if !sprite.is_some_and(|active_sprite| active_sprite.graphic.id == graphic.id) {
+        *sprite = Some(ActiveSprite::start(graphic, rng, sprite_tuning));
     }
     if let Some(stats) = stats {
-        stats.show(Some(&g));
+        stats.show(Some(&graphic));
     }
 }
 
@@ -102,7 +102,7 @@ impl ActiveSprite {
             // FUN_1413b3490's draw, which the second one overrides
             let _ = sprite_rng.rand15();
         }
-        let mut s = Self {
+        let mut active_sprite = Self {
             graphic,
             frame: graphic.first_frame(),
             interval: graphic.frame_duration,
@@ -113,8 +113,8 @@ impl ActiveSprite {
             animate: AnimateState::Playing,
             speed: Speed::ZERO,
         };
-        if f64::from(s.interval.get()) < 0.001 {
-            s.interval = Seconds::new(sprite_tuning.shortest);
+        if f64::from(active_sprite.interval.get()) < 0.001 {
+            active_sprite.interval = Seconds::new(sprite_tuning.shortest);
         }
         if graphic.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) {
             let d = graphic.frame_duration.get();
@@ -124,19 +124,20 @@ impl ActiveSprite {
                     * (graphic.frames.as_f32() * d + graphic.replay_delay.get()))
                     / 32767.0;
                 let f = Frame::of_data((t / d) as i32 as i16);
-                s.frame = f;
+                active_sprite.frame = f;
                 if graphic.frames <= f {
-                    s.frame = last;
-                    s.interval = Seconds::new(t - last.as_f32() * d);
+                    active_sprite.frame = last;
+                    active_sprite.interval = Seconds::new(t - last.as_f32() * d);
                 }
             } else {
                 let draw = sprite_rng.rand15() as i32;
-                let f = Frame::of_data((draw * i32::from(graphic.frames.get()) / 0x7fff) as i16);
-                s.frame = f.min(last);
+                let frame =
+                    Frame::of_data((draw * i32::from(graphic.frames.get()) / 0x7fff) as i16);
+                active_sprite.frame = frame.min(last);
             }
-            s.last_frame = s.frame;
+            active_sprite.last_frame = active_sprite.frame;
         }
-        s
+        active_sprite
     }
 
     /// A static sprite instance (`FUN_1413b3490`): its first frame, or one the Sprite stream
@@ -202,11 +203,11 @@ impl ActiveSprite {
 
     /// The interval of one frame at `speed` (at least 0.001).
     fn interval_at(&self, speed: Speed, sprite_tuning: SpriteTuning) -> Seconds {
-        let g = &self.graphic;
-        let mut i = g.frame_duration.get();
+        let graphic = &self.graphic;
+        let mut i = graphic.frame_duration.get();
         // COMISS/JA: only an ordered 1e-7 above the multiplier skips it
-        if at_most_or_unordered(EPSILON, g.speed_multiplier.get()) {
-            i *= g.speed_multiplier.get();
+        if at_most_or_unordered(EPSILON, graphic.speed_multiplier.get()) {
+            i *= graphic.speed_multiplier.get();
         }
         if Speed::ZERO < speed {
             i /= speed.get();
@@ -229,8 +230,8 @@ impl ActiveSprite {
         }
         self.changed = false;
         self.looped = false;
-        let g = self.graphic;
-        let last = g.frames - Frame::ONE;
+        let graphic = self.graphic;
+        let last = graphic.frames - Frame::ONE;
         let start = if self.frame > last {
             last
         } else if self.frame < Frame::ZERO {
@@ -239,7 +240,7 @@ impl ActiveSprite {
             self.frame
         };
         self.frame = start;
-        if !g.animated() {
+        if !graphic.animated() {
             return;
         }
         let time = dt + self.last;
@@ -247,22 +248,22 @@ impl ActiveSprite {
         let interval = if self.speed == speed {
             self.interval
         } else {
-            let i = self.interval_at(speed, sprite_tuning);
-            self.interval = i;
+            let seconds = self.interval_at(speed, sprite_tuning);
+            self.interval = seconds;
             self.speed = speed;
-            i
+            seconds
         };
         // COMISS/JC at 0x1413b5149: an unordered time or interval returns too
         if below_or_unordered(time.get(), interval.get()) {
             return;
         }
-        let forward = !g.backwards();
+        let forward = !graphic.backwards();
         self.changed = true;
         self.last_frame = start;
         // CVTTSS2SI EDX, MOVSX EAX, DX (0x1413b5177)
         let steps = Frame::of_data(cvttss2si(time.get() / interval.get()) as i16);
         self.last = time - Seconds::new(steps.as_f32() * interval.get());
-        if Speed::ZERO < speed || g.speed_multiplier == SpeedMultiplier::ZERO {
+        if Speed::ZERO < speed || graphic.speed_multiplier == SpeedMultiplier::ZERO {
             let f = start + if forward { steps } else { -steps };
             self.frame = f;
             self.looped = f < Frame::ZERO || last < f;
@@ -271,15 +272,15 @@ impl ActiveSprite {
         self.speed = speed;
         let mut stop = self.looped;
         if self.looped {
-            let mut f;
+            let mut frame;
             // COMISS/JBE at 0x1413b521f: an unordered delay loops at once
-            if at_most_or_unordered(g.replay_delay.get(), 0.0)
+            if at_most_or_unordered(graphic.replay_delay.get(), 0.0)
                 || self.animate == AnimateState::Delayed
             {
                 self.animate = AnimateState::Playing;
-                f = self.frame % g.frames;
-                if f < Frame::ZERO {
-                    f = f + g.frames;
+                frame = self.frame % graphic.frames;
+                if frame < Frame::ZERO {
+                    frame = frame + graphic.frames;
                 }
             } else {
                 let mut at = self.frame;
@@ -290,13 +291,14 @@ impl ActiveSprite {
                 self.looped = false;
                 self.animate = AnimateState::Delayed;
                 self.interval = Seconds::new(
-                    g.replay_delay.get() - (at - g.frames).as_f32() * g.frame_duration.get(),
+                    graphic.replay_delay.get()
+                        - (at - graphic.frames).as_f32() * graphic.frame_duration.get(),
                 );
-                f = if forward { Frame::ZERO } else { last };
+                frame = if forward { Frame::ZERO } else { last };
             }
-            self.frame = f;
-            if f == self.last_frame {
-                let next = f + if forward { Frame::ONE } else { -Frame::ONE };
+            self.frame = frame;
+            if frame == self.last_frame {
+                let next = frame + if forward { Frame::ONE } else { -Frame::ONE };
                 self.frame = next;
                 if next < Frame::ZERO || last < next {
                     stop = self.looped;
@@ -304,7 +306,7 @@ impl ActiveSprite {
                 }
             }
         }
-        if stop && g.flags.contains(SpriteFlags::ONCE) {
+        if stop && graphic.flags.contains(SpriteFlags::ONCE) {
             self.animate = AnimateState::Stopped;
             self.frame = if forward {
                 last.max(Frame::ZERO)
@@ -332,7 +334,7 @@ pub fn trade_sprite(master: &Master, roles: &Roles) -> Option<SpriteId> {
                     .of_some_master(t.object_id)
                     .contains(MasterRoles::TRADE_TARGET)
         })
-        .and_then(|t| t.sprites.carrying)
+        .and_then(|task| task.sprites.carrying)
 }
 
 /// Whether an object carries goods (`FUN_141188160`: an amount above 0 in its resource store,
@@ -426,7 +428,10 @@ pub fn building_death(
 ) -> Option<SpriteId> {
     let points = cvttss2si(build_points.get()).to_le_bytes();
     if i16::from_le_bytes([points[0], points[1]]) < master.creatable_part().build_time.get() {
-        let destruction = master.building.as_ref().and_then(|b| b.destruction_sprite);
+        let destruction = master
+            .building
+            .as_ref()
+            .and_then(|building_master| building_master.destruction_sprite);
         return destruction.or(master.death_sprite);
     }
     dying(master, look)
@@ -468,20 +473,23 @@ mod tests {
     fn the_chop_reaches_its_frame_22_after_second_of_20_ms_updates() {
         // MarvinBlue/426048731's 9181 from update 1008 (the tick oracle's trace): frame 0 after
         // the first update (time 0.02), frame 1 after the third (time 0.0155...)
-        let mut s = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
-        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
-        assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
-        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
-        s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
-        assert_eq!(s.frame, Frame::of_data(1));
-        assert!((s.last - Seconds::new(0.015_555)).get().abs() < 1e-5);
+        let mut active_sprite = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
+        active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
+        assert_eq!(
+            (active_sprite.frame, active_sprite.changed),
+            (Frame::of_data(0), false)
+        );
+        active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
+        active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
+        assert_eq!(active_sprite.frame, Frame::of_data(1));
+        assert!((active_sprite.last - Seconds::new(0.015_555)).get().abs() < 1e-5);
         let mut n = 3;
-        while !s.reached(Frame::of_data(22)) {
-            s.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
+        while !active_sprite.reached(Frame::of_data(22)) {
+            active_sprite.update(Seconds::new(0.02), Speed::new(1.0), tuning().sprite);
             n += 1;
         }
         // update 1057, the 49th
-        assert_eq!((n, s.frame), (49, Frame::of_data(22)));
+        assert_eq!((n, active_sprite.frame), (49, Frame::of_data(22)));
     }
 
     /// Slot 0x68: a new sprite starts its instance (a random first frame draws), the one shown
@@ -553,7 +561,10 @@ mod tests {
         // an object that does not move shows it alone
         let mut still = None;
         new_sprite(&mut still, None, walking, &mut rng, tuning().sprite);
-        assert_eq!(still.map(|s| s.graphic.id), Some(SpriteId::named(1)));
+        assert_eq!(
+            still.map(|active_sprite| active_sprite.graphic.id),
+            Some(SpriteId::named(1))
+        );
     }
 
     /// `FUN_1413b5070`'s compares are COMISS: a NaN speed multiplier still multiplies (JA at
@@ -561,23 +572,31 @@ mod tests {
     /// before a step (JC at 0x1413b5149).
     #[test]
     fn nan_speed_multiplier_holds_the_frame() {
-        let g = Graphic {
+        let graphic = Graphic {
             speed_multiplier: SpeedMultiplier::of_data(f32::NAN),
             ..CHOP
         };
-        let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
-        s.update(Seconds::new(1.0), Speed::new(1.0), tuning().sprite);
-        assert_eq!((s.frame, s.changed), (Frame::of_data(0), false));
+        let mut active_sprite =
+            ActiveSprite::start(graphic, &mut Well512::default(), tuning().sprite);
+        active_sprite.update(Seconds::new(1.0), Speed::new(1.0), tuning().sprite);
+        assert_eq!(
+            (active_sprite.frame, active_sprite.changed),
+            (Frame::of_data(0), false)
+        );
     }
 
     /// `CVTTSS2SI EDX` then `MOVSX EAX, DX` (0x1413b5177): a quotient past the i32 range steps
     /// 0 frames (0x80000000's low word), where a saturating cast would step back one.
     #[test]
     fn step_count_past_the_i32_range_steps_no_frame() {
-        let mut s = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
-        s.update(Seconds::new(3.0e8), Speed::new(1.0), tuning().sprite);
+        let mut active_sprite = ActiveSprite::start(CHOP, &mut Well512::default(), tuning().sprite);
+        active_sprite.update(Seconds::new(3.0e8), Speed::new(1.0), tuning().sprite);
         assert_eq!(
-            (s.frame, s.changed, s.looped),
+            (
+                active_sprite.frame,
+                active_sprite.changed,
+                active_sprite.looped
+            ),
             (Frame::of_data(0), true, false)
         );
     }
@@ -599,8 +618,8 @@ mod tests {
             replay_delay,
             flags,
         };
-        let after = |g: Graphic, frame: Option<i16>, dt: f32| {
-            let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
+        let after = |graphic: Graphic, frame: Option<i16>, dt: f32| {
+            let mut s = ActiveSprite::start(graphic, &mut Well512::default(), tuning().sprite);
             if let Some(f) = frame {
                 s.frame = Frame::of_data(f);
             }
@@ -678,9 +697,13 @@ mod tests {
             frames: Frame::of_data(1),
             ..four(SpriteFlags::ANIMATED, Seconds::ZERO)
         };
-        let s = after(one, None, 0.25);
+        let active_sprite = after(one, None, 0.25);
         assert_eq!(
-            (s.frame, s.looped, s.animate),
+            (
+                active_sprite.frame,
+                active_sprite.looped,
+                active_sprite.animate
+            ),
             (Frame::of_data(0), true, AnimateState::of_data(1))
         );
     }
@@ -688,14 +711,15 @@ mod tests {
     /// The replay delay's test is COMISS/JBE (0x1413b521f): a NaN delay loops at once.
     #[test]
     fn nan_replay_delay_loops_at_once() {
-        let g = Graphic {
+        let graphic = Graphic {
             frames: Frame::of_data(2),
             replay_delay: Seconds::new(f32::NAN),
             ..CHOP
         };
-        let mut s = ActiveSprite::start(g, &mut Well512::default(), tuning().sprite);
-        s.update(Seconds::new(0.1), Speed::new(1.0), tuning().sprite);
-        assert_eq!(s.animate, AnimateState::of_data(1));
+        let mut active_sprite =
+            ActiveSprite::start(graphic, &mut Well512::default(), tuning().sprite);
+        active_sprite.update(Seconds::new(0.1), Speed::new(1.0), tuning().sprite);
+        assert_eq!(active_sprite.animate, AnimateState::of_data(1));
     }
 
     #[test]
@@ -711,14 +735,20 @@ mod tests {
             flags: SpriteFlags::NONE,
         };
         let mut rng = Well512::default();
-        let mut s = ActiveSprite::start(still, &mut rng, tuning().sprite);
+        let mut active_sprite = ActiveSprite::start(still, &mut rng, tuning().sprite);
         assert_eq!(rng, Well512::default());
-        s.update(Seconds::new(0.5), Speed::new(1.0), tuning().sprite);
+        active_sprite.update(Seconds::new(0.5), Speed::new(1.0), tuning().sprite);
         assert_eq!(
-            (s.frame, s.changed, s.looped),
+            (
+                active_sprite.frame,
+                active_sprite.changed,
+                active_sprite.looped
+            ),
             (Frame::of_data(0), false, false)
         );
-        assert!(s.reached(Frame::of_data(0)) && s.reached(Frame::of_data(7)));
+        assert!(
+            active_sprite.reached(Frame::of_data(0)) && active_sprite.reached(Frame::of_data(7))
+        );
         // a random first frame draws once, not twice as an animated one does
         let mut once = Well512::default();
         let _ = once.rand15();
@@ -779,33 +809,33 @@ mod tests {
 
     #[test]
     fn combat_object_slots_show_its_look_else_its_master_s() {
-        let m = barracks();
+        let master = barracks();
         assert_eq!(
-            standing(&m, None, Cargo::Empty, &roles()),
+            standing(&master, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(2575))
         );
         assert_eq!(
-            walking(&m, None, Cargo::Empty, &roles()),
+            walking(&master, None, Cargo::Empty, &roles()),
             Some(SpriteId::named(10))
         );
-        assert_eq!(running(&m, None), Some(SpriteId::named(11)));
-        assert_eq!(attacking(&m, None), Some(SpriteId::named(12)));
-        assert_eq!(dying(&m, None), Some(SpriteId::named(2573)));
-        assert_eq!(undead(&m, None), None);
-        let l = look();
+        assert_eq!(running(&master, None), Some(SpriteId::named(11)));
+        assert_eq!(attacking(&master, None), Some(SpriteId::named(12)));
+        assert_eq!(dying(&master, None), Some(SpriteId::named(2573)));
+        assert_eq!(undead(&master, None), None);
+        let look = look();
         assert_eq!(
-            standing(&m, Some(&l), Cargo::Empty, &roles()),
+            standing(&master, Some(&look), Cargo::Empty, &roles()),
             Some(SpriteId::named(1))
         );
         assert_eq!(
-            walking(&m, Some(&l), Cargo::Empty, &roles()),
+            walking(&master, Some(&look), Cargo::Empty, &roles()),
             Some(SpriteId::named(2))
         );
         // the look's null sprite is its own, not the master's
-        assert_eq!(running(&m, Some(&l)), None);
-        assert_eq!(attacking(&m, Some(&l)), Some(SpriteId::named(3)));
-        assert_eq!(dying(&m, Some(&l)), Some(SpriteId::named(5)));
-        assert_eq!(undead(&m, Some(&l)), Some(SpriteId::named(6)));
+        assert_eq!(running(&master, Some(&look)), None);
+        assert_eq!(attacking(&master, Some(&look)), Some(SpriteId::named(3)));
+        assert_eq!(dying(&master, Some(&look)), Some(SpriteId::named(5)));
+        assert_eq!(undead(&master, Some(&look)), Some(SpriteId::named(6)));
     }
 
     #[test]
@@ -874,31 +904,31 @@ mod tests {
     /// not its death sprite (2573).
     #[test]
     fn building_that_dies_before_it_is_built_shows_its_destruction_sprite() {
-        let m = barracks();
+        let master = barracks();
         assert_eq!(
-            building_death(&m, None, Seconds::new(12.5)),
+            building_death(&master, None, Seconds::new(12.5)),
             Some(SpriteId::named(389))
         );
         assert_eq!(
-            building_death(&m, None, Seconds::new(49.9)),
+            building_death(&master, None, Seconds::new(49.9)),
             Some(SpriteId::named(389))
         );
         assert_eq!(
-            building_death(&m, None, Seconds::new(50.0)),
+            building_death(&master, None, Seconds::new(50.0)),
             Some(SpriteId::named(2573))
         );
         assert_eq!(
-            building_death(&m, Some(&look()), Seconds::new(50.0)),
+            building_death(&master, Some(&look()), Seconds::new(50.0)),
             Some(SpriteId::named(5))
         );
         // a NaN is the integer indefinite, whose short is 0
         assert_eq!(
-            building_death(&m, None, Seconds::new(f32::NAN)),
+            building_death(&master, None, Seconds::new(f32::NAN)),
             Some(SpriteId::named(389))
         );
         // the short wraps: 65586 build points are 50
         assert_eq!(
-            building_death(&m, None, Seconds::new(65586.0)),
+            building_death(&master, None, Seconds::new(65586.0)),
             Some(SpriteId::named(2573))
         );
         // without a destruction sprite its master's death sprite, never the look's

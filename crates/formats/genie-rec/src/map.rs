@@ -304,7 +304,9 @@ mod tests {
             num_zones: 3,
             ..MapZone::default()
         };
-        let read = writes_back_with(&zone, 11.97, |r| r.set_map_size(2, 2));
+        let read = writes_back_with(&zone, 11.97, |recording_header_reader| {
+            recording_header_reader.set_map_size(2, 2);
+        });
         assert_eq!((read.info().len(), read.tiles().len()), (255, 255));
         assert_eq!(
             (read.zone_map, read.passability_rules, read.num_zones),

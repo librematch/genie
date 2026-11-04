@@ -39,6 +39,7 @@ use crate::world::layer::generated::SpatialTuning;
 use genie_diff::Diff;
 use std::collections::BTreeMap;
 
+mod closest;
 mod footprint;
 pub use self::footprint::{Movers, SpotPick};
 mod grid;
@@ -270,17 +271,17 @@ impl Tiles {
     ///
     /// When `classes` does not hold one class per tile of the map.
     pub fn new(size: GridSize, classes: Vec<u8>) -> Self {
-        let n = classes.len();
+        let count = classes.len();
         assert_eq!(
-            n,
+            count,
             (size.width().max(0) * size.height().max(0)) as usize,
             "one class per tile"
         );
         Self {
             size,
             words: classes.into_iter().map(u64::from).collect(),
-            tall: vec![0; n],
-            lists: vec![Vec::new(); n],
+            tall: vec![0; count],
+            lists: vec![Vec::new(); count],
         }
     }
 
@@ -333,7 +334,7 @@ impl Tiles {
         self.size
             .index(tile)
             .and_then(|i| self.lists.get(i))
-            .map(|l| l.len() as u8)
+            .map(|object_ids| object_ids.len() as u8)
     }
 
     /// The objects on `tile` in the tile's order; none off the map.
@@ -381,7 +382,7 @@ impl Tiles {
         let Some(list) = self.lists.get_mut(i) else {
             return;
         };
-        let Some(k) = list.iter().position(|&o| o == id) else {
+        let Some(k) = list.iter().position(|&object_id| object_id == id) else {
             return;
         };
         let _ = list.swap_remove(k);
@@ -393,29 +394,29 @@ impl Tiles {
         let (Some(list), Some(count)) = (self.lists.get(i), self.tall.get_mut(i)) else {
             return;
         };
-        *count = list.iter().filter(|&&o| tall(o)).count() as u8;
+        *count = list.iter().filter(|&&object_id| tall(object_id)).count() as u8;
     }
 
     /// Marks (`bits`) on `tile`'s word, for a test's map.
     #[cfg(test)]
     pub(crate) fn mark_for_test(&mut self, tile: Tile, bits: u64) {
-        let i = self.size.index(tile).expect("a tile on the map");
-        self.words[i] |= bits;
+        let index = self.size.index(tile).expect("a tile on the map");
+        self.words[index] |= bits;
     }
 
     /// A tall object on `tile`, for a test's map.
     #[cfg(test)]
     pub(crate) fn add_tall_for_test(&mut self, tile: Tile) {
-        let i = self.size.index(tile).expect("a tile on the map");
-        self.lists[i].push(TAKEN_OUT);
-        self.tall[i] += 1;
+        let index = self.size.index(tile).expect("a tile on the map");
+        self.lists[index].push(TAKEN_OUT);
+        self.tall[index] += 1;
     }
 
     /// The tiles a static record covers (`FUN_141056460`): from the box's low edge to its high
     /// edge less 0.001, held on the map.
-    fn covered(&self, p: &Placed) -> (RangeInclusive<i32>, RangeInclusive<i32>) {
-        let (x, y) = (p.position.x(), p.position.y());
-        let (rx, ry) = (p.radius.x(), p.radius.y());
+    fn covered(&self, placed: &Placed) -> (RangeInclusive<i32>, RangeInclusive<i32>) {
+        let (x, y) = (placed.position.x(), placed.position.y());
+        let (rx, ry) = (placed.radius.x(), placed.radius.y());
         let hold = |v: i32, size: i32| v.clamp(0, size - 1);
         let (w, h) = (self.size.width(), self.size.height());
         let xs = hold((x - rx) as i32, w)..=hold(((x + rx) - 0.001) as i32, w);
@@ -424,11 +425,11 @@ impl Tiles {
     }
 
     /// The word indices of the covered tiles, row by row: each is on the map.
-    fn covered_indices(&self, p: &Placed) -> impl Iterator<Item = usize> + use<> {
+    fn covered_indices(&self, placed: &Placed) -> impl Iterator<Item = usize> + use<> {
         let width = self.size.width();
         let on_map = 0 < self.size.width() && 0 < self.size.height();
         let (xs, ys) = if on_map {
-            self.covered(p)
+            self.covered(placed)
         } else {
             (RangeInclusive::new(1, 0), RangeInclusive::new(1, 0))
         };
@@ -436,21 +437,21 @@ impl Tiles {
     }
 
     /// The covered tiles as a rectangle, as the manager hands it to the planners' callback.
-    fn covered_rect(&self, p: &Placed) -> PlanRect {
-        let (xs, ys) = self.covered(p);
+    fn covered_rect(&self, placed: &Placed) -> PlanRect {
+        let (xs, ys) = self.covered(placed);
         let [x0, y0, x1, y1] = [*xs.start(), *ys.start(), *xs.end(), *ys.end()].map(|v| v as i16);
         PlanRect::new(x0, y0, x1, y1)
     }
 
     /// A static record marks the tiles it covers that no player marked yet.
-    fn mark(&mut self, p: &Placed, o: Obstruction) {
-        let player = p.player.index() as u64;
-        let mut bits =
-            ((player << 8 | u64::from(o.class.mark_bits()) | 0x40) << 8) | (0x80_0000 << player);
-        if o.class == ObstructionClass::GATE {
+    fn mark(&mut self, placed: &Placed, obstruction: Obstruction) {
+        let player = placed.player.index() as u64;
+        let mut bits = ((player << 8 | u64::from(obstruction.class.mark_bits()) | 0x40) << 8)
+            | (0x80_0000 << player);
+        if obstruction.class == ObstructionClass::GATE {
             bits |= 0x8000;
         }
-        for i in self.covered_indices(p) {
+        for i in self.covered_indices(placed) {
             if let Some(word) = self.words.get_mut(i)
                 && *word < 0x80_0000
             {
@@ -465,17 +466,17 @@ impl Tiles {
     /// kind 0, 1, 2, 11 or 13), the rest stays as it is and the planners hear nothing (false).
     fn unmark(
         &mut self,
-        p: &Placed,
+        placed: &Placed,
         me: ObjectId,
         static_record: impl Fn(ObjectId) -> bool,
     ) -> bool {
-        let own = 1u64 << p.player.get();
-        for i in self.covered_indices(p) {
-            if self
-                .lists
-                .get(i)
-                .is_some_and(|l| l.iter().any(|&o| o != me && static_record(o)))
-            {
+        let own = 1u64 << placed.player.get();
+        for i in self.covered_indices(placed) {
+            if self.lists.get(i).is_some_and(|object_ids| {
+                object_ids
+                    .iter()
+                    .any(|&object_id| object_id != me && static_record(object_id))
+            }) {
                 return false;
             }
             if let Some(word) = self.words.get_mut(i)

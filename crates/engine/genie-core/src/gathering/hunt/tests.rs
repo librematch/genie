@@ -106,7 +106,7 @@ pub(crate) fn walks(held: Held) -> Walks<'static> {
 #[test]
 fn hunt_move_to_refuses_target_past_state_6() {
     let mover = walker();
-    let h = hunting(31);
+    let hunt_action = hunting(31);
     let walk = |state| {
         let to = WalkTo {
             id: Some(object_id(31)),
@@ -114,15 +114,22 @@ fn hunt_move_to_refuses_target_past_state_6() {
             gap: Distance::ZERO,
             state: Some(state),
         };
-        h.move_to_object(
-            to,
-            Distance::new(1.0),
-            &mover,
-            &walks(Held::default()),
-            &tuning().move_to,
-        )
-        .unwrap()
-        .map(|m| (ObjectId::field(m.target), m.point, m.state))
+        hunt_action
+            .move_to_object(
+                to,
+                Distance::new(1.0),
+                &mover,
+                &walks(Held::default()),
+                &tuning().move_to,
+            )
+            .unwrap()
+            .map(|move_to_action| {
+                (
+                    ObjectId::field(move_to_action.target),
+                    move_to_action.point,
+                    move_to_action.state,
+                )
+            })
     };
     assert_eq!(
         walk(ObjectState::Undead),
@@ -216,16 +223,16 @@ fn decay_task_stops_its_target_decay_once() {
         decay: AmountRate::new(0.25),
         ..Victim::default()
     };
-    let mut v = decaying();
-    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
-    assert_eq!(v.decay, AmountRate::new(0.25));
+    let mut victim = decaying();
+    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut victim, &roles()));
+    assert_eq!(victim.decay, AmountRate::new(0.25));
     hunt.task.kind4 = Some(attribute::DECAY_TASK);
-    assert!(!hunt.stops_decay_of(DecayRule::Runs, &mut v, &roles()));
-    assert_eq!(v.decay, AmountRate::new(0.25));
-    assert!(hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
-    assert_eq!(v.decay, AmountRate::new(-0.25));
-    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut v, &roles()));
-    assert_eq!(v.decay, AmountRate::new(-0.25));
+    assert!(!hunt.stops_decay_of(DecayRule::Runs, &mut victim, &roles()));
+    assert_eq!(victim.decay, AmountRate::new(0.25));
+    assert!(hunt.stops_decay_of(DecayRule::Stops, &mut victim, &roles()));
+    assert_eq!(victim.decay, AmountRate::new(-0.25));
+    assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut victim, &roles()));
+    assert_eq!(victim.decay, AmountRate::new(-0.25));
     let mut none = Victim::default();
     assert!(!hunt.stops_decay_of(DecayRule::Stops, &mut none, &roles()));
     assert_eq!(none.decay.get().to_bits(), 0);
@@ -249,8 +256,8 @@ fn stopped_decay_goes_back_to_the_world_at_once() {
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(-0.25));
     let mut rig = Rig::on_the_path(decaying);
-    rig.run(100, |c, u, actions, f, _| {
-        hunt.decay_check(c, u, actions, DecayRule::Runs, f, &roles())
+    rig.run(100, |step, unit, actions, fight, _| {
+        hunt.decay_check(step, unit, actions, DecayRule::Runs, fight, &roles())
     })
     .unwrap();
     assert_eq!(rig.f.victim.decay, AmountRate::new(0.25));
@@ -258,9 +265,9 @@ fn stopped_decay_goes_back_to_the_world_at_once() {
 
 /// [`walker`] in motion: its animation runs at speed 1 (`+0x7b8`), which a stop clears.
 pub(crate) fn walking() -> Mover {
-    let mut m = walker();
-    m.animated.speed = Speed::new(1.0);
-    m
+    let mut mover = walker();
+    mover.animated.speed = Speed::new(1.0);
+    mover
 }
 
 /// A villager walking at 0.8 tiles a second, radius 0.2.
@@ -396,14 +403,22 @@ fn villager_sent_to_tree_attacks_it_first_and_walks_there() {
     assert_eq!(
         (
             attack.state.bare(),
-            attack.state.move_to().copied().map(|m| m.state)
+            attack
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
         ),
         (AttackState::Move { move_to: None }, Some(MoveTo::Start))
     );
     // the first MoveTo's teardown stopped the unit
-    let v = mover.velocity.unwrap();
+    let velocity = mover.velocity.unwrap();
     assert_eq!(
-        (v.velocity.y(), v.acceleration.y(), mover.waiting),
+        (
+            velocity.velocity.y(),
+            velocity.acceleration.y(),
+            mover.waiting
+        ),
         (0.0, 0.0, 0)
     );
     // nothing carried, a human player and settings that keep it: the held kind stays
@@ -441,10 +456,10 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
         &tuning().hunt,
     )
     .unwrap();
-    let retarget = |hunt: &mut HuntAction, q: &Quarry, e: &Engagement, m: &mut Mover| {
+    let retarget = |hunt: &mut HuntAction, quarry: &Quarry, e: &Engagement, m: &mut Mover| {
         hunt.retarget(
             HuntRetarget {
-                target: q,
+                target: quarry,
                 player: PlayerId::new(2),
                 walks: walks(Held::default()),
                 drops_here: false,
@@ -485,7 +500,11 @@ fn hunt_retargeted_to_tree_beside_it_starts_its_attack_arrived() {
             hunt.target,
             hunt.state.bare(),
             attack.state.bare(),
-            attack.state.move_to().copied().map(|m| m.state)
+            attack
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
         ),
         (
             Some(HuntTargetId::new(object_id(9366))),
@@ -652,12 +671,18 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
         timer: Seconds::ZERO,
         lead: Lead::default(),
     };
-    let r = hunt_reads();
+    let hunt_reads = hunt_reads();
     let mut unit = Unit::default();
     unit.life.attribute_kind = Some(attribute::WOOD);
     let mut tree = victim(100.0);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
+        hunt.gather(
+            Seconds::new(0.02),
+            &mut unit,
+            &mut tree,
+            &hunt_reads,
+            &roles()
+        ),
         Ok(HuntGather::GoesOn)
     );
     let w = (1.0f32 * 0.39) * 0.02;
@@ -669,7 +694,13 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     unit.life.amount = Amount::new(9.95 - w);
     let mut tree = victim(50.0);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
+        hunt.gather(
+            Seconds::new(0.02),
+            &mut unit,
+            &mut tree,
+            &hunt_reads,
+            &roles()
+        ),
         Ok(HuntGather::DropOff)
     );
     assert_eq!(unit.life.amount, Amount::new(10.0));
@@ -678,7 +709,13 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
     unit.life.amount = Amount::ZERO;
     let mut tree = victim(0.05);
     assert_eq!(
-        hunt.gather(Seconds::new(0.02), &mut unit, &mut tree, &r, &roles()),
+        hunt.gather(
+            Seconds::new(0.02),
+            &mut unit,
+            &mut tree,
+            &hunt_reads,
+            &roles()
+        ),
         Ok(HuntGather::DropOff)
     );
     assert_eq!(
@@ -691,7 +728,7 @@ fn villager_gathers_work_rate_times_work_value_times_dt_until_its_load_is_full()
 /// (`set_state(3)`, `COMISS` with `JBE`).
 #[test]
 fn hunt_without_target_carries_its_load_off_or_searches() {
-    let mut h = HuntAction {
+    let mut hunt_action = HuntAction {
         target: None,
         state: HuntState::Gather,
         point: Position::ORIGIN,
@@ -702,12 +739,12 @@ fn hunt_without_target_carries_its_load_off_or_searches() {
         timer: Seconds::ZERO,
         lead: Lead::default(),
     };
-    assert!(h.ends_without_target(Amount::new(0.5)));
-    assert_eq!(h.state, HuntState::Gather);
+    assert!(hunt_action.ends_without_target(Amount::new(0.5)));
+    assert_eq!(hunt_action.state, HuntState::Gather);
     for held in [0.0, -1.0, f32::NAN] {
-        h.state = HuntState::Gather;
-        assert!(!h.ends_without_target(Amount::new(held)));
-        assert_eq!(h.state, HuntState::Search);
+        hunt_action.state = HuntState::Gather;
+        assert!(!hunt_action.ends_without_target(Amount::new(held)));
+        assert_eq!(hunt_action.state, HuntState::Search);
     }
 }
 
@@ -765,12 +802,12 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
         player: PlayerId::new(2),
         ..tree()
     };
-    for (q, range) in [(dead, CHOP.range), (sheep, Distance::new(1.5))] {
+    for (quarry, range) in [(dead, CHOP.range), (sheep, Distance::new(1.5))] {
         let mut held = Held::default();
         let (hunt, _) = HuntAction::start(
             HuntStart {
                 task: CHOP,
-                target: &q,
+                target: &quarry,
                 player: PlayerId::new(2),
                 player_kind: PlayerKind::Human,
                 carry_rule: false,
@@ -789,13 +826,13 @@ fn hunt_walks_to_dead_target_or_its_own_livestock() {
         )
         .unwrap();
         // a quiet MoveTo to the target that asks again when it moves (`+0x61` 1)
-        let walk = hunt.state.move_to().copied().map(|m| {
+        let walk = hunt.state.move_to().copied().map(|move_to_action| {
             (
-                m.state,
-                ObjectId::field(m.target),
-                m.range,
-                m.on_target_moved,
-                m.voice,
+                move_to_action.state,
+                ObjectId::field(move_to_action.target),
+                move_to_action.range,
+                move_to_action.on_target_moved,
+                move_to_action.voice,
             )
         });
         assert_eq!(
@@ -838,10 +875,12 @@ fn hunt_whose_target_went_walks_to_its_point() {
         ai_class: Some(class::TREE),
         ..hunt_reads()
     };
-    let lost = |h: &HuntAction, r: &HuntReads, rig: &mut Rig| {
-        let mut h = *h;
-        let got = rig.run(100, |c, u, _, _, _| h.lost_on_the_way(c, u, r, &roles()));
-        (got, h)
+    let lost = |h: &HuntAction, hunt_reads: &HuntReads, rig: &mut Rig| {
+        let mut hunt_action = *h;
+        let got = rig.run(100, |step, unit, _, _, _| {
+            hunt_action.lost_on_the_way(step, unit, hunt_reads, &roles())
+        });
+        (got, hunt_action)
     };
     assert!(lost(&hunt, &r, &mut rig).0.is_err());
     // the caller's search for the next tree found none: the hunt walks to its point
@@ -902,20 +941,20 @@ fn hunt_faces_its_own_pasture_dead_livestock() {
             ..hunting(15371)
         };
         let mut rig = Rig::on_the_path(victim);
-        let r = HuntReads {
+        let hunt_reads = HuntReads {
             sprites: HuntSprites {
                 moving: Some(MOVING),
                 ..HuntSprites::default()
             },
             ..hunt_reads()
         };
-        let got = rig.run(50, |c, u, actions, f, _| {
-            hunt.set_face(c, u, actions, f, &r, &roles())
+        let got = rig.run(50, |step, unit, actions, fight, _| {
+            hunt.set_face(step, unit, actions, fight, &hunt_reads, &roles())
         });
         (got, hunt, rig.sprite())
     };
-    let (r, hunt, shown) = face(ibex.clone());
-    assert_eq!(r, Ok(HuntNext::Stay));
+    let (hunt_next, hunt, shown) = face(ibex.clone());
+    assert_eq!(hunt_next, Ok(HuntNext::Stay));
     assert_eq!(
         (hunt.state, hunt.timer, hunt.state.move_to().copied()),
         (HuntState::Face, Seconds::ZERO, None)
@@ -967,8 +1006,8 @@ fn walk_to_the_point_ends_in_search_or_done() {
         rig.unit_mut().place = Static::at(at);
         let id = rig.unit().id;
         rig.t.set_motion(id, Some(Motion::Moving(walker())));
-        let got = rig.run(500, |c, u, _, _, _| {
-            h.update_point_walk(c, u, me(&h.state), who)
+        let got = rig.run(500, |step, unit, _, _, _| {
+            h.update_point_walk(step, unit, me(&h.state), who)
         });
         (got, rig.mover().velocity.unwrap().velocity.y())
     };
@@ -1033,15 +1072,23 @@ fn walk_to_the_point_ends_in_search_or_done() {
         },
         ..m
     });
-    let waiting = |h: &HuntAction| h.state.move_to().copied().map(|m| (m.state, m.wait.timer));
+    let waiting = |h: &HuntAction| {
+        h.state
+            .move_to()
+            .copied()
+            .map(|move_to_action| (move_to_action.state, move_to_action.wait.timer))
+    };
     assert_eq!(run(&mut h, walker_at).0.unwrap(), PointWalk::Walking);
     assert_eq!(waiting(&h), Some((MoveTo::Waiting, Seconds::new(0.5))));
     assert_eq!(run(&mut h, walker_at).0.unwrap(), PointWalk::Walking);
     assert_eq!(waiting(&h), Some((MoveTo::Start, Seconds::ZERO)));
     // an empty list answers 1 ("There is no list."): the walk ended
-    let mut h = hunt(HuntState::WalkSearch { move_to: None }, MoveTo::Arrived);
-    *h.state.walk_mut().unwrap() = None;
-    assert_eq!(run(&mut h, walker_at).0.unwrap(), PointWalk::Search);
+    let mut hunt_action = hunt(HuntState::WalkSearch { move_to: None }, MoveTo::Arrived);
+    *hunt_action.state.walk_mut().unwrap() = None;
+    assert_eq!(
+        run(&mut hunt_action, walker_at).0.unwrap(),
+        PointWalk::Search
+    );
 }
 
 /// The drop-off's and the point walk's `MoveTo` on the way (`0x140ac7a00` cases 7, 0xa and
@@ -1116,8 +1163,8 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
     assert!(drop(&mut h, &mut rig).is_err());
     // the walk to a point
     let point_walk = |h: &mut HuntAction, rig: &mut Rig, who| {
-        rig.run(100, |c, u, _, _, _| {
-            h.update_point_walk(c, u, me(&h.state), who)
+        rig.run(100, |step, unit, _, _, _| {
+            h.update_point_walk(step, unit, me(&h.state), who)
         })
     };
     let point = Position::new(35.5, 88.5, 0.0);
@@ -1137,7 +1184,10 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
     }));
     assert_eq!(point_walk(&mut h, &mut rig, who), Ok(PointWalk::Walking));
     assert_eq!(
-        h.state.move_to().copied().map(|m| (m.state, m.wait.state)),
+        h.state
+            .move_to()
+            .copied()
+            .map(|move_to_action| (move_to_action.state, move_to_action.wait.state)),
         Some((MoveTo::Moving, MoveWaitState::AskedAgain))
     );
     assert_eq!(rig.mover_mut().paths.len(), 2);
@@ -1149,8 +1199,8 @@ fn hunter_walks_to_its_drop_site_and_to_its_point() {
         player_kind: PlayerKind::Computer,
         ..who
     };
-    let mut h = walking(Some(to_point(MoveTo::Arrived, point, CHOP.range)));
-    assert!(point_walk(&mut h, &mut rig, computer).is_err());
+    let mut hunt_action = walking(Some(to_point(MoveTo::Arrived, point, CHOP.range)));
+    assert!(point_walk(&mut hunt_action, &mut rig, computer).is_err());
 }
 
 /// The units in the way of the drop-off's and the point walk's `MoveTo` (notify 0x215, the
@@ -1175,21 +1225,25 @@ fn hunter_walks_pass_on_the_units_in_their_way() {
             let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));
             rig.mover_mut().in_the_way = vec![object_id(77), object_id(78)];
             let drops = matches!(state, HuntState::Drop { .. });
-            let mut h = HuntAction {
+            let mut hunt_action = HuntAction {
                 state,
                 carry_to: Some(DropSiteId::new(object_id(10028))),
                 point: Position::new(35.5, 88.5, 0.0),
                 ..hunting(-1)
             };
-            *h.state.walk_mut().unwrap() = Some(MoveToAction {
+            *hunt_action.state.walk_mut().unwrap() = Some(MoveToAction {
                 target: drops.then(|| object_id(10028)),
                 ..to_point(move_to, Position::new(35.5, 88.5, 0.0), CHOP.range)
             });
-            rig.run(100, |c, u, _, _, _| {
+            rig.run(100, |step, unit, _, _, _| {
                 if drops {
-                    h.update_drop(c, u, me(&state), None, who).map(|_| ())
+                    hunt_action
+                        .update_drop(step, unit, me(&state), None, who)
+                        .map(|_| ())
                 } else {
-                    h.update_point_walk(c, u, me(&state), who).map(|_| ())
+                    hunt_action
+                        .update_point_walk(step, unit, me(&state), who)
+                        .map(|_| ())
                 }
             })
             .unwrap();
@@ -1212,10 +1266,10 @@ fn hunt_walks_to_its_target_place_within_its_range() {
             parts,
             ..
         } = &mut rig.t;
-        let u = &players[1].objects[ListIndex::new(0)];
+        let unit = &players[1].objects[ListIndex::new(0)];
         h.set_walk(
-            (spatial, u.position()),
-            parts.motion_mut(u.id),
+            (spatial, unit.position()),
+            parts.motion_mut(unit.id),
             victim,
             PlayerId::new(1),
             &walks(Held::default()),
@@ -1273,10 +1327,14 @@ fn hunt_walks_to_its_target_place_within_its_range() {
     assert!(set_walk(&mut hunting(10028), &mut rig, &alive).is_err());
     // a unit without speed: its MoveTo fails at its start (state 13)
     rig.mover_mut().stats.speed = Speed::ZERO;
-    let mut h = hunting(10028);
-    assert_eq!(set_walk(&mut h, &mut rig, &dead), Ok(()));
+    let mut hunt_action = hunting(10028);
+    assert_eq!(set_walk(&mut hunt_action, &mut rig, &dead), Ok(()));
     assert_eq!(
-        h.state.move_to().copied().map(|m| m.state),
+        hunt_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Failed)
     );
 }
@@ -1308,11 +1366,13 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
     };
     let lead = |h: &mut HuntAction, victim: Victim, herd: Option<Herd>| {
         let mut rig = Rig::on_the_path(victim);
-        let r = HuntReads {
+        let hunt_reads = HuntReads {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, _, f, _| h.update_lead(c, u, f, &r, &roles()))
+        rig.run(100, |step, unit, _, fight, _| {
+            h.update_lead(step, unit, fight, &hunt_reads, &roles())
+        })
     };
     let leading = |timer| HuntAction {
         state: HuntState::Lead,
@@ -1383,10 +1443,10 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
         (h.state.bare(), h.timer, h.lead.start),
         (HuntState::Lead, LEAD_WAIT, Point::new(29.5, 89.0))
     );
-    let mut h = leading(Seconds::new(-0.05));
+    let mut hunt_action = leading(Seconds::new(-0.05));
     assert_eq!(
         lead(
-            &mut h,
+            &mut hunt_action,
             animal(Position::new(35.0, 89.0, 0.0)),
             Some(herd(false))
         ),
@@ -1394,8 +1454,12 @@ fn herder_slaughters_its_animal_once_it_stands_or_walks_after_it() {
     );
     assert_eq!(
         (
-            h.state.bare(),
-            h.state.move_to().copied().map(|m| (m.state, m.range))
+            hunt_action.state.bare(),
+            hunt_action
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| (move_to_action.state, move_to_action.range))
         ),
         (
             HuntState::Walk { move_to: None },
@@ -1419,11 +1483,11 @@ fn hunt_update_runs_the_step_of_its_state() {
             rig.unit_mut().life.attribute_kind,
             rig.unit_mut().life.amount,
         ) = (Some(attribute::FOOD), Amount::new(held));
-        let mut r = hunt_reads();
-        r.attack.player_kind = player_kind;
+        let mut hunt_reads = hunt_reads();
+        hunt_reads.attack.player_kind = player_kind;
         let me = me(&h.state.bare());
-        rig.run(100, |c, u, actions, f, _| {
-            h.update(c, u, actions, me, f, &r)
+        rig.run(100, |step, u, actions, fight, _| {
+            h.update(step, u, actions, me, fight, &hunt_reads)
         })
     };
     let mut rig = Rig::on_the_path(Victim::default()).holding(10028, PlayerId::new(0));
@@ -1434,9 +1498,9 @@ fn hunt_update_runs_the_step_of_its_state() {
         state: HuntState::New,
         ..hunting(10028)
     };
-    let r = update(&mut h, &mut rig, PlayerKind::Human, 0.0);
+    let hunt_next = update(&mut h, &mut rig, PlayerKind::Human, 0.0);
     assert_eq!(
-        reason(r),
+        reason(hunt_next),
         "a Hunt action in a state the slice does not model"
     );
     // the target lost on the way
@@ -1455,7 +1519,7 @@ fn hunt_update_runs_the_step_of_its_state() {
     lost.t.players[0]
         .objects
         .iter_mut()
-        .for_each(|u| u.life.state = ObjectState::Removed);
+        .for_each(|unit| unit.life.state = ObjectState::Removed);
     let mut h = walking(-1, Seconds::ZERO, MoveTo::Moving);
     assert_eq!(
         update(&mut h, &mut lost, PlayerKind::Human, 0.0),
@@ -1506,10 +1570,14 @@ fn hunt_update_runs_the_step_of_its_state() {
         (HuntState::Walk { move_to: None }, Some(MoveTo::Moving))
     );
     let mut h = walking(10028, Seconds::ZERO, MoveTo::Moving);
-    *h.state.walk_mut().unwrap() = h.state.move_to().copied().map(|m| MoveToAction {
-        point: Position::new(35.0, 88.0, 0.0),
-        ..m
-    });
+    *h.state.walk_mut().unwrap() = h
+        .state
+        .move_to()
+        .copied()
+        .map(|move_to_action| MoveToAction {
+            point: Position::new(35.0, 88.0, 0.0),
+            ..move_to_action
+        });
     assert_eq!(
         update(&mut h, &mut rig, PlayerKind::Human, 0.0),
         Ok(HuntNext::Stay)
@@ -1540,12 +1608,12 @@ fn hunt_update_runs_the_step_of_its_state() {
         Ok(HuntNext::Search)
     );
     assert_eq!(h.state.bare(), HuntState::Search);
-    let mut h = hunting(-1);
+    let mut hunt_action = hunting(-1);
     assert_eq!(
-        update(&mut h, &mut rig, PlayerKind::Human, 5.0),
+        update(&mut hunt_action, &mut rig, PlayerKind::Human, 5.0),
         Ok(HuntNext::Drop)
     );
-    assert_eq!(h.state.bare(), HuntState::Gather);
+    assert_eq!(hunt_action.state.bare(), HuntState::Gather);
 }
 
 /// State 12's Attack and its end (`0x140ac7a00` case 0xb): under way (code 0) the hunt stays;
@@ -1565,9 +1633,9 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         ..Victim::default()
     };
     let attack = |h: &mut HuntAction, state, victim, queue_empty, ends| {
-        let mut a = own_attack(10028, state, Distance::new(1.0));
-        (a.voice, a.seen) = (Voice::Quiet, Position::new(30.0, 88.0, 0.0));
-        a.arms.idle_sprite = Some(Graphic {
+        let mut own_attack = own_attack(10028, state, Distance::new(1.0));
+        (own_attack.voice, own_attack.seen) = (Voice::Quiet, Position::new(30.0, 88.0, 0.0));
+        own_attack.arms.idle_sprite = Some(Graphic {
             id: SpriteId::named(1),
             frames: Frame::of_data(10),
             facets: FacetCount::of_data(8),
@@ -1576,7 +1644,7 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
             replay_delay: Seconds::ZERO,
             flags: SpriteFlags::NONE,
         });
-        *h.state.attack_mut().unwrap() = Some(a);
+        *h.state.attack_mut().unwrap() = Some(own_attack);
         let mut rig = Rig::on_the_path(victim).holding(10028, PlayerId::new(1));
         let mut r = hunt_reads();
         r.attack.flags.set(AttackerFlags::QUEUE_EMPTY, queue_empty);
@@ -1613,7 +1681,13 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         (Ok(HuntNext::Stay), false)
     );
     assert_eq!(
-        (h.state.bare(), h.state.move_to().copied().map(|m| m.range)),
+        (
+            h.state.bare(),
+            h.state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.range)
+        ),
         (
             HuntState::Walk { move_to: None },
             Some(Distance::new(tuning().hunt.own_livestock_range))
@@ -1648,29 +1722,29 @@ fn hunt_attack_ends_into_walk_search_or_its_point() {
         inside: true,
         ..sheep()
     };
-    let mut h = fresh(10028);
+    let mut hunt_action = fresh(10028);
     assert_eq!(
-        attack(&mut h, done, inside, true, false),
+        attack(&mut hunt_action, done, inside, true, false),
         (Ok(HuntNext::Stay), true)
     );
     assert_eq!(
-        (h.state.bare(), h.target),
+        (hunt_action.state.bare(), hunt_action.target),
         (HuntState::WalkSearch { move_to: None }, None)
     );
     let mut rig = Rig::on_the_path(sheep());
     let r = hunt_reads();
-    let r = rig.run(100, |c, u, actions, f, _| {
+    let hunt_next = rig.run(100, |step, unit, actions, fight, _| {
         fresh(10028).update(
-            c,
-            u,
+            step,
+            unit,
             actions,
             me(&HuntState::Attack { attack: None }),
-            f,
+            fight,
             &r,
         )
     });
     assert_eq!(
-        r.unwrap_err().reason(),
+        hunt_next.unwrap_err().reason(),
         "a Hunt in state 12 without its Attack"
     );
 }
@@ -1703,12 +1777,12 @@ fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
     };
     let face = |h: &mut HuntAction, victim: Victim, herd: Option<Herd>| {
         let mut rig = Rig::on_the_path(victim);
-        let r = HuntReads {
+        let hunt_reads = HuntReads {
             herd,
             ..hunt_reads()
         };
-        rig.run(100, |c, u, actions, f, _| {
-            h.set_face(c, u, actions, f, &r, &roles())
+        rig.run(100, |step, unit, actions, fight, _| {
+            h.set_face(step, unit, actions, fight, &hunt_reads, &roles())
         })
     };
     let walking = |target, moved| HuntAction {
@@ -1775,16 +1849,26 @@ fn hunter_facing_livestock_leads_slaughters_or_walks_to_it() {
         Ok(HuntNext::Stay)
     );
     assert_eq!(
-        (h.state.bare(), h.state.move_to().copied().map(|m| m.state)),
+        (
+            h.state.bare(),
+            h.state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
+        ),
         (HuntState::Walk { move_to: None }, Some(MoveTo::Start))
     );
-    let mut h = walking(9177, false);
+    let mut hunt_action = walking(9177, false);
     assert_eq!(
-        face(&mut h, sheep(ObjectState::Dying), None),
+        face(&mut hunt_action, sheep(ObjectState::Dying), None),
         Ok(HuntNext::Stay)
     );
     assert_eq!(
-        (h.state.bare(), h.state.move_to().copied(), h.timer),
+        (
+            hunt_action.state.bare(),
+            hunt_action.state.move_to().copied(),
+            hunt_action.timer
+        ),
         (HuntState::Face, None, Seconds::ZERO)
     );
 }
@@ -1827,10 +1911,10 @@ fn drop_off_gives_the_load_to_the_player() {
             rig.unit_mut().life.attribute_kind,
             rig.unit_mut().life.amount,
         ) = (held.kind, held.amount);
-        rig.run(28, |c, u, _, _, _| {
+        rig.run(28, |step, unit, _, _, _| {
             hunt.update_drop(
-                c,
-                u,
+                step,
+                unit,
                 me(&HuntState::Drop { move_to: None }),
                 Some(site),
                 who,
@@ -1938,7 +2022,7 @@ fn hunt_walk_starts_toward_its_target() {
         };
         let mut rig = Rig::on_the_path(house).holding(10028, PlayerId::new(0));
         rig.mover_mut().paths.clear();
-        let mut h = HuntAction {
+        let mut hunt_action = HuntAction {
             state: HuntState::Walk {
                 move_to: Some(MoveToAction {
                     sprite: Some(MOVING),
@@ -1951,12 +2035,23 @@ fn hunt_walk_starts_toward_its_target() {
             },
             ..hunting(10028)
         };
-        let r = hunt_reads();
-        let got = rig.run(100, |c, u, actions, f, _| {
-            h.update(c, u, actions, me(&HuntState::Walk { move_to: None }), f, &r)
+        let hunt_reads = hunt_reads();
+        let got = rig.run(100, |step, unit, actions, fight, _| {
+            hunt_action.update(
+                step,
+                unit,
+                actions,
+                me(&HuntState::Walk { move_to: None }),
+                fight,
+                &hunt_reads,
+            )
         });
         let paths = rig.mover().paths.len();
-        let walk = h.state.move_to().copied().map(|m| (m.state, m.wait.state));
+        let walk = hunt_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| (move_to_action.state, move_to_action.wait.state));
         (got, walk, paths, rig.sprite())
     };
     assert_eq!(
@@ -1981,19 +2076,30 @@ fn hunt_walk_starts_toward_its_target() {
 #[test]
 fn walk_that_ended_without_its_target_only_turns_to_the_face() {
     let mut rig = Rig::on_the_path(Victim::default());
-    let mut h = HuntAction {
+    let mut hunt_action = HuntAction {
         state: HuntState::Walk {
             move_to: Some(MoveToAction::sub_in(MoveTo::Arrived)),
         },
         ..hunting(-1)
     };
-    let r = hunt_reads();
-    let got = rig.run(100, |c, u, actions, f, _| {
-        h.update(c, u, actions, me(&HuntState::Walk { move_to: None }), f, &r)
+    let hunt_reads = hunt_reads();
+    let got = rig.run(100, |step, unit, actions, fight, _| {
+        hunt_action.update(
+            step,
+            unit,
+            actions,
+            me(&HuntState::Walk { move_to: None }),
+            fight,
+            &hunt_reads,
+        )
     });
     assert_eq!(got, Ok(HuntNext::Stay));
     assert_eq!(
-        (h.state, h.timer, h.state.move_to().copied()),
+        (
+            hunt_action.state,
+            hunt_action.timer,
+            hunt_action.state.move_to().copied()
+        ),
         (HuntState::Face, Seconds::ZERO, None)
     );
 }
@@ -2030,17 +2136,22 @@ fn move_to_that_lost_its_target_ends_the_drop_off_and_the_point_walk() {
     assert_eq!(got, Ok(Dropped::Going));
     assert_eq!(h.timer, DROP_WAIT);
     let mut rig = lost();
-    let mut h = HuntAction {
+    let mut hunt_action = HuntAction {
         state: HuntState::WalkSearch {
             move_to: Some(to_house(MoveTo::Moving, CHOP.range)),
         },
         ..hunting(-1)
     };
-    let got = rig.run(100, |c, u, _, _, _| {
-        h.update_point_walk(c, u, me(&HuntState::WalkSearch { move_to: None }), who)
+    let got = rig.run(100, |step, unit, _, _, _| {
+        hunt_action.update_point_walk(
+            step,
+            unit,
+            me(&HuntState::WalkSearch { move_to: None }),
+            who,
+        )
     });
     assert_eq!(
-        (got, h.state, h.state.move_to().copied()),
+        (got, hunt_action.state, hunt_action.state.move_to().copied()),
         (Ok(PointWalk::Search), HuntState::Search, None)
     );
 }
@@ -2069,8 +2180,8 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
             },
             ..hunting(-1)
         }));
-        rig.run(100, |c, u, actions, _, _| {
-            Ok(u.tree_lost(actions.list.hunt().unwrap(), c, &roles()))
+        rig.run(100, |step, unit, actions, _, _| {
+            Ok(unit.tree_lost(actions.list.hunt().unwrap(), step, &roles()))
         })
     };
     assert_eq!(
@@ -2096,30 +2207,36 @@ fn hunt_of_tree_searches_on_failed_walk_or_target_let_go() {
 #[test]
 fn dying_hunter_makes_no_move_to() {
     let mut mover = walker();
-    let mut h = hunting(-1);
-    h.point = Position::new(5.0, 6.0, 0.0);
+    let mut hunt_action = hunting(-1);
+    hunt_action.point = Position::new(5.0, 6.0, 0.0);
     let mut dying = walks(Held::default());
     dying.reads.state = ObjectState::Dying;
-    h.set_point_walk(
-        |move_to| HuntState::WalkSearch { move_to },
-        &mut mover,
-        &dying,
-        &tuning().move_to,
-    )
-    .unwrap();
+    hunt_action
+        .set_point_walk(
+            |move_to| HuntState::WalkSearch { move_to },
+            &mut mover,
+            &dying,
+            &tuning().move_to,
+        )
+        .unwrap();
     assert_eq!(
-        (h.state, h.state.move_to().copied()),
+        (hunt_action.state, hunt_action.state.move_to().copied()),
         (HuntState::WalkSearch { move_to: None }, None)
     );
-    h.set_point_walk(
-        |move_to| HuntState::WalkSearch { move_to },
-        &mut mover,
-        &walks(Held::default()),
-        &tuning().move_to,
-    )
-    .unwrap();
+    hunt_action
+        .set_point_walk(
+            |move_to| HuntState::WalkSearch { move_to },
+            &mut mover,
+            &walks(Held::default()),
+            &tuning().move_to,
+        )
+        .unwrap();
     assert_eq!(
-        h.state.move_to().copied().map(|m| m.state),
+        hunt_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Start)
     );
 }

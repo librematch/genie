@@ -95,7 +95,7 @@ pub(super) fn foundation_laid(
 ///
 /// A map without its terrain, and a tile the terrain does not hold.
 pub(super) fn lay_foundation(
-    c: &mut Construction,
+    construction: &mut Construction,
     world: &mut Spatial,
     placed: &Placed,
     master: &Master,
@@ -107,12 +107,12 @@ pub(super) fn lay_foundation(
         "a completion without the map's terrain",
     ))?;
     let (x, y) = (placed.position.x(), placed.position.y());
-    if c.snow == Snow::None
+    if construction.snow == Snow::None
         && 0 <= x as i32
         && 0 <= y as i32
         && terrain.snow_under(Tile::new(x as i32, y as i32))?
     {
-        c.snow = Snow::Completed;
+        construction.snow = Snow::Completed;
     }
     if let Some(laid) = laid {
         terrain.cover(
@@ -120,7 +120,7 @@ pub(super) fn lay_foundation(
                 position: placed.position,
                 clearance: master.clearance,
                 terrain: laid,
-                snow: c.snow,
+                snow: construction.snow,
                 master: master.id,
                 class: master.class,
                 terrain_bonus: master.combat_part().terrain_bonus,
@@ -239,7 +239,7 @@ impl Construction {
     /// A foundation the world does not hold.
     pub(crate) fn begin(
         id: ObjectId,
-        c: &mut Self,
+        construction: &mut Self,
         mover: Option<&mut Mover>,
         world: &mut Spatial,
         pathing: &mut Pathing,
@@ -250,18 +250,24 @@ impl Construction {
             roles,
             visibility_tuning,
         } = sight;
-        if !c.desolid {
+        if !construction.desolid {
             return Ok(ConstructionStart::NotDesolid);
         }
         let placed = *world.get(id).ok_or(SITE_GONE)?;
-        c.desolid = false;
-        c.progress = Seconds::new(f32::from_bits(STARTED));
-        if let Some(v) = world.sight.as_mut() {
-            v.construction_started(id, placed.position, placed.radius, roles, visibility_tuning)?;
+        construction.desolid = false;
+        construction.progress = Seconds::new(f32::from_bits(STARTED));
+        if let Some(visibility) = world.sight.as_mut() {
+            visibility.construction_started(
+                id,
+                placed.position,
+                placed.radius,
+                roles,
+                visibility_tuning,
+            )?;
         }
         // a master of obstruction kind 0 or 12, or of class 0, gets no record (FUN_141056460)
-        if c.record.recorded() {
-            world.add_record(id, c.record);
+        if construction.record.recorded() {
+            world.add_record(id, construction.record);
         }
         pathing.tiles_changed(world.take_changes());
         if let Some(p) = world.get(id) {

@@ -22,19 +22,23 @@ use genie_save::generated::world::{Object, RgeMapRow, RgeTile};
 
 /// A master of id `id`, its radius `radius` and an obstruction of kind `kind`.
 fn master(id: i16, radius: Radii, kind: u8) -> Master {
-    let mut m = combat_master(id);
-    let s = master_static_mut(&mut m);
-    (s.radius_x, s.radius_y, s.radius_z) = (radius.x(), radius.y(), radius.z());
-    s.los = 4.0;
-    s.obstruction_kind = kind;
-    s.obstruction_class = 3;
-    s.read_temp_5 = 6;
-    m
+    let mut combat_master = combat_master(id);
+    let rge_master_static_object = master_static_mut(&mut combat_master);
+    (
+        rge_master_static_object.radius_x,
+        rge_master_static_object.radius_y,
+        rge_master_static_object.radius_z,
+    ) = (radius.x(), radius.y(), radius.z());
+    rge_master_static_object.los = 4.0;
+    rge_master_static_object.obstruction_kind = kind;
+    rge_master_static_object.obstruction_class = 3;
+    rge_master_static_object.read_temp_5 = 6;
+    combat_master
 }
 
 /// `object` placed at (`x`, `y`).
 fn at(mut object: Object, x: f32, y: f32) -> Object {
-    let s = if object.tribe_building_object.is_some() {
+    let rge_static_object = if object.tribe_building_object.is_some() {
         &mut building_mut(&mut object)
             .tribe_combat_object
             .rge_combat_object
@@ -45,8 +49,8 @@ fn at(mut object: Object, x: f32, y: f32) -> Object {
     } else {
         static_mut(&mut object)
     };
-    [s.tx, s.ty] = [x, y];
-    s.inside_obj = -1;
+    [rge_static_object.tx, rge_static_object.ty] = [x, y];
+    rge_static_object.inside_obj = -1;
     object
 }
 
@@ -56,9 +60,9 @@ fn placed() -> Spatial {
     let mut unit = at(combat_object(10, 83), 1.5, 1.5);
     combat_mut(&mut unit).rge_combat_object.capture_flag = 2;
     let mut standing = at(building_object(11, 70), 2.5, 2.5);
-    let b = building_mut(&mut standing);
-    b.built = 1;
-    b.mupt_linked_object_references_linked_owner_id = -1;
+    let tribe_building_object = building_mut(&mut standing);
+    tribe_building_object.built = 1;
+    tribe_building_object.mupt_linked_object_references_linked_owner_id = -1;
     let mut desolid = at(building_object(12, 70), 0.5, 3.5);
     building_mut(&mut desolid).desolid_flag = 1;
     let mut inside = at(combat_object(13, 83), 2.5, 2.5);

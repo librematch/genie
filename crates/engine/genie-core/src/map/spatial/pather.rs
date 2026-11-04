@@ -72,10 +72,10 @@ impl Spatial {
         let hi_x = if a.x() <= b.x() { b.x() } else { a.x() };
         let lo_y = if b.y() <= a.y() { b.y() } else { a.y() };
         let hi_y = if a.y() <= b.y() { b.y() } else { a.y() };
-        let g = buffer.unwrap_or(Distance::ZERO);
-        self.put_tile_records(a, b, g, mask);
+        let distance = buffer.unwrap_or(Distance::ZERO);
+        self.put_tile_records(a, b, distance, mask);
         let walk_box = Rect::new(lo_x, lo_y, hi_x, hi_y);
-        let grown = walk_box.grown(g);
+        let grown = walk_box.grown(distance);
         let mut hits = Vec::new();
         if grown.leaves_map(self.map) {
             hits = self.edge_records(grown, QUERY_HITS);
@@ -86,7 +86,7 @@ impl Spatial {
         self.check_known_records(grown)?;
         let walk = Segment { from: a, to: b };
         let meets = |kind: ObstructionKind, bx: Rect| {
-            walk_box.overlaps(bx.grown(g)) && record_meets_segment(kind, bx, g, walk)
+            walk_box.overlaps(bx.grown(distance)) && record_meets_segment(kind, bx, distance, walk)
         };
         let level = self.grid.level(0);
         let shift = self.grid.shift(level);
@@ -103,19 +103,19 @@ impl Spatial {
                 }
             }
         }
-        for (id, p) in self.records_in(grown) {
-            let Some(o) = p.obstruction else {
+        for (id, placed) in self.records_in(grown) {
+            let Some(obstruction) = placed.obstruction else {
                 continue;
             };
-            let kind = o.kind.filed();
+            let kind = obstruction.kind.filed();
             if !kind.tested()
                 || by_id.moving(id)
                 || ignore.contains(&RecordId::from(id))
-                || !self.visits(p, kind, grown)
+                || !self.visits(placed, kind, grown)
             {
                 continue;
             }
-            let bx = p.bounds();
+            let bx = placed.bounds();
             if !meets(kind, bx) {
                 continue;
             }
@@ -125,7 +125,7 @@ impl Spatial {
                 ));
             }
             // The class of a gate, which a player's allies may pass (slot 0x678, `FUN_1411d4a30`).
-            if roles.of_class(p.class).contains(ClassRoles::GATE) {
+            if roles.of_class(placed.class).contains(ClassRoles::GATE) {
                 return Err(GenieError::unsupported(
                     "a pather query meeting a gate (its players' passage, slot 0x678)",
                 ));
@@ -334,8 +334,9 @@ impl WalkTest {
     /// Whether a record's box `bx`, grown by the buffer, meets the walk's box (edges included)
     /// and segment (`FUN_141052e10`).
     pub(super) fn meets(&self, bx: Rect) -> bool {
-        let g = self.grow;
-        Rect::between(self.lo, self.hi).overlaps(bx.grown(g)) && box_meets_segment(bx, g, self.walk)
+        let distance = self.grow;
+        Rect::between(self.lo, self.hi).overlaps(bx.grown(distance))
+            && box_meets_segment(bx, distance, self.walk)
     }
 }
 
@@ -346,11 +347,11 @@ pub(super) fn segments_meet(p1: Point, p2: Point, p3: Point, p4: Point) -> bool 
 }
 
 /// `FUN_141052e10` (the segment test's) and `FUN_1410512f0` (the walk test's) with the box grown
-/// by `r` (the manager's `+0x57`/`+0x58`): the walk crosses one of the grown box's edges or
+/// by `distance` (the manager's `+0x57`/`+0x58`): the walk crosses one of the grown box's edges or
 /// starts or ends inside it, the box ordered (low and high edges, [`Rect::ordered`]) for the
 /// inside tests.
-pub(super) fn box_meets_segment(b: Rect, r: Distance, walk: Segment) -> bool {
-    segment_meets_box(b, r.get(), walk, b.ordered())
+pub(super) fn box_meets_segment(rect: Rect, distance: Distance, walk: Segment) -> bool {
+    segment_meets_box(rect, distance.get(), walk, rect.ordered())
 }
 
 /// A record's test against the walk by its kind (`FUN_141051e00`, `FUN_141052800`): a circle's
@@ -358,18 +359,18 @@ pub(super) fn box_meets_segment(b: Rect, r: Distance, walk: Segment) -> bool {
 /// the others' (kinds 2, 3, 11, 13) order it ([`box_meets_segment`]).
 pub(super) fn record_meets_segment(
     kind: ObstructionKind,
-    b: Rect,
-    r: Distance,
+    rect: Rect,
+    distance: Distance,
     walk: Segment,
 ) -> bool {
     if kind == ObstructionKind::CIRCLE {
-        segment_meets_box(b, r.get(), walk, b)
+        segment_meets_box(rect, distance.get(), walk, rect)
     } else {
-        box_meets_segment(b, r, walk)
+        box_meets_segment(rect, distance, walk)
     }
 }
 
-/// The four edges of box `b` grown by `r`, each tested against the walk
+/// The four edges of box `rect` grown by `r`, each tested against the walk
 /// (`FUN_141052ca0`: `FUN_141054ec0`), then the inside tests of the walk's ends against `inside`
 /// grown by `r`. `FUN_141052ca0` also lists each crossing (record, id, point) at the manager's
 /// `+0x40` while its `+0x54` is set; `FUN_141051900` sets `+0x54` only for a list at `+0x40`
@@ -378,8 +379,8 @@ pub(super) fn record_meets_segment(
 /// and `FUN_1410560b0`'s zeros, and none of the routines that address it through
 /// `DAT_143f0a088` writes them. So the listing never runs, and the edges' order (the
 /// `FUN_1410512f0` tests all four, `FUN_141052e10` stops at the first crossing) does not show.
-pub(super) fn segment_meets_box(b: Rect, r: f32, walk: Segment, inside: Rect) -> bool {
-    let (bx0, by0, bx1, by1) = (b.x0(), b.y0(), b.x1(), b.y1());
+pub(super) fn segment_meets_box(rect: Rect, r: f32, walk: Segment, inside: Rect) -> bool {
+    let (bx0, by0, bx1, by1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
     let (lo_x, lo_y, hi_x, hi_y) = (inside.x0(), inside.y0(), inside.x1(), inside.y1());
     let (start, end) = (walk.from, walk.to);
     let edges = [
@@ -396,11 +397,11 @@ pub(super) fn segment_meets_box(b: Rect, r: f32, walk: Segment, inside: Rect) ->
     }
     // COMISS/JC (0x141052fb8..0x141052ff9, 0x1410530dc..0x141053119; 0x1410514ad..0x141051620,
     // 0x14105189e..0x1410518f2): a NaN coordinate is out
-    let outside = |p: Point| {
-        below_or_unordered(p.x(), lo_x - r)
-            || below_or_unordered(r + hi_x, p.x())
-            || below_or_unordered(p.y(), lo_y - r)
-            || below_or_unordered(r + hi_y, p.y())
+    let outside = |point: Point| {
+        below_or_unordered(point.x(), lo_x - r)
+            || below_or_unordered(r + hi_x, point.x())
+            || below_or_unordered(point.y(), lo_y - r)
+            || below_or_unordered(r + hi_y, point.y())
     };
     !(outside(start) && outside(end))
 }

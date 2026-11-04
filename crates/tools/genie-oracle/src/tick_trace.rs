@@ -39,8 +39,8 @@ fn word_at(bytes: &[u8], at: usize) -> Option<u32> {
 /// The eleven words of a lane from `at`.
 fn lane_words(word: &impl Fn(usize) -> GenieResult<u32>, at: usize) -> GenieResult<[u32; 11]> {
     let mut lane = [0; 11];
-    for (w, slot) in lane.iter_mut().enumerate() {
-        *slot = word(at + 4 * w)?;
+    for (index, slot) in lane.iter_mut().enumerate() {
+        *slot = word(at + 4 * index)?;
     }
     Ok(lane)
 }
@@ -62,7 +62,9 @@ impl TickTrace {
         let mut rows = Vec::new();
         let _ = ZlibDecoder::new(data.get(16..).ok_or(bad_trace())?)
             .read_to_end(&mut rows)
-            .map_err(|e| GenieError::io("a trace whose rows do not inflate").with_source(e))?;
+            .map_err(|error| {
+                GenieError::io("a trace whose rows do not inflate").with_source(error)
+            })?;
         let row = 4 * (1 + 11 * lane_count);
         if rows.len() < ticks * row {
             return Err(truncated_trace());
@@ -70,8 +72,8 @@ impl TickTrace {
         let word = |at: usize| word_at(&rows, at).ok_or(truncated_trace());
         let mut times = Vec::with_capacity(ticks);
         let mut lanes = Vec::with_capacity(ticks);
-        for t in 0..ticks {
-            let base = t * row;
+        for index in 0..ticks {
+            let base = index * row;
             times.push(word(base)?);
             lanes.push(
                 (0..lane_count)

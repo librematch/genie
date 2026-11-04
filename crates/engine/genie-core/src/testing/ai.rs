@@ -17,7 +17,7 @@ use crate::world::tests::in_update_filed;
 use crate::{GenieError, GenieResult};
 use std::mem::take;
 
-/// Runs `f` on object `me` of player `player` of `w` inside its update (dt 0, outside a turn),
+/// Runs `f` on object `me` of player `player` of `world` inside its update (dt 0, outside a turn),
 /// after the update's start took its sprite's facets
 /// ([`Unit::take_sprite_facets`](crate::objects::unit::Unit::take_sprite_facets)): on its unit
 /// AI, what the AI reads of the unit and the world, its side, its owner's type and the AI
@@ -31,9 +31,9 @@ use std::mem::take;
 ///
 /// # Panics
 ///
-/// An object `w` does not hold in `player`'s list.
+/// An object `world` does not hold in `player`'s list.
 pub(crate) fn run_ai<R>(
-    w: &mut World,
+    world: &mut World,
     (player, me): (PlayerId, ObjectId),
     f: impl FnOnce(
         &mut UnitAi,
@@ -43,31 +43,37 @@ pub(crate) fn run_ai<R>(
         &mut Well512,
     ) -> GenieResult<R>,
 ) -> GenieResult<R> {
-    let i = w
+    let i = world
         .players
         .player(player)?
         .objects
         .iter()
         .position(|u| u.id == me)
         .expect("the unit in its player's list");
-    in_update_filed(w, (player, ListIndex::new(i)), 0, |unit, actions, c| {
-        unit.take_sprite_facets(c.w.parts.mover_mut(unit.id));
-        let mut answer = None;
-        unit.run_ai(actions, c, |ai, at, side, kind, rng| {
-            answer = Some(f(ai, at, side, kind, rng)?);
-            Ok(())
-        })?;
-        let answer = answer.ok_or(GenieError::unreachable("a unit AI's run that did not run"))?;
-        // as the unit's update ends after its AI's run (`Unit::ai_part`)
-        let outcome = match c.taken_over.take() {
-            Some((new, main)) => Outcome::Captured(Captured {
-                new,
-                main,
-                also: Vec::new(),
-                building: take(&mut c.building_handover),
-            }),
-            None => Outcome::Stay,
-        };
-        Ok((answer, outcome))
-    })
+    in_update_filed(
+        world,
+        (player, ListIndex::new(i)),
+        0,
+        |unit, actions, step| {
+            unit.take_sprite_facets(step.w.parts.mover_mut(unit.id));
+            let mut answer = None;
+            unit.run_ai(actions, step, |ai, at, side, kind, rng| {
+                answer = Some(f(ai, at, side, kind, rng)?);
+                Ok(())
+            })?;
+            let answer =
+                answer.ok_or(GenieError::unreachable("a unit AI's run that did not run"))?;
+            // as the unit's update ends after its AI's run (`Unit::ai_part`)
+            let outcome = match step.taken_over.take() {
+                Some((new, main)) => Outcome::Captured(Captured {
+                    new,
+                    main,
+                    also: Vec::new(),
+                    building: take(&mut step.building_handover),
+                }),
+                None => Outcome::Stay,
+            };
+            Ok((answer, outcome))
+        },
+    )
 }

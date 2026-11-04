@@ -84,10 +84,10 @@ impl World {
         id: ObjectId,
         master: &Master,
     ) -> GenieResult<()> {
-        let (_, u) = self.object(id).ok_or(NOT_HELD)?;
+        let (_, unit) = self.object(id).ok_or(NOT_HELD)?;
         let construction = self
             .parts
-            .building_of(u.id)
+            .building_of(unit.id)
             .construction
             .ok_or(NO_CONSTRUCTION)?;
         let completion = Completion {
@@ -95,7 +95,7 @@ impl World {
             farm_bonus: farm_bonus(&self.players.player(owner)?.attributes),
             masters: self.model.masters.of(owner),
             player_kind: self.players.player(owner)?.kind,
-            ai: self.parts.unit_ai.contains(u.id),
+            ai: self.parts.unit_ai.contains(unit.id),
         };
         let part = completion.first_part(&construction, &self.model.roles)?;
         // its tracker part (FUN_14104eac0): the foundation leaves the pending lists
@@ -124,23 +124,23 @@ impl World {
     /// What the start does not model.
     pub(crate) fn construction_starts(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let place = self.place(id).ok_or(NOT_HELD)?;
-        let (Place::Live(p, _) | Place::Sleeping(p, _)) = place;
+        let (Place::Live(player_id, _) | Place::Sleeping(player_id, _)) = place;
         let volley = held(&mut self.players, place)?
             .master(
                 MasterTables::new(&self.model.masters, &self.parts.own_master),
-                p,
+                player_id,
             )?
             .creatable_part()
             .volley_fire;
         let now = self.world_time;
-        let u = held(&mut self.players, place)?;
-        let (layer, mover) = self.parts.building_and_mover_mut(u.id)?;
-        let Some(c) = layer.construction.as_mut() else {
+        let unit = held(&mut self.players, place)?;
+        let (layer, mover) = self.parts.building_and_mover_mut(unit.id)?;
+        let Some(construction) = layer.construction.as_mut() else {
             return Ok(());
         };
         if Construction::begin(
             id,
-            c,
+            construction,
             mover,
             &mut self.spatial,
             &mut self.pathing,
@@ -151,7 +151,7 @@ impl World {
             },
         )? == ConstructionStart::Begun
         {
-            self.parts.combat_mut(u.id)?.firepower = volley;
+            self.parts.combat_mut(unit.id)?.firepower = volley;
             self.watch_started(owner, id)?;
         }
         Ok(())
@@ -176,7 +176,7 @@ pub(crate) const NO_CONSTRUCTION: GenieError =
 pub(crate) fn held(players: &mut [Player], place: Place) -> GenieResult<&mut Unit> {
     match place {
         Place::Live(p, i) => players.live_mut(p, i),
-        Place::Sleeping(p, i) => players.asleep_mut(p, i),
+        Place::Sleeping(player_id, list_index) => players.asleep_mut(player_id, list_index),
     }
 }
 
@@ -204,19 +204,24 @@ impl World {
         let mut at = id.id();
         loop {
             for annex in self.objects().annexes(at).ids() {
-                let Some((q, a)) = self.object(annex) else {
+                let Some((annex_player_id, annex_unit)) = self.object(annex) else {
                     continue;
                 };
                 let desolid = self
                     .parts
-                    .building_of(a.id)
+                    .building_of(annex_unit.id)
                     .construction
                     .is_some_and(|c| c.desolid);
-                if a.master(self.master_tables(), q)?.kind < MasterKind::BUILDING || !desolid {
+                if annex_unit
+                    .master(self.master_tables(), annex_player_id)?
+                    .kind
+                    < MasterKind::BUILDING
+                    || !desolid
+                {
                     continue;
                 }
                 self.clear_foundations_under(annex)?;
-                self.construction_starts(q, annex)?;
+                self.construction_starts(annex_player_id, annex)?;
             }
             let Some(main) = self
                 .object(at)
@@ -234,26 +239,28 @@ impl World {
                 _ => break,
             }
         }
-        let (q, u) = self.object(at).ok_or(NOT_HELD)?;
-        if u.life.state != ObjectState::Foundation || below_or_unordered(u.life.hp.get(), 1.0) {
+        let (at_player_id, at_unit) = self.object(at).ok_or(NOT_HELD)?;
+        if at_unit.life.state != ObjectState::Foundation
+            || below_or_unordered(at_unit.life.hp.get(), 1.0)
+        {
             return Ok(BuildProgress::Ended);
         }
         if self
             .parts
-            .building_of(u.id)
+            .building_of(at_unit.id)
             .construction
             .is_some_and(|c| c.desolid)
         {
             self.clear_foundations_under(at)?;
-            self.construction_starts(q, at)?;
+            self.construction_starts(at_player_id, at)?;
         }
-        let q = self.object(at).ok_or(NOT_HELD)?.0;
-        let (u, layer) = self.object_and_layer_mut(at)?.ok_or(NOT_HELD)?;
-        let c = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
-        if c.add_work(&mut u.life.hp, amount) == BuildProgress::Ongoing {
+        let player_id = self.object(at).ok_or(NOT_HELD)?.0;
+        let (unit, layer) = self.object_and_layer_mut(at)?.ok_or(NOT_HELD)?;
+        let construction = layer.construction.as_mut().ok_or(NO_CONSTRUCTION)?;
+        if construction.add_work(&mut unit.life.hp, amount) == BuildProgress::Ongoing {
             return Ok(BuildProgress::Ongoing);
         }
-        self.set_state(q, at, ObjectState::Alive)?;
+        self.set_state(player_id, at, ObjectState::Alive)?;
         Ok(BuildProgress::Ended)
     }
 
@@ -290,7 +297,7 @@ impl World {
             self.parts.gather_point.get(building).copied(),
         );
         let old_class = old.master(self.master_tables(), p)?.class;
-        let old_lock = self.parts.building_of(old.id).gate.map(|g| g.locked);
+        let old_lock = self.parts.building_of(old.id).gate.map(|gate| gate.locked);
         // its attacking units (+0xce0) the world still holds each hear of the new object (their
         // slot 0x140), which is not modelled
         let enemies = self
@@ -311,8 +318,8 @@ impl World {
         if self.object(building).is_some() {
             self.parts.building_mut(building)?.stack_made = Some(new);
         }
-        let (q, nu) = self.object(new).ok_or(NOT_HELD)?;
-        let new_master = nu.master(self.master_tables(), q)?;
+        let (player_id, nu) = self.object(new).ok_or(NOT_HELD)?;
+        let new_master = nu.master(self.master_tables(), player_id)?;
         let mut point = None;
         let building_made = new_master.kind == MasterKind::BUILDING;
         let gate_lock = (building_made
@@ -343,11 +350,11 @@ impl World {
                     g.target
                 };
                 match self.object(target) {
-                    Some((_, t)) => Some(GatherPoint {
+                    Some((_, unit)) => Some(GatherPoint {
                         state: GatherPointState::Point,
-                        point: Position::new(t.position().x(), t.position().y(), 0.0),
+                        point: Position::new(unit.position().x(), unit.position().y(), 0.0),
                         target,
-                        target_master: Some(t.life.master_id),
+                        target_master: Some(unit.life.master_id),
                     }),
                     None => (g.point.x() != -1.0 && g.point.y() != -1.0).then_some(GatherPoint {
                         state: GatherPointState::Point,
@@ -358,8 +365,8 @@ impl World {
                 }
             });
         }
-        if let Some(g) = point.filter(|_| building_made) {
-            self.set_part(new, Part::GatherPoint(g))?;
+        if let Some(gather_point) = point.filter(|_| building_made) {
+            self.set_part(new, Part::GatherPoint(gather_point))?;
         }
         self.stack_takes_over(new, building_made, (orders, gate_lock))?;
         let (_, nu) = self.object_mut(new).ok_or(NOT_HELD)?;
@@ -417,44 +424,44 @@ impl World {
     /// [`crate::world::World::plain_object`], [`crate::world::World::make_building`]).
     pub(crate) fn make_new_object(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         master: MasterId,
         at: Position,
         mode: MakeMode,
     ) -> GenieResult<Option<ObjectId>> {
-        let Some(made) = player_master(&self.model.masters, p, master).cloned() else {
+        let Some(made) = player_master(&self.model.masters, player_id, master).cloned() else {
             return Ok(None);
         };
         // a combat unit (type 70, an effect's spawn): the master's slot 0x40 there, its footprint
         // cleared with the flag, its visible resources for one that gathers by itself
         if made.kind == MasterKind::COMBAT {
-            let idx = self.combat_object(p, master, &made, at)?;
-            let id = self.players.live(p, idx)?.id;
+            let idx = self.combat_object(player_id, master, &made, at)?;
+            let id = self.players.live(player_id, idx)?.id;
             if mode == MakeMode::Finished {
-                self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
+                self.clear_footprint(player_id, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
-                self.made_new_object(p)?;
+                self.made_new_object(player_id)?;
             }
             return Ok(Some(id));
         }
         // a plain object (types 10 and 20 to 39: a pasture's livestock): the master's slot 0x40
         // there, facing its drawn angle
         if made.kind != MasterKind::BUILDING {
-            let idx = self.plain_object(p, master, &made, at, Facing::Drawn)?;
-            let id = self.players.live(p, idx)?.id;
+            let idx = self.plain_object(player_id, master, &made, at, Facing::Drawn)?;
+            let id = self.players.live(player_id, idx)?.id;
             if mode == MakeMode::Finished {
-                self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
+                self.clear_footprint(player_id, master, at.ground(), Clearer::Builder)?;
             }
             if made.auto_gather.is_on() {
-                self.made_new_object(p)?;
+                self.made_new_object(player_id)?;
             }
             return Ok(Some(id));
         }
         let ai = Ok(unit_ai_kind(&made, master, &self.model.roles));
-        let (id, _) = self.make_building(p, master, ai, at)?;
+        let (id, _) = self.make_building(player_id, master, ai, at)?;
         if mode == MakeMode::Finished {
-            self.clear_footprint(p, master, at.ground(), Clearer::Builder)?;
+            self.clear_footprint(player_id, master, at.ground(), Clearer::Builder)?;
             // the building made on a flagged stack is the foundation its work builds
             let _ = self.work_building(
                 FoundationId::new(id),
@@ -462,12 +469,19 @@ impl World {
             )?;
         }
         if made.auto_gather.is_on() {
-            if self.players.player(p)?.objects.last().map(|u| u.id) != Some(id) {
+            if self
+                .players
+                .player(player_id)?
+                .objects
+                .last()
+                .map(|unit| unit.id)
+                != Some(id)
+            {
                 return Err(GenieError::unsupported(
                     "an auto-gathered new building with annexes (its visible resources)",
                 ));
             }
-            self.made_new_object(p)?;
+            self.made_new_object(player_id)?;
         }
         Ok(Some(id))
     }

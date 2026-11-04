@@ -65,8 +65,8 @@ impl Posture {
 }
 
 impl genie_diff::Diff for Posture {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.raw().diff(&other.raw(), differ);
     }
 }
 

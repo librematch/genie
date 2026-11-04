@@ -158,11 +158,11 @@ impl Planner {
     /// `FUN_140f7da90`: clear a cell and mark its children that lie off the map (its kind holds
     /// [`CellKind::OFF_MAP`] when all of it does).
     pub(super) fn init_cell(&mut self, level: GridLevel, at: PlanTile) {
-        let i = self.index(level, at);
-        self.cells[i] = Cell::EMPTY;
+        let cell_index = self.index(level, at);
+        self.cells[cell_index] = Cell::EMPTY;
         if level == GridLevel::TILES {
             if self.size.width() <= i32::from(at.x()) || self.size.height() <= i32::from(at.y()) {
-                self.cells[i].kind = CellKind::OFF_MAP;
+                self.cells[cell_index].kind = CellKind::OFF_MAP;
             }
         } else {
             for (bit, child) in at.children().into_iter().enumerate() {
@@ -172,7 +172,9 @@ impl Planner {
                     .kind
                     .contains(CellKind::OFF_MAP)
                 {
-                    self.cells[i].kind = self.cells[i].kind.plus(CellKind::child_off_map(bit));
+                    self.cells[cell_index].kind = self.cells[cell_index]
+                        .kind
+                        .plus(CellKind::child_off_map(bit));
                 }
             }
         }
@@ -238,24 +240,24 @@ impl Planner {
                 self.cells[i].kind = low.plus(CellKind::LONE);
             }
             if self.region.holds_at(GridLevel::TILES, at) {
-                let a = self.adjacency(at.tile(), tiles);
+                let adjacency = self.adjacency(at.tile(), tiles);
                 self.cells[i].edges = CellEdges::NONE;
-                if a & 1 == 0 {
-                    let mut b = CellEdges::NONE;
-                    if a & 2 != 0 {
-                        b = CellEdges::W;
+                if adjacency & 1 == 0 {
+                    let mut cell_edges = CellEdges::NONE;
+                    if adjacency & 2 != 0 {
+                        cell_edges = CellEdges::W;
                     }
-                    if a & 4 != 0 {
-                        b |= CellEdges::E;
+                    if adjacency & 4 != 0 {
+                        cell_edges |= CellEdges::E;
                     }
-                    if a & 8 != 0 {
-                        b |= CellEdges::N;
+                    if adjacency & 8 != 0 {
+                        cell_edges |= CellEdges::N;
                     }
-                    if a & 0x10 != 0 {
-                        b |= CellEdges::S;
+                    if adjacency & 0x10 != 0 {
+                        cell_edges |= CellEdges::S;
                     }
-                    self.cells[i].edges = b;
-                    if b.is_empty() {
+                    self.cells[i].edges = cell_edges;
+                    if cell_edges.is_empty() {
                         self.cells[i].kind |= CellKind::LONE | CellKind::NODE;
                     } else {
                         self.cells[i].kind &= !CellKind::LONE;
@@ -264,12 +266,12 @@ impl Planner {
             }
             return self.cells[i];
         }
-        let l = level.down();
+        let grid_level = level.down();
         let children = at.children();
         let mut child = [Cell::EMPTY; 4];
-        for (k, &c) in children.iter().enumerate() {
+        for (k, &plan_tile) in children.iter().enumerate() {
             if low.is_empty() || !self.cells[i].kind.intersects(CellKind::child_off_map(k)) {
-                child[k] = self.rebuild(l, c, tiles);
+                child[k] = self.rebuild(grid_level, plan_tile, tiles);
             }
         }
         let [d0, d1, d2, d3] = child.map(|c| c.edges);
@@ -282,13 +284,16 @@ impl Planner {
         let complex = child
             .iter()
             .any(|c| c.kind.intersects(CellKind::MIXED | CellKind::LONE))
-            || self.splits(child.map(|c| c.edges), dirs);
+            || self.splits(child.map(|cell| cell.edges), dirs);
         if complex {
             low = low.plus(CellKind::MIXED);
-            for (k, &at) in children.iter().enumerate() {
-                if !child[k].kind.intersects(CellKind::NODE | CellKind::MIXED) {
-                    let c = self.index(l, at);
-                    self.cells[c].kind = self.cells[c].kind.plus(CellKind::NODE);
+            for (index, &at) in children.iter().enumerate() {
+                if !child[index]
+                    .kind
+                    .intersects(CellKind::NODE | CellKind::MIXED)
+                {
+                    let cell_index = self.index(grid_level, at);
+                    self.cells[cell_index].kind = self.cells[cell_index].kind.plus(CellKind::NODE);
                 }
             }
         } else if level == GridLevel::TOP {

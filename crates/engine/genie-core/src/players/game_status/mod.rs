@@ -81,8 +81,8 @@ impl GameStatus {
 }
 
 impl genie_diff::Diff for GameStatus {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.raw().diff(&other.raw(), differ);
     }
 }
 
@@ -158,12 +158,12 @@ struct Count {
 }
 
 impl Count {
-    /// Player `i` of `status`, with the allied victory flag (`+0x2d0`, tested for 0) and the
-    /// relations both ways to the first player still playing (`relation` 0: allied;
+    /// Player `player_id` of `status`, with the allied victory flag (`+0x2d0`, tested for 0) and
+    /// the relations both ways to the first player still playing (`relation` 0: allied;
     /// `FUN_141667f70`).
     fn add(
         &mut self,
-        i: PlayerId,
+        player_id: PlayerId,
         status: GameStatus,
         allied_victory: u8,
         relations: (Relation, Relation),
@@ -181,7 +181,7 @@ impl Count {
                     }
                 } else {
                     self.side = 1;
-                    self.first = i;
+                    self.first = player_id;
                 }
             }
             GameStatus::Won => self.won += 1,

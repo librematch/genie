@@ -106,10 +106,16 @@ fn differences_name_the_object_its_master_and_the_field() {
         ),
     ];
     let (slice, game) = (slice.map(Object::from), game.map(Object::from));
-    let d = object_field_differences(&slice, &game);
-    let fields: Vec<(i32, i16, &str)> = d
+    let differences = object_field_differences(&slice, &game);
+    let fields: Vec<(i32, i16, &str)> = differences
         .iter()
-        .map(|d| (d.id.get(), d.master.get(), d.field.as_str()))
+        .map(|difference| {
+            (
+                difference.id.get(),
+                difference.master.get(),
+                difference.field.as_str(),
+            )
+        })
         .collect();
     assert_eq!(
         fields,
@@ -120,14 +126,20 @@ fn differences_name_the_object_its_master_and_the_field() {
             (4, 4, ONLY_IN_THE_SLICE)
         ]
     );
-    assert_eq!(d[0].to_string(), "2: life.hp slice 25.0 game 24.0");
     assert_eq!(
-        d[2].to_string(),
+        differences[0].to_string(),
+        "2: life.hp slice 25.0 game 24.0"
+    );
+    assert_eq!(
+        differences[2].to_string(),
         "3: only in the game (master 59 state 2 hp 1.0 at Position([0.0, 0.0, 0.0]) action None)"
     );
     assert_eq!(
         object_differences(&slice, &game),
-        d.iter().map(ToString::to_string).collect::<Vec<_>>()
+        differences
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
     );
 }
 

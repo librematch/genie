@@ -49,11 +49,11 @@ impl World {
             self.set_slot_state(group, slot, state)?;
             self.stop_member(id)?;
         }
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         let mut placed = SlotTry::NoWay;
         match state {
             SlotState::Stopping => {
-                if !g.motion.moving() {
+                if !held.motion.moving() {
                     placed = self.try_slot(group, id, to)?;
                 }
                 self.set_slot_state(group, slot, SlotState::InPlace)?;
@@ -87,17 +87,17 @@ impl World {
         id: ObjectId,
         to: BVector,
     ) -> GenieResult<SlotTry> {
-        let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
-        let g = self.groups.held(group)?;
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
+        let held = self.groups.held(group)?;
         let player_kind = self
             .players
-            .get(p.index())
-            .map_or(PlayerKind::Phantom, |q| q.kind);
+            .get(player_id.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
         let solid = mover.stats.radius.sized();
         let found = if solid {
-            let members: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
-            let at = u.moved_vector(self.parts.mover_of(u.id));
+            let members: Vec<ObjectId> = held.members.iter().map(|member| member.id).collect();
+            let at = unit.moved_vector(self.parts.mover_of(unit.id));
             let walker = mover.walker(id);
             let mut plan = Planning {
                 pathing: &mut self.pathing,
@@ -107,7 +107,7 @@ impl World {
                 groups: &self.groups,
             };
             let mut path = Path::default();
-            let r = short_path_for(
+            let short_found = short_path_for(
                 walker,
                 at.ground(),
                 (
@@ -126,25 +126,25 @@ impl World {
                 &members,
                 &mut path,
             )?;
-            !r.fails()
+            !short_found.fails()
         } else {
             let walker = LongWalker {
                 id,
-                position: u.position(),
+                position: unit.position(),
                 radius: mover.stats.radius.ground(),
                 mask: mover.stats.restriction_mask,
                 moves: mover.stats.speed != Speed::ZERO
                     || self
                         .model
                         .roles
-                        .of_master(u.life.master_id)
+                        .of_master(unit.life.master_id)
                         .contains(MasterRoles::LONG_PATH_MOVER),
                 ignore_units: &mover.ignore_units,
-                group_units: self.groups.group_units(u.group.id),
+                group_units: self.groups.group_units(unit.group.id),
             };
             long_path_for(
                 &walker,
-                u.position().ground(),
+                unit.position().ground(),
                 &self.spatial,
                 player_kind,
                 (to, 0.0),
@@ -181,12 +181,12 @@ impl World {
         gap: Distance,
     ) -> GenieResult<()> {
         let dt = self.dt_seconds;
-        let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let facets = u.sprite.map(|s| SpriteFacets {
-            count: s.graphic.facets,
-            turns: s.graphic.flags.contains(SpriteFlags::TURNS),
+        let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let facets = unit.sprite.map(|active_sprite| SpriteFacets {
+            count: active_sprite.graphic.facets,
+            turns: active_sprite.graphic.flags.contains(SpriteFlags::TURNS),
         });
-        let at = u.moved_vector(self.parts.mover_of(id));
+        let at = unit.moved_vector(self.parts.mover_of(id));
         let mover = self.parts.mover_mut(id).ok_or(NO_MOVER)?;
         let direction = mover.direction_to(at, to);
         let (turn, _) = mover.turn_toward(
@@ -223,16 +223,16 @@ impl World {
     /// or the group's walk has no path to go on.
     fn stop_at_slot(&mut self, group: GroupId, id: ObjectId) -> GenieResult<()> {
         self.stop_member(id)?;
-        let (_, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let paused = self.parts.mover_of(u.id).is_some_and(Mover::paused);
-        let g = self.groups.held(group)?;
+        let (_, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let paused = self.parts.mover_of(unit.id).is_some_and(Mover::paused);
+        let held = self.groups.held(group)?;
         let patrol =
-            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
-        let walks = g
+            top_path(&held.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let walks = held
             .motion
             .paths
             .first()
-            .is_some_and(|l| l.has_path && !l.points.is_empty());
+            .is_some_and(|path_data| path_data.has_path && !path_data.points.is_empty());
         if paused || (!patrol && !walks) {
             self.show_standing(id)?;
         }
@@ -285,8 +285,8 @@ impl World {
         slot: usize,
         state: SlotState,
     ) -> GenieResult<()> {
-        let g = self.groups.held_mut(group)?;
-        let formation = g.current_formation.as_mut().ok_or(NO_FORMATION)?;
+        let unit_group = self.groups.held_mut(group)?;
+        let formation = unit_group.current_formation.as_mut().ok_or(NO_FORMATION)?;
         let held = formation
             .slots
             .get_mut(slot)
@@ -317,8 +317,8 @@ impl World {
     /// Slot 0x568 of member `id` with group `group`'s forward and up vectors (`+0x14`,
     /// `+0x20`, [`crate::movement::Mover::set_orientation`]).
     pub(super) fn face_group(&mut self, group: GroupId, id: ObjectId) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let [_, forward, up, _] = g.motion.position;
+        let held = self.groups.held(group)?;
+        let [_, forward, up, _] = held.motion.position;
         if self.object(id).is_some()
             && let Some(mover) = self.parts.mover_mut(id)
         {
@@ -350,11 +350,13 @@ impl World {
             (p, u.life.master_id)
         };
         let kind = self.master(p, master_id)?.kind;
-        let u = match place {
+        let unit = match place {
             Place::Live(p, i) => self.players.live_mut(p, i)?,
-            Place::Sleeping(p, i) => self.players.asleep_mut(p, i)?,
+            Place::Sleeping(player_id, list_index) => {
+                self.players.asleep_mut(player_id, list_index)?
+            }
         };
-        let Some(mover) = self.parts.mover_mut(u.id) else {
+        let Some(mover) = self.parts.mover_mut(unit.id) else {
             return Ok(());
         };
         let map = self.spatial.map;
@@ -363,7 +365,7 @@ impl World {
         mover.mark_move(at, self.world_time);
         let (speed, radius) = (mover.stats.speed, mover.stats.radius);
         mover.new_position(
-            &mut u.place,
+            &mut unit.place,
             id,
             at,
             (&mut self.spatial, Some(&mut self.pathing)),
@@ -375,9 +377,9 @@ impl World {
             && kind < MasterKind::BUILDING
             && speed == Speed::ZERO
             && (self.model.tuning.group.linked_radius < radius.x() || self.model.tuning.group.linked_radius < radius.y())
-            && let Some(v) = self.spatial.sight.as_mut()
+            && let Some(visibility) = self.spatial.sight.as_mut()
         {
-            let _ = v.link_building(at, radius.ground(), self.model.tuning.visibility)?;
+            let _ = visibility.link_building(at, radius.ground(), self.model.tuning.visibility)?;
         }
         Ok(())
     }
@@ -397,14 +399,14 @@ impl World {
         let Some(index) = self
             .groups
             .get(group)
-            .and_then(|g| g.members.iter().position(|m| m.id == id))
+            .and_then(|g| g.members.iter().position(|member| member.id == id))
         else {
             return Ok(MemberMove::NoMember);
         };
-        let Some((_, u)) = self.object(id) else {
+        let Some((_, unit)) = self.object(id) else {
             return Ok(MemberMove::NoMember);
         };
-        let last = u.moved_vector(self.parts.mover_of(u.id));
+        let last = unit.moved_vector(self.parts.mover_of(unit.id));
         let own = &mut self
             .groups
             .held_mut(group)?

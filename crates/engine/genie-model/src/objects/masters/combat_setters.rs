@@ -20,7 +20,7 @@ impl Master {
     ) -> Option<&mut DamageAmount> {
         list.iter_mut()
             .find(|e| e.class == class)
-            .map(|e| &mut e.amount)
+            .map(|class_amount| &mut class_amount.amount)
     }
 
     /// `FUN_1410c12b0`, the RGE combat master's slot 0x18: an armor or attack amount
@@ -58,8 +58,8 @@ impl Master {
             | MasterAttribute::DISPLACEMENT_X
             | MasterAttribute::DISPLACEMENT_Y
             | MasterAttribute::DISPLACEMENT_Z => {
-                if let Some(p) = self.combat.as_mut() {
-                    p.set_value(attribute, v, world);
+                if let Some(combat_part) = self.combat.as_mut() {
+                    combat_part.set_value(attribute, v, world);
                 }
             }
             MasterAttribute::ARMOR | MasterAttribute::ATTACK => {
@@ -89,15 +89,17 @@ impl Master {
                 }
             }
             MasterAttribute::ATTACK => {
-                if let Some(p) = self.combat.as_mut() {
+                if let Some(combat_part) = self.combat.as_mut() {
                     let ClassAmount { class, amount } = class_amount(v);
-                    if let Some(e) = Self::class_entry(&mut p.weapons, class) {
-                        *e = match handicapped(world.handicap, class, world.masters_tuning) {
-                            Some(f) if *e == DamageAmount::ZERO => {
-                                DamageAmount::of_effect(amount.as_f32() * f)
-                            }
-                            _ => amount,
-                        };
+                    if let Some(damage_amount) = Self::class_entry(&mut combat_part.weapons, class)
+                    {
+                        *damage_amount =
+                            match handicapped(world.handicap, class, world.masters_tuning) {
+                                Some(f) if *damage_amount == DamageAmount::ZERO => {
+                                    DamageAmount::of_effect(amount.as_f32() * f)
+                                }
+                                _ => amount,
+                            };
                     }
                 }
             }
@@ -139,13 +141,13 @@ impl Master {
             | MasterAttribute::DISPLACEMENT_X
             | MasterAttribute::DISPLACEMENT_Y
             | MasterAttribute::DISPLACEMENT_Z => {
-                if let Some(p) = self.combat.as_mut() {
-                    p.add_value(attribute, v, world);
+                if let Some(combat_part) = self.combat.as_mut() {
+                    combat_part.add_value(attribute, v, world);
                 }
             }
             MasterAttribute::ROTATION_SPEED => {
-                if let Some(p) = self.moving.as_mut() {
-                    p.turn_speed += Seconds::new(v);
+                if let Some(moving_part) = self.moving.as_mut() {
+                    moving_part.turn_speed += Seconds::new(v);
                 }
             }
             MasterAttribute::ARMOR | MasterAttribute::ATTACK => {
@@ -175,15 +177,17 @@ impl Master {
                 }
             }
             MasterAttribute::ATTACK => {
-                if let Some(p) = self.combat.as_mut() {
+                if let Some(combat_part) = self.combat.as_mut() {
                     let ClassAmount { class, amount } = class_amount(v);
-                    if let Some(e) = Self::class_entry(&mut p.weapons, class) {
-                        *e = match handicapped(world.handicap, class, world.masters_tuning) {
-                            Some(f) if *e == DamageAmount::ZERO => {
-                                DamageAmount::of_effect(amount.as_f32() * f)
-                            }
-                            _ => e.plus(amount),
-                        };
+                    if let Some(damage_amount) = Self::class_entry(&mut combat_part.weapons, class)
+                    {
+                        *damage_amount =
+                            match handicapped(world.handicap, class, world.masters_tuning) {
+                                Some(f) if *damage_amount == DamageAmount::ZERO => {
+                                    DamageAmount::of_effect(amount.as_f32() * f)
+                                }
+                                _ => damage_amount.plus(amount),
+                            };
                     }
                 }
             }
@@ -224,13 +228,13 @@ impl Master {
             | MasterAttribute::DISPLACEMENT_X
             | MasterAttribute::DISPLACEMENT_Y
             | MasterAttribute::DISPLACEMENT_Z => {
-                if let Some(p) = self.combat.as_mut() {
-                    p.multiply_value(attribute, v);
+                if let Some(combat_part) = self.combat.as_mut() {
+                    combat_part.multiply_value(attribute, v);
                 }
             }
             MasterAttribute::ROTATION_SPEED => {
-                if let Some(p) = self.moving.as_mut() {
-                    p.turn_speed *= v;
+                if let Some(moving_part) = self.moving.as_mut() {
+                    moving_part.turn_speed *= v;
                 }
             }
             MasterAttribute::ARMOR | MasterAttribute::ATTACK => {
@@ -261,14 +265,17 @@ impl Master {
                 }
             }
             MasterAttribute::ATTACK => {
-                if let Some(p) = self.combat.as_mut() {
+                if let Some(combat_part) = self.combat.as_mut() {
                     let ClassAmount { class, amount } = class_amount(v);
-                    if let Some(e) = Self::class_entry(&mut p.weapons, class) {
+                    if let Some(damage_amount) = Self::class_entry(&mut combat_part.weapons, class)
+                    {
                         let share = match handicapped(world.handicap, class, world.masters_tuning) {
-                            Some(f) if *e == DamageAmount::ZERO => amount.as_f32() * f,
+                            Some(f) if *damage_amount == DamageAmount::ZERO => amount.as_f32() * f,
                             _ => amount.as_f32(),
                         };
-                        *e = DamageAmount::of_effect(e.as_f32() * (share / PERCENT) + ROUND);
+                        *damage_amount = DamageAmount::of_effect(
+                            damage_amount.as_f32() * (share / PERCENT) + ROUND,
+                        );
                     }
                 }
             }
@@ -284,16 +291,18 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile.as_mut() {
+        if let Some(missile_part) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
-                    m.smart_mode = SmartMode::from_bits_retain(low8(v));
+                    missile_part.smart_mode = SmartMode::from_bits_retain(low8(v));
                 }
-                MasterAttribute::PROJECTILE_HIT_MODE => m.hit_mode = HitMode::of_data(low8(v)),
+                MasterAttribute::PROJECTILE_HIT_MODE => {
+                    missile_part.hit_mode = HitMode::of_data(low8(v));
+                }
                 MasterAttribute::PROJECTILE_VANISH_MODE => {
-                    m.vanish_mode = VanishMode::from_bits_retain(low8(v));
+                    missile_part.vanish_mode = VanishMode::from_bits_retain(low8(v));
                 }
-                MasterAttribute::PROJECTILE_ARC => m.arc = ArcRatio::new(v),
+                MasterAttribute::PROJECTILE_ARC => missile_part.arc = ArcRatio::new(v),
                 _ => {}
             }
         }
@@ -307,18 +316,22 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile.as_mut() {
+        if let Some(missile_part) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
-                    m.smart_mode =
-                        SmartMode::from_bits_retain(m.smart_mode.bits().wrapping_add(low8(v)));
+                    missile_part.smart_mode = SmartMode::from_bits_retain(
+                        missile_part.smart_mode.bits().wrapping_add(low8(v)),
+                    );
                 }
-                MasterAttribute::PROJECTILE_HIT_MODE => m.hit_mode = m.hit_mode.plus(low8(v)),
+                MasterAttribute::PROJECTILE_HIT_MODE => {
+                    missile_part.hit_mode = missile_part.hit_mode.plus(low8(v));
+                }
                 MasterAttribute::PROJECTILE_VANISH_MODE => {
-                    m.vanish_mode =
-                        VanishMode::from_bits_retain(m.vanish_mode.bits().wrapping_add(low8(v)));
+                    missile_part.vanish_mode = VanishMode::from_bits_retain(
+                        missile_part.vanish_mode.bits().wrapping_add(low8(v)),
+                    );
                 }
-                MasterAttribute::PROJECTILE_ARC => m.arc += ArcRatio::new(v),
+                MasterAttribute::PROJECTILE_ARC => missile_part.arc += ArcRatio::new(v),
                 _ => {}
             }
         }
@@ -333,12 +346,12 @@ impl Master {
         v: f32,
         world: &AttributeWorld<'_>,
     ) {
-        if let Some(m) = self.missile.as_mut() {
+        if let Some(missile_part) = self.missile.as_mut() {
             match attribute {
                 MasterAttribute::PROJECTILE_SMART_MODE => {
-                    m.smart_mode = SmartMode::from_bits_retain(low8(v));
+                    missile_part.smart_mode = SmartMode::from_bits_retain(low8(v));
                 }
-                MasterAttribute::PROJECTILE_ARC => m.arc *= v,
+                MasterAttribute::PROJECTILE_ARC => missile_part.arc *= v,
                 _ => {}
             }
         }

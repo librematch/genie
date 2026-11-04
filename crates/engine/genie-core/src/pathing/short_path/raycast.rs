@@ -43,11 +43,15 @@ impl Ctx<'_> {
         Ok(self.mesh.tiles.checked(i)?)
     }
 
-    /// `FUN_140fa3dc0`: the first shape of `p`'s tile, not ignored, strictly holding `p` (shrunk).
-    pub(super) fn holder(&self, p: FixedPoint) -> GenieResult<Option<ShapeId>> {
-        for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
+    /// `FUN_140fa3dc0`: the first shape of `fixed_point`'s tile, not ignored, strictly holding
+    /// `fixed_point` (shrunk).
+    pub(super) fn holder(&self, fixed_point: FixedPoint) -> GenieResult<Option<ShapeId>> {
+        for &id in self.tile(Tile::new(
+            tile_of(fixed_point.x()),
+            tile_of(fixed_point.y()),
+        ))? {
             if !self.ignored(id)
-                && strictly_inside(*self.mesh.shapes.checked(id.index())?, p, self.d)
+                && strictly_inside(*self.mesh.shapes.checked(id.index())?, fixed_point, self.d)
             {
                 return Ok(Some(id));
             }
@@ -55,18 +59,25 @@ impl Ctx<'_> {
         Ok(None)
     }
 
-    /// `FUN_140fa2630`: the first shape of `p`'s tile other than `excl`, not ignored, holding `p`
-    /// with its edges.
+    /// `FUN_140fa2630`: the first shape of `fixed_point`'s tile other than `excl`, not ignored,
+    /// holding `fixed_point` with its edges.
     pub(super) fn holder_but(
         &self,
-        p: FixedPoint,
+        fixed_point: FixedPoint,
         excl: ShapeId,
-        d: FixedDistance,
+        fixed_distance: FixedDistance,
     ) -> GenieResult<Option<ShapeId>> {
-        for &id in self.tile(Tile::new(tile_of(p.x()), tile_of(p.y())))? {
+        for &id in self.tile(Tile::new(
+            tile_of(fixed_point.x()),
+            tile_of(fixed_point.y()),
+        ))? {
             if id != excl
                 && !self.ignored(id)
-                && inside(*self.mesh.shapes.checked(id.index())?, p, d)
+                && inside(
+                    *self.mesh.shapes.checked(id.index())?,
+                    fixed_point,
+                    fixed_distance,
+                )
             {
                 return Ok(Some(id));
             }
@@ -81,24 +92,40 @@ impl Ctx<'_> {
             callback: cb,
             list,
             start: a,
-            end: b,
-            fraction: t,
+            end: fixed_point,
+            fraction: ray_fraction,
         } = tile;
         let d = self.d.get();
         let mut result = None;
         // B and C first test the shape against the ray's box
         let mut bx = [
-            if a.x() < b.x() { a.x() } else { b.x() },
-            if a.y() < b.y() { a.y() } else { b.y() },
-            if b.x() < a.x() { a.x() } else { b.x() },
-            if b.y() < a.y() { a.y() } else { b.y() },
+            if a.x() < fixed_point.x() {
+                a.x()
+            } else {
+                fixed_point.x()
+            },
+            if a.y() < fixed_point.y() {
+                a.y()
+            } else {
+                fixed_point.y()
+            },
+            if fixed_point.x() < a.x() {
+                a.x()
+            } else {
+                fixed_point.x()
+            },
+            if fixed_point.y() < a.y() {
+                a.y()
+            } else {
+                fixed_point.y()
+            },
         ];
         if matches!(cb, Callback::Box) {
-            if a.x() == b.x() {
+            if a.x() == fixed_point.x() {
                 bx[0] -= 1;
                 bx[2] += 1;
             }
-            if a.y() == b.y() {
+            if a.y() == fixed_point.y() {
                 bx[1] -= 1;
                 bx[3] += 1;
             }
@@ -107,12 +134,17 @@ impl Ctx<'_> {
             if self.ignored(id) {
                 continue;
             }
-            let r = *self.mesh.shapes.checked(id.index())?;
-            let shrunk = FixedRect::new(r.x0() + d, r.y0() + d, r.x1() - d, r.y1() - d);
+            let fixed_rect = *self.mesh.shapes.checked(id.index())?;
+            let shrunk = FixedRect::new(
+                fixed_rect.x0() + d,
+                fixed_rect.y0() + d,
+                fixed_rect.x1() - d,
+                fixed_rect.y1() - d,
+            );
             match cb {
                 Callback::Corner(token) => {
-                    let mut tt = *t;
-                    let Some((k, side)) = ray_rect(a, b, shrunk, &mut tt) else {
+                    let mut tt = *ray_fraction;
+                    let Some((k, side)) = ray_rect(a, fixed_point, shrunk, &mut tt) else {
                         continue;
                     };
                     let k = if k == Meet::TouchAtStart {
@@ -126,7 +158,7 @@ impl Ctx<'_> {
                         k
                     };
                     result = Some((k, Hit { shape: id, side }));
-                    *t = tt;
+                    *ray_fraction = tt;
                 }
                 Callback::Box | Callback::Sight => {
                     let clip = [
@@ -154,15 +186,15 @@ impl Ctx<'_> {
                     if !(clip[0] < clip[2] && clip[1] < clip[3]) {
                         continue;
                     }
-                    let mut tt = *t;
-                    if let Some((k, side)) = ray_rect(a, b, shrunk, &mut tt) {
-                        let k = if k == Meet::TouchAtStart {
+                    let mut tt = *ray_fraction;
+                    if let Some((k, side)) = ray_rect(a, fixed_point, shrunk, &mut tt) {
+                        let meet = if k == Meet::TouchAtStart {
                             Meet::Touch
                         } else {
                             k
                         };
-                        result = Some((k, Hit { shape: id, side }));
-                        *t = tt;
+                        result = Some((meet, Hit { shape: id, side }));
+                        *ray_fraction = tt;
                     }
                 }
             }
@@ -178,7 +210,7 @@ impl Ctx<'_> {
         &self,
         a: FixedPoint,
         b: FixedPoint,
-        t: &mut RayFraction,
+        ray_fraction: &mut RayFraction,
         mut cb: Callback,
     ) -> GenieResult<Option<(Meet, Hit)>> {
         let (x0, y0, x1, y1) = (a.x(), a.y(), b.x(), b.y());
@@ -229,20 +261,22 @@ impl Ctx<'_> {
         while 0 < count {
             let e = err;
             let list = self.tile(Tile::new(tx, ty))?;
-            let r = self.ray_tile(RayTile {
+            let ray_tile = self.ray_tile(RayTile {
                 callback: &mut cb,
                 list,
                 start: a,
                 end: b,
-                fraction: t,
+                fraction: ray_fraction,
             })?;
             let mut left = count;
-            if r.is_some() {
-                let hy = ((i64::from(y1.wrapping_sub(y0)) * i64::from(t.get())) >> 22) as i32 + y0;
-                let hx = ((i64::from(dx) * i64::from(t.get())) >> 22) as i32 + x0;
+            if ray_tile.is_some() {
+                let hy = ((i64::from(y1.wrapping_sub(y0)) * i64::from(ray_fraction.get())) >> 22)
+                    as i32
+                    + y0;
+                let hx = ((i64::from(dx) * i64::from(ray_fraction.get())) >> 22) as i32 + x0;
                 let span =
                     (tile_of(hx) - tx).wrapping_abs() + 1 + (tile_of(hy) - ty).wrapping_abs();
-                result = r;
+                result = ray_tile;
                 left = if count < span { count } else { span };
             }
             count = left - 1;
@@ -257,40 +291,40 @@ impl Ctx<'_> {
     }
 
     /// `FUN_140fa2d00`: an axis ray from `from` toward `end` in direction `dir` (0 −y, 1 +x, 2 +y,
-    /// 3 −x) against the near side of shape `r` (shrunk), the ray's line strictly inside the
-    /// shape's span; the hit point and side.
+    /// 3 −x) against the near side of shape `fixed_rect` (shrunk), the ray's line strictly inside
+    /// the shape's span; the hit point and side.
     pub(super) fn axis_hit(
         from: FixedPoint,
         end: FixedPoint,
-        r: FixedRect,
-        d: FixedDistance,
+        fixed_rect: FixedRect,
+        fixed_distance: FixedDistance,
         dir: AxisDir,
     ) -> Option<(FixedPoint, ShapeSide)> {
         let [x, y] = from.get();
-        let d = d.get();
+        let d = fixed_distance.get();
         let met = match dir {
             AxisDir::PlusX => {
-                let h = d + r.x0();
-                (r.y0() + d < y && y < r.y1() - d && h < end.x() && x <= h)
+                let h = d + fixed_rect.x0();
+                (fixed_rect.y0() + d < y && y < fixed_rect.y1() - d && h < end.x() && x <= h)
                     .then_some(FixedPoint::new(h, y))
             }
             AxisDir::PlusY => {
-                let h = d + r.y0();
-                (r.x0() + d < x && x < r.x1() - d && h < end.y() && y <= h)
+                let h = d + fixed_rect.y0();
+                (fixed_rect.x0() + d < x && x < fixed_rect.x1() - d && h < end.y() && y <= h)
                     .then_some(FixedPoint::new(x, h))
             }
             AxisDir::MinusX => {
-                let h = r.x1() - d;
-                (r.y0() + d < y && y < r.y1() - d && end.x() < h && h <= x)
-                    .then_some(FixedPoint::new(h, y))
+                let x1 = fixed_rect.x1() - d;
+                (fixed_rect.y0() + d < y && y < fixed_rect.y1() - d && end.x() < x1 && x1 <= x)
+                    .then_some(FixedPoint::new(x1, y))
             }
             AxisDir::MinusY => {
-                let h = r.y1() - d;
-                (r.x0() + d < x && x < r.x1() - d && end.y() < h && h <= y)
-                    .then_some(FixedPoint::new(x, h))
+                let y1 = fixed_rect.y1() - d;
+                (fixed_rect.x0() + d < x && x < fixed_rect.x1() - d && end.y() < y1 && y1 <= y)
+                    .then_some(FixedPoint::new(x, y1))
             }
         };
-        met.map(|p| (p, dir.facing()))
+        met.map(|fixed_point| (fixed_point, dir.facing()))
     }
 
     /// `FUN_140fa8930` (and `FUN_140fa2420` per tile): an axis sweep from `from` to `to` in
@@ -304,7 +338,7 @@ impl Ctx<'_> {
         to: FixedPoint,
         dir: AxisDir,
     ) -> GenieResult<Sweep> {
-        let d = self.d;
+        let fixed_distance = self.d;
         let mut end = to;
         let mut out = Sweep::default();
         let visit = |list: &[ShapeId], end: &mut FixedPoint, out: &mut Sweep| -> GenieResult<()> {
@@ -312,14 +346,16 @@ impl Ctx<'_> {
                 if self.ignored(id) {
                     continue;
                 }
-                let r = *self.mesh.shapes.checked(id.index())?;
-                let Some((hp, side)) = Self::axis_hit(from, *end, r, d, dir) else {
+                let fixed_rect = *self.mesh.shapes.checked(id.index())?;
+                let Some((hp, side)) = Self::axis_hit(from, *end, fixed_rect, fixed_distance, dir)
+                else {
                     continue;
                 };
                 out.point = Some(hp);
                 out.side = Some(side);
                 if from == hp && *end == to {
-                    let back = Self::axis_hit(*end, from, r, d, dir.reverse());
+                    let back =
+                        Self::axis_hit(*end, from, fixed_rect, fixed_distance, dir.reverse());
                     if back.is_some_and(|(bp, _)| bp == from) {
                         continue;
                     }
@@ -367,16 +403,22 @@ impl Ctx<'_> {
         Ok(out)
     }
 
-    /// `FUN_140fa8e60`: whether the straight walk from `a` to `b` is blocked (the smoothing's line of
-    /// sight): an axis sweep along an axis, else the raycast with callback C.
-    pub(super) fn sight_blocked(&self, a: FixedPoint, b: FixedPoint) -> GenieResult<bool> {
-        if a.x() == b.x() {
-            return Ok(self.sweep(a, b, AxisDir::of_dy(b.y() - a.y()))?.found);
+    /// `FUN_140fa8e60`: whether the straight walk from `from` to `to` is blocked (the smoothing's
+    /// line of sight): an axis sweep along an axis, else the raycast with callback C.
+    pub(super) fn sight_blocked(&self, from: FixedPoint, to: FixedPoint) -> GenieResult<bool> {
+        if from.x() == to.x() {
+            return Ok(self
+                .sweep(from, to, AxisDir::of_dy(to.y() - from.y()))?
+                .found);
         }
-        if a.y() == b.y() {
-            return Ok(self.sweep(a, b, AxisDir::of_dx(b.x() - a.x()))?.found);
+        if from.y() == to.y() {
+            return Ok(self
+                .sweep(from, to, AxisDir::of_dx(to.x() - from.x()))?
+                .found);
         }
-        let mut t = RayFraction::START;
-        Ok(self.raycast(a, b, &mut t, Callback::Sight)?.is_some())
+        let mut ray_fraction = RayFraction::START;
+        Ok(self
+            .raycast(from, to, &mut ray_fraction, Callback::Sight)?
+            .is_some())
     }
 }

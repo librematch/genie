@@ -61,11 +61,11 @@ impl Graphics {
 
     /// `graphic` for `sprite`; the graphic it held before.
     pub fn insert(&mut self, sprite: SpriteId, graphic: Graphic) -> Option<Graphic> {
-        let i = index(sprite);
-        if self.by_id.len() <= i {
-            self.by_id.resize(i + 1, None);
+        let index = index(sprite);
+        if self.by_id.len() <= index {
+            self.by_id.resize(index + 1, None);
         }
-        let old = self.by_id.get_mut(i).and_then(|g| g.replace(graphic));
+        let old = self.by_id.get_mut(index).and_then(|g| g.replace(graphic));
         if old.is_none() {
             self.len += 1;
         }
@@ -97,9 +97,9 @@ impl<'a> Iterator for Iter<'a> {
     type Item = (SpriteId, &'a Graphic);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.find_map(|(i, g)| {
+        self.inner.find_map(|(i, graphic)| {
             let id = u16::try_from(i).ok()?.cast_signed();
-            Some((SpriteId::named(id), g.as_ref()?))
+            Some((SpriteId::named(id), graphic.as_ref()?))
         })
     }
 }
@@ -171,21 +171,24 @@ mod tests {
     /// their ids' order; two tables with the same graphics are equal.
     #[test]
     fn the_table_finds_and_walks_the_sprites_by_id() {
-        let mut g: Graphics = [
+        let mut graphics: Graphics = [
             (SpriteId::named(9), graphic(9, 1)),
             (SpriteId::named(2), graphic(2, 2)),
         ]
         .into_iter()
         .collect();
-        assert_eq!(g.len(), 2);
-        assert_eq!(g.get(SpriteId::named(9)), Some(&graphic(9, 1)));
-        assert_eq!(g.get(SpriteId::named(3)), None);
-        assert!(!g.contains_key(SpriteId::named(4000)));
+        assert_eq!(graphics.len(), 2);
+        assert_eq!(graphics.get(SpriteId::named(9)), Some(&graphic(9, 1)));
+        assert_eq!(graphics.get(SpriteId::named(3)), None);
+        assert!(!graphics.contains_key(SpriteId::named(4000)));
         assert_eq!(
-            g.insert(SpriteId::named(9), graphic(9, 5)),
+            graphics.insert(SpriteId::named(9), graphic(9, 5)),
             Some(graphic(9, 1))
         );
-        let walked: Vec<i16> = g.iter().map(|(s, _)| s.get()).collect();
+        let walked: Vec<i16> = graphics
+            .iter()
+            .map(|(sprite_id, _)| sprite_id.get())
+            .collect();
         assert_eq!(walked, [2, 9]);
         let same: Graphics = [
             (SpriteId::named(2), graphic(2, 2)),
@@ -193,12 +196,12 @@ mod tests {
         ]
         .into_iter()
         .collect();
-        assert_eq!(g, same);
+        assert_eq!(graphics, same);
         assert!(Graphics::new().is_empty());
         let mut from = Graphics::from([(SpriteId::named(2), graphic(2, 2))]);
         assert_eq!(from.len(), 1);
         from.clear();
         assert!(from.is_empty());
-        assert_eq!((&g).into_iter().count(), 2);
+        assert_eq!((&graphics).into_iter().count(), 2);
     }
 }

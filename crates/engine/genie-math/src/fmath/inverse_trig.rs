@@ -125,17 +125,20 @@ pub fn atan(x: f32) -> f32 {
         }
         (None, x)
     } else {
-        let a = fabs(x);
+        let abs_x = fabs(x);
         if ix < 0x3f98_0000 {
             if ix < 0x3f30_0000 {
-                (Some(0), (a * TWO - ONE) / (a + TWO))
+                (Some(0), (abs_x * TWO - ONE) / (abs_x + TWO))
             } else {
-                (Some(1), (a - ONE) / (a + ONE))
+                (Some(1), (abs_x - ONE) / (abs_x + ONE))
             }
         } else if ix < 0x401c_0000 {
-            (Some(2), (a - THREE_HALVES) / (a * THREE_HALVES + ONE))
+            (
+                Some(2),
+                (abs_x - THREE_HALVES) / (abs_x * THREE_HALVES + ONE),
+            )
         } else {
-            (Some(3), MINUS_ONE / a)
+            (Some(3), MINUS_ONE / abs_x)
         }
     };
     let z = t * t;

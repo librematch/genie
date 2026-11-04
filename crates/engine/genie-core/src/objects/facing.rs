@@ -42,8 +42,8 @@ const MINUS_ONE: f32 = FACING_MINUS_ONE;
 const TWO: f32 = FACING_TWO;
 
 /// The facets most routines count: the sprite's, at least 8 (`FUN_14114d780`, `FUN_14119d0c0`).
-fn at_least_eight(s: SpriteFacets) -> i32 {
-    s.count.at_least_eight()
+fn at_least_eight(sprite_facets: SpriteFacets) -> i32 {
+    sprite_facets.count.at_least_eight()
 }
 
 /// An angle held in 0 to 2π by one turn either way (the routines' tail).
@@ -73,7 +73,7 @@ pub fn modulo(x: f32, m: f32) -> f32 {
 /// (1, 0, 1) (`acosf`), in facets of 2π over the count, rounded half up, counted the other way
 /// when the cross product's height is below 0.
 #[must_use]
-pub fn facet_of_forward(forward: BVector, s: SpriteFacets) -> Facet {
+pub fn facet_of_forward(forward: BVector, sprite_facets: SpriteFacets) -> Facet {
     let length = sqrt(forward.x() * forward.x() + 0.0 + forward.y() * forward.y());
     let u = BVector::new(
         forward.x() / length,
@@ -89,8 +89,8 @@ pub fn facet_of_forward(forward: BVector, s: SpriteFacets) -> Facet {
         0.0
     };
     let side = cross(u, d).height();
-    let n = at_least_eight(s);
-    let q = angle / (TWO_PI / n as f32);
+    let facet_count = at_least_eight(sprite_facets);
+    let q = angle / (TWO_PI / facet_count as f32);
     let floor = libm::floorf(q);
     let low = floor as i32 as u8;
     let facet = if q < (floor as i32) as f32 + HALF {
@@ -101,17 +101,17 @@ pub fn facet_of_forward(forward: BVector, s: SpriteFacets) -> Facet {
     Facet::of_data(if 0.0 <= side {
         facet
     } else {
-        (n as u8).wrapping_sub(facet)
+        (facet_count as u8).wrapping_sub(facet)
     })
 }
 
 /// `FUN_14114d780`: the angle of a facet: its share of a turn plus a quarter of π, held in 0 to
 /// 2π.
 #[must_use]
-pub fn angle_of_facet(facet: Facet, s: SpriteFacets) -> Angle {
-    let n = at_least_eight(s);
+pub fn angle_of_facet(facet: Facet, sprite_facets: SpriteFacets) -> Angle {
+    let facet_count = at_least_eight(sprite_facets);
     Angle::new(wrapped(
-        (TWO_PI / n as f32) * f32::from(facet.get()) + QUARTER_PI,
+        (TWO_PI / facet_count as f32) * f32::from(facet.get()) + QUARTER_PI,
     ))
 }
 
@@ -119,15 +119,15 @@ pub fn angle_of_facet(facet: Facet, s: SpriteFacets) -> Angle {
 /// facets (at least 8 counted); none without (0, 0).
 #[must_use]
 pub fn facet_of_angle(angle: Angle, s: Option<SpriteFacets>) -> (Facet, f32) {
-    let Some(s) = s.filter(|s| s.count.any()) else {
+    let Some(s) = s.filter(|sprite_facets| sprite_facets.count.any()) else {
         return (Facet::of_data(0), 0.0);
     };
-    let n = at_least_eight(s) as f32;
-    let q = ((angle.get() - QUARTER_PI) * n) / TWO_PI;
-    let share = modulo(q, n);
+    let facet_count = at_least_eight(s) as f32;
+    let q = ((angle.get() - QUARTER_PI) * facet_count) / TWO_PI;
+    let share = modulo(q, facet_count);
     let mut q = q + HALF;
     if q < 0.0 {
-        q += n;
+        q += facet_count;
     }
     (Facet::of_data(q as i32 as u8), share)
 }
@@ -137,7 +137,7 @@ pub fn facet_of_angle(angle: Angle, s: Option<SpriteFacets>) -> (Facet, f32) {
 /// −π to π, times the facets over 2π; 0 on the same point (within 1e-7) or without facets.
 #[must_use]
 pub fn facets_to(at: Point, angle: Angle, to: Point, s: Option<SpriteFacets>) -> f32 {
-    let Some(s) = s.filter(|s| s.count.any()) else {
+    let Some(s) = s.filter(|sprite_facets| sprite_facets.count.any()) else {
         return 0.0;
     };
     offset_in_facets(to.x() - at.x(), to.y() - at.y(), angle, at_least_eight(s))
@@ -170,12 +170,12 @@ pub fn offset_in_facets(dx: f32, dy: f32, angle: Angle, n: i32) -> f32 {
 /// to 2π) and it faces. Returns the angle.
 #[must_use]
 pub fn face(at: Point, angle: Angle, to: Point, s: Option<SpriteFacets>) -> Angle {
-    let n = s.map_or(8, |s| s.count.at_least_eight());
+    let facet_count = s.map_or(8, |sprite_facets| sprite_facets.count.at_least_eight());
     let off = facets_to(at, angle, to, s);
     if (MINUS_HALF..=HALF).contains(&off) {
         return angle;
     }
-    Angle::new(wrapped((off * TWO_PI) / n as f32 + angle.get()))
+    Angle::new(wrapped((off * TWO_PI) / facet_count as f32 + angle.get()))
 }
 
 /// `FUN_141162db0` for a unit with a turn time (its master's `+0x758`, seconds): facing `to`
@@ -194,7 +194,7 @@ pub fn turn_toward(
     last_turn: Seconds,
     world_time: WorldTime,
 ) -> (Angle, Seconds, bool) {
-    let n = s.map_or(8, |s| s.count.at_least_eight());
+    let facet_count = s.map_or(8, |sprite_facets| sprite_facets.count.at_least_eight());
     let off = facets_to(at, angle, to, s);
     if (MINUS_HALF..=HALF).contains(&off) {
         return (angle, last_turn, true);
@@ -203,7 +203,7 @@ pub fn turn_toward(
     if now - last_turn < turn_time {
         return (angle, last_turn, false);
     }
-    let step = TWO_PI / n as f32;
+    let step = TWO_PI / facet_count as f32;
     let a = angle.get();
     let turned = Angle::new(wrapped(if 0.0 <= off { step + a } else { a - step }));
     let off = facets_to(at, turned, to, s);
@@ -214,16 +214,16 @@ pub fn turn_toward(
 /// facet faces a facet drawn from the Object stream (`r`, 0 to 0x7fff): `(r × facets) / 0x7fff`
 /// facets of 2π over the facets.
 #[must_use]
-pub fn drawn_angle(r: u32, s: SpriteFacets) -> Angle {
-    let n = s.count.counted();
-    let k = ((r as i32).wrapping_mul(n)) / 0x7fff;
-    Angle::new(wrapped(k as f32 * (TWO_PI / n as f32)))
+pub fn drawn_angle(r: u32, sprite_facets: SpriteFacets) -> Angle {
+    let counted = sprite_facets.count.counted();
+    let k = ((r as i32).wrapping_mul(counted)) / 0x7fff;
+    Angle::new(wrapped(k as f32 * (TWO_PI / counted as f32)))
 }
 
 /// A new object's sprite turns and has more than one facet: [`drawn_angle`] draws.
 #[must_use]
 pub fn draws_angle(s: Option<SpriteFacets>) -> bool {
-    s.is_some_and(|s| s.turns && s.count.several())
+    s.is_some_and(|sprite_facets| sprite_facets.turns && sprite_facets.count.several())
 }
 
 #[cfg(test)]
@@ -256,8 +256,8 @@ mod tests {
         assert_eq!(f, Facet::of_data(0));
         assert_eq!(angle_of_facet(f, VILLAGER), Angle::new(QUARTER_PI));
         // facing x: an eighth of a turn round, two facets of sixteen, the other way
-        let f = facet_of_forward(BVector::new(1.0, 0.0, 0.0), VILLAGER);
-        assert_eq!(f, Facet::of_data(14));
+        let facet = facet_of_forward(BVector::new(1.0, 0.0, 0.0), VILLAGER);
+        assert_eq!(facet, Facet::of_data(14));
         assert_eq!(
             angle_of_facet(Facet::of_data(14), VILLAGER),
             Angle::new(wrapped(TWO_PI / 16.0 * 14.0 + QUARTER_PI))
@@ -286,7 +286,7 @@ mod tests {
         );
         assert_eq!((last, faces), (Seconds::new(1.0), false));
         // 0.2 seconds later it waits
-        let (b, last2, faces2) = turn_toward(
+        let (angle, last2, faces2) = turn_toward(
             at,
             a,
             to,
@@ -295,7 +295,7 @@ mod tests {
             last,
             WorldTime::from_millis(1200),
         );
-        assert_eq!((b, last2, faces2), (a, Seconds::new(1.0), false));
+        assert_eq!((angle, last2, faces2), (a, Seconds::new(1.0), false));
         // facing within half a facet it faces at once, whatever the time
         let facing = turn_toward(
             at,

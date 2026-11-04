@@ -60,8 +60,8 @@ impl PlayState {
 }
 
 impl genie_diff::Diff for PlayState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.raw().diff(&other.raw(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.raw().diff(&other.raw(), differ);
     }
 }
 

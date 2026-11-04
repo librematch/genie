@@ -62,5 +62,5 @@ impl Graphic {
 /// (`new_sprite`).
 #[must_use]
 pub fn top_speed(base: Speed, shown: Option<&Graphic>) -> Speed {
-    shown.map_or(base, |g| g.speed_multiplier.applied_to(base))
+    shown.map_or(base, |graphic| graphic.speed_multiplier.applied_to(base))
 }

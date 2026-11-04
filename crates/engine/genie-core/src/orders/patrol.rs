@@ -145,10 +145,10 @@ impl World {
     /// timeout ([`patrol_timeout`]), its patrol zeroed with [`SavedPatrols::Dropped`].
     pub(super) fn start_patrol_timers(&mut self, ids: &[Option<ObjectId>], patrols: SavedPatrols) {
         let dt = self.dt;
-        for (i, &id) in ids.iter().enumerate() {
+        for (index, &id) in ids.iter().enumerate() {
             if let Some(ai) = id.and_then(|id| self.parts.unit_ai.get_mut(id)) {
                 ai.idle_timer = Millis::ZERO;
-                let timeout = patrol_timeout(i, dt);
+                let timeout = patrol_timeout(index, dt);
                 ai.adjusted_idle_timeout = timeout;
                 ai.secondary_timer = timeout;
                 if patrols == SavedPatrols::Dropped {
@@ -208,18 +208,18 @@ impl World {
                 listed.push(id);
             }
             let commands = self.groups.commands;
-            let g = self.groups.held_mut(id)?;
-            g.differentiator_id = commands;
+            let unit_group = self.groups.held_mut(id)?;
+            unit_group.differentiator_id = commands;
             let kept = waypoints_from(
-                g.motion.position[0].ground(),
+                unit_group.motion.position[0].ground(),
                 waypoints,
                 &self.model.tuning.order,
             );
             let Some((&last, before)) = kept.split_last() else {
                 continue;
             };
-            for w in before {
-                g.add_waypoint(*w, MoveFlags::FORGET_TARGET);
+            for point in before {
+                unit_group.add_waypoint(*point, MoveFlags::FORGET_TARGET);
             }
             let leg = CommandMoveTo {
                 range: Distance::ZERO,
@@ -235,13 +235,13 @@ impl World {
             let _ = self.command_move_to(id, None, last, leg)?;
         }
         for &id in &listed {
-            if let Some(g) = self.groups.get_mut(id) {
-                set_differentiator_groups(g, &listed);
+            if let Some(group) = self.groups.get_mut(id) {
+                set_differentiator_groups(group, &listed);
             }
         }
         self.groups.count_command();
-        for i in 0..split.loose.len() {
-            self.sweep_unit(&split.loose, i, waypoints, sweep)?;
+        for index in 0..split.loose.len() {
+            self.sweep_unit(&split.loose, index, waypoints, sweep)?;
         }
         Ok(())
     }
@@ -250,11 +250,19 @@ impl World {
     /// target on the ground (`FUN_14118f8c0`) is above its master's line of sight squared (`COMISS`:
     /// a NaN is not), so the target is out of its sight.
     fn out_of_sight(&self, unit: &Unit, master: &Master, target: ObjectId) -> GenieResult<bool> {
-        let Some(t) = self.world_object(target) else {
+        let Some(world_object) = self.world_object(target) else {
             return Ok(true);
         };
-        let tm = self.master(t.player(), t.master_id(self.model.slots))?;
-        let gap = footprint_gap_squared(unit.position(), master.radius, t.position(), tm.radius);
+        let tm = self.master(
+            world_object.player(),
+            world_object.master_id(self.model.slots),
+        )?;
+        let gap = footprint_gap_squared(
+            unit.position(),
+            master.radius,
+            world_object.position(),
+            tm.radius,
+        );
         Ok(master.line_of_sight.squared() < gap)
     }
 
@@ -276,11 +284,11 @@ impl World {
         let mut i = 0;
         while i < split.loose.len() {
             let id = *split.loose.checked(i)?;
-            let Some((p, u)) = self.object(id) else {
+            let Some((player_id, unit)) = self.object(id) else {
                 i += 1;
                 continue;
             };
-            let master = u.master(self.master_tables(), p)?;
+            let master = unit.master(self.master_tables(), player_id)?;
             if master.kind < MasterKind::COMBAT
                 || !master.creatable_part().formation_category.grouped()
                 || split.far.contains(&id)
@@ -288,22 +296,27 @@ impl World {
                 i += 1;
                 continue;
             }
-            if let Some(t) = target
-                && !self.out_of_sight(u, master, t)?
+            if let Some(object_id) = target
+                && !self.out_of_sight(unit, master, object_id)?
             {
                 i += 1;
                 continue;
             }
-            let g = self.groups.held(group)?;
-            let at = g.motion.position[0];
-            let from = u.position().ground();
+            let held = self.groups.held(group)?;
+            let at = held.motion.position[0];
+            let from = unit.position().ground();
             let moved = self
                 .parts
-                .mover_of(u.id)
-                .map_or_else(|| u.position(), |m| m.moved_at);
-            let restriction = self.parts.mover_of(u.id).map(|m| m.stats.restriction);
+                .mover_of(unit.id)
+                .map_or_else(|| unit.position(), |m| m.moved_at);
+            let restriction = self
+                .parts
+                .mover_of(unit.id)
+                .map(|mover| mover.stats.restriction);
             let tiles = self.spatial.tiles();
-            if let Some(planner) = restriction.and_then(|r| self.pathing.planner(r, tiles)) {
+            if let Some(planner) =
+                restriction.and_then(|restriction_id| self.pathing.planner(restriction_id, tiles))
+            {
                 let req = Request {
                     from,
                     to: at.ground(),
@@ -327,7 +340,7 @@ impl World {
             }
             // slot 0x520: +0x824 as the game holds it (x, height, y)
             let d = BVector::new(moved.x(), moved.z(), moved.y()) - at;
-            let influence = self.players.player(p)?.formations.influence.get();
+            let influence = self.players.player(player_id)?.formations.influence.get();
             if d.x() * d.x() + d.height() * d.height() + d.y() * d.y() <= influence * influence {
                 let _ = split.loose.remove(i);
                 let _ = self.add_to_group(group, id)?;
@@ -340,26 +353,25 @@ impl World {
         Ok(())
     }
 
-    /// The loose unit `loose[i]` of PATROL or `ATTACK_MOVE` (`FUN_14161b970`'s loop over the
-    /// splitter's loose units): one the world does not hold takes nothing. An attack move's unit
-    /// with a unit AI, `queued` (`+0x9`) or, without `ignore_pending` (`+0xa`), with an order in
-    /// its queue that is not ready ([`crate::unit_ai::UnitAi::has_unready_order`]), takes the
-    /// order through its queue (slot 0x30: the attack move `0x2dd` at the first waypoint,
-    /// priority 100), which is not modelled: the call leaves the record's shown point and ready
-    /// flag to the stack ([`ATTACK_MOVE_QUEUED`]). Any other leaves its unit group (`FUN_14102c160` with
-    /// −1); a unit that moves (with movement state: type 30 or more) loses its own waypoints
-    /// (slot 0x450) and its ignore list (`FUN_141197da0`), waits to move (slot 0x2a0 with 1) and
-    /// lists the other loose units (`FUN_14118c790`); an object below type 30 has those slots
-    /// empty, and its ignore list (the static part's, which only a walker's short pather reads)
-    /// is not held. Of the waypoints its place passes ([`waypoints_from`]) none leaves it there;
-    /// else each but the last becomes its own (slot 0x448 at its height) and it moves to the last
-    /// (slot 0x340: range 0, forced for a patrol only, walking): of type 70 or 80 through
-    /// `FUN_141216c50` ([`World::move_aside`]; type 50 and 60 run `FUN_1410866e0` without its
-    /// class test, which only masters of type 70 meet), types 30 and 40 not at all
-    /// (`FUN_14106d330`). Its unit AI takes the patrol order (an attack move's `0x2dd`) and the
-    /// move action (`FUN_140c64b60` with 1, `FUN_140c64b50`) and no target at the command's last
-    /// waypoint at the unit's height (`FUN_140c64be0`), even where the filter left that waypoint
-    /// out.
+    /// The loose unit `loose[list_index]` of PATROL or `ATTACK_MOVE` (`FUN_14161b970`'s loop over
+    /// the splitter's loose units): one the world does not hold takes nothing. An attack move's
+    /// unit with a unit AI, `queued` (`+0x9`) or, without `ignore_pending` (`+0xa`), with an order
+    /// in its queue that is not ready ([`crate::unit_ai::UnitAi::has_unready_order`]), takes the
+    /// order through its queue (slot 0x30: the attack move `0x2dd` at the first waypoint, priority
+    /// 100), which is not modelled: the call leaves the record's shown point and ready flag to the
+    /// stack ([`ATTACK_MOVE_QUEUED`]). Any other leaves its unit group (`FUN_14102c160` with −1); a
+    /// unit that moves (with movement state: type 30 or more) loses its own waypoints (slot 0x450)
+    /// and its ignore list (`FUN_141197da0`), waits to move (slot 0x2a0 with 1) and lists the other
+    /// loose units (`FUN_14118c790`); an object below type 30 has those slots empty, and its ignore
+    /// list (the static part's, which only a walker's short pather reads) is not held. Of the
+    /// waypoints its place passes ([`waypoints_from`]) none leaves it there; else each but the last
+    /// becomes its own (slot 0x448 at its height) and it moves to the last (slot 0x340: range 0,
+    /// forced for a patrol only, walking): of type 70 or 80 through `FUN_141216c50`
+    /// ([`World::move_aside`]; type 50 and 60 run `FUN_1410866e0` without its class test, which
+    /// only masters of type 70 meet), types 30 and 40 not at all (`FUN_14106d330`). Its unit AI
+    /// takes the patrol order (an attack move's `0x2dd`) and the move action (`FUN_140c64b60` with
+    /// 1, `FUN_140c64b50`) and no target at the command's last waypoint at the unit's height
+    /// (`FUN_140c64be0`), even where the filter left that waypoint out.
     pub(super) fn sweep_unit(
         &mut self,
         loose: &[ObjectId],
@@ -389,8 +401,8 @@ impl World {
             m.clear_user_waypoints();
             m.ignore_units.clear();
             m.waiting = 1;
-            for (k, &other) in loose.iter().enumerate() {
-                if k != i {
+            for (index, &other) in loose.iter().enumerate() {
+                if index != i {
                     ignore_unit(&mut m.ignore_units, other);
                 }
             }
@@ -401,9 +413,12 @@ impl World {
             return Ok(());
         };
         let (lx, ly) = (last.x(), last.y());
-        if let Some(m) = self.parts.mover_mut(id) {
-            for w in before {
-                m.add_user_waypoint(Position::new(w.x(), w.y(), z), &self.model.tuning.movement);
+        if let Some(mover) = self.parts.mover_mut(id) {
+            for point in before {
+                mover.add_user_waypoint(
+                    Position::new(point.x(), point.y(), z),
+                    &self.model.tuning.movement,
+                );
             }
         }
         // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep)
@@ -424,7 +439,9 @@ impl World {
         }
         let unit = match self.place(id) {
             Some(Place::Live(p, i)) => self.players.live_mut(p, i)?,
-            Some(Place::Sleeping(p, i)) => self.players.asleep_mut(p, i)?,
+            Some(Place::Sleeping(player_id, list_index)) => {
+                self.players.asleep_mut(player_id, list_index)?
+            }
             None => return Ok(()),
         };
         let rng = self.streams.get(Stream::Ai);

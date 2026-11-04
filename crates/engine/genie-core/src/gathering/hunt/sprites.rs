@@ -19,7 +19,7 @@ pub(crate) fn stand_sprite(
     held: Held,
     graphics: &Graphics,
 ) -> Option<Graphic> {
-    let g = |id: Option<SpriteId>| id.and_then(|s| graphics.get(s).copied());
+    let g = |id: Option<SpriteId>| id.and_then(|sprite_id| graphics.get(sprite_id).copied());
     let carrying = task.sprites.carrying;
     if task.resource.is_some()
         && task.resource == held.kind
@@ -57,7 +57,7 @@ pub(crate) fn resource_kind(
     slots: Slots,
 ) -> AttributeId {
     kind.and_then(AttributeId::load_resource)
-        .filter(|k| k.index() < attributes)
+        .filter(|attribute_id| attribute_id.index() < attributes)
         .unwrap_or(slots.attribute.food)
 }
 
@@ -76,17 +76,17 @@ pub struct HuntSprites {
 }
 
 impl HuntTask {
-    /// The hunt's view of master task `t`.
+    /// The hunt's view of master task `task`.
     #[must_use]
-    pub const fn of(t: &Task) -> Self {
+    pub const fn of(task: &Task) -> Self {
         Self {
-            id: t.id,
-            range: t.work_range,
-            resource: t.attribute_kind,
-            sprites: t.sprites,
-            work_value: t.work_val1,
-            productivity: t.attribute_kind2,
-            kind4: t.attribute_kind4,
+            id: task.id,
+            range: task.work_range,
+            resource: task.attribute_kind,
+            sprites: task.sprites,
+            work_value: task.work_val1,
+            productivity: task.attribute_kind2,
+            kind4: task.attribute_kind4,
         }
     }
 
@@ -115,7 +115,7 @@ pub fn walk_sprite(
 ) -> Option<Graphic> {
     let carrying = resource.is_some() && held.kind == resource && 1 <= held.amount.get() as i32;
     match (carrying, sprites.carrying) {
-        (true, Some(g)) => Some(g),
+        (true, Some(graphic)) => Some(graphic),
         _ => sprites.moving,
     }
 }

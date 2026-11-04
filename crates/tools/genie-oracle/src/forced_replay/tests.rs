@@ -212,7 +212,13 @@ fn the_continuous_run_reports_each_update_and_forces_the_games_state() {
         2,
     )
     .unwrap();
-    assert_eq!(reports.iter().map(|r| r.start).collect::<Vec<_>>(), [0, 1]);
+    assert_eq!(
+        reports
+            .iter()
+            .map(|tick_report| tick_report.start)
+            .collect::<Vec<_>>(),
+        [0, 1]
+    );
     for report in &reports {
         assert_eq!(report.differences.len(), 1, "{report:?}");
         assert!(report.differences[0].1.starts_with("frame seed slice "));
@@ -276,7 +282,12 @@ fn run_from_later_update_compares_the_updates_after_it() {
         1,
     )
     .unwrap();
-    assert_eq!(one.iter().map(|r| r.start).collect::<Vec<_>>(), [0]);
+    assert_eq!(
+        one.iter()
+            .map(|tick_report| tick_report.start)
+            .collect::<Vec<_>>(),
+        [0]
+    );
 }
 
 /// The unit groups take the game's state where they differ: the group command counter the
@@ -300,10 +311,11 @@ fn differing_groups_are_forced_to_the_games() {
         1,
     )
     .unwrap();
-    let group_lines = |r: &crate::TickReport| {
-        r.differences
+    let group_lines = |tick_report: &crate::TickReport| {
+        tick_report
+            .differences
             .iter()
-            .filter(|(_, d)| d.contains("command"))
+            .filter(|(_, text)| text.contains("command"))
             .count()
     };
     assert_eq!(group_lines(&reports[0]), 1, "{:?}", reports[0]);

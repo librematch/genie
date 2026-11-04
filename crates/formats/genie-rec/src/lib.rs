@@ -119,8 +119,8 @@ impl From<u16> for ObjectId {
 
 impl From<ObjectId> for u32 {
     #[inline]
-    fn from(n: ObjectId) -> Self {
-        n.0
+    fn from(object_id: ObjectId) -> Self {
+        object_id.0
     }
 }
 
@@ -362,7 +362,7 @@ mod tests {
         let reasons = |interval, ops: &[u32]| -> Vec<Result<(), &'static str>> {
             BodyActions::new(Cursor::new(body(interval, ops)), 12.0)
                 .unwrap()
-                .map(|action| action.map(|_| ()).map_err(|e| e.reason()))
+                .map(|action| action.map(|_| ()).map_err(|error| error.reason()))
                 .collect()
         };
         assert_eq!(
@@ -394,23 +394,25 @@ mod tests {
     // AI data parsing is incomplete: remove this attribute when the test starts passing
     #[should_panic = "assertion"] // matches the pre- and post-1.73 assert_eq! panic text
     fn incomplete_up_15_rec_with_ai() {
-        let f = File::open("test/rec.20181208-195117.mgz").unwrap();
-        let mut r = RecordedGame::new(f).unwrap();
-        let _ = r.header().expect("AI data cannot be fully parsed");
-        for act in r.actions().unwrap() {
+        let file = File::open("test/rec.20181208-195117.mgz").unwrap();
+        let mut recorded_game = RecordedGame::new(file).unwrap();
+        let _ = recorded_game
+            .header()
+            .expect("AI data cannot be fully parsed");
+        for act in recorded_game.actions().unwrap() {
             let _act = act.unwrap();
         }
     }
 
     #[test]
     fn aoc_1_0_rec() -> anyhow::Result<()> {
-        let f = File::open("test/missyou_finally_vs_11.mgx")?;
-        let mut r = RecordedGame::new(f)?;
-        let _ = r.header()?;
-        for act in r.actions()? {
+        let file = File::open("test/missyou_finally_vs_11.mgx")?;
+        let mut recorded_game = RecordedGame::new(file)?;
+        let _ = recorded_game.header()?;
+        for act in recorded_game.actions()? {
             match act {
                 Ok(act) => println!("{act:?}"),
-                Err(e) if e.reason() == "a string that does not decode as WINDOWS-1252" => {
+                Err(error) if error.reason() == "a string that does not decode as WINDOWS-1252" => {
                     // Skip invalid utf8 chat for now
                 }
                 Err(err) => return Err(err.into()),
@@ -421,10 +423,10 @@ mod tests {
 
     #[test]
     fn aok_rec() -> anyhow::Result<()> {
-        let f = File::open("test/aok.mgl")?;
-        let mut r = RecordedGame::new(f)?;
-        let _ = r.header()?;
-        for act in r.actions()? {
+        let file = File::open("test/aok.mgl")?;
+        let mut recorded_game = RecordedGame::new(file)?;
+        let _ = recorded_game.header()?;
+        for act in recorded_game.actions()? {
             println!("{:?}", act?);
         }
         Ok(())

@@ -80,8 +80,8 @@ impl GatherAction {
 
     /// The sprite the walks show (`FUN_140a8b660`, slot 0x68 with it): the task's carrying sprite
     /// while the unit carries at least 1 of the task's resource, else its moving one.
-    pub(super) fn walk_sprite(&self, unit: &Unit, r: &GatherReads) -> Option<Graphic> {
-        walk_sprite(self.task.resource, unit.life.held(), &r.sprites)
+    pub(super) fn walk_sprite(&self, unit: &Unit, gather_reads: &GatherReads) -> Option<Graphic> {
+        walk_sprite(self.task.resource, unit.life.held(), &gather_reads.sprites)
     }
 
     /// One update (slot 6, `0x140a8e1d0`) of `unit`'s Gather in states other than 8, `target`
@@ -89,58 +89,71 @@ impl GatherAction {
     /// (`FUN_140a992b0`); its end (codes 1 and 2) is `set_state(6)`. State 6 faces the target
     /// (`FUN_141162db0`) and, while it holds something, `set_state(7)`. State 7 gathers
     /// ([`GatherAction::gather`]). Without a target a loaded gatherer takes its load off
-    /// ([`Next::Drop`]). The world's dt (`c.dt`) runs its timers.
+    /// ([`Next::Drop`]). The world's dt (`step.dt`) runs its timers.
     ///
     /// # Errors
     ///
     /// What the update does not model.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
         target: Option<&mut Victim>,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         // a farm's time per stop follows the gatherer's work rate, every update
-        if target.as_deref().is_some_and(|t| {
+        if target.as_deref().is_some_and(|victim| {
             roles
-                .of_master(t.master_id)
+                .of_master(victim.master_id)
                 .contains(MasterRoles::STOP_FARM)
         }) {
             self.time_per_stop = StopRate {
-                work_rate: r.work_rate,
-                capacity: r.capacity,
-                productivity: r.stop_productivity,
+                work_rate: gather_reads.work_rate,
+                capacity: gather_reads.capacity,
+                productivity: gather_reads.stop_productivity,
             }
             .time_per_stop(self.task.work_value, self.stops);
         }
-        let dt = c.dt.seconds();
+        let dt = step.dt.seconds();
         match self.state {
             GatherState::Done => return Ok(Next::Done),
             GatherState::Idle => return Ok(Next::Stay),
-            GatherState::Moved { .. } => return self.update_moved(c, unit, me, r, roles),
-            GatherState::WalkBack { .. } => return self.update_walk_back(c, unit, me, r, roles),
+            GatherState::Moved { .. } => {
+                return self.update_moved(step, unit, me, gather_reads, roles);
+            }
+            GatherState::WalkBack { .. } => {
+                return self.update_walk_back(step, unit, me, gather_reads, roles);
+            }
             GatherState::FarmWait => {
-                return self.update_farm_wait(c, unit, target.as_deref(), r, roles);
+                return self.update_farm_wait(step, unit, target.as_deref(), gather_reads, roles);
             }
             GatherState::ReseedWalk { .. } => {
-                return self.update_reseed_walk(c, unit, me, target.as_deref(), r, roles);
+                return self.update_reseed_walk(
+                    step,
+                    unit,
+                    me,
+                    target.as_deref(),
+                    gather_reads,
+                    roles,
+                );
             }
             GatherState::Search => return Ok(self.update_search(dt)),
             _ => {}
         }
         let Some(target) = target.filter(|_| self.target.is_some()) else {
-            return self.update_without_target(c, unit, r, roles);
+            return self.update_without_target(step, unit, gather_reads, roles);
         };
         match self.state {
             GatherState::Walk { .. } if self.timer < Seconds::ZERO => {
-                self.update_walk_wait(c, unit, target, dt, r)
+                self.update_walk_wait(step, unit, target, dt, gather_reads)
             }
-            GatherState::Walk { .. } => self.update_walk(c, unit, me, target, r, roles),
-            GatherState::Face => self.update_face(c, unit, target, r, roles),
-            GatherState::Work => self.update_work(c, unit, target, r, roles),
+            GatherState::Walk { .. } => {
+                self.update_walk(step, unit, me, target, gather_reads, roles)
+            }
+            GatherState::Face => self.update_face(step, unit, target, gather_reads, roles),
+            GatherState::Work => self.update_work(step, unit, target, gather_reads, roles),
             _ => Err(GenieError::unsupported(
                 "a Gather action in a state the slice does not model",
             )),
@@ -165,9 +178,9 @@ impl GatherAction {
     /// modelled.
     fn update_without_target(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         if !matches!(
@@ -181,10 +194,10 @@ impl GatherAction {
         if Amount::ZERO < unit.life.amount {
             return Ok(Next::Drop);
         }
-        if waits_for_farm(r.master, self.target_class, roles) {
-            return self.begin_farm_wait(c, unit, r);
+        if waits_for_farm(gather_reads.master, self.target_class, roles) {
+            return self.begin_farm_wait(step, unit, gather_reads);
         }
-        self.begin_search(c, unit, r)
+        self.begin_search(step, unit, gather_reads)
     }
 
     /// Case 3's wait after a failed walk (the timer below 0 counts up by dt): at its end a
@@ -192,25 +205,28 @@ impl GatherAction {
     /// target's radius, 0 for a farm of stops), one of a farm's stops to the next (4).
     fn update_walk_wait(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &Unit,
         target: &Victim,
         dt: Seconds,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
     ) -> GenieResult<Next> {
         self.timer += dt;
         if self.timer < Seconds::ZERO {
             return Ok(Next::Stay);
         }
         self.timer = Seconds::ZERO;
-        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let walks = gather_reads.walks(
+            &step.w.model.graphics,
+            (unit, step.w.parts.mover_of(unit.id)),
+        );
+        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         if self.stops.several() {
-            let rng = c.w.streams.get(Stream::Action);
+            let rng = step.w.streams.get(Stream::Action);
             let to = self.walk_to(target, Distance::ZERO);
-            self.set_walk(to, target.radius, mover, rng, &walks, &c.w.model.tuning)?;
+            self.set_walk(to, target.radius, mover, rng, &walks, &step.w.model.tuning)?;
         } else {
-            let radius = if c
+            let radius = if step
                 .w
                 .model
                 .roles
@@ -225,7 +241,7 @@ impl GatherAction {
                 Distance::new(radius),
                 mover,
                 &walks,
-                &c.w.model.tuning.move_to,
+                &step.w.model.tuning.move_to,
             )?;
         }
         Ok(Next::Stay)
@@ -238,15 +254,15 @@ impl GatherAction {
     /// 0) on a target holding something or one regathered; an empty one is not modelled.
     fn update_face(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         target: &Victim,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         if roles.of_class(target.class).contains(ClassRoles::FARM) {
             if target.state < ObjectState::Alive {
-                return self.begin_search(c, unit, r);
+                return self.begin_search(step, unit, gather_reads);
             }
             if roles
                 .of_master(target.master_id)
@@ -257,12 +273,12 @@ impl GatherAction {
                 ));
             }
             if WorkerCount::ONE < target.workers {
-                return self.begin_farm_wait(c, unit, r);
+                return self.begin_farm_wait(step, unit, gather_reads);
             }
         }
         let at = unit.place.position();
-        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-        if face_target(mover, at, target.position, c.w.world_time)? == Aim::Turning {
+        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        if face_target(mover, at, target.position, step.w.world_time)? == Aim::Turning {
             return Ok(Next::Stay);
         }
         if Amount::ZERO < target.amount
@@ -270,7 +286,7 @@ impl GatherAction {
                 .of_master(target.master_id)
                 .contains(MasterRoles::REGATHERED)
         {
-            self.set_work(c, unit, r);
+            self.set_work(step, unit, gather_reads);
             self.time_at_stop = Seconds::ZERO;
             return Ok(Next::Stay);
         }
@@ -285,29 +301,32 @@ impl GatherAction {
     /// ([`GatherAction::gather`]).
     fn update_work(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         target: &mut Victim,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
-        let dt = c.dt.seconds();
+        let dt = step.dt.seconds();
         if self.stops.several() {
             self.time_at_stop += dt;
             if self.time_per_stop <= self.time_at_stop && self.current_stop.before_last(self.stops)
             {
-                if r.food_sold <= Amount::ZERO {
+                if gather_reads.food_sold <= Amount::ZERO {
                     self.current_stop = self.current_stop.next();
                 }
-                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                let rng = c.w.streams.get(Stream::Action);
+                let walks = gather_reads.walks(
+                    &step.w.model.graphics,
+                    (unit, step.w.parts.mover_of(unit.id)),
+                );
+                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let rng = step.w.streams.get(Stream::Action);
                 let to = self.walk_to(target, Distance::ZERO);
-                self.set_walk(to, target.radius, mover, rng, &walks, &c.w.model.tuning)?;
+                self.set_walk(to, target.radius, mover, rng, &walks, &step.w.model.tuning)?;
                 return Ok(Next::Stay);
             }
         }
-        self.gather(c, unit, target, r, roles)
+        self.gather(step, unit, target, gather_reads, roles)
     }
 
     /// State 4's sub-action list (case 3, [`GatherAction::update_list`]): its code 0 walks or
@@ -318,41 +337,44 @@ impl GatherAction {
     /// and none gives 6 (the game's `set_state(13)` with the search's notify).
     pub(super) fn update_walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
         target: &Victim,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
-        match self.update_list(c, unit, me, r, roles)? {
+        match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done => {
-                self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                self.set_face(c, unit, target, r, roles)
+                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                self.set_face(step, unit, target, gather_reads, roles)
             }
             // code 3: near a target with more than 3 workers it searches (set_state 3), else it
             // waits a random while (LAB_140a8ef80)
             SubCode::Failed => {
-                let mover = c.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
+                let mover = step.w.parts.mover_of(unit.id).ok_or(UNMOVING)?;
                 let me = mover.stats.radius.ground();
                 let at = unit.place.position();
                 let gap = footprint_gap_squared(at, me, target.position, target.radius);
-                if target.workers.as_f32() <= c.w.model.tuning.gather.wait_workers
-                    || c.w.model.tuning.gather.wait_gap <= gap.get()
+                if target.workers.as_f32() <= step.w.model.tuning.gather.wait_workers
+                    || step.w.model.tuning.gather.wait_gap <= gap.get()
                 {
-                    self.random_wait(c, unit);
+                    self.random_wait(step, unit);
                     return Ok(Next::Stay);
                 }
-                self.begin_search(c, unit, r)
+                self.begin_search(step, unit, gather_reads)
             }
             // its target let go: the Gather's goes too (slot 0x68 with none; the caller lets it
             // go), then `set_state(11)` with no target's radius
             SubCode::TargetGone => {
                 self.target = None;
-                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
-                self.set_walk_back(Distance::ZERO, mover, &walks, &c.w.model.tuning.move_to)?;
+                let walks = gather_reads.walks(
+                    &step.w.model.graphics,
+                    (unit, step.w.parts.mover_of(unit.id)),
+                );
+                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                self.set_walk_back(Distance::ZERO, mover, &walks, &step.w.model.tuning.move_to)?;
                 Ok(Next::Stay)
             }
         }
@@ -374,33 +396,42 @@ impl GatherAction {
     /// [`MoveWait::give_up`]: crate::movement::move_to::MoveWait::give_up
     pub(super) fn update_list(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         mut me: Me,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<SubCode> {
         me.action_state = ActionState::new(self.state.get());
-        let state = self.state.move_to().map(|m| m.state);
+        let state = self
+            .state
+            .move_to()
+            .map(|move_to_action| move_to_action.state);
         // the computer player's test is not held: its villagers would fail at once
         let how = ListUpdate {
             gives_up: GiveUp {
-                patience: if roles.of_class(r.class).contains(ClassRoles::VILLAGER) {
+                patience: if roles
+                    .of_class(gather_reads.class)
+                    .contains(ClassRoles::VILLAGER)
+                {
                     Patience::WaitsOnce
                 } else {
                     Patience::Fails
                 },
-                stance: r.stance,
+                stance: gather_reads.stance,
             },
             ..ListUpdate::default()
         };
         let code = match self.state.walk_mut() {
-            Some(move_to) => update_sub_actions(move_to, c, unit, me, how)?,
+            Some(move_to) => update_sub_actions(move_to, step, unit, me, how)?,
             // a state that does not walk has no sub-action: its list's update is the empty one's
-            None => update_sub_actions(&mut None, c, unit, me, how)?,
+            None => update_sub_actions(&mut None, step, unit, me, how)?,
         };
         if matches!(state, Some(MoveTo::Start | MoveTo::Moving)) {
-            unit.post_in_the_way(c.w.parts.motion.mover_mut(unit.id), &mut c.w.parts.unit_ai)?;
+            unit.post_in_the_way(
+                step.w.parts.motion.mover_mut(unit.id),
+                &mut step.w.parts.unit_ai,
+            )?;
         }
         Ok(code)
     }

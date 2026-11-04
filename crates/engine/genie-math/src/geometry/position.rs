@@ -94,8 +94,8 @@ impl From<[f32; 3]> for Position {
 }
 
 impl genie_diff::Diff for Position {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -115,23 +115,23 @@ mod tests {
     /// A place's x, y and z keep their bits, and its vector swaps y and the height.
     #[test]
     fn place_keeps_its_bits_and_its_vector_swaps_the_height_and_y() {
-        let p = Position::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
+        let position = Position::new(-0.0, 2.0, f32::from_bits(0x7fc0_0001));
         assert_eq!(
-            (p.x().to_bits(), p.y(), p.z().to_bits()),
+            (position.x().to_bits(), position.y(), position.z().to_bits()),
             (0x8000_0000, 2.0, 0x7fc0_0001)
         );
         assert_eq!(
-            p.ground().get().map(f32::to_bits),
+            position.ground().get().map(f32::to_bits),
             [0x8000_0000, 2.0f32.to_bits()]
         );
-        let v = p.vector();
+        let vector = position.vector();
         assert_eq!(
-            (v.x().to_bits(), v.height().to_bits(), v.y()),
+            (vector.x().to_bits(), vector.height().to_bits(), vector.y()),
             (0x8000_0000, 0x7fc0_0001, 2.0)
         );
         assert_eq!(
-            v.position().get().map(f32::to_bits),
-            p.get().map(f32::to_bits)
+            vector.position().get().map(f32::to_bits),
+            position.get().map(f32::to_bits)
         );
         assert_eq!(
             BVector::new(1.0, 3.0, 2.0).position(),

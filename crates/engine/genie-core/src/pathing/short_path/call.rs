@@ -47,7 +47,7 @@ impl Query {
     /// `FUN_140f9d300`'s and `FUN_140f9d3e0`'s casts: each float times 2^22 by `CVTTSS2SI` into
     /// a 64-bit register, its low 32 bits kept (the radius through `uint`, the same bits).
     pub(super) fn fixed(&self) -> Fixed {
-        let fixed = |f: Distance| cvttss2si_64((f * TO_FIXED).get()) as i32;
+        let fixed = |distance: Distance| cvttss2si_64((distance * TO_FIXED).get()) as i32;
         Fixed {
             from: self.from,
             to: self.to,
@@ -168,8 +168,8 @@ impl Call {
                 return Entry::InRange;
             }
         }
-        let on_map = |p: Point| {
-            let (x, y) = (p.x(), p.y());
+        let on_map = |point: Point| {
+            let (x, y) = (point.x(), point.y());
             at_most_or_unordered(0.0, x)
                 && at_most_or_unordered(0.0, y)
                 && below_or_unordered(x, self.map.width() as f32)
@@ -188,9 +188,9 @@ impl Call {
             .listed
             .iter()
             .filter(|l| at_target.is_none_or(|t| l.id != t.id))
-            .filter_map(|l| l.shape)
+            .filter_map(|listed| listed.shape)
             .collect();
-        let size = at_target.map_or(Footprint::ZERO, |t| t.half_size);
+        let size = at_target.map_or(Footprint::ZERO, |target| target.half_size);
         Entry::Search {
             query: Query {
                 from: FixedPoint::new(fixed(self.from.x()), fixed(self.from.y())),
@@ -210,8 +210,8 @@ impl Call {
 #[must_use]
 pub fn to_path(points: &[FixedPoint]) -> Path {
     let mut path = Path::default();
-    for p in points {
-        let [x, y] = p.get();
+    for fixed_point in points {
+        let [x, y] = fixed_point.get();
         let _ = path.push(BVector::new(x as f32 * TO_FLOAT, 0.0, y as f32 * TO_FLOAT));
     }
     path
@@ -258,13 +258,13 @@ impl Pather {
                 tx += 1;
             }
             if let Some(a) = run {
-                let r = FixedRect::new(
+                let fixed_rect = FixedRect::new(
                     (a as i32).wrapping_mul(ONE) - 0x20_0000,
                     (ty as i32).wrapping_mul(ONE) - 0x20_0000,
                     (tx as i32).wrapping_mul(ONE) + 0x20_0000,
                     y1,
                 );
-                self.temp.push(mesh.add(r));
+                self.temp.push(mesh.add(fixed_rect));
             }
             ty += 1;
             y1 = y1.wrapping_add(ONE);
@@ -288,7 +288,7 @@ impl Pather {
         &mut self,
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
-        q: &Query,
+        query: &Query,
         ignore: &[ShapeId],
     ) -> GenieResult<ShortPath> {
         if self.ignore.len() < mesh.shapes.len() {
@@ -297,7 +297,7 @@ impl Pather {
         for &id in ignore {
             *self.ignore.checked_mut(id.index())? = true;
         }
-        let result = self.core(mesh, words, &q.fixed());
+        let result = self.core(mesh, words, &query.fixed());
         for &id in ignore {
             if let Some(f) = self.ignore.get_mut(id.index()) {
                 *f = false;
@@ -316,18 +316,18 @@ impl Pather {
         &mut self,
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
-        q: &Query,
+        query: &Query,
     ) -> GenieResult<bool> {
-        let q = &q.fixed();
+        let fixed = &query.fixed();
         if self.ignore.len() < mesh.shapes.len() {
             self.ignore.resize(mesh.shapes.len(), false);
         }
-        let r = q.radius.get();
-        let d = 0x20_0000 - r;
+        let radius = fixed.radius.get();
+        let d = 0x20_0000 - radius;
         let w = mesh.width as i32;
-        let cap = w.wrapping_mul(ONE) - 1 - r;
-        let [sx, sy] = q.from.get();
-        let [gx, gy] = q.to.get();
+        let cap = w.wrapping_mul(ONE) - 1 - radius;
+        let [sx, sy] = fixed.from.get();
+        let [gx, gy] = fixed.to.get();
         let hold_high = |v: i32| {
             if v.wrapping_add(0x100_0000) < cap {
                 v.wrapping_add(0x100_0000)
@@ -336,10 +336,10 @@ impl Pather {
             }
         };
         let hold_low = |v: i32| {
-            if r < v.wrapping_sub(0x100_0000) {
+            if radius < v.wrapping_sub(0x100_0000) {
                 v.wrapping_sub(0x100_0000)
             } else {
-                r
+                radius
             }
         };
         let bounds = FixedRect::new(
@@ -349,10 +349,10 @@ impl Pather {
             hold_high(if gy < sy { sy } else { gy }),
         );
         self.remove_terrain(mesh);
-        self.add_terrain(mesh, words, q.blocked, bounds);
-        let goal = Goal::toward(FixedPoint::new(gx, gy), q);
+        self.add_terrain(mesh, words, fixed.blocked, bounds);
+        let goal = Goal::toward(FixedPoint::new(gx, gy), fixed);
         let ignore = self.ignore.clone();
-        let mut s = Search {
+        let mut search = Search {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
@@ -366,7 +366,7 @@ impl Pather {
             goal_node: None,
             best: NodeIndex::START,
         };
-        let started = s.start(q.from);
+        let started = search.start(fixed.from);
         self.remove_terrain(mesh);
         Ok(started? == Started::Stuck)
     }
@@ -377,14 +377,14 @@ impl Pather {
         &mut self,
         mesh: &mut Mesh,
         words: &dyn Fn(u32, u32) -> u64,
-        q: &Fixed,
+        fixed: &Fixed,
     ) -> GenieResult<ShortPath> {
-        let r = q.radius.get();
-        let d = 0x20_0000 - r;
+        let radius = fixed.radius.get();
+        let d = 0x20_0000 - radius;
         let w = mesh.width as i32;
-        let cap = w.wrapping_mul(ONE) - 1 - r;
-        let [sx, sy] = q.from.get();
-        let [mut gx, mut gy] = q.to.get();
+        let cap = w.wrapping_mul(ONE) - 1 - radius;
+        let [sx, sy] = fixed.from.get();
+        let [mut gx, mut gy] = fixed.to.get();
         let hold_high = |v: i32| {
             if v.wrapping_add(0x100_0000) < cap {
                 v.wrapping_add(0x100_0000)
@@ -393,10 +393,10 @@ impl Pather {
             }
         };
         let hold_low = |v: i32| {
-            if r < v.wrapping_sub(0x100_0000) {
+            if radius < v.wrapping_sub(0x100_0000) {
                 v.wrapping_sub(0x100_0000)
             } else {
-                r
+                radius
             }
         };
         let bounds = FixedRect::new(
@@ -413,16 +413,16 @@ impl Pather {
             return Ok(invalid);
         }
         if gx < bounds.x0() || gy < bounds.y0() || bounds.x1() < gx || bounds.y1() < gy {
-            match clip(q.from, FixedPoint::new(gx, gy), bounds) {
+            match clip(fixed.from, FixedPoint::new(gx, gy), bounds) {
                 Some((_, end)) => [gx, gy] = end.get(),
                 None => return Ok(invalid),
             }
         }
         self.remove_terrain(mesh);
-        self.add_terrain(mesh, words, q.blocked, bounds);
-        let goal = Goal::toward(FixedPoint::new(gx, gy), q);
+        self.add_terrain(mesh, words, fixed.blocked, bounds);
+        let goal = Goal::toward(FixedPoint::new(gx, gy), fixed);
         let ignore = self.ignore.clone();
-        let mut s = Search {
+        let mut search = Search {
             ctx: Ctx {
                 mesh,
                 ignore: &ignore,
@@ -436,6 +436,6 @@ impl Pather {
             goal_node: None,
             best: NodeIndex::START,
         };
-        s.run(q.from)
+        search.run(fixed.from)
     }
 }

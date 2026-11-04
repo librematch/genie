@@ -105,8 +105,8 @@ impl From<u8> for ObstructionKind {
 }
 
 impl genie_diff::Diff for ObstructionKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -121,7 +121,7 @@ mod tests {
         let kinds = |f: fn(ObstructionKind) -> bool| -> Vec<u8> {
             (0..16)
                 .map(ObstructionKind::from)
-                .filter(|&t| f(t))
+                .filter(|&obstruction_kind| f(obstruction_kind))
                 .map(ObstructionKind::get)
                 .collect()
         };

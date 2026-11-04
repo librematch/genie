@@ -48,25 +48,27 @@ pub fn settle(have: Amount, gift: Gift) -> (Amount, Amount) {
 }
 
 impl World {
-    /// `FUN_1416259e0`: player `p` may pay tribute, its tracker counting a market or a 1647 above
-    /// 0 (the build's `market` and `market_1647`; `FUN_140b26630`: a master the player has,
+    /// `FUN_1416259e0`: player `player_id` may pay tribute, its tracker counting a market or a 1647
+    /// above 0 (the build's `market` and `market_1647`; `FUN_140b26630`: a master the player has,
     /// `FUN_141659d20`, else none; the count of its done list, `FUN_14104eea0`).
     #[must_use]
-    pub fn pays_tribute(&self, p: PlayerId) -> bool {
+    pub fn pays_tribute(&self, player_id: PlayerId) -> bool {
         let has = |m: MasterId| {
             self.model
                 .masters
-                .get(p.index())
+                .get(player_id.index())
                 .is_some_and(|ms| ms.get(m).is_some())
         };
-        let s = self.model.slots.master;
-        [s.market, s.market_1647].iter().any(|&m| {
-            has(m)
-                && self
-                    .players
-                    .get(p.index())
-                    .is_some_and(|pl| !pl.tracker.list(ListKey::master(m)).is_empty())
-        })
+        let master_slots = self.model.slots.master;
+        [master_slots.market, master_slots.market_1647]
+            .iter()
+            .any(|&master_id| {
+                has(master_id)
+                    && self
+                        .players
+                        .get(player_id.index())
+                        .is_some_and(|pl| !pl.tracker.list(ListKey::master(master_id)).is_empty())
+            })
     }
 
     /// `FUN_140e7d040`: player `from` gives player `to` its `gifts` ([`settle`]), unless the two
@@ -269,20 +271,23 @@ mod tests {
         );
         assert_eq!(receiver.attributes[4], Amount::ZERO);
         for (from, to, market) in [(1, 2, false), (1, 1, true)] {
-            let mut t = world(market);
-            let before = t.players.clone();
-            t.tribute(player_id(from), player_id(to), &gifts).unwrap();
-            assert_eq!(t.players, before);
+            let mut market_world = world(market);
+            let before = market_world.players.clone();
+            market_world
+                .tribute(player_id(from), player_id(to), &gifts)
+                .unwrap();
+            assert_eq!(market_world.players, before);
         }
     }
 
     /// A computer player's AI would hear the tribute (its slot 0x3c8).
     #[test]
     fn computer_player_receipt_is_not_modelled() {
-        let mut t = world(true);
-        t.players[2].kind = PlayerKind::Computer;
+        let mut world = world(true);
+        world.players[2].kind = PlayerKind::Computer;
         assert!(
-            t.tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
+            world
+                .tribute(player_id(1), player_id(2), &[gift(1, 10.0, 0.3); 4])
                 .is_err()
         );
     }

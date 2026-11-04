@@ -16,19 +16,19 @@ use crate::world::slots::PlayerSlots;
 use std::sync::Arc;
 
 impl World {
-    /// The players party `party` reaches from player `p`: for a relation, each player past Gaia
+    /// The players party `party` reaches from player `from`: for a relation, each player past Gaia
     /// (`FUN_14152fdd0`, from 1, the player itself when it counts itself so) whose and to whom
     /// the relations (`+0x260`, `FUN_141667f50`) are the party's, in order.
-    pub(super) fn party(&self, p: PlayerId, party: Party) -> Vec<PlayerId> {
+    pub(super) fn party(&self, from: PlayerId, party: Party) -> Vec<PlayerId> {
         let relation =
             |a: PlayerId, b: PlayerId| self.players.player(a).ok()?.relations.get(b).copied();
         let mutual = |q: PlayerId, wanted: &[Relation]| {
             wanted
                 .iter()
-                .any(|&r| relation(p, q) == Some(r) && relation(q, p) == Some(r))
+                .any(|&r| relation(from, q) == Some(r) && relation(q, from) == Some(r))
         };
         let wanted: &[Relation] = match party {
-            Party::Own => return vec![p],
+            Party::Own => return vec![from],
             Party::Gaia => return vec![PlayerId::GAIA],
             Party::Allies => &[Relation::Ally],
             Party::Enemies => &[Relation::Enemy, Relation::Relation4],
@@ -36,61 +36,61 @@ impl World {
         };
         PlayerId::each(self.players.len())
             .skip(1)
-            .filter(|&q| mutual(q, wanted))
+            .filter(|&player_id| mutual(player_id, wanted))
             .collect()
     }
 
     /// `TRIBE_Effects::do_effect` (`FUN_141462440`) of effect `id` of the world's effect table
     /// (`+0x128`, [`crate::technology::Effects::get`], `FUN_140ec4510`): its commands
-    /// ([`World::do_effect`]) for player `p` with the effect's object `object`; an id outside
-    /// the table does nothing.
+    /// ([`World::do_effect`]) for player `player_id` with the effect's object `object`; an id
+    /// outside the table does nothing.
     pub(crate) fn do_table_effect(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         id: EffectId,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
         let effects = Arc::clone(&self.model.effects);
-        effects
-            .get(id)
-            .map_or(Ok(()), |e| self.do_effect(p, &e.commands, object))
+        effects.get(id).map_or(Ok(()), |effect| {
+            self.do_effect(player_id, &effect.commands, object)
+        })
     }
 
     /// `TRIBE_Effects::do_effect` (`FUN_141462440`) of an effect's commands `effect` (those of an
     /// effect of the table, [`World::do_table_effect`]; its 0x318 makes the spawns count in the
-    /// local player's statistics, which are not simulation) for player `p` with the effect's object
-    /// `object` (none for a research's): first its technology commands in order, the cost modifier
-    /// (`'e'`, [`World::tech_cost`]), the disable command (`'f'`, an id other than −1,
-    /// [`World::disable_tech`]) and the research time modifier (`'g'`, [`World::research_time`]);
-    /// then the base's ([`World::base_effect`]).
+    /// local player's statistics, which are not simulation) for player `player_id` with the
+    /// effect's object `object` (none for a research's): first its technology commands in order,
+    /// the cost modifier (`'e'`, [`World::tech_cost`]), the disable command (`'f'`, an id other
+    /// than −1, [`World::disable_tech`]) and the research time modifier (`'g'`,
+    /// [`World::research_time`]); then the base's ([`World::base_effect`]).
     pub(crate) fn do_effect(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         effect: &[EffectCommand],
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
-        for c in effect {
-            match *c {
+        for effect_command in effect {
+            match *effect_command {
                 EffectCommand::TechCost {
                     tech: Some(tech),
                     resource,
                     amount,
                     mode,
-                } => self.tech_cost(p, tech, resource, amount, mode)?,
+                } => self.tech_cost(player_id, tech, resource, amount, mode)?,
                 EffectCommand::TechDisable { tech } => {
                     if tech != DisabledTech::NONE {
-                        self.disable_tech(p, tech, object)?;
+                        self.disable_tech(player_id, tech, object)?;
                     }
                 }
                 EffectCommand::TechTime {
                     tech: Some(tech),
                     amount,
                     mode,
-                } => self.research_time(p, tech, amount, mode, None)?,
+                } => self.research_time(player_id, tech, amount, mode, None)?,
                 _ => {}
             }
         }
-        self.base_effect(p, effect, object)
+        self.base_effect(player_id, effect, object)
     }
 
     /// `RGE_Effects::do_effect` (`FUN_140ec2ac0`): each command by its kind, for the players of
@@ -100,24 +100,26 @@ impl World {
     /// and amount.
     pub(super) fn base_effect(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         effect: &[EffectCommand],
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
         let mut farms: Option<(f32, f32)> = None;
-        for c in effect {
-            match *c {
+        for effect_command in effect {
+            match *effect_command {
                 EffectCommand::Objects(kind) => Self::object_effect(kind, object)?,
                 EffectCommand::Attribute { .. } | EffectCommand::Costs { .. } => {
-                    self.attribute_command(p, c)?;
+                    self.attribute_command(player_id, effect_command)?;
                 }
                 EffectCommand::Resource { .. } | EffectCommand::ResourceMultiply { .. } => {
-                    self.resource_command(p, c, &mut farms)?;
+                    self.resource_command(player_id, effect_command, &mut farms)?;
                 }
                 EffectCommand::Enable { .. }
                 | EffectCommand::Upgrade { .. }
                 | EffectCommand::Spawn { .. }
-                | EffectCommand::Tech { .. } => self.master_command(p, c, object)?,
+                | EffectCommand::Tech { .. } => {
+                    self.master_command(player_id, effect_command, object)?;
+                }
                 // the technology commands, and the kinds no switch knows
                 EffectCommand::TechCost { .. }
                 | EffectCommand::TechDisable { .. }
@@ -126,7 +128,7 @@ impl World {
             }
         }
         if let Some((before, amount)) = farms {
-            self.farm_food(p, before, amount)?;
+            self.farm_food(player_id, before, amount)?;
         }
         Ok(())
     }
@@ -135,8 +137,12 @@ impl World {
     /// slot 0x148 ([`World::modify_attribute`]) for each player of the block; multiply too, but
     /// a cost attribute by a negative amount changes the cost entries instead, except in Gaia's
     /// block ([`EffectCommand::Costs`], `FUN_141666ee0`).
-    pub(super) fn attribute_command(&mut self, p: PlayerId, c: &EffectCommand) -> GenieResult<()> {
-        match *c {
+    pub(super) fn attribute_command(
+        &mut self,
+        owner: PlayerId,
+        effect_command: &EffectCommand,
+    ) -> GenieResult<()> {
+        match *effect_command {
             EffectCommand::Attribute {
                 party,
                 change,
@@ -145,7 +151,7 @@ impl World {
                 attribute,
                 amount,
             } => {
-                for q in self.party(p, party) {
+                for q in self.party(owner, party) {
                     self.modify_attribute(q, change, master, class, amount, attribute)?;
                 }
             }
@@ -155,8 +161,8 @@ impl World {
                 attribute,
                 edit,
             } => {
-                for q in self.party(p, party) {
-                    self.cost_entries(q, units, attribute, edit);
+                for player_id in self.party(owner, party) {
+                    self.cost_entries(player_id, units, attribute, edit);
                 }
             }
             _ => {}
@@ -171,10 +177,10 @@ impl World {
     pub(super) fn resource_command(
         &mut self,
         p: PlayerId,
-        c: &EffectCommand,
+        effect_command: &EffectCommand,
         farms: &mut Option<(f32, f32)>,
     ) -> GenieResult<()> {
-        match *c {
+        match *effect_command {
             EffectCommand::ResourceMultiply {
                 party,
                 attribute: Some(attribute),
@@ -210,8 +216,8 @@ impl World {
                         amount.get(),
                     ));
                 }
-                for q in self.party(p, party) {
-                    self.modify_resource(q, attribute, amount, change)?;
+                for player_id in self.party(p, party) {
+                    self.modify_resource(player_id, attribute, amount, change)?;
                 }
             }
             _ => {}
@@ -225,10 +231,10 @@ impl World {
     pub(super) fn master_command(
         &mut self,
         p: PlayerId,
-        c: &EffectCommand,
+        effect_command: &EffectCommand,
         object: Option<ObjectId>,
     ) -> GenieResult<()> {
-        match *c {
+        match *effect_command {
             EffectCommand::Enable {
                 party,
                 master: Some(unit),
@@ -272,8 +278,8 @@ impl World {
                 let Some(tech) = tech else {
                     return Ok(());
                 };
-                for q in self.party(p, party) {
-                    self.modify_tech(q, tech, mode, amount, location)?;
+                for player_id in self.party(p, party) {
+                    self.modify_tech(player_id, tech, mode, amount, location)?;
                 }
             }
             _ => {}
@@ -285,19 +291,20 @@ impl World {
     /// times the effect's player's attribute `scale`, when the player has it.
     pub(super) fn scaled_amount(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         scale: Option<AttributeId>,
         amount: f32,
     ) -> f32 {
         scale
-            .and_then(|a| self.players.get(p.index())?.attribute(a))
+            .and_then(|attribute_id| self.players.get(player_id.index())?.attribute(attribute_id))
             .map_or(amount, |scale| (amount * scale).get())
     }
 
-    /// Player `p`'s attribute `attribute`, 0 past its count (`+0x90`, the saved attributes').
-    pub(super) fn attribute_of(&self, p: PlayerId, attribute: AttributeId) -> Amount {
+    /// Player `player_id`'s attribute `attribute`, 0 past its count (`+0x90`, the saved
+    /// attributes').
+    pub(super) fn attribute_of(&self, player_id: PlayerId, attribute: AttributeId) -> Amount {
         self.players
-            .get(p.index())
+            .get(player_id.index())
             .and_then(|player| player.attribute(attribute))
             .unwrap_or(Amount::ZERO)
     }

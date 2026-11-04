@@ -88,30 +88,30 @@ fn the_main_module_reads_its_objects() {
 #[test]
 fn the_information_module_of_10_5_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
-    let e = InformationAi::read_from(&mut header_reader(&zeros, 10.5)).unwrap_err();
-    assert_eq!(e, not_read(""));
+    let error = InformationAi::read_from(&mut header_reader(&zeros, 10.5)).unwrap_err();
+    assert_eq!(error, not_read(""));
 }
 
 /// From 10.94 on it reads what the AI has seen; from 11.09 on the players' building counts.
 #[test]
 fn the_information_module_of_11_97_ends_at_its_unknown_part() {
     let zeros = vec![0u8; 1 << 18];
-    let e = InformationAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert_eq!(e, not_read(""));
+    let error = InformationAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    assert_eq!(error, not_read(""));
 }
 
 /// The tactical module ends after its unit lists.
 #[test]
 fn the_tactical_module_ends_after_its_unit_lists() {
     let zeros = vec![0u8; 1 << 10];
-    let e = TacticalAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert_eq!(e, not_read(""));
+    let error = TacticalAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    assert_eq!(error, not_read(""));
 }
 
 /// A player's AI reads its modules in order and stops in the information module.
 #[test]
 fn player_ai_stops_in_the_information_module() {
     let zeros = vec![0u8; 1 << 18];
-    let e = PlayerAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
-    assert_eq!(e, not_read(""));
+    let error = PlayerAi::read_from(&mut header_reader(&zeros, 11.97)).unwrap_err();
+    assert_eq!(error, not_read(""));
 }

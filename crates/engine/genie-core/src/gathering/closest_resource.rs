@@ -62,7 +62,7 @@ pub(crate) fn search_origin<T>(point: Point, site: Option<T>, unit: Position) ->
 /// 2172, `0x140c49d17`); the answer and the out argument's steps.
 pub(crate) fn closest_resource_of(
     (unit, actions, mover): (&Unit, &Action, Option<&Mover>),
-    c: &mut ResourceWorld<'_, '_>,
+    resource_world: &mut ResourceWorld<'_, '_>,
     others: OthersRef<'_>,
     (kind, cap, site): (GatherGroup, WorkerCount, Option<DropSiteId>),
     (current, min_state, point): (Option<ObjectId>, ObjectState, Point),
@@ -74,39 +74,44 @@ pub(crate) fn closest_resource_of(
     use crate::movement::UnitReach;
     let gather_search_tuning = &by_id.tuning().gather_search;
 
-    let site = match site.filter(|&s| c.spatial.get(s).is_some()) {
+    let site = match site.filter(|&role_id| resource_world.spatial.get(role_id).is_some()) {
         None => None,
         Some(site) => {
             // the unit itself (a mule cart searches from its own place) or another object
             let (sp, s) = if site.id() == unit.id {
-                Some((c.player, unit))
+                Some((resource_world.player, unit))
             } else {
                 others.find(site)
             }
             .ok_or(GenieError::unsupported(
                 "a resource search's drop site the slice does not hold",
             ))?;
-            let m = s.master(c.every, sp)?;
-            let footprint = roles
-                .of_master(m.id)
-                .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
-                || {
-                    let restriction = mover
-                        .ok_or(GenieError::unsupported(
-                            "a resource search without movement state",
-                        ))?
-                        .stats
-                        .restriction;
-                    let terrain = c.spatial.terrain.as_ref().ok_or(GenieError::unsupported(
-                        "the map's zones without its terrain",
-                    ))?;
-                    let values = terrain
-                        .restriction(restriction)
-                        .ok_or(UNKNOWN_RESTRICTION)?;
-                    let zones = c.zones.of(c.spatial.map, &terrain.kinds, values)?;
-                    let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
-                    zone(s.position()) == zone(unit.position())
-                };
+            let m = s.master(resource_world.every, sp)?;
+            let footprint =
+                roles
+                    .of_master(m.id)
+                    .contains(MasterRoles::SEARCH_FROM_FOOTPRINT)
+                    || {
+                        let restriction = mover
+                            .ok_or(GenieError::unsupported(
+                                "a resource search without movement state",
+                            ))?
+                            .stats
+                            .restriction;
+                        let terrain = resource_world.spatial.terrain.as_ref().ok_or(
+                            GenieError::unsupported("the map's zones without its terrain"),
+                        )?;
+                        let values = terrain
+                            .restriction(restriction)
+                            .ok_or(UNKNOWN_RESTRICTION)?;
+                        let zones = resource_world.zones.of(
+                            resource_world.spatial.map,
+                            &terrain.kinds,
+                            values,
+                        )?;
+                        let zone = |p: Position| zones.zone(Tile::new(p.x() as i32, p.y() as i32));
+                        zone(s.position()) == zone(unit.position())
+                    };
             Some(gather_search::SearchSite {
                 position: s.position(),
                 radius: m.radius,
@@ -115,23 +120,23 @@ pub(crate) fn closest_resource_of(
             })
         }
     };
-    if c.masters.table.is_none() {
+    if resource_world.masters.table.is_none() {
         return Err(GenieError::unsupported(
             "a resource search without its player's masters",
         ));
     }
-    let master = unit.master_in(c.masters)?;
+    let master = unit.master_in(resource_world.masters)?;
     let mover = mover.ok_or(GenieError::unsupported(
         "a resource search without movement state",
     ))?;
     let mask = mover.stats.restriction_mask;
-    let player = c.player;
+    let player = resource_world.player;
     // the unit out of its slot while it updates, as it stands
     let me = Candidate::of(
         unit.id,
         player,
         unit,
-        unit.master(c.every, player)?,
+        unit.master(resource_world.every, player)?,
         unit.position(),
     );
     let position = search_origin(point, site, unit.position());
@@ -150,7 +155,7 @@ pub(crate) fn closest_resource_of(
         kind,
         cap,
         ResourceWorld {
-            spatial: c.spatial,
+            spatial: resource_world.spatial,
             mask,
             candidates: Candidates {
                 objects: by_id,
@@ -161,7 +166,7 @@ pub(crate) fn closest_resource_of(
                 at: unit.position(),
                 walker: unit.me(actions),
                 master: unit.life.master_id,
-                plan: &mut c.plan,
+                plan: &mut resource_world.plan,
                 objects: by_id,
             },
         },
@@ -185,7 +190,7 @@ impl UnitView<'_, '_> {
             &self.c.w.model.roles,
             &self.c.w.model.tuning,
         );
-        let mut w = ResourceWorld {
+        let mut resource_world = ResourceWorld {
             player: self.player,
             spatial: &mut self.c.w.spatial,
             zones: &mut self.c.w.zones,
@@ -215,7 +220,7 @@ impl UnitView<'_, '_> {
                 &*self.actions,
                 self.c.w.parts.mover_of(self.unit.id),
             ),
-            &mut w,
+            &mut resource_world,
             owner_view(
                 &self.c.w.players,
                 &self.c.w.index,
@@ -230,7 +235,7 @@ impl UnitView<'_, '_> {
         let Some(id) = id else {
             return Ok(None);
         };
-        let (owner, u) = owner_view(
+        let (owner, unit) = owner_view(
             &self.c.w.players,
             &self.c.w.index,
             self.c.player,
@@ -240,10 +245,10 @@ impl UnitView<'_, '_> {
         .ok_or(GenieError::unsupported(
             "a resource found that the slice does not hold",
         ))?;
-        let class = u.master(self.c.w.master_tables(), owner)?.class;
+        let class = unit.master(self.c.w.master_tables(), owner)?.class;
         Ok(Some(Gatherable {
             id,
-            position: u.position(),
+            position: unit.position(),
             class,
         }))
     }
@@ -258,11 +263,11 @@ impl Unit {
     pub(crate) fn resource_search(
         &self,
         actions: &Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         kind: GatherGroup,
         cap: WorkerCount,
     ) -> GenieResult<Option<ObjectId>> {
-        self.resource_search_from(actions, c, kind, cap, None)
+        self.resource_search_from(actions, step, kind, cap, None)
     }
 
     /// [`Unit::resource_search`] from the drop site `site` (if any;
@@ -272,52 +277,56 @@ impl Unit {
     pub(crate) fn resource_search_from(
         &self,
         actions: &Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         kind: GatherGroup,
         cap: WorkerCount,
         site: Option<DropSiteId>,
     ) -> GenieResult<Option<ObjectId>> {
         let by_id = ObjectsRef::new(
-            &c.w.players,
-            &c.w.index,
-            &c.w.model.masters,
-            &c.w.parts,
-            &c.w.model.roles,
-            &c.w.model.tuning,
+            &step.w.players,
+            &step.w.index,
+            &step.w.model.masters,
+            &step.w.parts,
+            &step.w.model.roles,
+            &step.w.model.tuning,
         );
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
-        let current =
-            c.w.parts
-                .unit_ai
-                .get(self.id)
-                .ok_or(GenieError::unsupported(
-                    "a resource search without a unit AI",
-                ))?
-                .current_target;
-        let mut w = ResourceWorld {
-            player: c.player,
-            spatial: &mut c.w.spatial,
-            zones: &mut c.w.zones,
+        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
+        let current = step
+            .w
+            .parts
+            .unit_ai
+            .get(self.id)
+            .ok_or(GenieError::unsupported(
+                "a resource search without a unit AI",
+            ))?
+            .current_target;
+        let mut resource_world = ResourceWorld {
+            player: step.player,
+            spatial: &mut step.w.spatial,
+            zones: &mut step.w.zones,
             foreign: others.players(),
-            every: MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            masters: OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
+            every: MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            masters: OwnerMasters::new(
+                &step.w.parts.own_master,
+                step.w.model.masters.of(step.player),
+            ),
             plan: Planning {
-                pathing: &mut c.w.pathing,
-                now: c.w.world_time,
-                player_kind: c.w.players.player(c.player)?.kind,
-                object: c.w.streams.get(Stream::Object),
-                groups: &c.w.groups,
+                pathing: &mut step.w.pathing,
+                now: step.w.world_time,
+                player_kind: step.w.players.player(step.player)?.kind,
+                object: step.w.streams.get(Stream::Object),
+                groups: &step.w.groups,
             },
         };
         let search = (current, ObjectState::Alive, NO_POINT);
         closest_resource_of(
-            (self, actions, c.w.parts.mover_of(self.id)),
-            &mut w,
+            (self, actions, step.w.parts.mover_of(self.id)),
+            &mut resource_world,
             others,
             (kind, cap, site),
             search,
             by_id,
-            &c.w.model.roles,
+            &step.w.model.roles,
         )
         .map(|(id, _)| id)
     }

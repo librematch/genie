@@ -51,14 +51,14 @@ impl TryFrom<u8> for PlayerKind {
 }
 
 impl Display for PlayerKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        self.get().fmt(f)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        self.get().fmt(formatter)
     }
 }
 
 impl genie_diff::Diff for PlayerKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn unhandled_byte_is_refused() {
         for byte in [4, 0xff] {
-            let e = PlayerKind::try_from(byte).unwrap_err();
-            assert!(e.to_string().contains("InvalidPlayerType"), "{e}");
+            let error = PlayerKind::try_from(byte).unwrap_err();
+            assert!(error.to_string().contains("InvalidPlayerType"), "{error}");
         }
     }
 
@@ -94,7 +94,10 @@ mod tests {
             PlayerKind::Gaia,
             PlayerKind::Computer,
         ];
-        let computers: Vec<_> = kinds.into_iter().filter(|k| k.is_computer()).collect();
+        let computers: Vec<_> = kinds
+            .into_iter()
+            .filter(|player_kind| player_kind.is_computer())
+            .collect();
         assert_eq!(computers, [PlayerKind::Computer]);
     }
 }

@@ -346,7 +346,7 @@ fn villager_fights_back_weak_attacker_of_its_own_master() {
         .combat
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::new(0.6)));
-    assert!(!with(&|m| m
+    assert!(!with(&|master| master
         .combat
         .get_or_insert_with(Default::default)
         .weapon_range = Distance::new(f32::NAN)));
@@ -456,7 +456,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         now: WorldTime::ZERO,
         mode_680: Mode680::ZERO,
     };
-    let c = picker
+    let candidate = picker
         .candidate(
             &spatial,
             object_id(50),
@@ -465,7 +465,13 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         )
         .unwrap();
     assert_eq!(
-        (c.id, c.distance, c.category, c.class, c.speed),
+        (
+            candidate.id,
+            candidate.distance,
+            candidate.category,
+            candidate.class,
+            candidate.speed
+        ),
         (
             object_id(50),
             Distance::new(1.4),
@@ -475,7 +481,13 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
         )
     );
     assert_eq!(
-        (c.armed, c.reach, c.damage, c.hp, c.reload),
+        (
+            candidate.armed,
+            candidate.reach,
+            candidate.damage,
+            candidate.hp,
+            candidate.reload
+        ),
         (
             true,
             Distance::new(0.5),
@@ -484,7 +496,7 @@ fn candidate_statistics_are_its_class_hit_points_and_the_damage_to_it() {
             Seconds::new(2.0)
         )
     );
-    assert_eq!((c.workable, c.current), (false, false));
+    assert_eq!((candidate.workable, candidate.current), (false, false));
     assert!(
         picker
             .candidate(

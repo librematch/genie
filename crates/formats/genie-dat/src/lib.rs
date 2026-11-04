@@ -95,10 +95,10 @@ impl From<&str> for FileVersion {
 }
 
 impl fmt::Display for FileVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match from_utf8(&self.0[0..7]) {
-            Ok(s) => write!(f, "{s}"),
-            Err(_) => write!(f, "{:?}", self.0),
+            Ok(text) => write!(formatter, "{text}"),
+            Err(_) => write!(formatter, "{:?}", self.0),
         }
     }
 }
@@ -228,32 +228,32 @@ mod tests {
 
     #[test]
     fn aok() -> anyhow::Result<()> {
-        let mut f = File::open("fixtures/aok.dat")?;
-        let dat = DatFile::read_from(&mut f)?;
+        let mut file = File::open("fixtures/aok.dat")?;
+        let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 14);
         Ok(())
     }
 
     #[test]
     fn aoc() -> anyhow::Result<()> {
-        let mut f = File::open("fixtures/aoc1.0c.dat")?;
-        let dat = DatFile::read_from(&mut f)?;
+        let mut file = File::open("fixtures/aoc1.0c.dat")?;
+        let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 19);
         Ok(())
     }
 
     #[test]
     fn non_7bit_ascii_tech_name() -> anyhow::Result<()> {
-        let mut f = File::open("fixtures/age-of-chivalry.dat")?;
-        let dat = DatFile::read_from(&mut f)?;
+        let mut file = File::open("fixtures/age-of-chivalry.dat")?;
+        let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.techs[859].name(), "Székely (enable)");
         Ok(())
     }
 
     #[test]
     fn hd_edition() -> anyhow::Result<()> {
-        let mut f = File::open("fixtures/hd.dat")?;
-        let dat = DatFile::read_from(&mut f)?;
+        let mut file = File::open("fixtures/hd.dat")?;
+        let dat = DatFile::read_from(&mut file)?;
         assert_eq!(dat.civilizations.len(), 32);
         Ok(())
     }

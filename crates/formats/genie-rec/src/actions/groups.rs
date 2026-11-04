@@ -273,8 +273,8 @@ impl PatrolCommand {
         for i in 0..10 {
             output.write_f32::<LE>(self.waypoints.get(i).copied().unwrap_or_default().0)?;
         }
-        for i in 0..10 {
-            output.write_f32::<LE>(self.waypoints.get(i).copied().unwrap_or_default().1)?;
+        for index in 0..10 {
+            output.write_f32::<LE>(self.waypoints.get(index).copied().unwrap_or_default().1)?;
         }
         self.objects.write_to(output)?;
         Ok(())

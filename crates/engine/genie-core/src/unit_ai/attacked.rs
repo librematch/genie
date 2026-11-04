@@ -42,7 +42,7 @@ use crate::{GenieError, GenieResult};
 
 impl UnitAi {
     /// The base handler's damage case (`FUN_140c589c0`, cases 500 and a missile's warning, 0x20f:
-    /// "I took some damage from Unit #%d"), the attacker `n.caller`:
+    /// "I took some damage from Unit #%d"), the attacker `notify.caller`:
     ///
     /// 1. The retarget entries go (`+0x1d8` 0). An attacker already in the set (`FUN_140bf4cb0`)
     ///    of a unit whose top action has a target (slot 400) changes nothing (2).
@@ -80,27 +80,27 @@ impl UnitAi {
     ///    `COMISS`, `JA`) or could convert it makes it attack back. It returns 2.
     pub(super) fn damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        let known = self.attackers.contains(n.caller);
+        let known = self.attackers.contains(notify.caller);
         self.retries.clear();
         if known && side.top_target_now().is_some() {
             return Ok(GO_ON);
         }
         // slot 0x48's notify and the alert 0x201 reach the same owner
         alert_owner(player_kind)?;
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        let Some(attacker) = Self::world_object(n.caller, at, side)? else {
+        let Some(attacker) = Self::world_object(notify.caller, at, side)? else {
             return Ok(GO_ON);
         };
         let attacker_id = attacker.id;
@@ -108,7 +108,9 @@ impl UnitAi {
             return Ok(GO_ON);
         }
         // `IsIdle` (FUN_141017ad0) of the unit's group, read at the handler's start
-        let held_by_group = at.group.is_some_and(|g| !g.contains(GroupState::IDLE));
+        let held_by_group = at
+            .group
+            .is_some_and(|group_state| !group_state.contains(GroupState::IDLE));
         if !known
             && !player_kind.is_computer()
             && self.current_target != Some(attacker_id)
@@ -186,7 +188,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<()> {
         let unit_ai_tuning = &at.unit_ai_tuning;
-        let from = current.map_or(at.position, |t| t.position);
+        let from = current.map_or(at.position, |unit_seen| unit_seen.position);
         let (classes, radius) = self.search_area(at, player_kind);
         let found = side.closest(&Search {
             at: from.ground(),
@@ -302,14 +304,14 @@ impl UnitAi {
         } else {
             unit_ai_tuning.never_killed
         };
-        let a = side.duel(attacker_id)?;
-        let attacker_time = if HitPoints::ZERO < a.harmed {
-            a.hp / a.harmed
+        let duel = side.duel(attacker_id)?;
+        let attacker_time = if HitPoints::ZERO < duel.harmed {
+            duel.hp / duel.harmed
         } else {
             unit_ai_tuning.never_killed
         };
         // "my current target will take longer to kill"
-        if !t.converts && (attacker_time < target_time || a.converts) {
+        if !t.converts && (attacker_time < target_time || duel.converts) {
             let _ = self.strike_back(attacker_id, at, ai_rng, side)?;
         }
         Ok(GO_ON)
@@ -349,7 +351,7 @@ impl UnitAi {
     /// [`IN_THE_WAY`]: crate::unit_ai::NotifyKind::IN_THE_WAY
     pub(super) fn in_the_way(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
@@ -359,7 +361,7 @@ impl UnitAi {
             && at.combat_level == CombatLevel::ANIMAL;
         // p1 the unit met (−1 names none the update holds)
         if !boar
-            && let Some(met) = ObjectId::of_field(n.p[0])
+            && let Some(met) = ObjectId::of_field(notify.p[0])
             && at.unit(met).is_some()
             && self.retarget_disabled == 0
             && self.current_order.is_none()
@@ -383,18 +385,18 @@ impl UnitAi {
     /// [`SENT_OFF`]: crate::unit_ai::NotifyKind::SENT_OFF
     pub(super) fn sent_off(
         &mut self,
-        n: Notify,
+        notify: Notify,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
     ) -> GenieResult<u32> {
         let radius = Footprint::new(
-            n.p[0] as f32 / unit_ai_tuning.radius_scale,
-            n.p[1] as f32 / unit_ai_tuning.radius_scale,
+            notify.p[0] as f32 / unit_ai_tuning.radius_scale,
+            notify.p[1] as f32 / unit_ai_tuning.radius_scale,
         );
         // p3 the foundation: none (−1) has no footprint, so the unit has nowhere to go
-        let Some(site) = FoundationId::of_field(n.p[2]) else {
+        let Some(site) = FoundationId::of_field(notify.p[2]) else {
             return Ok(GO_ON);
         };
         let off = side.off_footprint(site, radius)?;
@@ -420,17 +422,17 @@ impl UnitAi {
             && roles.of_class(off.class).contains(ClassRoles::VILLAGER)
             && let (Some(site), Some(target)) = (off.site, off.action_target)
         {
-            let order = |o: &Named, order: OrderKind| QueuedOrder {
+            let order = |named: &Named, order: OrderKind| QueuedOrder {
                 issuer: Some(Issuer::Player(off.player)),
                 order,
                 priority: OrderPriority::COMMAND,
-                target: Some(o.id),
-                target_owner: Some(o.owner),
-                point: o.vector.with_height(0.0),
+                target: Some(named.id),
+                target_owner: Some(named.owner),
+                point: named.vector.with_height(0.0),
                 range: Distance::ZERO,
-                shown: o.vector,
+                shown: named.vector,
                 ready: true,
-                target_kind: Some(OrderTargetKind::of_master(o.master)),
+                target_kind: Some(OrderTargetKind::of_master(named.master)),
             };
             self.insert_order(order(&site, OrderKind::Foundation), QueueEnd::Front);
             self.insert_order(order(&target, OrderKind::OnTarget), QueueEnd::Back);
@@ -438,23 +440,23 @@ impl UnitAi {
         Ok(GO_ON)
     }
 
-    /// Slot 0x148 (`FUN_140c4d0d0`), the move off a footprint: with its force flag (`m.force`)
-    /// or without an action value, the unit's slot 0x340 takes the move with the same
-    /// arguments ([`AiCommand::MoveAside`], which the caller runs after the update); on its 1 the
-    /// action value becomes [`AiAction::MoveAside`], the old one the last, and the target stays.
-    /// The caller's slot 0x340 is `FUN_1410866e0`, which always gives 1, but for classes 51 and
-    /// 54 (`FUN_141216c50`, their packing), which it does not run. The move gives the unit its
+    /// Slot 0x148 (`FUN_140c4d0d0`), the move off a footprint: with its force flag
+    /// (`ai_move.force`) or without an action value, the unit's slot 0x340 takes the move with the
+    /// same arguments ([`AiCommand::MoveAside`], which the caller runs after the update); on its 1
+    /// the action value becomes [`AiAction::MoveAside`], the old one the last, and the target
+    /// stays. The caller's slot 0x340 is `FUN_1410866e0`, which always gives 1, but for classes 51
+    /// and 54 (`FUN_141216c50`, their packing), which it does not run. The move gives the unit its
     /// `MoveTo` at once: the update's later checks see it busy. Taken when it moves.
     pub(super) fn move_aside(
         &mut self,
-        m: AiMove,
+        ai_move: AiMove,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<Answer> {
-        if m.force == OrderForce::Unforced && self.current_action.is_some() {
+        if ai_move.force == OrderForce::Unforced && self.current_action.is_some() {
             return Ok(Answer::NotTaken);
         }
-        side.effect_now(Effect::Command(AiCommand::MoveAside(m)), self, rng)?;
+        side.effect_now(Effect::Command(AiCommand::MoveAside(ai_move)), self, rng)?;
         self.set_action(Some(AiAction::MoveAside));
         Ok(Answer::Taken)
     }
@@ -491,7 +493,7 @@ impl UnitAi {
     /// processing goes on. The other explorers' search is not modelled.
     pub(super) fn seek_unexplored(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
@@ -520,7 +522,7 @@ impl UnitAi {
                 "a scout that finds no undiscovered tile (the player's slot 0x2e8 with 0x211)",
             )),
             Some(OrderKind::AutoScout) => {
-                let Some(t) = side.seek_beyond_sight(ai_rng)? else {
+                let Some(tile) = side.seek_beyond_sight(ai_rng)? else {
                     // the player's scout map, from the tiles it sees; on the auto scout's action
                     // the AI's slot 0x40 hands the notify to the owner (slot 0x2e8 with 0x202,
                     // FUN_14162dab0: no case for it but the old short pather's hulled area, a
@@ -535,7 +537,8 @@ impl UnitAi {
                     return Ok(BREAK);
                 };
                 if self.current_action == Some(AiAction::AutoScout) {
-                    let _ = self.explore_at(t, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
+                    let _ =
+                        self.explore_at(tile, OrderForce::Forced, side, ai_rng, unit_ai_tuning)?;
                 }
                 self.current_action = action;
                 Ok(BREAK)
@@ -543,7 +546,7 @@ impl UnitAi {
             _ => {
                 self.remove_target();
                 self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-                side.owner_hears(n)?;
+                side.owner_hears(notify)?;
                 Ok(GO_ON)
             }
         }

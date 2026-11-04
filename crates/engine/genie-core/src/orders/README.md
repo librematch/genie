@@ -51,7 +51,7 @@ The files hold the orders by kind:
 | [`work.rs`](work.rs) | A kept attack, the garrison task and the work command and its task. |
 | [`gather/`](gather/) | The work command's Hunt. |
 | [`town_bell/`](town_bell/) | The town bell's commands. |
-| [`work/`](work/) | The garrison finder's view. |
+| [`work/`](work/) | The work command's parts. |
 <!-- /files -->
 
 ## How it connects

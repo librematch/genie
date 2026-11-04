@@ -34,22 +34,24 @@ pub struct PlayerComparison {
 pub(super) fn live<'a>(
     section: &PlayerSection<'a>,
 ) -> impl Iterator<Item = (&'a genie_save::Object, &'a RgeStaticObject)> {
-    section
-        .live_objects()
-        .filter_map(|o| o.static_part().map(|s| (o, s)))
+    section.live_objects().filter_map(|object| {
+        object
+            .static_part()
+            .map(|rge_static_object| (object, rge_static_object))
+    })
 }
 
 /// An object of a player's live list: not the stand-in for a saved object without a static part
 /// ([`unit`]). A missile's id is below 0 (the world's reusable ids, `next_reusable_object_id`).
-pub(super) fn listed(u: &Unit) -> bool {
-    u.id != ObjectId::UNSAVED
+pub(super) fn listed(unit: &Unit) -> bool {
+    unit.id != ObjectId::UNSAVED
 }
 
 /// An object saved alive without hit points: its first update kills it, and it leaves the live
 /// list within a few ticks (genie-core's lifecycle; a flare's 1 s corpse timer takes 14). The
 /// save's PLACEHOLDER2s, FLARE3s and empty town-centre annexes are such objects.
-pub(super) fn dies_at_start(s: &RgeStaticObject) -> bool {
-    matches!(s.object_state, 0 | 2) && s.hp < 1.0
+pub(super) fn dies_at_start(rge_static_object: &RgeStaticObject) -> bool {
+    matches!(rge_static_object.object_state, 0 | 2) && rge_static_object.hp < 1.0
 }
 
 /// What the block reads of a saved object, before the slice changes any of it.
@@ -57,14 +59,18 @@ pub(super) fn dies_at_start(s: &RgeStaticObject) -> bool {
 /// # Errors
 ///
 /// An id of −1, which names no object; a state past 8.
-pub(super) fn object_state(s: &RgeStaticObject) -> GenieResult<CheckpointObject> {
+pub(super) fn object_state(rge_static_object: &RgeStaticObject) -> GenieResult<CheckpointObject> {
     Ok(CheckpointObject {
-        id: ObjectId::try_from(s.id)?,
-        main_id: MasterId::of_data(s.master_obj)
+        id: ObjectId::try_from(rge_static_object.id)?,
+        main_id: MasterId::of_data(rge_static_object.master_obj)
             .ok_or(GenieError::invalid_input("a live object of no master"))?,
-        state: ObjectState::of_byte(s.object_state)?,
-        amount_held: Amount::new(s.attribute_amount_held),
-        position: Position::new(s.tx, s.ty, s.tz),
+        state: ObjectState::of_byte(rge_static_object.object_state)?,
+        amount_held: Amount::new(rge_static_object.attribute_amount_held),
+        position: Position::new(
+            rge_static_object.tx,
+            rge_static_object.ty,
+            rge_static_object.tz,
+        ),
         top_action: None,
         retarget_timer: None,
     })
@@ -81,7 +87,7 @@ pub fn player_state(section: &PlayerSection<'_>, id: u32) -> GenieResult<PlayerS
     Ok(PlayerState {
         live: live(section)
             .map(|(_, s)| s)
-            .filter(|s| !dies_at_start(s))
+            .filter(|rge_static_object| !dies_at_start(rge_static_object))
             .map(object_state)
             .collect::<Result<_, _>>()?,
         ..player_totals(section, id)
@@ -110,7 +116,7 @@ pub fn compare_first_checkpoint(recording: &[u8]) -> GenieResult<Vec<PlayerCompa
         .find_map(|op| match op {
             Ok(Op::Checkpoint { checkpoint, .. }) => Some(Ok(checkpoint)),
             Ok(_) => None,
-            Err(e) => Some(Err(e)),
+            Err(error) => Some(Err(error)),
         })
         .ok_or(no_checkpoint())??;
     let players = header.players();

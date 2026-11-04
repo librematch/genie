@@ -45,13 +45,14 @@ use crate::world::parts::Parts;
 use crate::world::player::AiSettings;
 use crate::{GenieError, GenieResult};
 
-/// Slot 0x228 (`FUN_141084070`): the sum of master `m`'s attacks above 0 (`COMISS`), from +0.
-pub(super) fn attacks(m: &Master) -> f32 {
-    m.combat_part()
+/// Slot 0x228 (`FUN_141084070`): the sum of master `master`'s attacks above 0 (`COMISS`), from +0.
+pub(super) fn attacks(master: &Master) -> f32 {
+    master
+        .combat_part()
         .weapons
         .iter()
         .filter(|w| DamageAmount::ZERO < w.amount)
-        .fold(0.0, |sum, w| sum + w.amount.as_f32())
+        .fold(0.0, |sum, class_amount| sum + class_amount.amount.as_f32())
 }
 
 /// An object the unit AI found or names that the slice does not hold (another player's it does
@@ -121,13 +122,13 @@ impl WorldPicker<'_> {
         } else if let Some(u) = self.others.own(id) {
             (self.player, u, self.attributes)
         } else {
-            let Some((q, u)) = self.others.foreign(id) else {
+            let Some((player_id, unit)) = self.others.foreign(id) else {
                 return Ok(None);
             };
-            let Some(foreign) = self.foreign.player(q) else {
+            let Some(foreign) = self.foreign.player(player_id) else {
                 return Ok(None);
             };
-            (q, u, &foreign.attributes[..])
+            (player_id, unit, &foreign.attributes[..])
         };
         let master = u.master(self.every, q)?;
         Ok(Some((q, u, attributes, master)))
@@ -144,28 +145,28 @@ impl WorldPicker<'_> {
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
     ) -> GenieResult<bool> {
-        let (_, p, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
+        let (_, who_unit, attributes, pm) = self.held(who)?.ok_or(GenieError::unsupported(
             "a priest's conversion test of an object the slice does not hold",
         ))?;
         if self
             .parts
             .unit_ai
-            .get(p.id)
-            .is_none_or(|a| a.ai_kind != UnitAiKind::Priest)
+            .get(who_unit.id)
+            .is_none_or(|unit_ai| unit_ai.ai_kind != UnitAiKind::Priest)
         {
             return Ok(false);
         }
         let converter = Converter {
             class: pm.class,
-            master: p.life.master_id,
-            faith: p.life.amount,
+            master: who_unit.life.master_id,
+            faith: who_unit.life.amount,
             attributes,
             tasks: &pm.action_part().tasks,
         };
-        let target = self.held(whom)?.map(|(q, t, _, tm)| Convertee {
-            owner: q,
+        let target = self.held(whom)?.map(|(player_id, unit, _, tm)| Convertee {
+            owner: player_id,
             class: tm.class,
-            master: t.life.master_id,
+            master: unit.life.master_id,
             hero: tm.creatable_part().hero_flag,
         });
         Ok(can_convert(
@@ -190,17 +191,17 @@ impl WorldPicker<'_> {
         roles: &Roles,
         damage_tuning: &DamageTuning,
     ) -> GenieResult<HitPoints> {
-        let (fq, f, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
-        let (tq, t, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
+        let (fq, from_unit, fa, fm) = self.held(from)?.ok_or(NOT_HELD)?;
+        let (tq, target_unit, ta, tm) = self.held(to)?.ok_or(NOT_HELD)?;
         let terrain = spatial.terrain.as_ref();
         let target = victim_of(
             (
-                t,
-                self.parts.unit_ai.contains(t.id),
-                self.parts.building_of(t.id),
-                self.parts.combat_of(t.id),
-                self.actions_of(t.id),
-                self.parts.unread.get(t.id),
+                target_unit,
+                self.parts.unit_ai.contains(target_unit.id),
+                self.parts.building_of(target_unit.id),
+                self.parts.combat_of(target_unit.id),
+                self.actions_of(target_unit.id),
+                self.parts.unread.get(target_unit.id),
             ),
             tm,
             ta,
@@ -211,12 +212,12 @@ impl WorldPicker<'_> {
         );
         let unit = victim_of(
             (
-                f,
-                self.parts.unit_ai.contains(f.id),
-                self.parts.building_of(f.id),
-                self.parts.combat_of(f.id),
-                self.actions_of(f.id),
-                self.parts.unread.get(f.id),
+                from_unit,
+                self.parts.unit_ai.contains(from_unit.id),
+                self.parts.building_of(from_unit.id),
+                self.parts.combat_of(from_unit.id),
+                self.actions_of(from_unit.id),
+                self.parts.unread.get(from_unit.id),
             ),
             fm,
             fa,
@@ -226,7 +227,7 @@ impl WorldPicker<'_> {
             roles,
         );
         let mut factor = elevation_factor(
-            f.position().z(),
+            from_unit.position().z(),
             unit.attack_elevation,
             &target,
             damage_tuning,
@@ -234,9 +235,9 @@ impl WorldPicker<'_> {
         if fm.kind == MasterKind::BUILDING {
             factor = building_elevation_factor(
                 factor,
-                self.parts.building_of(f.id).relics,
+                self.parts.building_of(from_unit.id).relics,
                 tm.kind,
-                self.parts.building_of(t.id).relics,
+                self.parts.building_of(target_unit.id).relics,
                 damage_tuning,
             );
         }
@@ -254,13 +255,13 @@ impl WorldPicker<'_> {
         damage_tuning: &DamageTuning,
         unit_ai_tuning: &UnitAiTuning,
     ) -> GenieResult<Duel> {
-        let (_, o, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
+        let (_, unit, _, om) = self.held(other)?.ok_or(NOT_HELD)?;
         Ok(Duel {
             converts: self.converts(other, self.me, TargetRules::Any, roles, unit_ai_tuning)?,
             attacks: attacks(om),
             harms: self.damage(spatial, other, self.me, roles, damage_tuning)?,
             harmed: self.damage(spatial, self.me, other, roles, damage_tuning)?,
-            hp: o.life.hp,
+            hp: unit.life.hp,
         })
     }
 
@@ -278,40 +279,40 @@ impl WorldPicker<'_> {
         roles: &Roles,
         unit_ai_tuning: &UnitAiTuning,
     ) -> GenieResult<bool> {
-        let (q, o, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
+        let (player_id, other_unit, attributes, om) = self.held(other)?.ok_or(NOT_HELD)?;
         if !om.object_flags.contains(ObjectFlags::SCOUT) || om.copy_id != Some(om.id) {
             return Ok(false);
         }
         let terrain = spatial.terrain.as_ref();
-        let v = victim_of(
+        let victim = victim_of(
             (
-                o,
-                self.parts.unit_ai.contains(o.id),
-                self.parts.building_of(o.id),
-                self.parts.combat_of(o.id),
-                self.actions_of(o.id),
-                self.parts.unread.get(o.id),
+                other_unit,
+                self.parts.unit_ai.contains(other_unit.id),
+                self.parts.building_of(other_unit.id),
+                self.parts.combat_of(other_unit.id),
+                self.actions_of(other_unit.id),
+                self.parts.unread.get(other_unit.id),
             ),
             om,
             attributes,
-            q,
+            player_id,
             terrain,
             self.mode_680,
             roles,
         );
-        let attacked = (self.actions_of(o.id).top_action_kind() == Some(ATTACK))
-            .then(|| self.actions_of(o.id).top_target())
+        let attacked = (self.actions_of(other_unit.id).top_action_kind() == Some(ATTACK))
+            .then(|| self.actions_of(other_unit.id).top_target())
             .flatten();
         let target = match attacked {
-            Some(t) => self.held(t)?.map(|(tq, t, ta, tm)| {
+            Some(object_id) => self.held(object_id)?.map(|(tq, unit, ta, tm)| {
                 victim_of(
                     (
-                        t,
-                        self.parts.unit_ai.contains(t.id),
-                        self.parts.building_of(t.id),
-                        self.parts.combat_of(t.id),
-                        self.actions_of(t.id),
-                        self.parts.unread.get(t.id),
+                        unit,
+                        self.parts.unit_ai.contains(unit.id),
+                        self.parts.building_of(unit.id),
+                        self.parts.combat_of(unit.id),
+                        self.actions_of(unit.id),
+                        self.parts.unread.get(unit.id),
                     ),
                     tm,
                     ta,
@@ -328,12 +329,12 @@ impl WorldPicker<'_> {
             projectile: om
                 .creatable_part()
                 .charge_projectile
-                .and_then(|id| player_master(self.every.players, q, id))
-                .map(|m| &m.combat_part().weapons[..]),
+                .and_then(|id| player_master(self.every.players, player_id, id))
+                .map(|master| &master.combat_part().weapons[..]),
             charge_event: om.creatable_part().charge_event,
-            range_powerup: self.parts.combat_of(o.id).range_powerup,
+            range_powerup: self.parts.combat_of(other_unit.id).range_powerup,
         };
-        let attack = shown_attack(&v, &shown, roles);
+        let attack = shown_attack(&victim, &shown, roles);
         let amount = DamageAmount::new;
         if amount(4) < attack
             || (amount(3) < attack
@@ -341,10 +342,10 @@ impl WorldPicker<'_> {
         {
             return Ok(false);
         }
-        if amount(0) < shown_melee_armor(&v, roles)? {
+        if amount(0) < shown_melee_armor(&victim, roles)? {
             return Ok(false);
         }
-        Ok(shown_range(&v, &shown, roles) <= Distance::new(unit_ai_tuning.harmless_range))
+        Ok(shown_range(&victim, &shown, roles) <= Distance::new(unit_ai_tuning.harmless_range))
     }
 
     /// Slot 0x78 of object `target`'s unit AI (`FUN_140c48610`): of its attackers in their order,
@@ -352,19 +353,24 @@ impl WorldPicker<'_> {
     /// [`crate::movement::footprint_gap`]; the first of a tie, `COMISS`: a NaN gap takes none
     /// over; [`NearestAttacker`]).
     pub(crate) fn nearest_attacker_of(&self, target: ObjectId) -> GenieResult<NearestAttacker> {
-        let Some((_, t, _, tm)) = self.held(target)? else {
+        let Some((_, target_unit, _, tm)) = self.held(target)? else {
             return Ok(NearestAttacker::NoUnitAi);
         };
-        let Some(ai) = self.parts.unit_ai.get(t.id) else {
+        let Some(ai) = self.parts.unit_ai.get(target_unit.id) else {
             return Ok(NearestAttacker::NoUnitAi);
         };
         let mut best: Option<(f32, ObjectId)> = None;
         // a missile's sender gone (−1) is held by no one
         for id in ai.attackers.iter().flatten() {
-            let Some((_, a, _, am)) = self.held(id)? else {
+            let Some((_, unit, _, am)) = self.held(id)? else {
                 continue;
             };
-            let gap = footprint_gap(t.position(), tm.radius, a.position(), am.radius);
+            let gap = footprint_gap(
+                target_unit.position(),
+                tm.radius,
+                unit.position(),
+                am.radius,
+            );
             if best.is_none_or(|(least, _)| gap < Distance::new(least)) {
                 best = Some((gap.get(), id));
             }
@@ -376,42 +382,45 @@ impl WorldPicker<'_> {
 
     /// The object `id` as the attack tests read it, and whether it moves (slot 0x208 above 0).
     pub(crate) fn target(&self, spatial: &Spatial, id: ObjectId) -> GenieResult<(Target, bool)> {
-        let (owner, t) = self.others.find(id).ok_or(NOT_HELD)?;
-        let m = t.master(self.every, owner)?;
+        let (owner, unit) = self.others.find(id).ok_or(NOT_HELD)?;
+        let master = unit.master(self.every, owner)?;
         let placed = spatial
             .get_known(id)?
             .ok_or(GenieError::unsupported("a found object without a place"))?;
         let capture = spatial
             .sight
             .as_ref()
-            .and_then(|v| v.seer(id))
-            .map_or(CaptureKind::None, |s| s.capture);
+            .and_then(|visibility| visibility.seer(id))
+            .map_or(CaptureKind::None, |seer| seer.capture);
         let target = Target {
             owner,
-            class: m.class,
-            kind: m.kind,
-            master: t.life.master_id,
-            combat_level: m.combat_level,
+            class: master.class,
+            kind: master.kind,
+            master: unit.life.master_id,
+            combat_level: master.combat_level,
             capture,
             flags: {
                 let mut flags = AttackTargetFlags::empty();
-                flags.set(AttackTargetFlags::HAS_AI, self.parts.unit_ai.contains(t.id));
-                flags.set(AttackTargetFlags::INSIDE, t.life.inside.is_some());
+                flags.set(
+                    AttackTargetFlags::HAS_AI,
+                    self.parts.unit_ai.contains(unit.id),
+                );
+                flags.set(AttackTargetFlags::INSIDE, unit.life.inside.is_some());
                 flags.set(
                     AttackTargetFlags::TARGETING,
-                    !t.flags.contains(UnitFlags::UNTARGETABLE),
+                    !unit.flags.contains(UnitFlags::UNTARGETABLE),
                 );
                 flags.set(
                     AttackTargetFlags::ATTACKABLE,
-                    t.flags.contains(UnitFlags::ATTACKABLE),
+                    unit.flags.contains(UnitFlags::ATTACKABLE),
                 );
                 flags.set(
                     AttackTargetFlags::DESOLID,
                     self.parts
-                        .building_of(t.id)
+                        .building_of(unit.id)
                         .construction
                         .as_ref()
-                        .is_some_and(|c| c.desolid),
+                        .is_some_and(|construction| construction.desolid),
                 );
                 flags
             },
@@ -421,8 +430,8 @@ impl WorldPicker<'_> {
         let moving = Speed::ZERO
             < self
                 .parts
-                .mover_of(t.id)
-                .map_or(Speed::ZERO, |m| m.stats.speed);
+                .mover_of(unit.id)
+                .map_or(Speed::ZERO, |mover| mover.stats.speed);
         Ok((target, moving))
     }
 }
@@ -432,7 +441,7 @@ impl WorldPicker<'_> {
 /// length or one measured) with its flags, and that level's waypoint; None without path data or
 /// a path at the top.
 pub(crate) fn patrol_information(mover: Option<&Mover>) -> Option<(PatrolPath, WaypointIndex)> {
-    let top = mover?.paths.last().filter(|l| l.has_path)?;
+    let top = mover?.paths.last().filter(|path_data| path_data.has_path)?;
     let mut path = Path::default();
     path.append(&Path {
         points: top.points.clone(),

@@ -43,8 +43,8 @@ impl MulAssign<f32> for ArcRatio {
 }
 
 impl genie_diff::Diff for ArcRatio {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -60,10 +60,10 @@ mod tests {
         assert!(!ArcRatio::new(0.5).is_flat());
         assert!(!ArcRatio::new(f32::NAN).is_flat());
         assert_eq!(ArcRatio::new(-0.25).get(), -0.25);
-        let mut a = ArcRatio::new(0.1);
-        a += ArcRatio::new(0.2);
-        assert_eq!(a.get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        a *= 3.0;
-        assert_eq!(a.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
+        let mut arc_ratio = ArcRatio::new(0.1);
+        arc_ratio += ArcRatio::new(0.2);
+        assert_eq!(arc_ratio.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        arc_ratio *= 3.0;
+        assert_eq!(arc_ratio.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
     }
 }

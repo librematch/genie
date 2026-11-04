@@ -42,11 +42,11 @@ impl Attack {
         sprite_rng: &mut Well512,
         sprite_tuning: SpriteTuning,
     ) -> GenieResult<()> {
-        let g = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
+        let graphic = self.arms.idle_sprite.ok_or(NO_STANDING_SPRITE)?;
         new_sprite(
             &mut unit.sprite,
             motion.move_stats_mut(),
-            g,
+            graphic,
             sprite_rng,
             sprite_tuning,
         );
@@ -68,7 +68,7 @@ impl Attack {
     /// starts ([`Attack::moving`]): how it started.
     pub(super) fn set_move(
         &mut self,
-        e: &Engagement,
+        engagement: &Engagement,
         mover: &mut Mover,
         reads: &MoveToReads<'_>,
         move_to_tuning: &MoveToTuning,
@@ -77,7 +77,13 @@ impl Attack {
             mover.stop()?;
         }
         self.state = AttackState::Move { move_to: None };
-        self.moving(e.range, e.target_position, e.gap, reads, move_to_tuning)
+        self.moving(
+            engagement.range,
+            engagement.target_position,
+            engagement.gap,
+            reads,
+            move_to_tuning,
+        )
     }
 
     /// `set_state(4)`'s own part: the range (slot 0x238's), the timer, the `MoveTo` to the target
@@ -136,73 +142,80 @@ impl Attack {
     /// (class 15) up to state 5, which keeps a non-villager at it, is not modelled.
     pub(super) fn lost(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         roles: &Roles,
     ) -> GenieResult<UpdateCode> {
         // The villagers' class, whose `MoveTo` waits once when the motion step gives up.
-        if r.ai_order.has_ai()
-            && (f.victim.player != PlayerId::new(0)
-                || !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER))
+        if attack_reads.ai_order.has_ai()
+            && (fight.victim.player != PlayerId::new(0)
+                || !roles
+                    .of_class(fight.own.class)
+                    .contains(ClassRoles::VILLAGER))
         {
-            forget_target(c.w.parts.unit_ai.get_mut(unit.id));
+            forget_target(step.w.parts.unit_ai.get_mut(unit.id));
         }
         let target = self.target.take();
-        let_go(c, unit, target)?;
+        let_go(step, unit, target)?;
         self.point = Position::from([NONE; 3]);
-        let human = f.own.player != PlayerId::new(0) && !r.player_kind.is_computer();
-        let waits = match r.ai_order {
+        let human = fight.own.player != PlayerId::new(0) && !attack_reads.player_kind.is_computer();
+        let waits = match attack_reads.ai_order {
             AiOrder::Absent => true,
             AiOrder::Idle => false,
-            AiOrder::Order(_) => r.flags.contains(AttackerFlags::QUEUE_EMPTY),
+            AiOrder::Order(_) => attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY),
         };
         if human && waits {
-            let speed =
-                c.w.parts
-                    .mover_of(unit.id)
-                    .map_or(Speed::ZERO, |m| m.stats.speed);
-            if r.stance == UnitStance::Aggressive
+            let speed = step
+                .w
+                .parts
+                .mover_of(unit.id)
+                .map_or(Speed::ZERO, |mover| mover.stats.speed);
+            if attack_reads.stance == UnitStance::Aggressive
                 && Speed::ZERO < speed
-                && !roles.of_class(f.own.class).contains(ClassRoles::VILLAGER)
+                && !roles
+                    .of_class(fight.own.class)
+                    .contains(ClassRoles::VILLAGER)
             {
                 // a mover of stance 0 that is not a villager waits where it saw the target:
                 // 0x1fb with 600 and 0x202 for a unit's own Attack, then `set_state(5)`
                 if self.voice.is_loud() {
                     unit.post_own(
-                        &mut c.w.parts.unit_ai,
+                        &mut step.w.parts.unit_ai,
                         NotifyKind::ACTION_INVALIDATED,
                         [600, 0, 0x202],
                     )?;
                 }
                 self.wait_at_seen(
                     unit,
-                    c.w.parts.motion_mut(unit.id),
-                    f,
-                    r,
-                    &c.w.model.graphics,
-                    &c.w.model.tuning.move_to,
+                    step.w.parts.motion_mut(unit.id),
+                    fight,
+                    attack_reads,
+                    &step.w.model.graphics,
+                    &step.w.model.tuning.move_to,
                 )?;
                 return Ok(UpdateCode::Code5);
             }
             unit.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::ACTION_COMPLETED,
                 [600, 0, 0],
             )?;
-        } else if r.ai_order.has_ai() && r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
+        } else if attack_reads.ai_order.has_ai()
+            && attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY)
+        {
             unit.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::ACTION_INVALIDATED,
                 [600, 0, 0x202],
             )?;
         }
         self.finish(
             unit,
-            c.w.parts.motion_mut(unit.id),
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion_mut(unit.id),
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         Ok(UpdateCode::Code5)
     }
@@ -216,25 +229,30 @@ impl Attack {
     /// Hunt's Attack out of sight").
     pub(super) fn out_of_sight(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        f: &Fight,
-        r: &AttackReads,
+        fight: &Fight,
+        attack_reads: &AttackReads,
         roles: &Roles,
     ) -> GenieResult<UpdateCode> {
         let target = self.target.take();
         self.finish_in(
             AttackState::Failed,
             unit,
-            c.w.parts.motion_mut(unit.id),
-            c.w.streams.get(Stream::Sprite),
-            c.w.model.tuning.sprite,
+            step.w.parts.motion_mut(unit.id),
+            step.w.streams.get(Stream::Sprite),
+            step.w.model.tuning.sprite,
         )?;
         // The predators' class (10), whose unit AI's slot 0x1f0 a failed Attack calls.
         // The boar's unit-AI type, whose slot 0x1f0 (`FUN_140c16d50`) sends it home.
         // The lion's unit-AI type, whose slot 0x1f0 (`FUN_140c16d60`) does nothing.
-        if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && !matches!(r.ai_kind, Some(UnitAiKind::Boar | UnitAiKind::Lion) | None)
+        if roles
+            .of_class(fight.own.class)
+            .contains(ClassRoles::PREDATOR)
+            && !matches!(
+                attack_reads.ai_kind,
+                Some(UnitAiKind::Boar | UnitAiKind::Lion) | None
+            )
         {
             return Err(GenieError::unsupported(
                 "a predator's failed Attack whose unit AI is not a boar's or a lion's (slot 0x1f0)",
@@ -243,23 +261,26 @@ impl Attack {
         if self.voice.is_quiet() {
             return Ok(UpdateCode::Failed);
         }
-        let_go(c, unit, target)?;
-        if r.ai_order.has_ai() {
-            forget_target(c.w.parts.unit_ai.get_mut(unit.id));
+        let_go(step, unit, target)?;
+        if attack_reads.ai_order.has_ai() {
+            forget_target(step.w.parts.unit_ai.get_mut(unit.id));
         }
-        if roles.of_class(f.own.class).contains(ClassRoles::PREDATOR)
-            && r.ai_kind == Some(UnitAiKind::Boar)
-            && let Some(home) =
-                c.w.parts
-                    .unit_ai
-                    .get_mut(unit.id)
-                    .and_then(|ai| ai.home.as_mut())
+        if roles
+            .of_class(fight.own.class)
+            .contains(ClassRoles::PREDATOR)
+            && attack_reads.ai_kind == Some(UnitAiKind::Boar)
+            && let Some(home) = step
+                .w
+                .parts
+                .unit_ai
+                .get_mut(unit.id)
+                .and_then(|ai| ai.home.as_mut())
         {
             home.homeward = true;
         }
-        if r.flags.contains(AttackerFlags::QUEUE_EMPTY) {
+        if attack_reads.flags.contains(AttackerFlags::QUEUE_EMPTY) {
             unit.post_own(
-                &mut c.w.parts.unit_ai,
+                &mut step.w.parts.unit_ai,
                 NotifyKind::ACTION_FAILED,
                 [600, 0, 0],
             )?;

@@ -40,8 +40,8 @@ impl MulAssign<f32> for Regeneration {
 }
 
 impl genie_diff::Diff for Regeneration {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -52,11 +52,11 @@ mod tests {
     /// A rate adds and scales as `f32`.
     #[test]
     fn regeneration_rate_adds_and_scales_as_floats() {
-        let mut r = Regeneration::new(30.0) + Regeneration::new(5.0);
-        assert_eq!(r, Regeneration::new(35.0));
-        r += Regeneration::new(-5.0);
-        r *= 0.5;
-        assert_eq!(r.get(), 15.0);
-        assert!(Regeneration::ZERO < r);
+        let mut regeneration = Regeneration::new(30.0) + Regeneration::new(5.0);
+        assert_eq!(regeneration, Regeneration::new(35.0));
+        regeneration += Regeneration::new(-5.0);
+        regeneration *= 0.5;
+        assert_eq!(regeneration.get(), 15.0);
+        assert!(Regeneration::ZERO < regeneration);
     }
 }

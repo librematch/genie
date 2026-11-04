@@ -56,8 +56,8 @@ impl Div<Seconds> for Angle {
 }
 
 impl genie_diff::Diff for TurnRate {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -71,14 +71,14 @@ mod tests {
     /// operation in the game's operand order.
     #[test]
     fn turn_rate_over_seconds_is_an_angle() {
-        let (r, dt) = (TurnRate::new(0.7), Seconds::new(0.3));
-        assert_eq!((r * dt).get().to_bits(), (0.7_f32 * 0.3).to_bits());
+        let (turn_rate, dt) = (TurnRate::new(0.7), Seconds::new(0.3));
+        assert_eq!((turn_rate * dt).get().to_bits(), (0.7_f32 * 0.3).to_bits());
         assert_eq!(
             (Angle::new(6.5) / Seconds::new(1.6)).get().to_bits(),
             (6.5_f32 / 1.6).to_bits()
         );
-        assert!(TurnRate::ZERO < r && r < TurnRate::MAX);
-        assert_eq!(TurnRate::new(f32::NAN).partial_cmp(&r), None);
+        assert!(TurnRate::ZERO < turn_rate && turn_rate < TurnRate::MAX);
+        assert_eq!(TurnRate::new(f32::NAN).partial_cmp(&turn_rate), None);
         assert_eq!(TurnRate::new(1.5).to_string(), "1.5");
     }
 }

@@ -79,14 +79,14 @@ impl From<i32> for NotifyKind {
 }
 
 impl LowerHex for NotifyKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        LowerHex::fmt(&self.0, f)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        LowerHex::fmt(&self.0, formatter)
     }
 }
 
 impl genie_diff::Diff for NotifyKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

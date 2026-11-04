@@ -31,14 +31,14 @@ impl From<u16> for TerrainId {
 }
 
 impl From<TerrainId> for u16 {
-    fn from(n: TerrainId) -> Self {
-        n.0
+    fn from(terrain_id: TerrainId) -> Self {
+        terrain_id.0
     }
 }
 
 impl From<TerrainId> for usize {
-    fn from(n: TerrainId) -> Self {
-        n.0.into()
+    fn from(terrain_id: TerrainId) -> Self {
+        terrain_id.0.into()
     }
 }
 

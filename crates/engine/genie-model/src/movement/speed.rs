@@ -62,8 +62,8 @@ impl Mul<Speed> for f32 {
     type Output = Speed;
 
     /// The speed scaled by `self` (one `f32` product, the factor first).
-    fn mul(self, s: Speed) -> Speed {
-        Speed(self * s.0)
+    fn mul(self, speed: Speed) -> Speed {
+        Speed(self * speed.0)
     }
 }
 
@@ -112,8 +112,8 @@ impl Mul<Speed> for Seconds {
 }
 
 impl genie_diff::Diff for Speed {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -134,9 +134,9 @@ mod tests {
         assert_eq!((3.0 * a).get().to_bits(), (3.0_f32 * 0.1).to_bits());
         assert_eq!((a / 3.0).get().to_bits(), (0.1_f32 / 3.0).to_bits());
         assert_eq!((b / a).to_bits(), (0.2_f32 / 0.1).to_bits());
-        let mut s = Speed::new(1.1);
-        s *= 1.15;
-        assert_eq!(s.get().to_bits(), (1.1_f32 * 1.15).to_bits());
+        let mut speed = Speed::new(1.1);
+        speed *= 1.15;
+        assert_eq!(speed.get().to_bits(), (1.1_f32 * 1.15).to_bits());
         assert!(Speed::ZERO < a && a <= a && a < Speed::MAX);
         assert_eq!(Speed::new(f32::NAN).partial_cmp(&Speed::ZERO), None);
         assert_eq!(Speed::new(0.5).to_string(), "0.5");
@@ -146,12 +146,12 @@ mod tests {
     /// operand first keeps its payload (`mulss` returns its first NaN operand).
     #[test]
     fn speed_over_seconds_is_distance() {
-        let (v, dt) = (Speed::new(1.2), Seconds::new(0.05));
-        assert_eq!(v * dt, Distance::new(1.2 * 0.05));
-        assert_eq!((dt * v).get().to_bits(), (0.05_f32 * 1.2).to_bits());
+        let (speed, dt) = (Speed::new(1.2), Seconds::new(0.05));
+        assert_eq!(speed * dt, Distance::new(1.2 * 0.05));
+        assert_eq!((dt * speed).get().to_bits(), (0.05_f32 * 1.2).to_bits());
         let nan = f32::from_bits(0x7fc0_0001);
         assert_eq!(
-            (Seconds::new(nan) * v).get().to_bits(),
+            (Seconds::new(nan) * speed).get().to_bits(),
             (nan * 1.2).to_bits()
         );
         assert_eq!(

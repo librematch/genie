@@ -94,7 +94,7 @@ impl UnitView<'_, '_> {
             .iter()
             .find(|&&(group, _)| group == own.action_part().task_by_group)
             .and_then(|&(_, id)| masters.get(id));
-        let (Some(t), Some(general)) = (
+        let (Some(task_target), Some(general)) = (
             task_target_with(
                 target,
                 1,
@@ -142,7 +142,7 @@ impl UnitView<'_, '_> {
             masters,
             &actor,
             &TaskOn {
-                target: Some(&t),
+                target: Some(&task_target),
                 general: Some(&general),
                 terrain,
             },
@@ -158,7 +158,7 @@ impl UnitView<'_, '_> {
             target,
             switches: [
                 switch.map(|m| m.id),
-                found.and_then(|(_, m)| m.map(|m| m.id)),
+                found.and_then(|(_, m)| m.map(|master| master.id)),
             ],
             task: found.map(|(task, _)| task),
         };
@@ -167,10 +167,10 @@ impl UnitView<'_, '_> {
         } else {
             Answer::NotTaken
         };
-        self.c
-            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                w.repair_order(p, i, order)
-            })?;
+        self.c.lend_at(
+            (&mut *self.unit, &mut *self.actions),
+            |world, player_id, list_index| world.repair_order(player_id, list_index, order),
+        )?;
         Ok(repairs)
     }
 
@@ -222,7 +222,7 @@ impl UnitView<'_, '_> {
             .get(self.player.index())
             .ok_or(UNIT_AI_MASTER)?;
         let own = unit.master(self.c.w.master_tables(), self.player)?;
-        let (Some(t), Some(general)) = (
+        let (Some(task_target), Some(general)) = (
             task_target_with(
                 target,
                 1,
@@ -272,7 +272,7 @@ impl UnitView<'_, '_> {
             masters,
             &actor,
             &TaskOn {
-                target: Some(&t),
+                target: Some(&task_target),
                 general: Some(&general),
                 terrain,
             },
@@ -287,16 +287,14 @@ impl UnitView<'_, '_> {
         let order = EnterOrder {
             target,
             task,
-            switch: switch.map(|m| m.id),
+            switch: switch.map(|master| master.id),
             slot,
         };
-        if let Some(n) = self
-            .c
-            .lend_at((&mut *self.unit, &mut *self.actions), |w, p, i| {
-                w.enter_order(p, i, order)
-            })?
-        {
-            self.c.notify_own(self.unit, n)?;
+        if let Some(notify) = self.c.lend_at(
+            (&mut *self.unit, &mut *self.actions),
+            |world, player_id, list_index| world.enter_order(player_id, list_index, order),
+        )? {
+            self.c.notify_own(self.unit, notify)?;
         }
         Ok(Answer::Taken)
     }
@@ -315,7 +313,7 @@ impl UnitView<'_, '_> {
 /// found are not modelled.
 pub(crate) fn town_centre(units: OthersRef<'_>, masters: MasterSlots) -> GenieResult<Option<Tile>> {
     Ok(town_centre_unit(units, masters)?
-        .map(|u| Tile::new(u.position().x() as i32, u.position().y() as i32)))
+        .map(|unit| Tile::new(unit.position().x() as i32, unit.position().y() as i32)))
 }
 
 /// [`town_centre`] as the object.
@@ -324,7 +322,9 @@ pub(crate) fn town_centre_unit(
     masters: MasterSlots,
 ) -> GenieResult<Option<&Unit>> {
     for master in town_centres(masters) {
-        let mut found = units.own_iter().filter(|u| u.life.master_id == master);
+        let mut found = units
+            .own_iter()
+            .filter(|unit| unit.life.master_id == master);
         let Some(first) = found.next() else { continue };
         if found.next().is_some() {
             return Err(GenieError::unsupported(

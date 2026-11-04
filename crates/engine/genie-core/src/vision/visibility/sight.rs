@@ -107,7 +107,7 @@ impl Visibility {
             roles,
             visibility_tuning,
         } = sight;
-        let Some(s) = self.seers.get(id).copied() else {
+        let Some(seer) = self.seers.get(id).copied() else {
             return Ok(TileCount::ZERO);
         };
         self.sight_on_los(
@@ -116,7 +116,7 @@ impl Visibility {
                 position,
                 radius,
                 shape,
-                los: SightTiles::of(s.los),
+                los: SightTiles::of(seer.los),
                 centre,
             },
             roles,
@@ -144,10 +144,10 @@ impl Visibility {
             return Ok(TileCount::ZERO);
         };
         let (shape, centre) = match s.building {
-            Some(b) if b != BuildingSight::Built => {
-                if b == BuildingSight::Unstarted {
-                    if let Some(s) = self.seers.get_mut(id) {
-                        s.explored = false;
+            Some(building_sight) if building_sight != BuildingSight::Built => {
+                if building_sight == BuildingSight::Unstarted {
+                    if let Some(seer) = self.seers.get_mut(id) {
+                        seer.explored = false;
                     }
                     return Ok(TileCount::ZERO);
                 }
@@ -162,7 +162,11 @@ impl Visibility {
                         .is_some_and(|t| t.is_computer())
                 {
                     // its tile goes to the allied computer players' lists (player +0x180)
-                    if self.player_kinds.iter().any(|t| t.is_computer()) {
+                    if self
+                        .player_kinds
+                        .iter()
+                        .any(|player_kind| player_kind.is_computer())
+                    {
                         self.unsupported("a market's sight with computer players");
                     }
                 }
@@ -230,8 +234,8 @@ impl Visibility {
         } else {
             self.explore(s.player, Tile::new(x as i32, y as i32), los, centre)?
         };
-        if let Some(s) = self.seers.get_mut(id) {
-            s.explored = true;
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.explored = true;
         }
         Ok(newly)
     }
@@ -251,7 +255,7 @@ impl Visibility {
             roles,
             visibility_tuning,
         } = sight;
-        let Some(s) = self.seers.get(id).copied() else {
+        let Some(seer) = self.seers.get(id).copied() else {
             return Ok(());
         };
         self.sight_off_los(
@@ -260,7 +264,7 @@ impl Visibility {
                 position,
                 radius,
                 shape,
-                los: SightTiles::of(s.los),
+                los: SightTiles::of(seer.los),
                 centre,
             },
             roles,
@@ -285,13 +289,13 @@ impl Visibility {
             los,
             centre,
         } = sight;
-        let Some(s) = self.seers.get(id).copied() else {
+        let Some(seer) = self.seers.get(id).copied() else {
             return Ok(());
         };
-        let centre = match s.building {
-            Some(_) if !s.explored => return Ok(()),
-            Some(b) if b != BuildingSight::Built => {
-                if b == BuildingSight::Unstarted {
+        let centre = match seer.building {
+            Some(_) if !seer.explored => return Ok(()),
+            Some(building_sight) if building_sight != BuildingSight::Built => {
+                if building_sight == BuildingSight::Unstarted {
                     return Ok(());
                 }
                 centre
@@ -300,7 +304,7 @@ impl Visibility {
             None => centre,
         };
         let shape = if roles
-            .of_master(s.master)
+            .of_master(seer.master)
             .contains(MasterRoles::CIRCLE_SIGHT)
         {
             SightShape::Circle
@@ -317,7 +321,7 @@ impl Visibility {
                 return Ok(());
             }
             self.unexplore_rect(
-                s.player,
+                seer.player,
                 TileRect::new(
                     (x - rx) as i32,
                     (y - ry) as i32,
@@ -326,7 +330,7 @@ impl Visibility {
                 ),
             )?;
         } else {
-            self.unexplore(s.player, Tile::new(x as i32, y as i32), los, centre)?;
+            self.unexplore(seer.player, Tile::new(x as i32, y as i32), los, centre)?;
         }
         Ok(())
     }
@@ -342,10 +346,10 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        let tile = |p: Position| {
+        let tile = |position: Position| {
             [
-                tile_of(p.x(), self.size.width()),
-                tile_of(p.y(), self.size.height()),
+                tile_of(position.x(), self.size.width()),
+                tile_of(position.y(), self.size.height()),
             ]
         };
         if tile(from) == tile(to) {
@@ -365,7 +369,7 @@ impl Visibility {
         if self
             .seers
             .get(id)
-            .is_some_and(|s| s.state == ObjectState::Alive)
+            .is_some_and(|seer| seer.state == ObjectState::Alive)
         {
             let _ = self.sight_on(
                 id,
@@ -393,7 +397,7 @@ impl Visibility {
         roles: &Roles,
         visibility_tuning: VisibilityTuning,
     ) -> GenieResult<()> {
-        let Some(old) = self.seers.get(id).map(|s| s.state) else {
+        let Some(old) = self.seers.get(id).map(|old_seer| old_seer.state) else {
             return Ok(());
         };
         if old == new || (new < old && new != ObjectState::Foundation) {
@@ -440,8 +444,8 @@ impl Visibility {
                 },
             )?;
         }
-        if let Some(s) = self.seers.get_mut(id) {
-            s.state = new;
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.state = new;
         }
         Ok(())
     }
@@ -473,9 +477,9 @@ impl Visibility {
                 visibility_tuning,
             },
         )?;
-        if let Some(s) = self.seers.get_mut(id) {
-            s.master = master;
-            s.los = los;
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.master = master;
+            seer.los = los;
         }
         let _ = self.sight_on(
             id,
@@ -494,9 +498,9 @@ impl Visibility {
     /// The master and line of sight of seer `id` without its sight (a master change inside
     /// another, whose unit has no tile, `+0x2e8` 0: its sight comes with them on its way out).
     pub fn seer_master(&mut self, id: ObjectId, master: MasterId, los: Distance) {
-        if let Some(s) = self.seers.get_mut(id) {
-            s.master = master;
-            s.los = los;
+        if let Some(seer) = self.seers.get_mut(id) {
+            seer.master = master;
+            seer.los = los;
         }
     }
 

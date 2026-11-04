@@ -52,7 +52,9 @@ impl Unit {
     pub(crate) fn lists_taker(&self, master: &Master, allied: bool) -> bool {
         master.kind == MasterKind::BUILDING
             && self.life.state < ObjectState::Alive
-            && master.building.is_some_and(|b| b.stack_unit.is_some())
+            && master
+                .building
+                .is_some_and(|building_master| building_master.stack_unit.is_some())
             && !allied
     }
 
@@ -82,8 +84,11 @@ impl Unit {
         let mut why = why
             .with("object", self.id)
             .with("master", self.life.master_id);
-        if let Some(a) = actions.top_action() {
-            why = why.with("action", format_args!("{} state {}", a.kind, a.state));
+        if let Some(top_action) = actions.top_action() {
+            why = why.with(
+                "action",
+                format_args!("{} state {}", top_action.kind, top_action.state),
+            );
         }
         if let Some(ai) = ai {
             why = why.with(
@@ -107,7 +112,7 @@ impl Unit {
             id: self.id,
             action_state: actions
                 .top_action()
-                .map_or(ActionState::NO_ACTION, |a| a.state),
+                .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
             group: self.group.id,
             human_order: self.last_human_order,
         }
@@ -122,11 +127,11 @@ impl Unit {
             moving: m
                 .velocity
                 .as_ref()
-                .is_some_and(|v| 0.0 < length(v.velocity)),
+                .is_some_and(|velocity| 0.0 < length(velocity.velocity)),
             waits: m.waiting != 0
                 && !actions
                     .top_action()
-                    .is_some_and(|a| matches!(a.state.get(), 6 | 7)),
+                    .is_some_and(|top_action| matches!(top_action.state.get(), 6 | 7)),
             last_move: m.last_move,
             pause: m.paths.first().map(|l| l.pause_time),
             human_order: self.last_human_order,
@@ -134,7 +139,7 @@ impl Unit {
                 .paths
                 .first()
                 .filter(|l| !l.points.is_empty())
-                .map(|l| l.created),
+                .map(|path_data| path_data.created),
             group: self.group.id,
         })
     }
@@ -166,7 +171,7 @@ impl Action {
             (ARTIFACT_KIND, _) => self
                 .list
                 .artifact()
-                .is_some_and(|a| a.goal.is_none_or(|g| g.x() == -1.0)),
+                .is_some_and(|artifact| artifact.goal.is_none_or(|position| position.x() == -1.0)),
             _ => false,
         })
     }
@@ -177,19 +182,23 @@ impl Action {
     pub(crate) fn attack_target(&self) -> Option<ObjectId> {
         self.list
             .hunt()
-            .map(|h| h.target.map(HuntTargetId::id))
+            .map(|hunt_action| hunt_action.target.map(HuntTargetId::id))
             .or_else(|| {
                 self.list
                     .gather()
-                    .and_then(|g| g.target)
+                    .and_then(|gather_action| gather_action.target)
                     .map(|t| Some(t.id()))
             })
-            .or_else(|| self.list.attack().map(|a| a.target.map(AttackTargetId::id)))
+            .or_else(|| {
+                self.list
+                    .attack()
+                    .map(|attack| attack.target.map(AttackTargetId::id))
+            })
             .or_else(|| {
                 self.list
                     .missile()
-                    .and_then(|a| a.target)
-                    .map(|t| Some(t.id()))
+                    .and_then(|missile_action| missile_action.target)
+                    .map(|role_id| Some(role_id.id()))
             })
             .flatten()
     }

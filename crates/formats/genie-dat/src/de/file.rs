@@ -196,8 +196,8 @@ impl DatFile {
         // The byte count is `data.len()`.
         let _ = DeflateDecoder::new(input)
             .read_to_end(&mut data)
-            .map_err(|e| {
-                GenieError::io("a data file that does not read or inflate").with_source(e)
+            .map_err(|error| {
+                GenieError::io("a data file that does not read or inflate").with_source(error)
             })?;
         Self::from_inflated(&data)
     }
@@ -218,10 +218,10 @@ impl DatFile {
         };
         let mut start = [0u8; 8];
         start.copy_from_slice(data.get(..8).ok_or_else(|| version(&[]))?);
-        let v = Version::of(&start).ok_or_else(|| version(&start))?;
-        Self::read_le_args(&mut Cursor::new(data), (v,)).map_err(|e| {
+        let start_version = Version::of(&start).ok_or_else(|| version(&start))?;
+        Self::read_le_args(&mut Cursor::new(data), (start_version,)).map_err(|error| {
             GenieError::invalid_input("a data file that does not follow the format")
-                .with("binrw", e)
+                .with("binrw", error)
         })
     }
 
@@ -234,8 +234,9 @@ impl DatFile {
     /// [`ErrorKind::Io`]: genie_error::ErrorKind::Io
     pub fn to_bytes(&self) -> GenieResult<Vec<u8>> {
         let mut out = Cursor::new(Vec::new());
-        self.write_le(&mut out)
-            .map_err(|e| GenieError::io("a data file that does not write").with("binrw", e))?;
+        self.write_le(&mut out).map_err(|error| {
+            GenieError::io("a data file that does not write").with("binrw", error)
+        })?;
         Ok(out.into_inner())
     }
 

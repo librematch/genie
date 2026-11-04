@@ -15,23 +15,25 @@ use crate::{GenieError, GenieResult};
 
 /// `FUN_141085450`, a combat object's melee armor as its master holds it: its best armor of
 /// class 4 above −32768, else its best of any, else its base armor.
-pub(super) fn master_melee_armor(a: &Armored) -> DamageAmount {
+pub(super) fn master_melee_armor(armored: &Armored) -> DamageAmount {
     let best = |of: Option<DamageClass>| {
-        a.armors
+        armored
+            .armors
             .iter()
-            .filter(|e| of.is_none_or(|c| c == e.class))
-            .fold(
-                DamageAmount::LEAST,
-                |m, e| {
-                    if m < e.amount { e.amount } else { m }
-                },
-            )
+            .filter(|e| of.is_none_or(|damage_class| damage_class == e.class))
+            .fold(DamageAmount::LEAST, |damage_amount, class_amount| {
+                if damage_amount < class_amount.amount {
+                    class_amount.amount
+                } else {
+                    damage_amount
+                }
+            })
     };
     let mut armor = best(Some(DamageClass::MELEE));
     if armor == DamageAmount::LEAST {
         armor = best(None);
         if armor == DamageAmount::LEAST {
-            armor = a.base_armor;
+            armor = armored.base_armor;
         }
     }
     armor
@@ -41,12 +43,12 @@ pub(super) fn master_melee_armor(a: &Armored) -> DamageAmount {
 /// melee armor powerup (`+0xa48`, slot 0x708) and stinger (`+0xb4c`, slot 0x770, 0 as
 /// [`Victim::most_hp`] says), each as 16 bits; a wall foundation (class 27 in state 0) has none.
 pub(super) fn melee_armor(
-    a: &Armored,
+    armored: &Armored,
     own_class: ClassId,
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let armor = master_melee_armor(a).plus(a.armor_powerups.melee);
+    let armor = master_melee_armor(armored).plus(armored.armor_powerups.melee);
     if roles.of_class(own_class).contains(ClassRoles::WALL) && state == ObjectState::Foundation {
         return DamageAmount::ZERO;
     }
@@ -58,33 +60,43 @@ pub(super) fn melee_armor(
 /// class, else its base armor and best of any, plus its powerup; the stinger `+0xb50` is 0, as
 /// [`Victim::most_hp`] says), less the armor removed.
 pub(super) fn class_armor(
-    a: &Armored,
+    armored: &Armored,
     class: OwnSlot,
     own_class: ClassId,
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let best = |c: DamageClass, from: DamageAmount| {
-        a.armors
+    let best = |damage_class: DamageClass, from: DamageAmount| {
+        armored
+            .armors
             .iter()
-            .filter(|e| e.class == c)
+            .filter(|e| e.class == damage_class)
             .fold(from, |m, e| if m < e.amount { e.amount } else { m })
     };
     let any = |from: DamageAmount| {
-        a.armors
+        armored
+            .armors
             .iter()
-            .fold(from, |m, e| if m < e.amount { e.amount } else { m })
+            .fold(from, |damage_amount, class_amount| {
+                if damage_amount < class_amount.amount {
+                    class_amount.amount
+                } else {
+                    damage_amount
+                }
+            })
     };
     match class {
-        OwnSlot::Melee => melee_armor(a, own_class, state, roles).minus(a.armor_removed.melee),
+        OwnSlot::Melee => {
+            melee_armor(armored, own_class, state, roles).minus(armored.armor_removed.melee)
+        }
         OwnSlot::Pierce => {
             let mut armor = best(DamageClass::PIERCE, DamageAmount::NO_CLASS);
             if armor == DamageAmount::NO_CLASS {
-                armor = any(a.base_armor);
+                armor = any(armored.base_armor);
             }
             armor
-                .plus(a.armor_powerups.pierce)
-                .minus(a.armor_removed.pierce)
+                .plus(armored.armor_powerups.pierce)
+                .minus(armored.armor_removed.pierce)
         }
     }
 }
@@ -114,7 +126,7 @@ impl OwnSlot {
 /// or pierce entry (3, 4) of a victim without [`CombatAbility::RESISTS_IGNORING`] meets 0; a combat
 /// victim's (type 70 and up) melee or pierce armor reads its class's ([`class_armor`]).
 pub(super) fn weapon_armor(
-    a: &Armored,
+    armored: &Armored,
     class: DamageClass,
     attacker: &Attacker,
     kind: MasterKind,
@@ -122,23 +134,23 @@ pub(super) fn weapon_armor(
     state: ObjectState,
     roles: &Roles,
 ) -> DamageAmount {
-    let mut armor = a.base_armor;
-    for e in &a.armors {
-        if e.class != class {
+    let mut armor = armored.base_armor;
+    for class_amount in &armored.armors {
+        if class_amount.class != class {
             continue;
         }
-        let own_slot = OwnSlot::of(e.class);
+        let own_slot = OwnSlot::of(class_amount.class);
         if MasterKind::MISSILE <= attacker.kind
             && own_slot.is_some()
             && attacker.ability.contains(CombatAbility::IGNORES_ARMOR)
-            && !a.ability.contains(CombatAbility::RESISTS_IGNORING)
+            && !armored.ability.contains(CombatAbility::RESISTS_IGNORING)
         {
             armor = DamageAmount::ZERO;
             continue;
         }
-        armor = e.amount;
+        armor = class_amount.amount;
         if let Some(slot) = own_slot.filter(|_| MasterKind::COMBAT <= kind) {
-            armor = class_armor(a, slot, own_class, state, roles);
+            armor = class_armor(armored, slot, own_class, state, roles);
         }
     }
     armor
@@ -176,26 +188,26 @@ pub(super) fn charges(
 /// armor, times the elevation factor and the terrain defense, adds when above 0 (or below 0
 /// against an armor below the base that rises above the attack: then at most 0). The damage is
 /// the sum, at least 1 (0 under the game's setting `+0x680` at 1). `bonus` is the attacker's
-/// bonus damage against `v` ([`bonus_damage`]), which the first such weapon adds with the
+/// bonus damage against `victim` ([`bonus_damage`]), which the first such weapon adds with the
 /// powerup.
 ///
 /// [`bonus_damage`]: crate::combat::damage::shown_values::bonus_damage
 pub fn armor_damage(
-    v: &Victim,
+    victim: &Victim,
     weapons: &[ClassAmount],
     factor: f32,
     attacker: &Attacker,
     bonus: f32,
     roles: &Roles,
 ) -> GenieResult<HitPoints> {
-    let a = v.armored.as_ref().ok_or(GenieError::unsupported(
+    let armored = victim.armored.as_ref().ok_or(GenieError::unsupported(
         "the armor of an object without combat values",
     ))?;
-    let (own_class, kind, state) = (v.class, v.kind, v.state);
-    let terrain = if a.terrain_bonus.restriction().is_none() {
+    let (own_class, kind, state) = (victim.class, victim.kind, victim.state);
+    let terrain = if armored.terrain_bonus.restriction().is_none() {
         1.0f32
     } else {
-        a.terrain.ok_or(GenieError::unsupported(
+        armored.terrain.ok_or(GenieError::unsupported(
             "a terrain defense bonus without the map's terrain or the restriction",
         ))?
     };
@@ -203,7 +215,8 @@ pub fn armor_damage(
     let mut charged = false;
     let mut bonused = false;
     for &ClassAmount { class, amount } in weapons {
-        let armor_f = weapon_armor(a, class, attacker, kind, own_class, state, roles).as_f32();
+        let armor_f =
+            weapon_armor(armored, class, attacker, kind, own_class, state, roles).as_f32();
         let mut attack = amount.as_f32();
         let pierce_or_melee = matches!(
             class,
@@ -232,12 +245,12 @@ pub fn armor_damage(
                 bonused = true;
             }
         }
-        if !pierce_or_melee && a.resistance != DamageShare::ZERO && 0.0 < attack - armor_f {
-            resist = 1.0 - a.resistance.get();
+        if !pierce_or_melee && armored.resistance != DamageShare::ZERO && 0.0 < attack - armor_f {
+            resist = 1.0 - armored.resistance.get();
         }
         let mut armor_f = armor_f;
         let mut below = false;
-        if attack < 0.0 && attack < armor_f && armor_f != a.base_armor.as_f32() {
+        if attack < 0.0 && attack < armor_f && armor_f != armored.base_armor.as_f32() {
             armor_f = if armor_f < 0.0 { armor_f } else { 0.0 };
             below = true;
         }

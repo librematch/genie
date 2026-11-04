@@ -69,12 +69,18 @@ pub(super) enum Steps {
 }
 
 impl HullPather<'_> {
-    /// The gap between `p` and the target's box grown by the radius; each axis held at 0 or
+    /// The gap between `point` and the target's box grown by the radius; each axis held at 0 or
     /// more by `MAXSS` (0x140f86bcf, 0x140f85a18): an unordered one is 0.
-    pub(super) fn target_gap(&self, t: &Target, p: Point) -> Distance {
-        let r = self.radius;
-        let gx = maxss((p.x() - t.at.x()).abs() - (t.radius.x() + r.get()), 0.0);
-        let gy = maxss((p.y() - t.at.y()).abs() - (t.radius.y() + r.get()), 0.0);
+    pub(super) fn target_gap(&self, target: &Target, point: Point) -> Distance {
+        let distance = self.radius;
+        let gx = maxss(
+            (point.x() - target.at.x()).abs() - (target.radius.x() + distance.get()),
+            0.0,
+        );
+        let gy = maxss(
+            (point.y() - target.at.y()).abs() - (target.radius.y() + distance.get()),
+            0.0,
+        );
         Distance::new(sqrt(gy * gy + gx * gx))
     }
 
@@ -116,8 +122,8 @@ impl HullPather<'_> {
             }
             _ => return Ok(false),
         };
-        let b = obstacle.bounds;
-        let (x0, y0, x1, y1) = (b.x0(), b.y0(), b.x1(), b.y1());
+        let rect = obstacle.bounds;
+        let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         let half = (x1 - x0) * HALF;
         if half != (y1 - y0) * HALF {
             return Ok(false);
@@ -132,30 +138,31 @@ impl HullPather<'_> {
         }
         let off = (half + self.radius.get()) * SQRT_2;
         let (px, py) = (-dy * off, off * dx);
-        for k in 0..2 {
-            let p = if k == 0 {
+        for index in 0..2 {
+            let point = if index == 0 {
                 Point::new(cx + px, cy + py)
             } else {
                 Point::new(cx - px, cy - py)
             };
-            if !self.bounds.holds(p) {
+            if !self.bounds.holds(point) {
                 continue;
             }
-            let first = self.hits(from, p)?;
+            let first = self.hits(from, point)?;
             if !first.is_empty() {
                 continue;
             }
-            let second = self.hits(p, to)?;
+            let second = self.hits(point, to)?;
             let fine = match second[..] {
                 [] => true,
-                [h] => target.is_some_and(|t| {
-                    h.id == t || self.by_id.annex_of(h.id).map(MainBuildingId::id) == Some(t)
+                [hit] => target.is_some_and(|object_id| {
+                    hit.id == object_id
+                        || self.by_id.annex_of(hit.id).map(MainBuildingId::id) == Some(object_id)
                 }),
                 _ => false,
             };
             if fine {
                 path.push(from);
-                path.push(p);
+                path.push(point);
                 path.push(to);
                 return Ok(true);
             }
@@ -165,20 +172,20 @@ impl HullPather<'_> {
 
     // The walks within a hull.
 
-    /// The points about box `b` a walk within a hull starts from: from the sides facing the region
-    /// of `p` about the box (inside it, its nearest side and those within the radius), a point every
-    /// `step` of the side's length, [`NUDGE`] off the box; with `reach`, only those within it of
-    /// `p`; none inside a box of the hull. [`Steps::Made`] when one was.
+    /// The points about box `rect` a walk within a hull starts from: from the sides facing the
+    /// region of `p` about the box (inside it, its nearest side and those within the radius), a
+    /// point every `step` of the side's length, [`NUDGE`] off the box; with `reach`, only those
+    /// within it of `p`; none inside a box of the hull. [`Steps::Made`] when one was.
     pub(super) fn side_points(
         &mut self,
         hull: HullIndex,
         root: NodeIndex,
-        b: Rect,
+        rect: Rect,
         p: Point,
         step: f32,
         reach: Option<(Point, f32)>,
     ) -> GenieResult<Steps> {
-        let (x0, y0, x1, y1) = (b.x0(), b.y0(), b.x1(), b.y1());
+        let (x0, y0, x1, y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         // `COMISS`/`JA`, then `SETBE`; `JBE`, then `CMOVA` (0x140f8d1fc..0x140f8d235,
         // 0x140f893a4..0x140f893d0): an unordered coordinate counts past the box's far side
         let col = if p.x() < x0 {
@@ -207,12 +214,12 @@ impl HullPather<'_> {
                 if right < down {
                     m = right;
                 }
-                let r = self.radius;
+                let distance = self.radius;
                 let mut sides = [
-                    down < r.get(),
-                    right < r.get(),
-                    up < r.get(),
-                    p.x() - x0 < r.get(),
+                    down < distance.get(),
+                    right < distance.get(),
+                    up < distance.get(),
+                    p.x() - x0 < distance.get(),
                 ];
                 if up < m {
                     side = 2;
@@ -239,13 +246,13 @@ impl HullPather<'_> {
             })
         };
         let mut made = Steps::NoneMade;
-        let mut add = |me: &mut Self, q: Point| -> GenieResult<()> {
-            if near(q) && me.hulls.checked(hull.index())?.box_holding(q).is_none() {
+        let mut add = |me: &mut Self, point: Point| -> GenieResult<()> {
+            if near(point) && me.hulls.checked(hull.index())?.box_holding(point).is_none() {
                 let _ = me.add_node(NewNode {
                     list: NodeList::WALKS,
                     open: true,
                     parent: Some(root),
-                    position: q,
+                    position: point,
                     goal: None,
                     hull: -1,
                     vertex: -1,
@@ -302,24 +309,32 @@ impl HullPather<'_> {
         goal: Option<Point>,
     ) -> GenieResult<Steps> {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
-        let d = self.radius + self.radius;
+        let distance = self.radius + self.radius;
         let mut made = Steps::NoneMade;
         for dir in DIRECTIONS {
-            let mut q = Point::new(d.get() * dir.x() + p.x(), d.get() * dir.y() + p.y());
+            let mut point = Point::new(
+                distance.get() * dir.x() + p.x(),
+                distance.get() * dir.y() + p.y(),
+            );
             if let Some((at, _)) = self.hulls.checked(hull.index())?.intersection(
                 AtStart::Ignored,
                 p,
-                q,
+                point,
                 hull_path_tuning,
             ) {
-                q = at;
+                point = at;
             }
-            if self.hulls.checked(hull.index())?.box_holding(q).is_none() {
+            if self
+                .hulls
+                .checked(hull.index())?
+                .box_holding(point)
+                .is_none()
+            {
                 let _ = self.add_node(NewNode {
                     list: NodeList::WALKS,
                     open: true,
                     parent: Some(root),
-                    position: q,
+                    position: point,
                     goal,
                     hull: -1,
                     vertex: -1,
@@ -334,12 +349,12 @@ impl HullPather<'_> {
 
     /// Whether a node of a walk within a hull may cast a ray toward `side`: not back along the
     /// ray that made it, nor into the side of the box it lies on.
-    pub(super) const fn may_cast(n: &Node, side: i32) -> bool {
-        if n.direction == side {
+    pub(super) const fn may_cast(node: &Node, side: i32) -> bool {
+        if node.direction == side {
             return false;
         }
-        let back = matches!((n.direction, side), (0, 1) | (1, 0) | (2, 3) | (3, 2));
-        let into = matches!((n.vertex, side), (0, 0) | (1, 2) | (2, 1) | (3, 3));
+        let back = matches!((node.direction, side), (0, 1) | (1, 0) | (2, 3) | (3, 2));
+        let into = matches!((node.vertex, side), (0, 0) | (1, 2) | (2, 1) | (3, 3));
         !(back || into)
     }
 
@@ -424,13 +439,13 @@ impl HullPather<'_> {
                 if HULL_ITERATIONS <= iterations || most <= *count {
                     break 'search;
                 }
-                let Some(n) = self.nodes.checked(NodeList::WALKS.head())?.next else {
+                let Some(node_index) = self.nodes.checked(NodeList::WALKS.head())?.next else {
                     break 'search;
                 };
                 iterations += 1;
-                self.close(NodeList::WALKS, n)?;
-                if self.on_map(self.nodes.checked(n)?.at) {
-                    break n;
+                self.close(NodeList::WALKS, node_index)?;
+                if self.on_map(self.nodes.checked(node_index)?.at) {
+                    break node_index;
                 }
             };
             let at = self.nodes.checked(node)?.at;
@@ -448,18 +463,18 @@ impl HullPather<'_> {
                 }
                 WalkEnd::Going => {}
             }
-            if let Some(g) = goal {
+            if let Some(point) = goal {
                 if self.nodes.checked(node)?.to_goal < best {
                     best = self.nodes.checked(node)?.to_goal;
                     nearest = Some(node);
                 }
-                if !self.blocked(at, g)? {
+                if !self.blocked(at, point)? {
                     let end = self.add_node(NewNode {
                         list: NodeList::WALKS,
                         open: false,
                         parent: Some(node),
-                        position: g,
-                        goal: Some(g),
+                        position: point,
+                        goal: Some(point),
                         hull: -1,
                         vertex: -1,
                         direction: 1,
@@ -500,8 +515,9 @@ impl HullPather<'_> {
     ) -> WalkEnd {
         match (target, goal) {
             (None, None) => WalkEnd::Going,
-            (None, Some(g)) => {
-                let d = (at.y() - g.y()) * (at.y() - g.y()) + (at.x() - g.x()) * (at.x() - g.x());
+            (None, Some(point)) => {
+                let d = (at.y() - point.y()) * (at.y() - point.y())
+                    + (at.x() - point.x()) * (at.x() - point.x());
                 if d <= (self.radius + range).squared().get() + NUDGE {
                     WalkEnd::Goal
                 } else {
@@ -544,14 +560,14 @@ impl HullPather<'_> {
         self.close(NodeList::WALKS, root)?;
         let mut made = self.first_steps(hull, root, from, goal)? == Steps::Made;
         let bounds = self.hulls.checked(hull.index())?.objects.checked(b)?.bounds;
-        let d = self.radius + self.radius;
+        let distance = self.radius + self.radius;
         made |= self.side_points(
             hull,
             root,
             bounds,
             from,
             hull_path_tuning.exit_step,
-            Some((from, d.get())),
+            Some((from, distance.get())),
         )? == Steps::Made;
         Ok((inside, !made))
     }
@@ -565,13 +581,13 @@ impl HullPather<'_> {
         nearest: Option<NodeIndex>,
         left_boxes: bool,
     ) -> GenieResult<Within> {
-        let Some(n) = end.or(nearest) else {
+        let Some(node_index) = end.or(nearest) else {
             return Ok(Within {
                 result: WalkResult::NoWay,
                 left_boxes,
             });
         };
-        self.build_path(paths.checked_mut(0)?, n)?;
+        self.build_path(paths.checked_mut(0)?, node_index)?;
         Ok(Within {
             result: if end.is_some() {
                 WalkResult::Reached
@@ -599,14 +615,14 @@ impl HullPather<'_> {
         let at = self.nodes.checked(node)?.at;
         let mut left_boxes = false;
         for side in 0..4 {
-            let n = *self.nodes.checked(node)?;
-            if !Self::may_cast(&n, side) {
+            let checked = *self.nodes.checked(node)?;
+            if !Self::may_cast(&checked, side) {
                 continue;
             }
-            if let Some((q, b, box_side)) = self
-                .hulls
-                .checked(hull.index())?
-                .ray_to_box(at, side, n.hull)
+            if let Some((q, b, box_side)) =
+                self.hulls
+                    .checked(hull.index())?
+                    .ray_to_box(at, side, checked.hull)
             {
                 let _ = self.add_node(NewNode {
                     list: NodeList::WALKS,
@@ -622,7 +638,7 @@ impl HullPather<'_> {
                 continue;
             }
             left_boxes = true;
-            let Some((mut q, edge)) = self.hulls.checked(hull.index())?.ray_to_hull(at, side)
+            let Some((mut point, edge)) = self.hulls.checked(hull.index())?.ray_to_hull(at, side)
             else {
                 continue;
             };
@@ -631,7 +647,7 @@ impl HullPather<'_> {
                     list: NodeList::WALKS,
                     open: true,
                     parent: Some(node),
-                    position: q,
+                    position: point,
                     goal,
                     hull: -1,
                     vertex: edge as i32,
@@ -642,14 +658,17 @@ impl HullPather<'_> {
             }
             if *count < most {
                 if nudge {
-                    let s = *SIDES.checked(side as usize)?;
-                    q = Point::new(q.x() + s.x() * NUDGE, q.y() + s.y() * NUDGE);
+                    let ground_offset = *SIDES.checked(side as usize)?;
+                    point = Point::new(
+                        point.x() + ground_offset.x() * NUDGE,
+                        point.y() + ground_offset.y() * NUDGE,
+                    );
                 }
                 if let Some(end) = self.add_node(NewNode {
                     list: NodeList::WALKS,
                     open: false,
                     parent: Some(node),
-                    position: q,
+                    position: point,
                     goal: None,
                     hull: -1,
                     vertex: -1,

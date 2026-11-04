@@ -137,8 +137,8 @@ pub(crate) fn footprint_clearing(
     let mut cleared = Vec::new();
     for y in y0..=y1 {
         for x in x0..=x1 {
-            for (id, o) in world.objects_on(Tile::new(i32::from(x), i32::from(y))) {
-                if let Some(c) = clearing_takes(site, id, o, looks, roles, build_tuning)? {
+            for (id, placed) in world.objects_on(Tile::new(i32::from(x), i32::from(y))) {
+                if let Some(c) = clearing_takes(site, id, placed, looks, roles, build_tuning)? {
                     cleared.push(c);
                 }
             }
@@ -205,13 +205,13 @@ pub(super) fn clearing_tiles(
 pub(super) fn clearing_takes(
     site: &ClearingSite,
     id: ObjectId,
-    o: &Placed,
+    placed: &Placed,
     looks: &BTreeMap<ObjectId, ClearLook>,
     roles: &Roles,
     build_tuning: &BuildTuning,
 ) -> GenieResult<Option<Cleared>> {
     use crate::math::fmath::below_or_unordered;
-    if o.master == site.master {
+    if placed.master == site.master {
         return Ok(None);
     }
     // The masters whose classes (39, the gate, and 52) take their owner's walls (27) off their
@@ -220,31 +220,33 @@ pub(super) fn clearing_takes(
         .of_class(site.class)
         .intersects(ClassRoles::GATE | ClassRoles::TOWER);
     // The wall class (27, `0x1b`): two walls beside a builder on a footprint's diagonal stop it.
-    let own_wall =
-        o.player == site.player && under_gate && roles.of_class(o.class).contains(ClassRoles::WALL);
-    let tree = site.by == Clearer::Builder && roles.of_class(o.class).contains(ClassRoles::TREE);
-    if !o.buildable_on.cleared() && !own_wall && !tree {
+    let own_wall = placed.player == site.player
+        && under_gate
+        && roles.of_class(placed.class).contains(ClassRoles::WALL);
+    let tree =
+        site.by == Clearer::Builder && roles.of_class(placed.class).contains(ClassRoles::TREE);
+    if !placed.buildable_on.cleared() && !own_wall && !tree {
         return Ok(None);
     }
     let seen = *looks.get(&id).ok_or(GenieError::unsupported(
         "a footprint clearing of an object the slice does not hold",
     ))?;
     // the tree's test: COMISS 1.0 against its hit points, JC passes it over (a NaN too)
-    if !o.buildable_on.cleared()
+    if !placed.buildable_on.cleared()
         && !own_wall
         && below_or_unordered(build_tuning.stump_hp, seen.hp.get())
     {
         return Ok(None);
     }
     let (rx, ry) = (site.radius.x(), site.radius.y());
-    let dx = (o.position.x() - site.at.x()).abs();
-    let dy = (o.position.y() - site.at.y()).abs();
-    if !(dx < o.radius.x() + rx && dy < o.radius.y() + ry) {
+    let dx = (placed.position.x() - site.at.x()).abs();
+    let dy = (placed.position.y() - site.at.y()).abs();
+    if !(dx < placed.radius.x() + rx && dy < placed.radius.y() + ry) {
         return Ok(None);
     }
     // COMISS 0 against the height, JNC: a flag master of height 0 or less stays
     if roles
-        .of_master(o.master)
+        .of_master(placed.master)
         .contains(MasterRoles::CLEARING_FLAG)
         && !below_or_unordered(0.0, seen.height.get())
     {
@@ -260,10 +262,10 @@ pub(super) fn clearing_takes(
     let roo_drops = site.by == Clearer::Builder
         && !seen.roo_called
         && !dies
-        && (below_or_unordered(0.0, seen.height.get()) || o.obstruction.is_some());
+        && (below_or_unordered(0.0, seen.height.get()) || placed.obstruction.is_some());
     Ok(Some(Cleared {
         id,
-        wall: roles.of_class(o.class).contains(ClassRoles::WALL),
+        wall: roles.of_class(placed.class).contains(ClassRoles::WALL),
         record_goes: destroy_drops || roo_drops,
     }))
 }

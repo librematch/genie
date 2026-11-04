@@ -33,8 +33,8 @@ impl AttackMoveCommand {
     /// first of them ([`World::read_units`]); without 1 to 10 waypoints it does nothing
     /// ([`Waypoints::used`]), else it runs [`World::attack_move`] with the sweep of an attack
     /// move (no patrol).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
         let Some(waypoints) = self.waypoints.used() else {
@@ -46,6 +46,6 @@ impl AttackMoveCommand {
             queued: self.queued,
             ignore_pending: self.ignore_pending,
         };
-        w.attack_move(self.player, ids, waypoints, sweep)
+        world.attack_move(self.player, ids, waypoints, sweep)
     }
 }

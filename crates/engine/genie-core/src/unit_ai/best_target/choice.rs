@@ -57,38 +57,41 @@ pub(super) fn tested(
     world: &AttackField<'_, '_, '_>,
     roles: &Roles,
 ) -> GenieResult<Option<FoundObject>> {
-    let Some(t) = world.found_object(id)? else {
+    let Some(found_object) = world.found_object(id)? else {
         return Ok(None);
     };
-    if !may_attack(me, (id, &t), relation, world)? {
+    if !may_attack(me, (id, &found_object), relation, world)? {
         return Ok(None);
     }
-    let gaia_taken = !me.scenario && t.owner == PlayerId::GAIA && MasterKind::COMBAT <= t.kind;
-    if gaia_taken && t.capture.any() {
+    let gaia_taken = !me.scenario
+        && found_object.owner == PlayerId::GAIA
+        && MasterKind::COMBAT <= found_object.kind;
+    if gaia_taken && found_object.capture.any() {
         return Ok(None);
     }
-    if !t.flags.contains(FoundFlags::TARGETABLE)
-        || (!t.flags.contains(FoundFlags::ATTACKABLE) && me.action == Some(AiAction::Attack))
+    if !found_object.flags.contains(FoundFlags::TARGETABLE)
+        || (!found_object.flags.contains(FoundFlags::ATTACKABLE)
+            && me.action == Some(AiAction::Attack))
         || world.shuns(id)
     {
         return Ok(None);
     }
-    Ok(kept_by_owner_and_class(me, ask, &t, roles).then_some(t))
+    Ok(kept_by_owner_and_class(me, ask, &found_object, roles).then_some(found_object))
 }
 
-/// The world's checks of object `id` (`t`, of relation list `relation`), in the game's order: it
-/// has a unit AI, is alive, not allied and not inside another; the unit AI's attack check; a
-/// combat unit's friends' scan; a neutral object's (list 3) test.
+/// The world's checks of object `id` (`found_object`, of relation list `relation`), in the game's
+/// order: it has a unit AI, is alive, not allied and not inside another; the unit AI's attack
+/// check; a combat unit's friends' scan; a neutral object's (list 3) test.
 pub(super) fn may_attack(
     me: &Searcher,
-    (id, t): (ObjectId, &FoundObject),
+    (id, found_object): (ObjectId, &FoundObject),
     relation: UnitRelation,
     world: &AttackField<'_, '_, '_>,
 ) -> GenieResult<bool> {
-    if !t.flags.contains(FoundFlags::HAS_AI)
-        || ObjectState::Dying <= t.state
-        || t.flags.contains(FoundFlags::ALLIED)
-        || t.flags.contains(FoundFlags::INSIDE)
+    if !found_object.flags.contains(FoundFlags::HAS_AI)
+        || ObjectState::Dying <= found_object.state
+        || found_object.flags.contains(FoundFlags::ALLIED)
+        || found_object.flags.contains(FoundFlags::INSIDE)
         || !world.can_attack(id)?
     {
         return Ok(false);
@@ -96,39 +99,45 @@ pub(super) fn may_attack(
     if me.kind == MasterKind::COMBAT && !world.spares_friends(id)? {
         return Ok(false);
     }
-    if relation == UnitRelation::Neutral && !world.attacks_neutral(t.class) {
+    if relation == UnitRelation::Neutral && !world.attacks_neutral(found_object.class) {
         return Ok(false);
     }
     Ok(true)
 }
 
-/// The owner and class rules of an object `t`: without `any_class` the buildings, walls,
+/// The owner and class rules of an object `found_object`: without `any_class` the buildings, walls,
 /// towers, gates and packed units are passed over; a computer player's unit passes over Gaia's
 /// objects that hold something or that others take by sight, and boats unless it is a boat, of
 /// class 52 or of [`MasterRoles::BOAT_HUNTER`].
 pub(super) fn kept_by_owner_and_class(
     me: &Searcher,
     ask: &Ask,
-    t: &FoundObject,
+    found_object: &FoundObject,
     roles: &Roles,
 ) -> bool {
-    if !ask.any_class && roles.of_class(t.class).contains(ClassRoles::NOT_ANY) {
+    if !ask.any_class
+        && roles
+            .of_class(found_object.class)
+            .contains(ClassRoles::NOT_ANY)
+    {
         return false;
     }
-    let captured = MasterKind::COMBAT <= t.kind && t.capture.any();
+    let captured = MasterKind::COMBAT <= found_object.kind && found_object.capture.any();
     // nothing held (`+0x310` at most 0) and not taken by sight
-    let free = t.held <= Amount::ZERO && !captured;
-    if me.player_kind.is_computer() && t.owner == PlayerId::GAIA && !free {
+    let free = found_object.held <= Amount::ZERO && !captured;
+    if me.player_kind.is_computer() && found_object.owner == PlayerId::GAIA && !free {
         return false;
     }
     let boat_free = roles.of_some_class(me.class).contains(ClassRoles::TOWER)
         || roles
             .of_master(me.master)
             .contains(MasterRoles::BOAT_HUNTER)
-        || !roles.of_class(t.class).contains(ClassRoles::BOAT);
+        || !roles
+            .of_class(found_object.class)
+            .contains(ClassRoles::BOAT);
     let is_boat = me
         .class
-        .is_some_and(|c| roles.of_class(c).contains(ClassRoles::BOAT));
+        .is_some_and(|class_id| roles.of_class(class_id).contains(ClassRoles::BOAT));
     !(me.player_kind.is_computer() && !boat_free && !is_boat)
 }
 
@@ -228,7 +237,7 @@ fn current_target(
     Ok(world
         .found_object(target)?
         .filter(|t| t.state <= ObjectState::Alive && !t.flags.contains(FoundFlags::ALLIED))
-        .map(|t| (target, t)))
+        .map(|found_object| (target, found_object)))
 }
 
 /// Whether the unit attacks walls: its targets' classes name a wall or a gate, or its owner's
@@ -237,9 +246,9 @@ fn attacks_walls(me: &Searcher, roles: &Roles) -> bool {
     let defending =
         // Class 13 (siege), whose units keep the walls' owner flag on the attack move order (`0x2dd`).
         matches!(me.order, Some(OrderKind::AttackMove)) && !roles.of_some_class(me.class).contains(ClassRoles::SIEGE);
-    me.target_classes.iter().any(|c| {
+    me.target_classes.iter().any(|class_id| {
         roles
-            .of_some_class(*c)
+            .of_some_class(*class_id)
             .intersects(ClassRoles::WALL | ClassRoles::GATE)
     }) || (me.walls_allowed && !defending)
 }
@@ -256,19 +265,22 @@ fn add_current(
     roles: &Roles,
     best_target_tuning: &BestTargetTuning,
 ) -> GenieResult<Option<AttackCategory>> {
-    let Some((target, t)) =
-        current.filter(|(_, t)| t.distance <= me.range || Speed::ZERO < me.speed)
+    let Some((target, t)) = current
+        .filter(|(_, found_object)| found_object.distance <= me.range || Speed::ZERO < me.speed)
     else {
         return Ok(None);
     };
-    let k = category(t.master, t.class, roles);
-    st.add(&world.candidate(target, t.distance, k)?, best_target_tuning);
+    let attack_category = category(t.master, t.class, roles);
+    st.add(
+        &world.candidate(target, t.distance, attack_category)?,
+        best_target_tuning,
+    );
     let narrows = !ask.idle
         && t.distance <= ask.distance
         && !roles
             .of_class(t.class)
             .intersects(ClassRoles::BUILDING | ClassRoles::FARM);
-    Ok(if narrows { k } else { None })
+    Ok(if narrows { attack_category } else { None })
 }
 
 /// The extra objects' entries but the current target's, by the attack check: one under the
@@ -286,13 +298,13 @@ pub(super) fn add_extra(
         if Some(id) == me.target {
             continue;
         }
-        let Some(t) = world.found_object(id)? else {
+        let Some(found_object) = world.found_object(id)? else {
             continue;
         };
         if !world.can_attack(id)? {
             continue;
         }
-        let mut gap = t.distance;
+        let mut gap = found_object.distance;
         if gap < me.min_range {
             if me.speed == Speed::ZERO {
                 continue;
@@ -300,7 +312,11 @@ pub(super) fn add_extra(
             gap = gap + me.weapon_range + Distance::new(ONE);
         }
         st.add(
-            &world.candidate(id, gap, category(t.master, t.class, roles))?,
+            &world.candidate(
+                id,
+                gap,
+                category(found_object.master, found_object.class, roles),
+            )?,
             best_target_tuning,
         );
     }
@@ -389,12 +405,13 @@ impl Walked {
                     continue;
                 }
                 let listed = Listed { id, relation };
-                let Some((t, gap, k)) = self.counted(me, ask, listed, me.sight, world, roles)?
+                let Some((found_object, gap, attack_category)) =
+                    self.counted(me, ask, listed, me.sight, world, roles)?
                 else {
                     continue;
                 };
                 {
-                    let held = roles.of_class(t.class);
+                    let held = roles.of_class(found_object.class);
                     if held.contains(ClassRoles::GATE) {
                         if self.gate.1 < Distance::ZERO || gap < self.gate.1 {
                             self.gate = (Some(id), gap);
@@ -411,7 +428,10 @@ impl Walked {
                         self.beyond_walls = true;
                     }
                 }
-                st.add(&world.candidate(id, gap, k)?, best_target_tuning);
+                st.add(
+                    &world.candidate(id, gap, attack_category)?,
+                    best_target_tuning,
+                );
             }
         }
         Ok(())
@@ -434,11 +454,13 @@ impl Walked {
         } = layer;
         for (id, relation) in take(&mut self.later) {
             let listed = Listed { id, relation };
-            let Some((t, gap, k)) = self.counted(me, ask, listed, me.range, world, roles)? else {
+            let Some((found_object, gap, attack_category)) =
+                self.counted(me, ask, listed, me.range, world, roles)?
+            else {
                 continue;
             };
             let counts = {
-                let held = roles.of_class(t.class);
+                let held = roles.of_class(found_object.class);
                 if held.contains(ClassRoles::GATE) {
                     self.walls
                 } else if held.contains(ClassRoles::WALL) {
@@ -449,7 +471,10 @@ impl Walked {
                 }
             };
             if counts {
-                st.add(&world.candidate(id, gap, k)?, best_target_tuning);
+                st.add(
+                    &world.candidate(id, gap, attack_category)?,
+                    best_target_tuning,
+                );
             }
         }
         Ok(())
@@ -466,18 +491,21 @@ impl Walked {
         world: &AttackField<'_, '_, '_>,
         roles: &Roles,
     ) -> GenieResult<Option<(FoundObject, Distance, Option<AttackCategory>)>> {
-        let Some(t) = tested(me, ask, id, relation, world, roles)? else {
+        let Some(found_object) = tested(me, ask, id, relation, world, roles)? else {
             return Ok(None);
         };
-        let gap = t.distance;
+        let gap = found_object.distance;
         if !within(me, ask, gap, near) {
             return Ok(None);
         }
-        let k = category(t.master, t.class, roles);
-        if self.narrowed.is_some_and(|n| k != Some(n)) {
+        let category = category(found_object.master, found_object.class, roles);
+        if self
+            .narrowed
+            .is_some_and(|attack_category| category != Some(attack_category))
+        {
             return Ok(None);
         }
-        Ok(Some((t, gap, k)))
+        Ok(Some((found_object, gap, category)))
     }
 
     /// A wall `id` at `gap`: the closest wall when it is the first or nearer (it counts only for a
@@ -516,16 +544,18 @@ fn rank_entries(
                 .of_master(me.master)
                 .contains(MasterRoles::MOVING_RULE_EXEMPT));
     st.rank(
-        &mut |e| {
-            if !e.fixed || e.category == Some(AttackCategory::SIEGE) {
+        &mut |entry| {
+            if !entry.fixed || entry.category == Some(AttackCategory::SIEGE) {
                 return Ok(i32::from(ranked) << 2);
             }
-            if EPSILON < (world.weapon_range(e.id)?).get() {
+            if EPSILON < (world.weapon_range(entry.id)?).get() {
                 return Ok(3);
             }
-            let farm = world
-                .found_object(e.id)?
-                .is_some_and(|t| roles.of_class(t.class).contains(ClassRoles::FARM));
+            let farm = world.found_object(entry.id)?.is_some_and(|found_object| {
+                roles
+                    .of_class(found_object.class)
+                    .contains(ClassRoles::FARM)
+            });
             Ok(if farm { 1 } else { 2 })
         },
         best_target_tuning,
@@ -560,7 +590,9 @@ fn choose(
         if !ask.idle && FEW_MOVING < st.moving {
             // none at the largest float: a gone target's path fails (slot 0x3d0)
             let closest = st.closest_moving.1;
-            if ask.paths == 0 || closest.map_or(Ok(false), |c| world.path(c, range))? {
+            if ask.paths == 0
+                || closest.map_or(Ok(false), |object_id| world.path(object_id, range))?
+            {
                 choice.target = closest;
                 return Ok(choice);
             }
@@ -588,12 +620,12 @@ fn current_holds(
     st: &Statistics,
     world: &mut AttackField<'_, '_, '_>,
 ) -> GenieResult<Option<ObjectId>> {
-    let Some((target, t)) = current else {
+    let Some((target, found_object)) = current else {
         return Ok(None);
     };
     let holds = st.moving < FEW_MOVING
-        && ((t.speed < Speed::new(EPSILON) && st.moving == EntryCount::ZERO)
-            || Speed::ZERO < t.speed)
+        && ((found_object.speed < Speed::new(EPSILON) && st.moving == EntryCount::ZERO)
+            || Speed::ZERO < found_object.speed)
         && !ask.idle
         && (world.engages(target)? || st.armed < EntryCount::new(1))
         && (ask.paths == 0 || world.path(target, me.range)?);
@@ -609,11 +641,11 @@ fn quick_pick(
     world: &mut AttackField<'_, '_, '_>,
 ) -> GenieResult<Option<ObjectId>> {
     for &i in st.order.iter().take(3) {
-        let e = *st.entries.checked(i)?;
-        if (e.moving || st.moving < EntryCount::new(1) || !ranked)
-            && world.quick_path(e.id, range)?
+        let entry = *st.entries.checked(i)?;
+        if (entry.moving || st.moving < EntryCount::new(1) || !ranked)
+            && world.quick_path(entry.id, range)?
         {
-            return Ok(Some(e.id));
+            return Ok(Some(entry.id));
         }
     }
     Ok(None)
@@ -629,12 +661,16 @@ fn path_pick(
     retries: &mut Vec<(ObjectId, WorldTime)>,
 ) -> GenieResult<Option<ObjectId>> {
     for &i in st.order.iter().take(3) {
-        let e = *st.entries.checked(i)?;
-        if Some(e.id) != tried && world.path(e.id, me.range)? {
-            return Ok(Some(e.id));
+        let entry = *st.entries.checked(i)?;
+        if Some(entry.id) != tried && world.path(entry.id, me.range)? {
+            return Ok(Some(entry.id));
         }
-        let wait = if e.moving { RETRY_MOVING } else { RETRY_OTHER };
-        retries.push((e.id, me.now.after(wait)));
+        let wait = if entry.moving {
+            RETRY_MOVING
+        } else {
+            RETRY_OTHER
+        };
+        retries.push((entry.id, me.now.after(wait)));
     }
     Ok(None)
 }

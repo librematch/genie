@@ -120,6 +120,6 @@ fn an_action_after_11_76_has_word_state() {
 
 #[test]
 fn an_unknown_action_kind_is_an_error() {
-    let e = UnitAction::read_from(&mut header_reader(&head(2).0, 11.76)).unwrap_err();
-    assert_eq!(e, unknown_unit_action(2));
+    let error = UnitAction::read_from(&mut header_reader(&head(2).0, 11.76)).unwrap_err();
+    assert_eq!(error, unknown_unit_action(2));
 }

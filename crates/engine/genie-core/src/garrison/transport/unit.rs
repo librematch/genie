@@ -23,52 +23,53 @@ use genie_model::model::Model;
 
 impl Unit {
     /// The Transport's update ([`crate::garrison::transport::TransportAction::update`] on the
-    /// step): `t`, the head's copy, runs and is written back after. What it reads of the unit's
-    /// master ([`crate::garrison::transport::TransportReads`]: the sprite its `MoveTo`'s start
-    /// shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
+    /// step): `transport_action`, the head's copy, runs and is written back after. What it reads of
+    /// the unit's master ([`crate::garrison::transport::TransportReads`]: the sprite its `MoveTo`'s
+    /// start shows, `FUN_140aa0d30`'s default for none); its code, whose 1 or 3 deletes it.
     pub(crate) fn transport_update(
         &mut self,
-        mut t: TransportAction,
+        mut transport_action: TransportAction,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         me: Me,
         roles: &Roles,
     ) -> GenieResult<HeadCode> {
         let master = object_master(
-            c.w.parts.own_master.get(self.id),
+            step.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )?;
-        let given = TransportAction::given_sprite(t.task, master)?;
+        let given = TransportAction::given_sprite(transport_action.task, master)?;
         let reads = TransportReads {
             radius: master.radius,
             restriction: master.terrain_restriction,
             defaults: MoveDefaults::of(
                 master,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
                 roles,
             ),
             given,
             standing: master
                 .standing_sprite
-                .and_then(|s| c.w.model.graphics.get(s))
+                .and_then(|sprite_id| step.w.model.graphics.get(sprite_id))
                 .copied(),
         };
         // written back before an error too: the stop's context reads the list
-        let code = t.update(c, self, actions, me, &reads);
+        let code = transport_action.update(step, self, actions, me, &reads);
         if let Some(own) = actions.list.transport_mut() {
-            *own = t;
+            *own = transport_action;
         }
         Ok(HeadCode::of(code?))
     }
 
-    /// The Transport's slot 8 on a move to `point` ([`crate::garrison::transport::TransportAction::move_to`])
-    /// with the map about the unit, then what its state change leaves: the unit stops (its
-    /// `MoveTo`'s teardown) and takes its standing sprite. `t` is the head's copy, which goes back
-    /// into `actions` after its move; `motion` is the unit's motion layer.
+    /// The Transport's slot 8 on a move to `point`
+    /// ([`crate::garrison::transport::TransportAction::move_to`]) with the map about the unit, then
+    /// what its state change leaves: the unit stops (its `MoveTo`'s teardown) and takes its
+    /// standing sprite. `transport_action` is the head's copy, which goes back into `actions` after
+    /// its move; `motion` is the unit's motion layer.
     pub(crate) fn transport_sail(
         &mut self,
-        (mut t, actions): (TransportAction, &mut Action),
+        (mut transport_action, actions): (TransportAction, &mut Action),
         mut motion: MotionMut<'_>,
         point: Position,
         (spatial, zones, pathing): (&Spatial, &mut Zones, &mut Pathing),
@@ -81,7 +82,7 @@ impl Unit {
             master,
             spatial.map,
             (&model.graphics, look),
-            t.task,
+            transport_action.task,
             &model.roles,
         )?;
         let restriction = master.terrain_restriction;
@@ -93,19 +94,19 @@ impl Unit {
             self.position(),
             &model.tuning.tile_path,
         )?;
-        let changed = t.move_to(
+        let changed = transport_action.move_to(
             point,
             &ship,
             &mut shore,
             &model.tuning.transport,
             &model.tuning.move_to,
         );
-        actions.list.set_transport(Some(t));
+        actions.list.set_transport(Some(transport_action));
         let changed = changed?;
         if changed.stopped
-            && let Some(m) = motion.mover_mut()
+            && let Some(mover) = motion.mover_mut()
         {
-            m.stop()?;
+            mover.stop()?;
         }
         if changed.stands {
             self.show_standing(

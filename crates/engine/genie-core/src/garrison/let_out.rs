@@ -39,7 +39,7 @@ impl World {
     /// it is.
     pub(crate) fn live_inside(&self, id: ObjectId) -> GenieResult<(PlayerId, ListIndex)> {
         match self.place(id) {
-            Some(Place::Live(p, i)) => Ok((p, i)),
+            Some(Place::Live(player_id, list_index)) => Ok((player_id, list_index)),
             _ => Err(GenieError::unsupported(
                 "a unit inside a building outside the live lists",
             )),
@@ -75,9 +75,9 @@ impl World {
         point: Point,
         (work_on, _sound): (Option<ObjectId>, bool),
     ) -> GenieResult<LetOut> {
-        let b = self.players.live(player, building)?;
-        let bid = b.id;
-        let bm = b.master(self.master_tables(), player)?.clone();
+        let live = self.players.live(player, building)?;
+        let bid = live.id;
+        let bm = live.master(self.master_tables(), player)?.clone();
         let gather = self.parts.gather_point.get(bid).copied();
         // the spot's goal (`FUN_1411d12d0` with x −1): without a gather point the first location
         // of the building unit AI's command queue (slot 0x218, then slot 0x220), else a gather
@@ -85,15 +85,15 @@ impl World {
         let queue_first = self
             .parts
             .unit_ai
-            .get(b.id)
-            .and_then(|a| a.building_orders.first())
-            .map(|o| o.point.ground());
+            .get(live.id)
+            .and_then(|unit_ai| unit_ai.building_orders.first())
+            .map(|queued_order| queued_order.point.ground());
         let toward = if point.x() == NO_POINT {
             match (gather, queue_first) {
                 (None, Some(q)) => Some(q),
                 _ => gather
-                    .filter(|g| g.target != Some(bid))
-                    .map(|g| g.point.ground()),
+                    .filter(|bid_gather_point| bid_gather_point.target != Some(bid))
+                    .map(|gather_point| gather_point.point.ground()),
             }
         } else {
             Some(point)
@@ -171,16 +171,16 @@ impl World {
         made: &Master,
         at: Position,
     ) -> GenieResult<()> {
-        let b = self.players.live(player, container)?;
-        let (bid, id) = (b.id, self.players.live(up, ui)?.id);
-        let bm = b.master(self.master_tables(), player)?.clone();
+        let live = self.players.live(player, container)?;
+        let (bid, id) = (live.id, self.players.live(up, ui)?.id);
+        let bm = live.master(self.master_tables(), player)?.clone();
         let share = self.unloaded_share((player, container), (up, ui), made, &bm)?;
         let b = self.players.live_mut(player, container)?;
         if let Some(share) = share {
             self.parts.combat_mut(b.id)?.firepower -= share;
         }
         // the unit out of its list (`FUN_141197e10`)
-        if let Some(k) = b.garrison.iter().position(|&g| g == id) {
+        if let Some(k) = b.garrison.iter().position(|&object_id| object_id == id) {
             let _ = b.garrison.swap_remove(k);
         }
         // COMISS volley, firepower; JBE keeps it: a NaN firepower stays
@@ -223,14 +223,14 @@ impl World {
         // a unit out of its container no longer counts down to its raid (`+0x9a0` 0)
         self.parts.combat_mut(unit.id)?.raider_countdown = RaiderCountdown::NONE;
         // the position setter's end: a place off where it last moved to is a move
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.mark_move(at, world_time);
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.mark_move(at, world_time);
         }
         let state = unit.life.state;
-        if let Some(v) = self.spatial.sight.as_mut()
+        if let Some(visibility) = self.spatial.sight.as_mut()
             && state == ObjectState::Alive
         {
-            let _ = v.sight_on(
+            let _ = visibility.sight_on(
                 id,
                 at,
                 made.radius,
@@ -242,8 +242,8 @@ impl World {
                 },
             )?;
         }
-        if let Some(e) = self.take_sight_unsupported() {
-            return Err(e);
+        if let Some(error) = self.take_sight_unsupported() {
+            return Err(error);
         }
         Ok(())
     }
@@ -270,12 +270,12 @@ impl World {
         else {
             return Err(GenieError::unsupported("an unload without the masters"));
         };
-        let b = self.players.live(player, container)?;
+        let live = self.players.live(player, container)?;
         let unit = self.players.live(up, ui)?;
         let rate = attack_rate(
             bm,
             own,
-            self.parts.combat_of(b.id).reload_powerup,
+            self.parts.combat_of(live.id).reload_powerup,
             &self.model.roles,
             &self.model.tuning.garrison,
         );
@@ -317,16 +317,23 @@ impl World {
         // the gather point (`+0xc30` 1, not on the building) gives a unit without a point its
         // target, when the world holds it, else its point
         let to = match let_out_aim(gather, point, bid) {
-            LetOutAim::Target(g) => {
-                if self.object(g.target).is_some() {
+            LetOutAim::Target(gather_point) => {
+                if self.object(gather_point.target).is_some() {
                     if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(up, ui)?.id) {
                         ai.remove_target();
                     }
                     // slot 0x128 with `+0xa14` 0: the unit AI keeps its notifies
-                    self.gather(up, ui, g, bid, OrderSource::Queued, FinderUse::Skips)?;
+                    self.gather(
+                        up,
+                        ui,
+                        gather_point,
+                        bid,
+                        OrderSource::Queued,
+                        FinderUse::Skips,
+                    )?;
                     return Ok(LetOut::Out);
                 }
-                g.point.ground()
+                gather_point.point.ground()
             }
             LetOutAim::Point(p) => p,
         };
@@ -392,8 +399,8 @@ impl World {
             .place
             .put_down(id, at, placed, (&mut self.spatial, &mut self.pathing));
         self.pathing.tiles_changed(self.spatial.take_changes());
-        if let Some(v) = self.spatial.sight.as_mut() {
-            v.moved(
+        if let Some(visibility) = self.spatial.sight.as_mut() {
+            visibility.moved(
                 id,
                 from,
                 at,
@@ -401,11 +408,11 @@ impl World {
                 &self.model.roles,
                 self.model.tuning.visibility,
             )?;
-            v.registry_moved(id, placed.class, from, at);
+            visibility.registry_moved(id, placed.class, from, at);
         }
         let unit = self.players.live_mut(up, ui)?;
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.mark_move(at, world_time);
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.mark_move(at, world_time);
         }
         self.came_out(up, ui, made.class, rest)
     }
@@ -437,7 +444,9 @@ pub(super) fn let_out_aim(
         {
             LetOutAim::Target(g)
         }
-        Some(g) if g.state == GatherPointState::Kept => LetOutAim::Point(g.point.ground()),
+        Some(gather_point) if gather_point.state == GatherPointState::Kept => {
+            LetOutAim::Point(gather_point.point.ground())
+        }
         _ => LetOutAim::Point(point),
     }
 }

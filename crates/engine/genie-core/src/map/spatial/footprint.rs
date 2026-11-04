@@ -88,9 +88,9 @@ impl Spatial {
         let reach = half - 1;
         let mut i = 0;
         while i < list.len() {
-            let t = *list.checked(i)?;
-            if (cx - t.x()).abs() < reach && (cy - t.y()).abs() < reach {
-                for n in t.beside() {
+            let checked = *list.checked(i)?;
+            if (cx - checked.x()).abs() < reach && (cy - checked.y()).abs() < reach {
+                for n in checked.beside() {
                     let at = ((ox + n.x()) * size + n.y() + oy) as usize;
                     if !*visited.checked(at)?
                         && self.passable(n, mask, me, Distance::new(radius_x), by_id)?
@@ -109,11 +109,11 @@ impl Spatial {
         };
         let mut spot = None;
         let mut empty = false;
-        for &t in &list {
-            if footprint.holds(t) {
+        for &tile in &list {
+            if footprint.holds(tile) {
                 continue;
             }
-            let (x, y) = (t.x(), t.y());
+            let (x, y) = (tile.x(), tile.y());
             let was_empty = empty;
             let count = self.tiles.objects(Tile::new(x, y));
             if empty && count.is_some_and(|n| n != 0) {
@@ -166,10 +166,11 @@ impl Spatial {
         let (rx, ry) = (site.radius.x(), site.radius.y());
         self.check_known(Rect::new(sx - rx, sy - ry, sx + rx, sy + ry))?;
         let counts = |id: ObjectId, o: &Placed| {
-            looks.get(&id).is_none_or(|l| {
-                let alive = l.state < ObjectState::Dying
-                    || (l.kind != MasterKind::BUILDING && l.state < ObjectState::Removed);
-                let foundation = l.kind == MasterKind::BUILDING && l.desolid;
+            looks.get(&id).is_none_or(|clear_look| {
+                let alive = clear_look.state < ObjectState::Dying
+                    || (clear_look.kind != MasterKind::BUILDING
+                        && clear_look.state < ObjectState::Removed);
+                let foundation = clear_look.kind == MasterKind::BUILDING && clear_look.desolid;
                 alive
                     && (!foundation
                         || (self.allied(site.player, o.player)
@@ -179,15 +180,15 @@ impl Spatial {
         Ok(self
             .objects
             .iter()
-            .filter(|&(id, o)| {
+            .filter(|&(id, placed)| {
                 id != site_id.id()
-                    && (obstructs || !o.moves)
-                    && !o.buildable_on.passed()
-                    && o.tall
-                    && o.radius.sized()
-                    && (o.position.x() - sx).abs() <= rx
-                    && (o.position.y() - sy).abs() <= ry
-                    && counts(id, o)
+                    && (obstructs || !placed.moves)
+                    && !placed.buildable_on.passed()
+                    && placed.tall
+                    && placed.radius.sized()
+                    && (placed.position.x() - sx).abs() <= rx
+                    && (placed.position.y() - sy).abs() <= ry
+                    && counts(id, placed)
             })
             .map(|(id, _)| id)
             .collect())
@@ -344,8 +345,8 @@ impl Spatial {
     ) -> GenieResult<bool> {
         let rect = Rect::between(point, point).grown(grow);
         self.check_known_records(rect)?;
-        Ok(self.records_in(rect).any(|(id, p)| {
-            let Some(o) = p
+        Ok(self.records_in(rect).any(|(id, placed)| {
+            let Some(obstruction) = placed
                 .obstruction
                 .filter(|_| !ignore.contains(&RecordId::from(id)))
             else {
@@ -354,10 +355,10 @@ impl Spatial {
             if movers == Movers::LeftOut && by_id.moving(id) {
                 return false;
             }
-            if !self.visits(p, o.kind, rect) {
+            if !self.visits(placed, obstruction.kind, rect) {
                 return false;
             }
-            p.bounds().grown(grow).holds(point)
+            placed.bounds().grown(grow).holds(point)
         }))
     }
 
@@ -388,11 +389,11 @@ impl Spatial {
         let query = rect.grown(grow);
         self.records_in(query)
             .filter(|(id, p)| {
-                p.obstruction
-                    .is_some_and(|o| o.kind.tested() && self.visits(p, o.kind, query))
-                    && !ignore.contains(&RecordId::from(*id))
+                p.obstruction.is_some_and(|obstruction| {
+                    obstruction.kind.tested() && self.visits(p, obstruction.kind, query)
+                }) && !ignore.contains(&RecordId::from(*id))
             })
-            .filter(|(_, p)| rect.overlaps(p.bounds().grown(grow)))
+            .filter(|(_, placed)| rect.overlaps(placed.bounds().grown(grow)))
             .map(|(id, _)| id)
             .collect()
     }

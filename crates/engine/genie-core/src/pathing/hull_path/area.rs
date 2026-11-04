@@ -47,8 +47,8 @@ impl HullPather<'_> {
         let near: Vec<ObjectId> = self
             .world
             .records()
-            .filter(|&(id, _, b)| {
-                !self.ignore.contains(&RecordId::from(id)) && b.grown(grow).holds(to)
+            .filter(|&(id, _, rect)| {
+                !self.ignore.contains(&RecordId::from(id)) && rect.grown(grow).holds(to)
             })
             .map(|(id, _, _)| id)
             .collect();
@@ -59,7 +59,7 @@ impl HullPather<'_> {
             others.extend(
                 near.iter()
                     .filter(|&&o| o != id)
-                    .map(|&o| RecordId::from(o)),
+                    .map(|&object_id| RecordId::from(object_id)),
             );
             if !self
                 .world
@@ -76,10 +76,10 @@ impl HullPather<'_> {
         }
         match held[..] {
             [] => Ok(None),
-            [p] => Ok(Some(Target {
-                at: p.position.ground(),
-                radius: p.radius,
-                moves: p.moves,
+            [placed] => Ok(Some(Target {
+                at: placed.position.ground(),
+                radius: placed.radius,
+                moves: placed.moves,
             })),
             _ => Err(GenieError::unsupported(
                 "the old short pather's goal held by two objects or more (the grid's order)",
@@ -99,23 +99,23 @@ impl HullPather<'_> {
         if target_id.is_none() {
             return Ok(false);
         }
-        let Some(t) = self.world.get_known(target_id)? else {
+        let Some(placed) = self.world.get_known(target_id)? else {
             return Ok(false);
         };
-        if t.position.x() != to.x() || t.position.y() != to.y() {
+        if placed.position.x() != to.x() || placed.position.y() != to.y() {
             return Ok(false);
         }
-        let r = self.radius.get();
+        let radius = self.radius.get();
         let (w, h) = (self.world.map.width(), self.world.map.height());
         self.bounds = Rect::new(0.0, 0.0, w as f32 - 0.0, h as f32 - 0.0);
-        let b = self.bounds;
-        let (bx0, by0, bx1, by1) = (b.x0(), b.y0(), b.x1(), b.y1());
+        let rect = self.bounds;
+        let (bx0, by0, bx1, by1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
         let on_map = at_most_or_unordered(bx0, to.x())
             && at_most_or_unordered(to.x(), bx1)
             && at_most_or_unordered(by0, to.y())
             && at_most_or_unordered(to.y(), by1);
         if on_map {
-            self.bounds = Rect::new(r, r, w as f32 - r, h as f32 - r);
+            self.bounds = Rect::new(radius, radius, w as f32 - radius, h as f32 - radius);
         }
         Ok(on_map)
     }
@@ -207,9 +207,9 @@ impl HullPather<'_> {
                 } else {
                     *by.checked(k)?
                 };
-                let p = *points.checked(i - 1)?;
-                Ok((last.y() - p.y()) * (last.y() - p.y())
-                    + (last.x() - p.x()) * (last.x() - p.x()))
+                let point = *points.checked(i - 1)?;
+                Ok((last.y() - point.y()) * (last.y() - point.y())
+                    + (last.x() - point.x()) * (last.x() - point.x()))
             })
             .collect::<GenieResult<_>>()?;
         for a in 0..count {
@@ -224,23 +224,23 @@ impl HullPather<'_> {
             }
         }
         let mut joined = 0;
-        for k in 0..count {
-            let e = *order.checked(k)?;
+        for index in 0..count {
+            let checked = *order.checked(index)?;
             let last = *self
                 .entrances
-                .checked(e)?
+                .checked(checked)?
                 .points
                 .last()
                 .unwrap_or(&Point::ORIGIN);
             let hull = self.hulls.checked_mut(hull.index())?;
-            let at = if joined + *by.checked(k)? != 0 {
-                joined + *by.checked(k)?
+            let at = if joined + *by.checked(index)? != 0 {
+                joined + *by.checked(index)?
             } else {
                 hull.points.len()
             };
             hull.points.insert(at, last);
-            hull.entrances.insert(at, Some(EntranceIndex(e)));
-            if *by.checked(k)? != 0 {
+            hull.entrances.insert(at, Some(EntranceIndex(checked)));
+            if *by.checked(index)? != 0 {
                 joined += 1;
             }
         }

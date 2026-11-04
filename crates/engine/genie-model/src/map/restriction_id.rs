@@ -49,7 +49,9 @@ impl RestrictionId {
     /// The value of a field that holds −1 for none.
     #[must_use]
     pub fn field(restriction: Option<Self>) -> i16 {
-        restriction.map_or(Self::NONE, |r| i16::try_from(r.0).unwrap_or(i16::MAX))
+        restriction.map_or(Self::NONE, |restriction_id| {
+            i16::try_from(restriction_id.0).unwrap_or(i16::MAX)
+        })
     }
 
     /// Its place in the restrictions' tables.
@@ -60,8 +62,8 @@ impl RestrictionId {
 }
 
 impl genie_diff::Diff for RestrictionId {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -74,14 +76,14 @@ mod tests {
     #[test]
     fn field_minus_one_is_none() {
         assert_eq!(RestrictionId::of_field(-1).unwrap(), None);
-        let r = RestrictionId::of_field(7).unwrap();
-        assert_eq!(r, Some(RestrictionId::named(7)));
-        assert_eq!(r.map(RestrictionId::index), Some(7));
+        let restriction_id = RestrictionId::of_field(7).unwrap();
+        assert_eq!(restriction_id, Some(RestrictionId::named(7)));
+        assert_eq!(restriction_id.map(RestrictionId::index), Some(7));
         assert!(RestrictionId::of_field(-2).is_err());
         assert_eq!(
             [-2, 3].map(RestrictionId::of_data),
             [None, Some(RestrictionId::named(3))]
         );
-        assert_eq!([r, None].map(RestrictionId::field), [7, -1]);
+        assert_eq!([restriction_id, None].map(RestrictionId::field), [7, -1]);
     }
 }

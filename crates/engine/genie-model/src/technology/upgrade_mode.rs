@@ -61,7 +61,13 @@ mod tests {
     /// −1 and 3 keep the masters, 2 is one object, 3 takes the own masters, 0 none of these.
     #[test]
     fn mode_names_its_walk() {
-        let of = |m: UpgradeMode| (m.keeps_masters(), m.one_object(), m.own_masters());
+        let of = |upgrade_mode: UpgradeMode| {
+            (
+                upgrade_mode.keeps_masters(),
+                upgrade_mode.one_object(),
+                upgrade_mode.own_masters(),
+            )
+        };
         assert_eq!(of(UpgradeMode::KEEP), (true, false, false));
         assert_eq!(of(UpgradeMode::WALK), (false, false, false));
         assert_eq!(of(UpgradeMode::ONE_OBJECT), (false, true, false));

@@ -187,7 +187,12 @@ mod tests {
         };
         let read = writes_back(&list, 11.97);
         assert_eq!(read.sprites.len(), 2);
-        assert_eq!(read.sprites[0].animation.map(|a| a.last_speed), Some(0.5));
+        assert_eq!(
+            read.sprites[0]
+                .animation
+                .map(|sprite_node_animation| sprite_node_animation.last_speed),
+            Some(0.5)
+        );
         assert!(read.sprites[1].animation.is_none());
     }
 }

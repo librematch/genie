@@ -159,7 +159,7 @@ impl OrderKind {
     #[must_use]
     pub const fn field(order: Option<Self>) -> i32 {
         match order {
-            Some(o) => o.value(),
+            Some(order_kind) => order_kind.value(),
             None => -1,
         }
     }
@@ -172,7 +172,7 @@ impl TryFrom<i32> for OrderKind {
     fn try_from(value: i32) -> GenieResult<Self> {
         Self::ALL
             .into_iter()
-            .find(|o| o.value() == value)
+            .find(|order_kind| order_kind.value() == value)
             .ok_or_else(|| {
                 GenieError::invalid_input(
                     "an order value no case of the unit AI's order handler names",
@@ -200,7 +200,10 @@ mod tests {
         for o in OrderKind::ALL {
             assert_eq!(OrderKind::try_from(o.value()), Ok(o));
         }
-        let mut values: Vec<i32> = OrderKind::ALL.iter().map(|o| o.value()).collect();
+        let mut values: Vec<i32> = OrderKind::ALL
+            .iter()
+            .map(|order_kind| order_kind.value())
+            .collect();
         values.sort_unstable();
         values.dedup();
         assert_eq!(values.len(), 33);
@@ -219,7 +222,7 @@ mod tests {
     fn value_no_case_names_is_an_error() {
         for v in [0, 0x2c4, 0x262, 0x269, 0x2cf, 0x2d0, 0x323] {
             assert_eq!(
-                OrderKind::try_from(v).map_err(|e| e.kind()),
+                OrderKind::try_from(v).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }

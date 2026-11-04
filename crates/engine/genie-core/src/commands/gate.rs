@@ -17,7 +17,7 @@ pub struct GateCommand {
 
 impl GateCommand {
     /// Its handler ([`World::gate`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.gate(self.player, self.id)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.gate(self.player, self.id)
     }
 }

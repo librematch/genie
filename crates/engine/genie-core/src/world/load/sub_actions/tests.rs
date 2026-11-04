@@ -65,21 +65,28 @@ fn slot() -> TribeBuildingObjectEntry1 {
 #[test]
 fn building_production_holds_its_slots_and_make_action() {
     let mut town_centre = building_object(10, 109);
-    let b = building_mut(&mut town_centre);
-    b.production_queue = vec![slot(), slot()];
-    b.production_queue_count = 1;
-    b.production_queue_enabled = 1;
-    b.production_queue_actions = action_list(vec![(ActionKind::MAKE_OBJECT, make())]);
-    let p = production(&town_centre).unwrap().unwrap();
-    assert_eq!(p.queue.slots.len(), 2);
-    assert_eq!(p.queue.slots[1].serial.get(), 1);
+    let tribe_building_object = building_mut(&mut town_centre);
+    tribe_building_object.production_queue = vec![slot(), slot()];
+    tribe_building_object.production_queue_count = 1;
+    tribe_building_object.production_queue_enabled = 1;
+    tribe_building_object.production_queue_actions =
+        action_list(vec![(ActionKind::MAKE_OBJECT, make())]);
+    let production = production(&town_centre).unwrap().unwrap();
+    assert_eq!(production.queue.slots.len(), 2);
+    assert_eq!(production.queue.slots[1].serial.get(), 1);
     assert_eq!(
-        p.queue.slots[0].costs[0],
+        production.queue.slots[0].costs[0],
         (Some(attribute::FOOD), Amount::new(50.0))
     );
-    assert_eq!((p.queue.count.get(), p.queue.next_serial.get()), (1, 2));
-    assert!(p.queue.enabled);
-    let Some(Making::Unit(made)) = p.action else {
+    assert_eq!(
+        (
+            production.queue.count.get(),
+            production.queue.next_serial.get()
+        ),
+        (1, 2)
+    );
+    assert!(production.queue.enabled);
+    let Some(Making::Unit(made)) = production.action else {
         panic!("a make action")
     };
     assert_eq!(
@@ -101,9 +108,9 @@ fn research_is_production_action_too() {
     };
     building_mut(&mut university).production_queue_actions =
         action_list(vec![(ActionKind::MAKE_TECH, research)]);
-    let p = production(&university).unwrap().unwrap();
+    let production = production(&university).unwrap().unwrap();
     assert!(
-        matches!(p.action, Some(Making::Research(r)) if r.tech == TechId::try_from(22).unwrap() && !r.paid && r.state == MakeTechState::New)
+        matches!(production.action, Some(Making::Research(make_tech)) if make_tech.tech == TechId::try_from(22).unwrap() && !make_tech.paid && make_tech.state == MakeTechState::New)
     );
 }
 
@@ -112,8 +119,8 @@ fn research_is_production_action_too() {
 fn make_action_in_state_of_none_fails() {
     let mut barracks = building_object(11, 12);
     let mut made = make();
-    if let Some(m) = made.tribe_action_make_obj.as_deref_mut() {
-        m.rge_action.state = 2;
+    if let Some(tribe_action_make_obj) = made.tribe_action_make_obj.as_deref_mut() {
+        tribe_action_make_obj.rge_action.state = 2;
     }
     building_mut(&mut barracks).production_queue_actions =
         action_list(vec![(ActionKind::MAKE_OBJECT, made)]);
@@ -148,7 +155,7 @@ fn gather_point_takes_its_saved_state() {
     let with = |state: i32| {
         let mut barracks = building_object(11, 12);
         building_mut(&mut barracks).gather_point_exists = state;
-        gather_point(&barracks).map(|g| g.map(|g| g.state))
+        gather_point(&barracks).map(|g| g.map(|barracks_gather_point| barracks_gather_point.state))
     };
     assert_eq!(with(0), Ok(None));
     assert_eq!(with(1), Ok(Some(GatherPointState::Point)));
@@ -165,8 +172,11 @@ fn building_without_anything_to_make_has_no_production() {
     let mut house = building_object(12, 70);
     assert!(production(&house).unwrap().is_none());
     building_mut(&mut house).value = vec![3];
-    let p = production(&house).unwrap().unwrap();
-    assert_eq!(p.disabled_techs, [TechId::try_from(3).unwrap()]);
+    let house_production = production(&house).unwrap().unwrap();
+    assert_eq!(
+        house_production.disabled_techs,
+        [TechId::try_from(3).unwrap()]
+    );
 }
 
 /// A make or research action without its part, or another action, is not modelled.
@@ -190,10 +200,10 @@ fn livestock() -> genie_save::Object {
 
 fn start(table: &MasterTable) -> Result<Option<DefaultStart>, Unstartable> {
     let mut object = livestock();
-    let s = static_mut(&mut object).clone();
+    let rge_static_object = static_mut(&mut object).clone();
     default_task(
         &object,
-        &s,
+        &rge_static_object,
         &PlayerObjects::default(),
         CivId::GAIA,
         Some(table),
@@ -232,7 +242,7 @@ fn the_default_task_starts_what_the_table_names() {
     let enter = ENTER;
     assert!(matches!(
         start(&table(DefaultAction::Kind(enter))),
-        Err(Unstartable::Unported(t)) if t == enter
+        Err(Unstartable::Unported(action_kind)) if action_kind == enter
     ));
     assert!(matches!(
         start(&table(DefaultAction::NoSuchTask)),
@@ -261,16 +271,16 @@ fn static_object_has_no_default_task() {
         })),
         ..genie_save::Object::default()
     };
-    let s = tree.static_part().unwrap().clone();
+    let static_part = tree.static_part().unwrap().clone();
     let objects = PlayerObjects::default();
     assert!(matches!(
-        default_task(&tree, &s, &objects, CivId::GAIA, None),
+        default_task(&tree, &static_part, &objects, CivId::GAIA, None),
         Ok(None)
     ));
     let object = livestock();
-    let s = object.static_part().unwrap().clone();
+    let rge_static_object = object.static_part().unwrap().clone();
     assert!(matches!(
-        default_task(&object, &s, &objects, CivId::GAIA, None),
+        default_task(&object, &rge_static_object, &objects, CivId::GAIA, None),
         Err(Unstartable::Unread(UnreadDefault::NoMasterTable))
     ));
 }
@@ -322,21 +332,27 @@ fn move_to() -> Action {
 #[test]
 fn saved_attack_reads_its_target_range_and_move_to() {
     let graphics = Graphics::new();
-    let a = saved_attack(&attack(5, vec![(MOVE_TO, move_to())]), Some(&graphics)).unwrap();
+    let graphics_attack =
+        saved_attack(&attack(5, vec![(MOVE_TO, move_to())]), Some(&graphics)).unwrap();
     assert_eq!(
-        (a.target, a.state.bare()),
+        (graphics_attack.target, graphics_attack.state.bare()),
         (
             Some(AttackTargetId::new(object_id(700))),
             AttackState::GotoSeen { move_to: None }
         )
     );
     // the MoveTo is quiet and holds its own state, point and range
-    let m = a.state.move_to().copied().unwrap();
+    let move_to_action = graphics_attack.state.move_to().copied().unwrap();
     assert_eq!(
-        (m.state, m.point.x(), m.point.y(), m.voice),
+        (
+            move_to_action.state,
+            move_to_action.point.x(),
+            move_to_action.point.y(),
+            move_to_action.voice
+        ),
         (MoveTo::Moving, 3.0, 4.0, Voice::Quiet)
     );
-    assert_eq!(a.range.get().to_bits(), 5.0_f32.to_bits());
+    assert_eq!(graphics_attack.range.get().to_bits(), 5.0_f32.to_bits());
     let plain = saved_attack(&attack(2, vec![]), Some(&graphics)).unwrap();
     assert_eq!(plain.state, AttackState::Killed);
     // a MoveTo belongs to a walk: in any other state it is no state of the game

@@ -8,8 +8,11 @@ const DOES_NOT_FIT: GenieError = GenieError::invalid_input("a value that does no
 
 /// The text of a fixed name field up to its first NUL.
 pub(crate) fn name_to_nul(bytes: &[u8]) -> GenieResult<String> {
-    String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect())
-        .map_err(|e| GenieError::invalid_input("a name that is no UTF-8").with_source(e))
+    String::from_utf8(bytes.iter().copied().take_while(|b| *b != 0).collect()).map_err(
+        |from_utf8_error| {
+            GenieError::invalid_input("a name that is no UTF-8").with_source(from_utf8_error)
+        },
+    )
 }
 
 /// `value` as the type of the field it is read from or written to.
@@ -41,7 +44,7 @@ mod tests {
     fn name_ends_at_its_nul_and_must_be_utf8() {
         assert_eq!(name_to_nul(b"ab\0cd").unwrap(), "ab");
         assert_eq!(
-            name_to_nul(&[0xff]).map_err(|e| e.reason()),
+            name_to_nul(&[0xff]).map_err(|error| error.reason()),
             Err("a name that is no UTF-8")
         );
     }

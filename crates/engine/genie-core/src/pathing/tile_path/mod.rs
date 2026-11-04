@@ -102,10 +102,10 @@ impl Path {
     /// Insert `p` at `index` (`FUN_140f95060`) unless it equals the point before or the point at
     /// `index`; false when it does or `index` lies beyond the end.
     pub fn insert(&mut self, index: usize, p: BVector) -> bool {
-        let n = self.points.len();
-        if n < index
+        let count = self.points.len();
+        if count < index
             || (0 < index && self.points.get(index - 1) == Some(&p))
-            || (index < n && self.points.get(index) == Some(&p))
+            || (index < count && self.points.get(index) == Some(&p))
         {
             return false;
         }

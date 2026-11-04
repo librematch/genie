@@ -271,8 +271,12 @@ fn trace(
 ) -> Option<Path> {
     // a tile never entered reads the game's 0xff: none
     let direction = |t: Tile| entered.get(cell(map, t)).copied().flatten();
-    let centre = |t: Tile| -> BVector {
-        BVector::new(t.x() as f32 + TILE_CENTRE, z, t.y() as f32 + TILE_CENTRE)
+    let centre = |tile: Tile| -> BVector {
+        BVector::new(
+            tile.x() as f32 + TILE_CENTRE,
+            z,
+            tile.y() as f32 + TILE_CENTRE,
+        )
     };
     let mut path = Path::default();
     let mut at = end;
@@ -310,7 +314,7 @@ fn search_refused(
     }
     if req
         .target
-        .is_some_and(|t| t.gap_squared <= req.range.squared())
+        .is_some_and(|long_target| long_target.gap_squared <= req.range.squared())
     {
         return Some(Searched::InRange);
     }
@@ -328,7 +332,9 @@ fn search_refused(
 /// range by `d` against the range, else `d` within `LongPathTuning::reached`.
 fn search_reached(req: &LongRequest, d: f32, long_path_tuning: LongPathTuning) -> bool {
     match req.target {
-        Some(t) => t.gap - req.range < Distance::new(EPSILON) || d < long_path_tuning.reached,
+        Some(long_target) => {
+            long_target.gap - req.range < Distance::new(EPSILON) || d < long_path_tuning.reached
+        }
         None if req.within_range => d - req.range.get() < EPSILON,
         None => d < long_path_tuning.reached,
     }
@@ -350,8 +356,8 @@ impl<'a> Grid<'a> {
     fn new(tiles: &'a Tiles, map: GridSize, req: &LongRequest, gates: GateAsk<'a>) -> Self {
         let blocked_terrain = req.mask.blocked();
         let mut lowered = vec![0u8; (map.width().max(0) * map.height().max(0)) as usize];
-        for &t in &req.lowered {
-            if let Some(cell) = map.index(t).and_then(|i| lowered.get_mut(i)) {
+        for &tile in &req.lowered {
+            if let Some(cell) = map.index(tile).and_then(|i| lowered.get_mut(i)) {
                 *cell = cell.wrapping_add(1);
             }
         }
@@ -400,7 +406,7 @@ impl<'a> Grid<'a> {
         req: &LongRequest,
     ) -> GenieResult<bool> {
         let corners =
-            |test: &dyn Fn(Tile) -> bool| beside.is_none_or(|b| b.iter().all(|&t| test(t)));
+            |test: &dyn Fn(Tile) -> bool| beside.is_none_or(|tiles| tiles.iter().all(|&t| test(t)));
         let clear = |test: &dyn Fn(Tile) -> bool| test(n) && corners(test);
         if !clear(&|t| self.word(t) & self.blocked_terrain == 0) {
             return Ok(false);
@@ -408,7 +414,7 @@ impl<'a> Grid<'a> {
         let passes = || {
             corners(&|t| self.word(t) & self.blocked == 0)
                 && self.tall(n) == 0
-                && corners(&|t| self.tall(t) == 0)
+                && corners(&|tile| self.tall(tile) == 0)
         };
         let word = self.word(n);
         let open = if word & self.blocked == 0 {
@@ -466,10 +472,10 @@ impl Relax<'_> {
         from: &Origin,
         (to, dir): (Tile, StepDir),
     ) -> GenieResult<Option<Tile>> {
-        let i = cell(self.map, to);
+        let cell = cell(self.map, to);
         let new_cost = step_cost(from.cost, from.at, to, self.req.to);
-        let seen = *front.entered.checked(i)?;
-        let old = *front.cost.checked(i)?;
+        let seen = *front.entered.checked(cell)?;
+        let old = *front.cost.checked(cell)?;
         if seen.is_some() && new_cost >= old {
             return Ok(None);
         }
@@ -481,18 +487,18 @@ impl Relax<'_> {
             return Ok(None);
         }
         // the start's none (0xff) is no direction
-        let mut c = if from.came == Some(dir) {
+        let mut long_cost = if from.came == Some(dir) {
             new_cost
         } else {
             new_cost.turned()
         };
         if at_goal {
-            c = LongCost::ZERO;
+            long_cost = LongCost::ZERO;
         }
-        if seen.is_none() || c < old {
-            *front.cost.checked_mut(i)? = c;
-            *front.entered.checked_mut(i)? = Some(dir);
-            front.heap.push(to, c)?;
+        if seen.is_none() || long_cost < old {
+            *front.cost.checked_mut(cell)? = long_cost;
+            *front.entered.checked_mut(cell)? = Some(dir);
+            front.heap.push(to, long_cost)?;
             if at_goal {
                 return Ok(Some(to));
             }
@@ -524,9 +530,10 @@ fn search(
         return Ok(early);
     }
     // the goal: the target's tile and footprint, else the goal tile
-    let (goal, rect) = req
-        .target
-        .map_or_else(|| (req.to, TileRect::of(req.to)), |t| (t.tile, t.rect));
+    let (goal, rect) = req.target.map_or_else(
+        || (req.to, TileRect::of(req.to)),
+        |long_target| (long_target.tile, long_target.rect),
+    );
     let n = (w.max(0) * h.max(0)) as usize;
     let relax = Relax {
         grid: Grid::new(tiles, map, req, gates),
@@ -579,8 +586,8 @@ fn search(
         let back = StepDir::behind(came);
         let here = *front.cost.checked(cell(map, c))?;
         for (dir, step) in StepDir::ALL.into_iter().zip(STEPS) {
-            let n = c + step;
-            if back.holds(dir) || !map.holds(n) || n == req.from {
+            let tile = c + step;
+            if back.holds(dir) || !map.holds(tile) || tile == req.from {
                 continue;
             }
             let from = Origin {
@@ -588,7 +595,7 @@ fn search(
                 cost: here,
                 came,
             };
-            if let Some(end) = relax.step(&mut front, &from, (n, dir))? {
+            if let Some(end) = relax.step(&mut front, &from, (tile, dir))? {
                 return Ok(Searched::Ran {
                     reached: true,
                     end,
@@ -625,8 +632,8 @@ mod tests {
             }
         }
         let mut t = Tiles::new(GridSize::new(w, h), classes);
-        for (y, r) in rows.iter().enumerate() {
-            for (x, c) in r.chars().enumerate() {
+        for (y, text) in rows.iter().enumerate() {
+            for (x, c) in text.chars().enumerate() {
                 if c == 'T' {
                     t.add_tall_for_test(Tile::new(x as i32, y as i32));
                 }
@@ -746,7 +753,7 @@ mod tests {
             ]
         );
         // the end on the start: its centre only
-        let p = trace(
+        let path = trace(
             Tile::new(0, 0),
             Tile::new(0, 0),
             &entered,
@@ -754,7 +761,7 @@ mod tests {
             0.0,
         )
         .unwrap();
-        assert_eq!(p.points, [BVector::new(0.5, 0.0, 0.5)]);
+        assert_eq!(path.points, [BVector::new(0.5, 0.0, 0.5)]);
     }
 
     #[test]

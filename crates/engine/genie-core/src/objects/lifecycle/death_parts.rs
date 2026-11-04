@@ -73,11 +73,11 @@ pub(crate) fn forget_resource(
     if id.is_recyclable() {
         return Ok(());
     }
-    if let (Some(m), Some(v)) = (
+    if let (Some(visibility_master), Some(visibility)) = (
         master.filter(|m| m.auto_gather.is_on()),
         spatial.sight.as_mut(),
     ) {
-        v.forget_resource(id, position, m.gather_group)?;
+        visibility.forget_resource(id, position, visibility_master.gather_group)?;
     }
     Ok(())
 }
@@ -97,7 +97,7 @@ pub(crate) fn forget_resource(
 ///
 /// What it does not model.
 pub(crate) fn combat_dies(
-    u: &mut Unit,
+    unit: &mut Unit,
     layer: &Building,
     master: &Master,
     spatial: &mut Spatial,
@@ -105,7 +105,7 @@ pub(crate) fn combat_dies(
     roles: &Roles,
     visibility_tuning: VisibilityTuning,
 ) -> GenieResult<()> {
-    if u.pasture.is_some() || u.my_pasture.is_some() {
+    if unit.pasture.is_some() || unit.my_pasture.is_some() {
         return Err(GenieError::unsupported(
             "a dying unit in a pasture (FUN_141189ca0)",
         ));
@@ -116,26 +116,28 @@ pub(crate) fn combat_dies(
     {
         return Err(GenieError::unsupported("a dying unit of class 1, 13 or 43"));
     }
-    u.life.hp = HitPoints::ZERO;
-    if u.flags.contains(UnitFlags::ROO_CALLED) {
+    unit.life.hp = HitPoints::ZERO;
+    if unit.flags.contains(UnitFlags::ROO_CALLED) {
         return Ok(());
     }
-    let desolid = layer.construction.is_some_and(|c| c.desolid);
+    let desolid = layer
+        .construction
+        .is_some_and(|construction| construction.desolid);
     if master.kind < MasterKind::BUILDING || (!desolid && Distance::ZERO < master.height) {
-        pathing.removed(u.id);
-        spatial.drop_record(u.id);
+        pathing.removed(unit.id);
+        spatial.drop_record(unit.id);
     }
     if MasterKind::COMBAT <= master.kind {
-        spatial.set_tall(u.id, false);
+        spatial.set_tall(unit.id, false);
     }
     if master.kind == MasterKind::BUILDING
         && layer.annex_of.is_none()
-        && u.life.inside.is_none()
-        && let Some(v) = spatial.sight.as_mut()
+        && unit.life.inside.is_none()
+        && let Some(visibility) = spatial.sight.as_mut()
     {
-        v.unlink_building(u.position(), master.radius, visibility_tuning)?;
+        visibility.unlink_building(unit.position(), master.radius, visibility_tuning)?;
     }
-    u.flags.set(UnitFlags::ROO_CALLED, true);
+    unit.flags.set(UnitFlags::ROO_CALLED, true);
     Ok(())
 }
 
@@ -193,7 +195,7 @@ pub(crate) struct BuiltDeath {
     pub(crate) building: BuildingDeath,
 }
 
-/// [`BuiltDeath`] of the building `u` of `master` with its combat layer `combat` (its store)
+/// [`BuiltDeath`] of the building `unit` of `master` with its combat layer `combat` (its store)
 /// and its main building `annex_of` (an annex's): the monastery (104), the wonder (276) and the
 /// castle (82) count one less in attributes 52, 42 and 134 (slot 0xf8 with −1, then slot 0xf0
 /// with 0 below 0); its master's technology (`+0x98c`) goes when no other building of the master
@@ -208,7 +210,7 @@ pub(crate) struct BuiltDeath {
 ///
 /// [`World::withdraw_tech`]: crate::world::World::withdraw_tech
 pub(crate) fn built_death(
-    (u, combat): (&mut Unit, &mut Combat),
+    (unit, combat): (&mut Unit, &mut Combat),
     annex_of: Option<MainBuildingId>,
     master: &Master,
     player_kind: PlayerKind,
@@ -219,21 +221,21 @@ pub(crate) fn built_death(
         "a dying building of a master without its building part",
     ))?;
     if player_kind.is_computer()
-        || u.pasture.is_some()
-        || u.my_pasture.is_some()
-        || !u.garrison.is_empty()
+        || unit.pasture.is_some()
+        || unit.my_pasture.is_some()
+        || !unit.garrison.is_empty()
     {
         return Err(GenieError::unsupported(
             "a dying building of a computer player, with a pasture or units inside",
         ));
     }
-    let adds = storage_leaves((u, combat), master, roles, slots);
+    let adds = storage_leaves((unit, combat), master, roles, slots);
     if building.foundation_terrain == Some(RESTORED_FOUNDATION) {
         return Err(GenieError::unsupported(
             "a dying building of foundation terrain 28 (its terrain 1, FUN_1411ce250)",
         ));
     }
-    let unlink = (annex_of.is_none() && u.life.inside.is_none()).then_some(u.position());
+    let unlink = (annex_of.is_none() && unit.life.inside.is_none()).then_some(unit.position());
     let count = {
         let held = roles.of_master(master.id);
         if held.contains(MasterRoles::MONASTERY) {
@@ -246,7 +248,7 @@ pub(crate) fn built_death(
             None
         }
     };
-    let tech = building.tech.map(|t| (master.id, t));
+    let tech = building.tech.map(|tech_id| (master.id, tech_id));
     Ok(BuiltDeath {
         adds,
         unlink,
@@ -261,7 +263,7 @@ pub(crate) fn built_death(
 /// nothing after, `FUN_14119d310` with −1 and 0); then each entry of mode 16 leaves its own store
 /// ([`Combat::store`](crate::objects::layers::Combat::store)) when the store holds its attribute.
 pub(crate) fn storage_leaves(
-    (u, combat): (&mut Unit, &mut Combat),
+    (unit, combat): (&mut Unit, &mut Combat),
     master: &Master,
     roles: &Roles,
     slots: Slots,
@@ -276,12 +278,12 @@ pub(crate) fn storage_leaves(
         }
     }
     if roles
-        .of_some_attribute(u.life.attribute_kind)
+        .of_some_attribute(unit.life.attribute_kind)
         .contains(AttributeRoles::HEADROOM)
     {
-        adds.push((slots.attribute.headroom, -u.life.amount));
-        u.life.attribute_kind = None;
-        u.life.amount = Amount::ZERO;
+        adds.push((slots.attribute.headroom, -unit.life.amount));
+        unit.life.attribute_kind = None;
+        unit.life.amount = Amount::ZERO;
     }
     // FUN_1411e6580: each entry of mode 16 leaves its own store, when the store holds it
     for &(kind, amount, flag) in &master.storage {
@@ -296,25 +298,27 @@ pub(crate) fn storage_leaves(
     adds
 }
 
-/// What the footprint clearing reads of the object `u` ([`crate::construction::build::ClearLook`]) with its
-/// owner's `masters`.
+/// What the footprint clearing reads of the object `unit`
+/// ([`crate::construction::build::ClearLook`]) with its owner's `masters`.
 ///
 /// # Errors
 ///
 /// An object of a master its owner lacks.
 pub(crate) fn clear_look_of(
-    u: &Unit,
+    unit: &Unit,
     layer: &Building,
     masters: OwnerMasters<'_>,
 ) -> GenieResult<ClearLook> {
-    let m = u.master_in(masters)?;
+    let master = unit.master_in(masters)?;
     Ok(ClearLook {
-        hp: u.life.hp,
-        height: m.height,
-        roo_called: u.flags.contains(UnitFlags::ROO_CALLED),
-        kind: m.kind,
-        state: u.life.state,
-        desolid: layer.construction.is_some_and(|c| c.desolid),
+        hp: unit.life.hp,
+        height: master.height,
+        roo_called: unit.flags.contains(UnitFlags::ROO_CALLED),
+        kind: master.kind,
+        state: unit.life.state,
+        desolid: layer
+            .construction
+            .is_some_and(|construction| construction.desolid),
     })
 }
 
@@ -328,8 +332,8 @@ pub(crate) fn clear_look_of(
 /// the master change (`FUN_141186580` through `FUN_141209d90`, -1 then 1 with the new master).
 pub(crate) fn count_class(attributes: &mut [Amount], master: &Master, by: f32, roles: &Roles) {
     let mut add = |i: usize| {
-        if let Some(v) = attributes.get_mut(i) {
-            *v += Amount::new(by);
+        if let Some(amount) = attributes.get_mut(i) {
+            *amount += Amount::new(by);
         }
     };
     if roles

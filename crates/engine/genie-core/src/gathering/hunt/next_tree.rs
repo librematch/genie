@@ -43,7 +43,7 @@ impl Unit {
     pub(crate) fn hunt_tree_search(
         &mut self,
         (hunt, actions): (&mut HuntAction, &mut Action),
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         within: Option<Distance>,
         near: Option<Distance>,
         roles: &Roles,
@@ -62,7 +62,7 @@ impl Unit {
         let site = hunt.carry_to;
         let Some(found) = self.resource_search_from(
             actions,
-            c,
+            step,
             GatherGroup::WOOD,
             WorkerCount::of_data(2),
             site,
@@ -70,72 +70,78 @@ impl Unit {
         else {
             return Ok(TreeSearch::NoneFound);
         };
-        let (tp, t) = OthersRef::of(&c.w.players, &c.w.index, c.player)?
+        let (tp, unit) = OthersRef::of(&step.w.players, &step.w.index, step.player)?
             .find(found)
             .ok_or(GenieError::unsupported(
                 "a hunt's next tree the slice does not hold",
             ))?;
         if let Some(near) = near {
             let (dx, dz, dy) = (
-                self.position().x() - t.position().x(),
-                self.position().z() - t.position().z(),
-                self.position().y() - t.position().y(),
+                self.position().x() - unit.position().x(),
+                self.position().z() - unit.position().z(),
+                self.position().y() - unit.position().y(),
             );
             if near.get() < sqrt(dx * dx + dz * dz + dy * dy) {
                 return Ok(TreeSearch::NoneFound);
             }
         }
-        let target_master = t.master(c.w.master_tables(), tp)?;
-        let own =
-            c.w.spatial
-                .relations
-                .get(c.player)
-                .ok_or(GenieError::unsupported(
-                    "a hunter's player without relations",
-                ))?;
+        let target_master = unit.master(step.w.master_tables(), tp)?;
+        let own = step
+            .w
+            .spatial
+            .relations
+            .get(step.player)
+            .ok_or(GenieError::unsupported(
+                "a hunter's player without relations",
+            ))?;
         let quarry = Quarry {
             id: found,
-            position: t.position(),
+            position: unit.position(),
             class: target_master.class,
             kind: target_master.kind,
-            state: t.life.state,
+            state: unit.life.state,
             player: tp,
-            amount: t.life.amount,
-            allied: allied(own, c.player, tp, AllyTest::WithRelation4),
-            top_action: c.w.parts.actions_of(t.id).top_action_kind(),
+            amount: unit.life.amount,
+            allied: allied(own, step.player, tp, AllyTest::WithRelation4),
+            top_action: step.w.parts.actions_of(unit.id).top_action_kind(),
             drop_site: false,
         };
         let master = object_master(
-            c.w.parts.own_master.get(self.id),
+            step.w.parts.own_master.get(self.id),
             (self.id, self.life.master_id),
-            c.w.model.masters.of(c.player),
+            step.w.model.masters.of(step.player),
         )?;
-        let drops_here = master.action_part().drop_sites.contains(&t.life.master_id);
+        let drops_here = master
+            .action_part()
+            .drop_sites
+            .contains(&unit.life.master_id);
         let at = |id: ObjectId| {
-            c.w.spatial
+            step.w
+                .spatial
                 .get_known(id)?
                 .ok_or(GenieError::unsupported("a hunt's object without a place"))
         };
         let (me_at, them) = (at(self.id)?, at(found)?);
-        let speed =
-            c.w.parts
-                .mover_of(self.id)
-                .map_or(Speed::ZERO, |m| m.stats.speed);
+        let speed = step
+            .w
+            .parts
+            .mover_of(self.id)
+            .map_or(Speed::ZERO, |m| m.stats.speed);
         let engagement = engagement(
-            c.w.parts.unit_ai.get(self.id),
+            step.w.parts.unit_ai.get(self.id),
             speed,
             master,
             me_at,
             them,
-            c.w.world_time,
+            step.w.world_time,
         )?;
         let walks = self.move_walks(
-            c.w.parts.mover_of(self.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.mover_of(self.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(self.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(self.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -143,16 +149,16 @@ impl Unit {
         let moving = hunt.task.walk_sprite_id(self.life.held());
         let arms = arms(
             master,
-            &c.w.model.graphics,
+            &step.w.model.graphics,
             hunt.task.sprites,
             moving,
             roles,
         );
-        let mover = c.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
+        let mover = step.w.parts.mover_mut(self.id).ok_or(HUNTER_UNMOVING)?;
         let retargeted = hunt.retarget(
             HuntRetarget {
                 target: &quarry,
-                player: c.player,
+                player: step.player,
                 walks,
                 drops_here,
             },
@@ -161,10 +167,10 @@ impl Unit {
             mover,
             BeginLayer {
                 roles,
-                attack_tuning: &c.w.model.tuning.attack,
-                move_to_tuning: &c.w.model.tuning.move_to,
+                attack_tuning: &step.w.model.tuning.attack,
+                move_to_tuning: &step.w.model.tuning.move_to,
             },
-            &c.w.model.tuning.hunt,
+            &step.w.model.tuning.hunt,
         );
         actions.list.set_hunt(Some(*hunt));
         if let Some(move_start) = retargeted? {
@@ -172,15 +178,15 @@ impl Unit {
                 show_arrived(
                     &arms,
                     &mut self.sprite,
-                    c.w.parts.motion_mut(self.id),
-                    c.w.streams.get(Stream::Sprite),
-                    c.w.model.tuning.sprite,
+                    step.w.parts.motion_mut(self.id),
+                    step.w.streams.get(Stream::Sprite),
+                    step.w.model.tuning.sprite,
                 )?;
             }
             // slot 0x68 (FUN_140a7a230): the old target goes, the new one is taken
-            self.hunt_release(c, [old])?;
-            let by = self.releaser(c)?;
-            take(c, self, found, by, roles)?;
+            self.hunt_release(step, [old])?;
+            let by = self.releaser(step)?;
+            take(step, self, found, by, roles)?;
         }
         Ok(TreeSearch::Found)
     }

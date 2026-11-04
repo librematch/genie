@@ -43,10 +43,10 @@ mod tests {
     /// The side terrains come first, then the terrains; −1 is none.
     #[test]
     fn placement_terrains_take_the_sides_first() {
-        let p = PlacementTerrains::of_data([4, -1, 2, 23]);
-        assert_eq!(p.beside, [Some(TerrainId::named(4)), None]);
+        let placement_terrains = PlacementTerrains::of_data([4, -1, 2, 23]);
+        assert_eq!(placement_terrains.beside, [Some(TerrainId::named(4)), None]);
         assert_eq!(
-            p.on,
+            placement_terrains.on,
             [Some(TerrainId::named(2)), Some(TerrainId::named(23))]
         );
         assert_eq!(PlacementTerrains::of_data([-1; 4]), PlacementTerrains::NONE);

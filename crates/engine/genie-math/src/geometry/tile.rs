@@ -79,10 +79,10 @@ impl TileRect {
         Self([x0, y0, x1, y1])
     }
 
-    /// The box of the one tile `t`.
+    /// The box of the one tile `tile`.
     #[must_use]
-    pub const fn of(t: Tile) -> Self {
-        Self([t.x(), t.y(), t.x(), t.y()])
+    pub const fn of(tile: Tile) -> Self {
+        Self([tile.x(), tile.y(), tile.x(), tile.y()])
     }
 
     /// Its x0, y0, x1 and y1, in that order.
@@ -115,10 +115,13 @@ impl TileRect {
         self.0[3]
     }
 
-    /// Whether it holds tile `t`: `x0 <= x <= x1` and `y0 <= y <= y1`.
+    /// Whether it holds tile `tile`: `x0 <= x <= x1` and `y0 <= y <= y1`.
     #[must_use]
-    pub const fn holds(self, t: Tile) -> bool {
-        self.0[0] <= t.x() && t.x() <= self.0[2] && self.0[1] <= t.y() && t.y() <= self.0[3]
+    pub const fn holds(self, tile: Tile) -> bool {
+        self.0[0] <= tile.x()
+            && tile.x() <= self.0[2]
+            && self.0[1] <= tile.y()
+            && tile.y() <= self.0[3]
     }
 }
 
@@ -162,8 +165,8 @@ impl SubAssign<TileOffset> for Tile {
 }
 
 impl genie_diff::Diff for Tile {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -215,17 +218,17 @@ mod tests {
     /// A tile keeps its x and y, orders by x then y, and steps by an offset (`+`, `-`, `-=`).
     #[test]
     fn tile_keeps_its_place_orders_by_column_then_row_and_steps() {
-        let t = Tile::new(3, -4);
-        assert_eq!((t.x(), t.y(), t.get()), (3, -4, [3, -4]));
-        assert_eq!(Tile::from([3, -4]), t);
+        let tile = Tile::new(3, -4);
+        assert_eq!((tile.x(), tile.y(), tile.get()), (3, -4, [3, -4]));
+        assert_eq!(Tile::from([3, -4]), tile);
         assert!(Tile::new(2, 9) < Tile::new(3, 0) && Tile::new(3, 0) < Tile::new(3, 1));
-        assert_eq!(t + TileOffset::new(-1, 1), Tile::new(2, -3));
-        assert_eq!(t - TileOffset::new(-1, 1), Tile::new(4, -5));
-        let mut back = t;
+        assert_eq!(tile + TileOffset::new(-1, 1), Tile::new(2, -3));
+        assert_eq!(tile - TileOffset::new(-1, 1), Tile::new(4, -5));
+        let mut back = tile;
         back -= TileOffset::new(-1, 1);
         assert_eq!(back, Tile::new(4, -5));
         assert_eq!(
-            t.beside(),
+            tile.beside(),
             [
                 Tile::new(2, -4),
                 Tile::new(4, -4),
@@ -237,25 +240,35 @@ mod tests {
             TileOffset::table([[1, 0], [0, -1]]),
             [TileOffset::new(1, 0), TileOffset::new(0, -1)]
         );
-        let o = TileOffset::new(5, 6);
-        assert_eq!((o.dx(), o.dy()), (5, 6));
+        let tile_offset = TileOffset::new(5, 6);
+        assert_eq!((tile_offset.dx(), tile_offset.dy()), (5, 6));
         // a routine on shorts reads the low 16 bits, signed
-        assert_eq!(t.short(), t);
-        assert_eq!(t.corner(), Point::new(3.0, -4.0));
+        assert_eq!(tile.short(), tile);
+        assert_eq!(tile.corner(), Point::new(3.0, -4.0));
         assert_eq!(Tile::new(0x1_0005, 0x8000).short(), Tile::new(5, -0x8000));
     }
 
     /// A tile box holds the tiles between its corners, the corners included.
     #[test]
     fn tile_box_holds_the_tiles_between_its_corners() {
-        let r = TileRect::new(1, 2, 3, 4);
+        let tile_rect = TileRect::new(1, 2, 3, 4);
         assert_eq!(
-            (r.x0(), r.y0(), r.x1(), r.y1(), r.get()),
+            (
+                tile_rect.x0(),
+                tile_rect.y0(),
+                tile_rect.x1(),
+                tile_rect.y1(),
+                tile_rect.get()
+            ),
             (1, 2, 3, 4, [1, 2, 3, 4])
         );
-        assert!(r.holds(Tile::new(1, 2)) && r.holds(Tile::new(3, 4)) && r.holds(Tile::new(2, 3)));
-        assert!(!r.holds(Tile::new(0, 3)) && !r.holds(Tile::new(2, 5)));
+        assert!(
+            tile_rect.holds(Tile::new(1, 2))
+                && tile_rect.holds(Tile::new(3, 4))
+                && tile_rect.holds(Tile::new(2, 3))
+        );
+        assert!(!tile_rect.holds(Tile::new(0, 3)) && !tile_rect.holds(Tile::new(2, 5)));
         assert_eq!(TileRect::of(Tile::new(5, 6)), TileRect::new(5, 6, 5, 6));
-        assert_eq!(TileRect::from([1, 2, 3, 4]), r);
+        assert_eq!(TileRect::from([1, 2, 3, 4]), tile_rect);
     }
 }

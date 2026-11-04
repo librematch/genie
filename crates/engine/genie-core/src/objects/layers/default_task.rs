@@ -73,10 +73,10 @@ impl Unstartable {
             Self::Unported(kind) => ("a default task the slice does not model", Some(kind)),
             Self::Unread(why) => (why.reason(), None),
         };
-        let e = GenieError::unsupported(reason);
+        let reason_error = GenieError::unsupported(reason);
         match kind {
-            Some(kind) => e.with("action type", kind),
-            None => e,
+            Some(kind) => reason_error.with("action type", kind),
+            None => reason_error,
         }
     }
 }
@@ -86,21 +86,21 @@ impl Unstartable {
 /// (the load reads the shared master's default task, not an own master's), a start that fails
 /// only between two runs.
 impl Diff for DefaultTask {
-    fn diff(&self, other: &Self, d: &mut Differ) {
+    fn diff(&self, other: &Self, differ: &mut Differ) {
         let is = |t: &Self, v: Self| *t == v;
-        if d.compares_unsaved() {
-            d.field("fly", &is(self, Self::Fly), &is(other, Self::Fly));
+        if differ.compares_unsaved() {
+            differ.field("fly", &is(self, Self::Fly), &is(other, Self::Fly));
         }
-        d.field("make", &is(self, Self::Make), &is(other, Self::Make));
-        if d.compares_gaps() {
-            d.field(
+        differ.field("make", &is(self, Self::Make), &is(other, Self::Make));
+        if differ.compares_gaps() {
+            differ.field(
                 "artifact",
                 &is(self, Self::Artifact),
                 &is(other, Self::Artifact),
             );
         }
-        if d.compares_unsaved() {
-            d.equal_field("fails", &self.fails(), &other.fails());
+        if differ.compares_unsaved() {
+            differ.equal_field("fails", &self.fails(), &other.fails());
         }
     }
 }
@@ -110,7 +110,7 @@ impl DefaultTask {
     #[must_use]
     pub const fn fails(self) -> Option<Unstartable> {
         match self {
-            Self::Fails(f) => Some(f),
+            Self::Fails(unstartable) => Some(unstartable),
             Self::Nothing | Self::Fly | Self::Make | Self::Artifact => None,
         }
     }
@@ -124,8 +124,8 @@ impl DefaultTask {
 pub fn default_start(master: &Master) -> DefaultTask {
     match master.default_task() {
         Some(t) if t.action_kind == MAKE => DefaultTask::Make,
-        Some(t) if ACTION_FACTORY_KINDS.contains(&t.action_kind) => {
-            DefaultTask::Fails(Unstartable::Unported(t.action_kind))
+        Some(task) if ACTION_FACTORY_KINDS.contains(&task.action_kind) => {
+            DefaultTask::Fails(Unstartable::Unported(task.action_kind))
         }
         _ => DefaultTask::Nothing,
     }
@@ -138,18 +138,18 @@ mod tests {
 
     #[test]
     fn start_that_fails_names_why() {
-        for t in [
+        for default_task in [
             DefaultTask::Nothing,
             DefaultTask::Fly,
             DefaultTask::Make,
             DefaultTask::Artifact,
         ] {
-            assert_eq!(t.fails(), None, "{t:?}");
+            assert_eq!(default_task.fails(), None, "{default_task:?}");
         }
         let e = Unstartable::Unported(ActionKind::named(6)).error();
         assert_eq!(e.reason(), "a default task the slice does not model");
-        let e = Unstartable::Unread(UnreadDefault::OwnMaster).error();
-        assert_eq!(e.reason(), "the default task of an object's own master");
+        let error = Unstartable::Unread(UnreadDefault::OwnMaster).error();
+        assert_eq!(error.reason(), "the default task of an object's own master");
     }
 
     #[test]
@@ -157,7 +157,7 @@ mod tests {
         let paths = |a, b, scope| {
             differences(&a, &b, scope)
                 .into_iter()
-                .map(|d| d.path)
+                .map(|difference| difference.path)
                 .collect::<Vec<_>>()
         };
         let (fly, none) = (DefaultTask::Fly, DefaultTask::Nothing);

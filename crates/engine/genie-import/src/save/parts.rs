@@ -9,108 +9,151 @@ use genie_save::generated::world::{
 /// an animated or doppelganger master's own record (both `RGE_Master_Animated_Object`), else the
 /// one its moving, action, combat or missile record holds.
 #[must_use]
-pub fn animated_master(m: &Master) -> Option<&RgeMasterAnimatedObject> {
-    let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
-        m.tribe_master_building_object
+pub fn animated_master(master: &Master) -> Option<&RgeMasterAnimatedObject> {
+    let combat = master.tribe_master_combat_object.as_deref().or_else(|| {
+        master
+            .tribe_master_building_object
             .as_deref()
-            .map(|b| &b.tribe_master_combat_object)
+            .map(|tribe_master_building_object| {
+                &tribe_master_building_object.tribe_master_combat_object
+            })
     });
-    if let Some(c) = combat {
-        let moving = &c
+    if let Some(tribe_master_combat_object) = combat {
+        let moving = &tribe_master_combat_object
             .rge_master_combat_object
             .rge_master_action_object
             .rge_master_moving_object;
         return Some(&moving.rge_master_animated_object);
     }
-    let r = m.rge_master.as_deref()?;
-    None.or(r.rge_master_animated_object.as_deref())
-        .or(r.rge_master_doppleganger_object.as_deref())
+    let rge_master = master.rge_master.as_deref()?;
+    None.or(rge_master.rge_master_animated_object.as_deref())
+        .or(rge_master.rge_master_doppleganger_object.as_deref())
         .or_else(|| {
-            r.rge_master_moving_object
+            rge_master
+                .rge_master_moving_object
                 .as_deref()
-                .map(|m| &m.rge_master_animated_object)
+                .map(|rge_master_moving_object| {
+                    &rge_master_moving_object.rge_master_animated_object
+                })
         })
         .or_else(|| {
-            r.rge_master_action_object
+            rge_master
+                .rge_master_action_object
                 .as_deref()
-                .map(|a| &a.rge_master_moving_object.rge_master_animated_object)
+                .map(|rge_master_action_object| {
+                    &rge_master_action_object
+                        .rge_master_moving_object
+                        .rge_master_animated_object
+                })
         })
         .or_else(|| {
-            r.rge_master_combat_object.as_deref().map(|c| {
-                &c.rge_master_action_object
-                    .rge_master_moving_object
-                    .rge_master_animated_object
-            })
+            rge_master
+                .rge_master_combat_object
+                .as_deref()
+                .map(|rge_master_combat_object| {
+                    &rge_master_combat_object
+                        .rge_master_action_object
+                        .rge_master_moving_object
+                        .rge_master_animated_object
+                })
         })
         .or_else(|| {
-            r.rge_master_missile_object.as_deref().map(|m| {
-                &m.rge_master_combat_object
-                    .rge_master_action_object
-                    .rge_master_moving_object
-                    .rge_master_animated_object
-            })
+            rge_master
+                .rge_master_missile_object
+                .as_deref()
+                .map(|rge_master_missile_object| {
+                    &rge_master_missile_object
+                        .rge_master_combat_object
+                        .rge_master_action_object
+                        .rge_master_moving_object
+                        .rge_master_animated_object
+                })
         })
 }
 
 /// The combat part of a saved master, when its class has one.
 #[must_use]
-pub fn combat_master(m: &Master) -> Option<&RgeMasterCombatObject> {
+pub fn combat_master(master: &Master) -> Option<&RgeMasterCombatObject> {
     None.or_else(|| {
-        m.tribe_master_combat_object
+        master
+            .tribe_master_combat_object
             .as_deref()
-            .map(|c| &c.rge_master_combat_object)
+            .map(|tribe_master_combat_object| &tribe_master_combat_object.rge_master_combat_object)
     })
     .or_else(|| {
-        m.tribe_master_building_object
+        master
+            .tribe_master_building_object
             .as_deref()
-            .map(|b| &b.tribe_master_combat_object.rge_master_combat_object)
+            .map(|tribe_master_building_object| {
+                &tribe_master_building_object
+                    .tribe_master_combat_object
+                    .rge_master_combat_object
+            })
     })
     .or_else(|| {
-        m.rge_master
+        master
+            .rge_master
             .as_deref()
             .and_then(|r| r.rge_master_combat_object.as_deref())
     })
     .or_else(|| {
-        m.rge_master.as_deref().and_then(|r| {
-            r.rge_master_missile_object
+        master.rge_master.as_deref().and_then(|rge_master| {
+            rge_master
+                .rge_master_missile_object
                 .as_deref()
-                .map(|m| &m.rge_master_combat_object)
+                .map(|rge_master_missile_object| {
+                    &rge_master_missile_object.rge_master_combat_object
+                })
         })
     })
 }
 
 /// The moving part of a saved master, when its class has one.
 #[must_use]
-pub fn moving_master(m: &Master) -> Option<&RgeMasterMovingObject> {
-    let combat = m.tribe_master_combat_object.as_deref().or_else(|| {
-        m.tribe_master_building_object
+pub fn moving_master(master: &Master) -> Option<&RgeMasterMovingObject> {
+    let combat = master.tribe_master_combat_object.as_deref().or_else(|| {
+        master
+            .tribe_master_building_object
             .as_deref()
-            .map(|b| &b.tribe_master_combat_object)
+            .map(|tribe_master_building_object| {
+                &tribe_master_building_object.tribe_master_combat_object
+            })
     });
-    if let Some(c) = combat {
+    if let Some(tribe_master_combat_object) = combat {
         return Some(
-            &c.rge_master_combat_object
+            &tribe_master_combat_object
+                .rge_master_combat_object
                 .rge_master_action_object
                 .rge_master_moving_object,
         );
     }
-    let r = m.rge_master.as_deref()?;
-    None.or(r.rge_master_moving_object.as_deref())
+    let rge_master = master.rge_master.as_deref()?;
+    None.or(rge_master.rge_master_moving_object.as_deref())
         .or_else(|| {
-            r.rge_master_action_object
+            rge_master
+                .rge_master_action_object
                 .as_deref()
-                .map(|a| &a.rge_master_moving_object)
+                .map(|rge_master_action_object| &rge_master_action_object.rge_master_moving_object)
         })
         .or_else(|| {
-            r.rge_master_combat_object
+            rge_master
+                .rge_master_combat_object
                 .as_deref()
-                .map(|c| &c.rge_master_action_object.rge_master_moving_object)
+                .map(|rge_master_combat_object| {
+                    &rge_master_combat_object
+                        .rge_master_action_object
+                        .rge_master_moving_object
+                })
         })
         .or_else(|| {
-            r.rge_master_missile_object.as_deref().map(|m| {
-                &m.rge_master_combat_object
-                    .rge_master_action_object
-                    .rge_master_moving_object
-            })
+            rge_master
+                .rge_master_missile_object
+                .as_deref()
+                .map(|rge_master_missile_object| {
+                    &rge_master_missile_object
+                        .rge_master_combat_object
+                        .rge_master_action_object
+                        .rge_master_moving_object
+                })
         })
 }

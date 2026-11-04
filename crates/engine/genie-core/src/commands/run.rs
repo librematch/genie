@@ -14,9 +14,9 @@ impl World {
     /// run ([`Command::run`]). Where the slice does not model what the command does, the lane of
     /// the player it stops ([`Command::stopped_player`]) stops.
     pub(crate) fn run(&mut self, command: &Command) {
-        if let Err(e) = command.run(self) {
+        if let Err(error) = command.run(self) {
             let player = command.stopped_player(self.players.len());
-            self.stop_player(player, e);
+            self.stop_player(player, error);
         }
     }
 
@@ -27,7 +27,7 @@ impl World {
             let unit = self
                 .players
                 .iter_mut()
-                .flat_map(|p| p.objects.iter_mut())
+                .flat_map(|player| player.objects.iter_mut())
                 .find(|o| o.id == id)
                 .filter(|o| self.parts.unit_ai.contains(o.id));
             if let Some(u) = unit {
@@ -49,7 +49,9 @@ impl World {
                 continue;
             };
             let (p, i) = match place {
-                Place::Live(p, i) | Place::Sleeping(p, i) => (p, i),
+                Place::Live(player_id, list_index) | Place::Sleeping(player_id, list_index) => {
+                    (player_id, list_index)
+                }
             };
             let player = self.players.player_mut(p)?;
             let unit = match place {

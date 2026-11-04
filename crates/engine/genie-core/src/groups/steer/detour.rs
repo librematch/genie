@@ -82,12 +82,12 @@ impl World {
         gap: Distance,
         differentiators: &[ObjectId],
     ) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let id = g.members.checked(index)?.id;
-        let [place, forward, _, _] = g.motion.position;
-        let (moving, waits) = (g.motion.moving(), g.motion.waits_to_move());
-        let r = self.rounder(id, differentiators)?;
-        let (way, serves) = self.find_way(&r, (to, forward, place))?;
+        let held = self.groups.held(group)?;
+        let id = held.members.checked(index)?.id;
+        let [place, forward, _, _] = held.motion.position;
+        let (moving, waits) = (held.motion.moving(), held.motion.waits_to_move());
+        let rounder = self.rounder(id, differentiators)?;
+        let (way, serves) = self.find_way(&rounder, (to, forward, place))?;
         if serves && !moving && !waits && ends_farther(&way.record, to, gap) {
             self.stop_member(id)?;
             self.show_standing(id)?;
@@ -98,9 +98,9 @@ impl World {
         if serves {
             let now = self.world_time;
             if self.object(id).is_some()
-                && let Some(m) = self.parts.mover_mut(id)
+                && let Some(mover) = self.parts.mover_mut(id)
             {
-                m.take_record_path(way.record.points, way.record.length, now, way.planned);
+                mover.take_record_path(way.record.points, way.record.length, now, way.planned);
             }
             let goal = (way.goal, ROUND_TIMER, ROUND_TIMER);
             let _ =
@@ -122,12 +122,12 @@ impl World {
             .specific_move)
     }
 
-    /// The way [`World::way_round`] finds for the rounder `r` to the slot's place `to`: round to
-    /// the slot, else one step on toward it from `forward`, else to the group's `place`, and
-    /// the long way round a blocked one; with whether the way serves.
+    /// The way [`World::way_round`] finds for the rounder `rounder` to the slot's place `to`: round
+    /// to the slot, else one step on toward it from `forward`, else to the group's `place`, and the
+    /// long way round a blocked one; with whether the way serves.
     fn find_way(
         &mut self,
-        r: &Rounder<'_>,
+        rounder: &Rounder<'_>,
         (to, forward, place): (BVector, BVector, BVector),
     ) -> GenieResult<(Way, bool)> {
         let mut way = Way {
@@ -136,16 +136,16 @@ impl World {
             planned: false,
             goal: to,
         };
-        self.round_to_slot(r, to, &mut way)?;
+        self.round_to_slot(rounder, to, &mut way)?;
         if way.result != ShortFound::Reached {
-            self.round_one_step(r, to, forward, &mut way)?;
+            self.round_one_step(rounder, to, forward, &mut way)?;
             if !way.result.leads() {
-                self.round_to_place(r, place, &mut way)?;
+                self.round_to_place(rounder, place, &mut way)?;
             }
         }
         let mut serves = way.result.leads();
         if way.result.fails() {
-            serves = self.round_long_way(r, to, &mut way)?;
+            serves = self.round_long_way(rounder, to, &mut way)?;
         }
         Ok((way, serves))
     }
@@ -160,9 +160,9 @@ impl World {
         id: ObjectId,
         differentiators: &'d [ObjectId],
     ) -> GenieResult<Rounder<'d>> {
-        let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let master = u.master(self.master_tables(), p)?;
-        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let master = unit.master(self.master_tables(), player_id)?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
         let grow = master.radius.x() * ROUND_RADIUS;
         Ok(Rounder {
             id,
@@ -172,10 +172,10 @@ impl World {
             },
             player_kind: self
                 .players
-                .get(p.index())
-                .map_or(PlayerKind::Phantom, |q| q.kind),
-            at: u.moved_vector(self.parts.mover_of(u.id)),
-            here: u.position(),
+                .get(player_id.index())
+                .map_or(PlayerKind::Phantom, |player| player.kind),
+            at: unit.moved_vector(self.parts.mover_of(unit.id)),
+            here: unit.position(),
             mask: mover.stats.restriction_mask,
             restriction: mover.stats.restriction,
             grow: Distance::new(grow),
@@ -190,7 +190,7 @@ impl World {
     /// records grown by the short pather's radius, the differentiators ignored).
     ///
     /// [`Spatial::point_clear_among`]: crate::map::spatial::Spatial::point_clear_among
-    fn round_clear(&mut self, r: &Rounder<'_>, p: BVector) -> GenieResult<bool> {
+    fn round_clear(&mut self, rounder: &Rounder<'_>, p: BVector) -> GenieResult<bool> {
         let by_id = ObjectsRef::new(
             &self.players,
             &self.index,
@@ -199,27 +199,38 @@ impl World {
             &self.model.roles,
             &self.model.tuning,
         );
-        self.spatial
-            .point_clear_among(r.id, p.ground(), r.grow, r.mask, r.differentiators, by_id)
+        self.spatial.point_clear_among(
+            rounder.id,
+            p.ground(),
+            rounder.grow,
+            rounder.mask,
+            rounder.differentiators,
+            by_id,
+        )
     }
 
     /// The way round's first try ([`World::way_round`]'s 1): to the slot `to` when the member
     /// could stand there, by the short pather when its footprint is near (a path of fewer than
     /// 2 points or no longer than [`EPSILON`] keeps no points and its result is not taken; a
     /// result but blocked or off the map serves), else by the tile planner (planned).
-    fn round_to_slot(&mut self, r: &Rounder<'_>, to: BVector, way: &mut Way) -> GenieResult<()> {
-        if !self.round_clear(r, to)? {
+    fn round_to_slot(
+        &mut self,
+        rounder: &Rounder<'_>,
+        to: BVector,
+        way: &mut Way,
+    ) -> GenieResult<()> {
+        if !self.round_clear(rounder, to)? {
             return Ok(());
         }
         let mut served = false;
-        if r.solid && r.near(to.x(), to.y()) {
-            let from = r.at.ground();
+        if rounder.solid && rounder.near(to.x(), to.y()) {
+            let from = rounder.at.ground();
             let res = self.round_short(
-                r.walker,
-                r.player_kind,
+                rounder.walker,
+                rounder.player_kind,
                 from,
                 to,
-                r.differentiators,
+                rounder.differentiators,
                 &mut way.record,
             )?;
             if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
@@ -231,8 +242,12 @@ impl World {
             }
         }
         if !served
-            && let Some(found) =
-                self.round_plan(r.restriction, r.at.ground(), to, &mut way.record)?
+            && let Some(found) = self.round_plan(
+                rounder.restriction,
+                rounder.at.ground(),
+                to,
+                &mut way.record,
+            )?
         {
             way.result = planned_as_short(found);
             way.planned = true;
@@ -247,30 +262,30 @@ impl World {
     /// than 2 points or no longer than [`EPSILON`] is blocked, its points emptied.
     fn round_one_step(
         &mut self,
-        r: &Rounder<'_>,
+        rounder: &Rounder<'_>,
         to: BVector,
         forward: BVector,
         way: &mut Way,
     ) -> GenieResult<()> {
-        let step = one_step_toward(r, to, forward, self.spatial.map);
+        let step = one_step_toward(rounder, to, forward, self.spatial.map);
         way.goal = step;
-        if !self.round_clear(r, step)? {
+        if !self.round_clear(rounder, step)? {
             return Ok(());
         }
         way.record.points.clear();
         let mut reached = false;
-        if r.solid {
-            let from = r.at.ground();
+        if rounder.solid {
+            let from = rounder.at.ground();
             way.result = self.round_short(
-                r.walker,
-                r.player_kind,
+                rounder.walker,
+                rounder.player_kind,
                 from,
                 step,
-                r.differentiators,
+                rounder.differentiators,
                 &mut way.record,
             )?;
         } else {
-            let (found, path) = self.round_long(r.id, r.here.ground(), step)?;
+            let (found, path) = self.round_long(rounder.id, rounder.here.ground(), step)?;
             way.record.points = path.points;
             // a long path found is measured once and taken as it is
             way.record.measure();
@@ -298,23 +313,23 @@ impl World {
     /// (planned).
     fn round_to_place(
         &mut self,
-        r: &Rounder<'_>,
+        rounder: &Rounder<'_>,
         place: BVector,
         way: &mut Way,
     ) -> GenieResult<()> {
         way.goal = place;
-        if !self.round_clear(r, place)? {
+        if !self.round_clear(rounder, place)? {
             return Ok(());
         }
         way.record.points.clear();
-        if r.solid && r.near(place.x(), place.y()) {
-            let from = r.at.ground();
+        if rounder.solid && rounder.near(place.x(), place.y()) {
+            let from = rounder.at.ground();
             way.result = self.round_short(
-                r.walker,
-                r.player_kind,
+                rounder.walker,
+                rounder.player_kind,
                 from,
                 place,
-                r.differentiators,
+                rounder.differentiators,
                 &mut way.record,
             )?;
             if way.record.points.len() < 2 || at_most_or_unordered(way.record.length.get(), EPSILON)
@@ -322,9 +337,12 @@ impl World {
                 way.result = ShortFound::Blocked;
                 way.record.points.clear();
             }
-        } else if let Some(found) =
-            self.round_plan(r.restriction, r.at.ground(), place, &mut way.record)?
-        {
+        } else if let Some(found) = self.round_plan(
+            rounder.restriction,
+            rounder.at.ground(),
+            place,
+            &mut way.record,
+        )? {
             way.result = planned_as_short(found);
             way.planned = true;
         }
@@ -334,9 +352,14 @@ impl World {
     /// The way round's last try ([`World::way_round`]'s 4, blocked or off the map): the long
     /// pather from where the member last moved to toward the slot's tile; a path of more than 2
     /// points serves, its last point the goal. Whether it serves.
-    fn round_long_way(&self, r: &Rounder<'_>, to: BVector, way: &mut Way) -> GenieResult<bool> {
+    fn round_long_way(
+        &self,
+        rounder: &Rounder<'_>,
+        to: BVector,
+        way: &mut Way,
+    ) -> GenieResult<bool> {
         way.record.points.clear();
-        let (_, path) = self.round_long(r.id, r.at.ground(), to)?;
+        let (_, path) = self.round_long(rounder.id, rounder.at.ground(), to)?;
         way.record.points = path.points;
         if 2 < way.record.points.len()
             && let Some(&last) = way.record.points.last()
@@ -374,7 +397,7 @@ impl World {
             object: self.streams.get(Stream::Object),
             groups: &self.groups,
         };
-        let r = short_path_for(
+        let short_found = short_path_for(
             walker,
             from,
             (&mut self.spatial, by_id),
@@ -384,7 +407,7 @@ impl World {
             record,
         )?;
         record.measure();
-        Ok(r)
+        Ok(short_found)
     }
 
     /// The way round's long pather (`FUN_140f9eb70` with the record) for member `id` from the
@@ -396,25 +419,25 @@ impl World {
         from: Point,
         to: BVector,
     ) -> GenieResult<(bool, Path)> {
-        let (p, u) = self.object(id).ok_or_else(|| member_gone(id))?;
-        let mover = self.parts.mover_of(u.id).ok_or(NO_MOVER)?;
+        let (player_id, unit) = self.object(id).ok_or_else(|| member_gone(id))?;
+        let mover = self.parts.mover_of(unit.id).ok_or(NO_MOVER)?;
         let player_kind = self
             .players
-            .get(p.index())
-            .map_or(PlayerKind::Phantom, |q| q.kind);
+            .get(player_id.index())
+            .map_or(PlayerKind::Phantom, |player| player.kind);
         let walker = LongWalker {
             id,
-            position: u.position(),
+            position: unit.position(),
             radius: mover.stats.radius.ground(),
             mask: mover.stats.restriction_mask,
             moves: mover.stats.speed != Speed::ZERO
                 || self
                     .model
                     .roles
-                    .of_master(u.life.master_id)
+                    .of_master(unit.life.master_id)
                     .contains(MasterRoles::LONG_PATH_MOVER),
             ignore_units: &mover.ignore_units,
-            group_units: self.groups.group_units(u.group.id),
+            group_units: self.groups.group_units(unit.group.id),
         };
         long_path_for(
             &walker,
@@ -519,12 +542,12 @@ struct Way {
 /// group's `forward` when both its axes are within [`ROUND_STILL`]), held inside the map (`map`)
 /// by the member's radius on x and, on y, its height radius.
 pub(super) fn one_step_toward(
-    r: &Rounder<'_>,
+    rounder: &Rounder<'_>,
     to: BVector,
     forward: BVector,
     map: GridSize,
 ) -> BVector {
-    let d = to - r.at;
+    let d = to - rounder.at;
     let mut dir = if d.x().abs() <= ROUND_STILL && d.y().abs() <= ROUND_STILL {
         forward
     } else {
@@ -533,16 +556,19 @@ pub(super) fn one_step_toward(
     dir = dir.with_height(0.0);
     let len = sqrt(dir.x() * dir.x() + 0.0 + dir.y() * dir.y());
     let dir = BVector::new(dir.x() / len, dir.height() / len, dir.y() / len);
-    let mut step = r.at + 1.0 * dir;
+    let mut step = rounder.at + 1.0 * dir;
     let (w, h) = (map.width(), map.height());
-    let (top_x, top_y) = (w as f32 - r.radius.x(), h as f32 - r.height.get());
-    if r.radius.x() > step.x() {
-        step = step.with_x(r.radius.x());
+    let (top_x, top_y) = (
+        w as f32 - rounder.radius.x(),
+        h as f32 - rounder.height.get(),
+    );
+    if rounder.radius.x() > step.x() {
+        step = step.with_x(rounder.radius.x());
     } else if step.x() > top_x {
         step = step.with_x(top_x);
     }
-    if r.height.get() > step.y() {
-        step = step.with_y(r.height.get());
+    if rounder.height.get() > step.y() {
+        step = step.with_y(rounder.height.get());
     } else if step.y() > top_y {
         step = step.with_y(top_y);
     }

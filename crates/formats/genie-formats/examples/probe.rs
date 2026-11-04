@@ -34,8 +34,8 @@ fn failed(e: impl Display) -> Outcome {
 
 fn dat_de(bytes: &[u8]) -> Outcome {
     let mut data = Vec::new();
-    if let Err(e) = DeflateDecoder::new(bytes).read_to_end(&mut data) {
-        return failed(e);
+    if let Err(bytes_error) = DeflateDecoder::new(bytes).read_to_end(&mut data) {
+        return failed(bytes_error);
     }
     match DatFile::from_inflated(&data) {
         Ok(dat) => Outcome {
@@ -43,7 +43,7 @@ fn dat_de(bytes: &[u8]) -> Outcome {
             roundtrip: Some(dat.to_bytes().is_ok_and(|b| b == data)),
             error: None,
         },
-        Err(e) => failed(e),
+        Err(error) => failed(error),
     }
 }
 
@@ -58,27 +58,27 @@ fn scenario(bytes: &[u8]) -> Outcome {
                 error: written.err().map(|e| format!("write: {e}")),
             }
         }
-        Err(e) => failed(e),
+        Err(error) => failed(error),
     }
 }
 
 fn campaign(bytes: &[u8]) -> Outcome {
-    let mut c = match genie_cpx::Campaign::read_from(Cursor::new(bytes)) {
+    let mut bytes_campaign = match genie_cpx::Campaign::read_from(Cursor::new(bytes)) {
         Ok(c) => c,
         Err(e) => return failed(e),
     };
     // the archive's header and index, then every scenario in it
-    for i in 0..c.len() {
-        if let Err(e) = c.by_index(i) {
-            return failed(format!("scenario {i}: {e}"));
+    for index in 0..bytes_campaign.len() {
+        if let Err(e) = bytes_campaign.by_index(index) {
+            return failed(format!("scenario {index}: {e}"));
         }
     }
     let mut out = Vec::new();
-    let written = c.write_to(&mut out);
+    let written = bytes_campaign.write_to(&mut out);
     Outcome {
         read: true,
         roundtrip: Some(written.is_ok() && out == bytes),
-        error: written.err().map(|e| format!("write: {e}")),
+        error: written.err().map(|error| format!("write: {error}")),
     }
 }
 
@@ -93,7 +93,7 @@ fn palette(bytes: &[u8]) -> Outcome {
                 error: written.err().map(|e| format!("write: {e}")),
             }
         }
-        Err(e) => failed(e),
+        Err(error) => failed(error),
     }
 }
 
@@ -108,7 +108,7 @@ fn strings_keyvalue(bytes: &[u8]) -> Outcome {
                 error: written.err().map(|e| format!("write: {e}")),
             }
         }
-        Err(e) => failed(e),
+        Err(error) => failed(error),
     }
 }
 
@@ -120,16 +120,16 @@ where
 {
     let text = match from_utf8(bytes) {
         Ok(t) => t,
-        Err(e) => return failed(e),
+        Err(utf8_error) => return failed(utf8_error),
     };
     let table: T = match genie_json::from_str(text) {
         Ok(t) => t,
-        Err(e) => return failed(e),
+        Err(error) => return failed(error),
     };
-    let same = genie_json::to_string(&table).ok().and_then(|w| {
-        let a: serde_json::Value = serde_json::from_str(text).ok()?;
-        let b: serde_json::Value = serde_json::from_str(&w).ok()?;
-        Some(a == b)
+    let same = genie_json::to_string(&table).ok().and_then(|table_text| {
+        let text_value: serde_json::Value = serde_json::from_str(text).ok()?;
+        let value: serde_json::Value = serde_json::from_str(&table_text).ok()?;
+        Some(text_value == value)
     });
     Outcome {
         read: true,
@@ -154,9 +154,9 @@ fn json(file: &str, bytes: &[u8]) -> Outcome {
 }
 
 /// A JSON string literal.
-fn quote(s: &str) -> String {
+fn quote(text: &str) -> String {
     let mut out = String::from("\"");
-    for c in s.chars() {
+    for c in text.chars() {
         match c {
             '"' => out.push_str("\\\""),
             '\\' => out.push_str("\\\\"),
@@ -201,7 +201,7 @@ fn main() {
             .map_or_else(|| "null".to_string(), |b| b.to_string());
         let error = outcome
             .error
-            .map_or_else(|| "null".to_string(), |e| quote(&e));
+            .map_or_else(|| "null".to_string(), |text| quote(&text));
         println!(
             "{{\"file\": {}, \"read\": {}, \"roundtrip\": {roundtrip}, \"error\": {error}}}",
             quote(&file),

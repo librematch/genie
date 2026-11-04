@@ -61,7 +61,8 @@ impl Application for GenieSwissKnifeApp {
         &mut self,
         command: &Self::Cmd,
     ) -> Result<Vec<Box<dyn Component<Self>>>, FrameworkError> {
-        install(command.verbose).map_err(|e| FrameworkErrorKind::ComponentError.context(e))?;
+        install(command.verbose)
+            .map_err(|error| FrameworkErrorKind::ComponentError.context(error))?;
         Ok(vec![Box::new(Terminal::new(self.term_colors(command)))])
     }
 

@@ -19,16 +19,18 @@ use genie_save::generated::world::Master;
 /// A walker: master 83 standing as sprite 10, walking as 11 and running as 12.
 fn walker() -> Master {
     let mut master = combat_master(83);
-    let s = master_static_mut(&mut master);
-    s.idle_sprite_id = 10;
-    s.idle2_sprite_id = -1;
-    s.terrain_restriction_mask_id = 1;
-    s.radius_x = 0.2;
-    let m = master_moving_mut(&mut master);
-    m.move_sprite_id = 11;
-    m.run_sprite_id = 12;
-    m.turn_speed = 0.5;
-    m.rge_master_animated_object.max_speed = 1.0;
+    let rge_master_static_object = master_static_mut(&mut master);
+    rge_master_static_object.idle_sprite_id = 10;
+    rge_master_static_object.idle2_sprite_id = -1;
+    rge_master_static_object.terrain_restriction_mask_id = 1;
+    rge_master_static_object.radius_x = 0.2;
+    let rge_master_moving_object = master_moving_mut(&mut master);
+    rge_master_moving_object.move_sprite_id = 11;
+    rge_master_moving_object.run_sprite_id = 12;
+    rge_master_moving_object.turn_speed = 0.5;
+    rge_master_moving_object
+        .rge_master_animated_object
+        .max_speed = 1.0;
     master
 }
 
@@ -69,8 +71,8 @@ fn table(facets: [i16; 3]) -> MasterTable {
 #[test]
 fn master_facets_are_its_sprites_when_they_agree() {
     let master = walker();
-    let s = master.tribe_master_combat_object.as_deref().unwrap();
-    let s = &s
+    let tribe_master_combat_object = master.tribe_master_combat_object.as_deref().unwrap();
+    let rge_master_static_object = &tribe_master_combat_object
         .rge_master_combat_object
         .rge_master_action_object
         .rge_master_moving_object
@@ -81,9 +83,18 @@ fn master_facets_are_its_sprites_when_they_agree() {
         turns: true,
     };
     // the fight sprite (0) is not in the data file
-    assert_eq!(master_facets(&master, s, &table([8; 3])), Some(facets));
-    assert_eq!(master_facets(&master, s, &table([8, 8, 16])), None);
-    assert_eq!(master_facets(&master, s, &MasterTable::default()), None);
+    assert_eq!(
+        master_facets(&master, rge_master_static_object, &table([8; 3])),
+        Some(facets)
+    );
+    assert_eq!(
+        master_facets(&master, rge_master_static_object, &table([8, 8, 16])),
+        None
+    );
+    assert_eq!(
+        master_facets(&master, rge_master_static_object, &MasterTable::default()),
+        None
+    );
 }
 
 /// The speed is the top speed times the sprite's factor above 0 (the run sprite, else the
@@ -91,15 +102,22 @@ fn master_facets_are_its_sprites_when_they_agree() {
 #[test]
 fn walker_moves_by_its_sprites_speed_factors() {
     let master = walker();
-    let s = {
-        let c = master.tribe_master_combat_object.as_deref().unwrap();
-        &c.rge_master_combat_object
+    let rge_master_static_object = {
+        let tribe_master_combat_object = master.tribe_master_combat_object.as_deref().unwrap();
+        &tribe_master_combat_object
+            .rge_master_combat_object
             .rge_master_action_object
             .rge_master_moving_object
             .rge_master_animated_object
             .rge_master_static_object
     };
-    let stats = moving_stats(&master, s, CivId::new(1), &table([8; 3])).unwrap();
+    let stats = moving_stats(
+        &master,
+        rge_master_static_object,
+        CivId::new(1),
+        &table([8; 3]),
+    )
+    .unwrap();
     assert_eq!(stats.speed.get().to_bits(), 3.0_f32.to_bits());
     assert_eq!(
         (stats.fly_mode, stats.move_algorithm),
@@ -114,7 +132,13 @@ fn walker_moves_by_its_sprites_speed_factors() {
     // without a run sprite, the move sprite's factor
     let mut no_run = walker();
     master_moving_mut(&mut no_run).run_sprite_id = -1;
-    let stats = moving_stats(&no_run, s, CivId::new(1), &table([8; 3])).unwrap();
+    let stats = moving_stats(
+        &no_run,
+        rge_master_static_object,
+        CivId::new(1),
+        &table([8; 3]),
+    )
+    .unwrap();
     assert_eq!(stats.speed.get().to_bits(), 2.0_f32.to_bits());
     // no factor at all: the top speed
     let plain = MasterTable::of_master(
@@ -124,7 +148,7 @@ fn walker_moves_by_its_sprites_speed_factors() {
         FlyMode::of_data(0),
     )
     .with_masks(vec![0, 1]);
-    let stats = moving_stats(&master, s, CivId::new(1), &plain).unwrap();
+    let stats = moving_stats(&master, rge_master_static_object, CivId::new(1), &plain).unwrap();
     assert_eq!(stats.speed.get().to_bits(), 1.0_f32.to_bits());
 }
 
@@ -132,27 +156,44 @@ fn walker_moves_by_its_sprites_speed_factors() {
 #[test]
 fn master_without_its_movement_has_no_stats() {
     let master = walker();
-    let s = {
-        let c = master.tribe_master_combat_object.as_deref().unwrap();
-        c.rge_master_combat_object
+    let rge_master_static_object = {
+        let tribe_master_combat_object = master.tribe_master_combat_object.as_deref().unwrap();
+        tribe_master_combat_object
+            .rge_master_combat_object
             .rge_master_action_object
             .rge_master_moving_object
             .rge_master_animated_object
             .rge_master_static_object
             .clone()
     };
-    assert!(moving_stats(&Master::default(), &s, CivId::new(1), &table([8; 3])).is_none());
-    assert!(moving_stats(&master, &s, CivId::new(2), &table([8; 3])).is_none());
+    assert!(
+        moving_stats(
+            &Master::default(),
+            &rge_master_static_object,
+            CivId::new(1),
+            &table([8; 3])
+        )
+        .is_none()
+    );
     assert!(
         moving_stats(
             &master,
-            &s,
+            &rge_master_static_object,
+            CivId::new(2),
+            &table([8; 3])
+        )
+        .is_none()
+    );
+    assert!(
+        moving_stats(
+            &master,
+            &rge_master_static_object,
             CivId::new(1),
             &table([8; 3]).with_masks(vec![0])
         )
         .is_none()
     );
-    let mut negative = s;
+    let mut negative = rge_master_static_object;
     negative.terrain_restriction_mask_id = -1;
     assert!(moving_stats(&master, &negative, CivId::new(1), &table([8; 3])).is_none());
 }

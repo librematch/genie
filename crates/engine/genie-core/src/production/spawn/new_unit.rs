@@ -54,14 +54,14 @@ use crate::world::layer::ClassRoles;
 use crate::world::layer::MasterRoles;
 
 impl World {
-    /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `i`. The spawn point
-    /// ([`spawn_point`], from `FUN_140ace630`), then the master's slot 0x40 at the building's
+    /// `FUN_140ad0240`: the unit of `master` spawns beside the building at `list_index`. The spawn
+    /// point ([`spawn_point`], from `FUN_140ace630`), then the master's slot 0x40 at the building's
     /// height (the ground's then, [`World::combat_object`]). Then attribute 81 lowers by its
-    /// population, the building notifies its unit AI 506
-    /// with 619, and the gather point's work comes (`FUN_140ace9c0`): `+0x7f9` (waiting to move)
-    /// set, the work command on the gather point's target at the point (slot 0x128 with 1). A
-    /// building without a gather point (`+0xc30` 0) spawns the unit idle, its spot facing nothing;
-    /// one whose unit AI holds a command queue (slot 0x218) is not modelled.
+    /// population, the building notifies its unit AI 506 with 619, and the gather point's work
+    /// comes (`FUN_140ace9c0`): `+0x7f9` (waiting to move) set, the work command on the gather
+    /// point's target at the point (slot 0x128 with 1). A building without a gather point
+    /// (`+0xc30` 0) spawns the unit idle, its spot facing nothing; one whose unit AI holds a
+    /// command queue (slot 0x218) is not modelled.
     ///
     /// The player's tracker lets its queue place go ([`crate::players::tracker::Tracker::unplace`], the
     /// counter one less).
@@ -73,12 +73,12 @@ impl World {
     /// [`spawn_point`]: crate::production::spawn::search::spawn_point
     pub(super) fn spawn(
         &mut self,
-        p: PlayerId,
-        i: ListIndex,
+        player_id: PlayerId,
+        list_index: ListIndex,
         master: MasterId,
         pop: Amount,
     ) -> GenieResult<()> {
-        if self.players.player(p)?.kind.is_computer() {
+        if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new unit (its AI's slot 0x398)",
             ));
@@ -88,8 +88,8 @@ impl World {
                 "a spawn without the players' sight",
             ));
         }
-        let building = &self.players.live(p, i)?;
-        let made = self.master(p, master)?.clone();
+        let building = &self.players.live(player_id, list_index)?;
+        let made = self.master(player_id, master)?.clone();
         if made.recyclable.recycled() {
             return Err(GenieError::unsupported(
                 "a new object of a recyclable master (a negative id)",
@@ -101,7 +101,7 @@ impl World {
             .parts
             .unit_ai
             .get(building.id)
-            .map(|a| a.building_orders.clone())
+            .map(|unit_ai| unit_ai.building_orders.clone())
             .unwrap_or_default();
         let gather = self.parts.gather_point.get(building.id).copied();
         let position = building.position();
@@ -116,15 +116,15 @@ impl World {
                 "a new unit of a master that does not move",
             ));
         }
-        let point = self.spot_beside(p, i, &made, toward)?;
-        let new = self.combat_object(p, master, &made, point.with_height(position.z()))?;
-        let class = self.tracker_key(p, master).class;
-        let owner = self.players.player_mut(p)?;
+        let point = self.spot_beside(player_id, list_index, &made, toward)?;
+        let new = self.combat_object(player_id, master, &made, point.with_height(position.z()))?;
+        let class = self.tracker_key(player_id, master).class;
+        let owner = self.players.player_mut(player_id)?;
         owner.add_attribute(self.model.slots.attribute.in_production, -pop)?;
         // its queue place goes (FUN_14104fb00 with -1, FUN_14104f330)
         owner.tracker.count_queued(QueuedUnits::ONE.negated());
         owner.tracker.unplace(Some(master), class);
-        let building = owner.objects.checked_mut(i)?;
+        let building = owner.objects.checked_mut(list_index)?;
         let (building_id, state) = (building.id, building.life.state);
         if let Some(ai) = self.parts.unit_ai.get_mut(building.id) {
             ai.post(
@@ -139,11 +139,13 @@ impl World {
         if !queue.is_empty() {
             // FUN_140ace9c0 with a command queue: the building unit AI's slot 0x200 hands it to
             // the new unit (FUN_140c15e50), its gather point's work skipped
-            self.hand_queue(p, new, &queue, position.z())?;
-        } else if let Some(gather) = gather.filter(|g| g.state == GatherPointState::Point) {
+            self.hand_queue(player_id, new, &queue, position.z())?;
+        } else if let Some(gather) =
+            gather.filter(|gather_point| gather_point.state == GatherPointState::Point)
+        {
             // only a state of 1 sends it (`FUN_140ace9c0`'s `+0xc30 != 1` return)
             self.gather(
-                p,
+                player_id,
                 new,
                 gather,
                 building_id,
@@ -152,13 +154,13 @@ impl World {
             )?;
         }
         // FUN_140ace760: the new unit's tasks that spawn more (action type 0x9c)
-        let now = self.players.live(p, new)?.life.master_id;
+        let now = self.players.live(player_id, new)?.life.master_id;
         if self
-            .master(p, now)?
+            .master(player_id, now)?
             .action_part()
             .tasks
             .iter()
-            .any(|t| t.action_kind == ActionKind::ACTION_156)
+            .any(|task| task.action_kind == ActionKind::ACTION_156)
         {
             return Err(GenieError::unsupported(
                 "a new unit's task that spawns more units",
@@ -176,23 +178,23 @@ impl World {
     /// modelled. The shown point (the game passes stack bytes there) is not held.
     pub(super) fn hand_queue(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         new: ListIndex,
         queue: &[QueuedOrder],
         z: f32,
     ) -> GenieResult<()> {
-        let master = self.players.live(p, new)?.life.master_id;
-        for o in queue {
-            self.queued_target(p, new, master, o)?;
-            let unit = self.players.live_mut(p, new)?;
+        let master = self.players.live(player_id, new)?.life.master_id;
+        for queued_order in queue {
+            self.queued_target(player_id, new, master, queued_order)?;
+            let unit = self.players.live_mut(player_id, new)?;
             let state = unit.life.state;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
                 let order = QueuedOrder {
                     priority: OrderPriority::COMMAND,
-                    point: o.point.with_z(z),
+                    point: queued_order.point.with_z(z),
                     range: Distance::ZERO,
                     ready: true,
-                    ..*o
+                    ..*queued_order
                 };
                 let _ = ai.queue_order(state, order, Dispatch::Queued, QueueEnd::Back)?;
             }
@@ -207,7 +209,7 @@ impl World {
     /// the world does not hold, passes.
     fn queued_target(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         new: ListIndex,
         master: MasterId,
         o: &QueuedOrder,
@@ -217,18 +219,21 @@ impl World {
             .is_some()
             .then(|| self.object(o.target))
             .flatten()
-            .map(|(tp, t)| (tp, t.life.master_id));
+            .map(|(tp, unit)| (tp, unit.life.master_id));
         let Some((tp, tm)) = target else {
             return Ok(());
         };
-        let ai = self.parts.unit_ai.get(self.players.live(p, new)?.id);
+        let ai = self
+            .parts
+            .unit_ai
+            .get(self.players.live(player_id, new)?.id);
         // The monastery, which a unit carrying a relic's order keeps (`FUN_141188e10`): an order
         // whose type, read as a class, is the relic's (`FUN_140c417f0` with 0x2a)
-        let relic_order = |q: &QueuedOrder| {
-            q.target_kind.is_some_and(|t| {
+        let relic_order = |queued_order: &QueuedOrder| {
+            queued_order.target_kind.is_some_and(|order_target_kind| {
                 self.model
                     .roles
-                    .of_class(t.class())
+                    .of_class(order_target_kind.class())
                     .contains(ClassRoles::RELIC)
             })
         };
@@ -244,7 +249,7 @@ impl World {
             && target_master.garrison.holds()
             // a queued order's target −1 is a point: it takes nothing in
             && o.target
-                .map_or(Ok(false), |t| self.takes_in(ContainerId::new(t), p, Some(master)))?
+                .map_or(Ok(false), |object_id| self.takes_in(ContainerId::new(object_id), player_id, Some(master)))?
         {
             return Err(GenieError::unsupported(
                 "a command queue's order on a building the unit may enter (its room, slot 0x198)",
@@ -253,21 +258,21 @@ impl World {
         Ok(())
     }
 
-    /// What the unit AI of player `p`'s new object of master `made` (id `master`) at `position`
-    /// reads ([`NewObject`]): its master's fields and its owner's type, posture (`+0x71c`) and
-    /// current age (attribute 6).
+    /// What the unit AI of player `player_id`'s new object of master `made` (id `master`) at
+    /// `position` reads ([`NewObject`]): its master's fields and its owner's type, posture
+    /// (`+0x71c`) and current age (attribute 6).
     ///
     /// # Errors
     ///
     /// A player without attribute 6.
     pub(crate) fn new_object(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         master: MasterId,
         made: &Master,
         position: Position,
     ) -> GenieResult<NewObject> {
-        let owner = self.players.player(p)?;
+        let owner = self.players.player(player_id)?;
         Ok(NewObject {
             player_kind: owner.kind,
             posture: owner.posture,
@@ -313,8 +318,8 @@ impl World {
             turns: standing.flags.contains(SpriteFlags::TURNS),
         };
         let angle = if draws_angle(Some(facets)) {
-            let r = self.streams.get(Stream::Object).rand15();
-            drawn_angle(r, facets)
+            let draw = self.streams.get(Stream::Object).rand15();
+            drawn_angle(draw, facets)
         } else {
             Angle::ZERO
         };
@@ -323,12 +328,12 @@ impl World {
 
     pub(crate) fn combat_object(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         master: MasterId,
         made: &Master,
         position: Position,
     ) -> GenieResult<ListIndex> {
-        if self.players.player(p)?.kind.is_computer() {
+        if self.players.player(player_id)?.kind.is_computer() {
             return Err(GenieError::unsupported(
                 "a computer player's new unit (its AI's slot 0x398)",
             ));
@@ -348,8 +353,8 @@ impl World {
         ))?;
         // the constructor's new_position: the ground's height by the master's fly mode (slot
         // 0x60, FUN_141193a10)
-        let position = self.spatial.terrain.as_ref().map_or(position, |t| {
-            t.ground(position.ground()).map_or(position, |g| {
+        let position = self.spatial.terrain.as_ref().map_or(position, |terrain| {
+            terrain.ground(position.ground()).map_or(position, |g| {
                 Position::new(
                     position.x(),
                     position.y(),
@@ -360,14 +365,14 @@ impl World {
         let ai_kind = unit_ai_kind(made, master, &self.model.roles).ok_or(
             GenieError::unsupported("a new combat unit without a unit AI"),
         )?;
-        let new_object = self.new_object(p, master, made, position)?;
+        let new_object = self.new_object(player_id, master, made, position)?;
         let standing = made
             .standing_sprite
-            .and_then(|s| self.model.graphics.get(s).copied())
+            .and_then(|sprite_id| self.model.graphics.get(sprite_id).copied())
             .ok_or(GenieError::unsupported(
                 "a new unit's standing sprite the data file does not have",
             ))?;
-        let id = self.take_object_id(p, master);
+        let id = self.take_object_id(player_id, master);
         let (sprite, facets, angle) = self.setup_draws(standing);
         let ai = UnitAi::constructed(
             ai_kind,
@@ -382,7 +387,7 @@ impl World {
             position,
             radius: made.radius,
             class: made.class,
-            player: p,
+            player: player_id,
             master,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
@@ -399,22 +404,22 @@ impl World {
         self.spatial.insert(id, placed);
         self.pathing.moved(id, &placed, MoveState::Standing);
         self.pathing.tiles_changed(self.spatial.take_changes());
-        if let Some(v) = self.spatial.sight.as_mut() {
-            v.add_seer(
+        if let Some(visibility) = self.spatial.sight.as_mut() {
+            visibility.add_seer(
                 id,
                 Seer {
-                    player: p,
+                    player: player_id,
                     master,
                     los: made.line_of_sight,
                     state: ObjectState::Alive,
                     explored: false,
                     building: None,
                     umv: 0,
-                    capture: capture_kind(p, made.class, master, &self.model.roles),
+                    capture: capture_kind(player_id, made.class, master, &self.model.roles),
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(
+            let _ = visibility.sight_on(
                 id,
                 position,
                 made.radius,
@@ -426,10 +431,10 @@ impl World {
                 },
             )?;
         }
-        if let Some(e) = self.take_sight_unsupported() {
-            return Err(e);
+        if let Some(error) = self.take_sight_unsupported() {
+            return Err(error);
         }
-        let owner = self.players.player_mut(p)?;
+        let owner = self.players.player_mut(player_id)?;
         for &(kind, amount, flag) in &made.storage {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
@@ -500,7 +505,7 @@ impl World {
                 // livestock's default task, the Artifact, starts once its action list is empty
                 default_task: if made
                     .default_task()
-                    .is_some_and(|t| t.action_kind == ARTIFACT_KIND)
+                    .is_some_and(|task| task.action_kind == ARTIFACT_KIND)
                 {
                     DefaultTask::Artifact
                 } else {
@@ -523,9 +528,9 @@ impl World {
             ))),
             ..ObjectParts::default()
         };
-        let idx = self.push_live(p, Object { unit, parts })?;
+        let idx = self.push_live(player_id, Object { unit, parts })?;
         // the static init's add to its player (slot 0x2d0) files it in the tracker
-        self.track_add(p, id, master)?;
+        self.track_add(player_id, id, master)?;
         Ok(idx)
     }
 }

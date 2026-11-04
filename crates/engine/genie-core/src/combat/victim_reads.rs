@@ -24,13 +24,13 @@ use crate::unit_ai::task_finder::Diplomacy;
 use crate::world::layer::Roles;
 use crate::world::{Mode680, Unread};
 
-/// What a hit of an attacker of player `attacker` reads of the object `u` of player `p`, of
-/// `master`, its player's `attributes` ([`victim_of`]): its relations to the attacker's player
+/// What a hit of an attacker of player `attacker` reads of the object `unit` of player `player_id`,
+/// of `master`, its player's `attributes` ([`victim_of`]): its relations to the attacker's player
 /// both ways (`dip`, [`Diplomacy::allied`] with allies), whether its place is a guess (the world
 /// `spatial` holds it as unknown, or not at all), its place in its tile's list and a building's
 /// annexes (the world's links).
 pub(crate) fn victim_in(
-    (u, unit_ai, building, combat, actions, unread): (
+    (unit, unit_ai, building, combat, actions, unread): (
         &Unit,
         bool,
         &Building,
@@ -38,42 +38,44 @@ pub(crate) fn victim_in(
         &Action,
         Option<&Unread>,
     ),
-    (p, master, attributes): (PlayerId, &Master, &[Amount]),
+    (player_id, master, attributes): (PlayerId, &Master, &[Amount]),
     (attacker, dip): (PlayerId, &dyn Diplomacy),
     spatial: &Spatial,
     mode_680: Mode680,
     roles: &Roles,
 ) -> Victim {
-    let mut v = victim_of(
-        (u, unit_ai, building, combat, actions, unread),
+    let mut victim = victim_of(
+        (unit, unit_ai, building, combat, actions, unread),
         master,
         attributes,
-        p,
+        player_id,
         spatial.terrain.as_ref(),
         mode_680,
         roles,
     );
-    v.allied = Allied {
-        by_attacker: dip.allied(attacker, p, AllyTest::WithRelation4),
-        by_target: dip.allied(p, attacker, AllyTest::WithRelation4),
+    victim.allied = Allied {
+        by_attacker: dip.allied(attacker, player_id, AllyTest::WithRelation4),
+        by_target: dip.allied(player_id, attacker, AllyTest::WithRelation4),
     };
-    v.uncertain = spatial.get(u.id).is_none_or(|o| o.unknown.is_some());
-    v.tile_place = spatial.tile_place(u.id);
-    if let Some(b) = v.building.as_mut() {
+    victim.uncertain = spatial
+        .get(unit.id)
+        .is_none_or(|placed| placed.unknown.is_some());
+    victim.tile_place = spatial.tile_place(unit.id);
+    if let Some(b) = victim.building.as_mut() {
         b.annexes = building.annexes.ids().collect();
     }
-    v
+    victim
 }
 
-/// What a hit reads of the object `u` of player `p` ([`Victim`]), whether it has a unit AI
-/// (`unit_ai`), its building layer (`building`), its combat layer (`combat`) and its action
-/// layer (`actions`): its master's values and its own, its
-/// player's elevation attributes, the terrain defense of its tile (`terrain`, the map's;
-/// 1 for an object inside another, which has no tile) and the game's setting `mode_680`. Its
-/// relations to an attacker (`allied`) and whether its place is a guess (`uncertain`) are the
-/// caller's. The slice holds neither its unit AI's alert mode and attackers nor its facing.
+/// What a hit reads of the object `unit` of player `player_id` ([`Victim`]), whether it has a unit
+/// AI (`unit_ai`), its building layer (`building`), its combat layer (`combat`) and its action
+/// layer (`actions`): its master's values and its own, its player's elevation attributes, the
+/// terrain defense of its tile (`terrain`, the map's; 1 for an object inside another, which has no
+/// tile) and the game's setting `mode_680`. Its relations to an attacker (`allied`) and whether its
+/// place is a guess (`uncertain`) are the caller's. The slice holds neither its unit AI's alert
+/// mode and attackers nor its facing.
 pub(crate) fn victim_of(
-    (u, unit_ai, building, combat, actions, unread): (
+    (unit, unit_ai, building, combat, actions, unread): (
         &Unit,
         bool,
         &Building,
@@ -83,7 +85,7 @@ pub(crate) fn victim_of(
     ),
     master: &Master,
     attributes: &[Amount],
-    p: PlayerId,
+    player_id: PlayerId,
     terrain: Option<&Terrain>,
     mode_680: Mode680,
     roles: &Roles,
@@ -98,17 +100,18 @@ pub(crate) fn victim_of(
     } else {
         ElevationBonus::default()
     };
-    let defense =
-        if master.combat_part().terrain_bonus.restriction().is_none() || u.life.inside.is_some() {
-            Some(1.0)
-        } else {
-            terrain.and_then(|t| {
-                t.defense(
-                    master.combat_part().terrain_bonus,
-                    Tile::new(u.position().x() as i32, u.position().y() as i32),
-                )
-            })
-        };
+    let defense = if master.combat_part().terrain_bonus.restriction().is_none()
+        || unit.life.inside.is_some()
+    {
+        Some(1.0)
+    } else {
+        terrain.and_then(|t| {
+            t.defense(
+                master.combat_part().terrain_bonus,
+                Tile::new(unit.position().x() as i32, unit.position().y() as i32),
+            )
+        })
+    };
     let tasks = |kind: ActionKind| {
         master
             .action_part()
@@ -117,13 +120,13 @@ pub(crate) fn victim_of(
             .any(|t| t.action_kind == kind)
     };
     Victim {
-        id: u.id,
+        id: unit.id,
         // the caller's, which holds the tile lists
         tile_place: 0,
-        hp: u.life.hp,
-        amount: u.life.amount,
-        state: u.life.state,
-        position: u.position(),
+        hp: unit.life.hp,
+        amount: unit.life.amount,
+        state: unit.life.state,
+        position: unit.position(),
         kind,
         class: master.class,
         master_id: master.id,
@@ -131,12 +134,15 @@ pub(crate) fn victim_of(
         height: master.height,
         storage: master.storage.first().map_or(Amount::ZERO, |s| s.1),
         capacity: master.capacity,
-        workers: u.workers,
+        workers: unit.workers,
         blast_defense: master.blast_defense,
         fog_visibility: master.fog_visibility,
-        goto_sleep: u.life.goto_sleep,
-        decay: u.life.master.map_or(AmountRate::ZERO, |m| m.decay),
-        player: p,
+        goto_sleep: unit.life.goto_sleep,
+        decay: unit
+            .life
+            .master
+            .map_or(AmountRate::ZERO, |master_data| master_data.decay),
+        player: player_id,
         elevation: ElevationBonus {
             higher: at(272).get(),
             lower: at(273).get(),
@@ -144,9 +150,9 @@ pub(crate) fn victim_of(
         attack_elevation,
         allied: Allied::NONE,
         uncertain: false,
-        inside: u.life.inside.is_some(),
+        inside: unit.life.inside.is_some(),
         source: Attacker {
-            id: u.id,
+            id: unit.id,
             kind,
             class: master.class,
             master_id: master.id,
@@ -164,7 +170,7 @@ pub(crate) fn victim_of(
             charge_hit: combat.charge_hit,
             attack_powerup: combat.attack_powerup,
             mode_680,
-            player: p,
+            player: player_id,
             kill_bonus_tasks: tasks(ActionKind::LOOT),
             // a missile's own (its part): its own strike sets it ([`Unit::own_strike`])
             fired_from: None,
@@ -198,7 +204,7 @@ pub(crate) fn victim_of(
                 .action_part()
                 .tasks
                 .iter()
-                .any(|t| t.action_kind == REMOVAL_REWARD && 1e-7 < t.work_val1.get()),
+                .any(|task| task.action_kind == REMOVAL_REWARD && 1e-7 < task.work_val1.get()),
             busy: actions.top_action_kind().is_some() || unread.is_some(),
             unit_ai,
             alert_idle: None,
@@ -219,7 +225,7 @@ pub(crate) fn victim_of(
             blast_taken: HitPoints::ZERO,
             trebuchet: is_trebuchet(master, roles),
             cost: paid_cost(master),
-            damaged_lately: u.damaged_lately,
+            damaged_lately: unit.damaged_lately,
             struck: false,
             relics: building.relics,
             razed: Vec::new(),

@@ -28,9 +28,9 @@ pub(crate) fn combat_object(id: i32, master: i16) -> Object {
         })),
         ..Object::default()
     };
-    let s = static_mut(&mut object);
-    s.id = id;
-    s.master_obj = master;
+    let rge_static_object = static_mut(&mut object);
+    rge_static_object.id = id;
+    rge_static_object.master_obj = master;
     object
 }
 
@@ -66,9 +66,9 @@ pub(crate) fn combat_master(id: i16) -> Master {
         ..Master::default()
     };
     // the master's id and its copy's, as the save writes them first
-    let s = master_static_mut(&mut master);
-    s.read_temp = id;
-    s.read_temp_2 = id;
+    let rge_master_static_object = master_static_mut(&mut master);
+    rge_master_static_object.read_temp = id;
+    rge_master_static_object.read_temp_2 = id;
     master
 }
 
@@ -100,15 +100,15 @@ pub(crate) fn building_object(id: i32, master: i16) -> Object {
         tribe_building_object: Some(Box::default()),
         ..Object::default()
     };
-    let s = &mut building_mut(&mut object)
+    let rge_static_object = &mut building_mut(&mut object)
         .tribe_combat_object
         .rge_combat_object
         .rge_action_object
         .rge_moving_object
         .rge_animated_object
         .rge_static_object;
-    s.id = id;
-    s.master_obj = master;
+    rge_static_object.id = id;
+    rge_static_object.master_obj = master;
     object
 }
 
@@ -140,13 +140,13 @@ pub(crate) fn action_list(actions: Vec<(ActionKind, Action)>) -> ActionList {
 
 /// A player's saved objects with the masters `masters` (each of type 70).
 pub(crate) fn with_masters(masters: Vec<Master>) -> PlayerObjects {
-    let n = masters.len();
+    let count = masters.len();
     PlayerObjects {
         // each master enabled, so the save's list holds them all
-        master_object_num: i32::try_from(n).expect("a test's few masters"),
-        enabled: vec![1; n],
-        marker: (n > 0).then_some(()),
-        masters: (n > 0).then(|| {
+        master_object_num: i32::try_from(count).expect("a test's few masters"),
+        enabled: vec![1; count],
+        marker: (count > 0).then_some(()),
+        masters: (count > 0).then(|| {
             masters
                 .into_iter()
                 .map(|master| PlayerMaster {
@@ -222,20 +222,20 @@ const SAVE_66_6: u32 = 0x0042_9999;
 /// A save of `players`, Gaia first, of the build's own version: the lists of one entry per
 /// player as long as the players, so [`save_bytes`] writes a save that reads back.
 pub(crate) fn header(players: Vec<Player>) -> Header {
-    let n = players.len();
+    let count = players.len();
     let mut header = Header::default();
     header.file_header.new_save_game_version = SAVE_66_6;
     let world = &mut header.world.base_world;
-    world.num_players = i16::try_from(n).expect("a test's few players");
-    world.player_time_delta = vec![0; n];
-    world.victory_conditions = vec![RgeVictoryConditions::default(); n];
+    world.num_players = i16::try_from(count).expect("a test's few players");
+    world.player_time_delta = vec![0; count];
+    world.victory_conditions = vec![RgeVictoryConditions::default(); count];
     world.players = players
         .into_iter()
         .map(|mut val| {
             if let Some(wp) = world_player_mut(&mut val) {
-                wp.base.relation.resize(n, 0);
-                wp.base.unit_diplomacy.resize(n, 0);
-                wp.tc_flared.resize(n, 0);
+                wp.base.relation.resize(count, 0);
+                wp.base.unit_diplomacy.resize(count, 0);
+                wp.tc_flared.resize(count, 0);
             }
             Positioned { pos: 0, val }
         })
@@ -245,17 +245,19 @@ pub(crate) fn header(players: Vec<Player>) -> Header {
 
 /// A player's world part, of any player type.
 fn world_player_mut(player: &mut Player) -> Option<&mut WorldPlayer> {
-    if let Some(g) = player.gaia_player.as_deref_mut() {
-        return Some(&mut g.world_player_gaia.world_player);
+    if let Some(gaia_player) = player.gaia_player.as_deref_mut() {
+        return Some(&mut gaia_player.world_player_gaia.world_player);
     }
-    if let Some(h) = player.human_or_coop_player.as_deref_mut() {
-        return Some(&mut h.world_player_human_or_coop);
+    if let Some(human_or_coop_player) = player.human_or_coop_player.as_deref_mut() {
+        return Some(&mut human_or_coop_player.world_player_human_or_coop);
     }
-    if let Some(c) = player.computer_player.as_deref_mut() {
-        return Some(&mut c.world_player_computer);
+    if let Some(computer_player) = player.computer_player.as_deref_mut() {
+        return Some(&mut computer_player.world_player_computer);
     }
     player
         .scenario_editor_phantom_player
         .as_deref_mut()
-        .map(|p| &mut p.world_player_scenario_editor_phantom)
+        .map(|scenario_editor_phantom_player| {
+            &mut scenario_editor_phantom_player.world_player_scenario_editor_phantom
+        })
 }

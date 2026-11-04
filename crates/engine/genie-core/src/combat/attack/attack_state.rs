@@ -108,9 +108,15 @@ impl AttackState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::Move { move_to: Some(m) }
-            | Self::GotoSeen { move_to: Some(m) }
-            | Self::GotoPoint { move_to: Some(m) } => Some(m),
+            Self::Move {
+                move_to: Some(move_to_action),
+            }
+            | Self::GotoSeen {
+                move_to: Some(move_to_action),
+            }
+            | Self::GotoPoint {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -118,7 +124,7 @@ impl AttackState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -126,9 +132,9 @@ impl AttackState {
     /// The same state, its walk without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut attack_state = self;
+        let _ = attack_state.take_move_to();
+        attack_state
     }
 
     /// One of the states in which a new order on the same target keeps the Attack as it is (4
@@ -156,10 +162,10 @@ mod tests {
     /// their target are 4 to 7 and 11.
     #[test]
     fn attack_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match AttackState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 3 | 8..=10 | 12 | 14..), "{b}"),
+        for index in 0..=255_u8 {
+            match AttackState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
+                Err(_) => assert!(matches!(index, 3 | 8..=10 | 12 | 14..), "{index}"),
             }
         }
         let keeping: Vec<u8> = (0..=13)
@@ -172,11 +178,14 @@ mod tests {
         assert_eq!(AttackState::default(), AttackState::New);
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 5, 11] {
-            let mut s = AttackState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut attack_state = AttackState::of_byte(b, Some(walk)).unwrap();
+            assert_eq!(
+                (attack_state.get(), attack_state.move_to()),
+                (b, Some(&walk))
+            );
+            assert_eq!(attack_state.bare().move_to(), None);
+            assert_eq!(attack_state.take_move_to(), Some(walk));
+            assert_eq!(attack_state.move_to(), None);
         }
         let stray = AttackState::of_byte(6, Some(walk)).unwrap_err();
         assert_eq!(stray.reason(), "a MoveTo of an Attack that does not walk");

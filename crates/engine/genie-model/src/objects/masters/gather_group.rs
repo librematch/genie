@@ -79,8 +79,8 @@ impl TryFrom<i32> for GatherGroup {
 }
 
 impl genie_diff::Diff for GatherGroup {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -97,7 +97,7 @@ mod tests {
         assert_eq!(GatherGroup::try_from(3), Ok(GatherGroup::STONE));
         for bad in [-1_i32, 256] {
             assert_eq!(
-                GatherGroup::try_from(bad).map_err(|e| e.kind()),
+                GatherGroup::try_from(bad).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }

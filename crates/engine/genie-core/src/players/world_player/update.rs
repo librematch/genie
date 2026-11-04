@@ -21,30 +21,30 @@ use crate::world::layer::MasterRoles;
 use crate::world::slots::PlayerSlots;
 
 impl World {
-    /// Player `p`'s slot 0x100 up to `WorldPlayerBase::update`. Gaia (`WorldPlayerGaia::update`)
-    /// adds the update's seconds to its own update time. A world player adds them to
-    /// `mUpdateTime` (`ADDSS` of `world+0x164` and the time) and, while it is at least a second
-    /// (`COMISS` with 1, `JC` ends the loop, also for a NaN), takes a second off and runs the
-    /// second's work ([`World::world_player_second`]) with the time before the step.
+    /// Player `player_id`'s slot 0x100 up to `WorldPlayerBase::update`. Gaia
+    /// (`WorldPlayerGaia::update`) adds the update's seconds to its own update time. A world player
+    /// adds them to `mUpdateTime` (`ADDSS` of `world+0x164` and the time) and, while it is at least
+    /// a second (`COMISS` with 1, `JC` ends the loop, also for a NaN), takes a second off and runs
+    /// the second's work ([`World::world_player_second`]) with the time before the step.
     ///
     /// # Errors
     ///
     /// The second's work met a part of the game the slice does not model.
-    pub fn update_world_player(&mut self, p: PlayerId) -> GenieResult<()> {
+    pub fn update_world_player(&mut self, player_id: PlayerId) -> GenieResult<()> {
         let dt = self.dt_seconds;
-        let player = self.players.player_mut(p)?;
+        let player = self.players.player_mut(player_id)?;
         if player.kind == PlayerKind::Gaia {
             player.gaia_update_time += dt;
             return Ok(());
         }
         player.update_time += dt;
         loop {
-            let time = self.players.player(p)?.update_time;
+            let time = self.players.player(player_id)?.update_time;
             if below_or_unordered(time.get(), SECOND) {
                 return Ok(());
             }
-            self.players.player_mut(p)?.update_time = time - Seconds::new(SECOND);
-            self.world_player_second(p, time)?;
+            self.players.player_mut(player_id)?.update_time = time - Seconds::new(SECOND);
+            self.world_player_second(player_id, time)?;
         }
     }
 
@@ -62,9 +62,13 @@ impl World {
     /// # Errors
     ///
     /// The defeat check's ([`World::defeat_check`]).
-    pub(super) fn world_player_second(&mut self, p: PlayerId, time: Seconds) -> GenieResult<()> {
+    pub(super) fn world_player_second(
+        &mut self,
+        player_id: PlayerId,
+        time: Seconds,
+    ) -> GenieResult<()> {
         let (world_time, period) = (self.world_time, self.history_period);
-        let player = self.players.player_mut(p)?;
+        let player = self.players.player_mut(player_id)?;
         player.history.update(
             &player.attributes,
             world_time,
@@ -75,9 +79,9 @@ impl World {
         let explored = if self.settings.explored_all() {
             Some(PERCENT)
         } else {
-            self.explored_share(p).map(|share| share * PERCENT)
+            self.explored_share(player_id).map(|share| share * PERCENT)
         };
-        let player = self.players.player_mut(p)?;
+        let player = self.players.player_mut(player_id)?;
         if let Some(e) = explored {
             set(
                 &mut player.attributes,
@@ -85,10 +89,10 @@ impl World {
                 Amount::new(e),
             );
         }
-        let a = &player.attributes;
-        let ratio = get(a, self.model.slots.attribute.kills)
-            - (get(a, self.model.slots.attribute.units_owned)
-                - get(a, self.model.slots.attribute.population));
+        let amounts = &player.attributes;
+        let ratio = get(amounts, self.model.slots.attribute.kills)
+            - (get(amounts, self.model.slots.attribute.units_owned)
+                - get(amounts, self.model.slots.attribute.population));
         set(
             &mut player.attributes,
             self.model.slots.attribute.kill_ratio,
@@ -107,33 +111,33 @@ impl World {
         if !matches!(player.kind, PlayerKind::Human | PlayerKind::Computer) {
             return Ok(());
         }
-        self.defeat_check(p)?;
-        if self.players.player(p)?.game_status == GameStatus::Playing {
-            self.trickles(p)?;
-            self.mill_food(p, time)?;
+        self.defeat_check(player_id)?;
+        if self.players.player(player_id)?.game_status == GameStatus::Playing {
+            self.trickles(player_id)?;
+            self.mill_food(player_id, time)?;
         }
         Ok(())
     }
 
-    /// `FUN_141285c50` on player `p`'s visible map (`+0x70`): its explored tiles (`+0x28`) over
-    /// its tiles (`+0x2c`, the width times the height its load sets), each converted
+    /// `FUN_141285c50` on player `player_id`'s visible map (`+0x70`): its explored tiles (`+0x28`)
+    /// over its tiles (`+0x2c`, the width times the height its load sets), each converted
     /// (`CVTDQ2PS`) before the division. None in a slice without the players' sight, whose
     /// attribute 22 the update then leaves.
     #[must_use]
-    pub fn explored_share(&self, p: PlayerId) -> Option<f32> {
+    pub fn explored_share(&self, player_id: PlayerId) -> Option<f32> {
         let sight = self.spatial.sight.as_ref()?;
-        let map = sight.maps.get(p.index())?;
+        let map = sight.maps.get(player_id.index())?;
         Some(map.explored.get() as f32 / (sight.size.width() * sight.size.height()) as f32)
     }
 
-    /// The defeat check of player `p` (`0x14163b72b`). The player stays in the game while one of
-    /// its victory timers runs ([`VictoryTimes::running`]) or else one of its objects, in its
-    /// list's order, keeps it ([`World::keeps_alive`]). Under the sudden death rule
-    /// ([`crate::world::settings::Settings::sudden_death`]), asked only for a player that stays, its
-    /// first built town centre ([`World::first_town_centre`]) decides once the player had one
-    /// (`mSuddenDeathCanBeEliminated`, `+0x1380`, which the first one found sets). A player not
-    /// yet lost then loses when it does not stay, or when it stays without a king (master 434 in
-    /// its tracker, `FUN_14104eea0`) under the regicide rule
+    /// The defeat check of player `player_id` (`0x14163b72b`). The player stays in the game while
+    /// one of its victory timers runs ([`VictoryTimes::running`]) or else one of its objects, in
+    /// its list's order, keeps it ([`World::keeps_alive`]). Under the sudden death rule
+    /// ([`crate::world::settings::Settings::sudden_death`]), asked only for a player that stays,
+    /// its first built town centre ([`World::first_town_centre`]) decides once the player had one
+    /// (`mSuddenDeathCanBeEliminated`, `+0x1380`, which the first one found sets). A player not yet
+    /// lost then loses when it does not stay, or when it stays without a king (master 434 in its
+    /// tracker, `FUN_14104eea0`) under the regicide rule
     /// ([`crate::world::settings::Settings::regicide`]): the status setter takes 2
     /// ([`World::set_status`]) and attribute 45 is cleared.
     ///
@@ -142,39 +146,39 @@ impl World {
     /// An object of a master the slice does not have; the status setter's.
     ///
     /// [`VictoryTimes::running`]: crate::players::world_player::VictoryTimes::running
-    pub fn defeat_check(&mut self, p: PlayerId) -> GenieResult<()> {
-        let mut stays = self.players.player(p)?.victory_times.running();
+    pub fn defeat_check(&mut self, player_id: PlayerId) -> GenieResult<()> {
+        let mut stays = self.players.player(player_id)?.victory_times.running();
         if !stays {
-            for unit in &self.players.player(p)?.objects {
-                if self.keeps_alive(p, unit)? {
+            for unit in &self.players.player(player_id)?.objects {
+                if self.keeps_alive(player_id, unit)? {
                     stays = true;
                     break;
                 }
             }
         }
         if stays && self.settings.sudden_death() {
-            let centre = self.first_town_centre(p).is_some();
-            let player = self.players.player_mut(p)?;
+            let centre = self.first_town_centre(player_id).is_some();
+            let player = self.players.player_mut(player_id)?;
             if player.sudden_death_eliminable {
                 stays = centre;
             } else if centre {
                 player.sudden_death_eliminable = true;
             }
         }
-        if self.players.player(p)?.game_status == GameStatus::Lost {
+        if self.players.player(player_id)?.game_status == GameStatus::Lost {
             return Ok(());
         }
         let kingless = self.settings.regicide()
             && self
                 .players
-                .player(p)?
+                .player(player_id)?
                 .tracker
                 .list(ListKey::master(self.model.slots.master.king))
                 .is_empty();
         if !stays || kingless {
-            self.set_status(p, GameStatus::Lost)?;
+            self.set_status(player_id, GameStatus::Lost)?;
             set(
-                &mut self.players.player_mut(p)?.attributes,
+                &mut self.players.player_mut(player_id)?.attributes,
                 self.model.slots.attribute.survival,
                 Amount::ZERO,
             );
@@ -182,8 +186,8 @@ impl World {
         Ok(())
     }
 
-    /// Whether object `unit` keeps player `p` in the game (`0x14163b790`), by its master's class
-    /// (`+0x410`, the decoded short, compared unsigned) and its state (`+0x640`):
+    /// Whether object `unit` keeps player `player_id` in the game (`0x14163b790`), by its master's
+    /// class (`+0x410`, the decoded short, compared unsigned) and its state (`+0x640`):
     /// - in states 1 to 4, a resource storage of the master holding attribute 11 with the store
     ///   mode 0x20 keeps it;
     /// - classes 11, 27 and 30 (other, walls, flags) and 1, 2, 14, 19, 20, 21, 37, 39, 42, 49, 58
@@ -200,8 +204,8 @@ impl World {
     /// # Errors
     ///
     /// An object of a master the slice does not have.
-    pub fn keeps_alive(&self, p: PlayerId, unit: &Unit) -> GenieResult<bool> {
-        let master = unit.master(self.master_tables(), p)?;
+    pub fn keeps_alive(&self, player_id: PlayerId, unit: &Unit) -> GenieResult<bool> {
+        let master = unit.master(self.master_tables(), player_id)?;
         let state = unit.life.state;
         if (ObjectState::Unfinished..=ObjectState::DyingSprite).contains(&state)
             && master.storage.iter().any(|&(kind, _, mode)| {
@@ -227,8 +231,8 @@ impl World {
         }
         if builds && state == ObjectState::Alive {
             let count = self
-                .trainable_count(p, master.id)
-                .wrapping_add(self.upgradable_count(p, master.id));
+                .trainable_count(player_id, master.id)
+                .wrapping_add(self.upgradable_count(player_id, master.id));
             if 0 < count {
                 return Ok(true);
             }

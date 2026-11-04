@@ -56,8 +56,11 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
-                Place::Sleeping(p, i)
-                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                Place::Sleeping(player_id, list_index)
+                    if !self
+                        .parts
+                        .unit_ai
+                        .contains(self.players.asleep(player_id, list_index)?.id) =>
                 {
                     continue;
                 }
@@ -105,13 +108,13 @@ impl World {
     /// toggles its gate lock: slot 0x670 ([`lock_gate`]) with slot 0x668's value negated. Its sound
     /// (slot 0x4c0) and the UI's flag are not held.
     pub(crate) fn gate(&mut self, player: PlayerId, id: ObjectId) -> GenieResult<()> {
-        let Some((p, unit)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(());
         };
-        if p != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
+        if player_id != player && !self.settings.flags.contains(OptionFlags::CHEATS_ENABLED) {
             return Ok(());
         }
-        if unit.master(self.master_tables(), p)?.kind != MasterKind::BUILDING {
+        if unit.master(self.master_tables(), player_id)?.kind != MasterKind::BUILDING {
             return Ok(());
         }
         let now = self.world_time;
@@ -150,8 +153,11 @@ impl World {
                 Place::Live(p, i) => (p, i),
                 // only slot 0x180 puts an object to sleep, one of a type below 30, which has no
                 // unit AI: the handler passes it over
-                Place::Sleeping(p, i)
-                    if !self.parts.unit_ai.contains(self.players.asleep(p, i)?.id) =>
+                Place::Sleeping(player_id, list_index)
+                    if !self
+                        .parts
+                        .unit_ai
+                        .contains(self.players.asleep(player_id, list_index)?.id) =>
                 {
                     continue;
                 }
@@ -255,7 +261,7 @@ impl World {
         for &id in &units {
             let unit = match self.place(id) {
                 Some(Place::Live(p, i)) => self.players.live_mut(p, i)?,
-                Some(Place::Sleeping(p, i)) => self.players.asleep_mut(p, i)?,
+                Some(Place::Sleeping(p, list_index)) => self.players.asleep_mut(p, list_index)?,
                 None => continue,
             };
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -274,7 +280,10 @@ impl World {
             }
         }
         for &id in &units {
-            if let Some(link) = self.object(id).and_then(|(_, u)| u.group.id) {
+            if let Some(link) = self
+                .object(id)
+                .and_then(|(_, link_unit)| link_unit.group.id)
+            {
                 let _ = self.remove_unit(link, id, None, LeavingWalk::Stands)?;
             }
             if let Some(ai) = self.parts.unit_ai.get_mut(id) {
@@ -289,12 +298,12 @@ impl World {
             }
             // a sleeping object is of a type below 30 (only slot 0x180 puts one to sleep), whose
             // slots 0x148 and 0x560 are empty (0x141072730, 0x141072740)
-            let Some(Place::Live(p, idx)) = self.place(id) else {
+            let Some(Place::Live(player_id, idx)) = self.place(id) else {
                 continue;
             };
-            self.object_stop(p, idx)?;
-            if let Some(m) = self.parts.mover_mut(self.players.live(p, idx)?.id) {
-                m.stand()?;
+            self.object_stop(player_id, idx)?;
+            if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, idx)?.id) {
+                mover.stand()?;
             }
         }
         Ok(())
@@ -324,8 +333,8 @@ impl World {
         let mut ids = ids.to_vec();
         let mut dropped = 0;
         for id in ids.iter_mut().take(checked) {
-            let keep = self.object(*id).is_some_and(|(p, _)| {
-                p == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
+            let keep = self.object(*id).is_some_and(|(player_id, _)| {
+                player_id == player || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
             });
             if !keep {
                 *id = None;
@@ -367,20 +376,20 @@ impl World {
             self.mutual_allies(owner, player)
                 && match pick {
                     UnloadPick::Player(number) => usize::try_from(number) == Ok(player.index()),
-                    UnloadPick::Object(o)
-                    | UnloadPick::SameMaster(o)
-                    | UnloadPick::AllBut(o)
-                    | UnloadPick::OtherMasters(o) => {
-                        self.place(o).is_some_and(|p| p.player() == player)
+                    UnloadPick::Object(object_id)
+                    | UnloadPick::SameMaster(object_id)
+                    | UnloadPick::AllBut(object_id)
+                    | UnloadPick::OtherMasters(object_id) => {
+                        self.place(object_id).is_some_and(|p| p.player() == player)
                     }
                     UnloadPick::All(_) | UnloadPick::Group(_) | UnloadPick::Other(..) => false,
                 }
         };
         let mut dropped = 0;
         for id in &mut ids {
-            let keep = self.place(*id).is_some_and(|p| {
-                p.player() == player
-                    || tied(p.player())
+            let keep = self.place(*id).is_some_and(|place| {
+                place.player() == player
+                    || tied(place.player())
                     || self.settings.flags.contains(OptionFlags::CHEATS_ENABLED)
             });
             if !keep {
@@ -394,16 +403,16 @@ impl World {
         Ok(Some(ids))
     }
 
-    /// `FUN_1416642c0` with the ally flag: players `a` and `b` each count the other as its own
-    /// or allied ([`crate::unit_ai::task_finder::allied`] on each one's relations); not for a
+    /// `FUN_1416642c0` with the ally flag: players `first` and `second` each count the other as its
+    /// own or allied ([`crate::unit_ai::task_finder::allied`] on each one's relations); not for a
     /// player the world lacks.
-    pub(crate) fn mutual_allies(&self, a: PlayerId, b: PlayerId) -> bool {
+    pub(crate) fn mutual_allies(&self, first: PlayerId, second: PlayerId) -> bool {
         let allied = |from: PlayerId, to: PlayerId| {
-            self.players.get(from.index()).is_some_and(|p| {
-                task_finder_allied(&p.relations, from, to, AllyTest::WithRelation4)
+            self.players.get(from.index()).is_some_and(|player| {
+                task_finder_allied(&player.relations, from, to, AllyTest::WithRelation4)
             })
         };
-        allied(a, b) && allied(b, a)
+        allied(first, second) && allied(second, first)
     }
 
     /// `FUN_140e6b750`: each id's object (`FUN_1415417a0`, live or sleeping), None where the
@@ -415,26 +424,32 @@ impl World {
     /// Slot 0x68 with the master's standing sprite (`+0x470`): the unit's top speed is the sprite's
     /// ([`crate::movement::move_to::MoveToAction::shows_standing`]), and the sprite itself where
     /// the slice holds it.
-    pub(crate) fn standing_sprite(&mut self, p: PlayerId, idx: ListIndex) -> GenieResult<()> {
-        let master = self.players.live(p, idx)?.life.master_id;
-        let standing = self.master(p, master)?.standing_sprite;
-        let shown = standing.and_then(|s| self.model.graphics.get(s)).copied();
-        let unit = self.players.live_mut(p, idx)?;
-        if let Some(m) = self.parts.mover_mut(unit.id) {
-            m.shows(shown.as_ref());
+    pub(crate) fn standing_sprite(
+        &mut self,
+        player_id: PlayerId,
+        idx: ListIndex,
+    ) -> GenieResult<()> {
+        let master = self.players.live(player_id, idx)?.life.master_id;
+        let standing = self.master(player_id, master)?.standing_sprite;
+        let shown = standing
+            .and_then(|sprite_id| self.model.graphics.get(sprite_id))
+            .copied();
+        let unit = self.players.live_mut(player_id, idx)?;
+        if let Some(mover) = self.parts.mover_mut(unit.id) {
+            mover.shows(shown.as_ref());
         }
         if unit.sprite.is_none() {
             return Ok(());
         }
-        let g = shown.ok_or(GenieError::unsupported(
+        let graphic = shown.ok_or(GenieError::unsupported(
             "a unit without its standing sprite",
         ))?;
         let rng = self.streams.get(Stream::Sprite);
-        let u = self.players.live_mut(p, idx)?;
+        let u = self.players.live_mut(player_id, idx)?;
         new_sprite(
             &mut u.sprite,
             self.parts.move_stats_mut(u.id),
-            g,
+            graphic,
             rng,
             self.model.tuning.sprite,
         );

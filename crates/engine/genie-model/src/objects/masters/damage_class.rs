@@ -40,8 +40,8 @@ impl From<i16> for DamageClass {
 }
 
 impl genie_diff::Diff for DamageClass {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -67,8 +67,8 @@ impl ClassAmount {
 }
 
 impl genie_diff::Diff for ClassAmount {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -79,8 +79,11 @@ mod tests {
     /// An entry keeps its class and amount; the named classes are the game's values.
     #[test]
     fn an_entry_holds_its_class_and_amount() {
-        let e = ClassAmount::new(4, -2);
-        assert_eq!((e.class, e.amount.get()), (DamageClass::MELEE, -2));
+        let class_amount = ClassAmount::new(4, -2);
+        assert_eq!(
+            (class_amount.class, class_amount.amount.get()),
+            (DamageClass::MELEE, -2)
+        );
         assert_eq!(DamageClass::PIERCE.get(), 3);
         assert_eq!(DamageClass::from(38), DamageClass::CLASS_38);
     }

@@ -135,7 +135,7 @@ fn an_object_own_slot_is_taken_while_it_holds_the_object() {
         id,
         ..Unit::default()
     };
-    let t = World::new(
+    let world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -153,23 +153,23 @@ fn an_object_own_slot_is_taken_while_it_holds_the_object() {
         ],
     );
     assert_eq!(
-        t.live_slot((PlayerId::new(1), ListIndex::new(0), object_id(3))),
+        world.live_slot((PlayerId::new(1), ListIndex::new(0), object_id(3))),
         Some((PlayerId::new(1), ListIndex::new(0)))
     );
     assert_eq!(
-        t.live_slot((PlayerId::new(0), ListIndex::new(0), object_id(2))),
+        world.live_slot((PlayerId::new(0), ListIndex::new(0), object_id(2))),
         Some((PlayerId::new(0), ListIndex::new(1)))
     );
     assert_eq!(
-        t.live_slot((PlayerId::new(5), ListIndex::new(9), object_id(3))),
+        world.live_slot((PlayerId::new(5), ListIndex::new(9), object_id(3))),
         Some((PlayerId::new(1), ListIndex::new(0)))
     );
     assert_eq!(
-        t.live_slot((PlayerId::new(1), ListIndex::new(0), object_id(4))),
+        world.live_slot((PlayerId::new(1), ListIndex::new(0), object_id(4))),
         None
     );
     assert_eq!(
-        t.live_slot((PlayerId::new(0), ListIndex::new(0), object_id(7))),
+        world.live_slot((PlayerId::new(0), ListIndex::new(0), object_id(7))),
         None
     );
 }
@@ -240,7 +240,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         },
         ..Unit::default()
     };
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -250,7 +250,7 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
             ..Player::default()
         }],
     );
-    t.model.masters = vec![Arc::new(Masters::new([Master {
+    world.model.masters = vec![Arc::new(Masters::new([Master {
         id: master_id(1243),
         class: class::LIVESTOCK,
         ..Master::default()
@@ -260,16 +260,17 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         worker_class: Some(class::VILLAGER),
         ..DropSite::default()
     };
-    t.model.drop_sites = Arc::new(vec![tc.clone()]);
+    world.model.drop_sites = Arc::new(vec![tc.clone()]);
     assert!(
-        t.drop_off_unasked(
-            PlayerId::new(0),
-            ListIndex::new(0),
-            UnitOrderAction::DropOffAndBack
-        )
-        .is_ok()
+        world
+            .drop_off_unasked(
+                PlayerId::new(0),
+                ListIndex::new(0),
+                UnitOrderAction::DropOffAndBack
+            )
+            .is_ok()
     );
-    t.model.drop_sites = Arc::new(vec![
+    world.model.drop_sites = Arc::new(vec![
         tc,
         DropSite {
             building: ids::PASTURE,
@@ -288,8 +289,8 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
         },
         ..Unit::default()
     };
-    t.model.masters[0] = Arc::new(Masters::new([
-        t.model.masters[0].get(master_id(1243)).unwrap().clone(),
+    world.model.masters[0] = Arc::new(Masters::new([
+        world.model.masters[0].get(master_id(1243)).unwrap().clone(),
         Master {
             id: ids::PASTURE,
             kind: MasterKind::BUILDING,
@@ -297,55 +298,61 @@ fn drop_off_order_leaves_livestock_without_drop_site_alone() {
             ..Master::default()
         },
     ]));
-    t.players[0].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::FOOD);
-    t.players[0].objects[ListIndex::new(0)].place_for_test(Position::new(10.0, 10.0, 0.0));
+    world.players[0].objects[ListIndex::new(0)]
+        .life
+        .attribute_kind = Some(attribute::FOOD);
+    world.players[0].objects[ListIndex::new(0)].place_for_test(Position::new(10.0, 10.0, 0.0));
     for (id, x, state) in [
         (500, 30.0, ObjectState::Alive),
         (501, 12.0, ObjectState::Foundation),
         (502, 20.0, ObjectState::Alive),
         (503, 15.0, ObjectState::Alive),
     ] {
-        let _ = t
+        let _ = world
             .push_live(PlayerId::new(0), pen(object_id(id), x, state))
             .unwrap();
-        t.track_add(PlayerId::new(0), object_id(id), ids::PASTURE)
+        world
+            .track_add(PlayerId::new(0), object_id(id), ids::PASTURE)
             .unwrap();
     }
     // the tracker's done list: the foundation 501 waits, 503 is the nearest standing one
-    let key = t.tracker_key(PlayerId::new(0), ids::PASTURE);
+    let key = world.tracker_key(PlayerId::new(0), ids::PASTURE);
     for id in [503, 502, 500] {
-        t.players[0].tracker.complete(object_id(id), key);
+        world.players[0].tracker.complete(object_id(id), key);
     }
     assert_eq!(
-        t.table_drop_site(
-            PlayerId::new(0),
-            Point::new(10.0, 10.0),
-            Some(attribute::FOOD),
-            class::LIVESTOCK
-        )
-        .unwrap(),
+        world
+            .table_drop_site(
+                PlayerId::new(0),
+                Point::new(10.0, 10.0),
+                Some(attribute::FOOD),
+                class::LIVESTOCK
+            )
+            .unwrap(),
         Some(DropSiteId::new(object_id(503)))
     );
     assert_eq!(
-        t.table_drop_site(
-            PlayerId::new(0),
-            Point::new(10.0, 10.0),
-            Some(attribute::WOOD),
-            class::LIVESTOCK
-        )
-        .unwrap(),
+        world
+            .table_drop_site(
+                PlayerId::new(0),
+                Point::new(10.0, 10.0),
+                Some(attribute::WOOD),
+                class::LIVESTOCK
+            )
+            .unwrap(),
         None
     );
-    let before = t.players[0].objects[ListIndex::new(0)].clone();
+    let before = world.players[0].objects[ListIndex::new(0)].clone();
     assert!(
-        t.drop_off_unasked(
-            PlayerId::new(0),
-            ListIndex::new(0),
-            UnitOrderAction::DropOffAndBack
-        )
-        .is_ok()
+        world
+            .drop_off_unasked(
+                PlayerId::new(0),
+                ListIndex::new(0),
+                UnitOrderAction::DropOffAndBack
+            )
+            .is_ok()
     );
-    assert_eq!(t.players[0].objects[ListIndex::new(0)], before);
+    assert_eq!(world.players[0].objects[ListIndex::new(0)], before);
 }
 
 /// `UNIT_ORDER`'s drop-off on a builder carrying wood (`FUN_14161e370` on a Build: slot 0x78,
@@ -557,7 +564,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
         t.parts
             .building_of(t.players[0].objects[ListIndex::new(1)].id)
             .construction
-            .map(|k| k.builders.get()),
+            .map(|construction| construction.builders.get()),
         Some(0)
     );
     assert_eq!(
@@ -587,7 +594,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
                 .state
                 .move_to()
                 .copied()
-                .map(|m| ObjectId::field(m.target))
+                .map(|move_to_action| ObjectId::field(move_to_action.target))
         ),
         (BuildState::Move { move_to: None }, None, Some(600))
     );
@@ -642,7 +649,7 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
             .actions_of(t.players[0].objects[ListIndex::new(0)].id)
             .list
             .build()
-            .map(|b| b.state.bare()),
+            .map(|build_action| build_action.state.bare()),
         Some(BuildState::Work)
     );
     assert!(
@@ -658,18 +665,19 @@ fn unit_order_drop_off_sends_carrying_builder_to_the_table_drop_site() {
 /// clears `+0x7b8`; the Attack waits in state 4 for the `MoveTo`'s end.
 #[test]
 fn work_attack_on_touching_target_starts_its_move_to_arrived() {
-    let (mut t, task) = work_attack(UnitStance::Aggressive);
-    t.start_attack(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        object_id(50),
-        &task,
-        Position::new(10.4, 10.0, 0.0),
-        Notifies::Cleared,
-    )
-    .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    let attack = t
+    let (mut world, task) = work_attack(UnitStance::Aggressive);
+    world
+        .start_attack(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            object_id(50),
+            &task,
+            Position::new(10.4, 10.0, 0.0),
+            Notifies::Cleared,
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    let attack = world
         .parts
         .actions_of(unit.id)
         .list
@@ -678,7 +686,11 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
     assert_eq!(
         (
             attack.state.bare(),
-            attack.state.move_to().copied().map(|m| m.state),
+            attack
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state),
             attack.target2
         ),
         (
@@ -688,12 +700,12 @@ fn work_attack_on_touching_target_starts_its_move_to_arrived() {
         )
     );
     assert_eq!(
-        unit.sprite.map(|s| s.graphic.id),
+        unit.sprite.map(|active_sprite| active_sprite.graphic.id),
         Some(SpriteId::named(300))
     );
-    assert_eq!(t.parts.anim_speed_of(unit.id), Some(Speed::ZERO));
+    assert_eq!(world.parts.anim_speed_of(unit.id), Some(Speed::ZERO));
     assert_eq!(
-        t.parts.mover_of(unit.id).map(|m| m.stats.speed),
+        world.parts.mover_of(unit.id).map(|mover| mover.stats.speed),
         Some(Speed::new(0.8))
     );
 }
@@ -738,11 +750,12 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
         ),
         Ok(Answer::NotTaken)
     );
-    let ai = |t: &World| {
-        t.parts
+    let ai = |world: &World| {
+        world
+            .parts
             .unit_ai
-            .get(t.players[1].objects[ListIndex::new(0)].id)
-            .map(|a| a.last_retarget_time)
+            .get(world.players[1].objects[ListIndex::new(0)].id)
+            .map(|unit_ai| unit_ai.last_retarget_time)
     };
     assert_ne!(ai(&t), Some(WorldTime::from_millis(3500)));
     assert_eq!(
@@ -764,8 +777,8 @@ fn work_command_keeps_the_top_attack_on_its_target_and_tells_its_unit_ai() {
 /// place and class; a target or a main building the slice does not hold fails.
 #[test]
 fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
-    let (mut t, _) = work_attack(UnitStance::Aggressive);
-    let aim = t.attack_aim(object_id(50)).unwrap();
+    let (mut world, _) = work_attack(UnitStance::Aggressive);
+    let aim = world.attack_aim(object_id(50)).unwrap();
     assert_eq!(
         (aim.owner, aim.class, aim.fog_visibility),
         (PlayerId::new(0), class::PREDATOR, FogVisibility::INVISIBLE)
@@ -778,8 +791,8 @@ fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
             class::PREDATOR
         )
     );
-    annexed(&mut t);
-    let aim = t.attack_aim(object_id(61)).unwrap();
+    annexed(&mut world);
+    let aim = world.attack_aim(object_id(61)).unwrap();
     assert_eq!(
         (aim.owner, aim.class, aim.fog_visibility),
         (PlayerId::new(0), class::TOWER, FogVisibility::VISIBLE)
@@ -792,18 +805,19 @@ fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
             class::BUILDING
         )
     );
-    let r = t.attack_aim(object_id(98));
+    let r = world.attack_aim(object_id(98));
     assert_eq!(
         r.err().map(|e| e.reason()),
         Some("an attack task's target the slice does not hold")
     );
-    t.parts
-        .building_mut(t.players[0].objects[ListIndex::new(2)].id)
+    world
+        .parts
+        .building_mut(world.players[0].objects[ListIndex::new(2)].id)
         .unwrap()
         .annex_of = Some(MainBuildingId::new(object_id(99)));
-    let r = t.attack_aim(object_id(61));
+    let attack_aim = world.attack_aim(object_id(61));
     assert_eq!(
-        r.err().map(|e| e.reason()),
+        attack_aim.err().map(|error| error.reason()),
         Some("an attack task's main building is gone")
     );
 }
@@ -815,22 +829,23 @@ fn an_attack_task_aims_at_its_target_or_an_annex_main_building() {
 /// A soldier without a unit AI only takes the target.
 #[test]
 fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
-    let (mut t, _) = work_attack(UnitStance::Aggressive);
-    annexed(&mut t);
-    t.world_time = WorldTime::from_millis(1730);
-    let aim = t.attack_aim(object_id(61)).unwrap();
-    t.attack_notifies(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        (object_id(61), &aim),
-        Position::new(21.0, 21.0, 0.0),
-        Notifies::Cleared,
-    )
-    .unwrap();
-    let ai = t
+    let (mut world, _) = work_attack(UnitStance::Aggressive);
+    annexed(&mut world);
+    world.world_time = WorldTime::from_millis(1730);
+    let aim = world.attack_aim(object_id(61)).unwrap();
+    world
+        .attack_notifies(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            (object_id(61), &aim),
+            Position::new(21.0, 21.0, 0.0),
+            Notifies::Cleared,
+        )
+        .unwrap();
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
@@ -863,21 +878,23 @@ fn an_attack_task_tells_its_unit_ai_the_order_the_action_and_the_target() {
         )
     );
     assert_eq!(
-        t.players[0].objects[ListIndex::new(2)].workers,
+        world.players[0].objects[ListIndex::new(2)].workers,
         WorkerCount::of_data(1)
     );
-    t.parts
-        .set_unit_ai(t.players[1].objects[ListIndex::new(0)].id, None);
-    t.attack_notifies(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        (object_id(61), &aim),
-        Position::new(21.0, 21.0, 0.0),
-        Notifies::Cleared,
-    )
-    .unwrap();
+    world
+        .parts
+        .set_unit_ai(world.players[1].objects[ListIndex::new(0)].id, None);
+    world
+        .attack_notifies(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            (object_id(61), &aim),
+            Position::new(21.0, 21.0, 0.0),
+            Notifies::Cleared,
+        )
+        .unwrap();
     assert_eq!(
-        t.players[0].objects[ListIndex::new(2)].workers,
+        world.players[0].objects[ListIndex::new(2)].workers,
         WorkerCount::of_data(2)
     );
 }
@@ -893,22 +910,23 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
         (0.5, AttackState::Ready, false, 300),
         (0.0, AttackState::Swing, true, 301),
     ] {
-        let (mut t, task) = work_attack(UnitStance::Aggressive);
-        let unit = &mut t.players[1].objects[ListIndex::new(0)];
+        let (mut world, task) = work_attack(UnitStance::Aggressive);
+        let unit = &mut world.players[1].objects[ListIndex::new(0)];
         let id = unit.id;
-        t.parts.set_unit_ai(id, None);
-        t.parts.combat_mut(id).unwrap().attack_timer = Seconds::new(timer);
-        t.start_attack(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(50),
-            &task,
-            Position::new(10.4, 10.0, 0.0),
-            Notifies::Cleared,
-        )
-        .unwrap();
-        let unit = &t.players[1].objects[ListIndex::new(0)];
-        let attack = t
+        world.parts.set_unit_ai(id, None);
+        world.parts.combat_mut(id).unwrap().attack_timer = Seconds::new(timer);
+        world
+            .start_attack(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(50),
+                &task,
+                Position::new(10.4, 10.0, 0.0),
+                Notifies::Cleared,
+            )
+            .unwrap();
+        let unit = &world.players[1].objects[ListIndex::new(0)];
+        let attack = world
             .parts
             .actions_of(unit.id)
             .list
@@ -921,7 +939,7 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
             "reload timer {timer}"
         );
         assert_eq!(
-            unit.sprite.map(|s| s.graphic.id),
+            unit.sprite.map(|active_sprite| active_sprite.graphic.id),
             Some(SpriteId::named(sprite))
         );
     }
@@ -929,12 +947,12 @@ fn an_attack_task_of_unit_that_cannot_move_goes_ready_in_reach() {
 
 /// Gaia's main building 60 (master 200, class 3) at (20.5, 20.5) and its annex 61 (master 201,
 /// class 52) at (22, 20.5), both fog visible, after the wolf of [`work_attack`]'s world.
-fn annexed(t: &mut World) {
-    let wolf = t.model.masters[0]
+fn annexed(world: &mut World) {
+    let wolf = world.model.masters[0]
         .get(master_id(126))
         .cloned()
         .expect("the wolf's master");
-    t.model.masters[0] = Arc::new(Masters::new([
+    world.model.masters[0] = Arc::new(Masters::new([
         wolf,
         Master {
             id: master_id(200),
@@ -969,7 +987,7 @@ fn annexed(t: &mut World) {
             },
         )
     };
-    let _ = t
+    let _ = world
         .push_live(
             PlayerId::new(0),
             building(
@@ -980,7 +998,7 @@ fn annexed(t: &mut World) {
             ),
         )
         .unwrap();
-    let _ = t
+    let _ = world
         .push_live(
             PlayerId::new(0),
             building(
@@ -1009,8 +1027,8 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         replay_delay: Seconds::ZERO,
         flags: SpriteFlags::ANIMATED,
     };
-    let mut t = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
-    t.model.graphics = Arc::new(Graphics::from([
+    let mut world = soldiers(&[(11, 4, Point::new(10.0, 10.0))], &[]);
+    world.model.graphics = Arc::new(Graphics::from([
         (SpriteId::named(300), standing),
         (
             SpriteId::named(301),
@@ -1031,7 +1049,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
     let mut walker = walker();
     // the soldier's speed 0.8: its standing sprite's factor 1, its walking one's 1.5
     walker.stats.speed = Speed::new(1.2);
-    let soldier = Arc::make_mut(&mut t.model.masters[1])
+    let soldier = Arc::make_mut(&mut world.model.masters[1])
         .get_mut(master_id(4))
         .unwrap();
     soldier.standing_sprite = Some(SpriteId::named(300));
@@ -1049,13 +1067,13 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         .weapon_range = Distance::ZERO;
     soldier.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
     soldier.move_stats = Some(walker.stats);
-    t.model.masters[0] = Arc::new(Masters::new([Master {
+    world.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(126),
         kind: MasterKind::COMBAT,
         class: class::PREDATOR,
         ..Master::default()
     }]));
-    let _ = t
+    let _ = world
         .push_live(
             PlayerId::new(0),
             Unit {
@@ -1084,18 +1102,18 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         unknown: None,
         obstruction: None,
     };
-    t.spatial = Spatial::new(GridSize::new(120, 120));
-    t.spatial.insert(
+    world.spatial = Spatial::new(GridSize::new(120, 120));
+    world.spatial.insert(
         object_id(11),
         placed(10.0, class::CLASS_0, PlayerId::new(1), master_id(4)),
     );
-    t.spatial.insert(
+    world.spatial.insert(
         object_id(50),
         placed(10.4, class::PREDATOR, PlayerId::new(0), master_id(126)),
     );
     let mut rng = Well512::default();
-    let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.put_mover(unit.id, Some(walker));
+    let unit = &mut world.players[1].objects[ListIndex::new(0)];
+    world.parts.put_mover(unit.id, Some(walker));
     unit.sprite = Some(ActiveSprite::start(
         Graphic {
             id: SpriteId::named(302),
@@ -1104,8 +1122,8 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         &mut rng,
         tuning().sprite,
     ));
-    t.parts.set_anim_speed(unit.id, Speed::new(1.0));
-    t.parts.set_unit_ai(
+    world.parts.set_anim_speed(unit.id, Speed::new(1.0));
+    world.parts.set_unit_ai(
         unit.id,
         Some(UnitAi {
             ai_kind: UnitAiKind::Ranged,
@@ -1121,7 +1139,7 @@ fn work_attack(stance: UnitStance) -> (World, Task) {
         sprites: TaskSprites::NONE,
         ..Task::default()
     };
-    (t, task)
+    (world, task)
 }
 
 /// A world of player 1's soldiers (master 4, formation category 3) and villagers (master 83,
@@ -1149,7 +1167,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
             ..Unit::default()
         })
         .collect();
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -1184,7 +1202,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         }),
         ..Master::default()
     };
-    t.model.masters = vec![
+    world.model.masters = vec![
         Arc::new(Masters::new([])),
         Arc::new(Masters::new([
             master(master_id(4), FormationClass::of_data(3)),
@@ -1192,7 +1210,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
         ])),
     ];
     if !members.is_empty() {
-        t.groups.groups.push(UnitGroup {
+        world.groups.groups.push(UnitGroup {
             id: group_id(5),
             members: members
                 .iter()
@@ -1204,7 +1222,7 @@ fn soldiers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
             ..UnitGroup::default()
         });
     }
-    t
+    world
 }
 
 /// `FUN_140fd76d0`: villagers move loose, soldiers within the influence distance of each
@@ -1219,14 +1237,14 @@ fn the_splitter_groups_soldiers_near_each_other_and_leaves_villagers_loose() {
         (13, 4, Point::new(23.5, 20.0)),
         (14, 4, Point::new(40.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[]);
-    let split = t
+    let mut world = soldiers(&units, &[]);
+    let split = world
         .split(&object_ids([14, 13, 12, 11, 10]), Kept::All, ControlKey::Up)
         .unwrap();
     // 12 has two to join it (11 and 13), 11 and 13 one each
     assert_eq!(split.groups, [object_id_list([12, 11, 13])]);
     assert_eq!(split.loose, object_id_list([10, 14]));
-    let split = t
+    let split = world
         .split(
             &object_ids([14, 13, 12, 11, 10]),
             Kept::All,
@@ -1236,8 +1254,8 @@ fn the_splitter_groups_soldiers_near_each_other_and_leaves_villagers_loose() {
     assert_eq!(split.loose, object_id_list([10]));
     assert_eq!(split.groups.len(), 4);
     // without auto formations every unit moves loose
-    t.players[1].formations.auto = false;
-    let split = t
+    world.players[1].formations.auto = false;
+    let split = world
         .split(&object_ids([14, 13, 12, 11, 10]), Kept::All, ControlKey::Up)
         .unwrap();
     assert_eq!(split.loose, object_id_list([10, 11, 12, 13, 14]));
@@ -1253,14 +1271,14 @@ fn the_splitter_keeps_the_order_members_of_an_existing_group_together() {
         (12, 4, Point::new(60.0, 20.0)),
         (13, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[11, 12]);
-    t.players[1].formations.auto = false;
-    let split = t
+    let mut world = soldiers(&units, &[11, 12]);
+    world.players[1].formations.auto = false;
+    let split = world
         .split(&object_ids([13, 12, 11]), Kept::All, ControlKey::Up)
         .unwrap();
     assert_eq!(split.groups, [object_id_list([11, 12])]);
     assert_eq!(split.loose, object_id_list([13]));
-    let split = t
+    let split = world
         .split(&object_ids([12, 13]), Kept::All, ControlKey::Up)
         .unwrap();
     assert_eq!(split.loose, object_id_list([12, 13]));
@@ -1275,8 +1293,8 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[]);
-    let _ = t
+    let mut soldiers = soldiers(&units, &[]);
+    let _ = soldiers
         .push_live(
             PlayerId::new(0),
             Unit {
@@ -1286,38 +1304,48 @@ fn the_command_check_drops_gone_units_and_others_units_of_its_first_60() {
         )
         .unwrap();
     assert_eq!(
-        t.command_check(PlayerId::new(1), &object_ids([11, 30, 99, -1]))
+        soldiers
+            .command_check(PlayerId::new(1), &object_ids([11, 30, 99, -1]))
             .unwrap(),
         Some(object_ids([11, -1, -1, -1]))
     );
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, true);
     assert_eq!(
-        t.command_check(PlayerId::new(1), &object_ids([11, 30, 99]))
+        soldiers
+            .command_check(PlayerId::new(1), &object_ids([11, 30, 99]))
             .unwrap(),
         Some(object_ids([11, 30, -1]))
     );
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, false);
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, false);
     assert_eq!(
-        t.command_check(PlayerId::new(1), &object_ids([30, 99]))
+        soldiers
+            .command_check(PlayerId::new(1), &object_ids([30, 99]))
             .unwrap(),
         None
     );
-    t.players[1].kind = PlayerKind::Computer;
+    soldiers.players[1].kind = PlayerKind::Computer;
     assert_eq!(
-        t.command_check(PlayerId::new(1), &object_ids([30, 99]))
+        soldiers
+            .command_check(PlayerId::new(1), &object_ids([30, 99]))
             .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerKind::Human;
+    soldiers.players[1].kind = PlayerKind::Human;
     // past the first 60 nothing is checked
     let mut ids = vec![99; 60];
     ids.push(30);
-    let check = |t: &World, ids: &[i32]| {
-        t.command_check(PlayerId::new(1), &object_ids(ids.iter().copied()))
+    let check = |world: &World, ids: &[i32]| {
+        world.command_check(PlayerId::new(1), &object_ids(ids.iter().copied()))
     };
-    assert_eq!(check(&t, &ids).unwrap(), None);
+    assert_eq!(check(&soldiers, &ids).unwrap(), None);
     ids[0] = 11;
-    let checked = check(&t, &ids).unwrap().unwrap();
+    let checked = check(&soldiers, &ids).unwrap().unwrap();
     assert_eq!(
         (checked[0], checked[1], checked[60]),
         (Some(object_id(11)), None, Some(object_id(30)))
@@ -1335,8 +1363,8 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[]);
-    t.players.push(Player {
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.players.push(Player {
         objects: vec![Unit {
             id: object_id(30),
             ..Unit::default()
@@ -1344,62 +1372,72 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
         .into(),
         ..Player::default()
     });
-    t.reindex();
-    t.players[1].relations = relation_row([3, 0, 4]);
-    t.players[2].relations = relation_row([3, 0, 0]);
-    let check = |t: &World, flag, named| {
-        t.unload_check(
-            PlayerId::new(1),
-            &object_ids([11, 30, 99]),
-            UnloadPick::of_packet(flag, named),
-        )
-        .unwrap()
+    soldiers.reindex();
+    soldiers.players[1].relations = relation_row([3, 0, 4]);
+    soldiers.players[2].relations = relation_row([3, 0, 0]);
+    let check = |world: &World, flag, named| {
+        world
+            .unload_check(
+                PlayerId::new(1),
+                &object_ids([11, 30, 99]),
+                UnloadPick::of_packet(flag, named),
+            )
+            .unwrap()
     };
-    assert_eq!(check(&t, 3, 12), Some(object_ids([11, 30, -1])));
-    assert_eq!(check(&t, 6, 12), Some(object_ids([11, 30, -1])));
-    assert_eq!(check(&t, 1, 1), Some(object_ids([11, 30, -1])));
+    assert_eq!(check(&soldiers, 3, 12), Some(object_ids([11, 30, -1])));
+    assert_eq!(check(&soldiers, 6, 12), Some(object_ids([11, 30, -1])));
+    assert_eq!(check(&soldiers, 1, 1), Some(object_ids([11, 30, -1])));
     // the named object of another player's, the issuer not named, another flag: out
-    assert_eq!(check(&t, 3, 30), Some(object_ids([11, -1, -1])));
-    assert_eq!(check(&t, 1, 2), Some(object_ids([11, -1, -1])));
-    assert_eq!(check(&t, 0, 12), Some(object_ids([11, -1, -1])));
-    assert_eq!(check(&t, 7, 12), Some(object_ids([11, -1, -1])));
+    assert_eq!(check(&soldiers, 3, 30), Some(object_ids([11, -1, -1])));
+    assert_eq!(check(&soldiers, 1, 2), Some(object_ids([11, -1, -1])));
+    assert_eq!(check(&soldiers, 0, 12), Some(object_ids([11, -1, -1])));
+    assert_eq!(check(&soldiers, 7, 12), Some(object_ids([11, -1, -1])));
     // allied one way only: out, unless the setting lets any through
-    t.players[2].relations = relation_row([3, 3, 0]);
-    assert_eq!(check(&t, 3, 12), Some(object_ids([11, -1, -1])));
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
-    assert_eq!(check(&t, 0, 12), Some(object_ids([11, 30, -1])));
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, false);
+    soldiers.players[2].relations = relation_row([3, 3, 0]);
+    assert_eq!(check(&soldiers, 3, 12), Some(object_ids([11, -1, -1])));
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, true);
+    assert_eq!(check(&soldiers, 0, 12), Some(object_ids([11, 30, -1])));
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, false);
     assert_eq!(
-        t.unload_check(
-            PlayerId::new(1),
-            &object_ids([30, 99]),
-            UnloadPick::of_packet(3, 12)
-        )
-        .unwrap(),
+        soldiers
+            .unload_check(
+                PlayerId::new(1),
+                &object_ids([30, 99]),
+                UnloadPick::of_packet(3, 12)
+            )
+            .unwrap(),
         None
     );
-    t.players[1].kind = PlayerKind::Computer;
+    soldiers.players[1].kind = PlayerKind::Computer;
     assert_eq!(
-        t.unload_check(
-            PlayerId::new(1),
-            &object_ids([30, 99]),
-            UnloadPick::of_packet(3, 12)
-        )
-        .unwrap(),
+        soldiers
+            .unload_check(
+                PlayerId::new(1),
+                &object_ids([30, 99]),
+                UnloadPick::of_packet(3, 12)
+            )
+            .unwrap(),
         Some(object_ids([-1, -1]))
     );
-    t.players[1].kind = PlayerKind::Human;
+    soldiers.players[1].kind = PlayerKind::Human;
     // past the first 60 nothing goes on
     let mut ids = vec![11; 60];
     ids.push(12);
     assert_eq!(
-        t.unload_check(
-            PlayerId::new(1),
-            &object_ids(ids),
-            UnloadPick::of_packet(3, 12)
-        )
-        .unwrap()
-        .map(|c| c.len()),
+        soldiers
+            .unload_check(
+                PlayerId::new(1),
+                &object_ids(ids),
+                UnloadPick::of_packet(3, 12)
+            )
+            .unwrap()
+            .map(|c| c.len()),
         Some(60)
     );
 }
@@ -1408,8 +1446,8 @@ fn the_unload_check_keeps_an_ally_object_the_command_ties_to_the_issuer() {
 #[test]
 fn the_lookup_keeps_gone_unit_entry() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    let _ = t
+    let mut world = soldiers(&units, &[]);
+    let _ = world
         .push_asleep(
             PlayerId::new(1),
             Unit {
@@ -1419,7 +1457,7 @@ fn the_lookup_keeps_gone_unit_entry() {
         )
         .unwrap();
     assert_eq!(
-        t.lookup(&object_ids([99, 40, 11, -1])),
+        world.lookup(&object_ids([99, 40, 11, -1])),
         [
             None,
             Some(Place::Sleeping(PlayerId::new(1), ListIndex::new(0))),
@@ -1439,7 +1477,7 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[11, 12]);
+    let mut world = soldiers(&units, &[11, 12]);
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
@@ -1452,8 +1490,8 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
         ready: true,
         target_kind: None,
     };
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(0)].id,
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(0)].id,
         Some(UnitAi {
             orders: vec![order],
             idle_timer: Millis::new(5),
@@ -1461,20 +1499,20 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
             ..UnitAi::default()
         }),
     );
-    let ai = t
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .cloned()
         .unwrap();
     let thirty = Unit {
         id: object_id(30),
         ..Unit::default()
     };
-    let _ = t
+    let _ = world
         .push_live(PlayerId::new(0), Object::with_ai(thirty, ai))
         .unwrap();
-    let _ = t
+    let _ = world
         .push_asleep(
             PlayerId::new(1),
             Unit {
@@ -1483,21 +1521,23 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
             },
         )
         .unwrap();
-    t.stop_command(player_id(1), &object_ids([11, 12, 99, 30, 40]))
+    world
+        .stop_command(player_id(1), &object_ids([11, 12, 99, 30, 40]))
         .unwrap();
-    let ai = t
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!((ai.orders.len(), ai.idle_timer), (0, Millis::new(300)));
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].group.id, None);
-    assert_eq!(t.players[1].objects[ListIndex::new(1)].group.id, None);
-    assert_eq!(t.groups.get(group_id(5)).unwrap().members.len(), 0);
+    assert_eq!(world.players[1].objects[ListIndex::new(0)].group.id, None);
+    assert_eq!(world.players[1].objects[ListIndex::new(1)].group.id, None);
+    assert_eq!(world.groups.get(group_id(5)).unwrap().members.len(), 0);
     assert_eq!(
-        t.parts
+        world
+            .parts
             .unit_ai
-            .get(t.players[0].objects[ListIndex::new(0)].id)
+            .get(world.players[0].objects[ListIndex::new(0)].id)
             .unwrap()
             .orders
             .len(),
@@ -1510,21 +1550,21 @@ fn stop_takes_its_units_out_of_their_group_and_empties_their_orders() {
 /// a queued order joins its unit AI's queue with the issuer as the order's.
 #[test]
 fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
-    let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
-    t.players.push(Player::default());
-    t.reindex();
-    t.player_time.push(Millis::ZERO);
-    t.model.masters.push(Arc::new(Masters::new([])));
+    let mut world = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
+    world.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
+    world.players.push(Player::default());
+    world.reindex();
+    world.player_time.push(Millis::ZERO);
+    world.model.masters.push(Arc::new(Masters::new([])));
     let walker = walker();
-    if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        m.move_stats = Some(walker.stats);
+    if let Some(master) = Arc::make_mut(&mut world.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
+        master.move_stats = Some(walker.stats);
     }
-    let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.put_mover(unit.id, Some(walker));
-    t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
+    let unit = &mut world.players[1].objects[ListIndex::new(0)];
+    world.parts.put_mover(unit.id, Some(walker));
+    world.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
     assert_eq!(
-        t.checked_units(PlayerId::new(2), &object_ids([11])),
+        world.checked_units(PlayerId::new(2), &object_ids([11])),
         object_ids([11])
     );
     let order = MoveOrder {
@@ -1533,7 +1573,8 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
         flags: OrderFlags::QUEUED,
         control: ControlKey::Up,
     };
-    t.move_order(PlayerId::new(2), &object_ids([11]), &order)
+    world
+        .move_order(PlayerId::new(2), &object_ids([11]), &order)
         .unwrap();
     let interact = Interact {
         target: None,
@@ -1542,15 +1583,19 @@ fn an_order_to_another_player_unit_goes_to_its_queue_with_the_setting() {
         flags: OrderFlags::QUEUED,
         filter: None,
     };
-    t.interact(PlayerId::new(2), &object_ids([11]), &interact)
+    world
+        .interact(PlayerId::new(2), &object_ids([11]), &interact)
         .unwrap();
-    let ai = t
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
-    let queued: Vec<(Option<Issuer>, OrderKind)> =
-        ai.orders.iter().map(|o| (o.issuer, o.order)).collect();
+    let queued: Vec<(Option<Issuer>, OrderKind)> = ai
+        .orders
+        .iter()
+        .map(|queued_order| (queued_order.issuer, queued_order.order))
+        .collect();
     let player_2 = Some(Issuer::Player(player_id(2)));
     assert_eq!(
         queued,
@@ -1615,15 +1660,16 @@ fn the_loose_units_of_move_or_an_interact_leave_their_groups() {
         flags: OrderFlags::empty(),
         filter: None,
     };
-    let mut t = two();
-    for u in &mut t.players[1].objects {
-        u.pasture = None;
-        u.my_pasture = None;
+    let mut world = two();
+    for unit in &mut world.players[1].objects {
+        unit.pasture = None;
+        unit.my_pasture = None;
     }
-    t.interact(PlayerId::new(1), &object_ids([11, 12]), &interact)
+    world
+        .interact(PlayerId::new(1), &object_ids([11, 12]), &interact)
         .unwrap();
-    assert_eq!(t.players[1].objects[ListIndex::new(0)].group.id, None);
-    assert_eq!(t.players[1].objects[ListIndex::new(1)].group.id, None);
+    assert_eq!(world.players[1].objects[ListIndex::new(0)].group.id, None);
+    assert_eq!(world.players[1].objects[ListIndex::new(1)].group.id, None);
 }
 
 /// A queued MOVE's new group (`FUN_140e67800` at `0x140e67b5d`): the first of its units the
@@ -1642,32 +1688,33 @@ fn queued_move_new_group_takes_its_first_unit_target() {
         current_target: target,
         ..UnitAi::default()
     };
-    let mut t = soldiers(&units, &[]);
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(0)].id,
+    let mut world = soldiers(&units, &[]);
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(0)].id,
         Some(ai(Some(object_id(13)))),
     );
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(1)].id,
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(1)].id,
         Some(ai(Some(object_id(11)))),
     );
     assert_eq!(
-        t.first_unit_target(&object_id_list([99, 11, 13])),
+        world.first_unit_target(&object_id_list([99, 11, 13])),
         Some((object_id(13), Point::new(21.0, 20.0), true))
     );
     assert_eq!(
-        t.first_unit_target(&object_id_list([13, 11])),
+        world.first_unit_target(&object_id_list([13, 11])),
         Some((object_id(11), Point::new(20.0, 20.0), true))
     );
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(0)].id,
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(0)].id,
         Some(ai(Some(object_id(98)))),
     );
-    assert_eq!(t.first_unit_target(&object_id_list([11, 13])), None);
-    t.parts
-        .set_unit_ai(t.players[1].objects[ListIndex::new(0)].id, None);
-    assert_eq!(t.first_unit_target(&object_id_list([11, 13])), None);
-    assert_eq!(t.first_unit_target(&object_id_list([99])), None);
+    assert_eq!(world.first_unit_target(&object_id_list([11, 13])), None);
+    world
+        .parts
+        .set_unit_ai(world.players[1].objects[ListIndex::new(0)].id, None);
+    assert_eq!(world.first_unit_target(&object_id_list([11, 13])), None);
+    assert_eq!(world.first_unit_target(&object_id_list([99])), None);
 }
 
 /// GATE and `FUN_1411dba30`: player 1's building 50 toggles its lock, a lock setting its last
@@ -1676,12 +1723,12 @@ fn queued_move_new_group_takes_its_first_unit_target() {
 #[test]
 fn gate_command_toggles_the_lock_of_building_of_its_player() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.world_time = WorldTime::from_millis(400);
-    t.players.push(Player::default());
-    t.reindex();
-    t.model.masters.push(Arc::new(Masters::new([])));
-    t.model.masters[1] = Arc::new(Masters::new([
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.world_time = WorldTime::from_millis(400);
+    soldiers.players.push(Player::default());
+    soldiers.reindex();
+    soldiers.model.masters.push(Arc::new(Masters::new([])));
+    soldiers.model.masters[1] = Arc::new(Masters::new([
         Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
@@ -1693,7 +1740,7 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
             ..Master::default()
         },
     ]));
-    let _ = t
+    let _ = soldiers
         .push_live(
             PlayerId::new(1),
             Object::with_building(
@@ -1713,27 +1760,31 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
             ),
         )
         .unwrap();
-    t.set_motion(object_id(50), Some(Motion::Moving(walker())));
-    let building = |t: &World| {
-        let b = &t.players[1].objects[ListIndex::new(1)];
+    soldiers.set_motion(object_id(50), Some(Motion::Moving(walker())));
+    let building = |world: &World| {
+        let unit = &world.players[1].objects[ListIndex::new(1)];
         (
-            t.parts.building_of(b.id).gate.unwrap().locked,
-            t.parts.mover_of(b.id).unwrap().last_move,
+            world.parts.building_of(unit.id).gate.unwrap().locked,
+            world.parts.mover_of(unit.id).unwrap().last_move,
         )
     };
-    t.gate(player_id(1), object_id(50)).unwrap();
-    assert_eq!(building(&t), (true, WorldTime::from_millis(401)));
-    t.world_time = WorldTime::from_millis(500);
-    t.gate(player_id(2), object_id(50)).unwrap();
-    assert_eq!(building(&t), (true, WorldTime::from_millis(401)));
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
-    t.gate(player_id(2), object_id(50)).unwrap();
-    assert_eq!(building(&t), (false, WorldTime::from_millis(401)));
-    t.gate(player_id(1), object_id(11)).unwrap();
-    t.gate(player_id(1), object_id(99)).unwrap();
+    soldiers.gate(player_id(1), object_id(50)).unwrap();
+    assert_eq!(building(&soldiers), (true, WorldTime::from_millis(401)));
+    soldiers.world_time = WorldTime::from_millis(500);
+    soldiers.gate(player_id(2), object_id(50)).unwrap();
+    assert_eq!(building(&soldiers), (true, WorldTime::from_millis(401)));
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, true);
+    soldiers.gate(player_id(2), object_id(50)).unwrap();
+    assert_eq!(building(&soldiers), (false, WorldTime::from_millis(401)));
+    soldiers.gate(player_id(1), object_id(11)).unwrap();
+    soldiers.gate(player_id(1), object_id(99)).unwrap();
     assert_eq!(
-        t.parts
-            .building_of(t.players[1].objects[ListIndex::new(0)].id)
+        soldiers
+            .parts
+            .building_of(soldiers.players[1].objects[ListIndex::new(0)].id)
             .gate,
         None
     );
@@ -1745,7 +1796,7 @@ fn gate_command_toggles_the_lock_of_building_of_its_player() {
 #[test]
 fn transformed_building_takes_its_new_master_build_time_in_state_2() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let master = |id, build_time| Master {
         id,
         kind: MasterKind::BUILDING,
@@ -1757,7 +1808,7 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
         }),
         ..Master::default()
     };
-    t.model.masters[1] = Arc::new(Masters::new([
+    world.model.masters[1] = Arc::new(Masters::new([
         master(ids::TROPHY_NONE, WholeSeconds::of_data(10)),
         master(master_id(1650), WholeSeconds::of_data(30)),
     ]));
@@ -1796,32 +1847,44 @@ fn transformed_building_takes_its_new_master_build_time_in_state_2() {
             ..Default::default()
         },
     };
-    t.set_live_for_test(player_id(1), [trophy(ObjectState::Alive)]);
-    t.transform_object(player_id(1), object_id(60), master_id(1650))
+    world.set_live_for_test(player_id(1), [trophy(ObjectState::Alive)]);
+    world
+        .transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(unit.life.master_id, master_id(1650));
     assert_eq!(unit.life.hp, HitPoints::new(50.0));
     assert_eq!(
-        t.parts.building_of(unit.id).construction.unwrap().progress,
+        world
+            .parts
+            .building_of(unit.id)
+            .construction
+            .unwrap()
+            .progress,
         Seconds::new(30.0)
     );
     // FUN_141225b70 in state 2: the volleys are the new master's volley fire
-    assert_eq!(t.parts.combat_of(unit.id).firepower, Firepower::new(2.0));
-    t.set_live_for_test(player_id(1), [trophy(ObjectState::Unfinished)]);
-    t.transform_object(player_id(1), object_id(60), master_id(1650))
+    assert_eq!(
+        world.parts.combat_of(unit.id).firepower,
+        Firepower::new(2.0)
+    );
+    world.set_live_for_test(player_id(1), [trophy(ObjectState::Unfinished)]);
+    world
+        .transform_object(player_id(1), object_id(60), master_id(1650))
         .unwrap();
     assert_eq!(
-        t.parts
-            .building_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .building_of(world.players[1].objects[ListIndex::new(0)].id)
             .construction
             .unwrap()
             .progress,
         Seconds::new(10.0)
     );
     assert_eq!(
-        t.parts
-            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .combat_of(world.players[1].objects[ListIndex::new(0)].id)
             .firepower,
         Firepower::new(7.0)
     );
@@ -1844,22 +1907,27 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
         filter: None,
     };
     let run = |queued| {
-        let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
-        if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-            m.kind = MasterKind::BUILDING;
+        let mut world = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
+        if let Some(master) = Arc::make_mut(&mut world.model.masters[1]).get_mut(ids::VILLAGER_MALE)
+        {
+            master.kind = MasterKind::BUILDING;
         }
-        let unit = &mut t.players[1].objects[ListIndex::new(0)];
+        let unit = &mut world.players[1].objects[ListIndex::new(0)];
         (unit.pasture, unit.my_pasture) = (None, None);
-        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
-        t.interact(PlayerId::new(1), &object_ids([11]), &interact(queued))
+        world.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
+        world
+            .interact(PlayerId::new(1), &object_ids([11]), &interact(queued))
             .unwrap();
-        let ai = t
+        let ai = world
             .parts
             .unit_ai
-            .get(t.players[1].objects[ListIndex::new(0)].id)
+            .get(world.players[1].objects[ListIndex::new(0)].id)
             .cloned()
             .unwrap();
-        ai.orders.iter().map(|o| o.order).collect::<Vec<_>>()
+        ai.orders
+            .iter()
+            .map(|queued_order| queued_order.order)
+            .collect::<Vec<_>>()
     };
     assert_eq!(run(false), Vec::<OrderKind>::new());
     assert_eq!(run(true), [OrderKind::OnTarget]);
@@ -1871,15 +1939,15 @@ fn queued_interact_to_an_object_that_does_not_move_also_queues_it() {
 /// `FUN_14108c050`, 0x140c42cd4): the AI's order ends and it forgets its targets.
 #[test]
 fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
-    let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
+    let mut world = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
     let walker = walker();
-    if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-        m.move_stats = Some(walker.stats);
+    if let Some(master) = Arc::make_mut(&mut world.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
+        master.move_stats = Some(walker.stats);
     }
-    let unit = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.put_mover(unit.id, Some(walker));
+    let unit = &mut world.players[1].objects[ListIndex::new(0)];
+    world.parts.put_mover(unit.id, Some(walker));
     (unit.pasture, unit.my_pasture) = (None, None);
-    t.parts.set_unit_ai(
+    world.parts.set_unit_ai(
         unit.id,
         Some(UnitAi {
             current_order: Some(OrderKind::Move),
@@ -1900,15 +1968,20 @@ fn an_order_to_busy_unit_ai_readies_its_queue_and_stops_the_unit() {
         flags: OrderFlags::empty(),
         filter: None,
     };
-    t.interact(PlayerId::new(1), &object_ids([11]), &interact)
+    world
+        .interact(PlayerId::new(1), &object_ids([11]), &interact)
         .unwrap();
-    let ai = t
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .cloned()
         .unwrap();
-    let queue: Vec<_> = ai.orders.iter().map(|o| (o.order, o.ready)).collect();
+    let queue: Vec<_> = ai
+        .orders
+        .iter()
+        .map(|queued_order| (queued_order.order, queued_order.ready))
+        .collect();
     assert_eq!(
         queue,
         [(OrderKind::Move, true), (OrderKind::OnTarget, true)]
@@ -1931,17 +2004,19 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         filter: None,
     };
     let mover = || {
-        let mut t = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
+        let mut soldiers = soldiers(&[(11, 83, Point::new(20.0, 20.0))], &[]);
         let walker = walker();
-        if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(ids::VILLAGER_MALE) {
-            m.move_stats = Some(walker.stats);
+        if let Some(master) =
+            Arc::make_mut(&mut soldiers.model.masters[1]).get_mut(ids::VILLAGER_MALE)
+        {
+            master.move_stats = Some(walker.stats);
         }
-        let unit = &mut t.players[1].objects[ListIndex::new(0)];
-        t.parts.put_mover(unit.id, Some(walker));
+        let unit = &mut soldiers.players[1].objects[ListIndex::new(0)];
+        soldiers.parts.put_mover(unit.id, Some(walker));
         (unit.pasture, unit.my_pasture) = (None, None);
-        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
-        t.spatial.map = GridSize::new(100, 100);
-        t
+        soldiers.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
+        soldiers.spatial.map = GridSize::new(100, 100);
+        soldiers
     };
     let mut t = mover();
     t.interact_unit(PlayerId::new(1), object_id(99), &[], None, &interact)
@@ -1965,7 +2040,14 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
         .unwrap()
         .orders
         .iter()
-        .map(|o| (o.order, o.point, o.shown, o.ready))
+        .map(|queued_order| {
+            (
+                queued_order.order,
+                queued_order.point,
+                queued_order.shown,
+                queued_order.ready,
+            )
+        })
         .collect();
     assert_eq!(
         queued,
@@ -1990,9 +2072,9 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
     };
     t.interact_unit(PlayerId::new(1), object_id(11), &[], None, &itself)
         .unwrap();
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.unit_ai.get(u.id).unwrap().orders, []);
-    assert_eq!(t.parts.actions_of(u.id).list.move_to().copied(), None);
+    let players = &t.players[1].objects[ListIndex::new(0)];
+    assert_eq!(t.parts.unit_ai.get(players.id).unwrap().orders, []);
+    assert_eq!(t.parts.actions_of(players.id).list.move_to().copied(), None);
     let mut t = mover();
     t.parts
         .put_mover(t.players[1].objects[ListIndex::new(0)].id, None);
@@ -2002,11 +2084,13 @@ fn an_interact_unit_queues_its_offset_point_and_takes_no_work_on_itself() {
             .reason()
     };
     assert_eq!(reason(&mut t), "an ordered unit without movement state");
-    let mut t = mover();
-    let u = t.remove_live(PlayerId::new(1), ListIndex::new(0)).unwrap();
-    let _ = t.push_asleep(PlayerId::new(1), u).unwrap();
+    let mut world = mover();
+    let object = world
+        .remove_live(PlayerId::new(1), ListIndex::new(0))
+        .unwrap();
+    let _ = world.push_asleep(PlayerId::new(1), object).unwrap();
     assert_eq!(
-        reason(&mut t),
+        reason(&mut world),
         "an order to a unit the slice does not hold live"
     );
 }
@@ -2064,22 +2148,23 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
         ..Task::default()
     };
     let run = |master: MasterId, held: Held, task: Task| {
-        let mut t = soldiers(&[(11, master.get(), Point::new(20.0, 20.0))], &[]);
+        let mut world = soldiers(&[(11, master.get(), Point::new(20.0, 20.0))], &[]);
         for (id, class) in [(83, class::VILLAGER), (4, class::CLASS_6)] {
-            if let Some(m) = Arc::make_mut(&mut t.model.masters[1]).get_mut(master_id(id)) {
+            if let Some(m) = Arc::make_mut(&mut world.model.masters[1]).get_mut(master_id(id)) {
                 m.class = class;
             }
         }
-        let unit = &mut t.players[1].objects[ListIndex::new(0)];
+        let unit = &mut world.players[1].objects[ListIndex::new(0)];
         (unit.life.attribute_kind, unit.life.amount) = (held.kind, held.amount);
-        t.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
-        t.carried_resource_test(PlayerId::new(1), ListIndex::new(0), &task)
+        world.parts.set_unit_ai(unit.id, Some(UnitAi::default()));
+        world
+            .carried_resource_test(PlayerId::new(1), ListIndex::new(0), &task)
             .unwrap();
-        let unit = &t.players[1].objects[ListIndex::new(0)];
+        let unit = &world.players[1].objects[ListIndex::new(0)];
         (
             unit.life.attribute_kind,
             unit.life.amount,
-            t.parts.unit_ai.get(unit.id).unwrap().retarget_disabled,
+            world.parts.unit_ai.get(unit.id).unwrap().retarget_disabled,
         )
     };
     // wood held, a gather of gold: none held, of gold
@@ -2130,7 +2215,7 @@ fn the_carried_resource_test_drops_another_resource_and_stops_soldier_retargetin
 #[test]
 fn move_inside_work_command_with_0_keeps_the_order_queue() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let order = QueuedOrder {
         issuer: Some(Issuer::Player(player_id(1))),
         order: OrderKind::Move,
@@ -2143,24 +2228,26 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
         ready: true,
         target_kind: None,
     };
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(0)].id,
+    world.parts.set_unit_ai(
+        world.players[1].objects[ListIndex::new(0)].id,
         Some(UnitAi {
             orders: vec![order],
             ..UnitAi::default()
         }),
     );
-    t.move_point_order_with(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        Position::new(30.0, 30.0, 0.0),
-        OrderSource::Queued,
-    )
-    .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.unit_ai.get(unit.id).unwrap().orders.len(), 1);
+    world
+        .move_point_order_with(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(30.0, 30.0, 0.0),
+            OrderSource::Queued,
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    assert_eq!(world.parts.unit_ai.get(unit.id).unwrap().orders.len(), 1);
     assert_eq!(
-        t.parts
+        world
+            .parts
             .actions_of(unit.id)
             .list
             .move_to()
@@ -2169,16 +2256,18 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
             .goal(),
         Some(Position::new(30.0, 30.0, 0.0))
     );
-    t.move_point_order(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        Position::new(31.0, 30.0, 0.0),
-    )
-    .unwrap();
+    world
+        .move_point_order(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            Position::new(31.0, 30.0, 0.0),
+        )
+        .unwrap();
     assert_eq!(
-        t.parts
+        world
+            .parts
             .unit_ai
-            .get(t.players[1].objects[ListIndex::new(0)].id)
+            .get(world.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
             .orders
             .len(),
@@ -2191,9 +2280,9 @@ fn move_inside_work_command_with_0_keeps_the_order_queue() {
 #[test]
 fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.players.push(Player::default());
-    t.reindex();
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.players.push(Player::default());
+    soldiers.reindex();
     let scout = Master {
         id: ids::ID_448,
         kind: MasterKind::COMBAT,
@@ -2207,10 +2296,11 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         }),
         ..Master::default()
     };
-    t.model
+    soldiers
+        .model
         .masters
         .push(Arc::new(Masters::new([scout.clone()])));
-    t.model.masters[1] = Arc::new(Masters::new([
+    soldiers.model.masters[1] = Arc::new(Masters::new([
         scout,
         Master {
             id: master_id(4),
@@ -2233,32 +2323,43 @@ fn an_auto_scout_reaches_any_player_scout_of_its_first_60_ids() {
         },
         ..Unit::default()
     };
-    t.parts
-        .set_unit_ai(t.players[1].objects[ListIndex::new(0)].id, Some(ai.clone()));
-    let _ = t
+    soldiers.parts.set_unit_ai(
+        soldiers.players[1].objects[ListIndex::new(0)].id,
+        Some(ai.clone()),
+    );
+    let _ = soldiers
         .push_live(
             PlayerId::new(1),
             Object::with_ai(unit(object_id(12)), ai.clone()),
         )
         .unwrap();
-    let _ = t
+    let _ = soldiers
         .push_live(PlayerId::new(2), Object::with_ai(unit(object_id(30)), ai))
         .unwrap();
     let mut ids = vec![99; 59];
     ids.extend([30, 11, 12]);
-    t.auto_scout(player_id(1), &object_ids(ids)).unwrap();
-    let order = |t: &World, p: usize, i: ListIndex| {
-        t.parts
+    soldiers.auto_scout(player_id(1), &object_ids(ids)).unwrap();
+    let order = |world: &World, p: usize, list_index: ListIndex| {
+        world
+            .parts
             .unit_ai
-            .get(t.players[p].objects[i].id)
+            .get(world.players[p].objects[list_index].id)
             .unwrap()
             .current_order
     };
-    assert_eq!(order(&t, 2, ListIndex::new(0)), Some(OrderKind::AutoScout));
-    assert_eq!(order(&t, 1, ListIndex::new(0)), None);
-    assert_eq!(order(&t, 1, ListIndex::new(1)), None);
-    t.auto_scout(player_id(1), &object_ids([12])).unwrap();
-    assert_eq!(order(&t, 1, ListIndex::new(1)), Some(OrderKind::AutoScout));
+    assert_eq!(
+        order(&soldiers, 2, ListIndex::new(0)),
+        Some(OrderKind::AutoScout)
+    );
+    assert_eq!(order(&soldiers, 1, ListIndex::new(0)), None);
+    assert_eq!(order(&soldiers, 1, ListIndex::new(1)), None);
+    soldiers
+        .auto_scout(player_id(1), &object_ids([12]))
+        .unwrap();
+    assert_eq!(
+        order(&soldiers, 1, ListIndex::new(1)),
+        Some(OrderKind::AutoScout)
+    );
 }
 
 /// `FUN_140c64d50`: the stance and its place are set; `NoAttack` on an attacking unit AI
@@ -2358,20 +2459,20 @@ fn no_attack_stops_an_attacking_unit_ai_and_forgets_its_target() {
 #[test]
 fn stance_reaches_another_player_unit_only_under_the_setting() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.players.push(Player::default());
-    t.reindex();
-    t.model.masters.push(Arc::new(Masters::new([Master {
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.players.push(Player::default());
+    soldiers.reindex();
+    soldiers.model.masters.push(Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         class: class::CLASS_54,
         ..Master::default()
     }])));
-    t.parts.set_unit_ai(
-        t.players[1].objects[ListIndex::new(0)].id,
+    soldiers.parts.set_unit_ai(
+        soldiers.players[1].objects[ListIndex::new(0)].id,
         Some(UnitAi::default()),
     );
-    let _ = t
+    let _ = soldiers
         .push_live(
             PlayerId::new(2),
             Object::with_ai(
@@ -2388,26 +2489,33 @@ fn stance_reaches_another_player_unit_only_under_the_setting() {
             ),
         )
         .unwrap();
-    let stance = |t: &World, p: usize| {
-        t.parts
+    let stance = |world: &World, p: usize| {
+        world
+            .parts
             .unit_ai
-            .get(t.players[p].objects[ListIndex::new(0)].id)
+            .get(world.players[p].objects[ListIndex::new(0)].id)
             .unwrap()
             .stance
     };
-    t.unit_ai_state(player_id(1), &object_ids([11, 30]), UnitStance::StandGround)
+    soldiers
+        .unit_ai_state(player_id(1), &object_ids([11, 30]), UnitStance::StandGround)
         .unwrap();
     assert_eq!(
-        (stance(&t, 1), stance(&t, 2)),
+        (stance(&soldiers, 1), stance(&soldiers, 2)),
         (UnitStance::StandGround, UnitStance::Aggressive)
     );
-    t.settings.flags.set(OptionFlags::CHEATS_ENABLED, true);
-    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::Defensive)
+    soldiers
+        .settings
+        .flags
+        .set(OptionFlags::CHEATS_ENABLED, true);
+    soldiers
+        .unit_ai_state(player_id(1), &object_ids([30]), UnitStance::Defensive)
         .unwrap();
-    assert_eq!(stance(&t, 2), UnitStance::Aggressive);
-    t.unit_ai_state(player_id(1), &object_ids([30]), UnitStance::NoAttack)
+    assert_eq!(stance(&soldiers, 2), UnitStance::Aggressive);
+    soldiers
+        .unit_ai_state(player_id(1), &object_ids([30]), UnitStance::NoAttack)
         .unwrap();
-    assert_eq!(stance(&t, 2), UnitStance::NoAttack);
+    assert_eq!(stance(&soldiers, 2), UnitStance::NoAttack);
 }
 
 /// `FUN_1411a6a70` on a unit inside a building (`+0x2f0` set, `+0x2e8` 0): no sight slots and
@@ -2532,7 +2640,7 @@ fn switched_in_the_open(
     let graphics = shown
         .iter()
         .map(|&id| {
-            let g = Graphic {
+            let graphic = Graphic {
                 id: SpriteId::named(id),
                 frames: Frame::of_data(10),
                 facets: FacetCount::of_data(8),
@@ -2541,7 +2649,7 @@ fn switched_in_the_open(
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
             };
-            (g.id, g)
+            (graphic.id, graphic)
         })
         .collect();
     let mut rng = Well512::default();
@@ -2658,7 +2766,10 @@ fn master_change_in_the_open_moves_the_storage_and_shows_the_new_standing_sprite
         (u.life.master_id, u.life.hp, combat.firepower),
         (master_id(5), HitPoints::new(30.0), Firepower::new(3.0))
     );
-    assert_eq!(u.sprite.map(|s| s.graphic.id), Some(SpriteId::named(11)));
+    assert_eq!(
+        u.sprite.map(|active_sprite| active_sprite.graphic.id),
+        Some(SpriteId::named(11))
+    );
     assert_eq!(
         (record.master, record.radius, record.obstruction_kind),
         (
@@ -2793,15 +2904,16 @@ fn master_change_clears_the_powerups_but_the_hit_points_one() {
 #[test]
 fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let point = Position::new(25.0, 21.0, 0.0);
     assert_eq!(
-        t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
+        world.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
         Ok(Answer::NotTaken)
     );
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_move_to(Some(MoveToAction {
@@ -2815,7 +2927,7 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
             wait: MoveWait::default(),
         }));
     assert_eq!(
-        t.head_takes_move(
+        world.head_takes_move(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(11)),
@@ -2823,42 +2935,46 @@ fn the_head_action_takes_move_only_where_its_slot_0x40_does() {
         ),
         Ok(Answer::NotTaken)
     );
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_move_to(None);
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_artifact(Some(Artifact::new(PlayerId::new(1), None)));
     assert_eq!(
-        t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
+        world.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point),
         Ok(Answer::Taken)
     );
-    let artifact = t
+    let artifact = world
         .parts
-        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        .actions_of(world.players[1].objects[ListIndex::new(0)].id)
         .list
         .artifact()
         .copied()
         .unwrap();
     assert_eq!(artifact.goal, Some(point));
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_artifact(None);
-    t.set_unread(
-        t.players[1].objects[ListIndex::new(0)].id,
+    world.set_unread(
+        world.players[1].objects[ListIndex::new(0)].id,
         GenieError::unsupported("a test's action"),
     );
     assert!(
-        t.head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point)
+        world
+            .head_takes_move(PlayerId::new(1), ListIndex::new(0), None, point)
             .is_err()
     );
 }
@@ -2925,20 +3041,20 @@ fn followers() -> World {
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = soldiers(&units, &[]);
-    t.players[1].formations.auto = false;
-    t.spatial.map = GridSize::new(120, 120);
+    let mut world = soldiers(&units, &[]);
+    world.players[1].formations.auto = false;
+    world.spatial.map = GridSize::new(120, 120);
     let walker = walker();
-    t.model.masters[1] = Arc::new(Masters::new([Master {
+    world.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(4),
         kind: MasterKind::COMBAT,
         move_stats: Some(walker.stats),
         ..Master::default()
     }]));
-    for u in &mut t.players[1].objects {
-        t.parts.put_mover(u.id, Some(walker.clone()));
-        t.parts.set_unit_ai(
-            u.id,
+    for unit in &mut world.players[1].objects {
+        world.parts.put_mover(unit.id, Some(walker.clone()));
+        world.parts.set_unit_ai(
+            unit.id,
             Some(UnitAi {
                 current_order: None,
                 current_action: None,
@@ -2947,16 +3063,16 @@ fn followers() -> World {
             }),
         );
     }
-    t.players.push(Player::default());
-    t.reindex();
-    t.model.masters.push(Arc::new(Masters::new([Master {
+    world.players.push(Player::default());
+    world.reindex();
+    world.model.masters.push(Arc::new(Masters::new([Master {
         id: master_id(5),
         kind: MasterKind::COMBAT,
         class: class::CLASS_6,
         radius: Footprint::new(0.5, 0.5),
         ..Master::default()
     }])));
-    let _ = t
+    let _ = world
         .push_live(
             PlayerId::new(2),
             Unit {
@@ -2971,7 +3087,7 @@ fn followers() -> World {
             },
         )
         .unwrap();
-    t.spatial.insert(
+    world.spatial.insert(
         object_id(30),
         Placed {
             position: Position::new(40.0, 20.0, 0.0),
@@ -2987,7 +3103,7 @@ fn followers() -> World {
             obstruction: None,
         },
     );
-    t
+    world
 }
 
 /// GUARD (`FUN_14161dee0`): each unit's AI takes the defend order on the target at once,
@@ -2998,9 +3114,10 @@ fn followers() -> World {
 #[test]
 fn guard_gives_its_units_the_defend_order_at_once() {
     for x in [20.3, 40.0] {
-        let mut t = followers();
-        t.players[2].objects[ListIndex::new(0)].place_for_test(Position::new(x, 20.0, 0.0));
-        t.spatial
+        let mut world = followers();
+        world.players[2].objects[ListIndex::new(0)].place_for_test(Position::new(x, 20.0, 0.0));
+        world
+            .spatial
             .set_position(
                 object_id(30),
                 Position::new(x, 20.0, 0.0),
@@ -3008,12 +3125,13 @@ fn guard_gives_its_units_the_defend_order_at_once() {
                 tuning().visibility,
             )
             .unwrap();
-        t.guard(PlayerId::new(1), &object_ids([11]), object_id(30))
+        world
+            .guard(PlayerId::new(1), &object_ids([11]), object_id(30))
             .unwrap();
-        let ai = t
+        let ai = world
             .parts
             .unit_ai
-            .get(t.players[1].objects[ListIndex::new(0)].id)
+            .get(world.players[1].objects[ListIndex::new(0)].id)
             .unwrap();
         assert_eq!(
             (ai.current_order, ai.current_action, ai.order_priority.get()),
@@ -3036,11 +3154,12 @@ fn guard_gives_its_units_the_defend_order_at_once() {
 /// the follow order and action and the target with its class at its place.
 #[test]
 fn follower_takes_the_follow_order_and_walks_to_its_target() {
-    let mut t = followers();
-    t.follow(PlayerId::new(1), &object_ids([11]), object_id(30))
+    let mut world = followers();
+    world
+        .follow(PlayerId::new(1), &object_ids([11]), object_id(30))
         .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    let ai = t.parts.unit_ai.get(unit.id).unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action),
         (Some(OrderKind::Follow), Some(AiAction::Follow))
@@ -3052,7 +3171,8 @@ fn follower_takes_the_follow_order_and_walks_to_its_target() {
     assert_eq!(ai.target_point, Position::new(40.0, 20.0, 0.0));
     assert_eq!(
         ObjectId::field(
-            t.parts
+            world
+                .parts
                 .actions_of(unit.id)
                 .list
                 .move_to()
@@ -3063,8 +3183,9 @@ fn follower_takes_the_follow_order_and_walks_to_its_target() {
         30
     );
     assert_eq!(
-        t.parts
-            .actions_of(t.players[1].objects[ListIndex::new(1)].id)
+        world
+            .parts
+            .actions_of(world.players[1].objects[ListIndex::new(1)].id)
             .list
             .move_to()
             .copied(),
@@ -3076,12 +3197,13 @@ fn follower_takes_the_follow_order_and_walks_to_its_target() {
 /// the two's mean, takes the move order and action, and ignores the other.
 #[test]
 fn followers_side_by_side_take_their_offsets_from_the_target() {
-    let mut t = followers();
-    t.follow(PlayerId::new(1), &object_ids([11, 12]), object_id(30))
+    let mut world = followers();
+    world
+        .follow(PlayerId::new(1), &object_ids([11, 12]), object_id(30))
         .unwrap();
-    for (i, (other, x)) in [(12, 39.5), (11, 40.5)].into_iter().enumerate() {
-        let unit = &t.players[1].objects[ListIndex::new(i)];
-        let ai = t.parts.unit_ai.get(unit.id).unwrap();
+    for (index, (other, x)) in [(12, 39.5), (11, 40.5)].into_iter().enumerate() {
+        let unit = &world.players[1].objects[ListIndex::new(index)];
+        let ai = world.parts.unit_ai.get(unit.id).unwrap();
         assert_eq!(
             (ai.current_order, ai.current_action),
             (Some(OrderKind::Move), Some(AiAction::Move))
@@ -3091,12 +3213,13 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
             (Some(object_id(30)), Position::new(x, 20.0, 0.0))
         );
         assert_eq!(
-            t.parts.mover_of(unit.id).unwrap().ignore_units,
+            world.parts.mover_of(unit.id).unwrap().ignore_units,
             [object_id(other)]
         );
         assert_eq!(
             ObjectId::field(
-                t.parts
+                world
+                    .parts
                     .actions_of(unit.id)
                     .list
                     .move_to()
@@ -3113,13 +3236,15 @@ fn followers_side_by_side_take_their_offsets_from_the_target() {
 /// other's units.
 #[test]
 fn follow_of_another_player_unit_does_nothing() {
-    let mut t = followers();
-    t.follow(PlayerId::new(2), &object_ids([11]), object_id(30))
+    let mut world = followers();
+    world
+        .follow(PlayerId::new(2), &object_ids([11]), object_id(30))
         .unwrap();
     assert_eq!(
-        t.parts
+        world
+            .parts
             .unit_ai
-            .get(t.players[1].objects[ListIndex::new(0)].id)
+            .get(world.players[1].objects[ListIndex::new(0)].id)
             .unwrap()
             .current_order,
         None
@@ -3131,8 +3256,8 @@ fn follow_of_another_player_unit_does_nothing() {
 #[test]
 fn builder_leaves_the_main_building_of_an_annex() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.model.masters[1] = Arc::new(Masters::new([Master {
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.model.masters[1] = Arc::new(Masters::new([Master {
         id: master_id(79),
         kind: MasterKind::BUILDING,
         ..Master::default()
@@ -3167,17 +3292,18 @@ fn builder_leaves_the_main_building_of_an_annex() {
             },
         )
     };
-    t.set_live_for_test(
+    soldiers.set_live_for_test(
         player_id(1),
         [
             building(object_id(60), None),
             building(object_id(70), Some(MainBuildingId::new(object_id(60)))),
         ],
     );
-    t.leave_builders(object_id(70)).unwrap();
-    let builders = |t: &World, i: ListIndex| {
-        t.parts
-            .building_of(t.players[1].objects[i].id)
+    soldiers.leave_builders(object_id(70)).unwrap();
+    let builders = |world: &World, list_index: ListIndex| {
+        world
+            .parts
+            .building_of(world.players[1].objects[list_index].id)
             .construction
             .unwrap()
             .builders
@@ -3185,14 +3311,14 @@ fn builder_leaves_the_main_building_of_an_annex() {
     };
     assert_eq!(
         (
-            builders(&t, ListIndex::new(0)),
-            builders(&t, ListIndex::new(1))
+            builders(&soldiers, ListIndex::new(0)),
+            builders(&soldiers, ListIndex::new(1))
         ),
         (1, 2)
     );
-    t.leave_builders(object_id(60)).unwrap();
-    t.leave_builders(object_id(99)).unwrap();
-    assert_eq!(builders(&t, ListIndex::new(0)), 0);
+    soldiers.leave_builders(object_id(60)).unwrap();
+    soldiers.leave_builders(object_id(99)).unwrap();
+    assert_eq!(builders(&soldiers, ListIndex::new(0)), 0);
 }
 
 /// `FUN_140c4da50`: the first queued order with a target that the unit itself issued; an
@@ -3231,8 +3357,8 @@ fn unit_own_queued_order_names_its_target() {
 #[test]
 fn an_action_new_target_is_taken_and_its_old_one_let_go() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.model.masters[0] = Arc::new(Masters::new([Master {
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.model.masters[0] = Arc::new(Masters::new([Master {
         id: master_id(66),
         kind: MasterKind::COMBAT,
         ..Master::default()
@@ -3247,22 +3373,22 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
         },
         ..Unit::default()
     };
-    t.players[0].objects = vec![
+    soldiers.players[0].objects = vec![
         deer(object_id(40), ObjectState::Alive, WorkerCount::of_data(1)),
         deer(object_id(41), ObjectState::Alive, WorkerCount::of_data(0)),
         deer(object_id(42), ObjectState::Removed, WorkerCount::of_data(0)),
     ]
     .into();
-    t.reindex();
-    let workers = |t: &World| -> Vec<i32> {
-        t.players[0]
+    soldiers.reindex();
+    let workers = |world: &World| -> Vec<i32> {
+        world.players[0]
             .objects
             .iter()
-            .map(|u| u.workers.get())
+            .map(|unit| unit.workers.get())
             .collect()
     };
     assert_eq!(
-        t.retarget_action(
+        soldiers.retarget_action(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(40)),
@@ -3271,9 +3397,9 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
         ),
         Ok(Some(object_id(40)))
     );
-    assert_eq!(workers(&t), [1, 0, 0]);
+    assert_eq!(workers(&soldiers), [1, 0, 0]);
     assert_eq!(
-        t.retarget_action(
+        soldiers.retarget_action(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(40)),
@@ -3282,9 +3408,9 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
         ),
         Ok(Some(object_id(41)))
     );
-    assert_eq!(workers(&t), [1, 0, 0]);
+    assert_eq!(workers(&soldiers), [1, 0, 0]);
     assert_eq!(
-        t.retarget_action(
+        soldiers.retarget_action(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(40)),
@@ -3293,9 +3419,9 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
         ),
         Ok(Some(object_id(41)))
     );
-    assert_eq!(workers(&t), [0, 1, 0]);
+    assert_eq!(workers(&soldiers), [0, 1, 0]);
     assert_eq!(
-        t.retarget_action(
+        soldiers.retarget_action(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(41)),
@@ -3304,9 +3430,9 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
         ),
         Ok(None)
     );
-    assert_eq!(workers(&t), [0, 0, 0]);
+    assert_eq!(workers(&soldiers), [0, 0, 0]);
     assert_eq!(
-        t.retarget_action(
+        soldiers.retarget_action(
             PlayerId::new(1),
             ListIndex::new(0),
             Some(object_id(99)),
@@ -3323,8 +3449,8 @@ fn an_action_new_target_is_taken_and_its_old_one_let_go() {
 #[test]
 fn build_new_target_leaves_the_old_foundation_builders() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
-    t.model.masters[1] = Arc::new(Masters::new([
+    let mut soldiers = soldiers(&units, &[]);
+    soldiers.model.masters[1] = Arc::new(Masters::new([
         Master {
             id: master_id(4),
             kind: MasterKind::COMBAT,
@@ -3365,21 +3491,22 @@ fn build_new_target_leaves_the_old_foundation_builders() {
             },
         )
     };
-    let _ = t
+    let _ = soldiers
         .push_live(
             PlayerId::new(1),
             foundation(object_id(60), BuilderCount::of_data(1)),
         )
         .unwrap();
-    let _ = t
+    let _ = soldiers
         .push_live(
             PlayerId::new(1),
             foundation(object_id(61), BuilderCount::of_data(0)),
         )
         .unwrap();
-    t.parts
+    soldiers
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(soldiers.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_build(Some(BuildAction {
@@ -3399,7 +3526,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
             site: None,
         }));
     assert_eq!(
-        t.build_set_target(
+        soldiers.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
             (Some(FoundationId::new(object_id(60))), true),
@@ -3408,8 +3535,9 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         Ok(Some(FoundationId::new(object_id(60))))
     );
     assert!(
-        t.parts
-            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        soldiers
+            .parts
+            .actions_of(soldiers.players[1].objects[ListIndex::new(0)].id)
             .list
             .build()
             .copied()
@@ -3417,7 +3545,7 @@ fn build_new_target_leaves_the_old_foundation_builders() {
             .added
     );
     assert_eq!(
-        t.build_set_target(
+        soldiers.build_set_target(
             PlayerId::new(1),
             ListIndex::new(0),
             (Some(FoundationId::new(object_id(60))), true),
@@ -3425,9 +3553,9 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         ),
         Ok(Some(FoundationId::new(object_id(61))))
     );
-    let build = t
+    let build = soldiers
         .parts
-        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        .actions_of(soldiers.players[1].objects[ListIndex::new(0)].id)
         .list
         .build()
         .copied()
@@ -3436,20 +3564,24 @@ fn build_new_target_leaves_the_old_foundation_builders() {
         (build.target.map(FoundationId::id), build.added),
         (Some(object_id(61)), false)
     );
-    let site = |t: &World, i: ListIndex| {
-        let u = &t.players[1].objects[i];
+    let site = |world: &World, list_index: ListIndex| {
+        let unit = &world.players[1].objects[list_index];
         (
-            t.parts
-                .building_of(u.id)
+            world
+                .parts
+                .building_of(unit.id)
                 .construction
                 .unwrap()
                 .builders
                 .get(),
-            u.workers.get(),
+            unit.workers.get(),
         )
     };
     assert_eq!(
-        (site(&t, ListIndex::new(1)), site(&t, ListIndex::new(2))),
+        (
+            site(&soldiers, ListIndex::new(1)),
+            site(&soldiers, ListIndex::new(2))
+        ),
         ((0, 0), (0, 2))
     );
 }
@@ -3460,14 +3592,14 @@ fn build_new_target_leaves_the_old_foundation_builders() {
 #[test]
 fn shutting_gate_kills_the_units_in_it_but_the_spared() {
     let units = [(11, 4, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let master = |id, kind, class| Master {
         id,
         kind,
         class,
         ..Master::default()
     };
-    t.model.masters[1] = Arc::new(Masters::new([
+    world.model.masters[1] = Arc::new(Masters::new([
         master(master_id(4), MasterKind::COMBAT, class::CLASS_6),
         master(ids::ID_42, MasterKind::COMBAT, class::RELIC),
         master(master_id(58), MasterKind::COMBAT, class::LIVESTOCK),
@@ -3484,19 +3616,19 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         },
         ..Unit::default()
     };
-    t.players[1].objects = vec![
+    world.players[1].objects = vec![
         unit(object_id(11), master_id(4), Amount::ZERO),
         unit(object_id(12), ids::ID_42, Amount::ZERO),
         unit(object_id(13), master_id(58), Amount::new(50.0)),
         unit(object_id(14), master_id(58), Amount::new(f32::NAN)),
     ]
     .into();
-    t.players[1].sleeping = vec![unit(object_id(15), master_id(10), Amount::ZERO)].into();
-    t.reindex();
+    world.players[1].sleeping = vec![unit(object_id(15), master_id(10), Amount::ZERO)].into();
+    world.reindex();
     for id in 11..=16 {
-        t.shut_in_gate(object_id(id)).unwrap();
+        world.shut_in_gate(object_id(id)).unwrap();
     }
-    let hp: Vec<(i32, f32)> = t.players[1]
+    let hp: Vec<(i32, f32)> = world.players[1]
         .objects
         .iter()
         .map(|u| (u.id.get(), u.life.hp.get()))
@@ -3505,7 +3637,7 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
         hp,
         [(11, 0.0), (12, 10.0), (13, 10.0), (14, 0.0), (15, 0.0)]
     );
-    assert_eq!(t.players[1].sleeping.len(), 0);
+    assert_eq!(world.players[1].sleeping.len(), 0);
 }
 
 /// `FUN_14106c6a0`: a villager's own master without a task for its player's foundation
@@ -3514,7 +3646,7 @@ fn shutting_gate_kills_the_units_in_it_but_the_spared() {
 #[test]
 fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
     let units = [(11, 83, Point::new(20.0, 20.0))];
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let task = |action_kind, object_id| Task {
         action_kind,
         object_group: None,
@@ -3534,7 +3666,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         }),
         ..Master::default()
     };
-    t.model.masters[1] = Arc::new(Masters::new([
+    world.model.masters[1] = Arc::new(Masters::new([
         villager(ids::VILLAGER_MALE, vec![task(GATHER, Some(master_id(53)))]),
         villager(ids::BUILDER, vec![task(ActionKind::BUILD, None)]),
         Master {
@@ -3545,8 +3677,8 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             ..Master::default()
         },
     ]));
-    t.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(25.0);
-    let _ = t
+    world.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(25.0);
+    let _ = world
         .push_live(
             PlayerId::new(1),
             Unit {
@@ -3561,7 +3693,7 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
             },
         )
         .unwrap();
-    let found = t
+    let found = world
         .find_work_task(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -3572,10 +3704,10 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         .unwrap();
     assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].life.master_id,
+        world.players[1].objects[ListIndex::new(0)].life.master_id,
         ids::VILLAGER_MALE
     );
-    let found = t
+    let found = world
         .find_work_task(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -3586,23 +3718,24 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
         .unwrap();
     assert_eq!(found.map(|t| t.action_kind), Some(ActionKind::BUILD));
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].life.master_id,
+        world.players[1].objects[ListIndex::new(0)].life.master_id,
         ids::BUILDER
     );
     // 118's own task: no change
     assert!(
-        t.find_work_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(60),
-            None,
-            MasterSwap::Change
-        )
-        .unwrap()
-        .is_some()
+        world
+            .find_work_task(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(60),
+                None,
+                MasterSwap::Change
+            )
+            .unwrap()
+            .is_some()
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(0)].life.master_id,
+        world.players[1].objects[ListIndex::new(0)].life.master_id,
         ids::BUILDER
     );
 }
@@ -3613,8 +3746,8 @@ fn slot_0x820_takes_the_first_master_of_the_swap_group_with_task() {
 #[test]
 fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
     let units = [(11, 4, Point::new(30.0, 30.0))];
-    let mut t = soldiers(&units, &[]);
-    t.spatial = Spatial::new(GridSize::new(40, 40));
+    let mut world = soldiers(&units, &[]);
+    world.spatial = Spatial::new(GridSize::new(40, 40));
     let sight = Visibility::new(
         GridSize::new(40, 40),
         vec![],
@@ -3623,7 +3756,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         0,
         vec![],
     );
-    t.spatial.sight = Some(sight);
+    world.spatial.sight = Some(sight);
     let walker = walker();
     let sheep_master = Master {
         id: master_id(594),
@@ -3633,7 +3766,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         move_stats: Some(walker.stats),
         ..Master::default()
     };
-    t.model.masters[1] = Arc::new(Masters::new([
+    world.model.masters[1] = Arc::new(Masters::new([
         sheep_master.clone(),
         Master {
             id: master_id(4),
@@ -3642,9 +3775,12 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             ..Master::default()
         },
     ]));
-    t.players.push(Player::default());
-    t.reindex();
-    t.model.masters.push(Arc::new(Masters::new([sheep_master])));
+    world.players.push(Player::default());
+    world.reindex();
+    world
+        .model
+        .masters
+        .push(Arc::new(Masters::new([sheep_master])));
     let sheep = |id, x: f32, y: f32| {
         Object::moving(
             Unit {
@@ -3660,16 +3796,17 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
             walker.clone(),
         )
     };
-    t.extend_live(
-        PlayerId::new(1),
-        [
-            sheep(object_id(20), 10.5, 10.5),
-            sheep(object_id(21), 12.5, 11.5),
-            sheep(object_id(22), 20.5, 10.5),
-        ],
-    )
-    .unwrap();
-    let _ = t
+    world
+        .extend_live(
+            PlayerId::new(1),
+            [
+                sheep(object_id(20), 10.5, 10.5),
+                sheep(object_id(21), 12.5, 11.5),
+                sheep(object_id(22), 20.5, 10.5),
+            ],
+        )
+        .unwrap();
+    let _ = world
         .push_live(PlayerId::new(2), sheep(object_id(23), 11.5, 10.5))
         .unwrap();
     let placed = |player, master, at: Point, radius| Placed {
@@ -3685,7 +3822,7 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         unknown: None,
         obstruction: None,
     };
-    t.spatial.insert(
+    world.spatial.insert(
         object_id(11),
         placed(PlayerId::new(1), master_id(4), Point::new(30.0, 30.0), 1.5),
     );
@@ -3695,24 +3832,25 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
         (22, 1, Point::new(20.5, 10.5)),
         (23, 2, Point::new(11.5, 10.5)),
     ] {
-        t.spatial.insert(
+        world.spatial.insert(
             object_id(id),
             placed(PlayerId::from(p), master_id(594), at, 0.2),
         );
     }
-    t.lead_herd(
-        PlayerId::new(1),
-        object_id(20),
-        DropSiteId::new(object_id(11)),
-    )
-    .unwrap();
+    world
+        .lead_herd(
+            PlayerId::new(1),
+            object_id(20),
+            DropSiteId::new(object_id(11)),
+        )
+        .unwrap();
     let goes = |p: usize, id: i32| {
-        t.players[p]
+        world.players[p]
             .objects
             .iter()
             .find(|u| u.id == object_id(id))
-            .and_then(|u| t.parts.actions_of(u.id).list.move_to().copied())
-            .map(|m| ObjectId::field(m.target))
+            .and_then(|unit| world.parts.actions_of(unit.id).list.move_to().copied())
+            .map(|move_to_action| ObjectId::field(move_to_action.target))
     };
     assert_eq!(goes(1, 20), Some(11));
     assert_eq!(goes(1, 21), Some(11));
@@ -3723,14 +3861,14 @@ fn led_sheep_takes_the_idle_livestock_about_it_to_the_drop_site() {
 /// `FUN_1410395a0`: the old list goes, the new one is copied whole, an empty one too.
 #[test]
 fn group_differentiator_groups_are_the_list_given() {
-    let mut g = UnitGroup {
+    let mut group = UnitGroup {
         differentiator_groups: vec![group_id(1), group_id(2), group_id(3)],
         ..UnitGroup::default()
     };
-    set_differentiator_groups(&mut g, &[group_id(7), group_id(8)]);
-    assert_eq!(g.differentiator_groups, [group_id(7), group_id(8)]);
-    set_differentiator_groups(&mut g, &[]);
-    assert_eq!(g.differentiator_groups, Vec::new());
+    set_differentiator_groups(&mut group, &[group_id(7), group_id(8)]);
+    assert_eq!(group.differentiator_groups, [group_id(7), group_id(8)]);
+    set_differentiator_groups(&mut group, &[]);
+    assert_eq!(group.differentiator_groups, Vec::new());
 }
 
 /// `FUN_14118c790`: each id joins the end of the ignore list, a repeated one again.
@@ -3799,7 +3937,7 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
         relations,
         ..Player::default()
     };
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -3829,13 +3967,13 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
         }),
         ..Master::default()
     };
-    t.model.masters = vec![
+    world.model.masters = vec![
         Arc::new(Masters::new([])),
         Arc::new(Masters::new([master(master_id(4), class)])),
         Arc::new(Masters::new([master(master_id(5), class::CLASS_6)])),
     ];
     for (id, player, x) in [(10, 1, 10.0), (20, 2, x)] {
-        t.spatial.insert(
+        world.spatial.insert(
             object_id(id),
             Placed {
                 position: Position::new(x, 10.0, 0.0),
@@ -3852,14 +3990,14 @@ fn soldier_and_enemy(x: f32, class: ClassId) -> World {
             },
         );
     }
-    t
+    world
 }
 
 /// `FUN_141227190` on an enemy nearer than the least range: the unit posts notify 0x1fe
 /// with the target to its own unit AI (slot 0x328) and takes no work.
 #[test]
 fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
-    let mut t = soldier_and_enemy(11.0, class::CLASS_6);
+    let mut world = soldier_and_enemy(11.0, class::CLASS_6);
     let work = Work {
         target: Some(object_id(20)),
         point: Position::new(11.0, 10.0, 0.0),
@@ -3867,10 +4005,11 @@ fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
         filter: None,
         source: OrderSource::Direct,
     };
-    t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
+    world
+        .order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
-    let unit = &t.players[1].objects[ListIndex::new(0)];
-    let ai = t.parts.unit_ai.get(unit.id).unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         ai.notifies,
         [Notify::own(
@@ -3879,7 +4018,7 @@ fn an_order_on_an_enemy_below_the_least_range_notifies_the_unit_ai() {
             [20, -1, -1]
         )]
     );
-    assert_eq!(t.parts.actions_of(unit.id).top_action_kind(), None);
+    assert_eq!(world.parts.actions_of(unit.id).top_action_kind(), None);
 }
 
 /// `FUN_140fd9ae0` with 61 or more: the sorted list (a gone unit null, sorted first) splits
@@ -3890,14 +4029,14 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
     let units: Vec<_> = (100..161)
         .map(|id| (id, 4, Point::new(20.0, 20.0)))
         .collect();
-    let mut t = soldiers(&units, &[]);
+    let mut world = soldiers(&units, &[]);
     let ids = object_ids((100..161).rev());
-    let split = t.split(&ids, Kept::All, ControlKey::Up).unwrap();
+    let split = world.split(&ids, Kept::All, ControlKey::Up).unwrap();
     assert_eq!(split.groups, [object_id_list(100..160)]);
     assert_eq!(split.loose, object_id_list([160]));
     // the gone 999 is the first run's first entry
     let gone: Vec<_> = ids.iter().copied().chain(object_ids([999])).collect();
-    let split = t.split(&gone, Kept::All, ControlKey::Up).unwrap();
+    let split = world.split(&gone, Kept::All, ControlKey::Up).unwrap();
     assert_eq!(
         split.groups,
         [object_id_list(100..159), object_id_list([159, 160])]
@@ -3905,11 +4044,11 @@ fn the_splitter_splits_an_order_to_more_than_60_units_in_runs_of_60() {
     assert_eq!(split.loose, Vec::<ObjectId>::new());
     // 159 twice: the first run's last entry has no next one to repeat it
     let twice = object_ids((100..160).chain([159]));
-    let split = t.split(&twice, Kept::All, ControlKey::Up).unwrap();
+    let split = world.split(&twice, Kept::All, ControlKey::Up).unwrap();
     assert_eq!(split.groups, [object_id_list(100..160)]);
     assert_eq!(split.loose, object_id_list([159]));
     // with Ctrl held the first run fills the 60 groups, the second's group is dropped
-    let split = t.split(&ids, Kept::All, ControlKey::Held).unwrap();
+    let split = world.split(&ids, Kept::All, ControlKey::Held).unwrap();
     assert_eq!(split.groups.len(), 60);
     assert_eq!(split.groups[59], [object_id(159)]);
     assert_eq!(split.loose, Vec::<ObjectId>::new());
@@ -3980,14 +4119,14 @@ fn units_of_an_order_take_their_offsets_from_their_centroid() {
         Point::new(104.32466, 39.299_885),
         Point::new(103.67509, 39.299_885),
     );
-    let c = centroid(&[a, b], &tuning().order).unwrap();
+    let centroid = centroid(&[a, b], &tuning().order).unwrap();
     let point = Point::new(108.37596, 43.91338);
     assert_eq!(
-        offset_point(a, c, point, GridSize::new(120, 120), &tuning().order),
+        offset_point(a, centroid, point, GridSize::new(120, 120), &tuning().order),
         Point::new(108.700_745, 43.91338)
     );
     assert_eq!(
-        offset_point(b, c, point, GridSize::new(120, 120), &tuning().order),
+        offset_point(b, centroid, point, GridSize::new(120, 120), &tuning().order),
         Point::new(108.05117, 43.91338)
     );
 }
@@ -4024,7 +4163,7 @@ fn the_box_of_an_order_moves_only_its_least_value_for_lower_one() {
 /// 9529 (formation category 0) stay loose, the scout 9185 has none to join it.
 #[test]
 fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
-    let f = Formations {
+    let formations = Formations {
         auto: true,
         influence: Distance::new(3.0),
         by_speed: false,
@@ -4052,7 +4191,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         !splits_together(
             &scout,
             &sheep,
-            f,
+            formations,
             JoinTest::Count,
             &mut none,
             &mut away,
@@ -4068,7 +4207,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         splits_together(
             &scout,
             &other,
-            f,
+            formations,
             JoinTest::Count,
             &mut short,
             &mut away,
@@ -4081,7 +4220,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         !splits_together(
             &scout,
             &other,
-            f,
+            formations,
             JoinTest::Count,
             &mut long,
             &mut away,
@@ -4095,7 +4234,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         !splits_together(
             &scout,
             &other,
-            f,
+            formations,
             JoinTest::Count,
             &mut nearest,
             &mut away,
@@ -4111,7 +4250,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         splits_together(
             &scout,
             &other,
-            f,
+            formations,
             JoinTest::Count,
             &mut lost,
             &mut away,
@@ -4128,7 +4267,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         splits_together(
             &scout,
             &nowhere,
-            f,
+            formations,
             JoinTest::Count,
             &mut short,
             &mut away,
@@ -4141,7 +4280,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
         !splits_together(
             &scout,
             &far,
-            f,
+            formations,
             JoinTest::Count,
             &mut none,
             &mut away,
@@ -4151,7 +4290,7 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
     );
     let wide = Formations {
         influence: Distance::new(40.0),
-        ..f
+        ..formations
     };
     assert!(
         splits_together(
@@ -4186,11 +4325,11 @@ fn the_splitter_joins_units_of_one_kind_within_the_influence_distance() {
 
 #[test]
 fn point_off_the_map_stays_inside_its_edge() {
-    let c = Point::new(10.0, 10.0);
+    let point = Point::new(10.0, 10.0);
     assert_eq!(
         offset_point(
             Point::new(5.0, 15.0),
-            c,
+            point,
             Point::new(2.0, 118.0),
             GridSize::new(120, 120),
             &tuning().order
@@ -4214,7 +4353,7 @@ fn patrol_staggers_its_units_timeouts_by_sixes() {
 /// and y is passed over; a NaN difference does not count (`COMISS`/`JNC`).
 #[test]
 fn patrol_passes_over_waypoint_within_tile_of_the_last() {
-    let w = [
+    let points = [
         Point::new(10.5, 10.5),
         Point::new(11.0, 10.0),
         Point::new(11.5, 10.9),
@@ -4223,7 +4362,7 @@ fn patrol_passes_over_waypoint_within_tile_of_the_last() {
         Point::new(12.5, 9.0),
     ];
     assert_eq!(
-        waypoints_from(Point::new(10.0, 10.0), &w, &tuning().order),
+        waypoints_from(Point::new(10.0, 10.0), &points, &tuning().order),
         [
             Point::new(11.0, 10.0),
             Point::new(11.5, 9.0),
@@ -4231,7 +4370,7 @@ fn patrol_passes_over_waypoint_within_tile_of_the_last() {
         ]
     );
     assert_eq!(
-        waypoints_from(Point::new(10.0, 10.0), &w[..1], &tuning().order),
+        waypoints_from(Point::new(10.0, 10.0), &points[..1], &tuning().order),
         Vec::<Point>::new()
     );
 }
@@ -4239,12 +4378,12 @@ fn patrol_passes_over_waypoint_within_tile_of_the_last() {
 /// Player 1's soldiers of `soldiers`, each walking and with a unit AI off any order, at a
 /// world dt of 100 ms.
 fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
-    let mut t = soldiers(units, members);
-    t.dt = Millis::new(100);
-    for u in &mut t.players[1].objects {
-        t.parts.put_mover(u.id, Some(walker()));
-        t.parts.set_unit_ai(
-            u.id,
+    let mut world = soldiers(units, members);
+    world.dt = Millis::new(100);
+    for unit in &mut world.players[1].objects {
+        world.parts.put_mover(unit.id, Some(walker()));
+        world.parts.set_unit_ai(
+            unit.id,
             Some(UnitAi {
                 ai_kind: UnitAiKind::Soldier,
                 current_order: None,
@@ -4260,7 +4399,7 @@ fn patrollers(units: &[(i32, i16, Point)], members: &[i32]) -> World {
             }),
         );
     }
-    t
+    world
 }
 
 /// `FORM_FORMATION` (`FUN_14161dba0`) of three soldiers: the splitter makes one group of them, its
@@ -4273,38 +4412,43 @@ fn formation_of_soldiers_makes_one_group_locked_to_its_kind() {
         (12, 4, Point::new(21.0, 20.0)),
         (13, 4, Point::new(22.0, 20.0)),
     ];
-    let mut t = searchable(patrollers(&units, &[]));
-    t.form_formation(
-        player_id(1),
-        &object_ids([11, 12, 13]),
-        FormationKind::UserDefined,
-    )
-    .unwrap();
-    let g = &t.groups.groups;
-    assert_eq!(g.len(), 1);
-    let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
+    let mut world = searchable(patrollers(&units, &[]));
+    world
+        .form_formation(
+            player_id(1),
+            &object_ids([11, 12, 13]),
+            FormationKind::UserDefined,
+        )
+        .unwrap();
+    let groups = &world.groups.groups;
+    assert_eq!(groups.len(), 1);
+    let ids: Vec<ObjectId> = groups[0].members.iter().map(|member| member.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
-    assert_eq!(g[0].formation_locked_kind, Some(FormationKind::UserDefined));
-    assert_eq!(g[0].differentiator_id, Differentiator::of_data(0));
-    assert_eq!(g[0].differentiator_groups, [g[0].id]);
-    assert_eq!(t.groups.commands, Differentiator::of_data(1));
-    // the same units again: their group takes the command without a new one
-    t.form_formation(
-        player_id(1),
-        &object_ids([11, 12, 13]),
-        FormationKind::Kind6,
-    )
-    .unwrap();
-    assert_eq!(t.groups.groups.len(), 1);
     assert_eq!(
-        t.groups.groups[0].formation_locked_kind,
+        groups[0].formation_locked_kind,
+        Some(FormationKind::UserDefined)
+    );
+    assert_eq!(groups[0].differentiator_id, Differentiator::of_data(0));
+    assert_eq!(groups[0].differentiator_groups, [groups[0].id]);
+    assert_eq!(world.groups.commands, Differentiator::of_data(1));
+    // the same units again: their group takes the command without a new one
+    world
+        .form_formation(
+            player_id(1),
+            &object_ids([11, 12, 13]),
+            FormationKind::Kind6,
+        )
+        .unwrap();
+    assert_eq!(world.groups.groups.len(), 1);
+    assert_eq!(
+        world.groups.groups[0].formation_locked_kind,
         Some(FormationKind::Kind6)
     );
     assert_eq!(
-        t.groups.groups[0].differentiator_id,
+        world.groups.groups[0].differentiator_id,
         Differentiator::of_data(1)
     );
-    assert_eq!(t.groups.commands, Differentiator::of_data(2));
+    assert_eq!(world.groups.commands, Differentiator::of_data(2));
 }
 
 /// A unit whose order is a defend or a follow stops first: its ignore list empties and its
@@ -4316,41 +4460,43 @@ fn formation_stops_the_units_that_march_and_ignores_gone_ones() {
         (11, 4, Point::new(20.0, 20.0)),
         (12, 4, Point::new(21.0, 20.0)),
     ];
-    let mut t = searchable(patrollers(&units, &[]));
+    let mut world = searchable(patrollers(&units, &[]));
     for (i, order) in [Some(OrderKind::Defend), Some(OrderKind::Patrol)]
         .into_iter()
         .enumerate()
     {
-        let u = &mut t.players[1].objects[ListIndex::new(i)];
-        t.parts.unit_ai.get_mut(u.id).unwrap().current_order = order;
-        t.parts.mover_mut(u.id).unwrap().ignore_units = vec![object_id(99)];
+        let unit = &mut world.players[1].objects[ListIndex::new(i)];
+        world.parts.unit_ai.get_mut(unit.id).unwrap().current_order = order;
+        world.parts.mover_mut(unit.id).unwrap().ignore_units = vec![object_id(99)];
     }
-    t.form_formation(
-        player_id(1),
-        &object_ids([11, 12]),
-        FormationKind::UserDefined,
-    )
-    .unwrap();
-    let marched = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.mover_of(marched.id).unwrap().ignore_units, []);
+    world
+        .form_formation(
+            player_id(1),
+            &object_ids([11, 12]),
+            FormationKind::UserDefined,
+        )
+        .unwrap();
+    let marched = &world.players[1].objects[ListIndex::new(0)];
+    assert_eq!(world.parts.mover_of(marched.id).unwrap().ignore_units, []);
     assert_ne!(
-        t.parts.unit_ai.get(marched.id).unwrap().current_order,
+        world.parts.unit_ai.get(marched.id).unwrap().current_order,
         Some(OrderKind::Defend)
     );
-    let other = &t.players[1].objects[ListIndex::new(1)];
+    let other = &world.players[1].objects[ListIndex::new(1)];
     assert_eq!(
-        t.parts.mover_of(other.id).unwrap().ignore_units,
+        world.parts.mover_of(other.id).unwrap().ignore_units,
         [object_id(99)]
     );
     // all gone: refused
-    let before = t.groups.commands;
-    t.form_formation(
-        player_id(1),
-        &object_ids([70, 71]),
-        FormationKind::UserDefined,
-    )
-    .unwrap();
-    assert_eq!(t.groups.commands, before);
+    let before = world.groups.commands;
+    world
+        .form_formation(
+            player_id(1),
+            &object_ids([70, 71]),
+            FormationKind::UserDefined,
+        )
+        .unwrap();
+    assert_eq!(world.groups.commands, before);
 }
 
 /// MarvinBlue/426049701's first PATROL (update 25): player 1's scout alone, one waypoint,
@@ -4360,18 +4506,25 @@ fn formation_stops_the_units_that_march_and_ignores_gone_ones() {
 /// 750, its saved patrol gone.
 #[test]
 fn lone_unit_patrols_to_its_waypoint() {
-    let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
-    let at = t.players[1].objects[ListIndex::new(0)].position();
-    t.players[1].objects[ListIndex::new(0)].place_for_test(at.with_z(1.5));
-    t.patrol(
-        player_id(1),
-        &object_ids([11]),
-        &[Point::new(30.0, 20.0)],
-        SavedPatrols::Dropped,
-    )
-    .unwrap();
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    let move_to = t.parts.actions_of(u.id).list.move_to().copied().unwrap();
+    let mut world = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let at = world.players[1].objects[ListIndex::new(0)].position();
+    world.players[1].objects[ListIndex::new(0)].place_for_test(at.with_z(1.5));
+    world
+        .patrol(
+            player_id(1),
+            &object_ids([11]),
+            &[Point::new(30.0, 20.0)],
+            SavedPatrols::Dropped,
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    let move_to = world
+        .parts
+        .actions_of(unit.id)
+        .list
+        .move_to()
+        .copied()
+        .unwrap();
     assert_eq!(
         (
             move_to.goal(),
@@ -4380,12 +4533,16 @@ fn lone_unit_patrols_to_its_waypoint() {
         ),
         (Some(Position::new(30.0, 20.0, 1.5)), -1, Distance::ZERO)
     );
-    let m = t.parts.mover_of(u.id).unwrap();
+    let mover = world.parts.mover_of(unit.id).unwrap();
     assert_eq!(
-        (m.waiting, m.ignore_units.len(), m.user_waypoints.len()),
+        (
+            mover.waiting,
+            mover.ignore_units.len(),
+            mover.user_waypoints.len()
+        ),
         (1, 0, 0)
     );
-    let ai = t.parts.unit_ai.get(u.id).unwrap();
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.last_order, ai.current_action),
         (Some(OrderKind::Patrol), None, Some(AiAction::Move))
@@ -4402,7 +4559,7 @@ fn lone_unit_patrols_to_its_waypoint() {
         (ai.patrol_path.is_none(), ai.patrol_waypoint.get()),
         (true, 0)
     );
-    assert_eq!(t.groups.commands, Differentiator::of_data(1));
+    assert_eq!(world.groups.commands, Differentiator::of_data(1));
 }
 
 /// A lone unit's waypoints but the last become its own (slot 0x448, a whole coordinate moved
@@ -4410,19 +4567,21 @@ fn lone_unit_patrols_to_its_waypoint() {
 /// command's last even where the filter left it out. Without `+0x8` the saved patrol stays.
 #[test]
 fn lone_unit_waypoints_but_the_last_become_its_own() {
-    let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
-    let w = [
+    let mut world = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let points = [
         Point::new(25.0, 20.0),
         Point::new(25.5, 20.5),
         Point::new(30.0, 20.0),
         Point::new(30.5, 20.5),
     ];
-    t.patrol(player_id(1), &object_ids([11]), &w, SavedPatrols::Kept)
+    world
+        .patrol(player_id(1), &object_ids([11]), &points, SavedPatrols::Kept)
         .unwrap();
-    let u = &t.players[1].objects[ListIndex::new(0)];
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts
-            .actions_of(u.id)
+        world
+            .parts
+            .actions_of(unit.id)
             .list
             .move_to()
             .copied()
@@ -4431,10 +4590,10 @@ fn lone_unit_waypoints_but_the_last_become_its_own() {
         Some(Position::new(30.0, 20.0, 0.0))
     );
     assert_eq!(
-        t.parts.mover_of(u.id).unwrap().user_waypoints,
+        world.parts.mover_of(unit.id).unwrap().user_waypoints,
         [BVector::new(25.5, 0.0, 20.5)]
     );
-    let ai = t.parts.unit_ai.get(u.id).unwrap();
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(ai.target_point, Position::new(30.5, 20.5, 0.0));
     assert!(ai.patrol_path.is_some());
 }
@@ -4444,11 +4603,11 @@ fn lone_unit_waypoints_but_the_last_become_its_own() {
 /// the unit's stopAction runs at once, before the move.
 #[test]
 fn move_runs_the_stop_of_pending_completion_first() {
-    let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
-    let ai = t
+    let mut world = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let ai = world
         .parts
         .unit_ai
-        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .get_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     ai.current_action = Some(AiAction::Move);
     ai.notifies = vec![Notify::own(
@@ -4457,22 +4616,23 @@ fn move_runs_the_stop_of_pending_completion_first() {
         [AiAction::Move.value(), 0, 0],
     )];
     assert_eq!(
-        t.move_to_point(
+        world.move_to_point(
             PlayerId::new(1),
             ListIndex::new(0),
             Position::new(30.0, 20.0, 0.0)
         ),
         Ok(Answer::NotTaken)
     );
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    let ai = t.parts.unit_ai.get(u.id).unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_action, ai.last_action, ai.notifies.len()),
         (None, Some(AiAction::Move), 0)
     );
     assert_eq!(
-        t.parts
-            .actions_of(u.id)
+        world
+            .parts
+            .actions_of(unit.id)
             .list
             .move_to()
             .copied()
@@ -4495,24 +4655,27 @@ fn lone_unit_attack_moves_to_its_waypoint() {
         queued: false,
         ignore_pending: true,
     };
-    let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
+    let mut world = patrollers(&[(11, 4, Point::new(20.0, 20.0))], &[]);
     // the reset redraws the adjusted idle timeout from it
-    t.parts
+    world
+        .parts
         .unit_ai
-        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .get_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .idle_timeout = Millis::new(3000);
-    t.attack_move(
-        player_id(1),
-        &object_ids([11]),
-        &[Point::new(30.0, 20.0)],
-        sweep,
-    )
-    .unwrap();
-    let u = &t.players[1].objects[ListIndex::new(0)];
+    world
+        .attack_move(
+            player_id(1),
+            &object_ids([11]),
+            &[Point::new(30.0, 20.0)],
+            sweep,
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts
-            .actions_of(u.id)
+        world
+            .parts
+            .actions_of(unit.id)
             .list
             .move_to()
             .copied()
@@ -4520,7 +4683,7 @@ fn lone_unit_attack_moves_to_its_waypoint() {
             .goal(),
         Some(Position::new(30.0, 20.0, 0.0))
     );
-    let ai = t.parts.unit_ai.get(u.id).unwrap();
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.target_point),
         (
@@ -4535,24 +4698,27 @@ fn lone_unit_attack_moves_to_its_waypoint() {
     );
     assert!(ai.patrol_path.is_none());
     // unforced: the MoveTo to the same point stands
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .move_to_mut()
         .unwrap()
         .range = Distance::new(0.25);
-    t.attack_move(
-        player_id(1),
-        &object_ids([11]),
-        &[Point::new(30.0, 20.0)],
-        sweep,
-    )
-    .unwrap();
+    world
+        .attack_move(
+            player_id(1),
+            &object_ids([11]),
+            &[Point::new(30.0, 20.0)],
+            sweep,
+        )
+        .unwrap();
     assert_eq!(
-        t.parts
-            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .actions_of(world.players[1].objects[ListIndex::new(0)].id)
             .list
             .move_to()
             .copied()
@@ -4561,16 +4727,18 @@ fn lone_unit_attack_moves_to_its_waypoint() {
         Distance::new(0.25)
     );
     // a patrol's forced move makes a new one
-    t.patrol(
-        player_id(1),
-        &object_ids([11]),
-        &[Point::new(30.0, 20.0)],
-        SavedPatrols::Kept,
-    )
-    .unwrap();
+    world
+        .patrol(
+            player_id(1),
+            &object_ids([11]),
+            &[Point::new(30.0, 20.0)],
+            SavedPatrols::Kept,
+        )
+        .unwrap();
     assert_eq!(
-        t.parts
-            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .actions_of(world.players[1].objects[ListIndex::new(0)].id)
             .list
             .move_to()
             .copied()
@@ -4637,14 +4805,15 @@ fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
         ),
         Err(ATTACK_MOVE_QUEUED)
     );
-    let mut t = patrollers(&[(11, 4, Point::new(20.0, 20.0))]);
-    t.parts
+    let mut world = patrollers(&[(11, 4, Point::new(20.0, 20.0))]);
+    world
+        .parts
         .unit_ai
-        .get_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .get_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .orders = vec![unready];
     assert_eq!(
-        t.attack_move(
+        world.attack_move(
             player_id(1),
             &object_ids([11]),
             &[Point::new(30.0, 20.0)],
@@ -4658,37 +4827,38 @@ fn an_attack_move_through_the_unit_ai_queue_is_not_modelled() {
 /// one whose waypoints all lie within a tile of it stays where it is, its order unchanged.
 #[test]
 fn loose_patrollers_ignore_each_other_and_one_at_its_waypoint_stays() {
-    let mut t = patrollers(
+    let mut world = patrollers(
         &[
             (11, 83, Point::new(20.0, 20.0)),
             (12, 83, Point::new(29.5, 20.0)),
         ],
         &[],
     );
-    t.patrol(
-        player_id(1),
-        &object_ids([11, 12]),
-        &[Point::new(30.0, 20.0)],
-        SavedPatrols::Dropped,
-    )
-    .unwrap();
-    let [a, b] = t.players[1].objects.as_slice() else {
+    world
+        .patrol(
+            player_id(1),
+            &object_ids([11, 12]),
+            &[Point::new(30.0, 20.0)],
+            SavedPatrols::Dropped,
+        )
+        .unwrap();
+    let [a, b] = world.players[1].objects.as_slice() else {
         panic!("two units")
     };
     assert_eq!(
-        t.parts.mover_of(a.id).unwrap().ignore_units,
+        world.parts.mover_of(a.id).unwrap().ignore_units,
         [object_id(12)]
     );
     assert_eq!(
-        t.parts.mover_of(b.id).unwrap().ignore_units,
+        world.parts.mover_of(b.id).unwrap().ignore_units,
         [object_id(11)]
     );
     assert!(
-        t.parts.actions_of(a.id).list.move_to().is_some()
-            && t.parts.actions_of(b.id).list.move_to().is_none()
+        world.parts.actions_of(a.id).list.move_to().is_some()
+            && world.parts.actions_of(b.id).list.move_to().is_none()
     );
-    assert_eq!(t.parts.unit_ai.get(b.id).unwrap().current_order, None);
-    assert_eq!(t.parts.mover_of(b.id).unwrap().waiting, 1);
+    assert_eq!(world.parts.unit_ai.get(b.id).unwrap().current_order, None);
+    assert_eq!(world.parts.mover_of(b.id).unwrap().waiting, 1);
 }
 
 /// `FUN_140fd9f40`: the splitter keeps group 5 (the order's 11 and 12 are all of it); the
@@ -4705,10 +4875,10 @@ fn kept_group_takes_the_loose_soldiers_about_it() {
         (15, 4, Point::new(21.0, 19.0)),
     ];
     let mut t = soldiers(&units, &[11, 12]);
-    for u in &mut t.players[1].objects {
-        let mut m = walker();
-        m.moved_at = u.position();
-        t.parts.put_mover(u.id, Some(m));
+    for unit in &mut t.players[1].objects {
+        let mut mover = walker();
+        mover.moved_at = unit.position();
+        t.parts.put_mover(unit.id, Some(mover));
     }
     t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
     let mut split = Split {
@@ -4719,18 +4889,18 @@ fn kept_group_takes_the_loose_soldiers_about_it() {
     };
     t.keep_group(&mut split, group_id(5), None).unwrap();
     assert_eq!(split.loose, object_id_list([14, 15]));
-    let g = t.groups.get(group_id(5)).unwrap();
-    assert!(g.has(object_id(13)));
-    assert_eq!(g.flags & GroupFlags::JOINED, GroupFlags::JOINED);
+    let group = t.groups.get(group_id(5)).unwrap();
+    assert!(group.has(object_id(13)));
+    assert_eq!(group.flags & GroupFlags::JOINED, GroupFlags::JOINED);
     // the unit after one that joins is passed over: 13 joins, 15 slides into its place
-    let mut t = soldiers(&units, &[11, 12]);
-    t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
+    let mut world = soldiers(&units, &[11, 12]);
+    world.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
     let mut split = Split {
         owner: Some(PlayerId::new(1)),
         loose: object_id_list([13, 15]),
         ..Split::default()
     };
-    t.keep_group(&mut split, group_id(5), None).unwrap();
+    world.keep_group(&mut split, group_id(5), None).unwrap();
     assert_eq!(split.loose, object_id_list([15]));
 }
 
@@ -4745,18 +4915,18 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
         (13, 4, Point::new(22.0, 20.0)),
     ];
     let world = |target_x: f32| {
-        let mut t = soldiers(&units, &[11, 12]);
-        Arc::make_mut(&mut t.model.masters[1])
+        let mut soldiers = soldiers(&units, &[11, 12]);
+        Arc::make_mut(&mut soldiers.model.masters[1])
             .get_mut(master_id(4))
             .unwrap()
             .line_of_sight = Distance::new(5.0);
-        t.model.masters[0] = Arc::new(Masters::new([Master {
+        soldiers.model.masters[0] = Arc::new(Masters::new([Master {
             id: ids::HOUSE,
             kind: MasterKind::BUILDING,
             class: class::BUILDING,
             ..Master::default()
         }]));
-        let _ = t
+        let _ = soldiers
             .push_live(
                 PlayerId::new(0),
                 Unit {
@@ -4771,26 +4941,39 @@ fn kept_group_takes_only_the_soldiers_that_do_not_see_the_target() {
                 },
             )
             .unwrap();
-        t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
-        for u in &mut t.players[1].objects {
-            let mut m = walker();
-            m.moved_at = u.position();
-            t.parts.put_mover(u.id, Some(m));
+        soldiers
+            .groups
+            .get_mut(group_id(5))
+            .unwrap()
+            .motion
+            .position[0] = BVector::new(21.0, 0.0, 20.0);
+        for unit in &mut soldiers.players[1].objects {
+            let mut mover = walker();
+            mover.moved_at = unit.position();
+            soldiers.parts.put_mover(unit.id, Some(mover));
         }
-        t
+        soldiers
     };
     for (target_x, joins) in [(30.0, true), (24.0, false)] {
-        let mut t = world(target_x);
+        let mut target_world = world(target_x);
         let mut split = Split {
             owner: Some(PlayerId::new(1)),
             loose: object_id_list([13]),
             groups: vec![object_id_list([11, 12])],
             ..Split::default()
         };
-        t.keep_group(&mut split, group_id(5), Some(object_id(60)))
+        target_world
+            .keep_group(&mut split, group_id(5), Some(object_id(60)))
             .unwrap();
         assert_eq!(split.loose.is_empty(), joins, "target at x {target_x}");
-        assert_eq!(t.groups.get(group_id(5)).unwrap().has(object_id(13)), joins);
+        assert_eq!(
+            target_world
+                .groups
+                .get(group_id(5))
+                .unwrap()
+                .has(object_id(13)),
+            joins
+        );
     }
 }
 
@@ -4805,10 +4988,10 @@ fn two_patrollers() -> World {
     ))
 }
 
-/// `t` on a 60 by 60 map of open land, its sight's registry for the searches.
-fn searchable(mut t: World) -> World {
+/// `world` on a 60 by 60 map of open land, its sight's registry for the searches.
+fn searchable(mut world: World) -> World {
     // the group's statistics search the members' surroundings
-    let mut s = Spatial::with_tiles(
+    let mut spatial = Spatial::with_tiles(
         GridSize::new(60, 60),
         Tiles::new(GridSize::new(60, 60), vec![1; 3600]),
     );
@@ -4817,19 +5000,19 @@ fn searchable(mut t: World) -> World {
         flags: TerrainFlags::WATER,
         forest: false,
     };
-    s.terrain = Some(Terrain::new(
+    spatial.terrain = Some(Terrain::new(
         GridSize::new(60, 60),
         vec![TileTerrain::of_save(0, 255, -1); 3600],
         vec![kind],
         vec![Restriction::new(vec![1.0])],
     ));
-    s.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([0, 0])]);
-    s.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([0, 1])]);
-    let mut v = Visibility::new(GridSize::new(60, 60), vec![], vec![], vec![], 0, vec![]);
-    v.registry = Some(Registry::new(2, 65));
-    s.sight = Some(v);
-    t.spatial = s;
-    t
+    spatial.relations = ByPlayer::new(vec![relation_row([0, 3]), relation_row([0, 0])]);
+    spatial.unit_diplomacy = ByPlayer::new(vec![relations([1, 4]), relations([0, 1])]);
+    let mut visibility = Visibility::new(GridSize::new(60, 60), vec![], vec![], vec![], 0, vec![]);
+    visibility.registry = Some(Registry::new(2, 65));
+    spatial.sight = Some(visibility);
+    world.spatial = spatial;
+    world
 }
 
 /// An attack move of two soldiers near each other: their group's move to the last waypoint
@@ -4844,8 +5027,8 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
         ignore_pending: true,
     };
     let mut t = two_patrollers();
-    for u in &mut t.players[1].objects {
-        t.parts.unit_ai.get_mut(u.id).unwrap().idle_timeout = Millis::new(3000);
+    for unit in &mut t.players[1].objects {
+        t.parts.unit_ai.get_mut(unit.id).unwrap().idle_timeout = Millis::new(3000);
     }
     t.attack_move(
         player_id(1),
@@ -4854,29 +5037,30 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
         sweep,
     )
     .unwrap();
-    let g = &t.groups.groups[0];
-    let top = g.motion.paths.last().unwrap();
+    let groups = &t.groups.groups[0];
+    let top = groups.motion.paths.last().unwrap();
     assert_eq!(
         (
             top.path_flags & PathFlags::LOOPS,
-            g.flags & GroupFlags::PATROL
+            groups.flags & GroupFlags::PATROL
         ),
         (PathFlags::NONE, GroupFlags::PATROL)
     );
-    let mut t = two_patrollers();
-    t.patrol(
-        player_id(1),
-        &object_ids([11, 12]),
-        &[Point::new(25.0, 25.0), Point::new(30.0, 20.0)],
-        SavedPatrols::Dropped,
-    )
-    .unwrap();
-    let g = &t.groups.groups[0];
-    let top = g.motion.paths.last().unwrap();
+    let mut world = two_patrollers();
+    world
+        .patrol(
+            player_id(1),
+            &object_ids([11, 12]),
+            &[Point::new(25.0, 25.0), Point::new(30.0, 20.0)],
+            SavedPatrols::Dropped,
+        )
+        .unwrap();
+    let group = &world.groups.groups[0];
+    let top = group.motion.paths.last().unwrap();
     assert_eq!(
         (
             top.path_flags & PathFlags::LOOPS,
-            g.flags & GroupFlags::PATROL
+            group.flags & GroupFlags::PATROL
         ),
         (PathFlags::LOOPS, GroupFlags::NONE)
     );
@@ -4888,26 +5072,31 @@ fn an_attack_moving_group_holds_its_path_to_the_last_waypoint() {
 /// tiles; the command count goes on.
 #[test]
 fn patrolling_group_walks_loop_through_its_waypoints() {
-    let mut t = two_patrollers();
-    let w = [Point::new(25.0, 25.0), Point::new(30.0, 20.0)];
-    t.patrol(
-        player_id(1),
-        &object_ids([11, 12]),
-        &w,
-        SavedPatrols::Dropped,
-    )
-    .unwrap();
-    assert_eq!(t.groups.groups.len(), 1);
-    let g = &t.groups.groups[0];
+    let mut world = two_patrollers();
+    let points = [Point::new(25.0, 25.0), Point::new(30.0, 20.0)];
+    world
+        .patrol(
+            player_id(1),
+            &object_ids([11, 12]),
+            &points,
+            SavedPatrols::Dropped,
+        )
+        .unwrap();
+    assert_eq!(world.groups.groups.len(), 1);
+    let group = &world.groups.groups[0];
     assert_eq!(
-        (g.owner, g.has(object_id(11)), g.has(object_id(12))),
+        (
+            group.owner,
+            group.has(object_id(11)),
+            group.has(object_id(12))
+        ),
         (Some(PlayerId::new(1)), true, true)
     );
     assert_eq!(
-        (g.differentiator_id, g.current_command),
+        (group.differentiator_id, group.current_command),
         (Differentiator::of_data(0), GroupCommandKind::MOVE)
     );
-    let top = g.motion.paths.last().unwrap();
+    let top = group.motion.paths.last().unwrap();
     assert_eq!(
         top.path_flags & (PathFlags::LOOPS | PathFlags::BACK_AND_FORTH),
         PathFlags::LOOPS | PathFlags::BACK_AND_FORTH
@@ -4917,11 +5106,11 @@ fn patrolling_group_walks_loop_through_its_waypoints() {
         top.points[1..],
         [BVector::new(25.0, 0.0, 25.0), BVector::new(30.0, 0.0, 20.0)]
     );
-    assert_eq!(t.groups.commands, Differentiator::of_data(1));
-    let ai = t
+    assert_eq!(world.groups.commands, Differentiator::of_data(1));
+    let ai = world
         .parts
         .unit_ai
-        .get(t.players[1].objects[ListIndex::new(0)].id)
+        .get(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap();
     assert_eq!(
         (ai.adjusted_idle_timeout, ai.patrol_path.is_none()),
@@ -4953,7 +5142,7 @@ fn move_of_soldiers_in_no_group_forms_new_groups() {
         .unwrap();
     let g = &t.groups.groups;
     assert_eq!(g.len(), 1);
-    let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
+    let ids: Vec<ObjectId> = g[0].members.iter().map(|member| member.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
     assert_eq!(t.groups.commands, Differentiator::of_data(1));
     let mut t = world();
@@ -4963,12 +5152,12 @@ fn move_of_soldiers_in_no_group_forms_new_groups() {
     };
     t.move_order(PlayerId::new(1), &object_ids([11, 12, 13]), &ctrl)
         .unwrap();
-    let g = &t.groups.groups;
-    assert_eq!(g.len(), 3);
-    for g in g {
-        assert_eq!(g.members.len(), 1);
+    let groups = &t.groups.groups;
+    assert_eq!(groups.len(), 3);
+    for group in groups {
+        assert_eq!(group.members.len(), 1);
         assert_eq!(
-            g.differentiator_groups,
+            group.differentiator_groups,
             [group_id(0), group_id(1), group_id(2)]
         );
     }
@@ -4991,23 +5180,28 @@ fn move_of_whole_group_keeps_it() {
         control: ControlKey::Up,
     };
     let kept = || {
-        let mut t = soldiers(&units, &[11, 12]);
-        t.groups.get_mut(group_id(5)).unwrap().motion.position[0] = BVector::new(21.0, 0.0, 20.0);
-        t
+        let mut soldiers = soldiers(&units, &[11, 12]);
+        soldiers
+            .groups
+            .get_mut(group_id(5))
+            .unwrap()
+            .motion
+            .position[0] = BVector::new(21.0, 0.0, 20.0);
+        soldiers
     };
     let mut t = kept();
     t.move_order(PlayerId::new(1), &object_ids([11, 12, 13]), &order)
         .unwrap();
     assert_eq!(t.groups.groups.len(), 1);
-    let g = t.groups.get(group_id(5)).unwrap();
-    assert!(g.has(object_id(13)));
+    let group = t.groups.get(group_id(5)).unwrap();
+    assert!(group.has(object_id(13)));
     // the keep sets flags bit 17, which the group's command then clears
     assert_eq!(
-        (g.flags & GroupFlags::JOINED, g.differentiator_id),
+        (group.flags & GroupFlags::JOINED, group.differentiator_id),
         (GroupFlags::NONE, Differentiator::of_data(0))
     );
     assert_eq!(t.groups.commands, Differentiator::of_data(1));
-    let mut t = kept();
+    let mut world = kept();
     // with a target the world holds the kept group takes the command on it (a unit of the
     // order itself, which has no task: the plain move to it)
     let at_12 = MoveOrder {
@@ -5015,7 +5209,8 @@ fn move_of_whole_group_keeps_it() {
         ..order
     };
     assert!(
-        t.move_order(PlayerId::new(1), &object_ids([11, 12, 13]), &at_12)
+        world
+            .move_order(PlayerId::new(1), &object_ids([11, 12, 13]), &at_12)
             .is_ok()
     );
 }
@@ -5027,18 +5222,22 @@ fn move_of_whole_group_keeps_it() {
 /// a new action.
 #[test]
 fn gather_takes_farm_but_no_other_building() {
-    let mut t = forage_world();
-    t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
+    let mut forage_world = forage_world();
+    forage_world
+        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    t.model.masters[1] = Arc::new(Masters::new(t.model.masters[1].iter().cloned().chain([
-        Master {
-            id: ids::FARM,
-            kind: MasterKind::BUILDING,
-            class: class::FARM,
-            radius: Footprint::new(1.5, 1.5),
-            ..Master::default()
-        },
-    ])));
+    forage_world.model.masters[1] = Arc::new(Masters::new(
+        forage_world.model.masters[1]
+            .iter()
+            .cloned()
+            .chain([Master {
+                id: ids::FARM,
+                kind: MasterKind::BUILDING,
+                class: class::FARM,
+                radius: Footprint::new(1.5, 1.5),
+                ..Master::default()
+            }]),
+    ));
     let farm = |id, state, annex_of| {
         Object::with_building(
             Unit {
@@ -5059,19 +5258,19 @@ fn gather_takes_farm_but_no_other_building() {
             },
         )
     };
-    let _ = t
+    let _ = forage_world
         .push_live(
             PlayerId::new(1),
             farm(object_id(800), ObjectState::Alive, None),
         )
         .unwrap();
-    let _ = t
+    let _ = forage_world
         .push_live(
             PlayerId::new(1),
             farm(object_id(801), ObjectState::Foundation, None),
         )
         .unwrap();
-    let _ = t
+    let _ = forage_world
         .push_live(
             PlayerId::new(1),
             farm(
@@ -5081,20 +5280,24 @@ fn gather_takes_farm_but_no_other_building() {
             ),
         )
         .unwrap();
-    let world = t.clone();
+    let world = forage_world.clone();
     assert_eq!(
-        t.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800)),
+        forage_world.retarget_gather(PlayerId::new(1), ListIndex::new(0), object_id(800)),
         Ok(Answer::Taken)
     );
-    let g = t
+    let gather_action = forage_world
         .parts
-        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        .actions_of(forage_world.players[1].objects[ListIndex::new(0)].id)
         .list
         .gather()
         .copied()
         .unwrap();
     assert_eq!(
-        (g.target, g.state.bare(), g.point),
+        (
+            gather_action.target,
+            gather_action.state.bare(),
+            gather_action.point
+        ),
         (
             Some(GatherTargetId::new(object_id(800))),
             GatherState::Walk { move_to: None },
@@ -5103,8 +5306,8 @@ fn gather_takes_farm_but_no_other_building() {
     );
     assert_eq!(
         (
-            t.players[0].objects[ListIndex::new(0)].workers,
-            t.players[1].objects[ListIndex::new(3)].workers
+            forage_world.players[0].objects[ListIndex::new(0)].workers,
+            forage_world.players[1].objects[ListIndex::new(3)].workers
         ),
         (WorkerCount::of_data(0), WorkerCount::of_data(1))
     );
@@ -5139,7 +5342,7 @@ fn gather_takes_farm_but_no_other_building() {
 /// [`crate::world::tests::forage_world`]'s forager 9175 carrying 6 berries (kind 17), its
 /// Gather on bush 600 from a work command, its player holding 10 attributes.
 fn foraging() -> World {
-    let mut t = forage_world();
+    let mut world = forage_world();
     let work = Work {
         target: Some(object_id(600)),
         point: Position::new(32.5, 89.5, 0.0),
@@ -5147,12 +5350,13 @@ fn foraging() -> World {
         filter: None,
         source: OrderSource::Direct,
     };
-    t.order_work(PlayerId::new(1), ListIndex::new(0), &work)
+    world
+        .order_work(PlayerId::new(1), ListIndex::new(0), &work)
         .unwrap();
-    t.players[1].attributes = vec![Amount::ZERO; 10];
-    let v = &mut t.players[1].objects[ListIndex::new(0)];
-    (v.life.attribute_kind, v.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
-    t
+    world.players[1].attributes = vec![Amount::ZERO; 10];
+    let unit = &mut world.players[1].objects[ListIndex::new(0)];
+    (unit.life.attribute_kind, unit.life.amount) = (Some(AttributeId::named(17)), Amount::new(6.0));
+    world
 }
 
 /// The drop-off order's ask (`FUN_14161e370`): the orders 7 and 8 ask a top Gather, Build or
@@ -5162,66 +5366,82 @@ fn foraging() -> World {
 #[test]
 fn drop_off_order_asks_the_top_gather_build_or_hunt() {
     use super::unit_order::{DropOffAsk, DropOffBy};
-    let mut t = foraging();
+    let mut foraging = foraging();
     let ask = |by, asked, unaimed| Some(DropOffAsk { by, asked, unaimed });
     // the ask carries the top action it found
-    let gather = |t: &World| {
+    let gather = |world: &World| {
         DropOffBy::Gather(
-            *t.parts
-                .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+            *world
+                .parts
+                .actions_of(world.players[1].objects[ListIndex::new(0)].id)
                 .list
                 .gather()
                 .unwrap(),
         )
     };
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(gather(&t), true, false)
+        ask(gather(&foraging), true, false)
     );
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (false, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (false, true))
             .unwrap(),
         None
     );
-    t.players[1].objects[ListIndex::new(0)].life.attribute_kind = Some(attribute::WOOD);
+    foraging.players[1].objects[ListIndex::new(0)]
+        .life
+        .attribute_kind = Some(attribute::WOOD);
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
             .unwrap(),
-        ask(gather(&t), false, false)
+        ask(gather(&foraging), false, false)
     );
-    let g = t
+    let gather_action = foraging
         .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(foraging.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .gather_mut()
         .unwrap();
-    (g.target, g.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
+    (gather_action.target, gather_action.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
-        ask(gather(&t), false, true)
+        ask(gather(&foraging), false, true)
     );
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, false))
             .unwrap(),
-        ask(gather(&t), false, false)
+        ask(gather(&foraging), false, false)
     );
     // a Hunt and a Build of a wood task, aimed
     let mut hunt = hunting(600);
     hunt.task.resource = Some(attribute::WOOD);
-    let v = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
-    t.parts
+    let v = &mut foraging.players[1].objects[ListIndex::new(0)];
+    foraging
+        .parts
+        .actions
+        .of_mut(v.id)
+        .unwrap()
+        .list
+        .set_gather(None);
+    foraging
+        .parts
         .actions
         .of_mut(v.id)
         .unwrap()
         .list
         .set_hunt(Some(hunt));
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
         ask(DropOffBy::Hunt(hunt), true, false)
     );
@@ -5233,29 +5453,44 @@ fn drop_off_order_asks_the_top_gather_build_or_hunt() {
         id: TaskId::of_task(-1),
         moving: None,
     };
-    let v = &mut t.players[1].objects[ListIndex::new(0)];
+    let players = &mut foraging.players[1].objects[ListIndex::new(0)];
     let build = started(
         object_id(10028),
         Position::new(10.5, 10.5, 0.0),
         Distance::new(5.0),
         task,
     );
-    t.parts
+    foraging
+        .parts
         .actions
-        .of_mut(v.id)
+        .of_mut(players.id)
         .unwrap()
         .list
         .set_build(Some(build));
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
         ask(DropOffBy::Build(build), true, false)
     );
-    let v = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.actions.of_mut(v.id).unwrap().list.set_build(None);
-    t.parts.actions.of_mut(v.id).unwrap().list.set_hunt(None);
+    let unit = &mut foraging.players[1].objects[ListIndex::new(0)];
+    foraging
+        .parts
+        .actions
+        .of_mut(unit.id)
+        .unwrap()
+        .list
+        .set_build(None);
+    foraging
+        .parts
+        .actions
+        .of_mut(unit.id)
+        .unwrap()
+        .list
+        .set_hunt(None);
     assert_eq!(
-        t.drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
+        foraging
+            .drop_off_ask(PlayerId::new(1), ListIndex::new(0), (true, true))
             .unwrap(),
         None
     );
@@ -5298,80 +5533,102 @@ fn drop_off_order_takes_gather_to_its_site_or_posts_the_other_load() {
         .copied();
     t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
         .unwrap();
-    let v = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.actions_of(v.id).list.gather().copied(), before);
-    let ai = t.parts.unit_ai.get(v.id).expect("the forager's unit AI");
+    let players = &t.players[1].objects[ListIndex::new(0)];
+    assert_eq!(
+        t.parts.actions_of(players.id).list.gather().copied(),
+        before
+    );
+    let ai = t
+        .parts
+        .unit_ai
+        .get(players.id)
+        .expect("the forager's unit AI");
     assert!(
-        ai.notifies.iter().any(|n| n.kind == NotifyKind::OTHER_LOAD),
+        ai.notifies
+            .iter()
+            .any(|notify| notify.kind == NotifyKind::OTHER_LOAD),
         "{:?}",
         ai.notifies
     );
-    let mut t = foraging();
-    let g = t
+    let mut world = foraging();
+    let g = world
         .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .gather_mut()
         .unwrap();
     (g.target, g.point) = (None, Position::new(NO_POINT, NO_POINT, 0.0));
-    t.unit_order(
-        player_id(1),
-        &object_ids([9175]),
-        UnitOrderAction::DropOffAndBack,
-    )
-    .unwrap();
-    let v = &t.players[1].objects[ListIndex::new(0)];
+    world
+        .unit_order(
+            player_id(1),
+            &object_ids([9175]),
+            UnitOrderAction::DropOffAndBack,
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts
-            .actions_of(v.id)
+        world
+            .parts
+            .actions_of(unit.id)
             .list
             .gather()
-            .map(|g| (g.carry_to, g.state.bare())),
+            .map(|gather_action| (gather_action.carry_to, gather_action.state.bare())),
         Some((
             Some(DropSiteId::new(object_id(700))),
             GatherState::Drop { move_to: None }
         ))
     );
-    assert_eq!(t.parts.unit_ai.get(v.id).map(|ai| ai.orders.len()), Some(1));
+    assert_eq!(
+        world.parts.unit_ai.get(unit.id).map(|ai| ai.orders.len()),
+        Some(1)
+    );
 }
 
 /// The drop-off order 7 to a Hunt carrying its load: it goes to the town centre 700 (state 8),
 /// which counts it as a worker.
 #[test]
 fn drop_off_order_takes_hunt_to_its_site() {
-    let mut t = foraging();
-    let v = &mut t.players[1].objects[ListIndex::new(0)];
-    t.parts.actions.of_mut(v.id).unwrap().list.set_gather(None);
+    let mut world = foraging();
+    let unit = &mut world.players[1].objects[ListIndex::new(0)];
+    world
+        .parts
+        .actions
+        .of_mut(unit.id)
+        .unwrap()
+        .list
+        .set_gather(None);
     let mut hunt = hunting(600);
     hunt.task.resource = Some(AttributeId::named(17));
     // the sprites' table of the world holds none
     hunt.task.sprites = TaskSprites::NONE;
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(v.id)
+        .of_mut(unit.id)
         .unwrap()
         .list
         .set_hunt(Some(hunt));
-    t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
+    world
+        .unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
         .unwrap();
-    let h = t
+    let hunt_action = world
         .parts
-        .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        .actions_of(world.players[1].objects[ListIndex::new(0)].id)
         .list
         .hunt()
         .copied()
         .expect("the Hunt");
     assert_eq!(
-        (h.carry_to, h.state.bare()),
+        (hunt_action.carry_to, hunt_action.state.bare()),
         (
             Some(DropSiteId::new(object_id(700))),
             HuntState::Drop { move_to: None }
         )
     );
     assert_eq!(
-        t.players[1].objects[ListIndex::new(2)].workers,
+        world.players[1].objects[ListIndex::new(2)].workers,
         WorkerCount::of_data(1)
     );
 }
@@ -5388,19 +5645,20 @@ fn drop_off_order_fails_on_what_it_does_not_hold() {
     assert_eq!(
         t.unit_order(player_id(1), &object_ids([9175]), UnitOrderAction::DropOff)
             .err()
-            .map(|e| e.reason()),
+            .map(|error| error.reason()),
         Some("a UNIT_ORDER drop-off of an action not held")
     );
-    let mut t = foraging();
-    t.players[1].objects[ListIndex::new(0)].life.amount = Amount::ZERO;
-    let before = t.players[1].objects[ListIndex::new(0)].clone();
-    t.unit_order(
-        player_id(1),
-        &object_ids([9175, 12345]),
-        UnitOrderAction::DropOff,
-    )
-    .unwrap();
-    assert_eq!(t.players[1].objects[ListIndex::new(0)], before);
+    let mut world = foraging();
+    world.players[1].objects[ListIndex::new(0)].life.amount = Amount::ZERO;
+    let before = world.players[1].objects[ListIndex::new(0)].clone();
+    world
+        .unit_order(
+            player_id(1),
+            &object_ids([9175, 12345]),
+            UnitOrderAction::DropOff,
+        )
+        .unwrap();
+    assert_eq!(world.players[1].objects[ListIndex::new(0)], before);
 }
 
 /// The attack task's start ends where the game's start does ([`crate::combat::attack::Attack::command`]
@@ -5412,35 +5670,37 @@ fn drop_off_order_fails_on_what_it_does_not_hold() {
 fn an_attack_task_start_ends_where_the_start_does() {
     use crate::combat::attack::AttackState;
     let started = |ai: bool, at: f32| {
-        let (mut t, task) = work_attack(UnitStance::Aggressive);
-        let unit = &mut t.players[1].objects[ListIndex::new(0)];
+        let (mut world, task) = work_attack(UnitStance::Aggressive);
+        let unit = &mut world.players[1].objects[ListIndex::new(0)];
         if !ai {
-            t.parts.set_unit_ai(unit.id, None);
+            world.parts.set_unit_ai(unit.id, None);
         }
-        t.parts.set_anim_speed(unit.id, Speed::new(0.5));
-        let mut wolf = *t.spatial.get(object_id(50)).unwrap();
+        world.parts.set_anim_speed(unit.id, Speed::new(0.5));
+        let mut wolf = *world.spatial.get(object_id(50)).unwrap();
         wolf.position = Position::new(at, 10.0, 0.0);
-        t.spatial.insert(object_id(50), wolf);
-        t.players[0].objects[ListIndex::new(0)].place = Static::at(Position::new(at, 10.0, 0.0));
-        t.start_attack(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            object_id(50),
-            &task,
-            Position::new(at, 10.0, 0.0),
-            Notifies::Cleared,
-        )
-        .unwrap();
-        let unit = &t.players[1].objects[ListIndex::new(0)];
-        let state = t
+        world.spatial.insert(object_id(50), wolf);
+        world.players[0].objects[ListIndex::new(0)].place =
+            Static::at(Position::new(at, 10.0, 0.0));
+        world
+            .start_attack(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                object_id(50),
+                &task,
+                Position::new(at, 10.0, 0.0),
+                Notifies::Cleared,
+            )
+            .unwrap();
+        let unit = &world.players[1].objects[ListIndex::new(0)];
+        let state = world
             .parts
             .actions_of(unit.id)
             .list
             .attack()
-            .map(|a| a.state.bare());
-        let notifies = t.parts.unit_ai.get(unit.id).map(|ai| ai.notifies.len());
-        let sprite = unit.sprite.map(|s| s.graphic.id);
-        (state, t.parts.anim_speed_of(unit.id), sprite, notifies)
+            .map(|attack| attack.state.bare());
+        let notifies = world.parts.unit_ai.get(unit.id).map(|ai| ai.notifies.len());
+        let sprite = unit.sprite.map(|active_sprite| active_sprite.graphic.id);
+        (state, world.parts.anim_speed_of(unit.id), sprite, notifies)
     };
     let (near, _, sprite, near_notifies) = started(true, 10.4);
     assert_eq!(sprite, Some(SpriteId::named(300)));
@@ -5468,18 +5728,19 @@ fn an_attack_task_start_ends_where_the_start_does() {
 /// Gaia's bush (its master 120); none on its town centre, which no task of it names.
 #[test]
 fn work_command_finds_its_master_and_task_on_target() {
-    let t = forage_world();
+    let world = forage_world();
     assert_eq!(
-        t.work_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            (None, Position::from([1.0; 3])),
-            None
-        )
-        .unwrap(),
+        world
+            .work_task(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                (None, Position::from([1.0; 3])),
+                None
+            )
+            .unwrap(),
         None
     );
-    let (with, task) = t
+    let (with, task) = world
         .work_task(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -5493,13 +5754,14 @@ fn work_command_finds_its_master_and_task_on_target() {
         (master_id(120), task_id(2), GATHER)
     );
     assert_eq!(
-        t.work_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            (Some(object_id(700)), Position::from([1.0; 3])),
-            None
-        )
-        .unwrap(),
+        world
+            .work_task(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                (Some(object_id(700)), Position::from([1.0; 3])),
+                None
+            )
+            .unwrap(),
         None
     );
 }
@@ -5508,10 +5770,11 @@ fn work_command_finds_its_master_and_task_on_target() {
 /// the other deer the hunter's Hunt: the unit AI hears the gather or hunt order on it.
 #[test]
 fn work_command_retargets_gather_or_hunt_on_its_task() {
-    let mut t = forage_world();
-    t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
+    let mut forage_world = forage_world();
+    forage_world
+        .gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    let took = t
+    let took = forage_world
         .retarget_gather_work(
             PlayerId::new(1),
             ListIndex::new(0),
@@ -5522,18 +5785,23 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             ),
         )
         .unwrap();
-    let v = &t.players[1].objects[ListIndex::new(0)];
+    let players = &forage_world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
         (
             took,
-            t.parts.actions_of(v.id).list.gather().map(|g| g.target)
+            forage_world
+                .parts
+                .actions_of(players.id)
+                .list
+                .gather()
+                .map(|gather_action| gather_action.target)
         ),
         (
             Answer::Taken,
             Some(Some(GatherTargetId::new(object_id(601))))
         )
     );
-    let ai = t.parts.unit_ai.get(v.id).unwrap();
+    let ai = forage_world.parts.unit_ai.get(players.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (
@@ -5542,25 +5810,32 @@ fn work_command_retargets_gather_or_hunt_on_its_task() {
             Some(object_id(601))
         )
     );
-    let mut t = hunt_world();
-    t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
+    let mut world = hunt_world();
+    world
+        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
-    t.retarget_hunt_work(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        (
-            object_id(501),
-            Position::new(36.5, 89.5, 0.0),
-            Notifies::Cleared,
-        ),
-    )
-    .unwrap();
-    let v = &t.players[1].objects[ListIndex::new(0)];
+    world
+        .retarget_hunt_work(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            (
+                object_id(501),
+                Position::new(36.5, 89.5, 0.0),
+                Notifies::Cleared,
+            ),
+        )
+        .unwrap();
+    let unit = &world.players[1].objects[ListIndex::new(0)];
     assert_eq!(
-        t.parts.actions_of(v.id).list.hunt().map(|h| h.target),
+        world
+            .parts
+            .actions_of(unit.id)
+            .list
+            .hunt()
+            .map(|hunt_action| hunt_action.target),
         Some(Some(HuntTargetId::new(object_id(501))))
     );
-    let ai = t.parts.unit_ai.get(v.id).unwrap();
+    let ai = world.parts.unit_ai.get(unit.id).unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (
@@ -5605,7 +5880,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
     let mut t = with_84(forage_world());
     t.gather_command(PlayerId::new(1), ListIndex::new(0), object_id(600))
         .unwrap();
-    let r = t.retarget_gather_work(
+    let answer = t.retarget_gather_work(
         PlayerId::new(1),
         ListIndex::new(0),
         (
@@ -5615,13 +5890,14 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         ),
     );
     assert_eq!(
-        r.err().map(|e| e.reason()),
+        answer.err().map(|e| e.reason()),
         Some("a gather sent to its player's master 84")
     );
-    let mut t = with_84(hunt_world());
-    t.hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
+    let mut world = with_84(hunt_world());
+    world
+        .hunt_command(PlayerId::new(1), ListIndex::new(0), object_id(500))
         .unwrap();
-    let r = t.retarget_hunt_work(
+    let retarget_hunt_work = world.retarget_hunt_work(
         PlayerId::new(1),
         ListIndex::new(0),
         (
@@ -5631,7 +5907,7 @@ fn work_command_retarget_to_its_player_master_84_fails() {
         ),
     );
     assert_eq!(
-        r.err().map(|e| e.reason()),
+        retarget_hunt_work.err().map(|error| error.reason()),
         Some("a hunt sent to its player's master 84")
     );
 }
@@ -5724,7 +6000,7 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ),
         Ok(Answer::NotTaken)
     );
-    let mut t = forage_world();
+    let mut world = forage_world();
     let build = BuildTask {
         range: Distance::new(0.1),
         work_value: WorkValue::new(1.0),
@@ -5733,9 +6009,10 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         id: task_id(3),
         moving: None,
     };
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_build(Some(started(
@@ -5749,15 +6026,16 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
         ..task
     };
     assert_eq!(
-        t.retake_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            at,
-            &building,
-            MasterSwap::Change
-        )
-        .err()
-        .map(|e| e.reason()),
+        world
+            .retake_task(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                at,
+                &building,
+                MasterSwap::Change
+            )
+            .err()
+            .map(|error| error.reason()),
         Some("a work command on the Build task of the unit's former master")
     );
 }
@@ -5767,28 +6045,30 @@ fn work_command_task_is_retaken_by_the_action_on_top() {
 #[test]
 fn work_command_factory_starts_the_task_action() {
     use crate::objects::masters::Task;
-    let mut t = forage_world();
-    let task = *t.model.masters[1]
+    let mut world = forage_world();
+    let task = *world.model.masters[1]
         .get(master_id(120))
         .unwrap()
         .action_part()
         .tasks
         .first()
         .unwrap();
-    t.start_task(
-        PlayerId::new(1),
-        ListIndex::new(0),
-        (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
-        &task,
-        (Notifies::Cleared, OrderSource::Direct),
-    )
-    .unwrap();
+    world
+        .start_task(
+            PlayerId::new(1),
+            ListIndex::new(0),
+            (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
+            &task,
+            (Notifies::Cleared, OrderSource::Direct),
+        )
+        .unwrap();
     assert_eq!(
-        t.parts
-            .actions_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .actions_of(world.players[1].objects[ListIndex::new(0)].id)
             .list
             .gather()
-            .map(|g| (g.target, g.state.bare())),
+            .map(|gather_action| (gather_action.target, gather_action.state.bare())),
         Some((
             Some(GatherTargetId::new(object_id(600))),
             GatherState::Walk { move_to: None }
@@ -5799,15 +6079,16 @@ fn work_command_factory_starts_the_task_action() {
         ..task
     };
     assert_eq!(
-        t.start_task(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
-            &unknown,
-            (Notifies::Cleared, OrderSource::Direct)
-        )
-        .err()
-        .map(|e| e.reason()),
+        world
+            .start_task(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                (Some(object_id(600)), Position::new(32.5, 89.5, 0.0)),
+                &unknown,
+                (Notifies::Cleared, OrderSource::Direct)
+            )
+            .err()
+            .map(|error| error.reason()),
         Some("the action factory for a task the slice does not model")
     );
 }
@@ -5824,9 +6105,9 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         (12, 4, Point::new(21.0, 20.0)),
         (13, 4, Point::new(22.0, 20.0)),
     ];
-    let mut t = searchable(patrollers(&units, &[]));
-    t.players.push(Player::default());
-    t.players[2].objects = vec![Unit {
+    let mut world = searchable(patrollers(&units, &[]));
+    world.players.push(Player::default());
+    world.players[2].objects = vec![Unit {
         id: object_id(60),
         place: Static::at(Position::new(40.0, 40.0, 0.0)),
         flags: UnitFlags::ATTACKABLE,
@@ -5839,7 +6120,7 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         ..Unit::default()
     }]
     .into();
-    t.reindex();
+    world.reindex();
     let building = Master {
         id: ids::HOUSE,
         kind: MasterKind::BUILDING,
@@ -5856,19 +6137,19 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
                 object_group: Some(class::BUILDING),
                 ..Task::default()
             }],
-            ..t.model.masters[1]
+            ..world.model.masters[1]
                 .get(master_id(4))
                 .unwrap()
                 .action
                 .clone()
                 .unwrap_or_default()
         }),
-        ..t.model.masters[1].get(master_id(4)).unwrap().clone()
+        ..world.model.masters[1].get(master_id(4)).unwrap().clone()
     };
-    t.model.masters[1] = Arc::new(Masters::new([soldier, building.clone()]));
-    t.model.masters.push(Arc::new(Masters::new([building])));
-    for u in &mut t.players[1].objects {
-        u.life.hp = HitPoints::new(25.0);
+    world.model.masters[1] = Arc::new(Masters::new([soldier, building.clone()]));
+    world.model.masters.push(Arc::new(Masters::new([building])));
+    for unit in &mut world.players[1].objects {
+        unit.life.hp = HitPoints::new(25.0);
     }
     let order = Interact {
         target: Some(object_id(60)),
@@ -5877,15 +6158,16 @@ fn an_interact_of_soldiers_on_an_enemy_building_forms_group_that_attacks_it() {
         flags: OrderFlags::DIRECT | OrderFlags::HUMAN,
         filter: None,
     };
-    t.interact(PlayerId::new(1), &object_ids([11, 12, 13]), &order)
+    world
+        .interact(PlayerId::new(1), &object_ids([11, 12, 13]), &order)
         .unwrap();
-    let g = &t.groups.groups;
-    assert_eq!(g.len(), 1);
-    let ids: Vec<ObjectId> = g[0].members.iter().map(|m| m.id).collect();
+    let groups = &world.groups.groups;
+    assert_eq!(groups.len(), 1);
+    let ids: Vec<ObjectId> = groups[0].members.iter().map(|member| member.id).collect();
     assert_eq!(ids, [object_id(11), object_id(12), object_id(13)]);
     assert_eq!(
-        (g[0].current_command, g[0].current_target.target),
+        (groups[0].current_command, groups[0].current_target.target),
         (GroupCommandKind::ATTACK, GroupTarget::Object(object_id(60)))
     );
-    assert_eq!(t.groups.commands, Differentiator::of_data(1));
+    assert_eq!(world.groups.commands, Differentiator::of_data(1));
 }

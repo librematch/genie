@@ -53,8 +53,8 @@ impl TryFrom<u8> for CaptureKind {
 }
 
 impl genie_diff::Diff for CaptureKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.get().diff(&other.get(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.get().diff(&other.get(), differ);
     }
 }
 
@@ -66,12 +66,12 @@ mod tests {
     #[test]
     fn only_zero_is_no_capture() {
         assert!(!CaptureKind::None.any());
-        for k in [
+        for capture_kind in [
             CaptureKind::BySight,
             CaptureKind::Again,
             CaptureKind::Livestock,
         ] {
-            assert!(k.any());
+            assert!(capture_kind.any());
         }
         assert_eq!(CaptureKind::default(), CaptureKind::None);
     }
@@ -86,8 +86,8 @@ mod tests {
             );
         }
         for value in [4, 0xff] {
-            let e = CaptureKind::try_from(value).unwrap_err();
-            assert!(e.to_string().contains("no store writes"), "{e}");
+            let error = CaptureKind::try_from(value).unwrap_err();
+            assert!(error.to_string().contains("no store writes"), "{error}");
         }
     }
 }

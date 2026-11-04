@@ -358,13 +358,13 @@ impl PathData {
     /// ends: at its first point it goes forward again ([`PathFlags::FORWARD`] set), at its last
     /// back (cleared). The units' and the groups' walks both take it.
     pub(crate) fn looping_next(&mut self, index: WaypointIndex) -> WaypointIndex {
-        let n = self.points.len();
+        let count = self.points.len();
         if !self.path_flags.contains(PathFlags::LOOPS) {
             return WaypointIndex::NONE;
         }
         if !self.path_flags.contains(PathFlags::BACK_AND_FORTH) {
             let next = index.next();
-            return if next.within(n) {
+            return if next.within(count) {
                 next
             } else {
                 WaypointIndex::FIRST
@@ -372,9 +372,9 @@ impl PathData {
         }
         if self.path_flags.contains(PathFlags::FORWARD) {
             let next = index.next();
-            if !next.within(n) {
+            if !next.within(count) {
                 self.path_flags.remove(PathFlags::FORWARD);
-                return WaypointIndex::last_of(n).previous();
+                return WaypointIndex::last_of(count).previous();
             }
             next
         } else {
@@ -390,7 +390,8 @@ impl PathData {
     /// Whether the level's target is object `id`, as the walk tests a hit (`0 <= target &&
     /// id == target`): a recyclable object's id is no level's target there.
     pub(crate) fn targets(&self, id: ObjectId) -> bool {
-        self.target.is_some_and(|t| !t.is_recyclable() && t == id)
+        self.target
+            .is_some_and(|object_id| !object_id.is_recyclable() && object_id == id)
     }
 
     /// A new level (`FUN_140f8f670`) with a new path (`FUN_14152eea0`, flags 6, made `now`).
@@ -507,10 +508,10 @@ pub(crate) fn gate_gap(
         return own;
     }
     let mut gap = own;
-    for a in by_id.annexes(id).ids().take(2) {
-        if let Some(p) = world.get(a) {
+    for object_id in by_id.annexes(id).ids().take(2) {
+        if let Some(placed) = world.get(object_id) {
             gap = Distance::new(minss(
-                annex(footprint_gap(at, radius, p.position, p.radius)).get(),
+                annex(footprint_gap(at, radius, placed.position, placed.radius)).get(),
                 gap.get(),
             ));
         }
@@ -536,7 +537,7 @@ fn pause_rank(
         if !player_kind.is_computer() && (other.player != player || theirs != mine) {
             theirs < mine
         } else if let Some(group) = me.group
-            && by_id.gait(id).and_then(|g| g.group) == Some(group)
+            && by_id.gait(id).and_then(|gait| gait.group) == Some(group)
         {
             let g = groups.and_then(|gs| gs.get(group))?;
             g.index_of(me.id) < g.index_of(id)
@@ -564,10 +565,10 @@ fn drop_edge_waypoints(level: &mut PathData, radius: Radii, map: GridSize) {
     }
 }
 
-/// `FUN_140f98d50`: a path's point `i` goes, the later ones move down (true); an index outside
-/// the path (below 0 or past its last point) changes nothing (false).
-fn remove_point(points: &mut Vec<BVector>, i: WaypointIndex) -> bool {
-    match i.slot() {
+/// `FUN_140f98d50`: a path's point `waypoint_index` goes, the later ones move down (true); an index
+/// outside the path (below 0 or past its last point) changes nothing (false).
+fn remove_point(points: &mut Vec<BVector>, waypoint_index: WaypointIndex) -> bool {
+    match waypoint_index.slot() {
         Some(k) if k < points.len() => {
             let _ = points.remove(k);
             true

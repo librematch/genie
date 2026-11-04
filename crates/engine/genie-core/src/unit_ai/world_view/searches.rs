@@ -208,7 +208,7 @@ impl UnitView<'_, '_> {
             self.c.player,
             self.new_owner,
         )?;
-        let look = |id: ObjectId| view.own(id).map(|u| (u.life.state, u.position()));
+        let look = |id: ObjectId| view.own(id).map(|unit| (unit.life.state, unit.position()));
         Ok(nearest_table_site(
             (
                 &self.c.w.model.drop_sites,
@@ -269,40 +269,48 @@ impl UnitView<'_, '_> {
             .unit
             .master(self.c.w.master_tables(), self.player)?
             .radius;
-        for r in lists[UnitRelation::Own]
+        for record in lists[UnitRelation::Own]
             .iter()
             .chain(&lists[UnitRelation::Ally])
         {
-            if r.id == me {
+            if record.id == me {
                 continue;
             }
-            let Some((owner, u)) = find(r.id) else {
+            let Some((owner, unit)) = find(record.id) else {
                 continue;
             };
-            if !self.c.w.parts.unit_ai.contains(u.id) || ObjectState::Dying <= u.life.state {
+            if !self.c.w.parts.unit_ai.contains(unit.id) || ObjectState::Dying <= unit.life.state {
                 continue;
             }
-            let m = u.master(self.c.w.master_tables(), owner)?;
-            let no_help = NO_HELP_CLASSES.contains(m.class);
-            if no_help || roles.of_master(m.id).contains(MasterRoles::SIEGE_TOWER) {
+            let master = unit.master(self.c.w.master_tables(), owner)?;
+            let no_help = NO_HELP_CLASSES.contains(master.class);
+            if no_help
+                || roles
+                    .of_master(master.id)
+                    .contains(MasterRoles::SIEGE_TOWER)
+            {
                 continue;
             }
-            if !gaia_attacker && roles.of_class(m.class).contains(ClassRoles::VILLAGER) {
+            if !gaia_attacker && roles.of_class(master.class).contains(ClassRoles::VILLAGER) {
                 continue;
             }
             if owner != self.player && !self.c.w.spatial.allied_with(owner, self.player) {
                 continue;
             }
-            let gap =
-                footprint_gap_squared(self.unit.position(), my_radius, u.position(), m.radius);
+            let gap = footprint_gap_squared(
+                self.unit.position(),
+                my_radius,
+                unit.position(),
+                master.radius,
+            );
             if DistanceSquared::new(self.c.w.model.tuning.unit_ai.help_reach) < gap {
                 continue;
             }
             if !self.helper_free(
                 owner,
-                u,
-                self.c.w.parts.actions_of(u.id),
-                m,
+                unit,
+                self.c.w.parts.actions_of(unit.id),
+                master,
                 attacker,
                 roles,
             )? {
@@ -338,8 +346,8 @@ impl UnitView<'_, '_> {
         // the search about the town centre only while the player has no scout map
         let scout_map = self.c.w.spatial.scout_map(self.player).is_some();
         let (mut area, map, line_of_sight) = self.scout_area()?;
-        if !scout_map && let Some(p) = unexplored_area(tc, map, &mut area)? {
-            return Ok(Some(p));
+        if !scout_map && let Some(tile) = unexplored_area(tc, map, &mut area)? {
+            return Ok(Some(tile));
         }
         // none about the town centre: the unit AI's own search (slot 0x90)
         let seeker = Seeker {
@@ -365,8 +373,8 @@ impl UnitView<'_, '_> {
         area.scouted = scouted;
         let found = beyond_sight(&mut area, at, line_of_sight, map, rng)?;
         // the point found is marked in the scout map (FUN_140f4d5e0 with 1)
-        if let Some(t) = found {
-            self.c.w.spatial.scout(player, t);
+        if let Some(tile) = found {
+            self.c.w.spatial.scout(player, tile);
         }
         Ok(found)
     }
@@ -377,7 +385,7 @@ impl UnitView<'_, '_> {
     /// `FUN_141285350` 0xf) with 1.
     pub(crate) fn make_scout_map(&mut self) {
         let size = SCOUT_MAP_SIZE;
-        let mut m = InfluenceMap::new(GridSize::new(size, size), 0);
+        let mut influence_map = InfluenceMap::new(GridSize::new(size, size), 0);
         let (w, h) = (self.c.w.spatial.map.width(), self.c.w.spatial.map.height());
         for y in 0..h {
             for x in 0..w {
@@ -388,10 +396,10 @@ impl UnitView<'_, '_> {
                     .scout_sight(self.player, Tile::new(x, y))
                     .is_some_and(TileSight::seen)
                 {
-                    m.set(Tile::new(x, y), 1);
+                    influence_map.set(Tile::new(x, y), 1);
                 }
             }
         }
-        self.c.w.spatial.set_scout_map(self.player, m);
+        self.c.w.spatial.set_scout_map(self.player, influence_map);
     }
 }

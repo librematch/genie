@@ -54,10 +54,10 @@ impl World {
             .roles
             .of_class(unit.master(self.master_tables(), player)?.class)
             .contains(ClassRoles::LIVESTOCK);
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "an Artifact's move to an object the slice does not hold",
         ))?;
-        let target_master = t.master(self.master_tables(), tp)?;
+        let target_master = target_unit.master(self.master_tables(), tp)?;
         let to_building = livestock && target_master.kind == MasterKind::BUILDING;
         let to_town_centre = livestock
             && self
@@ -68,7 +68,7 @@ impl World {
         let at = self
             .spatial
             .get(target)
-            .map(|p| p.position)
+            .map(|placed| placed.position)
             .ok_or(GenieError::unsupported(
                 "an Artifact's move to an object without a place",
             ))?;
@@ -88,7 +88,7 @@ impl World {
         let to = WalkTo { at, ..to };
         let unit = self.players.live_mut(player, idx)?;
         let (targets, gone) = match self.parts.actions_mut(unit.id)?.list.artifact_mut() {
-            Some(a) => a.take_object(
+            Some(artifact) => artifact.take_object(
                 to,
                 (to_building, to_town_centre),
                 &reads,
@@ -104,8 +104,8 @@ impl World {
             self.take(t, by)?;
         }
         // set_state(5)'s sub-actions went: the Enter it held lets its building or transport go
-        if let Some(t) = gone.released {
-            self.release(t, by)?;
+        if let Some(object_id) = gone.released {
+            self.release(object_id, by)?;
         }
         if gone.stops {
             self.parts
@@ -125,13 +125,13 @@ impl World {
     /// What the moves do not model.
     pub(crate) fn lead_herd(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         sheep: ObjectId,
         site: DropSiteId,
     ) -> GenieResult<()> {
-        self.send_to_site(p, sheep, site)?;
+        self.send_to_site(player_id, sheep, site)?;
         let mut listed = Vec::new();
-        self.herd_from(p, sheep, site, &mut listed)
+        self.herd_from(player_id, sheep, site, &mut listed)
     }
 
     /// `FUN_140ac4c60` from the animal `sheep` (`listed` the animals sent so far, a static list of
@@ -170,21 +170,21 @@ impl World {
                 }
                 let ids = self.spatial.tiles().list(Tile::new(tx, ty)).to_vec();
                 for id in ids {
-                    let Some(Place::Live(q, i)) = self.place(id) else {
+                    let Some(Place::Live(player_id, list_index)) = self.place(id) else {
                         continue;
                     };
-                    let u = &self.players.live(q, i)?;
-                    if q != p
-                        || u.life.state != ObjectState::Alive
+                    let unit = &self.players.live(player_id, list_index)?;
+                    if player_id != p
+                        || unit.life.state != ObjectState::Alive
                         || !self
                             .model
                             .roles
-                            .of_class(u.master(self.master_tables(), q)?.class)
+                            .of_class(unit.master(self.master_tables(), player_id)?.class)
                             .contains(ClassRoles::LIVESTOCK)
                         || !self
                             .parts
-                            .actions_of(u.id)
-                            .top_action_idle(self.parts.unread.get(u.id))?
+                            .actions_of(unit.id)
+                            .top_action_idle(self.parts.unread.get(unit.id))?
                         || listed.contains(&id)
                     {
                         continue;
@@ -207,17 +207,17 @@ impl World {
         sheep: ObjectId,
         site: DropSiteId,
     ) -> GenieResult<()> {
-        let Some(Place::Live(q, idx)) = self.place(sheep) else {
+        let Some(Place::Live(player_id, idx)) = self.place(sheep) else {
             return Err(GenieError::unsupported(
                 "a led animal the slice does not hold live",
             ));
         };
-        if q != p {
+        if player_id != p {
             return Err(GenieError::unsupported("a led animal of another player"));
         }
         // the hunt's drop site is a raw field yet
         let (site, point) = Some(site)
-            .and_then(|id| self.spatial.get(id).map(|s| (id, s.position)))
+            .and_then(|id| self.spatial.get(id).map(|placed| (id, placed.position)))
             .ok_or(GenieError::unsupported("a drop site without a place"))?;
         self.move_to_object(p, idx, site.id(), point)
     }
@@ -236,17 +236,17 @@ impl World {
             let Some(place) = self.place(id) else {
                 continue;
             };
-            let Place::Live(p, idx) = place else {
+            let Place::Live(player_id, idx) = place else {
                 return Err(GenieError::unsupported("a cancel at a sleeping object"));
             };
-            let unit = &self.players.live(p, idx)?;
+            let unit = &self.players.live(player_id, idx)?;
             if unit.life.state != ObjectState::Alive
-                || unit.master(self.master_tables(), p)?.kind < MasterKind::BUILDING
+                || unit.master(self.master_tables(), player_id)?.kind < MasterKind::BUILDING
             {
                 continue;
             }
-            self.cancel_queued(p, idx, index, batch)?;
-            self.cancel_tail(p, idx, index)?;
+            self.cancel_queued(player_id, idx, index, batch)?;
+            self.cancel_tail(player_id, idx, index)?;
         }
         Ok(())
     }
@@ -285,13 +285,13 @@ impl World {
             let Some(place) = self.place(id) else {
                 continue;
             };
-            let Place::Live(p, idx) = place else {
+            let Place::Live(player_id, idx) = place else {
                 return Err(GenieError::unsupported("a UNIT_ORDER to a sleeping object"));
             };
             // any player's unit the world holds: the command's list (`FUN_140e6b750`) and the
             // order filter none by owner
-            let unit = &self.players.live(p, idx)?;
-            let kind = unit.master(self.master_tables(), p)?.kind;
+            let unit = &self.players.live(player_id, idx)?;
+            let kind = unit.master(self.master_tables(), player_id)?.kind;
             if unit.life.state != ObjectState::Alive
                 || kind < MasterKind::ACTION
                 || unit.life.amount <= Amount::ZERO
@@ -303,55 +303,71 @@ impl World {
                     "a UNIT_ORDER drop-off of an action not held",
                 ));
             }
-            match self.drop_off_ask(p, idx, (asks, way_back))? {
-                Some(ask) => self.asked_drop_off(p, idx, &ask)?,
-                None => self.drop_off_unasked(p, idx, action)?,
+            match self.drop_off_ask(player_id, idx, (asks, way_back))? {
+                Some(ask) => self.asked_drop_off(player_id, idx, &ask)?,
+                None => self.drop_off_unasked(player_id, idx, action)?,
             }
         }
         Ok(())
     }
-    /// The drop-off order's ask of object `idx` of player `p` (`asks` for the orders 7 and 8):
-    /// a top Gather (5), Build (101) or Hunt (110), with whether it asks for the drop-off of the
-    /// load (slot 0x78: the task's resource, any for −1, of the load's kind) and whether it is
+    /// The drop-off order's ask of object `idx` of player `player_id` (`asks` for the orders 7 and
+    /// 8): a top Gather (5), Build (101) or Hunt (110), with whether it asks for the drop-off of
+    /// the load (slot 0x78: the task's resource, any for −1, of the load's kind) and whether it is
     /// unaimed (`way_back`, the order 8, of an action without a target or a point); None for
     /// another action, for none and for the order 6.
     pub(super) fn drop_off_ask(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         idx: ListIndex,
         (asks, way_back): (bool, bool),
     ) -> GenieResult<Option<DropOffAsk>> {
-        let unit = self.players.live(p, idx)?;
+        let unit = self.players.live(player_id, idx)?;
         let top = if asks {
             self.parts.actions_of(unit.id).top_action_kind()
         } else {
             None
         };
         let found = match top {
-            Some(GATHER) => self.parts.actions_of(unit.id).list.gather().map(|g| {
-                (
-                    DropOffBy::Gather(*g),
-                    g.target.map(GatherTargetId::id),
-                    g.point,
-                    g.task.resource,
-                )
-            }),
-            Some(ActionKind::BUILD) => self.parts.actions_of(unit.id).list.build().map(|b| {
-                (
-                    DropOffBy::Build(*b),
-                    b.target.map(FoundationId::id),
-                    b.point,
-                    b.task.resource,
-                )
-            }),
-            Some(HUNT) => self.parts.actions_of(unit.id).list.hunt().map(|h| {
-                (
-                    DropOffBy::Hunt(*h),
-                    h.target.map(HuntTargetId::id),
-                    h.point,
-                    h.task.resource,
-                )
-            }),
+            Some(GATHER) => self
+                .parts
+                .actions_of(unit.id)
+                .list
+                .gather()
+                .map(|gather_action| {
+                    (
+                        DropOffBy::Gather(*gather_action),
+                        gather_action.target.map(GatherTargetId::id),
+                        gather_action.point,
+                        gather_action.task.resource,
+                    )
+                }),
+            Some(ActionKind::BUILD) => {
+                self.parts
+                    .actions_of(unit.id)
+                    .list
+                    .build()
+                    .map(|build_action| {
+                        (
+                            DropOffBy::Build(*build_action),
+                            build_action.target.map(FoundationId::id),
+                            build_action.point,
+                            build_action.task.resource,
+                        )
+                    })
+            }
+            Some(HUNT) => self
+                .parts
+                .actions_of(unit.id)
+                .list
+                .hunt()
+                .map(|hunt_action| {
+                    (
+                        DropOffBy::Hunt(*hunt_action),
+                        hunt_action.target.map(HuntTargetId::id),
+                        hunt_action.point,
+                        hunt_action.task.resource,
+                    )
+                }),
             _ => None,
         };
         let Some((by, target, point, resource)) = found else {
@@ -362,7 +378,7 @@ impl World {
             asked: hunt_asked_drop_off(
                 resource,
                 unit.life.attribute_kind,
-                self.players.player(p)?.attributes.len(),
+                self.players.player(player_id)?.attributes.len(),
                 self.model.slots,
             ),
             unaimed: way_back && target.is_none() && point.x() == NO_POINT && point.y() == NO_POINT,
@@ -377,27 +393,29 @@ impl World {
     /// [`World::queue_way_back`]).
     pub(super) fn asked_drop_off(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         idx: ListIndex,
         ask: &DropOffAsk,
     ) -> GenieResult<()> {
         if !ask.asked {
-            self.other_load(p, idx)?;
+            self.other_load(player_id, idx)?;
         }
         if ask.unaimed {
-            self.record_town_bell(p, idx)?;
+            self.record_town_bell(player_id, idx)?;
         }
         if ask.asked {
             match ask.by {
-                DropOffBy::Build(build) => self.build_drop_off_now((p, idx), build)?,
+                DropOffBy::Build(build) => self.build_drop_off_now((player_id, idx), build)?,
                 DropOffBy::Gather(gather) => {
-                    self.drop_off_at_site(p, idx, &SiteWalker::Gather(gather))?;
+                    self.drop_off_at_site(player_id, idx, &SiteWalker::Gather(gather))?;
                 }
-                DropOffBy::Hunt(hunt) => self.drop_off_at_site(p, idx, &SiteWalker::Hunt(hunt))?,
+                DropOffBy::Hunt(hunt) => {
+                    self.drop_off_at_site(player_id, idx, &SiteWalker::Hunt(hunt))?;
+                }
             }
         }
         if ask.unaimed {
-            self.queue_way_back(p, idx)?;
+            self.queue_way_back(player_id, idx)?;
         }
         Ok(())
     }
@@ -408,19 +426,19 @@ impl World {
     /// (slot 0x178, [`World::take`]).
     pub(super) fn drop_off_at_site(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         idx: ListIndex,
         walker: &SiteWalker,
     ) -> GenieResult<()> {
-        let unit = self.take_out(p, idx)?;
+        let unit = self.take_out(player_id, idx)?;
         // its action layer goes out of the table with it, as the updating object's
         let mut actions = self.parts.take_actions(unit.id);
-        let player = &self.players.player(p)?;
+        let player = &self.players.player(player_id)?;
         let (mover, by_id) = self
             .parts
             .lend_mover(unit.id, (&self.players, &self.index, &self.model));
         let world = DropWorld {
-            masters: by_id.masters().of(p),
+            masters: by_id.masters().of(player_id),
             spatial: &mut self.spatial,
             zones: &mut self.zones,
             pathing: &mut self.pathing,
@@ -429,7 +447,7 @@ impl World {
             player_kind: player.kind,
             groups: &self.groups,
         };
-        let others = OthersRef::of(&self.players, &self.index, p)?;
+        let others = OthersRef::of(&self.players, &self.index, player_id)?;
         let result = match *walker {
             SiteWalker::Hunt(mut hunt) => unit.drop_off_in(
                 (&mut hunt, &mut actions),
@@ -449,9 +467,9 @@ impl World {
             ),
         };
         self.parts.put_actions(unit.id, actions);
-        let idx = self.put_back_own(p, unit)?;
+        let idx = self.put_back_own(player_id, unit)?;
         if let Some(site) = result? {
-            self.take(site, self.releaser(p, idx)?)?;
+            self.take(site, self.releaser(player_id, idx)?)?;
         }
         Ok(())
     }

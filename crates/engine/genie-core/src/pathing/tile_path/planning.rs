@@ -53,24 +53,24 @@ impl Planner {
         self.points.clear();
         let result = match found {
             (None, _) => Found::Nothing,
-            (Some(n), result) => {
+            (Some(node_index), result) => {
                 self.last = goal;
                 let (to_x, to_y) = (req.to.x(), req.to.y());
                 let mut end = BVector::new(to_x, 0.0, to_y);
                 let toward =
                     result != Found::Goal || self.cell(GridLevel::TILES, goal).edges.is_empty();
                 if toward {
-                    let c = self.tile_toward(n, goal);
-                    let dy = f32::from(goal.y()) - f32::from(c.y());
-                    let dx = f32::from(goal.x()) - f32::from(c.x());
+                    let plan_tile = self.tile_toward(node_index, goal);
+                    let dy = f32::from(goal.y()) - f32::from(plan_tile.y());
+                    let dx = f32::from(goal.x()) - f32::from(plan_tile.x());
                     if result != Found::Goal
                         || req.radii.get() + tile_path_tuning.goal_gap < sqrt(dy * dy + dx * dx)
                     {
-                        end = Self::centre(c);
+                        end = Self::centre(plan_tile);
                     }
                 }
                 self.points.push(end);
-                self.trace_back(n, start);
+                self.trace_back(node_index, start);
                 self.points
                     .push(BVector::new(req.from.x(), 0.0, req.from.y()));
                 result
@@ -81,22 +81,23 @@ impl Planner {
         }
         self.mark_goal(req.goal(), Mark::Clear, tile_path_tuning);
         self.clear_nodes();
-        for &r in &req.closed {
-            self.close_rect(r, Mark::Clear);
+        for &plan_rect in &req.closed {
+            self.close_rect(plan_rect, Mark::Clear);
         }
         Ok(result)
     }
 
     /// `FUN_140f7d160`: the tile or one of its four neighbours (right, below, left, above) has an
     /// edge.
-    pub(super) fn near_passable(&self, t: PlanTile) -> bool {
-        let edges =
-            |t: PlanTile| self.on_map(t) && !self.cell(GridLevel::TILES, t).edges.is_empty();
-        edges(t)
-            || edges(t.stepped(1, 0))
-            || edges(t.stepped(0, 1))
-            || edges(t.stepped(-1, 0))
-            || edges(t.stepped(0, -1))
+    pub(super) fn near_passable(&self, tile: PlanTile) -> bool {
+        let edges = |plan_tile: PlanTile| {
+            self.on_map(plan_tile) && !self.cell(GridLevel::TILES, plan_tile).edges.is_empty()
+        };
+        edges(tile)
+            || edges(tile.stepped(1, 0))
+            || edges(tile.stepped(0, 1))
+            || edges(tile.stepped(-1, 0))
+            || edges(tile.stepped(0, -1))
     }
 
     /// The planner's entry (`FUN_140f7c530`): the search over the levels; for a human player's
@@ -143,7 +144,7 @@ impl Planner {
             self.shorter_start(req, &mut levels, tile_path_tuning)?;
         }
         if let Some(walls) = walls {
-            let smoothed = |r: Found| !matches!(r, Found::OffMap | Found::Nothing);
+            let smoothed = |found: Found| !matches!(found, Found::OffMap | Found::Nothing);
             if smoothed(first) {
                 smooth(&mut levels, walls, tile_path_tuning)?;
             }
@@ -218,12 +219,12 @@ impl Planner {
         levels: &mut Path,
         tile_path_tuning: &TilePathTuning,
     ) -> GenieResult<()> {
-        let n = levels.points.len();
+        let count = levels.points.len();
         let Some(&p0) = levels.points.first() else {
             return Ok(());
         };
         let mut i = 1;
-        if n <= 1 {
+        if count <= 1 {
             return Ok(());
         }
         loop {
@@ -238,11 +239,11 @@ impl Planner {
                 break;
             }
             i += 1;
-            if n <= i {
+            if count <= i {
                 break;
             }
         }
-        if i <= 1 || i == n {
+        if i <= 1 || i == count {
             return Ok(());
         }
         let Some(&pt) = levels.points.get(i) else {
@@ -294,7 +295,7 @@ impl Planner {
         self.points.clear();
         let result = match found {
             (None, _) => Found::Nothing,
-            (Some(n), result) => {
+            (Some(node_index), result) => {
                 self.last = goal;
                 let end = if result == Found::Goal
                     && !self.cell(GridLevel::TILES, goal).edges.is_empty()
@@ -302,10 +303,10 @@ impl Planner {
                     let (to_x, to_y) = (req.to.x(), req.to.y());
                     BVector::new(to_x, 0.0, to_y)
                 } else {
-                    Self::centre(self.tile_toward(n, goal))
+                    Self::centre(self.tile_toward(node_index, goal))
                 };
                 self.points.push(end);
-                self.trace_back(n, start);
+                self.trace_back(node_index, start);
                 self.points
                     .push(BVector::new(req.from.x(), 0.0, req.from.y()));
                 result
@@ -316,8 +317,8 @@ impl Planner {
         }
         self.mark_goal_tiles(req.goal(), Mark::Clear);
         self.clear_nodes();
-        for &r in &req.closed {
-            self.close_rect(r, Mark::Clear);
+        for &plan_rect in &req.closed {
+            self.close_rect(plan_rect, Mark::Clear);
         }
         Ok(result)
     }

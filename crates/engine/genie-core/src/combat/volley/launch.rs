@@ -65,12 +65,12 @@ impl Unit {
     /// master −1).
     pub(crate) fn launch(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         aimed: &Aimed,
         shot: &Shot,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let made = player_master(&c.w.model.masters, c.player, shot.made).ok_or(
+        let made = player_master(&step.w.model.masters, step.player, shot.made).ok_or(
             GenieError::unsupported("a missile its player's masters do not have"),
         )?;
         let stats = made.missile_stats().ok_or(GenieError::unsupported(
@@ -84,37 +84,40 @@ impl Unit {
         let moving = made.move_stats.ok_or(GenieError::unsupported(
             "a missile master that does not move",
         ))?;
-        let (id, flying) = if let Some(pooled) = c.w.recycling.missiles.pop() {
+        let (id, flying) = if let Some(pooled) = step.w.recycling.missiles.pop() {
             pooled
         } else {
-            let id = c.w.recycling.next_id;
-            c.w.recycling.next_id = id.predecessor();
+            let id = step.w.recycling.next_id;
+            step.w.recycling.next_id = id.predecessor();
             (id, true)
         };
         // the setups' draws: static (its sprite, its facet), then moving (its angle)
         let standing = made
             .standing_sprite
-            .and_then(|s| c.w.model.graphics.get(s).copied());
+            .and_then(|sprite_id| step.w.model.graphics.get(sprite_id).copied());
         if let Some(g) = standing {
-            let _ =
-                ActiveSprite::start(g, c.w.streams.get(Stream::Sprite), c.w.model.tuning.sprite);
+            let _ = ActiveSprite::start(
+                g,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
+            );
             if g.flags.contains(SpriteFlags::RANDOM_FIRST_FRAME) && g.facets.several() {
-                let _ = c.w.streams.get(Stream::Object).rand15();
+                let _ = step.w.streams.get(Stream::Object).rand15();
             }
         }
-        let facets = standing.map(|g| SpriteFacets {
-            count: g.facets,
-            turns: g.flags.contains(SpriteFlags::TURNS),
+        let facets = standing.map(|graphic| SpriteFacets {
+            count: graphic.facets,
+            turns: graphic.flags.contains(SpriteFlags::TURNS),
         });
         let mut angle = Angle::ZERO;
-        if let Some(f) = facets.filter(|_| draws_angle(facets)) {
-            let r = c.w.streams.get(Stream::Object).rand15();
-            angle = drawn_angle(r, f);
+        if let Some(sprite_facets) = facets.filter(|_| draws_angle(facets)) {
+            let draw = step.w.streams.get(Stream::Object).rand15();
+            angle = drawn_angle(draw, sprite_facets);
         }
         let mut mover = Mover {
             animated: Animated::default(),
             forward: BVector::new(1.0, 0.0, 0.0),
-            right: BVector::new(0.0, 0.0, c.w.model.tuning.spawn.start_right_z),
+            right: BVector::new(0.0, 0.0, step.w.model.tuning.spawn.start_right_z),
             velocity: None,
             paths: Vec::new(),
             factor: 1.0,
@@ -122,7 +125,7 @@ impl Unit {
             waiting: 0,
             wait_delays: WaitDelays::NONE,
             attack_moving: false,
-            last_move: c.w.world_time,
+            last_move: step.w.world_time,
             moved_at: Position::ORIGIN,
             substitute_count: SubstituteCount::NONE,
             ignore_units: Vec::new(),
@@ -133,25 +136,27 @@ impl Unit {
             in_the_way: Vec::new(),
             sprite_facets: facets,
         };
-        let mut position = mover.set_position(shot.at, c.w.spatial.map, &c.w.model.tuning.movement);
+        let mut position =
+            mover.set_position(shot.at, step.w.spatial.map, &step.w.model.tuning.movement);
         if !flying {
-            let ground =
-                c.w.spatial
-                    .terrain
-                    .as_ref()
-                    .ok_or(GenieError::unsupported(
-                        "a missile without the map's terrain",
-                    ))?
-                    .ground(position.ground())?;
+            let ground = step
+                .w
+                .spatial
+                .terrain
+                .as_ref()
+                .ok_or(GenieError::unsupported(
+                    "a missile without the map's terrain",
+                ))?
+                .ground(position.ground())?;
             position = position.with_z(grounded(position.z(), ground, stats.fly_mode));
         }
-        mover.mark_move(position, c.w.world_time);
+        mover.mark_move(position, step.w.world_time);
         let solid = 0.0 < made.radius.x() && 0.0 < made.radius.y() && made.is_tall();
         let placed = Placed {
             position,
             radius: made.radius,
             class: made.class,
-            player: c.player,
+            player: step.player,
             master: made.id,
             obstruction_kind: made.obstruction_kind,
             buildable_on: made.buildable_on,
@@ -165,24 +170,24 @@ impl Unit {
                 },
             ),
         };
-        c.w.spatial.insert(id, placed);
-        c.w.pathing.moved(id, &placed, MoveState::Standing);
-        if let Some(v) = c.w.spatial.sight.as_mut() {
-            v.add_seer(
+        step.w.spatial.insert(id, placed);
+        step.w.pathing.moved(id, &placed, MoveState::Standing);
+        if let Some(visibility) = step.w.spatial.sight.as_mut() {
+            visibility.add_seer(
                 id,
                 Seer {
-                    player: c.player,
+                    player: step.player,
                     master: made.id,
                     los: made.line_of_sight,
                     state: ObjectState::Alive,
                     explored: false,
                     building: None,
                     umv: 0,
-                    capture: capture_kind(c.player, made.class, made.id, roles),
+                    capture: capture_kind(step.player, made.class, made.id, roles),
                     kind: made.kind,
                 },
             );
-            let _ = v.sight_on(
+            let _ = visibility.sight_on(
                 id,
                 position,
                 made.radius,
@@ -190,11 +195,11 @@ impl Unit {
                 SightCentre::Tile,
                 SightLayer {
                     roles,
-                    visibility_tuning: c.w.model.tuning.visibility,
+                    visibility_tuning: step.w.model.tuning.visibility,
                 },
             )?;
         }
-        let held = static_storage(c.w.players.player_mut(c.player)?, &made.storage)?;
+        let held = static_storage(step.w.players.player_mut(step.player)?, &made.storage)?;
         // its action: the target and the shooter taken (slot 0x178), then the start
         let mut action = MissileAction {
             state: MissileState::New,
@@ -214,7 +219,7 @@ impl Unit {
                     position: self.position(),
                     radius: made.radius,
                     master: Some(self.life.master_id),
-                    owner: Some(c.player),
+                    owner: Some(step.player),
                 }
             } else {
                 Origin::NONE
@@ -222,7 +227,7 @@ impl Unit {
             met: Vec::new(),
         };
         let point = {
-            let draws = c.w.streams.get(Stream::Action);
+            let draws = step.w.streams.get(Stream::Action);
             aim(
                 AimAt {
                     point: action.point,
@@ -235,7 +240,7 @@ impl Unit {
                 },
                 &mut || draws.rand15(),
                 roles,
-                &c.w.model.tuning.missile,
+                &step.w.model.tuning.missile,
             )?
         };
         if let Some(a) = action.launch(position, point, &stats)? {
@@ -265,11 +270,11 @@ impl Unit {
         };
         // it joins the end of its owner's list (slot 0x2d0, which files it in the tracker);
         // then its action takes the target and the shooter
-        c.w.players.player_mut(c.player)?.tracker.add(
+        step.w.players.player_mut(step.player)?.tracker.add(
             id,
             key(
-                c.w.model.masters.of(c.player),
-                &c.w.model.lines,
+                step.w.model.masters.of(step.player),
+                &step.w.model.lines,
                 made.id,
                 roles,
             ),
@@ -293,19 +298,19 @@ impl Unit {
                 motion: Some(Motion::Moving(mover)),
                 // its +0x900, the firing object's attack count when fired
                 combat: Combat {
-                    attack_count: c.w.parts.combat_of(self.id).attack_count,
+                    attack_count: step.w.parts.combat_of(self.id).attack_count,
                     ..Default::default()
                 },
                 ..Default::default()
             },
         };
-        let _ = c.w.push_live(c.player, missile)?;
+        let _ = step.w.push_live(step.player, missile)?;
         let missile = Releaser {
             id,
             class: Some(class),
-            player: c.player,
+            player: step.player,
         };
-        take(c, self, aimed.target, missile, roles)?;
+        take(step, self, aimed.target, missile, roles)?;
         if shot.shooter {
             // the shooter, of the missile's own player: never listed
             self.taken(None, id);

@@ -56,8 +56,8 @@ impl InterfaceKind {
 }
 
 impl genie_diff::Diff for InterfaceKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

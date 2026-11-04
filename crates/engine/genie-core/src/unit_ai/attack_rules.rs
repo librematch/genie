@@ -74,12 +74,11 @@ pub enum TargetRules {
     Own,
 }
 
-/// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `p` may convert object
-/// `t` (None: one the world does not hold), with [`TargetRules::Any`] its faith not asked. Never
-/// for class 43, nor without full faith (100, `COMISS`: a NaN fails) unless with
-/// [`TargetRules::Any`]; never a Gaia object, nor with the
-/// owner's attribute 67 at most 0, nor livestock (58); master 53 converts only the boats (2, 20,
-/// 21, 22, 53); never the
+/// The priest's slot 0x1b8 (`FUN_140c1af00`, "CanConvert"): whether priest `converter` may convert
+/// object `convertee` (None: one the world does not hold), with [`TargetRules::Any`] its faith not
+/// asked. Never for class 43, nor without full faith (100, `COMISS`: a NaN fails) unless with
+/// [`TargetRules::Any`]; never a Gaia object, nor with the owner's attribute 67 at most 0, nor
+/// livestock (58); master 53 converts only the boats (2, 20, 21, 22, 53); never the
 /// [`MasterRoles::NEVER_CONVERTED`](crate::world::layer::MasterRoles::NEVER_CONVERTED) masters,
 /// walls (27), gates (39) or flags (30); never a master whose hero flag grants
 /// [`HeroFlags::NO_CONVERSION`]. Then the priest's convert task (action type 104): its last for any
@@ -87,37 +86,42 @@ pub enum TargetRules {
 /// (`+0x26`) the owner holds at most 0 (or not a number) fails.
 #[must_use]
 pub fn can_convert(
-    p: &Converter<'_>,
+    converter: &Converter<'_>,
     t: Option<&Convertee>,
     rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> bool {
     if roles
-        .of_class(p.class)
+        .of_class(converter.class)
         .contains(ClassRoles::MONK_WITH_RELIC)
     {
         return false;
     }
     // full faith (`COMISS`: a NaN has none)
-    let faithful = Amount::new(unit_ai_tuning.full_faith) <= p.faith;
+    let faithful = Amount::new(unit_ai_tuning.full_faith) <= converter.faith;
     if rules == TargetRules::Own && !faithful {
         return false;
     }
-    let Some(t) = t else {
+    let Some(convertee) = t else {
         return false;
     };
-    if t.owner == PlayerId::GAIA
-        || p.attributes.get(67).is_some_and(|&a| a <= Amount::ZERO)
-        || roles.of_class(t.class).contains(ClassRoles::LIVESTOCK)
+    if convertee.owner == PlayerId::GAIA
+        || converter
+            .attributes
+            .get(67)
+            .is_some_and(|&a| a <= Amount::ZERO)
+        || roles
+            .of_class(convertee.class)
+            .contains(ClassRoles::LIVESTOCK)
     {
         return false;
     }
     if roles
-        .of_master(p.master)
+        .of_master(converter.master)
         .contains(MasterRoles::BOAT_CONVERTER)
     {
-        return roles.of_class(t.class).intersects(
+        return roles.of_class(convertee.class).intersects(
             ClassRoles::TRADE_BOAT
                 | ClassRoles::TRANSPORT
                 | ClassRoles::FISHING_SHIP
@@ -126,19 +130,19 @@ pub fn can_convert(
         );
     }
     if roles
-        .of_master(t.master)
+        .of_master(convertee.master)
         .contains(MasterRoles::NEVER_CONVERTED)
         || roles
-            .of_class(t.class)
+            .of_class(convertee.class)
             .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::FLAG)
     {
         return false;
     }
-    if t.hero.grants(HeroFlags::NO_CONVERSION) {
+    if convertee.hero.grants(HeroFlags::NO_CONVERSION) {
         return false;
     }
     let mut task = None;
-    for k in p
+    for k in converter
         .tasks
         .iter()
         .filter(|k| k.action_kind == ActionKind::CONVERT)
@@ -146,15 +150,15 @@ pub fn can_convert(
         if k.object_group.is_none() && k.object_id.is_none() {
             task = Some(k);
         }
-        if k.object_id == Some(t.master) || k.for_class(t.class) {
+        if k.object_id == Some(convertee.master) || k.for_class(convertee.class) {
             task = Some(k);
             break;
         }
     }
     if let Some(k) = task
-        && let Some(i) = k.attribute_kind4
-        && let Some(&a) = p.attributes.get(i.index())
-        && at_most_or_unordered(a.get(), 0.0)
+        && let Some(attribute_id) = k.attribute_kind4
+        && let Some(&amount) = converter.attributes.get(attribute_id.index())
+        && at_most_or_unordered(amount.get(), 0.0)
     {
         return false;
     }
@@ -346,8 +350,12 @@ pub(crate) fn patrol_distance(points: &[BVector], point: BVector) -> GenieResult
     }
     let mut least = PATROL_FARTHEST;
     for pair in points.windows(2) {
-        let d = line_distance(point, *pair.checked(0)?, *pair.checked(1)?);
-        least = if least <= d.get() { least } else { d.get() };
+        let distance = line_distance(point, *pair.checked(0)?, *pair.checked(1)?);
+        least = if least <= distance.get() {
+            least
+        } else {
+            distance.get()
+        };
     }
     Ok(Distance::new(least))
 }
@@ -383,17 +391,17 @@ pub(super) fn footprint_point_gap(at: Position, radius: Footprint, point: Point)
 /// A defending unit's patrol range.
 pub fn siege_can_attack(
     me: &Attacker,
-    s: &Seeker,
-    t: &Target,
+    seeker: &Seeker,
+    target: &Target,
     rules: TargetRules,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
     if roles
-        .of_class(t.class)
+        .of_class(target.class)
         .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
-        || s.stance == UnitStance::NoAttack
-        || !siege_in_reach(me, s, t, unit_ai_tuning)?
+        || seeker.stance == UnitStance::NoAttack
+        || !siege_in_reach(me, seeker, target, unit_ai_tuning)?
     {
         return Ok(false);
     }
@@ -401,7 +409,7 @@ pub fn siege_can_attack(
     if me.player == PlayerId::GAIA && !takes_by_sight {
         return Ok(false);
     }
-    if (t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID))
+    if (target.kind == MasterKind::BUILDING && target.flags.contains(AttackTargetFlags::DESOLID))
         || me.state < ObjectState::Alive
     {
         return Ok(false);
@@ -417,7 +425,7 @@ pub fn siege_can_attack(
     if matches!(me.top_action, Some(ActionKind::PACK | ActionKind::UNPACK)) {
         return Ok(false);
     }
-    Ok(rules == TargetRules::Any || siege_chooses(me, s, t, roles))
+    Ok(rules == TargetRules::Any || siege_chooses(me, seeker, target, roles))
 }
 
 /// [`siege_can_attack`]'s reach by the stance: the target's footprint gap to the unit's state
@@ -429,26 +437,31 @@ pub fn siege_can_attack(
 /// A defending unit's patrol range.
 pub(super) fn siege_in_reach(
     me: &Attacker,
-    s: &Seeker,
-    t: &Target,
+    seeker: &Seeker,
+    target: &Target,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
     // `powf` with 2 (`DAT_142e8c150`), y's first
     let diagonal = sqrt(powf(me.radius.y(), 2.0) + powf(me.radius.x(), 2.0));
-    let gap = footprint_point_gap(t.position, t.radius, s.state_position) - Distance::new(diagonal);
+    let gap = footprint_point_gap(target.position, target.radius, seeker.state_position)
+        - Distance::new(diagonal);
     let mut range = me.range;
-    if t.owner == PlayerId::GAIA {
+    if target.owner == PlayerId::GAIA {
         range += Distance::new(unit_ai_tuning.gaia_target_reach);
     }
-    match s.stance {
+    match seeker.stance {
         UnitStance::StandGround
-            if s.order != Some(OrderKind::Defend)
+            if seeker.order != Some(OrderKind::Defend)
                 && !at_most_or_unordered(gap.get(), range.get()) =>
         {
             Ok(false)
         }
         UnitStance::Defensive => {
-            if matches!(s.order, Some(OrderKind::Patrol | OrderKind::AttackMove)) || s.patrol_path {
+            if matches!(
+                seeker.order,
+                Some(OrderKind::Patrol | OrderKind::AttackMove)
+            ) || seeker.patrol_path
+            {
                 defend_patrol_range()?;
             }
             // `JA` rejects: an unordered gap passes
@@ -466,35 +479,42 @@ pub(super) fn siege_in_reach(
 /// [`ClassRoles::TREBUCHET_TARGET`](crate::world::layer::ClassRoles::TREBUCHET_TARGET); masters
 /// 1744 and 1746 with a building as their current target by their priority alone; attack priority 3
 /// only [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
-pub(super) fn siege_chooses(me: &Attacker, s: &Seeker, t: &Target, roles: &Roles) -> bool {
+pub(super) fn siege_chooses(
+    me: &Attacker,
+    seeker: &Seeker,
+    target: &Target,
+    roles: &Roles,
+) -> bool {
     let priority = me.attack_priority;
     if priority == AttackPriority::PRIORITY_0 {
         if roles
             .of_master(me.master)
             .contains(MasterRoles::RAM_TARGETS_ONLY)
         {
-            return roles.of_class(t.class).contains(ClassRoles::RAM_TARGET);
+            return roles
+                .of_class(target.class)
+                .contains(ClassRoles::RAM_TARGET);
         }
         if roles
             .of_some_class(me.class)
             .intersects(ClassRoles::PACKED_TREBUCHET | ClassRoles::UNPACKED_TREBUCHET)
         {
             return roles
-                .of_class(t.class)
+                .of_class(target.class)
                 .contains(ClassRoles::TREBUCHET_TARGET);
         }
     }
     if roles
         .of_master(me.master)
         .contains(MasterRoles::BUILDING_BY_PRIORITY)
-        && s.target.is_some()
-        && s.target_master_kind == Some(MasterKind::BUILDING)
+        && seeker.target.is_some()
+        && seeker.target_master_kind == Some(MasterKind::BUILDING)
     {
         return priority == AttackPriority::PRIORITY_1 || priority.past_3();
     }
     !priority.limited()
         || roles
-            .of_class(t.class)
+            .of_class(target.class)
             .contains(ClassRoles::PRIORITY_3_TARGET)
 }
 

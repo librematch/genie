@@ -265,7 +265,7 @@ impl UnitAi {
         let mut i = 0;
         while i < self.retries.len() {
             let (target, timeout) = *self.retries.checked(i)?;
-            if seen(target)?.is_none_or(|u| u.hp < HitPoints::new(1.0)) {
+            if seen(target)?.is_none_or(|unit_seen| unit_seen.hp < HitPoints::new(1.0)) {
                 self.retries.clear();
                 break;
             }
@@ -418,7 +418,8 @@ impl UnitAi {
         history: OrderHistory,
         ai: &mut Well512,
     ) {
-        let leaving = |o| self.current_order == Some(o) && order != Some(o);
+        let leaving =
+            |order_kind| self.current_order == Some(order_kind) && order != Some(order_kind);
         if leaving(OrderKind::Patrol) || leaving(OrderKind::AttackMove) {
             if self.adjusted_idle_timeout == Millis::new(750) {
                 self.update_adjusted_idle_timeout(ai);
@@ -549,14 +550,14 @@ impl UnitAi {
     /// changes the AI only on slot 0x340's 1: the caller's slot 0x340 is `FUN_1410866e0`, which
     /// always gives 1, but for classes 51 and 54 (`FUN_141216c50`, their packing), which it
     /// does not run.
-    pub(super) const fn move_to(&mut self, m: AiMove) -> Option<AiMove> {
-        if matches!(m.force, OrderForce::Unforced) && self.current_action.is_some() {
+    pub(super) const fn move_to(&mut self, ai_move: AiMove) -> Option<AiMove> {
+        if matches!(ai_move.force, OrderForce::Unforced) && self.current_action.is_some() {
             return None;
         }
         self.set_action(Some(AiAction::Move));
         // FUN_140c64c10 with -1: the world holds no object -1
-        self.target_at(None, None, m.point);
-        Some(m)
+        self.target_at(None, None, ai_move.point);
+        Some(ai_move)
     }
 
     /// `FUN_140c41e50`: the unit's last human order time drops to `FUN_140fe0d10`'s 5000, not on

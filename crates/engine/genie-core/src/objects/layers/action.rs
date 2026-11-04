@@ -75,15 +75,15 @@ impl Action {
     /// The type of its top action, if it has one.
     #[must_use]
     pub fn top_action_kind(&self) -> Option<ActionKind> {
-        self.top_action().map(|a| a.kind)
+        self.top_action().map(|top_action| top_action.kind)
     }
 
     /// Its top action (the list's head) as the slice models it, type and state.
     #[must_use]
     pub fn top_action(&self) -> Option<TopAction> {
-        self.list.head().map(|a| TopAction {
-            kind: a.kind(),
-            state: a.state(),
+        self.list.head().map(|action| TopAction {
+            kind: action.kind(),
+            state: action.state(),
         })
     }
 
@@ -94,34 +94,50 @@ impl Action {
     pub fn top_sub_action(&self) -> Option<TopAction> {
         use crate::movement::move_to::{MOVE_TO, MoveTo};
         let walking = |m: Option<MoveTo>| {
-            m.map(|m| TopAction {
+            m.map(|move_to| TopAction {
                 kind: MOVE_TO,
-                state: ActionState::new(m.number()),
+                state: ActionState::new(move_to.number()),
             })
         };
         match self.list.head()? {
-            actions::Action::Artifact(a) => walking(a.move_to().map(|m| m.state)).or_else(|| {
-                a.enter().map(|e| TopAction {
-                    kind: ENTER,
-                    state: ActionState::new(e.state.get()),
-                })
-            }),
-            actions::Action::Hunt(h) => h
+            actions::Action::Artifact(artifact) => walking(artifact.move_to().map(|m| m.state))
+                .or_else(|| {
+                    artifact.enter().map(|e| TopAction {
+                        kind: ENTER,
+                        state: ActionState::new(e.state.get()),
+                    })
+                }),
+            actions::Action::Hunt(hunt_action) => hunt_action
                 .state
                 .attack()
                 .map(|a| TopAction {
                     kind: ATTACK,
                     state: ActionState::new(a.state.get()),
                 })
-                .or_else(|| walking(h.state.move_to().map(|m| m.state))),
-            actions::Action::Build(b) => walking(b.state.move_to().map(|m| m.state)),
-            actions::Action::Repair(r) => walking(r.state.move_to().map(|m| m.state)),
-            actions::Action::Fly(f) => walking(f.state.move_to().map(|m| m.state)),
-            actions::Action::Gather(g) => walking(g.state.move_to().map(|m| m.state)),
-            actions::Action::Attack(a) => walking(a.state.move_to().map(|m| m.state)),
-            actions::Action::Explore(e) => walking(e.state.move_to().map(|m| m.state)),
-            actions::Action::Enter(e) => walking(e.state.move_to().map(|m| m.state)),
-            actions::Action::Transport(t) => walking(t.state.move_to().map(|m| m.state)),
+                .or_else(|| walking(hunt_action.state.move_to().map(|m| m.state))),
+            actions::Action::Build(build_action) => {
+                walking(build_action.state.move_to().map(|m| m.state))
+            }
+            actions::Action::Repair(repair_action) => {
+                walking(repair_action.state.move_to().map(|m| m.state))
+            }
+            actions::Action::Fly(fly) => walking(fly.state.move_to().map(|m| m.state)),
+            actions::Action::Gather(gather_action) => {
+                walking(gather_action.state.move_to().map(|m| m.state))
+            }
+            actions::Action::Attack(attack) => walking(attack.state.move_to().map(|m| m.state)),
+            actions::Action::Explore(explore_action) => {
+                walking(explore_action.state.move_to().map(|m| m.state))
+            }
+            actions::Action::Enter(enter_action) => {
+                walking(enter_action.state.move_to().map(|m| m.state))
+            }
+            actions::Action::Transport(transport_action) => walking(
+                transport_action
+                    .state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+            ),
             actions::Action::MoveTo(_)
             | actions::Action::Missile(_)
             | actions::Action::Make(_)

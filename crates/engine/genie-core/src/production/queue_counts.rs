@@ -26,16 +26,16 @@ impl QueuedUnits {
         self.0
     }
 
-    /// The count plus `n`, wrapping as the game's short.
+    /// The count plus `queued_units`, wrapping as the game's short.
     #[must_use]
-    pub const fn plus(self, n: Self) -> Self {
-        Self(self.0.wrapping_add(n.0))
+    pub const fn plus(self, queued_units: Self) -> Self {
+        Self(self.0.wrapping_add(queued_units.0))
     }
 
-    /// The count less `n`, wrapping as the game's short.
+    /// The count less `queued_units`, wrapping as the game's short.
     #[must_use]
-    pub const fn minus(self, n: Self) -> Self {
-        Self(self.0.wrapping_sub(n.0))
+    pub const fn minus(self, queued_units: Self) -> Self {
+        Self(self.0.wrapping_sub(queued_units.0))
     }
 
     /// The count negated (a cancel's change of the queued units), wrapping as the game's short.
@@ -53,8 +53,8 @@ impl Sum for QueuedUnits {
 }
 
 impl genie_diff::Diff for QueuedUnits {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -98,8 +98,8 @@ impl QueueLength {
 }
 
 impl genie_diff::Diff for QueueLength {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -132,8 +132,8 @@ impl EntrySerial {
 }
 
 impl genie_diff::Diff for EntrySerial {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -166,8 +166,8 @@ impl QueueChanges {
 }
 
 impl genie_diff::Diff for QueueChanges {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

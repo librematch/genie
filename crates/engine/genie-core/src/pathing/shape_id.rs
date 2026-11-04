@@ -32,7 +32,7 @@ impl ShapeId {
     #[must_use]
     pub const fn link(next: Option<Self>) -> i32 {
         match next {
-            Some(s) => s.0 as i32,
+            Some(shape_id) => shape_id.0 as i32,
             None => -1,
         }
     }
@@ -54,9 +54,12 @@ mod tests {
     /// A free slot's link is the next free slot's number, −1 for none, and reads back.
     #[test]
     fn free_slot_link_is_the_next_slot_or_minus_one() {
-        let s = ShapeId::new(7);
-        assert_eq!((s.get(), s.index(), s.to_string()), (7, 7, "7".to_owned()));
-        assert_eq!([Some(s), None].map(ShapeId::link), [7, -1]);
-        assert_eq!([7, -1].map(ShapeId::of_link), [Some(s), None]);
+        let shape_id = ShapeId::new(7);
+        assert_eq!(
+            (shape_id.get(), shape_id.index(), shape_id.to_string()),
+            (7, 7, "7".to_owned())
+        );
+        assert_eq!([Some(shape_id), None].map(ShapeId::link), [7, -1]);
+        assert_eq!([7, -1].map(ShapeId::of_link), [Some(shape_id), None]);
     }
 }

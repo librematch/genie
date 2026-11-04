@@ -137,7 +137,7 @@ impl AiAction {
     #[must_use]
     pub const fn field(action: Option<Self>) -> i32 {
         match action {
-            Some(a) => a.value(),
+            Some(ai_action) => ai_action.value(),
             None => -1,
         }
     }
@@ -150,7 +150,7 @@ impl TryFrom<i32> for AiAction {
     fn try_from(value: i32) -> GenieResult<Self> {
         Self::ALL
             .into_iter()
-            .find(|a| a.value() == value)
+            .find(|ai_action| ai_action.value() == value)
             .ok_or_else(|| {
                 GenieError::invalid_input("an action value no unit AI's action names")
                     .with("action", value)
@@ -169,7 +169,10 @@ mod tests {
         for a in AiAction::ALL {
             assert_eq!(AiAction::try_from(a.value()), Ok(a));
         }
-        let mut values: Vec<i32> = AiAction::ALL.iter().map(|a| a.value()).collect();
+        let mut values: Vec<i32> = AiAction::ALL
+            .iter()
+            .map(|ai_action| ai_action.value())
+            .collect();
         values.sort_unstable();
         values.dedup();
         assert_eq!(values.len(), 30);
@@ -184,7 +187,7 @@ mod tests {
     fn value_no_action_names_is_an_error() {
         for v in [0, 0x25e, 0x263, 0x2c1, 0x2c6, 700 + 100] {
             assert_eq!(
-                AiAction::try_from(v).map_err(|e| e.kind()),
+                AiAction::try_from(v).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
@@ -202,13 +205,13 @@ mod tests {
         assert_eq!(AiAction::Trade.order(), Some(OrderKind::Trade));
         assert_eq!(AiAction::HeroPower.order(), Some(OrderKind::HeroPower));
         assert_eq!(AiAction::OnTarget.order(), Some(OrderKind::OnTarget));
-        for a in [
+        for ai_action in [
             AiAction::Make,
             AiAction::Research,
             AiAction::MoveAside,
             AiAction::GroupAside,
         ] {
-            assert_eq!(a.order(), None, "{a:?}");
+            assert_eq!(ai_action.order(), None, "{ai_action:?}");
         }
     }
 }

@@ -111,19 +111,19 @@ mod tests {
     fn the_statistics_values_do_the_game_operations() {
         let (a, b) = (TargetScore::new(0.1), TargetScore::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        let mut c = a;
-        c *= 3.0;
-        assert_eq!(c.get().to_bits(), (0.1_f32 * 3.0).to_bits());
+        let mut target_score = a;
+        target_score *= 3.0;
+        assert_eq!(target_score.get().to_bits(), (0.1_f32 * 3.0).to_bits());
         assert!(TargetScore::ZERO < a);
         assert_eq!(TargetScore::new(f32::NAN).partial_cmp(&a), None);
         assert!(KillTime::new(1.0) < KillTime::new(f32::MAX));
         assert_eq!(KillTime::default().get(), 0.0);
-        let mut n = EntryCount::ZERO;
-        n.count_one();
-        n.count_one();
-        assert_eq!(n, EntryCount::new(2));
-        let mut w = OrderWeight::new(0.1);
-        w += OrderWeight::new(0.2);
-        assert_eq!(w.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        let mut entry_count = EntryCount::ZERO;
+        entry_count.count_one();
+        entry_count.count_one();
+        assert_eq!(entry_count, EntryCount::new(2));
+        let mut order_weight = OrderWeight::new(0.1);
+        order_weight += OrderWeight::new(0.2);
+        assert_eq!(order_weight.get().to_bits(), (0.1_f32 + 0.2).to_bits());
     }
 }

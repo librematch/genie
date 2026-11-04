@@ -25,8 +25,8 @@ fn main() {
     )
     .unwrap();
 
-    let f = File::open(infile).expect("could not read file");
-    let scen = Scenario::read_from(f).expect("invalid scenario file");
+    let file = File::open(infile).expect("could not read file");
+    let scen = Scenario::read_from(file).expect("invalid scenario file");
 
     println!("Scenario: {}", scen.filename());
     println!("Version:");

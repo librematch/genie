@@ -40,12 +40,12 @@ mod tests {
     /// Each spawning area attribute changes its own value.
     #[test]
     fn each_spawning_area_attribute_changes_its_value() {
-        let mut s = VolleySpread::default();
-        *s.lane_mut(MasterAttribute::SPAWNING_AREA_LENGTH) = Distance::new(2.0);
-        *s.lane_mut(MasterAttribute::SPAWNING_AREA_RANDOMNESS) = Distance::new(3.0);
-        *s.lane_mut(MasterAttribute::SPAWNING_AREA_WIDTH) = Distance::new(1.0);
+        let mut volley_spread = VolleySpread::default();
+        *volley_spread.lane_mut(MasterAttribute::SPAWNING_AREA_LENGTH) = Distance::new(2.0);
+        *volley_spread.lane_mut(MasterAttribute::SPAWNING_AREA_RANDOMNESS) = Distance::new(3.0);
+        *volley_spread.lane_mut(MasterAttribute::SPAWNING_AREA_WIDTH) = Distance::new(1.0);
         assert_eq!(
-            s,
+            volley_spread,
             VolleySpread {
                 x: Distance::new(1.0),
                 y: Distance::new(2.0),

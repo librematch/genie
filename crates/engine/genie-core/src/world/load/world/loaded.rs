@@ -40,8 +40,8 @@ pub fn loaded_world(
 /// The ghosts' watched lists as the game's load builds them ([`World::build_watched`]), once the
 /// world holds its registry; what it cannot build stops every player.
 pub fn watch_at_load(turns: &mut World) {
-    if let Err(e) = turns.build_watched() {
-        stop_all(turns, &e);
+    if let Err(error) = turns.build_watched() {
+        stop_all(turns, &error);
     }
 }
 
@@ -53,18 +53,27 @@ pub fn hunted_origins(turns: &mut World, start: &Header) {
     let places: BTreeMap<i32, Position> = start
         .players()
         .iter()
-        .flat_map(|p| {
-            p.live_objects()
-                .chain(p.sleeping_objects())
+        .flat_map(|player_section| {
+            player_section
+                .live_objects()
+                .chain(player_section.sleeping_objects())
                 .collect::<Vec<_>>()
         })
-        .filter_map(|o| {
-            o.static_part()
-                .map(|s| (s.id, Position::new(s.tx, s.ty, s.tz)))
+        .filter_map(|object| {
+            object.static_part().map(|rge_static_object| {
+                (
+                    rge_static_object.id,
+                    Position::new(
+                        rge_static_object.tx,
+                        rge_static_object.ty,
+                        rge_static_object.tz,
+                    ),
+                )
+            })
         })
         .collect();
-    for (p, player) in turns.players.iter().enumerate() {
-        let masters = turns.model.masters.get(p);
+    for (index, player) in turns.players.iter().enumerate() {
+        let masters = turns.model.masters.get(index);
         for unit in player.objects.iter().chain(player.sleeping.iter()) {
             let Some(ai) = turns
                 .parts
@@ -79,14 +88,15 @@ pub fn hunted_origins(turns: &mut World, start: &Header) {
             };
             let leash = masters
                 .and_then(|m| m.get(unit.life.master_id))
-                .and_then(|m| {
-                    m.action_part()
+                .and_then(|master| {
+                    master
+                        .action_part()
                         .tasks
                         .iter()
                         .rev()
                         .find(|t| t.action_kind == ActionKind::HUNT_RANGE)
                 })
-                .map_or(Distance::ZERO, |t| t.work_range);
+                .map_or(Distance::ZERO, |task| task.work_range);
             ai.hunted = Some(Hunted { origin, leash });
         }
     }
@@ -124,7 +134,12 @@ mod tests {
     #[test]
     fn the_load_makes_the_objects_in_sight_registry() {
         let save = header(vec![gaia(Vec::new()), human(Vec::new())]);
-        let registry = |world: World| world.spatial.sight.is_some_and(|s| s.registry.is_some());
+        let registry = |world: World| {
+            world
+                .spatial
+                .sight
+                .is_some_and(|visibility| visibility.registry.is_some())
+        };
         assert!(!registry(saved_world(&save, None, layer()).unwrap()));
         assert!(registry(loaded_world(&save, None, layer()).unwrap()));
     }

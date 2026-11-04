@@ -10,39 +10,48 @@ use std::path::{Path, PathBuf};
 
 #[test]
 fn linked_techs_read_their_keys() {
-    let t: LinkedTechs = genie_json::from_str(
+    let linked_techs: LinkedTechs = genie_json::from_str(
         r#"{"LinkedTechs": [{"NameId": 424001, "Comment": "Satrapies", "Local": true,
             "Type": "MutuallyExclusive", "Techs": [1195, 1196]}]}"#,
     )
     .unwrap();
-    let l = &t.linked_techs[0];
+    let linked_tech_group = &linked_techs.linked_techs[0];
     assert_eq!(
-        (l.name_id, l.local, l.kind.as_str(), &l.techs[..]),
+        (
+            linked_tech_group.name_id,
+            linked_tech_group.local,
+            linked_tech_group.kind.as_str(),
+            &linked_tech_group.techs[..]
+        ),
         (424_001, Some(true), "MutuallyExclusive", &[1195, 1196][..])
     );
-    assert_eq!((l.starting_tech, l.instant), (None, None));
+    assert_eq!(
+        (linked_tech_group.starting_tech, linked_tech_group.instant),
+        (None, None)
+    );
 }
 
 #[test]
 fn an_unknown_key_is_refused() {
-    let r: Result<LinkedTechs, _> = genie_json::from_str(r#"{"LinkedTechs": [], "Extra": 1}"#);
-    assert!(r.is_err());
+    let linked_techs: Result<LinkedTechs, _> =
+        genie_json::from_str(r#"{"LinkedTechs": [], "Extra": 1}"#);
+    assert!(linked_techs.is_err());
 }
 
 #[test]
 fn drop_sites_read_their_targets() {
-    let d: DropSites = genie_json::from_str(
+    let drop_sites: DropSites = genie_json::from_str(
         r#"{"drop_site_list": [{"name": "Town Center", "building_id": 109, "worker_object_group": 4,
             "accepts_livestock": true, "target_list": [{"name": "Hunted Animals", "object_group": 9,
             "object_state": 5, "attribute_type": 15}], "update_ai_resource_types": [{"resource_type": 0}]}]}"#,
     )
     .unwrap();
-    let s = &d.drop_site_list[0];
+    let drop_site = &drop_sites.drop_site_list[0];
     assert_eq!(
         (
-            s.building_id,
-            s.target_list[0].object_state,
-            s.update_ai_resource_kinds.as_ref().unwrap()[0].resource_kind
+            drop_site.building_id,
+            drop_site.target_list[0].object_state,
+            drop_site.update_ai_resource_kinds.as_ref().unwrap()[0].resource_kind
         ),
         (109, Some(5), 0)
     );
@@ -50,7 +59,7 @@ fn drop_sites_read_their_targets() {
 
 #[test]
 fn maps_rollover_string_is_number_or_name() {
-    let m: Maps = genie_json::from_str(
+    let maps: Maps = genie_json::from_str(
         r#"{"default_map_type": 13, "default_nomad_map_type": 33, "default_battle_royale_map_type": 145,
             "map_list": [{"data_name": "A", "name_string_id": 1, "rollover_string_id": 30110,
             "icon_reference": "I", "map_icon_filename": "m", "script_filename": "A.rms", "storage_id": 9,
@@ -59,39 +68,49 @@ fn maps_rollover_string_is_number_or_name() {
             "style": "real world", "water": true}]}"#,
     )
     .unwrap();
-    assert_eq!(m.map_list[0].rollover_string_id, StringId::Number(30110));
+    assert_eq!(maps.map_list[0].rollover_string_id, StringId::Number(30110));
     assert_eq!(
-        m.map_list[1].rollover_string_id,
+        maps.map_list[1].rollover_string_id,
         StringId::Name("RMS_B".into())
     );
     assert_eq!(
-        (m.map_list[0].water, m.map_list[1].water),
+        (maps.map_list[0].water, maps.map_list[1].water),
         (None, Some(true))
     );
 }
 
 #[test]
 fn future_units_keep_the_civ_order() {
-    let f: FutureUnits = genie_json::from_str(
+    let future_units: FutureUnits = genie_json::from_str(
         r#"{"Gaia": {"Buildings": []}, "Aztecs": {"Buildings": [{"ID": 118, "Name": "Builder",
             "Techs": [], "Units": [{"ID": 87, "Name": "Archery Range", "RequiredAge": 2}]}]}}"#,
     )
     .unwrap();
-    assert_eq!(f.0.keys().collect::<Vec<_>>(), ["Gaia", "Aztecs"]);
     assert_eq!(
-        f.0["Aztecs"].buildings[0].units.as_ref().unwrap()[0].required_age,
+        future_units.0.keys().collect::<Vec<_>>(),
+        ["Gaia", "Aztecs"]
+    );
+    assert_eq!(
+        future_units.0["Aztecs"].buildings[0]
+            .units
+            .as_ref()
+            .unwrap()[0]
+            .required_age,
         Some(2)
     );
 }
 
 #[test]
 fn buttons_read_their_keys() {
-    let b: Buttons = genie_json::from_str(
+    let buttons: Buttons = genie_json::from_str(
         r#"{"command_button_list": [{"name": "Set Gather Point", "button_action_id": 51,
             "sequence_id": 4, "icon_id": 45, "help_string_id": 4144, "more_help_string_id": 4944}]}"#,
     )
     .unwrap();
-    assert_eq!(b.command_button_list[0].more_help_string_id, Some(4944));
+    assert_eq!(
+        buttons.command_button_list[0].more_help_string_id,
+        Some(4944)
+    );
 }
 
 /// Read a table, write it, read it again: the same value.
@@ -100,7 +119,7 @@ where
     T: DeserializeOwned + serde::Serialize + PartialEq + Debug,
 {
     let text = read_to_string(dir.join(file)).unwrap();
-    let table: T = genie_json::from_str(&text).unwrap_or_else(|e| panic!("{file}: {e}"));
+    let table: T = genie_json::from_str(&text).unwrap_or_else(|error| panic!("{file}: {error}"));
     let written = genie_json::to_string(&table).unwrap();
     let again: T = genie_json::from_str(&written).unwrap();
     assert_eq!(table, again, "{file}");

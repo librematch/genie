@@ -43,7 +43,7 @@ mod tests {
             SubCode::Failed,
             SubCode::TargetGone,
         ]
-        .map(|c| UpdateCode::from(c).get());
+        .map(|sub_code| UpdateCode::from(sub_code).get());
         assert_eq!(bytes, [0, 1, 3, 5]);
     }
 }

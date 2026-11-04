@@ -47,9 +47,9 @@ impl Default for Hotkey {
 }
 
 impl fmt::Display for Hotkey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
-            f,
+            formatter,
             "{}: {}{}{}{}",
             self.string_id,
             if self.ctrl { "Ctrl-" } else { "" },
@@ -225,10 +225,10 @@ impl Hotkey {
 
         name.map_or_else(
             || format!("{}: {}{}{}{}", self.string_id, ctrl, alt, shift, self.key),
-            |s| {
+            |text| {
                 format!(
                     "{} ({}): {}{}{}{}",
-                    s, self.string_id, ctrl, alt, shift, self.key
+                    text, self.string_id, ctrl, alt, shift, self.key
                 )
             },
         )

@@ -95,16 +95,21 @@ type KeyedRow = ((CivId, MasterId), Row);
 /// A task or a cost slot that holds no type or attribute.
 fn dat_rows(dat: &DatFile) -> GenieResult<Vec<KeyedRow>> {
     let units = dat.civs.iter().enumerate().flat_map(|(c, civ)| {
-        civ.units.iter().enumerate().filter_map(move |(m, unit)| {
-            Some((
-                CivId::new(c as u8),
-                MasterId::of_data(m as i16)?,
-                unit.as_ref()?,
-            ))
-        })
+        civ.units
+            .iter()
+            .enumerate()
+            .filter_map(move |(index, unit)| {
+                Some((
+                    CivId::new(c as u8),
+                    MasterId::of_data(index as i16)?,
+                    unit.as_ref()?,
+                ))
+            })
     });
     units
-        .map(|(c, m, unit)| dat_row(m, unit, &dat.sounds).map(|r| ((c, m), r)))
+        .map(|(civ_id, master_id, unit)| {
+            dat_row(master_id, unit, &dat.sounds).map(|row| ((civ_id, master_id), row))
+        })
         .collect()
 }
 
@@ -117,13 +122,13 @@ fn dat_rows(dat: &DatFile) -> GenieResult<Vec<KeyedRow>> {
 fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResult<Row> {
     let default_action = match unit.bird.as_ref() {
         None => DefaultAction::None,
-        Some(b) => {
-            let tasks = b
+        Some(bird) => {
+            let tasks = bird
                 .tasks
                 .iter()
-                .map(|t| Ok((t.id, ActionKind::try_from(t.action_kind)?)))
+                .map(|task| Ok((task.id, ActionKind::try_from(task.action_kind)?)))
                 .collect::<GenieResult<Vec<_>>>()?;
-            default_action(b.default_task_id, tasks.into_iter())
+            default_action(bird.default_task_id, tasks.into_iter())
         }
     };
     Ok(Row {
@@ -133,14 +138,14 @@ fn dat_row(id: MasterId, unit: &Unit, sounds: &[Sound]) -> GenieResult<Row> {
         },
         default_action,
         work: Some(dat_work(id, unit, sounds)?),
-        turning: unit.dead_fish.as_ref().map(|d| Turning {
-            move_algorithm: MoveAlgorithm::from_bits_retain(d.old_move_algorithm),
-            min_collision_size_multiplier: d.min_collision_size_multiplier,
+        turning: unit.dead_fish.as_ref().map(|dead_fish| Turning {
+            move_algorithm: MoveAlgorithm::from_bits_retain(dead_fish.old_move_algorithm),
+            min_collision_size_multiplier: dead_fish.min_collision_size_multiplier,
         }),
         projectile_kind: unit
             .projectile
             .as_ref()
-            .map(|p| ProjectileKind::of_data(p.projectile_kind)),
+            .map(|projectile| ProjectileKind::of_data(projectile.projectile_kind)),
         fly_mode: FlyMode::of_data(unit.fly_mode),
     })
 }
@@ -209,33 +214,39 @@ impl TerrainTable {
         let passable = dat
             .terrain_restrictions
             .iter()
-            .map(|r| Restriction::new(r.passable_buildable_dmg_multiplier.clone()))
+            .map(|terrain_restriction| {
+                Restriction::new(
+                    terrain_restriction
+                        .passable_buildable_dmg_multiplier
+                        .clone(),
+                )
+            })
             .collect();
         let kinds = dat
             .terrain_block
             .terrains
             .iter()
-            .map(|t| {
+            .map(|terrain| {
                 // FUN_140f5efb0: the densities of the terrain's units of class 15 (Gaia's)
-                let trees: i32 = t
+                let trees: i32 = terrain
                     .terrain_unit_id
                     .iter()
-                    .zip(&t.terrain_unit_density)
-                    .take(usize::try_from(t.number_of_terrain_units_used).unwrap_or(0))
+                    .zip(&terrain.terrain_unit_density)
+                    .take(usize::try_from(terrain.number_of_terrain_units_used).unwrap_or(0))
                     .filter(|&(&id, _)| {
                         usize::try_from(id).is_ok_and(|i| {
                             dat.civs
                                 .first()
-                                .and_then(|c| c.units.get(i))
+                                .and_then(|civ| civ.units.get(i))
                                 .and_then(Option::as_ref)
-                                .is_some_and(|u| u.class == 15)
+                                .is_some_and(|unit| unit.class == 15)
                         })
                     })
                     .map(|(_, &d)| i32::from(d))
                     .sum();
                 TerrainKind {
-                    shown: t.enabled != 0 || 0 <= t.terrain_to_draw,
-                    flags: TerrainFlags::from_bits_retain(t.is_water),
+                    shown: terrain.enabled != 0 || 0 <= terrain.terrain_to_draw,
+                    flags: TerrainFlags::from_bits_retain(terrain.is_water),
                     forest: 249 < trees,
                 }
             })
@@ -304,22 +315,22 @@ pub struct MasterTable {
 
 /// A technology of the `.dat` as the tech tree holds it: its costs, its type and its effect's
 /// id, which names the effect table's entry ([`tech_tables`]).
-fn tech_def(t: &Tech) -> GenieResult<TechDef> {
+fn tech_def(tech: &Tech) -> GenieResult<TechDef> {
     Ok(TechDef {
-        costs: tech_costs(t)?,
-        kind: TechKind::from(t.kind),
-        effect_id: EffectId::of_data(t.effect_id),
-        required: t.required_techs.map(TechId::of_data),
-        required_count: t.required_tech_count,
-        civ: CivId::of_tech(t.civ)?,
-        mode: TechMode::of_data(t.full_tech_mode),
-        locations: t
+        costs: tech_costs(tech)?,
+        kind: TechKind::from(tech.kind),
+        effect_id: EffectId::of_data(tech.effect_id),
+        required: tech.required_techs.map(TechId::of_data),
+        required_count: tech.required_tech_count,
+        civ: CivId::of_tech(tech.civ)?,
+        mode: TechMode::of_data(tech.full_tech_mode),
+        locations: tech
             .research_locations
             .iter()
-            .map(|l| {
+            .map(|research_location| {
                 (
-                    MasterId::of_data(l.location_id),
-                    WholeSeconds::of_data(l.queue_time),
+                    MasterId::of_data(research_location.location_id),
+                    WholeSeconds::of_data(research_location.queue_time),
                 )
             })
             .collect(),
@@ -327,13 +338,13 @@ fn tech_def(t: &Tech) -> GenieResult<TechDef> {
 }
 
 /// A technology's three costs: each its resource, amount and whether it is paid.
-fn tech_costs(t: &Tech) -> GenieResult<[Cost; 3]> {
-    let [c0, c1, c2] = t.resource_costs.each_ref();
-    let cost = |c: &ResearchResourceCost| -> GenieResult<_> {
+fn tech_costs(tech: &Tech) -> GenieResult<[Cost; 3]> {
+    let [c0, c1, c2] = tech.resource_costs.each_ref();
+    let cost = |research_resource_cost: &ResearchResourceCost| -> GenieResult<_> {
         Ok(Cost {
-            attribute: AttributeId::of_field(c.kind)?,
-            amount: CostAmount::of_data(c.amount),
-            paid: CostPaid::of_data(c.flag),
+            attribute: AttributeId::of_field(research_resource_cost.kind)?,
+            amount: CostAmount::of_data(research_resource_cost.amount),
+            paid: CostPaid::of_data(research_resource_cost.flag),
         })
     };
     Ok([cost(c0)?, cost(c1)?, cost(c2)?])
@@ -355,7 +366,15 @@ fn effect(e: &DatEffect) -> GenieResult<Effect> {
     let commands = e
         .commands
         .iter()
-        .map(|c| EffectCommand::of_data(c.kind, c.a, c.b, c.c, c.d))
+        .map(|effect_command| {
+            EffectCommand::of_data(
+                effect_command.kind,
+                effect_command.a,
+                effect_command.b,
+                effect_command.c,
+                effect_command.d,
+            )
+        })
         .collect::<Result<_, _>>()?;
     Ok(Effect { commands })
 }
@@ -391,18 +410,18 @@ impl MasterTable {
             .iter()
             .enumerate()
             .filter_map(|(id, g)| {
-                let g = g.as_ref()?;
+                let graphic = g.as_ref()?;
                 let id = SpriteId::of_data(i16::try_from(id).ok()?)?;
                 Some((
                     id,
                     Graphic {
                         id,
-                        frames: Frame::of_data(g.frame_count),
-                        facets: FacetCount::of_data(g.angle_count),
-                        speed_multiplier: SpeedMultiplier::of_data(g.speed_multiplier),
-                        frame_duration: Seconds::new(g.frame_duration),
-                        replay_delay: Seconds::new(g.replay_delay),
-                        flags: SpriteFlags::from_bits_retain(g.sequence_kind),
+                        frames: Frame::of_data(graphic.frame_count),
+                        facets: FacetCount::of_data(graphic.angle_count),
+                        speed_multiplier: SpeedMultiplier::of_data(graphic.speed_multiplier),
+                        frame_duration: Seconds::new(graphic.frame_duration),
+                        replay_delay: Seconds::new(graphic.replay_delay),
+                        flags: SpriteFlags::from_bits_retain(graphic.sequence_kind),
                     },
                 ))
             })
@@ -448,26 +467,28 @@ impl MasterTable {
     /// The dead-object values of `master` for `civ`; None if the data file has no such master.
     #[must_use]
     pub fn get(&self, civ: CivId, master: MasterId) -> Option<MasterData> {
-        self.rows.get(&(civ, master)).map(|r| r.data)
+        self.rows.get(&(civ, master)).map(|row| row.data)
     }
 
     /// The default action of `master` for `civ`; None if the data file has no such master.
     #[must_use]
     pub fn default_action(&self, civ: CivId, master: MasterId) -> Option<DefaultAction> {
-        self.rows.get(&(civ, master)).map(|r| r.default_action)
+        self.rows.get(&(civ, master)).map(|row| row.default_action)
     }
 
     /// The `.dat`'s work-command values of a civ's master: the task swap group the save lacks, and
     /// the tasks a master without saved ones has.
     #[must_use]
     pub fn work(&self, civ: CivId, master: MasterId) -> Option<&work::Master> {
-        self.rows.get(&(civ, master)).and_then(|r| r.work.as_ref())
+        self.rows
+            .get(&(civ, master))
+            .and_then(|row| row.work.as_ref())
     }
 
     /// How a civ's moving master turns; None for a master without a moving part.
     #[must_use]
     pub fn turning(&self, civ: CivId, master: MasterId) -> Option<Turning> {
-        self.rows.get(&(civ, master)).and_then(|r| r.turning)
+        self.rows.get(&(civ, master)).and_then(|row| row.turning)
     }
 
     /// A missile master's `projectile_type` (`+0x880`).
@@ -475,13 +496,13 @@ impl MasterTable {
     pub fn projectile_kind(&self, civ: CivId, master: MasterId) -> Option<ProjectileKind> {
         self.rows
             .get(&(civ, master))
-            .and_then(|r| r.projectile_kind)
+            .and_then(|row| row.projectile_kind)
     }
 
     /// A master's `fly_mode` (`+0x608`): 0 keeps its objects on the ground, 1 above it.
     #[must_use]
     pub fn fly_mode(&self, civ: CivId, master: MasterId) -> Option<FlyMode> {
-        self.rows.get(&(civ, master)).map(|r| r.fly_mode)
+        self.rows.get(&(civ, master)).map(|row| row.fly_mode)
     }
 
     /// A sprite's speed factor; None for a sprite the data file does not have.
@@ -666,7 +687,7 @@ mod tests {
 
     #[test]
     fn rows_are_found_by_civ_and_master() {
-        let t = MasterTable::from_rows([
+        let master_table = MasterTable::from_rows([
             (
                 (CivId::new(1), MasterId::of_data(332).unwrap()),
                 MasterData {
@@ -685,18 +706,19 @@ mod tests {
             ),
         ]);
         assert_eq!(
-            t.get(CivId::new(1), MasterId::of_data(332).unwrap())
-                .map(|d| d.decay),
+            master_table
+                .get(CivId::new(1), MasterId::of_data(332).unwrap())
+                .map(|master_data| master_data.decay),
             Some(AmountRate::new(1.0))
         );
         assert_eq!(
-            t.default_action(CivId::new(2), MasterId::of_data(705).unwrap()),
+            master_table.default_action(CivId::new(2), MasterId::of_data(705).unwrap()),
             Some(DefaultAction::Kind(ARTIFACT_KIND))
         );
         assert_eq!(
             (
-                t.get(CivId::new(2), MasterId::of_data(332).unwrap()),
-                t.default_action(CivId::new(1), MasterId::of_data(705).unwrap())
+                master_table.get(CivId::new(2), MasterId::of_data(332).unwrap()),
+                master_table.default_action(CivId::new(1), MasterId::of_data(705).unwrap())
             ),
             (None, None)
         );
@@ -757,7 +779,7 @@ mod tests {
         assert_eq!(
             linked
                 .into_iter()
-                .map(|(t, k)| (t.get(), k))
+                .map(|(tech_id, k)| (tech_id.get(), k))
                 .collect::<Vec<_>>(),
             [
                 (1131, Linked::MutuallyExclusive),

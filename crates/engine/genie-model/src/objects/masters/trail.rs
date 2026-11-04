@@ -74,14 +74,14 @@ impl MulAssign<f32> for TrailDensity {
 }
 
 impl Diff for TrailMode {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
 impl Diff for TrailDensity {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -94,10 +94,13 @@ mod tests {
     #[test]
     fn the_trail_effects_add_and_multiply() {
         assert_eq!(TrailMode::of_data(255).plus(2), TrailMode::of_data(1));
-        let mut d = TrailDensity::new(0.1);
-        d += TrailDensity::new(0.2);
-        assert_eq!(d.get().to_bits(), (0.1_f32 + 0.2).to_bits());
-        d *= 3.0;
-        assert_eq!(d.get().to_bits(), ((0.1_f32 + 0.2) * 3.0).to_bits());
+        let mut trail_density = TrailDensity::new(0.1);
+        trail_density += TrailDensity::new(0.2);
+        assert_eq!(trail_density.get().to_bits(), (0.1_f32 + 0.2).to_bits());
+        trail_density *= 3.0;
+        assert_eq!(
+            trail_density.get().to_bits(),
+            ((0.1_f32 + 0.2) * 3.0).to_bits()
+        );
     }
 }

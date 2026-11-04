@@ -40,8 +40,8 @@ impl MoveWaitState {
 }
 
 impl genie_diff::Diff for MoveWaitState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -52,10 +52,10 @@ mod tests {
     /// Each state reads back from its byte; the bytes without a state are errors.
     #[test]
     fn its_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match MoveWaitState::of_byte(b) {
-                Ok(s) => assert_eq!(s.get(), b),
-                Err(_) => assert!(matches!(b, 3..), "{b}"),
+        for index in 0..=255_u8 {
+            match MoveWaitState::of_byte(index) {
+                Ok(move_wait_state) => assert_eq!(move_wait_state.get(), index),
+                Err(_) => assert!(matches!(index, 3..), "{index}"),
             }
         }
         assert_eq!(MoveWaitState::AskedAgain.to_string(), "2");

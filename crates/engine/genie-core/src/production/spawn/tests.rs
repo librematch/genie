@@ -84,7 +84,7 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
         },
         ..Unit::default()
     };
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -116,28 +116,30 @@ fn gather_point_whose_tree_is_gone_takes_the_closest_tree_within_sight() {
         line_of_sight: Distance::new(4.0),
         ..Master::default()
     };
-    t.model.masters = vec![
+    world.model.masters = vec![
         Arc::new(Masters::new([tree.clone()])),
         Arc::new(Masters::new([villager, tree])),
     ];
-    let g = GatherPoint {
+    let gather_point = GatherPoint {
         state: GatherPointState::Point,
         point: Position::new(21.0, 21.0, 0.0),
         target: Some(object_id(5)),
         target_master: Some(master_id(349)),
     };
     assert_eq!(
-        t.lost_gather_target(PlayerId::new(1), ListIndex::new(0), g)
+        world
+            .lost_gather_target(PlayerId::new(1), ListIndex::new(0), gather_point)
             .unwrap(),
         Some(object_id(10))
     );
     // 7 tiles from the closest tree's footprint, beyond the villager's sight of 4
     let far = GatherPoint {
         point: Position::new(30.0, 21.0, 0.0),
-        ..g
+        ..gather_point
     };
     assert_eq!(
-        t.lost_gather_target(PlayerId::new(1), ListIndex::new(0), far)
+        world
+            .lost_gather_target(PlayerId::new(1), ListIndex::new(0), far)
             .unwrap(),
         None
     );
@@ -151,8 +153,8 @@ fn hill_test(mode: u8, at: [i32; 2], raised: &[([i32; 2], u8)]) -> (u8, bool) {
         Scene::open(GridSize::new(10, 10)).elevation(3),
         |scene, &(t, e)| scene.elevation_on([Tile::from(t)], e),
     );
-    let w = scene.build();
-    let map = WorldMap { turns: &w };
+    let world = scene.build();
+    let map = WorldMap { turns: &world };
     let tile = Tile::from(at);
     let shape = map.shape(tile).unwrap();
     let fails = hill_fails(
@@ -209,12 +211,12 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
         walls: [false; 4],
     };
     let mut tried = Vec::new();
-    let p = spawn_point(
+    let spawn_point = spawn_point(
         &site,
         Footprint::new(0.2, 0.2),
-        &mut |c| {
-            tried.push(c);
-            Ok(if c.y() > 46.9 {
+        &mut |point| {
+            tried.push(point);
+            Ok(if point.y() > 46.9 {
                 Tested::Blocked { stays: true }
             } else {
                 Tested::Free
@@ -223,7 +225,7 @@ fn the_tc_spawns_its_villager_below_the_sheep_on_its_right() {
         &tuning().spawn,
     )
     .unwrap();
-    assert_eq!(p, Point::new(106.5, 46.5));
+    assert_eq!(spawn_point, Point::new(106.5, 46.5));
     assert_eq!(
         tried,
         [
@@ -243,7 +245,7 @@ fn blocker_that_moves_lets_the_spot_try_its_next_candidate() {
         count: 1,
     };
     let mut n = 0;
-    let p = try_spot(&spot, &mut |_| {
+    let point = try_spot(&spot, &mut |_| {
         n += 1;
         Ok(if n == 1 {
             Tested::Blocked { stays: false }
@@ -252,7 +254,7 @@ fn blocker_that_moves_lets_the_spot_try_its_next_candidate() {
         })
     })
     .unwrap();
-    assert_eq!(p, Some(Point::new(1.5, 1.0)));
+    assert_eq!(point, Some(Point::new(1.5, 1.0)));
 }
 
 fn near_sheep(state: ObjectState) -> Near {
@@ -360,14 +362,14 @@ fn fogged_building_blocks_build_by_its_visibility_mask() {
             seen_by,
             ..SceneObject::new(500, owner, house_master(), Position::new(20.5, 20.5, 0.0))
         };
-        let w = Scene::open(GridSize::new(120, 120))
+        let world = Scene::open(GridSize::new(120, 120))
             .sight(TileSight::Explored)
             .players(2)
             .object(house)
             .build();
         build_placement(
             &site,
-            &WorldMap { turns: &w },
+            &WorldMap { turns: &world },
             Point::new(21.0, 21.0),
             &roles(),
             &tuning().spawn,
@@ -411,8 +413,8 @@ fn the_sheep_blocks_the_villager_where_their_boxes_overlap() {
         hill_mode: HillMode::ANY,
         placement: PlacementTerrains::NONE,
     };
-    let w = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
-    let map = WorldMap { turns: &w };
+    let world = Scene::open(GridSize::new(120, 120)).object(sheep()).build();
+    let map = WorldMap { turns: &world };
     assert_eq!(
         map.objects(Tile::new(106, 47)),
         Ok(vec![near_sheep(ObjectState::Alive)])
@@ -456,13 +458,13 @@ fn the_first_object_of_tile_list_reports_the_block() {
         SceneObject::new(9521, PlayerId::GAIA, master, sheep().at)
     };
     let at = |first: SceneObject, second: SceneObject| {
-        let w = Scene::open(GridSize::new(120, 120))
+        let world = Scene::open(GridSize::new(120, 120))
             .object(first)
             .object(second)
             .build();
         placement(
             &villager,
-            &WorldMap { turns: &w },
+            &WorldMap { turns: &world },
             Point::new(106.5, 47.5),
             ZoneTest::Skipped,
             &roles(),
@@ -483,15 +485,15 @@ fn the_first_object_of_tile_list_reports_the_block() {
 #[test]
 fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     let world = || {
-        let mut t = forage_world();
+        let mut forage_world = forage_world();
         // the villager's standing sprite (a graphic of ten frames, eight facets)
-        for masters in &mut t.model.masters {
+        for masters in &mut forage_world.model.masters {
             Arc::make_mut(masters)
                 .get_mut(ids::VILLAGER_MALE)
                 .unwrap()
                 .standing_sprite = Some(SpriteId::named(300));
         }
-        let _ = Arc::make_mut(&mut t.model.graphics).insert(
+        let _ = Arc::make_mut(&mut forage_world.model.graphics).insert(
             SpriteId::named(300),
             Graphic {
                 id: SpriteId::named(300),
@@ -503,10 +505,10 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
                 flags: SpriteFlags::ANIMATED,
             },
         );
-        let p = &mut t.players[1];
-        p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
-        t.parts.set_unit_ai(
-            p.objects[ListIndex::new(2)].id,
+        let players = &mut forage_world.players[1];
+        players.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
+        forage_world.parts.set_unit_ai(
+            players.objects[ListIndex::new(2)].id,
             Some(UnitAi {
                 ai_kind: UnitAiKind::Predator,
                 current_order: None,
@@ -515,7 +517,7 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
                 ..UnitAi::default()
             }),
         );
-        t
+        forage_world
     };
     let mut t = world();
     let before = t.players[1].objects.len();
@@ -526,22 +528,25 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
         Amount::new(1.0),
     )
     .unwrap();
-    let p = &t.players[1];
-    assert_eq!(p.objects.len(), before + 1);
-    let made = p.objects.last().unwrap();
+    let player = &t.players[1];
+    assert_eq!(player.objects.len(), before + 1);
+    let made = player.objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
     assert_eq!(
-        p.attributes[attribute::IN_PRODUCTION.index()],
+        player.attributes[attribute::IN_PRODUCTION.index()],
         Amount::new(2.0)
     );
     let completed = t
         .parts
         .unit_ai
-        .get(p.objects[ListIndex::new(2)].id)
+        .get(player.objects[ListIndex::new(2)].id)
         .unwrap()
         .notifies
         .iter()
-        .any(|n| n.kind == NotifyKind::ACTION_COMPLETED && n.p == [AiAction::Make.value(), 0, 0]);
+        .any(|notify| {
+            notify.kind == NotifyKind::ACTION_COMPLETED
+                && notify.p == [AiAction::Make.value(), 0, 0]
+        });
     assert!(completed);
     // the centre's command queue goes to the new unit
     let mut t = world();
@@ -580,7 +585,13 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
     assert_eq!(
         queued
             .iter()
-            .map(|o| (o.order, o.priority.get(), o.point, o.range, o.ready))
+            .map(|queued_order| (
+                queued_order.order,
+                queued_order.priority.get(),
+                queued_order.point,
+                queued_order.range,
+                queued_order.ready
+            ))
             .collect::<Vec<_>>(),
         [(
             OrderKind::Move,
@@ -590,6 +601,34 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
             true
         )]
     );
+    // an order on an object the world holds that the new unit cannot enter (the centre has no
+    // room) goes to it as it is
+    let mut t = world();
+    let centre = t.players[1].objects[ListIndex::new(2)].id;
+    t.parts
+        .unit_ai
+        .get_mut(centre)
+        .unwrap()
+        .building_orders
+        .push(QueuedOrder {
+            target: Some(centre),
+            ..queued_move()
+        });
+    t.spawn(
+        PlayerId::new(1),
+        ListIndex::new(2),
+        ids::VILLAGER_MALE,
+        Amount::new(1.0),
+    )
+    .unwrap();
+    let made = t.players[1].objects.last().unwrap();
+    let targets: Vec<_> = t
+        .parts
+        .unit_ai
+        .get(made.id)
+        .map(|ai| ai.orders.iter().map(|order| order.target).collect())
+        .unwrap_or_default();
+    assert_eq!(targets, [Some(centre)]);
     let mut t = world();
     t.players[1].kind = PlayerKind::Computer;
     assert!(
@@ -629,15 +668,15 @@ fn made_villager_spawns_beside_its_town_centre_and_takes_its_queue() {
 /// running sprite (the deer 9655 of MarvinBlue/426048731 ran at the running speed).
 #[test]
 fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
-    let mut t = forage_world();
-    for masters in &mut t.model.masters {
+    let mut world = forage_world();
+    for masters in &mut world.model.masters {
         let villager = Arc::make_mut(masters).get_mut(ids::VILLAGER_MALE).unwrap();
         villager.standing_sprite = Some(SpriteId::named(300));
         let moving = villager.move_stats.as_mut().unwrap();
         moving.base = Speed::new(0.8);
         moving.speed = Speed::new(1.6);
     }
-    let _ = Arc::make_mut(&mut t.model.graphics).insert(
+    let _ = Arc::make_mut(&mut world.model.graphics).insert(
         SpriteId::named(300),
         Graphic {
             id: SpriteId::named(300),
@@ -649,18 +688,19 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
             flags: SpriteFlags::ANIMATED,
         },
     );
-    t.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
-    t.spawn(
-        PlayerId::new(1),
-        ListIndex::new(2),
-        ids::VILLAGER_MALE,
-        Amount::new(1.0),
-    )
-    .unwrap();
-    let made = t.players[1].objects.last().unwrap();
+    world.players[1].attributes[attribute::IN_PRODUCTION.index()] = Amount::new(1.0);
+    world
+        .spawn(
+            PlayerId::new(1),
+            ListIndex::new(2),
+            ids::VILLAGER_MALE,
+            Amount::new(1.0),
+        )
+        .unwrap();
+    let made = world.players[1].objects.last().unwrap();
     assert_eq!(made.life.master_id, ids::VILLAGER_MALE);
     assert_eq!(
-        t.parts.mover_of(made.id).unwrap().stats.speed,
+        world.parts.mover_of(made.id).unwrap().stats.speed,
         Speed::new(0.4)
     );
 }
@@ -671,14 +711,14 @@ fn made_unit_moves_at_the_speed_of_its_standing_sprite() {
 #[test]
 fn only_gather_point_of_state_1_sends_the_new_unit() {
     let waits = |state| {
-        let mut t = forage_world();
-        for masters in &mut t.model.masters {
+        let mut world = forage_world();
+        for masters in &mut world.model.masters {
             Arc::make_mut(masters)
                 .get_mut(ids::VILLAGER_MALE)
                 .unwrap()
                 .standing_sprite = Some(SpriteId::named(300));
         }
-        let _ = Arc::make_mut(&mut t.model.graphics).insert(
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(
             SpriteId::named(300),
             Graphic {
                 id: SpriteId::named(300),
@@ -690,10 +730,10 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
                 flags: SpriteFlags::ANIMATED,
             },
         );
-        let p = &mut t.players[1];
-        p.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
-        t.parts.set_unit_ai(
-            p.objects[ListIndex::new(2)].id,
+        let player = &mut world.players[1];
+        player.attributes[attribute::IN_PRODUCTION.index()] = Amount::new(3.0);
+        world.parts.set_unit_ai(
+            player.objects[ListIndex::new(2)].id,
             Some(UnitAi {
                 ai_kind: UnitAiKind::Predator,
                 current_order: None,
@@ -702,25 +742,26 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
                 ..UnitAi::default()
             }),
         );
-        let at = p.objects[ListIndex::new(2)].id;
+        let at = player.objects[ListIndex::new(2)].id;
         let gather = Some(GatherPoint {
             state,
             point: Position::new(40.0, 80.0, 0.0),
             target: None,
             target_master: None,
         });
-        t.set_part(at, Part::GatherPoint(gather)).unwrap();
-        t.spawn(
-            PlayerId::new(1),
-            ListIndex::new(2),
-            ids::VILLAGER_MALE,
-            Amount::new(1.0),
-        )
-        .unwrap();
-        t.players[1]
+        world.set_part(at, Part::GatherPoint(gather)).unwrap();
+        world
+            .spawn(
+                PlayerId::new(1),
+                ListIndex::new(2),
+                ids::VILLAGER_MALE,
+                Amount::new(1.0),
+            )
+            .unwrap();
+        world.players[1]
             .objects
             .last()
-            .and_then(|u| t.parts.mover_of(u.id).map(|m| m.waiting))
+            .and_then(|unit| world.parts.mover_of(unit.id).map(|mover| mover.waiting))
     };
     assert_eq!(waits(GatherPointState::Point), Some(1));
     assert_eq!(waits(GatherPointState::Kept), Some(0));
@@ -731,16 +772,16 @@ fn only_gather_point_of_state_1_sends_the_new_unit() {
 /// later rings.
 fn all_blocked(site: &Site) -> (Vec<Point>, GenieResult<Point>) {
     let mut tried = Vec::new();
-    let r = spawn_point(
+    let spawn_point = spawn_point(
         site,
         Footprint::new(0.5, 0.5),
-        &mut |c| {
-            tried.push(c);
+        &mut |point| {
+            tried.push(point);
             Ok(Tested::Blocked { stays: true })
         },
         &tuning().spawn,
     );
-    (tried, r)
+    (tried, spawn_point)
 }
 
 /// `FUN_1411d12d0` without a gather point: one pass over the eight segments of an open
@@ -756,7 +797,7 @@ fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
         gather: None,
         walls: [false; 4],
     };
-    let (tried, r) = all_blocked(&site);
+    let (tried, point) = all_blocked(&site);
     let top = [
         Point::new(8.5, 11.5),
         Point::new(9.0, 11.5),
@@ -805,7 +846,7 @@ fn spawn_search_without_gather_point_walks_the_eight_segments_once() {
     ];
     assert_eq!(tried, segments.concat());
     assert_eq!(
-        r,
+        point,
         Err(GenieError::unsupported(
             "a spawn point beyond the building's sides (the search's later rings)"
         ))
@@ -823,7 +864,7 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
         gather: Some(Point::new(20.0, 5.0)),
         walls: [false, true, false, true],
     };
-    let (tried, r) = all_blocked(&site);
+    let (tried, point) = all_blocked(&site);
     assert_eq!(
         tried,
         [
@@ -839,7 +880,7 @@ fn second_pass_between_walled_corners_tries_the_bottom_right_corner() {
             Point::new(11.5, 9.0)
         ]
     );
-    assert!(r.is_err());
+    assert!(point.is_err());
 }
 
 /// A queued move of the centre's, which a new unit's notified walk forgets.
@@ -865,29 +906,34 @@ fn queued_move() -> QueuedOrder {
 fn gather_point_without_target_walks_the_new_unit_there() {
     use crate::movement::move_to::{MoveTo, MoveToAction, MoveWait};
     let walked = |source| {
-        let mut t = forage_world();
-        let u = &mut t.players[1].objects[ListIndex::new(0)];
-        t.parts.set_town_bell_flag(u.id, BellShelter::Sheltered);
-        t.parts
+        let mut world = forage_world();
+        let unit = &mut world.players[1].objects[ListIndex::new(0)];
+        world
+            .parts
+            .set_town_bell_flag(unit.id, BellShelter::Sheltered);
+        world
+            .parts
             .unit_ai
-            .get_mut(u.id)
+            .get_mut(unit.id)
             .unwrap()
             .orders
             .push(queued_move());
-        t.gather_move(
-            PlayerId::new(1),
-            ListIndex::new(0),
-            Position::new(40.0, 80.0, 0.0),
-            source,
-        )
-        .unwrap();
-        t.swap_remove_live(PlayerId::new(1), ListIndex::new(0))
+        world
+            .gather_move(
+                PlayerId::new(1),
+                ListIndex::new(0),
+                Position::new(40.0, 80.0, 0.0),
+                source,
+            )
+            .unwrap();
+        world
+            .swap_remove_live(PlayerId::new(1), ListIndex::new(0))
             .unwrap()
     };
-    let u = walked(OrderSource::Direct);
-    assert_eq!(u.parts.mover().unwrap().waiting, 1);
-    assert!(!u.parts.town_bell.flag.is_sheltered());
-    let ai = u.parts.unit_ai.as_ref().unwrap();
+    let object = walked(OrderSource::Direct);
+    assert_eq!(object.parts.mover().unwrap().waiting, 1);
+    assert!(!object.parts.town_bell.flag.is_sheltered());
+    let ai = object.parts.unit_ai.as_ref().unwrap();
     assert_eq!(
         (ai.current_order, ai.current_action, ai.current_target),
         (Some(OrderKind::Move), Some(AiAction::Move), None)
@@ -895,7 +941,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     assert_eq!(ai.target_point, Position::new(40.0, 80.0, 0.0));
     assert_eq!(ai.orders, []);
     assert_eq!(
-        u.parts.actions.list.move_to().copied(),
+        object.parts.actions.list.move_to().copied(),
         Some(MoveToAction {
             sprite: None,
             state: MoveTo::Start,
@@ -914,7 +960,7 @@ fn gather_point_without_target_walks_the_new_unit_there() {
     );
     assert_eq!(
         unloaded.parts.actions.list.move_to().copied(),
-        u.parts.actions.list.move_to().copied()
+        object.parts.actions.list.move_to().copied()
     );
 }
 
@@ -935,10 +981,10 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
         OrderSource::Direct,
     )
     .unwrap();
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.mover_of(u.id).unwrap().waiting, 1);
-    assert_eq!(t.parts.actions_of(u.id).list.move_to().copied(), None);
-    assert_eq!(t.parts.unit_ai.get(u.id).unwrap().current_order, None);
+    let unit = &t.players[1].objects[ListIndex::new(0)];
+    assert_eq!(t.parts.mover_of(unit.id).unwrap().waiting, 1);
+    assert_eq!(t.parts.actions_of(unit.id).list.move_to().copied(), None);
+    assert_eq!(t.parts.unit_ai.get(unit.id).unwrap().current_order, None);
     // a second walk finds the first's `MoveTo`
     let mut t = forage_world();
     t.gather_move(
@@ -962,10 +1008,10 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
         reason(&mut t),
         "a gather point's move of a unit with an action"
     );
-    let mut t = forage_world();
-    t.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
+    let mut world = forage_world();
+    world.players[1].objects[ListIndex::new(0)].life.state = ObjectState::Dying;
     assert_eq!(
-        reason(&mut t),
+        reason(&mut world),
         "a gather point's move of a unit not in state 2"
     );
 }
@@ -975,7 +1021,7 @@ fn gather_point_walk_waits_without_speed_and_stops_at_the_unmodelled() {
 /// on a random one) and 801 (moving, its standing sprite 21 of eight facets).
 fn remains_world() -> World {
     use crate::objects::masters::{Master, Masters};
-    let mut t = forage_world();
+    let mut world = forage_world();
     let graphic = |id, flags| Graphic {
         id,
         frames: Frame::of_data(10),
@@ -990,7 +1036,7 @@ fn remains_world() -> World {
         (21, SpriteFlags::ANIMATED),
     ] {
         let id = SpriteId::named(id);
-        let _ = Arc::make_mut(&mut t.model.graphics).insert(id, graphic(id, flags));
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(id, graphic(id, flags));
     }
     let static_remains = Master {
         id: master_id(800),
@@ -1010,7 +1056,7 @@ fn remains_world() -> World {
         move_stats: Some(walker().stats),
         ..Master::default()
     };
-    for masters in &mut t.model.masters {
+    for masters in &mut world.model.masters {
         *masters = Arc::new(Masters::new(
             masters
                 .iter()
@@ -1018,7 +1064,7 @@ fn remains_world() -> World {
                 .chain([static_remains.clone(), moving_remains.clone()]),
         ));
     }
-    t
+    world
 }
 
 /// The master's slot 0x40 for remains (`FUN_1411a45a0`, `FUN_141141640`): a static object gives
@@ -1041,17 +1087,21 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
             Facing::Dead(None),
         )
         .unwrap();
-    let u = &t.players[1].objects[i];
+    let players = &t.players[1].objects[i];
     assert_eq!(
-        (u.life.class, u.life.attribute_kind, u.life.amount),
+        (
+            players.life.class,
+            players.life.attribute_kind,
+            players.life.amount
+        ),
         (Class::Static, Some(attribute::POPULATION), Amount::new(5.0))
     );
     assert_eq!(
-        (u.life.death_facets, u.sprite),
+        (players.life.death_facets, players.sprite),
         (Some(FacetCount::of_data(8)), None)
     );
     assert_eq!(t.players[1].attributes[4], food + Amount::new(1.0));
-    let i = t
+    let list_index = t
         .plain_object(
             PlayerId::new(1),
             master_id(801),
@@ -1060,28 +1110,29 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
             Facing::Dead(Some(Facet::of_data(2))),
         )
         .unwrap();
-    let u = &t.players[1].objects[i];
+    let unit = &t.players[1].objects[list_index];
     let facets = SpriteFacets {
         count: FacetCount::of_data(8),
         turns: false,
     };
     assert_eq!(
-        t.parts.mover_of(u.id).map(|m| m.angle),
+        t.parts.mover_of(unit.id).map(|mover| mover.angle),
         Some(angle_of_facet(Facet::of_data(2), facets))
     );
     let reason = |change: &dyn Fn(&mut Master), facing| {
-        let mut t = remains_world();
-        let mut m = made(&t, master_id(801));
+        let mut world = remains_world();
+        let mut m = made(&world, master_id(801));
         change(&mut m);
-        t.plain_object(
-            PlayerId::new(1),
-            m.id,
-            &m,
-            Position::new(31.5, 85.5, 0.0),
-            facing,
-        )
-        .unwrap_err()
-        .reason()
+        world
+            .plain_object(
+                PlayerId::new(1),
+                m.id,
+                &m,
+                Position::new(31.5, 85.5, 0.0),
+                facing,
+            )
+            .unwrap_err()
+            .reason()
     };
     let unchanged = |_: &mut Master| {};
     assert_eq!(
@@ -1107,7 +1158,7 @@ fn remains_take_their_storage_and_face_their_dead_object_facet() {
         "moving remains of an object without a facet the slice holds"
     );
     assert_eq!(
-        reason(&|m| m.move_stats = None, Facing::Drawn),
+        reason(&|master| master.move_stats = None, Facing::Drawn),
         "moving remains without a moving master"
     );
 }
@@ -1190,7 +1241,7 @@ fn build_static_test_answers_the_map_edge_terrain_and_exploration() {
     };
     assert_eq!(
         build_static_test(&zoned, &flat, Point::new(50.0, 50.0), &tuning().spawn)
-            .map(|c| c.map(PlacementCode::code))
+            .map(|placement_code| placement_code.map(PlacementCode::code))
             .unwrap_err()
             .reason(),
         "BUILD's placement test in a zone mode"
@@ -1225,7 +1276,8 @@ fn build_scan_counts_what_the_player_sees_of_tile() {
         fog_visibility,
         ..near_sheep(ObjectState::Alive)
     };
-    let sees = |map: &WorldMap<'_>, o: Near, sight| build_sees(&site, map, &o, sight, &roles());
+    let sees =
+        |map: &WorldMap<'_>, near: Near, sight| build_sees(&site, map, &near, sight, &roles());
     assert_eq!(
         sees(
             &flat,
@@ -1304,7 +1356,7 @@ fn build_scan_ignores_the_dead_the_moving_own_walls_and_foreign_foundations() {
         state: ObjectState::Alive,
         ..near_sheep(ObjectState::Alive)
     };
-    let ignores = |site: &BuildSite<'_>, o: Near| build_ignores(site, &flat, &o, &roles());
+    let ignores = |site: &BuildSite<'_>, near: Near| build_ignores(site, &flat, &near, &roles());
     assert!(!ignores(&site, house));
     assert!(ignores(
         &site,
@@ -1384,7 +1436,7 @@ fn build_scan_passes_over_moving_friends_buildable_ground_and_felled_trees() {
         state: ObjectState::Alive,
         ..near_sheep(ObjectState::Unfinished)
     };
-    let passes = |o: Near| build_passes(&site, &flat, &o, &roles());
+    let passes = |near: Near| build_passes(&site, &flat, &near, &roles());
     assert!(passes(walker));
     assert!(passes(Near {
         player: PlayerId::new(0),
@@ -1451,8 +1503,8 @@ fn build_blockers_are_the_standing_objects_whose_box_overlaps() {
         state: ObjectState::Alive,
         ..near_sheep(ObjectState::Alive)
     };
-    let blocks = |site: &BuildSite<'_>, o: Near| {
-        blocks_build(site, &flat, &o, Point::new(21.0, 21.0), &roles())
+    let blocks = |site: &BuildSite<'_>, near: Near| {
+        blocks_build(site, &flat, &near, Point::new(21.0, 21.0), &roles())
     };
     assert!(blocks(&site, house));
     for passed in [
@@ -1530,13 +1582,13 @@ fn the_build_static_scans_find_dying_house_build_passes_over() {
     let build_values = Restriction::new(vec![1.0, 0.0]);
     let build = house_site(&build_values, false);
     let test = |site: &BuildSite<'_>, house: SceneObject| {
-        let w = Scene::open(GridSize::new(120, 120))
+        let world = Scene::open(GridSize::new(120, 120))
             .players(2)
             .object(house)
             .build();
         build_placement(
             site,
-            &WorldMap { turns: &w },
+            &WorldMap { turns: &world },
             Point::new(21.0, 21.0),
             &roles(),
             &tuning().spawn,
@@ -1594,7 +1646,7 @@ fn terrains(kinds: [u8; 9], flags: Vec<TerrainFlags>) -> World {
 fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
     use crate::production::spawn::terrains::point_terrain_allows;
     // terrains 0 (land), 1 and 2 (shallow water), 3 (shallows)
-    let w = terrains(
+    let world = terrains(
         [0, 1, 2, 3, 0, 0, 0, 0, 0],
         vec![
             TerrainFlags::NONE,
@@ -1603,7 +1655,7 @@ fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
             TerrainFlags::SHALLOWS,
         ],
     );
-    let map = WorldMap { turns: &w };
+    let map = WorldMap { turns: &world };
     let t = |id: u8| Some(TerrainId::named(id));
     let at = |i: i32| Tile::new(i % 3, i / 3);
     assert_eq!(point_terrain_allows(&map, [t(1), t(3)], at(1)), Ok(true));
@@ -1619,7 +1671,7 @@ fn placement_terrain_takes_its_own_tile_or_one_of_shared_flag() {
 #[test]
 fn side_terrains_take_the_others_of_shared_flag() {
     use crate::production::spawn::terrains::side_terrains;
-    let w = terrains(
+    let world = terrains(
         [0; 9],
         vec![
             TerrainFlags::NONE,
@@ -1629,7 +1681,7 @@ fn side_terrains_take_the_others_of_shared_flag() {
             TerrainFlags::ICE | TerrainFlags::BEACH,
         ],
     );
-    let map = WorldMap { turns: &w };
+    let map = WorldMap { turns: &world };
     let t = |id: u8| Some(TerrainId::named(id));
     let ids = |v: &[u8]| v.iter().copied().map(TerrainId::named).collect::<Vec<_>>();
     assert_eq!(side_terrains(&map, [t(0), t(0)]), Ok(ids(&[0, 0])));
@@ -1643,8 +1695,8 @@ fn side_terrains_take_the_others_of_shared_flag() {
 #[test]
 fn master_placement_terrains_test_the_point_and_the_tiles_beside() {
     // the centre (1, 1) of terrain 5, the tile right of it (2, 1) of terrain 6
-    let w = terrains([0, 0, 0, 0, 5, 6, 0, 0, 0], vec![TerrainFlags::NONE; 8]);
-    let map = WorldMap { turns: &w };
+    let world = terrains([0, 0, 0, 0, 5, 6, 0, 0, 0], vec![TerrainFlags::NONE; 8]);
+    let map = WorldMap { turns: &world };
     let t = |id: u8| Some(TerrainId::named(id));
     let centre = Point::new(1.5, 1.5);
     let whole = TileRect::new(0, 0, 2, 2);

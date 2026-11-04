@@ -23,8 +23,8 @@ struct DisplayLang {
 /// Prints the key value pairs of an input language file to `stdout`.
 fn main() -> anyhow::Result<()> {
     let cli_input = DisplayLang::from_args();
-    let mut f = File::open(&cli_input.file_name)?;
-    let lang_file = cli_input.file_kind.read_from(&mut f)?;
+    let mut file = File::open(&cli_input.file_name)?;
+    let lang_file = cli_input.file_kind.read_from(&mut file)?;
     println!("{lang_file}");
     Ok(())
 }

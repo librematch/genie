@@ -65,7 +65,7 @@ impl UnitView<'_, '_> {
     /// [`Action::top_target`]: crate::objects::layers::Action::top_target
     pub(crate) fn top_target_now(&self) -> Option<ObjectId> {
         let target = self.actions.top_target();
-        target.filter(|&t| self.c.w.spatial.get(t).is_some())
+        target.filter(|&object_id| self.c.w.spatial.get(object_id).is_some())
     }
 
     /// What the full update's tail tests of object `id`, the target of its unit's top action
@@ -79,7 +79,7 @@ impl UnitView<'_, '_> {
         let Some(seen) = self.seen_unit(id)? else {
             return Ok(None);
         };
-        let u = owner_view(
+        let unit = owner_view(
             &self.c.w.players,
             &self.c.w.index,
             self.c.player,
@@ -87,14 +87,14 @@ impl UnitView<'_, '_> {
         )?
         .get(id)
         .ok_or_else(|| object_gone(id))?;
-        let kind = u.master(self.c.w.master_tables(), seen.owner)?.kind;
+        let kind = unit.master(self.c.w.master_tables(), seen.owner)?.kind;
         Ok(Some(TargetFlags {
             owner: seen.owner,
             kind,
-            capture: self.c.w.parts.combat_of(u.id).capture_flag,
-            pasture: u.pasture,
-            untargetable: u.flags.contains(UnitFlags::UNTARGETABLE),
-            attackable: u.flags.contains(UnitFlags::ATTACKABLE),
+            capture: self.c.w.parts.combat_of(unit.id).capture_flag,
+            pasture: unit.pasture,
+            untargetable: unit.flags.contains(UnitFlags::UNTARGETABLE),
+            attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
         }))
     }
 
@@ -105,38 +105,38 @@ impl UnitView<'_, '_> {
     ///
     /// An object the slice does not hold.
     pub(crate) fn seen_unit(&self, id: ObjectId) -> GenieResult<Option<UnitSeen>> {
-        let Some(p) = self.c.w.spatial.get(id) else {
+        let Some(placed) = self.c.w.spatial.get(id) else {
             return Ok(None);
         };
-        let (owner, u) = OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
+        let (owner, unit) = OthersRef::of(&self.c.w.players, &self.c.w.index, self.c.player)?
             .find(id)
             .ok_or(GenieError::unsupported("an object the slice does not hold"))?;
-        let m = u.master(self.c.w.master_tables(), owner)?;
+        let master = unit.master(self.c.w.master_tables(), owner)?;
         let me = self.unit.master(self.c.w.master_tables(), self.player)?;
         Ok(Some(UnitSeen {
             id,
-            class: m.class,
+            class: master.class,
             owner,
-            combat_level: m.combat_level,
-            state: u.life.state,
+            combat_level: master.combat_level,
+            state: unit.life.state,
             target: self
                 .c
                 .w
                 .parts
                 .unit_ai
-                .get(u.id)
-                .and_then(|a| a.current_target),
+                .get(unit.id)
+                .and_then(|unit_ai| unit_ai.current_target),
             gap_squared: footprint_gap_squared(
                 self.unit.position(),
                 me.radius,
-                p.position,
-                p.radius,
+                placed.position,
+                placed.radius,
             ),
-            position: p.position,
-            hp: u.life.hp,
-            master: u.life.master_id,
-            kind: m.kind,
-            main: self.c.w.parts.building_of(u.id).annex_of,
+            position: placed.position,
+            hp: unit.life.hp,
+            master: unit.life.master_id,
+            kind: master.kind,
+            main: self.c.w.parts.building_of(unit.id).annex_of,
             allied: allied(
                 &self.c.w.players.player(self.player)?.relations,
                 self.player,

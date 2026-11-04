@@ -30,7 +30,7 @@ impl World {
             .held(group)?
             .members
             .iter()
-            .map(|m| m.id)
+            .map(|member| member.id)
             .collect();
         let mut counts = [0i32; 9];
         for &id in &ids {
@@ -44,9 +44,9 @@ impl World {
             }
         }
         let mut best = 0;
-        for k in 1..9 {
-            if *counts.checked(best)? < *counts.checked(k)? {
-                best = k;
+        for index in 1..9 {
+            if *counts.checked(best)? < *counts.checked(index)? {
+                best = index;
             }
         }
         if 3 <= best {
@@ -82,20 +82,22 @@ impl World {
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
     pub fn lock_formation(&mut self, group: GroupId, kind: FormationKind) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         // the spacing is read again for every member held (0x14102500a): the first whose
         // radius gives one above it sets it, and every later member finds it set
-        let mut spacing = g.desired_spacing;
-        for m in &g.members {
+        let mut spacing = held.desired_spacing;
+        for member in &held.members {
             if spacing != Distance::ZERO {
                 break;
             }
-            if let Some((p, u)) = self.object(m.id) {
-                let unit =
-                    FormationUnit::of(u.master(self.master_tables(), p)?, &self.model.tuning.group);
-                let s = unit.radius * self.model.tuning.group.spacing_factor;
-                if spacing <= s && s != spacing {
-                    spacing = s;
+            if let Some((player_id, u)) = self.object(member.id) {
+                let unit = FormationUnit::of(
+                    u.master(self.master_tables(), player_id)?,
+                    &self.model.tuning.group,
+                );
+                let distance = unit.radius * self.model.tuning.group.spacing_factor;
+                if spacing <= distance && distance != spacing {
+                    spacing = distance;
                 }
             }
         }
@@ -124,7 +126,7 @@ impl World {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
-        let ids: Vec<ObjectId> = g.members.iter().map(|m| m.id).collect();
+        let ids: Vec<ObjectId> = g.members.iter().map(|member| member.id).collect();
         let mut n = [0i32; 4];
         for &id in &ids {
             if let Some(at) = self

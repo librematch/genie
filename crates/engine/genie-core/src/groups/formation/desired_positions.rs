@@ -36,7 +36,7 @@ pub(super) const fn top_level(paths: &[PathData]) -> Option<&PathData> {
 pub fn on_last_high_level_waypoint(paths: &[PathData]) -> bool {
     top_level(paths)
         .filter(|t| t.has_path)
-        .is_some_and(|t| t.waypoint.at_or_past_last(t.points.len()))
+        .is_some_and(|path_data| path_data.waypoint.at_or_past_last(path_data.points.len()))
 }
 
 /// `FUN_141046500`: the path of the walked level's top ancestor, or, without one, the walked
@@ -44,7 +44,7 @@ pub fn on_last_high_level_waypoint(paths: &[PathData]) -> bool {
 pub(crate) fn top_path(paths: &[PathData]) -> Option<&PathData> {
     top_level(paths).map_or_else(
         || paths.first().filter(|w| w.has_path),
-        |top| Some(top).filter(|t| t.has_path),
+        |top| Some(top).filter(|path_data| path_data.has_path),
     )
 }
 
@@ -55,55 +55,55 @@ pub(crate) fn top_path(paths: &[PathData]) -> Option<&PathData> {
 pub(super) fn measured_path(paths: &[PathData]) -> Option<&PathData> {
     top_level(paths)
         .filter(|t| t.has_path)
-        .or_else(|| paths.first().filter(|w| w.has_path))
+        .or_else(|| paths.first().filter(|path_data| path_data.has_path))
 }
 
 impl World {
-    /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) chooses itself for group
-    /// `g` (given none and its lock -1 or 0): a line (2), unless its path (the top level's, else the
-    /// walked level's, [`measured_path`]) makes it a column (1): off the last high waypoint
+    /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) chooses itself for group `group` (given
+    /// none and its lock -1 or 0): a line (2), unless its path (the top level's, else the walked
+    /// level's, [`measured_path`]) makes it a column (1): off the last high waypoint
     /// ([`on_last_high_level_waypoint`]) or on a patrol (the top path's [`PathFlags::LOOPS`],
     /// `FUN_141046500`) always; on the last waypoint, beyond both the owner's minimum column
-    /// distance (`+0x6b8`) and its column-to-line distance (`+0x6bc`, plus the target's radius
-    /// and range when the group has a target), measured on the ground from the group's place to
-    /// the path's last point (the origin for a path of fewer than two points); the game tests a
-    /// current column against the one and any other type against the other first, which the
-    /// outcome does not depend on. Flags bit 2 (`MinAutoDistanceLock`) make it a line, a group of horde units
+    /// distance (`+0x6b8`) and its column-to-line distance (`+0x6bc`, plus the target's radius and
+    /// range when the group has a target), measured on the ground from the group's place to the
+    /// path's last point (the origin for a path of fewer than two points); the game tests a current
+    /// column against the one and any other type against the other first, which the outcome does
+    /// not depend on. Flags bit 2 (`MinAutoDistanceLock`) make it a line, a group of horde units
     /// only ([`World::horde_units_only`]) a horde (0).
     ///
     /// # Errors
     ///
     /// A member of a master the slice does not have.
-    pub fn own_formation_kind(&self, g: &UnitGroup) -> GenieResult<FormationKind> {
-        let current = g
+    pub fn own_formation_kind(&self, group: &UnitGroup) -> GenieResult<FormationKind> {
+        let current = group
             .current_formation
             .as_ref()
-            .map_or(FormationKind::Horde, |f| f.kind);
+            .map_or(FormationKind::Horde, |formation| formation.kind);
         let mut kind = FormationKind::Line;
-        if let Some(path) = measured_path(&g.motion.paths) {
+        if let Some(path) = measured_path(&group.motion.paths) {
             let end = if 1 < path.points.len() {
                 *path.points.checked(path.points.len() - 1)?
             } else {
                 BVector::ZERO
             };
-            let mut d = end - g.motion.position[0];
+            let mut d = end - group.motion.position[0];
             d = d.with_height(0.0);
-            let formations = g
+            let formations = group
                 .owner
-                .and_then(|o| self.players.get(o.index()))
-                .map(|p| p.formations)
+                .and_then(|player_id| self.players.get(player_id.index()))
+                .map(|player| player.formations)
                 .unwrap_or_default();
             let mut column_to_line = formations.column_to_line_distance.distance().get();
             let min_column = formations.min_column_distance.distance().get();
-            if g.current_target.target.key().is_some() {
+            if group.current_target.target.key().is_some() {
                 column_to_line = column_to_line
-                    + g.current_target.target_radius.get()
-                    + g.current_target.range.get();
+                    + group.current_target.target_radius.get()
+                    + group.current_target.range.get();
             }
             let remaining = sqrt(d.x() * d.x() + d.height() * d.height() + d.y() * d.y());
-            let patrol =
-                top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
-            if on_last_high_level_waypoint(&g.motion.paths) && !patrol {
+            let patrol = top_path(&group.motion.paths)
+                .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
+            if on_last_high_level_waypoint(&group.motion.paths) && !patrol {
                 if (current != FormationKind::Column || column_to_line <= remaining)
                     && (current == FormationKind::Column || min_column <= remaining)
                     && min_column < remaining
@@ -115,16 +115,16 @@ impl World {
                 kind = FormationKind::Column;
             }
         }
-        if g.flags.contains(GroupFlags::LINE) {
+        if group.flags.contains(GroupFlags::LINE) {
             kind = FormationKind::Line;
         }
-        if self.horde_units_only(g)? {
+        if self.horde_units_only(group)? {
             kind = FormationKind::Horde;
         }
         Ok(kind)
     }
 
-    /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) lays group `g` out in for the type
+    /// The type `UpdateDesiredPositions` (`FUN_14103fd00`) lays group `group` out in for the type
     /// `given`: the given one, else (none, the game's −1) the group's lock
     /// (`mFormationLockedType`), or without a lock (−1) or with a horde's (0) its own choice
     /// ([`World::own_formation_kind`]).
@@ -134,12 +134,12 @@ impl World {
     /// As [`World::own_formation_kind`].
     pub fn formation_kind(
         &self,
-        g: &UnitGroup,
+        group: &UnitGroup,
         given: Option<FormationKind>,
     ) -> GenieResult<FormationKind> {
-        Ok(match (given, g.formation_locked_kind) {
+        Ok(match (given, group.formation_locked_kind) {
             (Some(given), _) => given,
-            (None, None | Some(FormationKind::Horde)) => self.own_formation_kind(g)?,
+            (None, None | Some(FormationKind::Horde)) => self.own_formation_kind(group)?,
             (None, Some(locked)) => locked,
         })
     }
@@ -173,25 +173,29 @@ impl World {
         group: GroupId,
         given: Option<FormationKind>,
     ) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        if g.members.is_empty() {
+        let held = self.groups.held(group)?;
+        if held.members.is_empty() {
             return Ok(());
         }
-        let kind = self.formation_kind(g, given)?;
-        let current_kind = g
+        let kind = self.formation_kind(held, given)?;
+        let current_kind = held
             .current_formation
             .as_ref()
             .map_or(FormationKind::Horde, |f| f.kind);
         let renew = current_kind != kind || given.is_some();
         let laid_out = !renew
-            && g.current_formation
+            && held
+                .current_formation
                 .as_ref()
-                .is_some_and(|f| f.kind == kind && f.slots.len() == g.members.len());
-        let g = self.groups.held_mut(group)?;
+                .is_some_and(|f| f.kind == kind && f.slots.len() == held.members.len());
+        let unit_group = self.groups.held_mut(group)?;
         // a group without a formation takes a new one; a renewal keeps the old as the previous
-        let current = g.current_formation.take().unwrap_or_else(Formation::new);
-        let mut f = if renew {
-            g.previous_formation = Some(current);
+        let current = unit_group
+            .current_formation
+            .take()
+            .unwrap_or_else(Formation::new);
+        let mut formation = if renew {
+            unit_group.previous_formation = Some(current);
             Formation::new()
         } else {
             current
@@ -203,30 +207,32 @@ impl World {
             | FormationKind::Column
                 if !laid_out =>
             {
-                self.create_column_line(&mut f, group, LineKind::of_formation(kind))
+                self.create_column_line(&mut formation, group, LineKind::of_formation(kind))
                     .map(|_| ())
             }
-            FormationKind::Phalanx if !laid_out => self.create_phalanx(&mut f, group).map(|_| ()),
-            FormationKind::Box if !laid_out => self.create_box(&mut f, group).map(|_| ()),
+            FormationKind::Phalanx if !laid_out => {
+                self.create_phalanx(&mut formation, group).map(|_| ())
+            }
+            FormationKind::Box if !laid_out => self.create_box(&mut formation, group).map(|_| ()),
             // true: the group has members; the transform after (`LAB_141040abf`)
             FormationKind::Horde if !laid_out => self
                 .groups
                 .held(group)
-                .and_then(|g| self.create_horde(&mut f, g))
-                .and_then(|_| self.formation_transform(&mut f, group, SlotOrder::Closest))
+                .and_then(|g| self.create_horde(&mut formation, g))
+                .and_then(|_| self.formation_transform(&mut formation, group, SlotOrder::Closest))
                 .map(|_| ()),
             FormationKind::UserDefined if !laid_out => self
                 .groups
                 .held(group)
-                .and_then(|g| self.create_udf(&mut f, g))
-                .and_then(|_| self.formation_transform(&mut f, group, SlotOrder::Closest))
+                .and_then(|g| self.create_udf(&mut formation, g))
+                .and_then(|_| self.formation_transform(&mut formation, group, SlotOrder::Closest))
                 .map(|_| ()),
             // laid out already, or a type the switch does not know: the transform alone
             _ => self
-                .formation_transform(&mut f, group, SlotOrder::Closest)
+                .formation_transform(&mut formation, group, SlotOrder::Closest)
                 .map(|_| ()),
         };
-        self.groups.held_mut(group)?.current_formation = Some(f);
+        self.groups.held_mut(group)?.current_formation = Some(formation);
         result
     }
 }
@@ -318,16 +324,16 @@ pub fn find_point_from_front(line: &PointLine, distance: Distance) -> Option<BVe
     while 0.0 <= length.abs() {
         let total = covered + length;
         if distance <= total {
-            let p = line.points.get(node)?.point;
+            let point = line.points.get(node)?.point;
             if distance <= 0.0 {
-                return Some(p);
+                return Some(point);
             }
             let k = (distance - covered) / length;
             let along = [k * diff.x(), k * diff.height(), k * diff.y()];
             return Some(BVector::new(
-                along[0] + p.x(),
-                along[1] + p.height(),
-                p.y() + along[2],
+                along[0] + point.x(),
+                along[1] + point.height(),
+                point.y() + along[2],
             ));
         }
         node += 1;

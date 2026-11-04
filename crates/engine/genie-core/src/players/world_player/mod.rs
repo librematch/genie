@@ -133,19 +133,23 @@ impl VictoryTimes {
     pub fn running(&self) -> bool {
         [self.wonder, self.ruins, self.artifacts]
             .into_iter()
-            .any(|t| !below_or_unordered(t.get(), 0.0))
+            .any(|seconds| !below_or_unordered(seconds.get(), 0.0))
     }
 }
 
-/// Attribute `k` of `attributes`, 0 past them (the game's array holds them all).
-fn get(attributes: &[Amount], k: AttributeId) -> Amount {
-    attributes.get(k.index()).copied().unwrap_or(Amount::ZERO)
+/// Attribute `attribute_id` of `attributes`, 0 past them (the game's array holds them all).
+fn get(attributes: &[Amount], attribute_id: AttributeId) -> Amount {
+    attributes
+        .get(attribute_id.index())
+        .copied()
+        .unwrap_or(Amount::ZERO)
 }
 
-/// Attribute `k` of `attributes` takes `v`; none past them (the game's array holds them all).
-fn set(attributes: &mut [Amount], k: AttributeId, v: Amount) {
-    if let Some(a) = attributes.get_mut(k.index()) {
-        *a = v;
+/// Attribute `attribute_id` of `attributes` takes `v`; none past them (the game's array holds them
+/// all).
+fn set(attributes: &mut [Amount], attribute_id: AttributeId, v: Amount) {
+    if let Some(amount) = attributes.get_mut(attribute_id.index()) {
+        *amount = v;
     }
 }
 

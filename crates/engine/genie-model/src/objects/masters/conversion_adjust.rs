@@ -39,12 +39,12 @@ mod tests {
     /// Each conversion attribute changes its own value.
     #[test]
     fn each_conversion_attribute_changes_its_value() {
-        let mut c = ConversionAdjust::default();
-        *c.lane_mut(MasterAttribute::CONVERSION_CHANCE_MODIFIER) = 3.0;
-        *c.lane_mut(MasterAttribute::MAX_CONVERSION_TIME_MODIFIER) = 2.0;
-        *c.lane_mut(MasterAttribute::MIN_CONVERSION_TIME_MODIFIER) = 1.0;
+        let mut conversion_adjust = ConversionAdjust::default();
+        *conversion_adjust.lane_mut(MasterAttribute::CONVERSION_CHANCE_MODIFIER) = 3.0;
+        *conversion_adjust.lane_mut(MasterAttribute::MAX_CONVERSION_TIME_MODIFIER) = 2.0;
+        *conversion_adjust.lane_mut(MasterAttribute::MIN_CONVERSION_TIME_MODIFIER) = 1.0;
         assert_eq!(
-            c,
+            conversion_adjust,
             ConversionAdjust {
                 min_time: 1.0,
                 max_time: 2.0,

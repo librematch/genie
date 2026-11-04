@@ -161,8 +161,8 @@ impl CreatablePart {
                 *self.volley_spread.lane_mut(attribute) += Distance::new(v);
             }
             MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD => {
-                let n = cvttss2si(f32::from(self.train_location_entry.get()) + v);
-                if let Some(n) = select_entry(self.train_locations.len(), n) {
+                let entry = cvttss2si(f32::from(self.train_location_entry.get()) + v);
+                if let Some(n) = select_entry(self.train_locations.len(), entry) {
                     self.train_location_entry = TrainLocationEntry::of_selected(n);
                 }
             }

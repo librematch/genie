@@ -54,32 +54,33 @@ impl Unit {
     pub(crate) fn capture(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
         slots: Slots,
     ) -> GenieResult<(bool, Vec<ObjectId>)> {
-        let class = self.placed_class(c)?;
-        self.capture_stop(actions, c, class, roles)?;
-        let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
+        let class = self.placed_class(step)?;
+        self.capture_stop(actions, step, class, roles)?;
+        let changed = self.change_owner(actions, step, new, roles)? == OwnerChange::Changed;
         // the scan reads the owner after the change: the old one when `new` lacks the master
         let mut taken = Vec::new();
         // The livestock class (`-0xe72` raw).
         // The siege class (`-0xe9f` raw), whose ownership change drops the units it carries
         // (`FUN_14120f800`).
         if roles.of_class(class).contains(ClassRoles::LIVESTOCK)
-            && (if changed { new } else { c.player }) != PlayerId::GAIA
+            && (if changed { new } else { step.player }) != PlayerId::GAIA
         {
-            scan_livestock(c, self.position(), new, &mut taken, roles, slots)?;
+            scan_livestock(step, self.position(), new, &mut taken, roles, slots)?;
         }
         Ok((changed, taken))
     }
 
     /// The master class the world files the captured object under.
-    pub(crate) fn placed_class(&self, c: &Step<'_>) -> GenieResult<ClassId> {
-        c.w.spatial
+    pub(crate) fn placed_class(&self, step: &Step<'_>) -> GenieResult<ClassId> {
+        step.w
+            .spatial
             .get(self.id)
-            .map(|p| p.class)
+            .map(|placed| placed.class)
             .ok_or(GenieError::unsupported(
                 "a captured object the world does not hold",
             ))
@@ -100,50 +101,55 @@ impl Unit {
     pub(crate) fn capture_stop(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         class: ClassId,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let by = self.releaser(c)?;
+        let by = self.releaser(step)?;
         if let Some(artifact) = actions.list.artifact_mut() {
             let (gone, released) = artifact.stop();
             if gone.stops {
-                c.w.parts
+                step.w
+                    .parts
                     .mover_mut(self.id)
                     .ok_or(GenieError::unsupported(
                         "a walking animal without movement state",
                     ))?
                     .stop()?;
             }
-            for t in [gone.released, released].into_iter().flatten() {
-                release(c, self, t, by)?;
+            for object_id in [gone.released, released].into_iter().flatten() {
+                release(step, self, object_id, by)?;
             }
             self.show_standing(
-                c.w.parts.motion.layer_mut(self.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion.layer_mut(self.id),
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
         } else {
             // any other top action's slot 0x38 is the base's false for what an animal or an
             // artifact holds (a `MoveTo` of its own), and the list goes
             let (mut releases, mut leaves) = (Vec::new(), Vec::new());
             self.tear_down_actions(
-                (actions, c.w.parts.unread.get(self.id)),
-                c.w.parts.motion.layer_mut(self.id),
+                (actions, step.w.parts.unread.get(self.id)),
+                step.w.parts.motion.layer_mut(self.id),
                 &mut releases,
                 &mut leaves,
                 by,
             )?;
-            torn_down(c, self, (leaves, releases))?;
+            torn_down(step, self, (leaves, releases))?;
         }
         let trading = actions.top_action_kind() == Some(TRADE_ACTION)
             && below_or_unordered(0.0, self.life.amount.get())
             && self.life.attribute_kind.is_some();
         if !roles.of_class(class).contains(ClassRoles::LIVESTOCK)
             && !trading
-            && c.w
+            && step
+                .w
                 .parts
                 .unit_ai
                 .get(self.id)
@@ -151,7 +157,7 @@ impl Unit {
         {
             let place = (self.place.position().ground(), Some(class));
             // slot 0xb0 with 0, its stopAction a call on the unit at once
-            self.run_calls(actions, c, |ai, side, rng| {
+            self.run_calls(actions, step, |ai, side, rng| {
                 ai.stop_with(StopOrder::End, Some(place), side, rng, roles)?;
                 ai.forget_targets();
                 Ok(())
@@ -174,12 +180,12 @@ impl Unit {
         &mut self,
         actions: &mut Action,
         new: PlayerId,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let changed = self.change_owner(actions, c, new, roles)? == OwnerChange::Changed;
-        if changed || c.building_handover {
-            c.taken_over = Some((new, changed));
+        let changed = self.change_owner(actions, step, new, roles)? == OwnerChange::Changed;
+        if changed || step.building_handover {
+            step.taken_over = Some((new, changed));
         }
         Ok(())
     }
@@ -192,18 +198,24 @@ impl Unit {
     pub(crate) fn take_by_sight(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let master = self.master(c.w.master_tables(), c.player)?;
+        let master = self.master(step.w.master_tables(), step.player)?;
         if roles.of_class(master.class).contains(ClassRoles::SIEGE) && !self.garrison.is_empty() {
             return Err(HANDS_LEFT);
         }
-        let _ = self.change_owner(actions, c, new, roles)?;
-        c.w.parts.combat_mut(self.id)?.capture_flag = CaptureKind::None;
-        if let Some(s) = c.w.spatial.sight.as_mut().and_then(|v| v.seer_mut(self.id)) {
-            s.capture = CaptureKind::None;
+        let _ = self.change_owner(actions, step, new, roles)?;
+        step.w.parts.combat_mut(self.id)?.capture_flag = CaptureKind::None;
+        if let Some(seer) = step
+            .w
+            .spatial
+            .sight
+            .as_mut()
+            .and_then(|visibility| visibility.seer_mut(self.id))
+        {
+            seer.capture = CaptureKind::None;
         }
         Ok(())
     }
@@ -215,43 +227,44 @@ impl Unit {
     pub(crate) fn change_owner(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         new: PlayerId,
         roles: &Roles,
     ) -> GenieResult<OwnerChange> {
-        let master = self.master(c.w.master_tables(), c.player);
+        let master = self.master(step.w.master_tables(), step.player);
         if master.is_ok_and(|m| m.kind == MasterKind::BUILDING) {
-            c.building_handover = true;
-            let has =
-                c.w.model
-                    .masters
-                    .get(new.index())
-                    .is_some_and(|m| m.get(self.life.master_id).is_some());
+            step.building_handover = true;
+            let has = step
+                .w
+                .model
+                .masters
+                .get(new.index())
+                .is_some_and(|masters| masters.get(self.life.master_id).is_some());
             return Ok(if has {
                 OwnerChange::Changed
             } else {
                 OwnerChange::Kept
             });
         }
-        let held = c.w.parts.dead_master.get(self.id);
-        let tables = MasterTables::new(&c.w.model.masters, &c.w.parts.own_master);
-        let dead = dead_master_of(self, c.player.index(), tables, held);
+        let held = step.w.parts.dead_master.get(self.id);
+        let tables = MasterTables::new(&step.w.model.masters, &step.w.parts.own_master);
+        let dead = dead_master_of(self, step.player.index(), tables, held);
         let id = self.id;
         let changed = change_hands(
-            (self, actions, c.w.parts.unit_ai.get_mut(id)),
-            (c.player.index(), new),
+            (self, actions, step.w.parts.unit_ai.get_mut(id)),
+            (step.player.index(), new),
             tables,
-            &mut c.w.spatial,
-            c.w.world_time,
+            &mut step.w.spatial,
+            step.w.world_time,
             roles,
-            c.w.model.tuning.visibility,
+            step.w.model.tuning.visibility,
         )?;
         let Some(own) = changed else {
             return Ok(OwnerChange::Kept);
         };
-        c.w.set_part(self.id, Part::OwnMaster(own))?;
+        step.w.set_part(self.id, Part::OwnMaster(own))?;
         if let Some(d) = dead {
-            c.w.set_part(self.id, Part::DeadMaster(Box::new(d)))?;
+            step.w.set_part(self.id, Part::DeadMaster(Box::new(d)))?;
         }
         Ok(OwnerChange::Changed)
     }
@@ -275,7 +288,7 @@ pub(crate) const TRADE_ACTION: ActionKind = ActionKind::TRADE;
 /// the new owner sees (`FUN_141663500`), within 3 tiles of `at` (x outer, y inner); each is taken
 /// in turn, with its own scan. Two on one tile would need the tile's object list order.
 pub(crate) fn scan_livestock(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     at: Position,
     new: PlayerId,
     taken: &mut Vec<ObjectId>,
@@ -283,18 +296,18 @@ pub(crate) fn scan_livestock(
     slots: Slots,
 ) -> GenieResult<()> {
     let (tx, ty) = (at.x() as i32, at.y() as i32);
-    let (w, h) = (c.w.spatial.map.width(), c.w.spatial.map.height());
+    let (w, h) = (step.w.spatial.map.width(), step.w.spatial.map.height());
     for x in (tx - 3).max(0)..=(tx + 3).min(w - 1) {
         for y in (ty - 3).max(0)..=(ty + 3).min(h - 1) {
-            if !c.w.spatial.sees_tile(new, Tile::new(x, y)) {
+            if !step.w.spatial.sees_tile(new, Tile::new(x, y)) {
                 continue;
             }
-            match livestock_on(c, Tile::new(x, y), taken, roles)?[..] {
+            match livestock_on(step, Tile::new(x, y), taken, roles)?[..] {
                 [] => {}
                 [id] => {
-                    if let Some(position) = take_livestock(c, id, new, slots, roles)? {
+                    if let Some(position) = take_livestock(step, id, new, slots, roles)? {
                         taken.push(id);
-                        scan_livestock(c, position, new, taken, roles, slots)?;
+                        scan_livestock(step, position, new, taken, roles, slots)?;
                     }
                 }
                 _ => {
@@ -311,13 +324,13 @@ pub(crate) fn scan_livestock(
 /// The scan's finds on tile (`x`, `y`): Gaia's livestock in state 2 of the updating object's
 /// player's list whose centre is on the tile, not yet `taken`.
 fn livestock_on(
-    c: &Step<'_>,
+    step: &Step<'_>,
     tile: Tile,
     taken: &[ObjectId],
     roles: &Roles,
 ) -> GenieResult<Vec<ObjectId>> {
     let (x, y) = (tile.x(), tile.y());
-    Ok(OthersRef::of(&c.w.players, &c.w.index, c.player)?
+    Ok(OthersRef::of(&step.w.players, &step.w.index, step.player)?
         .own_iter()
         .filter(|u| {
             let (ux, uy) = (u.position().x(), u.position().y());
@@ -325,12 +338,12 @@ fn livestock_on(
                 && ux as i32 == x
                 && uy as i32 == y
                 && !taken.contains(&u.id)
-                && c.w.spatial.get(u.id).is_some_and(|p| {
-                    roles.of_class(p.class).contains(ClassRoles::LIVESTOCK)
-                        && p.player == PlayerId::GAIA
+                && step.w.spatial.get(u.id).is_some_and(|placed| {
+                    roles.of_class(placed.class).contains(ClassRoles::LIVESTOCK)
+                        && placed.player == PlayerId::GAIA
                 })
         })
-        .map(|u| u.id)
+        .map(|unit| unit.id)
         .collect())
 }
 
@@ -338,24 +351,25 @@ fn livestock_on(
 /// the updating object, its capture stop and its ownership change. Its place when `new` took it;
 /// None when `new` lacks the master and the animal stays Gaia's, which scans nothing.
 fn take_livestock(
-    c: &mut Step<'_>,
+    step: &mut Step<'_>,
     id: ObjectId,
     new: PlayerId,
     slots: Slots,
     roles: &Roles,
 ) -> GenieResult<Option<Position>> {
-    let mut unit =
-        c.w.take_out_own(c.player, id)?
-            .ok_or_else(|| object_gone(id))?;
+    let mut unit = step
+        .w
+        .take_out_own(step.player, id)?
+        .ok_or_else(|| object_gone(id))?;
     // its action layer goes out of the table with it, as the updating object's
-    let mut actions = c.w.parts.take_actions(id);
+    let mut actions = step.w.parts.take_actions(id);
     let done = (|| {
-        unit.capture_stop(&mut actions, c, slots.class.livestock, roles)?;
-        unit.change_owner(&mut actions, c, new, roles)
+        unit.capture_stop(&mut actions, step, slots.class.livestock, roles)?;
+        unit.change_owner(&mut actions, step, new, roles)
     })();
     let position = unit.position();
-    c.w.parts.put_actions(id, actions);
-    let _ = c.w.put_back_own(c.player, unit)?;
+    step.w.parts.put_actions(id, actions);
+    let _ = step.w.put_back_own(step.player, unit)?;
     Ok((done? == OwnerChange::Changed).then_some(position))
 }
 

@@ -70,9 +70,9 @@ mod tests {
         assert_eq!(TerrainId::of_data(-1), None);
         assert_eq!(TerrainId::of_data(-2), None);
         assert_eq!(TerrainId::of_data(256), None);
-        let t = TerrainId::named(27);
+        let terrain_id = TerrainId::named(27);
         assert_eq!(
-            (t.get(), t.index(), t.to_string()),
+            (terrain_id.get(), terrain_id.index(), terrain_id.to_string()),
             (27, 27, "27".to_owned())
         );
     }

@@ -83,15 +83,15 @@ pub struct Payer<'a> {
 }
 
 impl Debug for Payer<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        f.debug_struct("Payer").finish_non_exhaustive()
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        formatter.debug_struct("Payer").finish_non_exhaustive()
     }
 }
 
 /// The object of `set` with id `id`.
 pub(super) fn find(set: &[Repaired], id: ObjectId) -> GenieResult<usize> {
     set.iter()
-        .position(|o| o.id == id)
+        .position(|repaired| repaired.id == id)
         .ok_or(GenieError::unreachable("a repair's object outside its set"))
 }
 
@@ -126,23 +126,23 @@ pub fn repair_building(
     roles: &Roles,
     slots: Slots,
 ) -> GenieResult<RepairOutcome> {
-    let o = set.checked(idx)?;
+    let checked = set.checked(idx)?;
     if roles
-        .of_class(o.class)
+        .of_class(checked.class)
         .contains(ClassRoles::REPAIRED_AS_UNIT)
     {
         return repair_unit(set, idx, amount, payer, roles, slots);
     }
-    if below_or_unordered(o.hp.get(), ONE) {
+    if below_or_unordered(checked.hp.get(), ONE) {
         return Ok(RepairOutcome::Unpaid);
     }
     if from == RepairFrom::Repairer
-        && let Some(main) = o.main
+        && let Some(main) = checked.main
     {
         let m = find(set, main.id())?;
         return repair_building(set, m, amount, RepairFrom::Repairer, payer, roles, slots);
     }
-    for annex in o.annexes.clone() {
+    for annex in checked.annexes.clone() {
         let a = find(set, annex)?;
         match set.checked(a)?.kind {
             MasterKind::COMBAT => {
@@ -162,16 +162,16 @@ pub fn repair_building(
             _ => {}
         }
     }
-    let o = set.checked(idx)?;
-    let most = HitPoints::of_master(o.master_hp);
+    let repaired = set.checked(idx)?;
+    let most = HitPoints::of_master(repaired.master_hp);
     let mut amount = amount;
-    if most < o.hp + amount {
-        amount = most - o.hp;
+    if most < repaired.hp + amount {
+        amount = most - repaired.hp;
     }
-    let share = CostCount::new((o.building_repair_cost.get() * amount) / most);
+    let share = CostCount::new((repaired.building_repair_cost.get() * amount) / most);
     if pay(
         payer.masters,
-        o.master,
+        repaired.master,
         share,
         &mut *payer.attributes,
         roles,
@@ -201,18 +201,21 @@ pub fn repair_unit(
     roles: &Roles,
     slots: Slots,
 ) -> GenieResult<RepairOutcome> {
-    let o = set.checked_mut(idx)?;
+    let repaired = set.checked_mut(idx)?;
     let mut amount = amount;
-    if roles.of_class(o.class).contains(ClassRoles::REPAIR_COSTED) {
-        let most = HitPoints::of_master(o.master_hp) + o.hp_powerup.max;
-        let now = o.hp_powerup.room() + o.hp;
+    if roles
+        .of_class(repaired.class)
+        .contains(ClassRoles::REPAIR_COSTED)
+    {
+        let most = HitPoints::of_master(repaired.master_hp) + repaired.hp_powerup.max;
+        let now = repaired.hp_powerup.room() + repaired.hp;
         if most < now + amount {
             amount = most - now;
         }
-        let share = CostCount::new((o.unit_repair_cost.get() * amount) / most);
+        let share = CostCount::new((repaired.unit_repair_cost.get() * amount) / most);
         if pay(
             payer.masters,
-            o.master,
+            repaired.master,
             share,
             &mut *payer.attributes,
             roles,
@@ -223,7 +226,12 @@ pub fn repair_unit(
         }
     }
     Ok(
-        match heal_hp(&mut o.hp, &mut o.hp_powerup, o.master_hp, amount) {
+        match heal_hp(
+            &mut repaired.hp,
+            &mut repaired.hp_powerup,
+            repaired.master_hp,
+            amount,
+        ) {
             Heal::Full => RepairOutcome::Full,
             Heal::Partial => RepairOutcome::Healed,
         },
@@ -249,14 +257,20 @@ impl PaidAttributes {
 }
 
 impl Attributes for PaidAttributes {
-    fn get(&self, i: AttributeId) -> GenieResult<Amount> {
-        self.values.get(i.index()).copied().ok_or(NO_ATTRIBUTE)
+    fn get(&self, attribute_id: AttributeId) -> GenieResult<Amount> {
+        self.values
+            .get(attribute_id.index())
+            .copied()
+            .ok_or(NO_ATTRIBUTE)
     }
 
-    fn subtract(&mut self, i: AttributeId, amount: Amount) -> GenieResult<()> {
-        let v = self.values.get_mut(i.index()).ok_or(NO_ATTRIBUTE)?;
-        *v -= amount;
-        self.adds.push((i, -amount));
+    fn subtract(&mut self, attribute_id: AttributeId, amount: Amount) -> GenieResult<()> {
+        let value = self
+            .values
+            .get_mut(attribute_id.index())
+            .ok_or(NO_ATTRIBUTE)?;
+        *value -= amount;
+        self.adds.push((attribute_id, -amount));
         Ok(())
     }
 }

@@ -31,8 +31,8 @@ pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, change: FlagCha
     };
     level.flags.set(flag, change == FlagChange::Set);
     if flag == LevelFlags::MET_TARGET {
-        for p in parents {
-            p.flags |= LevelFlags::MET_TARGET;
+        for path_data in parents {
+            path_data.flags |= LevelFlags::MET_TARGET;
         }
     }
 }
@@ -40,7 +40,9 @@ pub(super) fn set_flag(paths: &mut [PathData], flag: LevelFlags, change: FlagCha
 /// `FUN_140f98e80` on the walked level: it and its parents go, the level holds the defaults
 /// (its plans back to 10, flags clear; its repath time stays).
 pub(super) fn reset_level(paths: &mut Vec<PathData>) -> GenieResult<()> {
-    let repath_time = paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
+    let repath_time = paths
+        .first()
+        .map_or(Seconds::ZERO, |path_data| path_data.repath_time);
     paths.truncate(1);
     let level = PathData {
         repath_time,

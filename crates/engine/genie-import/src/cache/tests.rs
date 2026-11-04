@@ -29,33 +29,33 @@ fn small_table() -> MasterTable {
     ];
     let civ = CivId::new(1);
     let id = |i: usize| MasterId::named(i16::try_from(i).unwrap());
-    let mut t = MasterTable::from_rows(
+    let mut master_table = MasterTable::from_rows(
         (0..kinds.len()).map(|i| ((civ, id(i)), MasterData::default(), DefaultAction::None)),
     );
-    for (i, &kind) in kinds.iter().enumerate() {
-        let class = if i == 0 {
+    for (index, &kind) in kinds.iter().enumerate() {
+        let class = if index == 0 {
             ClassId::of_master(-1)
         } else {
-            ClassId::named(i16::try_from(i).unwrap())
+            ClassId::named(i16::try_from(index).unwrap())
         };
         let master = Master {
-            id: id(i),
+            id: id(index),
             class,
             ..Master::of_kind(kind)
         };
-        t = t.with_work(civ, id(i), master);
+        master_table = master_table.with_work(civ, id(index), master);
     }
-    t.techs = vec![
+    master_table.techs = vec![
         TechDef::default(),
         TechDef {
             effect_id: EffectId::of_data(0),
             ..TechDef::default()
         },
     ];
-    t.effects = Effects::new(vec![Effect {
+    master_table.effects = Effects::new(vec![Effect {
         commands: vec![EffectCommand::of_data(1, 3, 1, -1, 20.0).unwrap()],
     }]);
-    t.with_sprite(
+    master_table.with_sprite(
         SpriteId::of_data(5).unwrap(),
         SpeedMultiplier::of_data(1.5),
         FacetCount::of_data(8),
@@ -89,13 +89,13 @@ fn the_cache_returns_what_it_wrote_and_nothing_for_another_key() {
     assert_eq!(read_cached(&dir, &k).unwrap(), Some(table));
     let other = key(&[("a", b"2")], &[0; 32]);
     assert_eq!(read_cached(&dir, &other).unwrap(), None);
-    assert!(
-        read_dir(&dir).unwrap().all(|e| !e
+    assert!(read_dir(&dir).unwrap().all(|dir_entry| {
+        !dir_entry
             .unwrap()
             .file_name()
             .to_string_lossy()
-            .contains(".tmp-"))
-    );
+            .contains(".tmp-")
+    }));
     remove_dir_all(&dir).unwrap();
 }
 
@@ -103,9 +103,9 @@ fn the_cache_returns_what_it_wrote_and_nothing_for_another_key() {
 #[test]
 fn second_writes_replace_the_first() {
     let dir = scratch("rewrite");
-    let k = key(&[], &[0; 32]);
-    write_cached(&dir, &k, &MasterTable::default()).unwrap();
-    write_cached(&dir, &k, &small_table()).unwrap();
-    assert_eq!(read_cached(&dir, &k).unwrap(), Some(small_table()));
+    let key = key(&[], &[0; 32]);
+    write_cached(&dir, &key, &MasterTable::default()).unwrap();
+    write_cached(&dir, &key, &small_table()).unwrap();
+    assert_eq!(read_cached(&dir, &key).unwrap(), Some(small_table()));
     remove_dir_all(&dir).unwrap();
 }

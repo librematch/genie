@@ -46,7 +46,7 @@ impl Victim {
         self.armored
             .as_ref()
             .filter(|_| self.tribe())
-            .map_or(self.hp, |a| a.hp_powerup.room() + self.hp)
+            .map_or(self.hp, |armored| armored.hp_powerup.room() + self.hp)
     }
 
     /// Slot 0xc8, its most hit points: a combat unit's or building's (`FUN_141202bb0`) hit point
@@ -60,7 +60,7 @@ impl Victim {
         self.armored
             .as_ref()
             .filter(|_| self.tribe())
-            .map_or(hp, |a| hp + a.hp_powerup.max)
+            .map_or(hp, |armored| hp + armored.hp_powerup.max)
     }
 
     /// `FUN_141188880`: the share of its most hit points it has (slot 0xc0, at most slot 0xc8 by
@@ -95,7 +95,7 @@ pub fn bonus_damage(attacker: &Victim, target: &Victim, roles: &Roles) -> f32 {
     for t in attacker
         .bonus_tasks
         .iter()
-        .filter(|t| t.action_kind == BONUS_DAMAGE)
+        .filter(|task| task.action_kind == BONUS_DAMAGE)
     {
         let any = t.object_id.is_none()
             && t.object_group.is_none()
@@ -147,12 +147,14 @@ pub struct Shown<'a> {
 /// [`charged`]) and, unless its master's `charge_target` is −1, works on `target` (slot 0x2f0,
 /// [`charge_hit`], or slot 0x2f8, [`range_charge_hit`]); with a `charge_target` but no target,
 /// not. A combat object of type 50 or 60 has no charge (`FUN_14106c580`).
-pub(super) fn charge_shown(v: &Victim, target: Option<&Victim>, roles: &Roles) -> bool {
-    let a = &v.source;
-    v.tribe()
-        && charged(a)
-        && (a.charge_target == ChargeTarget::EVERY
-            || target.is_some_and(|t| charge_hit(a, t, roles) || range_charge_hit(a, t, roles)))
+pub(super) fn charge_shown(shooter: &Victim, target: Option<&Victim>, roles: &Roles) -> bool {
+    let attacker = &shooter.source;
+    shooter.tribe()
+        && charged(attacker)
+        && (attacker.charge_target == ChargeTarget::EVERY
+            || target.is_some_and(|victim| {
+                charge_hit(attacker, victim, roles) || range_charge_hit(attacker, victim, roles)
+            }))
 }
 
 /// Which weapons the shown attack's best ([`best_attack`]) reads: the fighting classes' (melee,
@@ -176,12 +178,13 @@ pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount 
                     DamageClass::PIERCE | DamageClass::MELEE | DamageClass::CLASS_31
                 )
         })
-        .fold(
-            DamageAmount::ZERO,
-            |m, w| {
-                if m < w.amount { w.amount } else { m }
-            },
-        )
+        .fold(DamageAmount::ZERO, |damage_amount, class_amount| {
+            if damage_amount < class_amount.amount {
+                class_amount.amount
+            } else {
+                damage_amount
+            }
+        })
 }
 
 /// Slot 0x878 of a combat object, the attack it shows (`FUN_141085c70`; a combat unit's or
@@ -194,12 +197,12 @@ pub(super) fn best_attack(weapons: &[ClassAmount], of: Weapons) -> DamageAmount 
 /// or 3 adds the charge (`+0x9e0`). A combat object of type 50 or 60 has no powerups (its slots
 /// answer 0). The sums wrap at 16 bits.
 #[must_use]
-pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
-    let a = &v.source;
-    let charge = charge_shown(v, s.target, roles);
+pub fn shown_attack(v: &Victim, shown: &Shown<'_>, roles: &Roles) -> DamageAmount {
+    let attacker = &v.source;
+    let charge = charge_shown(v, shown.target, roles);
     if charge
-        && a.charge_kind.ranged()
-        && let Some(weapons) = s.projectile
+        && attacker.charge_kind.ranged()
+        && let Some(weapons) = shown.projectile
     {
         return best_attack(weapons, Weapons::Fighting);
     }
@@ -208,18 +211,18 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
         attack = best_attack(&v.weapons, Weapons::Any);
     }
     let powerup = if v.tribe() {
-        a.attack_powerup.get()
+        attacker.attack_powerup.get()
     } else {
         0.0
     };
     attack = attack
         .plus(DamageAmount::of_effect(powerup))
         .plus(DamageAmount::of_effect(0.0));
-    if let Some(t) = s.target {
-        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, t, roles)));
+    if let Some(victim) = shown.target {
+        attack = attack.plus(DamageAmount::of_effect(bonus_damage(v, victim, roles)));
     }
-    if charge && a.charge_kind.adds_to_attack() {
-        attack = attack.plus(DamageAmount::of_effect(a.charge.get()));
+    if charge && attacker.charge_kind.adds_to_attack() {
+        attack = attack.plus(DamageAmount::of_effect(attacker.charge.get()));
     }
     attack
 }
@@ -233,14 +236,14 @@ pub fn shown_attack(v: &Victim, s: &Shown<'_>, roles: &Roles) -> DamageAmount {
 /// An object without combat values (a type below 50): the villager's harmless test, its one
 /// caller, reads an attacker, which is a combat object (below type 50 the class's table has no
 /// slot 0x868).
-pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> GenieResult<DamageAmount> {
-    let a = v.armored.as_ref().ok_or(GenieError::unreachable(
+pub fn shown_melee_armor(victim: &Victim, roles: &Roles) -> GenieResult<DamageAmount> {
+    let armored = victim.armored.as_ref().ok_or(GenieError::unreachable(
         "the melee armor of an object without combat values",
     ))?;
-    Ok(if v.tribe() {
-        melee_armor(a, v.class, v.state, roles)
+    Ok(if victim.tribe() {
+        melee_armor(armored, victim.class, victim.state, roles)
     } else {
-        master_melee_armor(a)
+        master_melee_armor(armored)
     })
 }
 
@@ -248,14 +251,14 @@ pub fn shown_melee_armor(v: &Victim, roles: &Roles) -> GenieResult<DamageAmount>
 /// range (`+0x828`), to which a ready charge of type 6 or 7 ([`charge_shown`]) adds its master's
 /// `charge_event`, plus its max range powerup (`+0xa40`, slot 0x700; 0 for a type 50 or 60).
 #[must_use]
-pub fn shown_range(v: &Victim, s: &Shown<'_>, roles: &Roles) -> Distance {
-    let a = &v.source;
-    let mut range = a.weapon_range;
-    if a.charge_kind.ranged() && charge_shown(v, s.target, roles) {
-        range += s.charge_event.range();
+pub fn shown_range(victim: &Victim, shown: &Shown<'_>, roles: &Roles) -> Distance {
+    let attacker = &victim.source;
+    let mut range = attacker.weapon_range;
+    if attacker.charge_kind.ranged() && charge_shown(victim, shown.target, roles) {
+        range += shown.charge_event.range();
     }
-    let powerup = if v.tribe() {
-        s.range_powerup
+    let powerup = if victim.tribe() {
+        shown.range_powerup
     } else {
         Distance::ZERO
     };

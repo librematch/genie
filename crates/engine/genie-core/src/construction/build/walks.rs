@@ -53,17 +53,17 @@ impl BuildAction {
     /// the table lacks.
     pub(super) fn walk_to_foundation(
         &self,
-        c: &Step<'_>,
+        step: &Step<'_>,
         builder: &Unit,
         roles: &Roles,
     ) -> GenieResult<(Option<WalkTo>, Option<MoveToAction>)> {
         let move_reads = builder.move_to_reads(
-            c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.motion.mover(builder.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -72,13 +72,14 @@ impl BuildAction {
         } else {
             Some(
                 move_reads
-                    .walk_to(c.w, self.target.map(FoundationId::id))?
+                    .walk_to(step.w, self.target.map(FoundationId::id))?
                     .ok_or(SITE_GONE)?,
             )
         };
         Ok((
             to,
-            self.task.walk(&move_reads, to, &c.w.model.tuning.move_to)?,
+            self.task
+                .walk(&move_reads, to, &step.w.model.tuning.move_to)?,
         ))
     }
 
@@ -92,20 +93,20 @@ impl BuildAction {
     /// The walk's and the notifies'.
     pub(super) fn step_walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<SubCode> {
         let how = ListUpdate {
-            gives_up: Self::gives_up(c, builder, reads, roles)?,
+            gives_up: Self::gives_up(step, builder, reads, roles)?,
             ..ListUpdate::default()
         };
         match self.state.walk_mut() {
-            Some(move_to) => update_sub_actions(move_to, c, builder, me, how),
+            Some(move_to) => update_sub_actions(move_to, step, builder, me, how),
             // a state that does not walk has no sub-action: its list's update is the empty one's
-            None => update_sub_actions(&mut None, c, builder, me, how),
+            None => update_sub_actions(&mut None, step, builder, me, how),
         }
     }
 }

@@ -51,7 +51,7 @@ fn trace_gives_each_ticks_world_time_and_lanes() {
 #[test]
 fn file_of_another_kind_is_refused() {
     assert_eq!(
-        TickTrace::decode(b"GRTRACE3\0\0\0\0").map_err(|e| e.reason()),
+        TickTrace::decode(b"GRTRACE3\0\0\0\0").map_err(|error| error.reason()),
         Err(bad_trace().reason())
     );
 }
@@ -61,7 +61,8 @@ fn the_first_difference_names_the_tick_lane_and_word() {
     let a = TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![[2; 11]])])).unwrap();
     let mut changed = [2; 11];
     changed[9] = 7;
-    let b = TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![changed])])).unwrap();
-    assert_eq!(a.first_difference(&b), Some((1, 0, 9)));
+    let tick_trace =
+        TickTrace::decode(&encode(&[(104, vec![[1; 11]]), (208, vec![changed])])).unwrap();
+    assert_eq!(a.first_difference(&tick_trace), Some((1, 0, 9)));
     assert_eq!(a.first_difference(&a), None);
 }

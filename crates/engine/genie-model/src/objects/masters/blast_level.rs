@@ -53,8 +53,8 @@ impl BlastLevel {
 
 impl Diff for BlastLevel {
     /// By equality: the level is one value.
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

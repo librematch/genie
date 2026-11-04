@@ -50,9 +50,9 @@ pub(super) fn search_passes(
             });
             passes.push(single(unit_tile));
         }
-        Some(s) => passes.push(single(Tile::new(
-            s.position.x() as i32,
-            s.position.y() as i32,
+        Some(search_site) => passes.push(single(Tile::new(
+            search_site.position.x() as i32,
+            search_site.position.y() as i32,
         ))),
         None => passes.push(single(unit_tile)),
     }
@@ -103,13 +103,13 @@ pub(super) fn sort_point_and_side(
     let los = los.get();
     site.map_or_else(
         || ((ux, uy), box_side(los)),
-        |s| {
-            let (sx, sy) = (s.position.x(), s.position.y());
+        |search_site| {
+            let (sx, sy) = (search_site.position.x(), search_site.position.y());
             let at = (
                 sx * gather_search_tuning.site_share + ux * gather_search_tuning.unit_share,
                 sy * gather_search_tuning.site_share + uy * gather_search_tuning.unit_share,
             );
-            let site_los = SightTiles::of(s.line_of_sight).get();
+            let site_los = SightTiles::of(search_site.line_of_sight).get();
             let wide = if site_los.wrapping_add(10) <= los.wrapping_add(10) {
                 los
             } else {
@@ -117,7 +117,7 @@ pub(super) fn sort_point_and_side(
             };
             (
                 at,
-                if s.footprint {
+                if search_site.footprint {
                     box_side(wide)
                 } else {
                     box_side(los)
@@ -132,12 +132,12 @@ pub(super) fn sort_point_and_side(
 /// its radius, truncated, at least 1, less 1, to the site's x plus its radius, truncated, at most
 /// the map's last column; y alike), row by row.
 pub(super) fn footprint_seeds(
-    s: &SearchSite,
+    search_site: &SearchSite,
     map: GridSize,
     passable: &dyn Fn(Tile) -> bool,
 ) -> Vec<Cell> {
-    let (sx, sy) = (s.position.x(), s.position.y());
-    let (rx, ry) = (s.radius.x(), s.radius.y());
+    let (sx, sy) = (search_site.position.x(), search_site.position.y());
+    let (rx, ry) = (search_site.radius.x(), search_site.radius.y());
     let x0 = ((sx - rx) as i32).max(1) - 1;
     let x1 = ((sx + rx) as i32).min(map.width() - 1);
     let y0 = ((sy - ry) as i32).max(1) - 1;
@@ -180,7 +180,12 @@ pub(super) fn first_resource(
     let open = |o: &Candidate| o.pasture.is_some() || !o.untargetable;
     let found: Vec<&Candidate> = on_tile
         .iter()
-        .filter(|o| open(o) && o.auto_gather && o.gather_group == kind && Amount::ZERO < o.amount)
+        .filter(|candidate| {
+            open(candidate)
+                && candidate.auto_gather
+                && candidate.gather_group == kind
+                && Amount::ZERO < candidate.amount
+        })
         .collect();
     match found.as_slice() {
         [one] => Ok(Some(**one)),

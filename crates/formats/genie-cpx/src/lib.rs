@@ -97,8 +97,8 @@ where
             .entries()
             .map(|entry| (entry.name.clone(), entry.filename.clone()))
             .collect();
-        for (i, (name, filename)) in names.iter().enumerate() {
-            writer.add_raw(name, filename, self.by_index_raw(i)?);
+        for (index, (name, filename)) in names.iter().enumerate() {
+            writer.add_raw(name, filename, self.by_index_raw(index)?);
         }
 
         let _output = writer.flush()?;

@@ -30,17 +30,17 @@ impl WorldTime {
         self.0
     }
 
-    /// The moment `d` after it (the game's wrapping add).
+    /// The moment `millis` after it (the game's wrapping add).
     #[must_use]
-    pub const fn after(self, d: Millis) -> Self {
-        Self(self.0.wrapping_add(d.0))
+    pub const fn after(self, millis: Millis) -> Self {
+        Self(self.0.wrapping_add(millis.0))
     }
 
-    /// The moment `d` before it, not before the game's start (the game's saturating
+    /// The moment `millis` before it, not before the game's start (the game's saturating
     /// subtraction: a unit's last human order time that the world's dt counts down).
     #[must_use]
-    pub const fn saturating_before(self, d: Millis) -> Self {
-        Self(self.0.saturating_sub(d.0))
+    pub const fn saturating_before(self, millis: Millis) -> Self {
+        Self(self.0.saturating_sub(millis.0))
     }
 
     /// The span from `earlier` to it (the game's wrapping subtraction).
@@ -66,8 +66,8 @@ impl WorldTime {
 }
 
 impl genie_diff::Diff for WorldTime {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -91,16 +91,16 @@ impl Millis {
         self.0
     }
 
-    /// The span and `d` (the game's wrapping add: a timer that counts the updates' time up).
+    /// The span and `millis` (the game's wrapping add: a timer that counts the updates' time up).
     #[must_use]
-    pub const fn wrapping_add(self, d: Self) -> Self {
-        Self(self.0.wrapping_add(d.0))
+    pub const fn wrapping_add(self, millis: Self) -> Self {
+        Self(self.0.wrapping_add(millis.0))
     }
 
-    /// The span less `d`, at least none (a timer that counts down to 0).
+    /// The span less `millis`, at least none (a timer that counts down to 0).
     #[must_use]
-    pub const fn saturating_sub(self, d: Self) -> Self {
-        Self(self.0.saturating_sub(d.0))
+    pub const fn saturating_sub(self, millis: Self) -> Self {
+        Self(self.0.saturating_sub(millis.0))
     }
 
     /// The span in seconds (`cvtsi2ss`, then `divss` by 1000 in f32: `world+0x164` of an
@@ -112,8 +112,8 @@ impl Millis {
 }
 
 impl genie_diff::Diff for Millis {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -150,8 +150,8 @@ impl WholeSeconds {
 }
 
 impl genie_diff::Diff for WholeSeconds {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -192,8 +192,8 @@ impl Seconds {
     /// A master's whole seconds (a build, train or research time) as the game converts them
     /// (`CVTSI2SS`, exact for an `i16`).
     #[must_use]
-    pub fn of_master(s: WholeSeconds) -> Self {
-        Self(f32::from(s.0))
+    pub fn of_master(whole_seconds: WholeSeconds) -> Self {
+        Self(f32::from(whole_seconds.0))
     }
 
     /// The seconds, as the save and the game's arithmetic hold them.
@@ -241,14 +241,14 @@ impl Mul<Seconds> for f32 {
     type Output = Self;
 
     /// A rate per second over the span: what it adds up to (one `f32` product).
-    fn mul(self, s: Seconds) -> Self {
-        self * s.0
+    fn mul(self, seconds: Seconds) -> Self {
+        self * seconds.0
     }
 }
 
 impl genie_diff::Diff for Seconds {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -276,8 +276,8 @@ mod tests {
 
     #[test]
     fn span_counts_up_wrapping_and_down_to_none() {
-        let t = Millis::new(u32::MAX).wrapping_add(Millis::new(2));
-        assert_eq!(t.get(), 1);
+        let millis = Millis::new(u32::MAX).wrapping_add(Millis::new(2));
+        assert_eq!(millis.get(), 1);
         assert_eq!(
             Millis::new(50).saturating_sub(Millis::new(80)),
             Millis::ZERO
@@ -291,11 +291,14 @@ mod tests {
         let (a, b) = (Seconds::new(0.1), Seconds::new(0.2));
         assert_eq!((a + b).get().to_bits(), (0.1_f32 + 0.2).to_bits());
         assert_eq!((b - a).get().to_bits(), (0.2_f32 - 0.1).to_bits());
-        let mut t = Seconds::new(1.0);
-        t -= Seconds::new(0.069);
-        assert_eq!(t.get().to_bits(), (1.0_f32 - 0.069).to_bits());
-        t += Seconds::new(0.069);
-        assert_eq!(t.get().to_bits(), ((1.0_f32 - 0.069) + 0.069).to_bits());
+        let mut seconds = Seconds::new(1.0);
+        seconds -= Seconds::new(0.069);
+        assert_eq!(seconds.get().to_bits(), (1.0_f32 - 0.069).to_bits());
+        seconds += Seconds::new(0.069);
+        assert_eq!(
+            seconds.get().to_bits(),
+            ((1.0_f32 - 0.069) + 0.069).to_bits()
+        );
         assert_eq!((-a).get().to_bits(), (-0.1_f32).to_bits());
         assert_eq!((a * 3.0).get().to_bits(), (0.1_f32 * 3.0).to_bits());
         let mut scaled = a;

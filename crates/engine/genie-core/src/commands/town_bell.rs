@@ -45,7 +45,7 @@ impl Bell {
 
 impl TownBellCommand {
     /// Its handler ([`World::town_bell`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.town_bell(self.player, self.id, self.bell)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.town_bell(self.player, self.id, self.bell)
     }
 }

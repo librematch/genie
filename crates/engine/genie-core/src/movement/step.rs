@@ -109,8 +109,9 @@ impl Mover {
             Some(GroupSpeed::OwnMove(speed)) => {
                 // the walked level walks (state 3) and its pause is not above 0 (`COMISS`
                 // then `JA`: a NaN pause walks)
-                let walks = self.paths.first().is_some_and(|l| {
-                    l.state == PathState::Walking && at_most_or_unordered(l.pause_time.get(), 0.0)
+                let walks = self.paths.first().is_some_and(|path_data| {
+                    path_data.state == PathState::Walking
+                        && at_most_or_unordered(path_data.pause_time.get(), 0.0)
                 });
                 return if walks { speed } else { Speed::ZERO };
             }
@@ -149,8 +150,8 @@ impl Mover {
             group,
             movement_tuning,
         );
-        if let Some(v) = self.velocity.as_mut() {
-            v.velocity = v.velocity.with_y(speed.get());
+        if let Some(velocity) = self.velocity.as_mut() {
+            velocity.velocity = velocity.velocity.with_y(speed.get());
         }
         // the position setter runs only for a distance it moves
         let Some(at) =
@@ -329,8 +330,8 @@ impl Mover {
     ) -> GenieResult<Motion> {
         let result = self.motion_passes(place, me, dt, world, plan.as_deref_mut(), by_id);
         // every exit of the step removes the kept hits' temporary shapes (FUN_141055970)
-        if let Some(p) = plan {
-            p.pathing.drop_temporary_shapes();
+        if let Some(planning) = plan {
+            planning.pathing.drop_temporary_shapes();
         }
         result
     }
@@ -362,15 +363,15 @@ impl Mover {
         // the gap to the target, else to where the top level's path ends; a gate's is the
         // least over it and its first two annexes (slot 0x680), each annex's less 0.1
         // (`MINSS`, 0x1411512b8)
-        let gap = target.as_ref().map_or(Distance::new(FAR), |(id, t)| {
-            let own = footprint_gap(at, ground_radius, t.position, t.radius);
+        let gap = target.as_ref().map_or(Distance::new(FAR), |(id, placed)| {
+            let own = footprint_gap(at, ground_radius, placed.position, placed.radius);
             let near = (at, ground_radius);
             gate_gap(
                 world,
                 near,
-                (*id, t),
+                (*id, placed),
                 own,
-                |g| g - Distance::new(movement_tuning.range_floor),
+                |distance| distance - Distance::new(movement_tuning.range_floor),
                 by_id,
                 roles,
             )
@@ -465,13 +466,13 @@ impl Mover {
         let mut heading = BVector::ZERO;
         loop {
             // a level without a path ends the step (`LAB_14115582c`), as no level does
-            let Some(level) = self.paths.first().filter(|l| l.has_path) else {
+            let Some(level) = self.paths.first().filter(|path_data| path_data.has_path) else {
                 return Ok(Motion::Done);
             };
             let (target, gap, to_end) =
                 self.level_gaps(place.position(), world, level.target, ground_radius, by_id)?;
             let goal = Goal {
-                target: target.as_ref().map(|(id, t)| (*id, t)),
+                target: target.as_ref().map(|(id, placed)| (*id, placed)),
                 gap,
                 to_end,
             };
@@ -504,7 +505,7 @@ impl Mover {
                     (p.now, p.player_kind)
                 });
             let groups = plan.as_deref().map(|p| p.groups);
-            let pathing = plan.as_deref_mut().map(|p| &mut *p.pathing);
+            let pathing = plan.as_deref_mut().map(|planning| &mut *planning.pathing);
             let step = self.walk(
                 place.position(),
                 me,
@@ -522,8 +523,8 @@ impl Mover {
                 },
                 by_id,
             )?;
-            if let Next::Done(m) = step {
-                return Ok(m);
+            if let Next::Done(motion) = step {
+                return Ok(motion);
             }
         }
     }
@@ -589,7 +590,7 @@ impl Mover {
             let rect = Rect::spanning(from, to);
             let grow = self.stats.radius.x();
             world.check_known_records(rect.grown(Distance::new(grow)))?;
-            let player = world.get(me.id).map(|p| p.player);
+            let player = world.get(me.id).map(|placed| placed.player);
             let hits = world.walk_hits(WalkQuery {
                 start: from,
                 end: to,
@@ -617,8 +618,8 @@ impl Mover {
                     // on for it and its parents; then back to the top of the step
                     let level = self.paths.walked_mut()?;
                     level.flags = (level.flags | LevelFlags::REACHED) & !LevelFlags::AT_WAYPOINT;
-                    for l in &mut self.paths {
-                        l.flags |= LevelFlags::MET_TARGET;
+                    for path_data in &mut self.paths {
+                        path_data.flags |= LevelFlags::MET_TARGET;
                     }
                     return Ok(Next::Again);
                 }

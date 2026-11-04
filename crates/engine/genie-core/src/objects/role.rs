@@ -85,14 +85,14 @@ impl<R: Role> Hash for RoleId<R> {
 }
 
 impl<R: Role> fmt::Debug for RoleId<R> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}({})", R::NAME, self.0)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}({})", R::NAME, self.0)
     }
 }
 
 impl<R: Role> fmt::Display for RoleId<R> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
     }
 }
 
@@ -117,8 +117,8 @@ impl<R: Role> IntKey for RoleId<R> {
 }
 
 impl<R: Role> genie_diff::Diff for RoleId<R> {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 

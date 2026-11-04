@@ -134,8 +134,8 @@ impl HullPather<'_> {
         }
         self.start = from;
         self.goal = to;
-        let mut q = self.query(from, to, target_id, range)?;
-        if self.already_there(&q) {
+        let mut hull_query = self.query(from, to, target_id, range)?;
+        if self.already_there(&hull_query) {
             return Ok((ShortFound::InRange, path, false));
         }
         self.buffer = (Distance::ZERO < self.radius).then_some(self.radius * HALF);
@@ -145,7 +145,12 @@ impl HullPather<'_> {
         self.world.set_manager_buffer(self.buffer);
         self.world.clear_tile_records();
         self.world.set_manager_ignore(&self.ignore);
-        if self.quick_path(from, self.quick_goal(&q), q.target_id, &mut path)? {
+        if self.quick_path(
+            from,
+            self.quick_goal(&hull_query),
+            hull_query.target_id,
+            &mut path,
+        )? {
             return Ok((ShortFound::Reached, path, true));
         }
         if quick == QuickPath::Only {
@@ -154,8 +159,8 @@ impl HullPather<'_> {
         let hulls = self.set_area(from, to, hulls);
         // no target on the goal: the first record with an object that holds the goal is the
         // target, its id still -1 (`FUN_141051900` at 0x140f85fd9)
-        if q.target.is_none() {
-            q.target = self.goal_record(to)?;
+        if hull_query.target.is_none() {
+            hull_query.target = self.goal_record(to)?;
         }
         let [ax0, ay0, ax1, ay1] = self.area.get();
         self.world.check_known_records(Rect::new(
@@ -166,10 +171,10 @@ impl HullPather<'_> {
         ))?;
         self.empty(NodeList::SEARCH)?;
         let mut rounds = Rounds::new(walk_length(from, to));
-        if let Some(result) = self.search(&q, hulls, &mut rounds, &mut path)? {
+        if let Some(result) = self.search(&hull_query, hulls, &mut rounds, &mut path)? {
             return Ok((result, path, true));
         }
-        let result = self.path_end(&q, &rounds, &mut path)?;
+        let result = self.path_end(&hull_query, &rounds, &mut path)?;
         Ok((result, path, true))
     }
 
@@ -182,16 +187,18 @@ impl HullPather<'_> {
         to: Point,
         target_id: Option<ObjectId>,
     ) -> GenieResult<bool> {
-        let r = self.radius.get();
+        let radius = self.radius.get();
         let (w, h) = (self.world.map.width(), self.world.map.height());
-        self.bounds = Rect::new(r, r, w as f32 - r, h as f32 - r);
+        self.bounds = Rect::new(radius, radius, w as f32 - radius, h as f32 - radius);
         let (bx1, by1) = (self.bounds.x1(), self.bounds.y1());
         // each bound by `COMISS`/`JA` (0x140f8569f..0x140f85701): an unordered coordinate passes
-        if from.x() < r || bx1 < from.x() || from.y() < r || by1 < from.y() {
+        if from.x() < radius || bx1 < from.x() || from.y() < radius || by1 < from.y() {
             return Ok(true);
         }
-        Ok((to.x() < r || bx1 < to.x() || to.y() < r || by1 < to.y())
-            && !self.edge_goal(to, target_id)?)
+        Ok(
+            (to.x() < radius || bx1 < to.x() || to.y() < radius || by1 < to.y())
+                && !self.edge_goal(to, target_id)?,
+        )
     }
 
     /// The search's query: the target counts only where it stands on the goal; an object off the
@@ -206,12 +213,17 @@ impl HullPather<'_> {
         let mut target_id = target_id;
         // the game tests the id's sign: a recyclable object's id is no target either
         let target = match target_id {
-            Some(t) if !t.is_recyclable() => match self.world.get_known(t)? {
-                Some(p) if p.position.x() == to.x() && p.position.y() == to.y() => Some(Target {
-                    at: p.position.ground(),
-                    radius: p.radius,
-                    moves: p.moves,
-                }),
+            Some(object_id) if !object_id.is_recyclable() => match self
+                .world
+                .get_known(object_id)?
+            {
+                Some(placed) if placed.position.x() == to.x() && placed.position.y() == to.y() => {
+                    Some(Target {
+                        at: placed.position.ground(),
+                        radius: placed.radius,
+                        moves: placed.moves,
+                    })
+                }
                 Some(_) => {
                     target_id = None;
                     None
@@ -231,23 +243,23 @@ impl HullPather<'_> {
 
     /// Whether the unit is there already (result 0): on the goal, or within range of the target's
     /// box or of the goal (the straight walk less the radius).
-    fn already_there(&self, q: &HullQuery) -> bool {
-        let (from, to) = (q.from, q.to);
-        let gap = q.target.as_ref().map_or_else(
+    fn already_there(&self, hull_query: &HullQuery) -> bool {
+        let (from, to) = (hull_query.from, hull_query.to);
+        let gap = hull_query.target.as_ref().map_or_else(
             || walk_length(from, to) - self.radius,
-            |t| self.target_gap(t, from),
+            |target| self.target_gap(target, from),
         );
-        (from.x() == to.x() && from.y() == to.y()) || gap <= q.range
+        (from.x() == to.x() && from.y() == to.y()) || gap <= hull_query.range
     }
 
     /// The quick path's goal: without a range (or with a target off the goal) the goal, short of
     /// a target on it by both radii when the target moves or stands near; with a range the goal
     /// moved on by the range along the walk.
-    fn quick_goal(&self, q: &HullQuery) -> Point {
+    fn quick_goal(&self, hull_query: &HullQuery) -> Point {
         let hull_path_tuning = &self.by_id.tuning().hull_path;
-        let (from, to, r) = (q.from, q.to, self.radius);
-        if q.range != Distance::ZERO
-            && !q
+        let (from, to, distance) = (hull_query.from, hull_query.to, self.radius);
+        if hull_query.range != Distance::ZERO
+            && !hull_query
                 .target
                 .as_ref()
                 .is_some_and(|t| t.at.x() != to.x() && t.at.y() != to.y())
@@ -255,20 +267,23 @@ impl HullPather<'_> {
             let v = [to.x() - from.x(), to.y() - from.y(), 0.0];
             let len = sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
             let (ux, uy) = (v[0] / len, v[1] / len);
-            return Point::new(ux * q.range.get() + to.x(), uy * q.range.get() + to.y());
+            return Point::new(
+                ux * hull_query.range.get() + to.x(),
+                uy * hull_query.range.get() + to.y(),
+            );
         }
         let mut goal = to;
-        if let Some(t) = q.target.as_ref()
-            && t.at.x() == to.x()
-            && t.at.y() == to.y()
+        if let Some(target) = hull_query.target.as_ref()
+            && target.at.x() == to.x()
+            && target.at.y() == to.y()
         {
             let (dx, dy) = (to.x() - from.x(), to.y() - from.y());
             let d = dy * dy + dx * dx;
-            if t.moves || d <= hull_path_tuning.near_target {
+            if target.moves || d <= hull_path_tuning.near_target {
                 let len = sqrt(d);
                 goal = Point::new(
-                    goal.x() - (dx / len) * (r.get() + t.radius.x()),
-                    goal.y() - (dy / len) * (r.get() + t.radius.y()),
+                    goal.x() - (dx / len) * (distance.get() + target.radius.x()),
+                    goal.y() - (dy / len) * (distance.get() + target.radius.y()),
                 );
             }
         }
@@ -302,11 +317,11 @@ impl HullPather<'_> {
     /// without a node it ends there too, or finds none (3). The result.
     pub(super) fn path_end(
         &mut self,
-        q: &HullQuery,
+        hull_query: &HullQuery,
         rounds: &Rounds,
         path: &mut Waypoints,
     ) -> GenieResult<ShortFound> {
-        let (from, to, range) = (q.from, q.to, q.range);
+        let (from, to, range) = (hull_query.from, hull_query.to, hull_query.range);
         let Some(end) = rounds.best_node else {
             if !rounds.within {
                 return Ok(ShortFound::Blocked);
@@ -318,7 +333,7 @@ impl HullPather<'_> {
         }
         path.points.clear();
         self.build_path(path, end)?;
-        if rounds.found && self.found_end(q, rounds, path)? {
+        if rounds.found && self.found_end(hull_query, rounds, path)? {
             return Ok(ShortFound::Reached);
         }
         Ok(self.partway(path, from, to, range))
@@ -332,11 +347,11 @@ impl HullPather<'_> {
             .points
             .last()
             .unwrap_or(&Point::new(f32::NAN, f32::NAN));
-        let e = self.nodes.checked(end)?.at;
+        let point = self.nodes.checked(end)?.at;
         let path_distance =
             (last.y() - to.y()) * (last.y() - to.y()) + (last.x() - to.x()) * (last.x() - to.x());
-        let node_distance =
-            (e.y() - to.y()) * (e.y() - to.y()) + (e.x() - to.x()) * (e.x() - to.x());
+        let node_distance = (point.y() - to.y()) * (point.y() - to.y())
+            + (point.x() - to.x()) * (point.x() - to.x());
         Ok(below_or_unordered(node_distance, path_distance))
     }
 
@@ -346,31 +361,36 @@ impl HullPather<'_> {
     /// partway.
     pub(super) fn found_end(
         &mut self,
-        q: &HullQuery,
+        hull_query: &HullQuery,
         rounds: &Rounds,
         path: &mut Waypoints,
     ) -> GenieResult<bool> {
         let Some(entrance) = rounds.entrance else {
             return Ok(true);
         };
-        let e = &self.entrances.checked(entrance.0)?.points;
-        for j in (0..e.len().saturating_sub(1)).rev() {
-            path.push(*e.checked(j)?);
+        let points = &self.entrances.checked(entrance.0)?.points;
+        for index in (0..points.len().saturating_sub(1)).rev() {
+            path.push(*points.checked(index)?);
         }
         if !rounds.entered_box {
             return Ok(true);
         }
-        let k = path.points.len() - 1;
-        let hits = self.hits(*path.points.checked(k)?, *path.points.checked(k - 1)?)?;
+        let count = path.points.len() - 1;
+        let hits = self.hits(
+            *path.points.checked(count)?,
+            *path.points.checked(count - 1)?,
+        )?;
         let clear = match hits.as_slice() {
             [] => true,
-            [h] => q.target_id.is_some_and(|t| h.id == t),
+            [hit] => hull_query
+                .target_id
+                .is_some_and(|object_id| hit.id == object_id),
             _ => false,
         };
         if clear {
             return Ok(true);
         }
-        let _ = path.points.remove(k);
+        let _ = path.points.remove(count);
         Ok(false)
     }
 }

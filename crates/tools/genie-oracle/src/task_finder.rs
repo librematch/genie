@@ -84,9 +84,9 @@ impl Diplomacy for FinderWorld {
     /// [`genie_core::unit_ai::task_finder::allied`] with `from`'s relations: a player without
     /// them counts only itself.
     fn allied(&self, from: PlayerId, to: PlayerId, test: AllyTest) -> bool {
-        self.relations
-            .get(from)
-            .map_or(from == to, |r| task_finder_allied(r, from, to, test))
+        self.relations.get(from).map_or(from == to, |by_player| {
+            task_finder_allied(by_player, from, to, test)
+        })
     }
 
     fn drops_at(&self, building: MasterId, actor: &Actor<'_>) -> bool {
@@ -106,18 +106,21 @@ impl FinderWorld {
                 None => break,
             }
         }
-        let o = self.objects.get(&id)?;
+        let finder_object = self.objects.get(&id)?;
         Some(TaskTarget {
             id,
-            master: self.masters.of(o.player)?.get(o.master)?,
-            player: o.player,
-            state: o.state,
-            held: o.held,
-            hp: o.hp,
-            max_hp: o.max_hp,
-            attackable: o.attackable,
-            pasture: o.pasture,
-            top_action: o.top_action,
+            master: self
+                .masters
+                .of(finder_object.player)?
+                .get(finder_object.master)?,
+            player: finder_object.player,
+            state: finder_object.state,
+            held: finder_object.held,
+            hp: finder_object.hp,
+            max_hp: finder_object.max_hp,
+            attackable: finder_object.attackable,
+            pasture: finder_object.pasture,
+            top_action: finder_object.top_action,
         })
     }
 
@@ -130,20 +133,23 @@ impl FinderWorld {
     /// The finder's view of unit `id` as the actor.
     #[must_use]
     pub fn actor(&self, id: ObjectId) -> Option<Actor<'_>> {
-        let o = self.objects.get(&id)?;
+        let finder_object = self.objects.get(&id)?;
         Some(Actor {
             id,
-            master: self.masters.of(o.player)?.get(o.master)?,
-            player: o.player,
-            held: o.held,
+            master: self
+                .masters
+                .of(finder_object.player)?
+                .get(finder_object.master)?,
+            player: finder_object.player,
+            held: finder_object.held,
             attribute_95: self
                 .attribute_95
-                .get(o.player.index())
+                .get(finder_object.player.index())
                 .copied()
                 .unwrap_or(Amount::ZERO),
             civ: self
                 .civs
-                .get(o.player.index())
+                .get(finder_object.player.index())
                 .copied()
                 .unwrap_or(CivId::GAIA),
         })
@@ -186,7 +192,7 @@ pub fn finder_world(save: &[u8], table: &MasterTable) -> GenieResult<FinderWorld
             .collect(),
         civs: sections
             .iter()
-            .map(|p| CivId::new(p.world_player().base.civ_id))
+            .map(|player_section| CivId::new(player_section.world_player().base.civ_id))
             .collect(),
         drop_sites: table.drop_sites.clone(),
         roles: layer.roles.clone(),
@@ -200,53 +206,70 @@ fn finder_objects(
 ) -> GenieResult<HashMap<ObjectId, FinderObject>> {
     let mut objects = HashMap::new();
     for (player, section) in PlayerId::each(sections.len()).zip(sections) {
-        for o in section.live_objects().chain(section.sleeping_objects()) {
-            if let Some(s) = o.static_part() {
-                let id = ObjectId::try_from(s.id)?;
-                let _ = objects.insert(id, finder_object(player, section, (o, s))?);
+        for object in section.live_objects().chain(section.sleeping_objects()) {
+            if let Some(rge_static_object) = object.static_part() {
+                let id = ObjectId::try_from(rge_static_object.id)?;
+                let _ = objects.insert(
+                    id,
+                    finder_object(player, section, (object, rge_static_object))?,
+                );
             }
         }
     }
     Ok(objects)
 }
 
-/// The finder's view of one saved object `o` (its static part `s`) of player `player`'s section.
+/// The finder's view of one saved object `object` (its static part `rge_static_object`) of player
+/// `player`'s section.
 fn finder_object(
     player: PlayerId,
     section: &genie_save::PlayerSection<'_>,
-    (o, s): (&genie_save::Object, &RgeStaticObject),
+    (object, rge_static_object): (&genie_save::Object, &RgeStaticObject),
 ) -> GenieResult<FinderObject> {
-    let combat = o.combat();
+    let combat = object.combat();
     let powerup = |f: fn(&TribeCombatObject) -> f32| combat.map_or(0.0, f);
     let master_hp = section
         .objects()
-        .master(s.master_obj)
-        .and_then(|m| m.static_part())
-        .map_or(0.0, |m| f32::from(m.read_temp_6));
+        .master(rge_static_object.master_obj)
+        .and_then(|master| master.static_part())
+        .map_or(0.0, |rge_master_static_object| {
+            f32::from(rge_master_static_object.read_temp_6)
+        });
     Ok(FinderObject {
         player,
-        master: MasterId::try_from(s.master_obj)?,
-        state: ObjectState::of_byte(s.object_state)?,
+        master: MasterId::try_from(rge_static_object.master_obj)?,
+        state: ObjectState::of_byte(rge_static_object.object_state)?,
         held: Held {
-            kind: AttributeId::of_field(s.attribute_kind_held)?,
-            amount: Amount::new(s.attribute_amount_held),
+            kind: AttributeId::of_field(rge_static_object.attribute_kind_held)?,
+            amount: Amount::new(rge_static_object.attribute_amount_held),
         },
         hp: HitPoints::new(
-            s.hp + (powerup(|c| c.hitpoints_max_powerup) - powerup(|c| c.hitpoints_powerup)),
+            rge_static_object.hp
+                + (powerup(|c| c.hitpoints_max_powerup) - powerup(|c| c.hitpoints_powerup)),
         ),
-        max_hp: HitPoints::new(master_hp + powerup(|c| c.hitpoints_max_powerup)),
-        attackable: s.unit_attackable_flag != 0,
-        pasture: PastureId::of_field(s.parent_pasture_id),
-        annex_of: o
+        max_hp: HitPoints::new(
+            master_hp + powerup(|tribe_combat_object| tribe_combat_object.hitpoints_max_powerup),
+        ),
+        attackable: rge_static_object.unit_attackable_flag != 0,
+        pasture: PastureId::of_field(rge_static_object.parent_pasture_id),
+        annex_of: object
             .tribe_building_object
             .as_deref()
-            .and_then(|b| ObjectId::of_field(b.mupt_linked_object_references_linked_owner_id)),
-        top_action: o
+            .and_then(|tribe_building_object| {
+                ObjectId::of_field(
+                    tribe_building_object.mupt_linked_object_references_linked_owner_id,
+                )
+            }),
+        top_action: object
             .actions()
-            .and_then(|a| a.entries().next())
+            .and_then(|action_list| action_list.entries().next())
             .map(|(kind, _)| ActionKind::try_from(kind))
             .transpose()?,
-        position: Position::new(s.tx, s.ty, s.tz),
+        position: Position::new(
+            rge_static_object.tx,
+            rge_static_object.ty,
+            rge_static_object.tz,
+        ),
     })
 }
 

@@ -18,10 +18,10 @@ pub struct SeekShelterCommand {
 impl SeekShelterCommand {
     /// The check (`FUN_140e558b0`) refuses a count past the packet's ids; the handler reads
     /// the first of them ([`World::read_units`], [`World::seek_shelter`]).
-    pub(crate) fn run(&self, w: &mut World) -> GenieResult<()> {
-        let Some(ids) = w.read_units(self.player, &self.units) else {
+    pub(crate) fn run(&self, world: &mut World) -> GenieResult<()> {
+        let Some(ids) = world.read_units(self.player, &self.units) else {
             return Ok(());
         };
-        w.seek_shelter(self.player, ids)
+        world.seek_shelter(self.player, ids)
     }
 }

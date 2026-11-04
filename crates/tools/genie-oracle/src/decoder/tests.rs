@@ -26,21 +26,21 @@ fn interact(num: u16, ids: Vec<i32>) -> Vec<u8> {
 /// `0xffff` orders the last commanded units and leaves the note.
 #[test]
 fn an_interact_notes_its_own_list_and_later_one_keeps_it() {
-    let mut d = Decoder::default();
+    let mut decoder = Decoder::default();
     assert!(matches!(
-        d.command(&interact(2, vec![10, 11, 12])),
+        decoder.command(&interact(2, vec![10, 11, 12])),
         Some(Command::Order(_))
     ));
     assert_eq!(
-        d.last_commanded.get(&2),
+        decoder.last_commanded.get(&2),
         Some(&vec![Some(object_id(10)), Some(object_id(11))])
     );
     assert!(matches!(
-        d.command(&interact(UnitList::LAST_COMMANDED, vec![])),
+        decoder.command(&interact(UnitList::LAST_COMMANDED, vec![])),
         Some(Command::Order(_))
     ));
     assert_eq!(
-        d.last_commanded.get(&2),
+        decoder.last_commanded.get(&2),
         Some(&vec![Some(object_id(10)), Some(object_id(11))])
     );
 }
@@ -48,7 +48,7 @@ fn an_interact_notes_its_own_list_and_later_one_keeps_it() {
 /// FOLLOW and GUARD list their units without the unit-list reader: no note.
 #[test]
 fn follow_and_guard_note_no_list() {
-    let mut d = Decoder::default();
+    let mut decoder = Decoder::default();
     let follow = packets::Follow {
         commp_id: 1,
         num: 1,
@@ -67,8 +67,8 @@ fn follow_and_guard_note_no_list() {
     }
     .encode()
     .unwrap();
-    assert!(d.command(&follow).is_some() && d.command(&guard).is_some());
-    assert!(d.last_commanded.is_empty());
+    assert!(decoder.command(&follow).is_some() && decoder.command(&guard).is_some());
+    assert!(decoder.last_commanded.is_empty());
 }
 
 /// A packet without its player byte gives no command.

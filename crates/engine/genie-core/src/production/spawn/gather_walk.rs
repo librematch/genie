@@ -57,13 +57,13 @@ impl World {
     /// [`UnitAi::notify_work`]: crate::unit_ai::UnitAi::notify_work
     pub(crate) fn gather_move(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         new: ListIndex,
         point: Position,
         source: OrderSource,
     ) -> GenieResult<()> {
         let world_time = self.world_time;
-        let sprite = self.point_move_sprite(p, new)?;
+        let sprite = self.point_move_sprite(player_id, new)?;
         let villager =
             // A building's master type (`'P'`).
             // A combat unit's master type (`'F'`, `TRIBE_Master_Combat_Object`).
@@ -73,8 +73,8 @@ impl World {
             // The gate class, whose own walls BUILD's placement scan passes over (`FUN_14123aee0`).
             // The relic's master, which always stays (`FUN_141194e80`).
             // The villager class, whose new units count in attribute 248.
-            self.model.roles.of_class(self.players.live(p, new)?.master(self.master_tables(), p)?.class).contains(ClassRoles::VILLAGER);
-        let unit = self.players.live_mut(p, new)?;
+            self.model.roles.of_class(self.players.live(player_id, new)?.master(self.master_tables(), player_id)?.class).contains(ClassRoles::VILLAGER);
+        let unit = self.players.live_mut(player_id, new)?;
         if let Some(m) = self.parts.mover_mut(unit.id) {
             m.waiting = 1;
         }
@@ -87,7 +87,7 @@ impl World {
         if self
             .parts
             .mover_of(unit.id)
-            .map_or(Speed::ZERO, |m| m.stats.speed)
+            .map_or(Speed::ZERO, |mover| mover.stats.speed)
             <= Speed::ZERO
         {
             return Ok(());
@@ -147,22 +147,26 @@ impl World {
     /// over Gaia's sleeping objects (`+0x38`). None found: the unit moves to the point.
     pub(super) fn lost_gather_target(
         &self,
-        p: PlayerId,
+        player_id: PlayerId,
         new: ListIndex,
-        g: GatherPoint,
+        gather_point: GatherPoint,
     ) -> GenieResult<Option<ObjectId>> {
         let class = self
             .model
             .masters
             .first()
-            .and_then(|m| g.target_master.and_then(|t| m.get(t)))
-            .map(|m| m.class);
+            .and_then(|masters| {
+                gather_point
+                    .target_master
+                    .and_then(|master_id| masters.get(master_id))
+            })
+            .map(|master| master.class);
         let los = self
             .players
-            .live(p, new)?
-            .master(self.master_tables(), p)?
+            .live(player_id, new)?
+            .master(self.master_tables(), player_id)?
             .line_of_sight;
-        let (x, y) = (g.point.x(), g.point.y());
+        let (x, y) = (gather_point.point.x(), gather_point.point.y());
         let gaia = self
             .players
             .first()
@@ -179,19 +183,19 @@ impl World {
                     best = Some((u, d));
                 }
             }
-            let Some((u, _)) = best else {
+            let Some((unit, _)) = best else {
                 return Ok(None);
             };
-            let radius = u.master(self.master_tables(), PlayerId::GAIA)?.radius;
+            let radius = unit.master(self.master_tables(), PlayerId::GAIA)?.radius;
             let gap = |d: f32, r: f32| {
                 let g = d.abs() - r;
                 if 0.0 <= g { g } else { 0.0 }
             };
             let (gx, gy) = (
-                gap(x - u.position().x(), radius.x()),
-                gap(y - u.position().y(), radius.y()),
+                gap(x - unit.position().x(), radius.x()),
+                gap(y - unit.position().y(), radius.y()),
             );
-            Ok((gy * gy + gx * gx <= los.squared().get()).then_some(u.id))
+            Ok((gy * gy + gx * gx <= los.squared().get()).then_some(unit.id))
         };
         if let Some(id) = closest(gaia.objects.as_slice())? {
             return Ok(Some(id));
@@ -217,48 +221,48 @@ impl World {
     /// fewer than 10 or fewer than its capacity.
     pub(crate) fn gather(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         new: ListIndex,
-        g: GatherPoint,
+        gather_point: GatherPoint,
         building: ObjectId,
         source: OrderSource,
         finder: FinderUse,
     ) -> GenieResult<()> {
         // the walk's place is the point on the ground (height 0)
-        let at = g.point.with_z(0.0);
-        if g.target.is_none() {
-            return self.gather_move(p, new, at, source);
+        let at = gather_point.point.with_z(0.0);
+        if gather_point.target.is_none() {
+            return self.gather_move(player_id, new, at, source);
         }
         // its own building takes it at once (slot 0x1a0 forced) while it holds fewer than 10 or
         // fewer than its master's capacity (its slot 0x498 against `+0x5d4`); else the building
         // is a target as any other
-        if g.target == Some(building)
-            && let Some((bp, b)) = self.object(building)
+        if gather_point.target == Some(building)
+            && let Some((bp, building_unit)) = self.object(building)
         {
-            let room = b.master(self.master_tables(), bp)?.garrison;
-            let held = self.garrisoned(b.id)?;
+            let room = building_unit.master(self.master_tables(), bp)?.garrison;
+            let held = self.garrisoned(building_unit.id)?;
             if held < FORCED_ENTRY_BELOW || held.below(room) {
-                return self.enter_forced(p, new, ContainerId::new(building));
+                return self.enter_forced(player_id, new, ContainerId::new(building));
             }
         }
-        let target = match g.target.filter(|&t| self.object(t).is_some()) {
-            Some(t) => t,
-            None => match self.lost_gather_target(p, new, g)? {
+        let target = match gather_point.target.filter(|&t| self.object(t).is_some()) {
+            Some(object_id) => object_id,
+            None => match self.lost_gather_target(player_id, new, gather_point)? {
                 Some(id) => id,
-                None => return self.gather_move(p, new, at, source),
+                None => return self.gather_move(player_id, new, at, source),
             },
         };
         // both arms above answer a target the world holds
-        let (owner, t) = self.object(target).ok_or(GenieError::unreachable(
+        let (owner, unit) = self.object(target).ok_or(GenieError::unreachable(
             "a gather point's target the world held just before",
         ))?;
-        let on_building = t.master(self.master_tables(), owner)?.kind == MasterKind::BUILDING;
-        if let Some(m) = self.parts.mover_mut(self.players.live(p, new)?.id) {
-            m.waiting = 1;
+        let on_building = unit.master(self.master_tables(), owner)?.kind == MasterKind::BUILDING;
+        if let Some(mover) = self.parts.mover_mut(self.players.live(player_id, new)?.id) {
+            mover.waiting = 1;
         }
         let garrison = finder == FinderUse::Asks
             && on_building
-            && self.garrison_task_found(p, new, target, at)?;
+            && self.garrison_task_found(player_id, new, target, at)?;
         let work = Work {
             target: Some(target),
             point: at,
@@ -270,6 +274,6 @@ impl World {
                 source
             },
         };
-        self.order_work(p, new, &work)
+        self.order_work(player_id, new, &work)
     }
 }

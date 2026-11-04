@@ -22,8 +22,8 @@ impl PlanTile {
 
     /// The tile of a point, each coordinate `(short)(int)v` as the planner cuts it.
     #[must_use]
-    pub const fn of_point(p: Point) -> Self {
-        Self([p.x() as i32 as i16, p.y() as i32 as i16])
+    pub const fn of_point(point: Point) -> Self {
+        Self([point.x() as i32 as i16, point.y() as i32 as i16])
     }
 
     /// Its x and y.
@@ -139,15 +139,18 @@ mod tests {
 
     #[test]
     fn plan_tile_steps_shifts_and_widens() {
-        let t = PlanTile::new(13, -2);
-        assert_eq!((t.x(), t.y(), t.get()), (13, -2, [13, -2]));
-        assert_eq!(t.stepped(-1, 3), PlanTile::new(12, 1));
+        let plan_tile = PlanTile::new(13, -2);
+        assert_eq!(
+            (plan_tile.x(), plan_tile.y(), plan_tile.get()),
+            (13, -2, [13, -2])
+        );
+        assert_eq!(plan_tile.stepped(-1, 3), PlanTile::new(12, 1));
         assert_eq!(
             PlanTile::new(13, 6).at_level(GridLevel::new(2)),
             PlanTile::new(3, 1)
         );
         assert_eq!(PlanTile::new(13, 6).parent(), PlanTile::new(6, 3));
-        assert_eq!(t.tile(), Tile::new(13, -2));
+        assert_eq!(plan_tile.tile(), Tile::new(13, -2));
         assert_eq!(
             PlanTile::of_point(Point::new(7.9, -0.5)),
             PlanTile::new(7, 0)
@@ -170,21 +173,21 @@ mod tests {
             PlanTile::new(0x4000, 0).children()[0],
             PlanTile::new(-0x8000, 0)
         );
-        let c = PlanTile::new(3, 1);
+        let plan_tile = PlanTile::new(3, 1);
         let two = GridLevel::new(2);
-        assert_eq!(c.corner_at(two), PlanTile::new(12, 4));
-        assert_eq!(c.centre_at(two), PlanTile::new(14, 6));
-        assert_eq!(c.centre_at(GridLevel::TILES), c);
+        assert_eq!(plan_tile.corner_at(two), PlanTile::new(12, 4));
+        assert_eq!(plan_tile.centre_at(two), PlanTile::new(14, 6));
+        assert_eq!(plan_tile.centre_at(GridLevel::TILES), plan_tile);
     }
 
     #[test]
     fn rect_holds_cell_of_level_by_its_shifted_corners() {
-        let r = PlanRect::new(8, 4, 23, 15);
-        assert_eq!(r.get(), [8, 4, 23, 15]);
-        assert!(r.holds_at(GridLevel::TILES, PlanTile::new(8, 15)));
-        assert!(!r.holds_at(GridLevel::TILES, PlanTile::new(7, 15)));
+        let plan_rect = PlanRect::new(8, 4, 23, 15);
+        assert_eq!(plan_rect.get(), [8, 4, 23, 15]);
+        assert!(plan_rect.holds_at(GridLevel::TILES, PlanTile::new(8, 15)));
+        assert!(!plan_rect.holds_at(GridLevel::TILES, PlanTile::new(7, 15)));
         // level 3: x 1..=2, y 0..=1
-        assert!(r.holds_at(GridLevel::TOP, PlanTile::new(2, 1)));
-        assert!(!r.holds_at(GridLevel::TOP, PlanTile::new(3, 1)));
+        assert!(plan_rect.holds_at(GridLevel::TOP, PlanTile::new(2, 1)));
+        assert!(!plan_rect.holds_at(GridLevel::TOP, PlanTile::new(3, 1)));
     }
 }

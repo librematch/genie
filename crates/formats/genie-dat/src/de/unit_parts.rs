@@ -80,7 +80,9 @@ impl Bird {
     /// The unit's default task, from its own task list.
     #[must_use]
     pub fn default_task(&self) -> Option<&Task> {
-        self.tasks.iter().find(|t| t.id == self.default_task_id)
+        self.tasks
+            .iter()
+            .find(|task| task.id == self.default_task_id)
     }
 }
 

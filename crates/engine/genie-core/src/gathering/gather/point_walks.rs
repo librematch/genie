@@ -143,15 +143,17 @@ impl GatherAction {
     /// which would walk back again.
     pub(super) fn update_walk_back(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
-        match self.update_list(c, unit, me, r, roles)? {
+        match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
-            SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.begin_search(c, unit, r),
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
+                self.begin_search(step, unit, gather_reads)
+            }
         }
     }
 
@@ -159,14 +161,14 @@ impl GatherAction {
     /// ([`GatherAction::begin_search`], the same notify) with a timer of a second.
     pub(super) fn begin_farm_wait(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
     ) -> GenieResult<Next> {
-        self.tear_down(c.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::FarmWait;
         self.timer = FARM_WAIT_TIME;
-        Self::show(c, unit, self.stand_sprite(unit, r));
+        Self::show(step, unit, self.stand_sprite(unit, gather_reads));
         Ok(Next::Search)
     }
 
@@ -179,16 +181,16 @@ impl GatherAction {
     /// more does nothing.
     pub(super) fn update_farm_wait(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         target: Option<&Victim>,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
         if Seconds::ZERO <= self.timer {
             return Ok(Next::Stay);
         }
-        self.timer += c.dt.seconds();
+        self.timer += step.dt.seconds();
         if self.timer < Seconds::ZERO {
             return Ok(Next::Stay);
         }
@@ -206,30 +208,36 @@ impl GatherAction {
             if roles
                 .of_some_class(self.target_class)
                 .contains(ClassRoles::FARM)
-                && target.is_some_and(|t| WorkerCount::ONE < t.workers)
+                && target.is_some_and(|victim| WorkerCount::ONE < victim.workers)
             {
-                let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-                let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+                let walks = gather_reads.walks(
+                    &step.w.model.graphics,
+                    (unit, step.w.parts.mover_of(unit.id)),
+                );
+                let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
                 self.set_walk_back(
                     Distance::new(radius),
                     mover,
                     &walks,
-                    &c.w.model.tuning.move_to,
+                    &step.w.model.tuning.move_to,
                 )?;
                 self.target = None;
                 return Ok(Next::Stay);
             }
-            self.tear_down(c.w.parts.mover_mut(unit.id))?;
-            self.set_idle(c, unit, r);
+            self.tear_down(step.w.parts.mover_mut(unit.id))?;
+            self.set_idle(step, unit, gather_reads);
             return Ok(Next::Stay);
         }
-        let walks = r.walks(&c.w.model.graphics, (unit, c.w.parts.mover_of(unit.id)));
-        let mover = c.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
+        let walks = gather_reads.walks(
+            &step.w.model.graphics,
+            (unit, step.w.parts.mover_of(unit.id)),
+        );
+        let mover = step.w.parts.mover_mut(unit.id).ok_or(UNMOVING)?;
         self.begin_reseed_walk(
             Distance::new(radius),
             mover,
             &walks,
-            &c.w.model.tuning.move_to,
+            &step.w.model.tuning.move_to,
         )?;
         Ok(Next::Stay)
     }
@@ -241,21 +249,21 @@ impl GatherAction {
     /// ([`Next::Reseed`]). A quiet `MoveTo` never gives 4, which would walk again.
     pub(super) fn update_reseed_walk(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
         target: Option<&Victim>,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
-        match self.update_list(c, unit, me, r, roles)? {
+        match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             SubCode::Done | SubCode::TargetGone => {
-                self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                if let Some(t) = target
-                    && !(ObjectState::Alive < t.state && t.state != ObjectState::Undead)
+                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                if let Some(victim) = target
+                    && !(ObjectState::Alive < victim.state && victim.state != ObjectState::Undead)
                 {
-                    return self.set_face(c, unit, t, r, roles);
+                    return self.set_face(step, unit, victim, gather_reads, roles);
                 }
                 Ok(Next::Reseed {
                     end: WalkEnd::Arrived,
@@ -305,34 +313,39 @@ impl GatherAction {
     /// unit stands ([`GatherAction::stand_sprite`]).
     pub(super) fn begin_search(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
     ) -> GenieResult<Next> {
-        self.tear_down(c.w.parts.mover_mut(unit.id))?;
+        self.tear_down(step.w.parts.mover_mut(unit.id))?;
         self.state = GatherState::Search;
         self.timer = SEARCH_WAIT;
-        Self::show(c, unit, self.stand_sprite(unit, r));
+        Self::show(step, unit, self.stand_sprite(unit, gather_reads));
         Ok(Next::Search)
     }
 
     /// `set_state(1)` (case 1): the timer clears and the unit stands.
-    pub(super) fn set_done(&mut self, c: &mut Step<'_>, unit: &mut Unit, r: &GatherReads) {
+    pub(super) fn set_done(
+        &mut self,
+        step: &mut Step<'_>,
+        unit: &mut Unit,
+        gather_reads: &GatherReads,
+    ) {
         self.state = GatherState::Done;
         self.timer = Seconds::ZERO;
-        Self::show(c, unit, self.stand_sprite(unit, r));
+        Self::show(step, unit, self.stand_sprite(unit, gather_reads));
     }
 
     /// The sprite the gatherer stands with (`FUN_140a8b6b0`): the task's carrying sprite while
     /// it carries at least 1 of the task's resource, else its master's standing sprite.
-    pub(super) fn stand_sprite(&self, unit: &Unit, r: &GatherReads) -> Option<Graphic> {
+    pub(super) fn stand_sprite(&self, unit: &Unit, gather_reads: &GatherReads) -> Option<Graphic> {
         let resource = self.task.resource;
         let Held { kind, amount } = unit.life.held();
-        match r.sprites.carrying {
-            Some(c) if resource.is_some() && kind == resource && 1 <= amount.get() as i32 => {
-                Some(c)
+        match gather_reads.sprites.carrying {
+            Some(graphic) if resource.is_some() && kind == resource && 1 <= amount.get() as i32 => {
+                Some(graphic)
             }
-            _ => r.sprites.standing,
+            _ => gather_reads.sprites.standing,
         }
     }
 
@@ -342,20 +355,20 @@ impl GatherAction {
     /// quiet `MoveTo` never gives 4, which would walk again.
     pub(super) fn update_moved(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
-        r: &GatherReads,
+        gather_reads: &GatherReads,
         roles: &Roles,
     ) -> GenieResult<Next> {
-        match self.update_list(c, unit, me, r, roles)? {
+        match self.update_list(step, unit, me, gather_reads, roles)? {
             SubCode::UnderWay => Ok(Next::Stay),
             code @ (SubCode::Done | SubCode::Failed | SubCode::TargetGone) => {
-                self.tear_down(c.w.parts.mover_mut(unit.id))?;
-                if code != SubCode::Failed && r.player_kind.is_computer() {
-                    self.set_done(c, unit, r);
+                self.tear_down(step.w.parts.mover_mut(unit.id))?;
+                if code != SubCode::Failed && gather_reads.player_kind.is_computer() {
+                    self.set_done(step, unit, gather_reads);
                 } else {
-                    self.set_idle(c, unit, r);
+                    self.set_idle(step, unit, gather_reads);
                 }
                 Ok(Next::Stay)
             }

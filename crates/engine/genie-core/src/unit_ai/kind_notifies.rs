@@ -31,17 +31,17 @@ impl UnitAi {
     /// base handler's.
     pub(super) fn hunted_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
-            NotifyKind::DAMAGED => self.hunted_damaged(n, time, at, player_kind, ai_rng, side),
+        match notify.kind {
+            NotifyKind::DAMAGED => self.hunted_damaged(notify, time, at, player_kind, ai_rng, side),
             NotifyKind::MISSILE_WARNING => Ok(GO_ON),
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -52,15 +52,15 @@ impl UnitAi {
     /// handler; 0x20f goes on.
     pub(super) fn boar_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
-            NotifyKind::DAMAGED => self.boar_damaged(n, time, at, ai_rng, side),
+        match notify.kind {
+            NotifyKind::DAMAGED => self.boar_damaged(notify, time, at, ai_rng, side),
             NotifyKind::ACTION_COMPLETED => {
                 if self.current_action == Some(AiAction::MoveAside) {
                     self.idle_timeout = self.adjusted_idle_timeout.wrapping_add(Millis::new(1));
@@ -69,10 +69,10 @@ impl UnitAi {
                         home.homeward = true;
                     }
                 }
-                self.base_notify(n, time, at, player_kind, ai_rng, side)
+                self.base_notify(notify, time, at, player_kind, ai_rng, side)
             }
             NotifyKind::MISSILE_WARNING => Ok(GO_ON),
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -82,27 +82,27 @@ impl UnitAi {
     /// handler.
     pub(super) fn lion_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::ACTION_COMPLETED => {
-                if n.p[0] == AiAction::Attack.value() {
+                if notify.p[0] == AiAction::Attack.value() {
                     // FUN_140c41bc0 with 1000: the idle timeout, then slot 0x1a8
                     self.set_idle_timeout(LION_ATTACKED_TIMEOUT, ai_rng);
                     self.remove_target();
                     self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
-                self.base_notify(n, time, at, player_kind, ai_rng, side)
+                self.base_notify(notify, time, at, player_kind, ai_rng, side)
             }
             NotifyKind::TARGET_MOVED => {
-                self.lion_target_moved(n, time, at, player_kind, ai_rng, side)
+                self.lion_target_moved(notify, time, at, player_kind, ai_rng, side)
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -114,7 +114,7 @@ impl UnitAi {
     /// 0xb0 with 1) and slot 0x48 hands the notify to the owner (not held), the base handler's.
     pub(super) fn lion_target_moved(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -131,7 +131,7 @@ impl UnitAi {
         // a target within its sight whose master has no flag 0x10 (`+0x654`) it
         // attacks again (slot 0xb8: the target, forced, not any, its group) and the
         // processing breaks
-        let flags = at.target.map_or(ObjectFlags::NONE, |t| t.flags);
+        let flags = at.target.map_or(ObjectFlags::NONE, |seen| seen.flags);
         if let Some(gap) = gap
             && let Some(target) = self.current_target
             && !below_or_unordered(at.los.squared().get(), gap.get())
@@ -145,7 +145,7 @@ impl UnitAi {
         // to the owner (not held)
         self.remove_target();
         self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
-        self.base_notify(n, time, at, player_kind, ai_rng, side)
+        self.base_notify(notify, time, at, player_kind, ai_rng, side)
     }
 
     /// The villager's handler (`FUN_140c22bf0`; the notifies it has no case for go to the base
@@ -164,20 +164,20 @@ impl UnitAi {
     /// is [`UnitAi::work_on_made`]'s, a load of another resource [`UnitAi::drop_other_load`]'s.
     pub(super) fn villager_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::ACTION_INVALIDATED
             | NotifyKind::TARGET_MOVED
             | NotifyKind::REQUIRES_SEARCH
                 if self.current_action == Some(AiAction::Attack) =>
             {
-                if n.kind == NotifyKind::TARGET_MOVED && self.stop_after_kill {
+                if notify.kind == NotifyKind::TARGET_MOVED && self.stop_after_kill {
                     let failed = Notify::own(
                         at.id,
                         NotifyKind::ACTION_FAILED,
@@ -186,14 +186,16 @@ impl UnitAi {
                     self.post(failed, at.state)?;
                     return Ok(GO_ON);
                 }
-                self.base_notify(n, time, at, player_kind, ai_rng, side)
+                self.base_notify(notify, time, at, player_kind, ai_rng, side)
             }
             NotifyKind::ACTION_INVALIDATED
             | NotifyKind::TARGET_MOVED
-            | NotifyKind::REQUIRES_SEARCH => self.villager_search(n, at, player_kind, side, ai_rng),
+            | NotifyKind::REQUIRES_SEARCH => {
+                self.villager_search(notify, at, player_kind, side, ai_rng)
+            }
             // a completion or a failure of its action (0x1fa, 0x1f9) stops it
             NotifyKind::ACTION_COMPLETED | NotifyKind::ACTION_FAILED => {
-                if AiAction::field(self.current_action) == n.p[0] {
+                if AiAction::field(self.current_action) == notify.p[0] {
                     self.remove_target();
                     self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
@@ -205,20 +207,20 @@ impl UnitAi {
             // a missile's warning it does not dodge (the player's `+0xe10`) is its damage
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.villager_damaged(n, time, at, player_kind, ai_rng, side)
+                self.villager_damaged(notify, time, at, player_kind, ai_rng, side)
             }
             // off the build or the hunt action, the object its action made (a pasture,
             // `p[1]`) which the world holds: the unit works it at its place (slot 0x7e8,
             // the caller's)
-            NotifyKind::PASTURE_BUILT => self.work_on_made(n, at, side, ai_rng),
+            NotifyKind::PASTURE_BUILT => self.work_on_made(notify, at, side, ai_rng),
             // a load of another resource asked off (FUN_141658e20 from its place, its slot
             // 0x128 on the site, its slot 0x30 back to its action's target: the caller's)
             NotifyKind::OTHER_LOAD => self.drop_other_load(side, ai_rng),
             // its own cases the slice does not model; any other is the base handler's
             NotifyKind(0x217..=0x21a) => {
-                Err(VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", n.kind, n.p)))
+                Err(VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.p)))
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -227,13 +229,13 @@ impl UnitAi {
     /// (slot 0x7e8, the caller's).
     pub(super) fn work_on_made(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         side: &mut UnitView<'_, '_>,
         rng: &mut Well512,
     ) -> GenieResult<u32> {
-        if (n.p[0] == AiAction::Build.value() || n.p[0] == AiAction::Hunt.value())
-            && let Some(made) = Self::world_object(ObjectId::of_field(n.p[1]), at, side)?
+        if (notify.p[0] == AiAction::Build.value() || notify.p[0] == AiAction::Hunt.value())
+            && let Some(made) = Self::world_object(ObjectId::of_field(notify.p[1]), at, side)?
         {
             side.effect_now(
                 Effect::Command(AiCommand::WorkOn {
@@ -272,19 +274,19 @@ impl UnitAi {
     /// takes as damage unless it dodges; any other notify is the base handler's.
     pub(super) fn transport_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.transport_damaged(n, time, at, player_kind, ai_rng, side)
+                self.transport_damaged(notify, time, at, player_kind, ai_rng, side)
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -292,20 +294,20 @@ impl UnitAi {
     /// one, its damage notify, a missile's warning it takes as damage unless it dodges.
     pub(super) fn trader_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::REQUIRES_SEARCH => self.trader_search(at, side, ai_rng),
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.trade_damaged(n, time, at, player_kind, ai_rng, side)
+                self.trade_damaged(notify, time, at, player_kind, ai_rng, side)
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -313,22 +315,22 @@ impl UnitAi {
     /// damage notify, a missile's warning it takes as damage unless it dodges.
     pub(super) fn fishing_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Build) => {
                 self.fishing_builder_search(at, player_kind, side, ai_rng)
             }
             NotifyKind::MISSILE_WARNING if dodges(at, ai_rng) => Ok(GO_ON),
             NotifyKind::DAMAGED | NotifyKind::MISSILE_WARNING => {
-                self.fishing_damaged(n, time, at, player_kind, ai_rng, side)
+                self.fishing_damaged(notify, time, at, player_kind, ai_rng, side)
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -338,7 +340,7 @@ impl UnitAi {
     /// any other notify is the base handler's.
     pub(super) fn siege_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -346,14 +348,14 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        match n.kind {
+        match notify.kind {
             NotifyKind::DAMAGED
                 if roles
                     .of_some_class(at.class)
                     .contains(ClassRoles::SKIPS_SIEGE_CHECK)
                     && player_kind.is_computer() =>
             {
-                self.packed_damaged(n, time, at, player_kind, ai_rng, side)
+                self.packed_damaged(notify, time, at, player_kind, ai_rng, side)
             }
             NotifyKind::TOO_CLOSE => back_up(),
             NotifyKind::ACTION_EXECUTED
@@ -365,7 +367,7 @@ impl UnitAi {
                     Ok(GO_ON)
                 }
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -374,19 +376,19 @@ impl UnitAi {
     /// (`FUN_140c54e30`); else it stops and runs away, and the processing breaks.
     pub(super) fn packed_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             alert_owner(player_kind)?;
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        if at.unit(n.caller).is_none() {
+        if at.unit(notify.caller).is_none() {
             return Ok(GO_ON);
         }
         self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
@@ -398,14 +400,14 @@ impl UnitAi {
     /// and a healer's search.
     pub(super) fn soldier_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             NotifyKind::TOO_CLOSE => back_up(),
             NotifyKind::ACTION_EXECUTED | NotifyKind::MISSILE_WARNING
                 if player_kind.is_computer() =>
@@ -415,7 +417,7 @@ impl UnitAi {
             NotifyKind::REQUIRES_SEARCH if self.current_action == Some(AiAction::Heal) => {
                 Err(GenieError::unsupported("a healer's search notify"))
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -423,20 +425,20 @@ impl UnitAi {
     /// destroyed target.
     pub(super) fn tower_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
+        match notify.kind {
             // "I'm dead, I give up.": the owner's alert (slot 0x2e8 with 0x209: a human
             // player's alert list and the old pather's hulled-area reset, not held; a
             // computer player's AI hears it), the notifies end and it gives up. Alive, the
             // other owners of the units inside it hear 0x201 and the base handler's damage
             // case follows
-            NotifyKind::DAMAGED if n.p[1] < 1 => {
+            NotifyKind::DAMAGED if notify.p[1] < 1 => {
                 alert_owner(player_kind)?;
                 self.end_notifies(time, at, side, ai_rng)?;
                 Ok(DEAD)
@@ -445,23 +447,23 @@ impl UnitAi {
                 if at.flags.contains(SurroundingFlags::GUEST_COMPUTER) {
                     alert_owner(PlayerKind::Computer)?;
                 }
-                self.damaged(n, time, at, player_kind, ai_rng, side)
+                self.damaged(notify, time, at, player_kind, ai_rng, side)
             }
             // "I am a defensive building and my current target has been destroyed, purging
             // attack order.": a target gone or dead (above state 2) is forgotten
             // (`FUN_140c5e1e0`) and the current action stops (slot 0xb0 with 1)
             NotifyKind::ACTION_COMPLETED
-                if n.p[0] == 600 && self.current_order == Some(OrderKind::Attack) =>
+                if notify.p[0] == 600 && self.current_order == Some(OrderKind::Attack) =>
             {
                 let gone = self.current_target.is_none()
-                    || at.target.is_none_or(|t| ObjectState::Alive < t.state);
+                    || at.target.is_none_or(|seen| ObjectState::Alive < seen.state);
                 if gone {
                     self.remove_target();
                     self.stop_current(StopOrder::Keep, at, side, ai_rng)?;
                 }
                 Ok(GO_ON)
             }
-            _ => self.base_notify(n, time, at, player_kind, ai_rng, side),
+            _ => self.base_notify(notify, time, at, player_kind, ai_rng, side),
         }
     }
 
@@ -469,28 +471,30 @@ impl UnitAi {
     /// going; 0x202, 0x216 and 0x21b are the base handler's, any other notify ends there.
     pub(super) fn building_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
-            NotifyKind::DAMAGED => self.building_damaged(n, time, at, player_kind, side, ai_rng),
+        match notify.kind {
+            NotifyKind::DAMAGED => {
+                self.building_damaged(notify, time, at, player_kind, side, ai_rng)
+            }
             // "Unit #%d is attacking me": it joins the attackers and the unit is under attack
             NotifyKind::ATTACKED => {
-                let _ = self.attackers.add(n.caller);
+                let _ = self.attackers.add(notify.caller);
                 side.set_under_attack(true);
                 Ok(GO_ON)
             }
             // "is no longer doing an action on me.": one in the set (FUN_140bf4cb0) leaves it
             NotifyKind::NO_LONGER_ON_ME => {
-                self.attackers.remove(n.caller);
+                self.attackers.remove(notify.caller);
                 Ok(GO_ON)
             }
             NotifyKind::REQUIRES_SEARCH | NotifyKind::SENT_OFF | NotifyKind::SENT_OFF_GROUP => {
-                self.base_notify(n, time, at, player_kind, ai_rng, side)
+                self.base_notify(notify, time, at, player_kind, ai_rng, side)
             }
             _ => Ok(GO_ON),
         }
@@ -501,15 +505,15 @@ impl UnitAi {
     /// action value (`FUN_140c64b50`) and breaks off.
     pub(super) fn livestock_notify(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
-        match n.kind {
-            NotifyKind::SENT_OFF => self.base_notify(n, time, at, player_kind, ai_rng, side),
+        match notify.kind {
+            NotifyKind::SENT_OFF => self.base_notify(notify, time, at, player_kind, ai_rng, side),
             NotifyKind::REQUIRES_SEARCH => Err(GenieError::unsupported(
                 "a livestock's notify 0x202 (its settings' test)",
             )),

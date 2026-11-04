@@ -72,8 +72,8 @@ impl ExactSizeIterator for Places {}
 impl FusedIterator for Places {}
 
 impl genie_diff::Diff for ListIndex {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -83,8 +83,8 @@ mod tests {
 
     #[test]
     fn list_index_counts_from_the_first_place() {
-        let i = ListIndex::FIRST;
-        assert_eq!((i.get(), i.next().get()), (0, 1));
+        let list_index = ListIndex::FIRST;
+        assert_eq!((list_index.get(), list_index.next().get()), (0, 1));
         assert_eq!(ListIndex::new(7).next(), ListIndex::new(8));
         assert!(ListIndex::new(2) < ListIndex::new(3));
         assert_eq!(ListIndex::new(5).to_string(), "5");

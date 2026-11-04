@@ -131,11 +131,21 @@ impl GatherState {
     #[must_use]
     pub const fn move_to(&self) -> Option<&MoveToAction> {
         match self {
-            Self::Walk { move_to: Some(m) }
-            | Self::Drop { move_to: Some(m) }
-            | Self::WalkBack { move_to: Some(m) }
-            | Self::Moved { move_to: Some(m) }
-            | Self::ReseedWalk { move_to: Some(m) } => Some(m),
+            Self::Walk {
+                move_to: Some(move_to_action),
+            }
+            | Self::Drop {
+                move_to: Some(move_to_action),
+            }
+            | Self::WalkBack {
+                move_to: Some(move_to_action),
+            }
+            | Self::Moved {
+                move_to: Some(move_to_action),
+            }
+            | Self::ReseedWalk {
+                move_to: Some(move_to_action),
+            } => Some(move_to_action),
             _ => None,
         }
     }
@@ -143,7 +153,7 @@ impl GatherState {
     /// Its walk's `MoveTo` taken out (the state stays), none in any other state.
     pub const fn take_move_to(&mut self) -> Option<MoveToAction> {
         match self.walk_mut() {
-            Some(m) => m.take(),
+            Some(move_to_action) => move_to_action.take(),
             None => None,
         }
     }
@@ -151,9 +161,9 @@ impl GatherState {
     /// The same state, its walk without a `MoveTo`: the state a `set_state` names.
     #[must_use]
     pub const fn bare(self) -> Self {
-        let mut s = self;
-        let _ = s.take_move_to();
-        s
+        let mut gather_state = self;
+        let _ = gather_state.take_move_to();
+        gather_state
     }
 }
 
@@ -167,23 +177,26 @@ mod tests {
     /// `MoveTo` of a state that does not walk; the walks give theirs.
     #[test]
     fn gather_states_read_back_from_their_bytes() {
-        for b in 0..=255_u8 {
-            match GatherState::of_byte(b, None) {
-                Ok(s) => assert_eq!(s.get(), b),
+        for index in 0..=255_u8 {
+            match GatherState::of_byte(index, None) {
+                Ok(s) => assert_eq!(s.get(), index),
                 Err(_) => assert!(
-                    matches!(b, 5 | 9 | 10 | 12 | 14 | 16..=0xf1 | 0xf4..),
-                    "{b}"
+                    matches!(index, 5 | 9 | 10 | 12 | 14 | 16..=0xf1 | 0xf4..),
+                    "{index}"
                 ),
             }
         }
         assert_eq!(GatherState::FarmWait.to_string(), "243");
         let walk = MoveToAction::sub_in(MoveTo::Moving);
         for b in [4, 8, 11, 15, 0xf2] {
-            let mut s = GatherState::of_byte(b, Some(walk)).unwrap();
-            assert_eq!((s.get(), s.move_to()), (b, Some(&walk)));
-            assert_eq!(s.bare().move_to(), None);
-            assert_eq!(s.take_move_to(), Some(walk));
-            assert_eq!(s.move_to(), None);
+            let mut gather_state = GatherState::of_byte(b, Some(walk)).unwrap();
+            assert_eq!(
+                (gather_state.get(), gather_state.move_to()),
+                (b, Some(&walk))
+            );
+            assert_eq!(gather_state.bare().move_to(), None);
+            assert_eq!(gather_state.take_move_to(), Some(walk));
+            assert_eq!(gather_state.move_to(), None);
         }
         assert!(GatherState::of_byte(7, Some(walk)).is_err());
         assert_eq!(GatherState::Work.bare(), GatherState::Work);

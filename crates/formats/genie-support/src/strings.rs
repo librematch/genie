@@ -204,7 +204,9 @@ mod tests {
         let other = [0x61, 0x0a, 1, 0, b'a'];
         assert_eq!((&other[..]).read_hd_style_str(), Err(NOT_DECODED));
         assert_eq!(
-            (&bytes[..5]).read_hd_style_str().map_err(|e| e.reason()),
+            (&bytes[..5])
+                .read_hd_style_str()
+                .map_err(|error| error.reason()),
             Err("a list past the input's end")
         );
     }

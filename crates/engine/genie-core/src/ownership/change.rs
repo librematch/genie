@@ -42,17 +42,17 @@ use crate::world::parts::Part;
 use crate::world::player::Player;
 
 impl World {
-    /// Slot 0x70 ([`change_hands`]) to Gaia of the object at `j` of player `q`, from outside its
-    /// update: once Gaia has its master it leaves `q`'s list (`FUN_141630930`, the last object
-    /// in its place) for the end of Gaia's (`FUN_14167f670` -> `FUN_141616200`) with its
-    /// attributes ([`World::hand_over_attributes`]). Its only callers give livestock, which
-    /// Gaia's add does not take into its list of class 10 of combat level 4 (`+0x14a0`, a draw
-    /// on the Player stream).
-    pub(crate) fn give_gaia(&mut self, q: PlayerId, j: ListIndex) -> GenieResult<()> {
-        let mut unit = self.take_out(q, j)?;
+    /// Slot 0x70 ([`change_hands`]) to Gaia of the object at `j` of player `player_id`, from
+    /// outside its update: once Gaia has its master it leaves `player_id`'s list (`FUN_141630930`,
+    /// the last object in its place) for the end of Gaia's (`FUN_14167f670` -> `FUN_141616200`)
+    /// with its attributes ([`World::hand_over_attributes`]). Its only callers give livestock,
+    /// which Gaia's add does not take into its list of class 10 of combat level 4 (`+0x14a0`, a
+    /// draw on the Player stream).
+    pub(crate) fn give_gaia(&mut self, player_id: PlayerId, slot: ListIndex) -> GenieResult<()> {
+        let mut unit = self.take_out(player_id, slot)?;
         let held = self.parts.dead_master.get(unit.id);
         let tables = MasterTables::new(&self.model.masters, &self.parts.own_master);
-        let dead = dead_master_of(&unit, q.index(), tables, held);
+        let dead = dead_master_of(&unit, player_id.index(), tables, held);
         let id = unit.id;
         let changed = change_hands(
             (
@@ -60,14 +60,14 @@ impl World {
                 self.parts.actions.of_mut(id)?,
                 self.parts.unit_ai.get_mut(id),
             ),
-            (q.index(), PlayerId::GAIA),
+            (player_id.index(), PlayerId::GAIA),
             tables,
             &mut self.spatial,
             self.world_time,
             &self.model.roles,
             self.model.tuning.visibility,
         );
-        let j = self.put_back_own(q, unit)?;
+        let list_index = self.put_back_own(player_id, unit)?;
         let Some(own) = changed? else {
             return Ok(());
         };
@@ -75,8 +75,9 @@ impl World {
         if let Some(d) = dead {
             self.set_part(id, Part::DeadMaster(Box::new(d)))?;
         }
-        let unit = self.swap_remove_live(q, j)?;
-        let handed = self.hand_over_attributes(q, PlayerId::GAIA, unit.parts.own_master.as_ref());
+        let unit = self.swap_remove_live(player_id, list_index)?;
+        let handed =
+            self.hand_over_attributes(player_id, PlayerId::GAIA, unit.parts.own_master.as_ref());
         // the old owner's remove and Gaia's add (slots 0x2d8, 0x2d0) move it between the
         // trackers; a building whose build points reach its build time completes in Gaia's
         // (`FUN_1411cd860`, `COMISS`/`JC`: a NaN does not)
@@ -85,15 +86,17 @@ impl World {
             .model
             .masters
             .first()
-            .and_then(|m| m.get(master_id))
-            .is_some_and(|m| m.kind == MasterKind::BUILDING)
+            .and_then(|masters| masters.get(master_id))
+            .is_some_and(|master| master.kind == MasterKind::BUILDING)
             && self
                 .parts
                 .building_of(unit.unit.id)
                 .construction
-                .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
+                .is_some_and(|construction| {
+                    Seconds::of_master(construction.build_time) <= construction.progress
+                });
         let _ = self.push_live(PlayerId::GAIA, unit)?;
-        self.track_remove(q, id, master_id)?;
+        self.track_remove(player_id, id, master_id)?;
         self.track_add(PlayerId::GAIA, id, master_id)?;
         if built {
             self.track_complete(PlayerId::GAIA, id, master_id)?;
@@ -147,15 +150,17 @@ impl World {
         let Some(Place::Live(_, idx)) = self.place(id) else {
             return Err(HANDS_LEFT);
         };
-        let u = self.players.player(old)?.objects.checked(idx)?;
-        let master = u.master(self.master_tables(), old)?.clone();
-        let (state, held, amount) = (u.life.state, u.life.attribute_kind, u.life.amount);
+        let unit = self.players.player(old)?.objects.checked(idx)?;
+        let master = unit.master(self.master_tables(), old)?.clone();
+        let (state, held, amount) = (unit.life.state, unit.life.attribute_kind, unit.life.amount);
         let built = self
             .parts
-            .building_of(u.id)
+            .building_of(unit.id)
             .construction
-            .is_some_and(|c| Seconds::of_master(c.build_time) <= c.progress);
-        let rice = self.parts.building_of(u.id).rice;
+            .is_some_and(|construction| {
+                Seconds::of_master(construction.build_time) <= construction.progress
+            });
+        let rice = self.parts.building_of(unit.id).rice;
         let placed = self.spatial.get(id).copied();
         if state < ObjectState::Dying {
             self.unrecord(id);
@@ -249,11 +254,11 @@ impl World {
         id: ObjectId,
         placed: Option<Placed>,
     ) -> GenieResult<()> {
-        if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
-            v.sight_off(
+        if let (Some(visibility_placed), Some(visibility)) = (placed, self.spatial.sight.as_mut()) {
+            visibility.sight_off(
                 id,
-                p.position,
-                p.radius,
+                visibility_placed.position,
+                visibility_placed.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
                 SightLayer {
@@ -272,11 +277,11 @@ impl World {
         id: ObjectId,
         placed: Option<Placed>,
     ) -> GenieResult<()> {
-        if let (Some(p), Some(v)) = (placed, self.spatial.sight.as_mut()) {
-            let _ = v.sight_on(
+        if let (Some(visibility_placed), Some(visibility)) = (placed, self.spatial.sight.as_mut()) {
+            let _ = visibility.sight_on(
                 id,
-                p.position,
-                p.radius,
+                visibility_placed.position,
+                visibility_placed.radius,
                 SightShape::Footprint,
                 SightCentre::Tile,
                 SightLayer {
@@ -297,8 +302,8 @@ impl World {
         };
         if record.recorded() {
             self.spatial.add_record(id, record);
-            if let Some(p) = self.spatial.get(id).copied() {
-                self.pathing.place_shape(id, &p);
+            if let Some(placed) = self.spatial.get(id).copied() {
+                self.pathing.place_shape(id, &placed);
             }
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
@@ -317,10 +322,10 @@ impl World {
         new: PlayerId,
     ) -> GenieResult<()> {
         for annex in self.objects().annexes(id).ids() {
-            let Some((q, a)) = self.object(annex) else {
+            let Some((player_id, unit)) = self.object(annex) else {
                 continue;
             };
-            if a.master(self.master_tables(), q)?.kind != MasterKind::BUILDING {
+            if unit.master(self.master_tables(), player_id)?.kind != MasterKind::BUILDING {
                 continue;
             }
             let annex_watched = self
@@ -328,11 +333,11 @@ impl World {
                 .player(old)?
                 .watched
                 .iter()
-                .any(|w| w.id == annex);
+                .any(|watched| watched.id == annex);
             if annex_watched {
                 self.unwatch(old, annex)?;
             }
-            self.building_changes_hands(q, annex, new, false)?;
+            self.building_changes_hands(player_id, annex, new, false)?;
         }
         Ok(())
     }
@@ -374,8 +379,8 @@ impl World {
         let changed = own.is_some();
         if let Some(own) = own {
             self.set_part(id, Part::OwnMaster(own))?;
-            if let Some(d) = dead {
-                self.set_part(id, Part::DeadMaster(Box::new(d)))?;
+            if let Some(master) = dead {
+                self.set_part(id, Part::DeadMaster(Box::new(master)))?;
             }
         }
         Ok(if changed {
@@ -408,7 +413,9 @@ impl World {
         rice: bool,
     ) -> GenieResult<()> {
         let building = master.building.as_ref();
-        if let Some(stack) = building.and_then(|b| b.stack_unit) {
+        if let Some(stack) =
+            building.and_then(|stack_building_master| stack_building_master.stack_unit)
+        {
             let stack = if self
                 .model
                 .roles
@@ -422,10 +429,10 @@ impl World {
             };
             let at = self
                 .object(id)
-                .map_or(Position::ORIGIN, |(_, u)| u.position());
+                .map_or(Position::ORIGIN, |(_, unit)| unit.position());
             self.remains(owner, stack, at, None)?;
         }
-        if let Some(tech) = building.and_then(|b| b.tech) {
+        if let Some(tech) = building.and_then(|building_master| building_master.tech) {
             self.research_built(owner, tech)?;
         }
         Ok(())
@@ -441,7 +448,7 @@ impl World {
     pub(crate) fn garrison_leaves(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
         let inside = self
             .object(id)
-            .map_or_else(Vec::new, |(_, u)| u.garrison.clone());
+            .map_or_else(Vec::new, |(_, unit)| unit.garrison.clone());
         let mut stayed = Vec::new();
         for &g in inside.iter().rev() {
             let Some(Place::Live(_, bi)) = self.place(id) else {
@@ -458,9 +465,9 @@ impl World {
                 stayed.push(g);
             }
         }
-        for g in stayed {
-            if let Some((q, _)) = self.object(g) {
-                self.destroy(q, g)?;
+        for object_id in stayed {
+            if let Some((player_id, _)) = self.object(object_id) {
+                self.destroy(player_id, object_id)?;
             }
         }
         Ok(())
@@ -479,10 +486,10 @@ impl World {
         new: PlayerId,
         own: Option<&Master>,
     ) -> GenieResult<()> {
-        let Some(m) = own else {
+        let Some(master) = own else {
             return Ok(());
         };
-        for &(kind, amount, flag) in &m.storage {
+        for &(kind, amount, flag) in &master.storage {
             if let Some(kind) = kind
                 && matches!(flag, 2 | 16 | 32)
             {
@@ -491,17 +498,17 @@ impl World {
         }
         count_class(
             &mut self.players.player_mut(old)?.attributes,
-            m,
+            master,
             -1.0,
             &self.model.roles,
         );
         count_class(
             &mut self.players.player_mut(new)?.attributes,
-            m,
+            master,
             1.0,
             &self.model.roles,
         );
-        for &(kind, amount, flag) in &m.storage {
+        for &(kind, amount, flag) in &master.storage {
             if let Some(kind) = kind
                 && matches!(flag, 1 | 2 | 32)
             {
@@ -523,12 +530,12 @@ pub(crate) const DEAD_COPY_KINDS: [MasterKind; 6] = [
     MasterKind::BUILDING,
 ];
 
-/// The dead master an ownership change of `u` from player `old` makes, unless it holds one
+/// The dead master an ownership change of `unit` from player `old` makes, unless it holds one
 /// (`held`): its master's death spawn (`+0x5e4`, the master it reads: its own, else its old
 /// owner's) in the old owner's table, a copy of type 10 to 40, 70 or 80 (`FUN_14120f800`, before
 /// the copy `FUN_141186d10`); none without a death spawn ([`crate::world::parts::Parts::dead_master`]).
 pub(crate) fn dead_master_of(
-    u: &Unit,
+    unit: &Unit,
     old: usize,
     masters: MasterTables<'_>,
     held: Option<&Master>,
@@ -539,16 +546,16 @@ pub(crate) fn dead_master_of(
     let old_table = masters.players.get(old)?;
     let reads = masters
         .own
-        .get(u.id)
-        .or_else(|| old_table.get(u.life.master_id))?;
+        .get(unit.id)
+        .or_else(|| old_table.get(unit.life.master_id))?;
     let spawn = reads.death_spawns.first().copied().flatten()?;
     old_table
         .get(spawn)
-        .filter(|d| DEAD_COPY_KINDS.contains(&d.kind))
+        .filter(|master| DEAD_COPY_KINDS.contains(&master.kind))
         .cloned()
 }
 
-/// `FUN_14120f800`, slot 0x70 of a combat object (`TRIBE_Combat_Object`'s): unit `u` of player
+/// `FUN_14120f800`, slot 0x70 of a combat object (`TRIBE_Combat_Object`'s): unit `unit` of player
 /// `old` goes to player `new` (`masters`, every player's). First its records take the new owner
 /// ([`Spatial::records_owner`]); without its master in the new owner's table (`player+0x28`)
 /// nothing else changes and the answer is none. Then, in order: its sight goes from the old
@@ -568,7 +575,7 @@ pub(crate) fn dead_master_of(
 /// the message of game mode 12 for master 1377; nor are the slot 0xa8 calls on the copies (the
 /// masters' graphics).
 pub(crate) fn change_hands(
-    (u, actions, ai): (&mut Unit, &mut Action, Option<&mut UnitAi>),
+    (unit, actions, ai): (&mut Unit, &mut Action, Option<&mut UnitAi>),
     (old, new): (usize, PlayerId),
     masters: MasterTables<'_>,
     spatial: &mut Spatial,
@@ -576,16 +583,16 @@ pub(crate) fn change_hands(
     roles: &Roles,
     visibility_tuning: VisibilityTuning,
 ) -> GenieResult<Option<Box<Master>>> {
-    spatial.records_owner(u.id, new)?;
-    let Some(to) = player_master(masters.players, new, u.life.master_id) else {
+    spatial.records_owner(unit.id, new)?;
+    let Some(to) = player_master(masters.players, new, unit.life.master_id) else {
         return Ok(None);
     };
     let old_table = masters.players.get(old);
     let mut own = Box::new(
         masters
             .own
-            .get(u.id)
-            .or_else(|| old_table.and_then(|m| m.get(u.life.master_id)))
+            .get(unit.id)
+            .or_else(|| old_table.and_then(|m| m.get(unit.life.master_id)))
             .ok_or(GenieError::unsupported(
                 "an ownership change of an object whose master the slice does not have",
             ))?
@@ -596,19 +603,19 @@ pub(crate) fn change_hands(
         own.line_of_sight = to.line_of_sight;
     }
     let los = own.line_of_sight;
-    let sees = if u.life.state == ObjectState::Alive && u.life.inside.is_none() {
+    let sees = if unit.life.state == ObjectState::Alive && unit.life.inside.is_none() {
         Seeing::Sees
     } else {
         Seeing::Blind
     };
-    spatial.change_owner(u.id, new, los, sees, roles, visibility_tuning)?;
-    if let Some(a) = actions.list.artifact_mut() {
-        a.gaia = new == PlayerId::GAIA;
+    spatial.change_owner(unit.id, new, los, sees, roles, visibility_tuning)?;
+    if let Some(artifact) = actions.list.artifact_mut() {
+        artifact.gaia = new == PlayerId::GAIA;
     }
     let mut inbox = Inbox {
         ai,
-        id: u.id,
-        state: u.life.state,
+        id: unit.id,
+        state: unit.life.state,
     };
     if let Some(ai) = inbox.ai.as_deref_mut() {
         ai.clear_notifies(world_time.since_start())?;
@@ -617,7 +624,7 @@ pub(crate) fn change_hands(
     Ok(Some(own))
 }
 
-/// [`World::building_changes_hands`] of a building in state 2: its old owner `p` loses its
+/// [`World::building_changes_hands`] of a building in state 2: its old owner `player` loses its
 /// master's storage of flag 4 and a `held` attribute 4 (slot 0xf8, the `amount`'s sign
 /// flipped, `DAT_142e88e80`).
 ///
@@ -625,7 +632,7 @@ pub(crate) fn change_hands(
 ///
 /// An attribute the player does not hold.
 pub(crate) fn lose_built_storage(
-    p: &mut Player,
+    player: &mut Player,
     master: &Master,
     held: Option<AttributeId>,
     amount: Amount,
@@ -636,7 +643,7 @@ pub(crate) fn lose_built_storage(
         if let Some(kind) = kind
             && flag == STORAGE_WHILE_BUILT
         {
-            p.add_attribute(kind, -amount)?;
+            player.add_attribute(kind, -amount)?;
         }
     }
     // The population headroom attribute, which a building's held amount gives (`+0x308` 4).
@@ -644,19 +651,19 @@ pub(crate) fn lose_built_storage(
         .of_some_attribute(held)
         .contains(AttributeRoles::HEADROOM)
     {
-        p.add_attribute(slots.attribute.headroom, -amount)?;
+        player.add_attribute(slots.attribute.headroom, -amount)?;
     }
     Ok(())
 }
 
-/// [`World::building_changes_hands`] of a building in state 2: its new owner `p` gains its
+/// [`World::building_changes_hands`] of a building in state 2: its new owner `player` gains its
 /// master's storage of flags 4 and 8 and a `held` attribute 4 (its `amount`).
 ///
 /// # Errors
 ///
 /// An attribute the player does not hold.
 pub(crate) fn gain_built_storage(
-    p: &mut Player,
+    player: &mut Player,
     master: &Master,
     held: Option<AttributeId>,
     amount: Amount,
@@ -667,14 +674,14 @@ pub(crate) fn gain_built_storage(
         if let Some(kind) = kind
             && matches!(flag, STORAGE_WHILE_BUILT | STORAGE_8)
         {
-            p.add_attribute(kind, amount)?;
+            player.add_attribute(kind, amount)?;
         }
     }
     if roles
         .of_some_attribute(held)
         .contains(AttributeRoles::HEADROOM)
     {
-        p.add_attribute(slots.attribute.headroom, amount)?;
+        player.add_attribute(slots.attribute.headroom, amount)?;
     }
     Ok(())
 }

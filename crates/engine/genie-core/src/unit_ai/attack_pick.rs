@@ -302,7 +302,7 @@ impl Seeker {
     }
 }
 
-/// Slot 0xa0 of `me`'s unit AI with 0, `CanAttack`: whether it may attack `t`, by type: the
+/// Slot 0xa0 of `me`'s unit AI with 0, `CanAttack`: whether it may attack `target`, by type: the
 /// hunted animal's (`FUN_140c18d00`) while its action list holds an Attack (type 9) or a type 7
 /// (slot 0x538); the predator's ([`predator_may_attack`]), the lion's ([`lion_may_attack`]) and
 /// the civilian's ([`civilian_may_attack`]) by attack priority and class; the base's
@@ -313,13 +313,13 @@ impl Seeker {
 pub fn can_attack(
     me: &Attacker,
     seeker: &Seeker,
-    t: &Target,
+    target: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
     match me.ai_kind {
         UnitAiKind::Hunted => Ok(matches!(me.top_action, Some(ATTACK | ActionKind::COMBAT))),
-        UnitAiKind::Predator => Ok(predator_may_attack(me.attack_priority, t.class, roles)),
+        UnitAiKind::Predator => Ok(predator_may_attack(me.attack_priority, target.class, roles)),
         UnitAiKind::Boar
         | UnitAiKind::Ranged
         | UnitAiKind::Ranged2
@@ -329,13 +329,13 @@ pub fn can_attack(
         | UnitAiKind::Artifact
         | UnitAiKind::SiegeTower
         | UnitAiKind::Livestock => Ok(true),
-        UnitAiKind::Lion => Ok(lion_may_attack(me.attack_priority, t.class, roles)),
-        UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, t.class, roles)),
+        UnitAiKind::Lion => Ok(lion_may_attack(me.attack_priority, target.class, roles)),
+        UnitAiKind::Civilian => Ok(civilian_may_attack(me.attack_priority, target.class, roles)),
         UnitAiKind::Building => Ok(false),
-        UnitAiKind::Tower => tower_can_attack(me, t, roles, unit_ai_tuning),
-        UnitAiKind::Soldier => soldier_can_attack(me, seeker, t, roles, unit_ai_tuning),
+        UnitAiKind::Tower => tower_can_attack(me, target, roles, unit_ai_tuning),
+        UnitAiKind::Soldier => soldier_can_attack(me, seeker, target, roles, unit_ai_tuning),
         UnitAiKind::Siege => {
-            siege_can_attack(me, seeker, t, TargetRules::Own, roles, unit_ai_tuning)
+            siege_can_attack(me, seeker, target, TargetRules::Own, roles, unit_ai_tuning)
         }
         UnitAiKind::Priest => Err(GenieError::unsupported(
             "an attack check (slot 0xa0) of a unit-AI type not modelled",
@@ -372,38 +372,38 @@ pub(super) fn predator_may_attack(
 /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 pub fn tower_can_attack(
     me: &Attacker,
-    t: &Target,
+    target: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
     if me.player == PlayerId::GAIA
         || roles
-            .of_class(t.class)
+            .of_class(target.class)
             .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC)
     {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
+    let gaia_combat = !me.scenario && MasterKind::COMBAT <= target.kind && !target.capture.any();
     if !gaia_combat
-        && t.owner == PlayerId::GAIA
+        && target.owner == PlayerId::GAIA
         && !roles
-            .of_class(t.class)
+            .of_class(target.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
     {
         return Ok(false);
     }
-    if (t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID))
+    if (target.kind == MasterKind::BUILDING && target.flags.contains(AttackTargetFlags::DESOLID))
         || roles
-            .of_master(t.master)
+            .of_master(target.master)
             .contains(MasterRoles::TOWER_SPARED)
         || me.state <= ObjectState::Unfinished
     {
         return Ok(false);
     }
-    if roles.of_class(t.class).contains(ClassRoles::PREDATOR)
+    if roles.of_class(target.class).contains(ClassRoles::PREDATOR)
         && me.attack_priority < AttackPriority::PRIORITY_3
     {
-        return Ok(t.combat_level == CombatLevel::MILITARY);
+        return Ok(target.combat_level == CombatLevel::MILITARY);
     }
     if !roles
         .of_some_class(me.class)
@@ -415,7 +415,7 @@ pub fn tower_can_attack(
     }
     Ok(!me.attack_priority.limited()
         || roles
-            .of_class(t.class)
+            .of_class(target.class)
             .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
@@ -458,27 +458,27 @@ impl Attacker {
 /// [`ClassRoles::PRIORITY_3_TARGET`](crate::world::layer::ClassRoles::PRIORITY_3_TARGET).
 pub fn soldier_can_attack(
     me: &Attacker,
-    s: &Seeker,
-    t: &Target,
+    seeker: &Seeker,
+    target: &Target,
     roles: &Roles,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
-    if roles.of_class(t.class).contains(ClassRoles::LAND_MINE) {
+    if roles.of_class(target.class).contains(ClassRoles::LAND_MINE) {
         return Ok(false);
     }
-    let gaia_combat = !me.scenario && MasterKind::COMBAT <= t.kind && !t.capture.any();
+    let gaia_combat = !me.scenario && MasterKind::COMBAT <= target.kind && !target.capture.any();
     if me.player == PlayerId::GAIA && !gaia_combat {
         return Ok(false);
     }
-    if t.owner == PlayerId::GAIA
+    if target.owner == PlayerId::GAIA
         && !roles
-            .of_class(t.class)
+            .of_class(target.class)
             .intersects(ClassRoles::PREY | ClassRoles::PREDATOR)
         && !gaia_combat
     {
         return Ok(false);
     }
-    if !t.flags.contains(AttackTargetFlags::TARGETING) {
+    if !target.flags.contains(AttackTargetFlags::TARGETING) {
         return Ok(false);
     }
     if me.player_kind.is_computer() {
@@ -493,23 +493,23 @@ pub fn soldier_can_attack(
         .of_some_attribute(me.held)
         .contains(AttributeRoles::RELIC)
         || roles
-            .of_class(t.class)
+            .of_class(target.class)
             .intersects(ClassRoles::ARTIFACT | ClassRoles::RELIC | ClassRoles::MISC_BUILDING)
     {
         return Ok(false);
     }
-    if t.kind == MasterKind::BUILDING && t.flags.contains(AttackTargetFlags::DESOLID) {
+    if target.kind == MasterKind::BUILDING && target.flags.contains(AttackTargetFlags::DESOLID) {
         return Ok(false);
     }
-    if s.stance == UnitStance::NoAttack {
+    if seeker.stance == UnitStance::NoAttack {
         return Ok(false);
     }
-    if !stance_reaches(me, s, t, unit_ai_tuning)? {
+    if !stance_reaches(me, seeker, target, unit_ai_tuning)? {
         return Ok(false);
     }
     Ok(!me.attack_priority.limited()
         || roles
-            .of_class(t.class)
+            .of_class(target.class)
             .contains(ClassRoles::PRIORITY_3_TARGET))
 }
 
@@ -544,20 +544,24 @@ pub(super) fn never_attacks(me: &Attacker, roles: &Roles) -> bool {
 /// A range the slice does not model, and a defending patrol's range.
 pub(super) fn stance_reaches(
     me: &Attacker,
-    s: &Seeker,
-    t: &Target,
+    seeker: &Seeker,
+    target: &Target,
     unit_ai_tuning: &UnitAiTuning,
 ) -> GenieResult<bool> {
-    let d2 = point_gap_squared(s.state_position, t.position, t.radius);
+    let d2 = point_gap_squared(seeker.state_position, target.position, target.radius);
     let reach = me.range_against()? + Distance::new(unit_ai_tuning.stance_range_growth);
-    match s.stance {
+    match seeker.stance {
         UnitStance::StandGround
-            if !matches!(s.order, Some(OrderKind::Defend)) && reach.squared() < d2 =>
+            if !matches!(seeker.order, Some(OrderKind::Defend)) && reach.squared() < d2 =>
         {
             return Ok(false);
         }
         UnitStance::Defensive => {
-            if matches!(s.order, Some(OrderKind::Patrol | OrderKind::AttackMove)) || s.patrol_path {
+            if matches!(
+                seeker.order,
+                Some(OrderKind::Patrol | OrderKind::AttackMove)
+            ) || seeker.patrol_path
+            {
                 defend_patrol_range()?;
             }
             let reach = reach + Distance::new(unit_ai_tuning.defend_growth);
@@ -576,10 +580,10 @@ pub(super) fn stance_reaches(
 /// [`BlastLevel::SPARES_FRIENDS`] nor [`BlastLevel::SKIPS_FRIEND_CHECK`] (`FUN_1410bf160`,
 /// `FUN_1410bfcb0`) scans the tiles of the blast around the target for its own or allied objects
 /// (not modelled).
-pub(crate) fn spares_friends(me: &Attacker, t: &Target, roles: &Roles) -> GenieResult<bool> {
+pub(crate) fn spares_friends(me: &Attacker, target: &Target, roles: &Roles) -> GenieResult<bool> {
     if me.attack_priority == AttackPriority::PRIORITY_3
         && !roles
-            .of_class(t.class)
+            .of_class(target.class)
             .contains(ClassRoles::PRIORITY_3_TARGET)
     {
         return Ok(false);

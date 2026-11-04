@@ -99,8 +99,8 @@ impl Motion {
         places: Orient,
         group_tuning: &GroupTuning,
     ) -> Orientation {
-        let d = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
-        if d < group_tuning.square_min || group_tuning.square_max < d {
+        let height = up.height() * forward.height() + up.x() * forward.x() + up.y() * forward.y();
+        if height < group_tuning.square_min || group_tuning.square_max < height {
             return Orientation::Unchanged;
         }
         let right = normalize(cross(up, forward));
@@ -140,8 +140,8 @@ impl World {
         g.motion.new_position[0] = at;
         g.motion.position[0] = at;
         self.set_initial_orientation(group)?;
-        let g = self.groups.held_mut(group)?;
-        g.flags |= GroupFlags::PLACED;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.flags |= GroupFlags::PLACED;
         Ok(())
     }
 
@@ -167,20 +167,24 @@ impl World {
     /// When the world does not hold `group`: the game's routine gets the group itself, from a
     /// caller that holds it.
     pub fn clear_spot(&mut self, group: GroupId, centroid: BVector) -> GenieResult<BVector> {
-        let g = self.groups.held(group)?;
-        let Some(first) = g.members.first() else {
+        let held = self.groups.held(group)?;
+        let Some(first) = held.members.first() else {
             return Ok(centroid);
         };
-        let (p, u) = self.object(first.id).ok_or(GenieError::unsupported(
+        let (player_id, unit) = self.object(first.id).ok_or(GenieError::unsupported(
             "a group's clear spot without its first member (a null object)",
         ))?;
-        let mask = self.master_mask(p, u.life.master_id)?;
+        let mask = self.master_mask(player_id, unit.life.master_id)?;
         // the centroid's temporary tile records, with the buffer the last FUN_1410562d0 left,
         // which no one removes here: they stay for the queries after (FUN_141052b90)
         let grow = self.spatial.manager_grow();
         let at = centroid.ground();
         self.spatial.put_tile_records(at, at, grow, mask);
-        let members: Vec<RecordId> = g.members.iter().map(|m| RecordId::from(m.id)).collect();
+        let members: Vec<RecordId> = held
+            .members
+            .iter()
+            .map(|member| RecordId::from(member.id))
+            .collect();
         // the manager's ignore list (FUN_1410562e0 with the group's +0xf0, +0xe4)
         self.spatial.set_manager_ignore(&members);
         let mut spiral = Spiral::from(centroid.ground());
@@ -223,19 +227,22 @@ impl World {
     /// When the world does not hold `group`: the game's routine gets the group itself, and its
     /// caller ([`World::set_initial_position`]) holds it.
     pub fn set_initial_orientation(&mut self, group: GroupId) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let forwards: Vec<BVector> = g
+        let held = self.groups.held(group)?;
+        let forwards: Vec<BVector> = held
             .members
             .iter()
-            .filter_map(|m| self.world_object(m.id).map(|o| o.forward()))
+            .filter_map(|member| {
+                self.world_object(member.id)
+                    .map(|world_object| world_object.forward())
+            })
             .collect();
         let mut sum = [0.0f32; 3];
         for f in &forwards {
             sum = [sum[0] + f.x(), sum[1] + f.height(), sum[2] + f.y()];
         }
         if !forwards.is_empty() {
-            let n = forwards.len() as f32;
-            sum = [sum[0] / n, sum[1] / n, sum[2] / n];
+            let count = forwards.len() as f32;
+            sum = [sum[0] / count, sum[1] / count, sum[2] / count];
         }
         let squared = sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2];
         let forward = if squared == 0.0 {
@@ -247,8 +254,8 @@ impl World {
             let l = sqrt(squared);
             BVector::new(sum[0] / l, sum[1] / l, sum[2] / l)
         };
-        let g = self.groups.held_mut(group)?;
-        let _ = g.motion.set_orientation(
+        let unit_group = self.groups.held_mut(group)?;
+        let _ = unit_group.motion.set_orientation(
             forward,
             BVector::new(0.0, 1.0, 0.0),
             Orient::Both,
@@ -293,9 +300,9 @@ impl World {
         let Some(g) = self.groups.get(group) else {
             return Ok(());
         };
-        let m = &g.motion;
-        let forward = m.position[1];
-        let front = ahead.get() * forward + m.position[0];
+        let motion = &g.motion;
+        let forward = motion.position[1];
+        let front = ahead.get() * forward + motion.position[0];
         let held: Vec<(ObjectId, BVector)> = g
             .members
             .iter()
@@ -304,20 +311,20 @@ impl World {
                     .map(|(_, u)| (mb.id, u.moved_vector(self.parts.mover_of(u.id))))
             })
             .collect();
-        let centre = if m.flags.contains(MotionFlags::NEW) {
+        let centre = if motion.flags.contains(MotionFlags::NEW) {
             let mut c = [0.0f32; 3];
             for &(_, p) in &held {
                 c = [c[0] + p.x(), c[1] + p.height(), c[2] + p.y()];
             }
-            let n = g.members.len() as f32;
-            BVector::new(c[0] / n, c[1] / n, c[2] / n)
+            let count = g.members.len() as f32;
+            BVector::new(c[0] / count, c[1] / count, c[2] / count)
         } else {
-            m.position[0]
+            motion.position[0]
         };
         // the lead's slot 0x270: an object that does not move (a ghost found by the lead -1)
         // stands nowhere (`FUN_141071e30`)
         if g.formation_locked_kind == Some(FormationKind::Flanked)
-            && let Some(lead) = self.lead_object(m).filter(WorldObject::moves)
+            && let Some(lead) = self.lead_object(motion).filter(WorldObject::moves)
         {
             let master = self.master(lead.player(), lead.master_id(self.model.slots))?;
             let mask = self.master_mask(lead.player(), lead.master_id(self.model.slots))?;
@@ -346,11 +353,11 @@ impl World {
         let mut nearest = None;
         let mut nearest_d = DistanceSquared::new(FARTHEST);
         for &(id, p) in &held {
-            let q = p.with_height(0.0);
-            if line_distance(q, through, forward) < limit.get() {
+            let ground_point = p.with_height(0.0);
+            if line_distance(ground_point, through, forward) < limit.get() {
                 in_front.push((id, p));
             }
-            let d = ground_squared(q, front);
+            let d = ground_squared(ground_point, front);
             if d < nearest_d {
                 nearest = Some(id);
                 nearest_d = d;
@@ -364,21 +371,21 @@ impl World {
         let mut beside = FARTHEST;
         let mut chosen_d = DistanceSquared::new(FARTHEST);
         for &(id, p) in &in_front {
-            let d = ground_squared(p, front);
-            if d < chosen_d {
+            let distance_squared = ground_squared(p, front);
+            if distance_squared < chosen_d {
                 chosen = Some(id);
                 beside = (p.y() - centre.y()) * (p.y() - centre.y())
                     + (p.x() - centre.x()) * (p.x() - centre.x());
-                chosen_d = d;
+                chosen_d = distance_squared;
             }
         }
         let spot = match self.object(chosen) {
-            Some((p, u))
+            Some((player_id, u))
                 if !in_front.is_empty()
                     || ground_squared(u.moved_vector(self.parts.mover_of(u.id)), front)
                         <= nearest_d
                     || {
-                        let r = u.master(self.master_tables(), p)?.radius.x();
+                        let r = u.master(self.master_tables(), player_id)?.radius.x();
                         beside <= (r + r) * (r + r)
                     } =>
             {
@@ -386,28 +393,32 @@ impl World {
             }
             _ => self
                 .object(nearest)
-                .map(|(_, u)| u.moved_vector(self.parts.mover_of(u.id))),
+                .map(|(_, unit)| unit.moved_vector(self.parts.mover_of(unit.id))),
         };
         let Some(at) = spot else {
             return Ok(());
         };
-        let g = self.groups.held_mut(group)?;
-        g.stored_positions.clear_points();
-        g.motion.new_position[0] = at;
-        g.motion.position[0] = at;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.stored_positions.clear_points();
+        unit_group.motion.new_position[0] = at;
+        unit_group.motion.position[0] = at;
         Ok(())
     }
 
-    /// The terrain classes master `master` of player `p` lets its objects stand on: its
+    /// The terrain classes master `master` of player `player_id` lets its objects stand on: its
     /// restriction (`+0x606`) in the map's table (`FUN_141054630`).
     ///
     /// # Errors
     ///
     /// No such master, a master without a restriction (the game indexes before the table) and a
     /// map without its terrain.
-    pub(crate) fn master_mask(&self, p: PlayerId, master: MasterId) -> GenieResult<TerrainMask> {
+    pub(crate) fn master_mask(
+        &self,
+        player_id: PlayerId,
+        master: MasterId,
+    ) -> GenieResult<TerrainMask> {
         let restriction =
-            self.master(p, master)?
+            self.master(player_id, master)?
                 .terrain_restriction
                 .ok_or(GenieError::unsupported(
                     "a terrain mask of a master without a restriction",
@@ -475,10 +486,10 @@ mod tests {
     /// `FUN_141049e10` facing x with up y: right is `y × x`, (0, 0, -1), the constructor's.
     #[test]
     fn an_orientation_takes_the_cross_product_of_up_and_forward_as_its_right() {
-        let mut m = Motion::new();
-        m.flags = MotionFlags::NONE;
+        let mut motion = Motion::new();
+        motion.flags = MotionFlags::NONE;
         assert_eq!(
-            m.set_orientation(
+            motion.set_orientation(
                 BVector::new(2.0, 0.0, 0.0),
                 BVector::new(0.0, 1.0, 0.0),
                 Orient::Both,
@@ -486,13 +497,13 @@ mod tests {
             ),
             Orientation::Set
         );
-        assert_eq!(m.position[1], BVector::new(1.0, 0.0, 0.0));
-        assert_eq!(m.position[3], BVector::new(0.0, 0.0, -1.0));
-        assert_eq!(m.new_position[3], BVector::new(0.0, 0.0, -1.0));
-        assert_eq!(m.flags, MotionFlags::MOVED);
+        assert_eq!(motion.position[1], BVector::new(1.0, 0.0, 0.0));
+        assert_eq!(motion.position[3], BVector::new(0.0, 0.0, -1.0));
+        assert_eq!(motion.new_position[3], BVector::new(0.0, 0.0, -1.0));
+        assert_eq!(motion.flags, MotionFlags::MOVED);
         // a forward too far from square to the up is refused
         assert_eq!(
-            m.set_orientation(
+            motion.set_orientation(
                 BVector::new(1.0, 0.1, 0.0),
                 BVector::new(0.0, 1.0, 0.0),
                 Orient::Both,
@@ -519,7 +530,7 @@ mod tests {
         use crate::map::spatial::{Obstruction, Placed, Spatial, Tiles};
         use crate::map::terrain::{Terrain, TerrainKind};
         let (units, parts) = World::split_layers(objects.into_iter().map(Into::into));
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -530,13 +541,13 @@ mod tests {
             }],
         )
         .with_parts(parts);
-        t.model.masters = vec![Arc::new(Masters::new([Master {
+        world.model.masters = vec![Arc::new(Masters::new([Master {
             id: master_id(4),
             radius: Footprint::new(0.4, 0.4),
             terrain_restriction: Some(RestrictionId::named(0)),
             ..Master::default()
         }]))];
-        t.spatial = Spatial::with_tiles(
+        world.spatial = Spatial::with_tiles(
             GridSize::new(20, 20),
             Tiles::new(GridSize::new(20, 20), vec![1; 400]),
         );
@@ -545,14 +556,14 @@ mod tests {
             flags: TerrainFlags::WATER,
             forest: false,
         };
-        t.spatial.terrain = Some(Terrain::new(
+        world.spatial.terrain = Some(Terrain::new(
             GridSize::new(20, 20),
             vec![TileTerrain::of_save(0, 255, -1); 400],
             vec![kind],
             vec![Restriction::new(vec![1.0])],
         ));
         for u in &units {
-            t.spatial.insert(
+            world.spatial.insert(
                 u.id,
                 Placed {
                     position: u.position(),
@@ -572,33 +583,33 @@ mod tests {
                 },
             );
         }
-        let mut g = UnitGroup::new(group_id(1));
-        g.members = units
+        let mut group = UnitGroup::new(group_id(1));
+        group.members = units
             .iter()
-            .map(|u| Member {
-                id: u.id,
+            .map(|unit| Member {
+                id: unit.id,
                 ..Member::default()
             })
             .collect();
-        g.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
-        g.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
-        g.motion.flags = MotionFlags::NONE;
-        g.desired_spacing = Distance::new(2.0);
-        g.stored_positions.points = vec![LinePoint::default(); 2];
-        g.stored_positions.length = Distance::new(3.0);
-        t.groups = UnitGroups {
-            groups: vec![g],
+        group.motion.position[0] = BVector::new(10.0, 0.0, 10.0);
+        group.motion.position[1] = BVector::new(1.0, 0.0, 0.0);
+        group.motion.flags = MotionFlags::NONE;
+        group.desired_spacing = Distance::new(2.0);
+        group.stored_positions.points = vec![LinePoint::default(); 2];
+        group.stored_positions.length = Distance::new(3.0);
+        world.groups = UnitGroups {
+            groups: vec![group],
             ..UnitGroups::default()
         };
-        t
+        world
     }
 
-    fn placed(t: &World) -> (BVector, BVector, usize) {
-        let g = &t.groups.groups[0];
+    fn placed(world: &World) -> (BVector, BVector, usize) {
+        let group = &world.groups.groups[0];
         (
-            g.motion.position[0],
-            g.motion.new_position[0],
-            g.stored_positions.points.len(),
+            group.motion.position[0],
+            group.motion.new_position[0],
+            group.stored_positions.points.len(),
         )
     }
 
@@ -608,15 +619,16 @@ mod tests {
     /// group stands on 10's place, its stored points gone, their length kept.
     #[test]
     fn the_group_moves_onto_the_member_in_front_nearest_the_point_ahead() {
-        let mut t = front_world(vec![
+        let mut world = front_world(vec![
             unit(10, 15.0, 10.5),
             unit(11, 13.0, 9.2),
             unit(12, 19.0, 15.0),
         ]);
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(
-            placed(&t),
+            placed(&world),
             (
                 BVector::new(15.0, 0.0, 10.5),
                 BVector::new(15.0, 0.0, 10.5),
@@ -624,7 +636,7 @@ mod tests {
             )
         );
         assert_eq!(
-            t.groups.groups[0].stored_positions.length,
+            world.groups.groups[0].stored_positions.length,
             Distance::new(3.0)
         );
     }
@@ -644,19 +656,21 @@ mod tests {
                 0
             )
         );
-        let mut t = front_world(Vec::<Object>::new());
-        t.groups.groups[0].members = vec![Member {
+        let mut world = front_world(Vec::<Object>::new());
+        world.groups.groups[0].members = vec![Member {
             id: object_id(99),
             ..Member::default()
         }];
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(
-            placed(&t),
+            placed(&world),
             (BVector::new(10.0, 0.0, 10.0), BVector::ZERO, 2)
         );
         // a group the world does not hold is left alone
-        t.move_position_to_front(group_id(2), Distance::new(100.0))
+        world
+            .move_position_to_front(group_id(2), Distance::new(100.0))
             .unwrap();
     }
 
@@ -670,10 +684,11 @@ mod tests {
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 11.5));
-        let mut t = front_world(units);
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        let mut world = front_world(units);
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
-        assert_eq!(placed(&t).0, BVector::new(19.0, 0.0, 13.0));
+        assert_eq!(placed(&world).0, BVector::new(19.0, 0.0, 13.0));
     }
 
     /// [`MotionFlags::NEW`] take the line through the members' centre, (13, 0, 12): 11 at
@@ -690,10 +705,11 @@ mod tests {
         t.move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(placed(&t).0, BVector::new(13.0, 0.0, 12.2));
-        let mut t = front_world(units);
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        let mut world = front_world(units);
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
-        assert_eq!(placed(&t).0, BVector::new(6.0, 0.0, 10.1));
+        assert_eq!(placed(&world).0, BVector::new(6.0, 0.0, 10.1));
     }
 
     /// A flanked group (8) whose lead could stand on the group's place among the members stays
@@ -725,13 +741,14 @@ mod tests {
         );
         let mut other = units[1].clone();
         other.unit.id = object_id(50);
-        let mut t = front_world(vec![units[0].clone(), units[1].clone(), other]);
-        flanked(&mut t);
-        t.groups.groups[0].members.truncate(2);
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        let mut world = front_world(vec![units[0].clone(), units[1].clone(), other]);
+        flanked(&mut world);
+        world.groups.groups[0].members.truncate(2);
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(
-            placed(&t),
+            placed(&world),
             (
                 BVector::new(15.0, 0.0, 10.5),
                 BVector::new(15.0, 0.0, 10.5),
@@ -768,13 +785,14 @@ mod tests {
                 2
             )
         );
-        let mut t = front_world(units);
-        flanked(&mut t);
-        t.players[0].ghosts = vec![ghost_at(-2, 3.0, 3.0)];
-        t.move_position_to_front(group_id(1), Distance::new(100.0))
+        let mut world = front_world(units);
+        flanked(&mut world);
+        world.players[0].ghosts = vec![ghost_at(-2, 3.0, 3.0)];
+        world
+            .move_position_to_front(group_id(1), Distance::new(100.0))
             .unwrap();
         assert_eq!(
-            placed(&t),
+            placed(&world),
             (
                 BVector::new(15.0, 0.0, 10.5),
                 BVector::new(15.0, 0.0, 10.5),
@@ -793,20 +811,20 @@ mod tests {
                 .iter()
                 .enumerate()
                 .map(|(i, f)| {
-                    let u = unit(10 + i as i32, 5.0, 5.0);
+                    let unit = unit(10 + i as i32, 5.0, 5.0);
                     match f {
                         Some(f) => {
                             let mut mover = walker();
                             mover.forward = *f;
-                            Object::moving(u, mover)
+                            Object::moving(unit, mover)
                         }
-                        None => u.into(),
+                        None => unit.into(),
                     }
                 })
                 .collect();
-            let mut t = front_world(units);
-            t.set_initial_orientation(group_id(1)).unwrap();
-            t.groups.groups[0].motion.position[1]
+            let mut units_world = front_world(units);
+            units_world.set_initial_orientation(group_id(1)).unwrap();
+            units_world.groups.groups[0].motion.position[1]
         };
         assert_eq!(
             facing(&[Some(BVector::new(0.0, 0.0, 1.0)), None]),
@@ -819,15 +837,15 @@ mod tests {
             ]),
             BVector::new(0.0, 0.0, 1.0)
         );
-        let mut t = front_world(Vec::<Object>::new());
-        t.groups.groups[0].members = vec![Member {
+        let mut world = front_world(Vec::<Object>::new());
+        world.groups.groups[0].members = vec![Member {
             id: object_id(99),
             ..Member::default()
         }];
-        t.groups.groups[0].motion.position[1] = BVector::new(0.0, 0.0, 1.0);
-        t.set_initial_orientation(group_id(1)).unwrap();
+        world.groups.groups[0].motion.position[1] = BVector::new(0.0, 0.0, 1.0);
+        world.set_initial_orientation(group_id(1)).unwrap();
         assert_eq!(
-            t.groups.groups[0].motion.position[1],
+            world.groups.groups[0].motion.position[1],
             BVector::new(1.0, 0.0, 0.0)
         );
     }

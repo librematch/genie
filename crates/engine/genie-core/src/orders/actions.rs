@@ -81,10 +81,10 @@ impl World {
 
     /// Object `idx` of player `player` as the releaser of its actions' targets.
     pub(crate) fn releaser(&self, player: PlayerId, idx: ListIndex) -> GenieResult<Releaser> {
-        let u = self.players.live(player, idx)?;
+        let unit = self.players.live(player, idx)?;
         Ok(Releaser {
-            id: u.id,
-            class: Some(u.master(self.master_tables(), player)?.class),
+            id: unit.id,
+            class: Some(unit.master(self.master_tables(), player)?.class),
             player,
         })
     }
@@ -103,29 +103,29 @@ impl World {
         idx: ListIndex,
         (order, action): (Option<OrderKind>, Option<AiAction>),
     ) -> GenieResult<()> {
-        let u = &self.players.live(player, idx)?;
+        let live = &self.players.live(player, idx)?;
         let Some(target) = self
             .parts
             .unit_ai
-            .get(u.id)
-            .and_then(|a| a.current_target)
-            .filter(|t| !t.is_recyclable())
+            .get(live.id)
+            .and_then(|unit_ai| unit_ai.current_target)
+            .filter(|object_id| !object_id.is_recyclable())
         else {
             return Ok(());
         };
-        let position = u.moved_vector(self.parts.mover_of(u.id));
-        let Some((q, t)) = self.object(target) else {
+        let position = live.moved_vector(self.parts.mover_of(live.id));
+        let Some((player_id, unit)) = self.object(target) else {
             return Ok(());
         };
-        let class = t.master(self.master_tables(), q)?.class;
+        let class = unit.master(self.master_tables(), player_id)?.class;
         let record = OrderRecord {
             order,
             action,
             time: self.world_time,
             position,
             target: Some(target),
-            category: category(t.life.master_id, class, &self.model.roles),
-            target_position: t.moved_vector(self.parts.mover_of(t.id)),
+            category: category(unit.life.master_id, class, &self.model.roles),
+            target_position: unit.moved_vector(self.parts.mover_of(unit.id)),
         };
         if let Some(ai) = self
             .parts
@@ -172,13 +172,13 @@ impl World {
         id: ObjectId,
         master: MasterId,
     ) -> GenieResult<()> {
-        let Some(Place::Live(p, idx)) = self.place(id) else {
+        let Some(Place::Live(player_id, idx)) = self.place(id) else {
             return Ok(());
         };
-        if p != player || self.master(player, master).is_err() {
+        if player_id != player || self.master(player, master).is_err() {
             return Ok(());
         }
-        let unit = &self.players.live(p, idx)?;
+        let unit = &self.players.live(player_id, idx)?;
         if !self
             .model
             .roles
@@ -188,7 +188,7 @@ impl World {
         {
             return Ok(());
         }
-        self.transform_building(p, idx, master)
+        self.transform_building(player_id, idx, master)
     }
 
     /// A building's slot 0x90 (`FUN_1411e6d90`, with 0 from each caller): [`World::change_master`],
@@ -205,9 +205,9 @@ impl World {
         let build_time = self.master(player, new)?.creatable_part().build_time;
         let unit = self.players.live_mut(player, idx)?;
         if unit.life.state == ObjectState::Alive
-            && let Some(c) = self.parts.building_mut(unit.id)?.construction.as_mut()
+            && let Some(construction) = self.parts.building_mut(unit.id)?.construction.as_mut()
         {
-            c.progress = Seconds::of_master(build_time);
+            construction.progress = Seconds::of_master(build_time);
         }
         Ok(())
     }
@@ -224,7 +224,7 @@ impl World {
             .parts
             .building_of(unit.id)
             .gate
-            .is_some_and(|g| g.other_masters)
+            .is_some_and(|gate| gate.other_masters)
         {
             return Err(GenieError::unsupported(
                 "a gate's toggle to a master of its own or its original owner's",
@@ -234,7 +234,7 @@ impl World {
             .master(self.master_tables(), player)?
             .building
             .as_ref()
-            .and_then(|b| b.transform_unit)
+            .and_then(|building_master| building_master.transform_unit)
         else {
             return Ok(());
         };
@@ -257,8 +257,8 @@ impl World {
                     &self.model.tuning,
                 ),
             )?;
-            for u in units {
-                self.shut_in_gate(u)?;
+            for object_id in units {
+                self.shut_in_gate(object_id)?;
             }
             self.parts
                 .mover_mut(self.players.live(player, idx)?.id)
@@ -283,27 +283,27 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(());
         };
-        let (p, u) = (place.player(), self.players.at(place)?);
-        let master = u.master(self.master_tables(), p)?;
+        let (place_player_id, place_unit) = (place.player(), self.players.at(place)?);
+        let master = place_unit.master(self.master_tables(), place_player_id)?;
         let spared = TRIBE_COMBAT <= master.kind
             && (self.model.roles.of_class(master.class).contains(ClassRoles::ALWAYS_SPARED)
                 // The class `FUN_140c89760` lets scout without the master's flag when a game setting allows it
                 // (raw `0x3a`).
                 // The town centre (master 109, `0x6109` raw), to which livestock's `MoveTo` goes as to a point
                 // (`FUN_140aa0df0`).
-                || (self.model.roles.of_class(master.class).contains(ClassRoles::LIVESTOCK) && Amount::ZERO < u.life.amount));
+                || (self.model.roles.of_class(master.class).contains(ClassRoles::LIVESTOCK) && Amount::ZERO < place_unit.life.amount));
         if spared {
             return Ok(());
         }
         let unit = match place {
             Place::Live(p, i) => self.players.live_mut(p, i)?,
-            Place::Sleeping(p, i) => {
-                let woken = self.swap_remove_asleep(p, i)?;
+            Place::Sleeping(player_id, i) => {
+                let woken = self.swap_remove_asleep(player_id, i)?;
                 let (id, master) = (woken.unit.id, woken.unit.life.master_id);
-                let i = self.push_live(p, woken)?;
+                let list_index = self.push_live(player_id, woken)?;
                 // the wake's remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
-                self.track_relist(p, id, master)?;
-                self.players.live_mut(p, i)?
+                self.track_relist(player_id, id, master)?;
+                self.players.live_mut(player_id, list_index)?
             }
         };
         unit.life.goto_sleep = false;
@@ -441,13 +441,17 @@ pub(crate) fn switch_master(
         }
         unit.life.master_id = new;
         let moving = MoveState::of_mover(motion.mover());
-        if let Some(m) = motion.mover_mut() {
-            m.stats = next.move_stats.ok_or(GenieError::unsupported(
+        if let Some(mover) = motion.mover_mut() {
+            mover.stats = next.move_stats.ok_or(GenieError::unsupported(
                 "a moving unit's new master does not move",
             ))?;
             // the top speed the unit reads with the sprite it shows, from the new master's base
-            if let Some(shown) = unit.sprite.as_ref().map(|s| &s.graphic) {
-                m.stats.show(Some(shown));
+            if let Some(shown) = unit
+                .sprite
+                .as_ref()
+                .map(|active_sprite| &active_sprite.graphic)
+            {
+                mover.stats.show(Some(shown));
             }
         }
         let id = unit.id;
@@ -464,13 +468,13 @@ pub(crate) fn switch_master(
                 // is in no list nor the obstruction manager: its record takes the new master's
                 // values for its way out
                 world.spatial.set_inside_record(id, placed);
-                if let Some(v) = world.spatial.sight.as_mut() {
-                    v.seer_master(id, new, next.line_of_sight);
+                if let Some(visibility) = world.spatial.sight.as_mut() {
+                    visibility.seer_master(id, new, next.line_of_sight);
                 }
             } else {
-                if let Some(o) = placed.obstruction.as_mut() {
-                    o.kind = next.obstruction_kind;
-                    o.class = next.obstruction_class;
+                if let Some(obstruction) = placed.obstruction.as_mut() {
+                    obstruction.kind = next.obstruction_kind;
+                    obstruction.class = next.obstruction_class;
                 }
                 world.pathing.removed(id);
                 world.spatial.sight_master(
@@ -493,9 +497,9 @@ pub(crate) fn switch_master(
         // on; a unit whose sprite it does not hold shows its old master's. Without the
         // graphics (no data file) the Sprite stream is not modelled.
         if !world.graphics.is_empty() && old.standing_sprite != next.standing_sprite {
-            let g = next
+            let graphic = next
                 .standing_sprite
-                .and_then(|s| world.graphics.get(s).copied())
+                .and_then(|sprite_id| world.graphics.get(sprite_id).copied())
                 .ok_or(GenieError::unsupported(
                     "a new master's standing sprite the data file does not have",
                 ))?;
@@ -503,12 +507,12 @@ pub(crate) fn switch_master(
                 new_sprite(
                     &mut unit.sprite,
                     motion.move_stats_mut(),
-                    g,
+                    graphic,
                     world.sprite,
                     sprite_tuning,
                 );
             } else {
-                let _ = ActiveSprite::start(g, world.sprite, sprite_tuning);
+                let _ = ActiveSprite::start(graphic, world.sprite, sprite_tuning);
             }
         }
         switched.promoted = true;

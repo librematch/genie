@@ -61,14 +61,14 @@ impl FromIterator<Self> for TerrainMask {
 }
 
 impl Display for TerrainMask {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
-        write!(f, "{:#04x}", self.0)
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
+        write!(formatter, "{:#04x}", self.0)
     }
 }
 
 impl genie_diff::Diff for TerrainMask {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 

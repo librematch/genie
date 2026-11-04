@@ -88,14 +88,14 @@ impl World {
             queued: order.queued,
             direct: order.direct,
         };
-        for m in &self.groups.held(group)?.members {
-            let Some((_, u)) = self.object(m.id) else {
+        for group_member in &self.groups.held(group)?.members {
+            let Some((_, unit)) = self.object(group_member.id) else {
                 continue;
             };
-            let Some(member) = Some(m.id) else {
+            let Some(member) = Some(group_member.id) else {
                 continue;
             };
-            if u.life.hp < HitPoints::new(self.model.tuning.group.member_min_hp) {
+            if unit.life.hp < HitPoints::new(self.model.tuning.group.member_min_hp) {
                 continue;
             }
             if let Some(task) = self.member_task(member, &query)? {
@@ -144,7 +144,7 @@ impl World {
             drop_sites: &self.model.drop_sites,
         };
         let target = query.target;
-        let t = self.task_target(target, 1)?;
+        let task_target = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
         let terrain = self.task_terrain(query.point.with_height(0.0));
         let find = |list: &Master| {
@@ -152,7 +152,7 @@ impl World {
                 list,
                 &actor,
                 &TaskOn {
-                    target: Some(&t),
+                    target: Some(&task_target),
                     general: Some(&general),
                     terrain,
                 },
@@ -180,7 +180,7 @@ impl World {
             }
         }
         match found {
-            Some(task) => self.task_range(&task, &t).map(Some),
+            Some(task) => self.task_range(&task, &task_target).map(Some),
             None if holds_board_task(own) => Err(GenieError::unsupported(
                 "a group's command on a target (its task, slot 0x130)",
             )),
@@ -199,7 +199,7 @@ impl World {
             OWNER_RANGE_TASK => Some(Distance::new(
                 self.players
                     .get(target.player.index())
-                    .and_then(|p| p.attributes.get(OWNER_RANGE_ATTRIBUTE))
+                    .and_then(|player| player.attributes.get(OWNER_RANGE_ATTRIBUTE))
                     .copied()
                     .ok_or_else(|| {
                         GenieError::missing_data("a player without the attribute of a task's range")
@@ -225,5 +225,5 @@ fn holds_board_task(master: &Master) -> bool {
             .action_part()
             .tasks
             .iter()
-            .any(|t| matches!(t.action_kind, BOARD_TASK | UNBOARD_TASK))
+            .any(|task| matches!(task.action_kind, BOARD_TASK | UNBOARD_TASK))
 }

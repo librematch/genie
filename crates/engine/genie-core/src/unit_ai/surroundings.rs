@@ -1,9 +1,12 @@
 //! What the unit AI knows of its surroundings: the searches' results, its home, its targets
-//! and what it has seen.
+//! and what it has seen; and the unit's read of them as its AI runs ([`Unit::surroundings`]).
 
+use crate::GenieError;
 use crate::GenieResult;
 use crate::combat::Firepower;
 use crate::construction::MainBuildingId;
+use crate::construction::build::CART_TASK;
+use crate::groups::GroupCommandKind;
 use crate::map::Distance;
 use crate::map::DistanceSquared;
 use crate::map::Footprint;
@@ -13,25 +16,37 @@ use crate::map::Tile;
 use crate::map::WholeDistance;
 use crate::map::spatial::TileSight;
 use crate::math::fmath::BVector;
+use crate::movement::Mover;
 use crate::movement::Speed;
 use crate::objects::ActionState;
 use crate::objects::HitPoints;
+use crate::objects::ObjectId;
+use crate::objects::ObjectKey;
 use crate::objects::ObjectState;
+use crate::objects::layers::Action;
+use crate::objects::masters::ActionKind;
 use crate::objects::masters::AttackPriority;
 use crate::objects::masters::ClassId;
 use crate::objects::masters::CombatLevel;
+use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
 use crate::objects::masters::MasterKind;
 use crate::objects::masters::ObjectFlags;
-use crate::objects::{ObjectId, ObjectKey};
+use crate::objects::unit::Unit;
+use crate::objects::unit::UnitFlags;
 use crate::ownership::CaptureKind;
 use crate::players::Chance;
 use crate::players::PlayerId;
+use crate::unit_ai::world_view::OwnerView;
+use crate::unit_ai::world_view::changed_view;
+use crate::world::AiSwitches;
 use crate::world::Seconds;
 use crate::world::WorldTime;
 use crate::world::layer::Roles;
 use crate::world::layer::Slots;
 use crate::world::layer::generated::UnitAiTuning;
+use crate::world::others::OthersRef;
+use crate::world::step::Step;
 use genie_diff::Diff;
 use std::collections::HashSet;
 
@@ -96,19 +111,19 @@ pub fn flood_search(
     }
     let mut queue = vec![at];
     let mut next = 0;
-    while let Some(&q) = queue.get(next) {
+    while let Some(&next_tile) = queue.get(next) {
         next += 1;
-        if (ux - q.x()).abs() >= r - 1 || (uy - q.y()).abs() >= r - 1 {
+        if (ux - next_tile.x()).abs() >= r - 1 || (uy - next_tile.y()).abs() >= r - 1 {
             continue;
         }
-        for n in q.beside() {
-            if !reached.insert(n) {
+        for tile in next_tile.beside() {
+            if !reached.insert(tile) {
                 continue;
             }
-            if let Some(id) = test(n)? {
+            if let Some(id) = test(tile)? {
                 return Ok(Some(id));
             }
-            queue.push(n);
+            queue.push(tile);
         }
     }
     Ok(None)
@@ -293,7 +308,9 @@ pub(super) struct LiveTop {
 /// The idle part's group test (`0x140c67e8f`): no group, or one that is idle (`FUN_141017ad0`) of
 /// a unit that does not move (slot 0x5c8).
 pub(super) fn group_lets_idle(group: Option<GroupState>) -> bool {
-    group.is_none_or(|g| g.contains(GroupState::IDLE) && !g.contains(GroupState::MEMBER_MOVING))
+    group.is_none_or(|group_state| {
+        group_state.contains(GroupState::IDLE) && !group_state.contains(GroupState::MEMBER_MOVING)
+    })
 }
 
 bitflags::bitflags! {
@@ -319,7 +336,7 @@ impl Surroundings {
     #[must_use]
     pub fn unit(&self, id: impl ObjectKey) -> Option<&UnitSeen> {
         let id = id.key()?;
-        self.units.iter().find(|u| u.id == id)
+        self.units.iter().find(|unit_seen| unit_seen.id == id)
     }
 }
 
@@ -436,4 +453,191 @@ pub enum Pace {
     Walk,
     /// It runs.
     Run,
+}
+
+impl Unit {
+    /// What the unit's AI reads of it and the world as it runs ([`Surroundings`]): the unit,
+    /// its master (`master`, its class `class`), its owner `player` (a captured unit's new one,
+    /// whose map sees the AI's target), `busy` (an action of its own) and `interruptible` (slot
+    /// 0x2d0), through `view` (the owner's side).
+    ///
+    /// # Errors
+    ///
+    /// A busy unit of a master the slice does not have, and what the target's block and the
+    /// named units do not model.
+    #[allow(clippy::too_many_lines)]
+    pub(crate) fn surroundings(
+        &self,
+        actions: &Action,
+        step: &Step<'_>,
+        view: &OwnerView,
+        (master, class): (Option<&Master>, Option<ClassId>),
+        (player, busy, interruptible): (PlayerId, bool, bool),
+    ) -> GenieResult<Surroundings> {
+        Ok(Surroundings {
+            position: self.position(),
+            hp: self.life.hp,
+            speed: step
+                .w
+                .parts
+                .mover_of(self.id)
+                .map_or(Speed::ZERO, |m| m.stats.speed),
+            map: step.w.spatial.map,
+            dt_seconds: step.dt.seconds(),
+            flags: {
+                let mut flags = SurroundingFlags::empty();
+                flags.set(SurroundingFlags::MODE_1, step.w.mode_680.is_one());
+                flags.set(SurroundingFlags::BUSY, busy);
+                flags.set(SurroundingFlags::INTERRUPTIBLE, interruptible);
+                flags.set(
+                    SurroundingFlags::TASK_0X99,
+                    master.is_some_and(|m| {
+                        m.action_part()
+                            .tasks
+                            .iter()
+                            .any(|t| t.action_kind == CART_TASK)
+                    }),
+                );
+                flags.set(SurroundingFlags::GARRISONED, self.life.inside.is_some());
+                flags.set(
+                    SurroundingFlags::RANGED,
+                    master.is_some_and(|m| m.combat_part().missile.master().is_some()),
+                );
+                flags.set(
+                    SurroundingFlags::SCENARIO,
+                    step.w.settings.game_mode.scenario(),
+                );
+                flags.set(
+                    SurroundingFlags::TASK_0X69,
+                    master.is_some_and(|m| {
+                        m.action_part()
+                            .tasks
+                            .iter()
+                            .any(|task| task.action_kind == ActionKind::HEAL)
+                    }),
+                );
+                flags.set(
+                    SurroundingFlags::UNDER_ATTACK,
+                    self.flags.contains(UnitFlags::UNDER_ATTACK),
+                );
+                flags.set(
+                    SurroundingFlags::ATTACK_LISTED,
+                    actions.list.attack().is_some(),
+                );
+                flags.set(
+                    SurroundingFlags::ATTACK_MOVING,
+                    step.w
+                        .parts
+                        .mover_of(self.id)
+                        .is_some_and(|m| m.attack_moving),
+                );
+                flags.set(
+                    SurroundingFlags::DISABLE_TOWER_PRIORITY,
+                    view.ai_settings
+                        .switches
+                        .contains(AiSwitches::DISABLE_TOWER_PRIORITY),
+                );
+                flags.set(
+                    SurroundingFlags::GUEST_COMPUTER,
+                    self.garrison.iter().any(|&object_id| {
+                        step.w.spatial.get(object_id).is_some_and(|placed| {
+                            placed.player != player
+                                && step
+                                    .w
+                                    .players
+                                    .get(placed.player.index())
+                                    .is_some_and(|q| q.kind.is_computer())
+                        })
+                    }),
+                );
+                flags
+            },
+            player,
+            class: match class {
+                Some(class) => Some(class),
+                None if busy => {
+                    return Err(GenieError::unsupported(
+                        "a busy unit of a master the slice does not have",
+                    ));
+                }
+                None => None,
+            },
+            combat_level: master.map_or(CombatLevel::NONE, |m| m.combat_level),
+            attack_priority: master.map_or(AttackPriority::PRIORITY_0, |m| {
+                m.creatable_part().attack_priority
+            }),
+            size: master.map_or(Footprint::ZERO, |m| m.radius),
+            los: master.map_or(Distance::ZERO, |m| m.line_of_sight),
+            search_radius: master.map_or(Distance::ZERO, |m| m.action_part().search_radius),
+            weapon_range: master.map_or(Distance::ZERO, |m| m.combat_part().weapon_range),
+            state: self.life.state,
+            kind: master.map_or(MasterKind::of_data(0), |m| m.kind),
+            firepower: step.w.parts.combat_of(self.id).firepower,
+            capture: self.capture_kind(step),
+            master: self.life.master_id,
+            // a new owner sees the target with its own map
+            target: self.ai_target(step, view.player)?,
+            id: self.id,
+            anim_speed: step.w.parts.anim_speed_of(self.id),
+            action_state: if step.w.parts.unread.contains(self.id) {
+                None
+            } else {
+                Some(
+                    actions
+                        .top_action()
+                        .map_or(ActionState::NO_ACTION, |top_action| top_action.state),
+                )
+            },
+            units: self.named_units(
+                step,
+                changed_view(
+                    OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+                    view.new_owner,
+                ),
+                view,
+                master,
+            )?,
+            group: (self.group.id)
+                .and_then(|id| step.w.groups.get(id))
+                .map(|group| {
+                    let mut flags = GroupState::empty();
+                    flags.set(
+                        GroupState::COMMANDED,
+                        group.current_command != GroupCommandKind::NONE,
+                    );
+                    flags.set(GroupState::IDLE, group.is_idle());
+                    flags.set(GroupState::PATROL, group.patrols());
+                    flags.set(GroupState::MOVING, group.motion.moving());
+                    flags.set(
+                        GroupState::MEMBER_MOVING,
+                        step.w.parts.mover_of(self.id).is_some_and(Mover::is_moving),
+                    );
+                    flags
+                }),
+            top_target: actions.top_target_seen(
+                step,
+                OthersRef::of(&step.w.players, &step.w.index, step.player)?,
+            )?,
+            min_range: master.map_or(Distance::ZERO, |m| m.combat_part().min_range),
+            moved_at: step
+                .w
+                .parts
+                .mover_of(self.id)
+                .map_or_else(|| self.position(), |mover| mover.moved_at)
+                .vector(),
+            dodge_chance: step
+                .w
+                .players
+                .get(player.index())
+                .map_or(Chance::NONE, |q| q.dodge_chance),
+            keep_distance_chance: step
+                .w
+                .players
+                .get(player.index())
+                .map_or(Chance::NONE, |q| q.keep_distance_chance),
+            roles: step.w.model.roles.clone(),
+            slots: step.w.model.slots,
+            unit_ai_tuning: step.w.model.tuning.unit_ai,
+        })
+    }
 }

@@ -112,9 +112,9 @@ impl GatherAction {
         let walk = walks
             .live(mover)
             .to_point(point, range, given, move_to_tuning)?;
-        Ok(walk.map(|m| MoveToAction {
+        Ok(walk.map(|move_to_action| MoveToAction {
             on_target_moved,
-            ..m
+            ..move_to_action
         }))
     }
 }

@@ -98,8 +98,8 @@ impl Fly {
             return MoveToDrop::NoneDropped;
         }
         if state == FlyState::Choosing {
-            let r = action.rand15() as i32;
-            self.timer = Seconds::new(((r * 10) / 0x7fff + 5) as f32);
+            let draw = action.rand15() as i32;
+            self.timer = Seconds::new(((draw * 10) / 0x7fff + 5) as f32);
         }
         if walked {
             MoveToDrop::Dropped
@@ -119,10 +119,15 @@ impl Fly {
     /// # Errors
     ///
     /// A bird without movement state, and the states and tasks the slice does not model.
-    pub(crate) fn update(&mut self, c: &mut Step<'_>, bird: &mut Unit, me: Me) -> GenieResult<()> {
-        let _ = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
+    pub(crate) fn update(
+        &mut self,
+        step: &mut Step<'_>,
+        bird: &mut Unit,
+        me: Me,
+    ) -> GenieResult<()> {
+        let _ = step.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
         if Seconds::ZERO < self.timer {
-            self.timer -= c.dt.seconds();
+            self.timer -= step.dt.seconds();
         }
         let rest = self.task.wait_time;
         match self.state {
@@ -130,25 +135,25 @@ impl Fly {
                 if Seconds::ZERO < self.timer {
                     return Ok(());
                 }
-                self.set_state_of(bird, FlyState::Choosing, c)
+                self.set_state_of(bird, FlyState::Choosing, step)
             }
             FlyState::Choosing => {
-                let mover = c.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
+                let mover = step.w.parts.mover_of(bird.id).ok_or(NO_MOVER)?;
                 let sprites = FlightSprites {
                     walking: bird
-                        .master(c.w.master_tables(), c.player)?
+                        .master(step.w.master_tables(), step.player)?
                         .moving_part()
                         .move_sprite,
-                    graphics: &c.w.model.graphics,
+                    graphics: &step.w.model.graphics,
                 };
-                let action = c.w.streams.get(Stream::Action);
+                let action = step.w.streams.get(Stream::Action);
                 let dropped =
-                    self.choose(bird.position(), mover, c.w.spatial.map, action, &sprites)?;
-                stop_if(c.w.parts.mover_mut(bird.id), dropped)
+                    self.choose(bird.position(), mover, step.w.spatial.map, action, &sprites)?;
+                stop_if(step.w.parts.mover_mut(bird.id), dropped)
             }
             FlyState::Flying { .. } => {
                 if self.timer <= Seconds::ZERO {
-                    self.set_state_of(bird, FlyState::Resting, c)?;
+                    self.set_state_of(bird, FlyState::Resting, step)?;
                     if EPSILON < rest.get() {
                         self.timer = rest;
                     }
@@ -159,18 +164,21 @@ impl Fly {
                 // (its set_state(4) shows its sprite, +0x58, before the motion step)
                 // a rest set above dropped the MoveTo: the list's update finds none
                 let mut move_to = self.state.move_to().copied();
-                let code = update_sub_actions(&mut move_to, c, bird, me, ListUpdate::default())?;
-                if let FlyState::Flying { move_to: m } = &mut self.state {
-                    *m = move_to;
+                let code = update_sub_actions(&mut move_to, step, bird, me, ListUpdate::default())?;
+                if let FlyState::Flying {
+                    move_to: move_to_action,
+                } = &mut self.state
+                {
+                    *move_to_action = move_to;
                 }
                 if code == SubCode::UnderWay {
                     return Ok(());
                 }
                 if EPSILON < rest.get() {
                     self.timer += rest;
-                    return self.set_state_of(bird, FlyState::Resting, c);
+                    return self.set_state_of(bird, FlyState::Resting, step);
                 }
-                self.set_state_of(bird, FlyState::Choosing, c)
+                self.set_state_of(bird, FlyState::Choosing, step)
             }
             _ => Err(GenieError::unsupported(
                 "a Fly action in a state the slice does not model",
@@ -180,9 +188,14 @@ impl Fly {
 
     /// [`Fly::set_state`] of `bird`'s Fly with the step's Action stream; a dropped `MoveTo` stops
     /// the bird at once ([`stop_if`]).
-    fn set_state_of(&mut self, bird: &Unit, state: FlyState, c: &mut Step<'_>) -> GenieResult<()> {
-        let dropped = self.set_state(state, c.w.streams.get(Stream::Action));
-        stop_if(c.w.parts.mover_mut(bird.id), dropped)
+    fn set_state_of(
+        &mut self,
+        bird: &Unit,
+        state: FlyState,
+        step: &mut Step<'_>,
+    ) -> GenieResult<()> {
+        let dropped = self.set_state(state, step.w.streams.get(Stream::Action));
+        stop_if(step.w.parts.mover_mut(bird.id), dropped)
     }
 
     /// State 3: an angle drawn from the Action stream (`0..360`, `FUN_140810fc0`), a distance of
@@ -203,15 +216,15 @@ impl Fly {
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
     ) -> GenieResult<MoveToDrop> {
-        let t = self.task;
+        let task = self.task;
         let (speed, position) = (mover.stats.speed, at);
         let radius = mover.stats.radius.ground();
-        let leash = f32::from(t.holding_attr) * f32::from(t.holding_attr);
+        let leash = f32::from(task.holding_attr) * f32::from(task.holding_attr);
         let mut angle = action.below_checked(360) as i32;
-        let factor = if t.work_val1.get() < EPSILON {
+        let factor = if task.work_val1.get() < EPSILON {
             1.0
         } else {
-            t.work_val1.get()
+            task.work_val1.get()
         };
         let distance = (speed * self.timer * factor).get();
         let (x, y, z) = (position.x(), position.y(), position.z());
@@ -239,22 +252,25 @@ impl Fly {
                 return Ok(self.set_state(FlyState::Resting, action));
             }
         };
-        if !t.terrain.is_none() {
+        if !task.terrain.is_none() {
             return Err(GenieError::unsupported(
                 "a flight to a terrain of its task's",
             ));
         }
-        if t.work_val2.get() as i32 as i16 != -1 && Distance::ZERO < t.work_range {
+        if task.work_val2.get() as i32 as i16 != -1 && Distance::ZERO < task.work_range {
             return Err(GenieError::unsupported(
                 "a flight keeping away from a class",
             ));
         }
-        if EPSILON < t.work_val1.get() {
+        if EPSILON < task.work_val1.get() {
             return Err(GenieError::unsupported(
                 "a flight's animation speed (+0x7b8)",
             ));
         }
-        let sprite = graphic_of(sprites.graphics, Self::flight_sprite(t, action, sprites)?)?;
+        let sprite = graphic_of(
+            sprites.graphics,
+            Self::flight_sprite(task, action, sprites)?,
+        )?;
         // FUN_140aa0d30 to the point within 0 with the flight's sprite, not quiet, then
         // set_state(4) keeps it
         let flight = MoveToAction {
@@ -283,7 +299,7 @@ impl Fly {
     ///
     /// A task with only a carrying sprite (the game's draw loops on).
     fn flight_sprite(
-        t: Task,
+        task: Task,
         action: &mut Well512,
         sprites: &FlightSprites<'_>,
     ) -> GenieResult<Option<SpriteId>> {
@@ -292,7 +308,7 @@ impl Fly {
             proceeding,
             working,
             carrying,
-        } = t.sprites;
+        } = task.sprites;
         if moving.is_none() && carrying.is_none() && proceeding.is_none() {
             return Ok(sprites.walking);
         }
@@ -359,41 +375,41 @@ impl Unit {
     pub(crate) fn start_fly(
         &mut self,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         task: Task,
     ) -> GenieResult<()> {
-        if c.player != PlayerId::GAIA {
+        if step.player != PlayerId::GAIA {
             return Err(GenieError::unsupported(
                 "a player's bird's default Fly (its task's +0x15)",
             ));
         }
-        let fly_mode = self.master(c.w.master_tables(), c.player)?.fly_mode;
+        let fly_mode = self.master(step.w.master_tables(), step.player)?.fly_mode;
         actions.list.set_fly(Some(Fly::start(
             task,
             self.position(),
-            c.w.streams.get(Stream::Action),
+            step.w.streams.get(Stream::Action),
         )));
         if fly_mode == FlyMode::ABOVE {
-            self.lift_to_fly_height(c)?;
+            self.lift_to_fly_height(step)?;
         }
         Ok(())
     }
 
     /// The bird goes to the fly height on its tile (slot 0x58, the position setter), which marks
     /// the move (`+0x824`, `+0x870`).
-    fn lift_to_fly_height(&mut self, c: &mut Step<'_>) -> GenieResult<()> {
+    fn lift_to_fly_height(&mut self, step: &mut Step<'_>) -> GenieResult<()> {
         let (x, y) = (self.position().x(), self.position().y());
-        let at = Position::new(x, y, c.w.model.tuning.fly.height);
-        let moving = MoveState::of_mover(c.w.parts.mover_of(self.id));
+        let at = Position::new(x, y, step.w.model.tuning.fly.height);
+        let moving = MoveState::of_mover(step.w.parts.mover_of(self.id));
         self.new_position(
             at,
             moving,
-            (&mut c.w.spatial, Some(&mut c.w.pathing)),
-            &c.w.model.roles,
-            c.w.model.tuning.visibility,
+            (&mut step.w.spatial, Some(&mut step.w.pathing)),
+            &step.w.model.roles,
+            step.w.model.tuning.visibility,
         )?;
-        if let Some(m) = c.w.parts.mover_mut(self.id) {
-            m.mark_move(at, c.w.world_time);
+        if let Some(mover) = step.w.parts.mover_mut(self.id) {
+            mover.mark_move(at, step.w.world_time);
         }
         Ok(())
     }
@@ -445,10 +461,10 @@ mod tests {
     /// The hawk's movement state: top speed `speed`, radii 0.2, waiting to move (a stop clears
     /// it).
     fn wings(speed: f32) -> Mover {
-        let mut m = walker();
-        m.stats.speed = Speed::new(speed);
-        m.stats.radius = Radii::new(0.2, 0.2, 0.5);
-        m
+        let mut mover = walker();
+        mover.stats.speed = Speed::new(speed);
+        mover.stats.radius = Radii::new(0.2, 0.2, 0.5);
+        mover
     }
 
     /// A flight's `MoveTo` in `state` to `point` within 0, not quiet, without a sprite.
@@ -496,7 +512,7 @@ mod tests {
             objects: vec![bird].into(),
             ..Player::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -506,10 +522,10 @@ mod tests {
         .with_ais([(object_id(9925), UnitAi::default())])
         .with_actions([(object_id(9925), layer)])
         .with_motions([(object_id(9925), Motion::Moving(wings(speed)))]);
-        t.spatial = Spatial::new(GridSize::new(120, 120));
-        t.streams.get(Stream::Action).set_seed(seed);
-        t.model.graphics = Arc::new(hawk_graphics());
-        t.model.masters = vec![Arc::new(Masters::new([Master {
+        world.spatial = Spatial::new(GridSize::new(120, 120));
+        world.streams.get(Stream::Action).set_seed(seed);
+        world.model.graphics = Arc::new(hawk_graphics());
+        world.model.masters = vec![Arc::new(Masters::new([Master {
             id: master_id(96),
             moving: Some(MovingPart {
                 move_sprite: Some(SpriteId::named(846)),
@@ -517,7 +533,7 @@ mod tests {
             }),
             ..Master::default()
         }]))];
-        t
+        world
     }
 
     /// The hawk's sprites: 846 (its task's moving and working one, its master's walking one)
@@ -525,7 +541,7 @@ mod tests {
     fn hawk_graphics() -> Graphics {
         [(846, 0.0625), (1595, 0.0625)]
             .map(|(id, frame_duration)| {
-                let g = Graphic {
+                let graphic = Graphic {
                     id: SpriteId::named(id),
                     frames: Frame::of_data(60),
                     facets: FacetCount::of_data(16),
@@ -534,13 +550,13 @@ mod tests {
                     replay_delay: Seconds::ZERO,
                     flags: SpriteFlags::ANIMATED | SpriteFlags::TURNS,
                 };
-                (g.id, g)
+                (graphic.id, graphic)
             })
             .into()
     }
 
     /// The hawk's update of 21 ms through its step: its Fly after it.
-    fn flown(t: &mut World) -> GenieResult<Fly> {
+    fn flown(world: &mut World) -> GenieResult<Fly> {
         let me = Me {
             human_order: WorldTime::ZERO,
             id: object_id(9925),
@@ -548,38 +564,39 @@ mod tests {
             action_state: ActionState::NO_ACTION,
         };
         in_update(
-            t,
+            world,
             (PlayerId::new(0), ListIndex::new(0)),
             21,
-            |u, actions, c| u.fly_part(actions, c, me),
+            |unit, actions, step| unit.fly_part(actions, step, me),
         )?;
-        Ok(*t
+        Ok(*world
             .parts
-            .actions_of(t.players[0].objects[ListIndex::new(0)].id)
+            .actions_of(world.players[0].objects[ListIndex::new(0)].id)
             .list
             .fly()
             .unwrap())
     }
 
     /// The hawk stopped (slot 0x5d0 clears its wait to move).
-    fn stopped(t: &World) -> bool {
-        t.parts
-            .mover_of(t.players[0].objects[ListIndex::new(0)].id)
+    fn stopped(world: &World) -> bool {
+        world
+            .parts
+            .mover_of(world.players[0].objects[ListIndex::new(0)].id)
             .unwrap()
             .waiting
             == 0
     }
 
     /// The notifies 0x1f9 the hawk's unit AI holds.
-    fn failures(t: &World) -> usize {
-        let ai = t
+    fn failures(world: &World) -> usize {
+        let ai = world
             .parts
             .unit_ai
-            .get(t.players[0].objects[ListIndex::new(0)].id)
+            .get(world.players[0].objects[ListIndex::new(0)].id)
             .unwrap();
         let failed = ai.notifies.iter();
         failed
-            .filter(|n| n.kind == NotifyKind::ACTION_FAILED)
+            .filter(|notify| notify.kind == NotifyKind::ACTION_FAILED)
             .count()
     }
 
@@ -597,17 +614,17 @@ mod tests {
             },
             0.015_977_083,
         );
-        let mut t = sky_world(fly, 1.32, 1);
-        let mut e = t.streams.get(Stream::Action).clone();
-        let fly = flown(&mut t).unwrap();
-        assert!(stopped(&t));
-        assert_eq!(failures(&t), 0);
-        let time = ((e.rand15() as i32 * 10) / 0x7fff + 5) as f32;
+        let mut world = sky_world(fly, 1.32, 1);
+        let mut rng = world.streams.get(Stream::Action).clone();
+        let fly = flown(&mut world).unwrap();
+        assert!(stopped(&world));
+        assert_eq!(failures(&world), 0);
+        let time = ((rng.rand15() as i32 * 10) / 0x7fff + 5) as f32;
         assert_eq!(
             (fly.state, fly.timer),
             (FlyState::Choosing, Seconds::new(time))
         );
-        assert_eq!(t.streams.get(Stream::Action).draws, 1);
+        assert_eq!(world.streams.get(Stream::Action).draws, 1);
     }
 
     /// State 3's choice (`FUN_140b03a00` case 3): no time left (no distance) or no point on the
@@ -618,15 +635,15 @@ mod tests {
     fn choice_without_distance_or_point_rests() {
         let mover = &wings(1.32);
         let choose = |fly: &mut Fly, map: GridSize| {
-            let mut r = Well512::default();
-            r.set_seed(7);
+            let mut rng = Well512::default();
+            rng.set_seed(7);
             let graphics = hawk_graphics();
             let sprites = FlightSprites {
                 walking: None,
                 graphics: &graphics,
             };
-            let got = fly.choose(AT, mover, map, &mut r, &sprites);
-            (got, r.draws)
+            let got = fly.choose(AT, mover, map, &mut rng, &sprites);
+            (got, rng.draws)
         };
         let mut fly = hawk(FlyState::Choosing, 0.0);
         let _ = choose(&mut fly, GridSize::new(120, 120)).0.unwrap();
@@ -669,7 +686,7 @@ mod tests {
         }
     }
 
-    /// State 3's sprite (`0x140a84b40`): `r % 3` picks among the moving, working and proceeding
+    /// State 3's sprite (`0x140a84b40`): `rng % 3` picks among the moving, working and proceeding
     /// sprites and takes the first there from that index on; a task with no moving, proceeding
     /// or carrying sprite takes the master's walking one without a draw; only a carrying sprite
     /// is not modelled (the game's draw loops on).
@@ -702,23 +719,23 @@ mod tests {
                 Ok(Some(SpriteId::named(2)))
             );
         }
-        let mut r = Well512::default();
+        let mut rng = Well512::default();
         assert_eq!(
-            Fly::flight_sprite(with([-1, -1, 5, -1]), &mut r, &sprites),
+            Fly::flight_sprite(with([-1, -1, 5, -1]), &mut rng, &sprites),
             Ok(Some(SpriteId::named(846)))
         );
-        assert_eq!(r.draws, 0);
-        assert!(Fly::flight_sprite(with([-1, -1, -1, 7]), &mut r, &sprites).is_err());
+        assert_eq!(rng.draws, 0);
+        assert!(Fly::flight_sprite(with([-1, -1, -1, 7]), &mut rng, &sprites).is_err());
     }
 
     #[test]
     fn choice_flies_speed_times_time_along_drawn_angle() {
         // update 718: 10 s left less dt, 1.32 a second: 13.17 tiles at the drawn angle, then
         // the sprite draw; the MoveTo starts at the bird's height
-        let mut t = sky_world(hawk(FlyState::Choosing, 10.0), 1.32, 7);
-        let mut e = t.streams.get(Stream::Action).clone();
-        let fly = flown(&mut t).unwrap();
-        let angle = e.below_checked(360) as i32;
+        let mut world = sky_world(hawk(FlyState::Choosing, 10.0), 1.32, 7);
+        let mut rng = world.streams.get(Stream::Action).clone();
+        let fly = flown(&mut world).unwrap();
+        let angle = rng.below_checked(360) as i32;
         let d = 1.32 * (10.0f32 - 0.021) * 1.0;
         let theta = angle as f32 * DEGREE;
         let (c, s) = (cos(theta), sin(theta));
@@ -726,7 +743,7 @@ mod tests {
         let inside = |p: Point| 0.0 < p.x() && p.x() <= 119.0 && 0.0 < p.y() && p.y() <= 119.0;
         assert!(inside(point), "the seed's first angle lands on the map");
         // the sprite draw: the task's moving 846, working 846, proceeding 1595 from r % 3 on
-        let drawn = [846, 846, 1595][e.rand15() as usize % 3];
+        let drawn = [846, 846, 1595][rng.rand15() as usize % 3];
         let to = point.with_height(9.0);
         let sprite = hawk_graphics().get(SpriteId::named(drawn)).copied();
         assert_eq!(
@@ -738,8 +755,8 @@ mod tests {
                 })
             }
         );
-        assert_eq!(t.streams.get(Stream::Action).draws, 2);
-        assert!(!stopped(&t));
+        assert_eq!(world.streams.get(Stream::Action).draws, 2);
+        assert!(!stopped(&world));
     }
 
     #[test]
@@ -756,10 +773,10 @@ mod tests {
             },
             5.0,
         );
-        let mut t = sky_world(fly, 1.32, 1);
-        let fly = flown(&mut t).unwrap();
-        assert_eq!(failures(&t), 1);
-        assert!(stopped(&t));
+        let mut world = sky_world(fly, 1.32, 1);
+        let fly = flown(&mut world).unwrap();
+        assert_eq!(failures(&world), 1);
+        assert!(stopped(&world));
         assert_eq!(fly.state, FlyState::Choosing);
     }
 
@@ -773,37 +790,43 @@ mod tests {
             },
             5.0,
         );
-        let mut t = sky_world(fly, 0.0, 1);
-        let fly = flown(&mut t).unwrap();
+        let mut world = sky_world(fly, 0.0, 1);
+        let fly = flown(&mut world).unwrap();
         assert_eq!(
-            (fly.state.move_to().map(|m| m.state), failures(&t)),
+            (
+                fly.state
+                    .move_to()
+                    .map(|move_to_action| move_to_action.state),
+                failures(&world)
+            ),
             (Some(MoveTo::Failed), 0)
         );
-        assert!(!stopped(&t));
-        let _ = flown(&mut t).unwrap();
-        assert_eq!(failures(&t), 1);
-        assert!(stopped(&t));
+        assert!(!stopped(&world));
+        let _ = flown(&mut world).unwrap();
+        assert_eq!(failures(&world), 1);
+        assert!(stopped(&world));
     }
 
     #[test]
     fn resting_bird_chooses_once_its_rest_ran_out() {
-        let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
-        let fly = flown(&mut t).unwrap();
+        let mut world = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
+        let fly = flown(&mut world).unwrap();
         assert_eq!(
-            (fly.state, t.streams.get(Stream::Action).draws),
+            (fly.state, world.streams.get(Stream::Action).draws),
             (FlyState::Resting, 0)
         );
-        t.parts
+        world
+            .parts
             .actions
-            .of_mut(t.players[0].objects[ListIndex::new(0)].id)
+            .of_mut(world.players[0].objects[ListIndex::new(0)].id)
             .unwrap()
             .list
             .fly_mut()
             .unwrap()
             .timer = Seconds::new(0.01);
-        let fly = flown(&mut t).unwrap();
+        let fly = flown(&mut world).unwrap();
         assert_eq!(
-            (fly.state, t.streams.get(Stream::Action).draws),
+            (fly.state, world.streams.get(Stream::Action).draws),
             (FlyState::Choosing, 1)
         );
     }
@@ -811,12 +834,12 @@ mod tests {
     /// A bird without movement state fails its update, whatever its state.
     #[test]
     fn bird_without_movement_state_does_not_fly() {
-        let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
-        let bird = &mut t.players[0].objects[ListIndex::new(0)];
+        let mut world = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
+        let bird = &mut world.players[0].objects[ListIndex::new(0)];
         bird.place = Static::at(AT);
         let id = bird.id;
-        t.set_motion(id, None);
-        assert_eq!(flown(&mut t), Err(NO_MOVER));
+        world.set_motion(id, None);
+        assert_eq!(flown(&mut world), Err(NO_MOVER));
     }
 
     /// A bird that starts its master's default Fly (a load from the header) takes the master's
@@ -830,36 +853,42 @@ mod tests {
             ..Task::default()
         };
         let start = |default: Option<TaskIndex>| {
-            let mut t = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
-            let bird = &mut t.players[0].objects[ListIndex::new(0)];
-            t.parts.actions.of_mut(bird.id).unwrap().list.set_fly(None);
-            t.parts.actions.of_mut(bird.id).unwrap().default_task = DefaultTask::Fly;
-            let master = Arc::make_mut(&mut t.model.masters[0])
+            let mut world = sky_world(hawk(FlyState::Resting, 0.5), 1.32, 1);
+            let bird = &mut world.players[0].objects[ListIndex::new(0)];
+            world
+                .parts
+                .actions
+                .of_mut(bird.id)
+                .unwrap()
+                .list
+                .set_fly(None);
+            world.parts.actions.of_mut(bird.id).unwrap().default_task = DefaultTask::Fly;
+            let master = Arc::make_mut(&mut world.model.masters[0])
                 .get_mut(master_id(96))
                 .unwrap();
             let action = master.action.get_or_insert_with(Default::default);
             action.tasks = vec![task];
             action.default_task = default;
-            let r = in_update(
-                &mut t,
+            let in_update = in_update(
+                &mut world,
                 (PlayerId::new(0), ListIndex::new(0)),
                 21,
                 Unit::start_default_task,
             );
-            let fly = t
+            let fly = world
                 .parts
-                .actions_of(t.players[0].objects[ListIndex::new(0)].id)
+                .actions_of(world.players[0].objects[ListIndex::new(0)].id)
                 .list
                 .fly()
                 .copied();
-            (r, fly)
+            (in_update, fly)
         };
         let (r, fly) = start(TaskIndex::of_data(0));
         assert_eq!(r, Ok(DefaultStart::Started));
-        assert_eq!(fly.map(|f| f.task), Some(task));
-        let (r, fly) = start(None);
+        assert_eq!(fly.map(|task_fly| task_fly.task), Some(task));
+        let (default_start, fly) = start(None);
         assert_eq!(
-            r.unwrap_err().reason(),
+            default_start.unwrap_err().reason(),
             "a bird's default Fly whose master has no default task"
         );
         assert_eq!(fly, None);

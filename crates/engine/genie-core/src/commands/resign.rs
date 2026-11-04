@@ -25,7 +25,7 @@ pub struct ResignCommand {
 
 impl ResignCommand {
     /// Its handler ([`World::resign`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.resign(self.player, self.departure)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.resign(self.player, self.departure)
     }
 }

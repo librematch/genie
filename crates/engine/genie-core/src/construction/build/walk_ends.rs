@@ -33,37 +33,38 @@ impl BuildAction {
     /// What the restart and the wait do not model.
     pub(super) fn walk_ended(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
         if matches!(self.state, BuildState::Clear { .. }) {
-            return self.restart(c, builder, roles);
+            return self.restart(step, builder, roles);
         }
         if self.target.is_none() {
-            return self.idle(c, builder, reads);
+            return self.idle(step, builder, reads);
         }
         if !roles
             .of_some_class(reads.class)
             .contains(ClassRoles::VILLAGER)
         {
             let at = builder.position();
-            let ground =
-                c.w.parts
-                    .mover_of(builder.id)
-                    .map(|m| m.stats.radius.ground())
-                    .ok_or(BUILDER_UNMOVING)?;
-            let t = *c.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
-            let gap = footprint_gap_squared(at, ground, t.position, t.radius);
+            let ground = step
+                .w
+                .parts
+                .mover_of(builder.id)
+                .map(|mover| mover.stats.radius.ground())
+                .ok_or(BUILDER_UNMOVING)?;
+            let placed = *step.w.spatial.get_known(self.target)?.ok_or(SITE_GONE)?;
+            let gap = footprint_gap_squared(at, ground, placed.position, placed.radius);
             let range = self.task.range;
             if !(gap <= range.squared()
-                || gap <= DistanceSquared::new(c.w.model.tuning.build.reach))
+                || gap <= DistanceSquared::new(step.w.model.tuning.build.reach))
             {
-                return self.restart(c, builder, roles);
+                return self.restart(step, builder, roles);
             }
         }
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         self.state = BuildState::Work;
         Ok(())
     }
@@ -88,32 +89,34 @@ impl BuildAction {
     /// [`Spatial::foreign_marks`]: crate::map::spatial::Spatial::foreign_marks
     pub(super) fn walk_failed(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
         if let Some(target) = self.target {
-            let s = Self::site_unit(c, reads)?.ok_or(FOREIGN_SITE)?;
-            let desolid =
-                c.w.parts
-                    .building_of(s.id)
-                    .construction
-                    .is_some_and(|k| k.desolid);
-            let placed = *c.w.spatial.get_known(target)?.ok_or(SITE_GONE)?;
-            if desolid && c.w.spatial.foreign_marks(&placed) {
-                let seen =
-                    c.w.spatial
-                        .building_sight(target.id(), placed.position, placed.player)
-                        .ok_or(UNSEEN_SITE)?
-                        .seen();
+            let s = Self::site_unit(step, reads)?.ok_or(FOREIGN_SITE)?;
+            let desolid = step
+                .w
+                .parts
+                .building_of(s.id)
+                .construction
+                .is_some_and(|construction| construction.desolid);
+            let placed = *step.w.spatial.get_known(target)?.ok_or(SITE_GONE)?;
+            if desolid && step.w.spatial.foreign_marks(&placed) {
+                let seen = step
+                    .w
+                    .spatial
+                    .building_sight(target.id(), placed.position, placed.player)
+                    .ok_or(UNSEEN_SITE)?
+                    .seen();
                 if seen {
-                    self.remove_marked(c)?;
-                    return self.halt_in(c, builder, reads);
+                    self.remove_marked(step)?;
+                    return self.halt_in(step, builder, reads);
                 }
             }
         }
-        let mover = c.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
+        let mover = step.w.parts.mover_of(builder.id).ok_or(BUILDER_UNMOVING)?;
         let (restriction, ground, moved_at) = (
             mover.stats.restriction,
             mover.stats.radius.x(),
@@ -121,13 +124,17 @@ impl BuildAction {
         );
         let mut found = Found::Nothing;
         // the foundation's place and its master's radius, read before the planner's borrow
-        let known = c.w.spatial.get_known(self.target).map(Option::<&_>::copied);
-        let master_radius = match Self::site_unit(c, reads)? {
-            Some(s) => Some(s.master(c.w.master_tables(), c.player)?.radius.x()),
+        let known = step
+            .w
+            .spatial
+            .get_known(self.target)
+            .map(Option::<&_>::copied);
+        let master_radius = match Self::site_unit(step, reads)? {
+            Some(unit) => Some(unit.master(step.w.master_tables(), step.player)?.radius.x()),
             None => None,
         };
         if self.target.is_some()
-            && let Some(planner) = c.w.pathing.planner(restriction, c.w.spatial.tiles())
+            && let Some(planner) = step.w.pathing.planner(restriction, step.w.spatial.tiles())
         {
             let t = known?.ok_or(SITE_GONE)?;
             let radius = master_radius.unwrap_or_else(|| t.radius.x());
@@ -145,13 +152,13 @@ impl BuildAction {
                 false,
                 &mut path,
                 None,
-                &c.w.model.tuning.tile_path,
+                &step.w.model.tuning.tile_path,
             )?;
         }
         if found.reaches() {
-            self.restart(c, builder, roles)
+            self.restart(step, builder, roles)
         } else {
-            self.idle(c, builder, reads)
+            self.idle(step, builder, reads)
         }
     }
 
@@ -161,12 +168,12 @@ impl BuildAction {
     /// # Errors
     ///
     /// What the removal does not model.
-    pub(super) fn remove_marked(&self, c: &mut Step<'_>) -> GenieResult<()> {
+    pub(super) fn remove_marked(&self, step: &mut Step<'_>) -> GenieResult<()> {
         if let Some(target) = self.target
-            && let Some((q, _)) = c.w.object(target)
-            && !c.w.players.player(q)?.kind.is_computer()
+            && let Some((player_id, _)) = step.w.object(target)
+            && !step.w.players.player(player_id)?.kind.is_computer()
         {
-            c.w.remove_building(q, target.id())?;
+            step.w.remove_building(player_id, target.id())?;
         }
         Ok(())
     }
@@ -181,17 +188,17 @@ impl BuildAction {
     /// The prelude's and the release's.
     pub(super) fn lose_foundation(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         if self.target.is_some() {
             let target = self.target.take();
-            release(c, builder, target, reads.by)?;
+            release(step, builder, target, reads.by)?;
         }
-        self.walk_to_point(c, builder, roles)
+        self.walk_to_point(step, builder, roles)
     }
 
     /// `set_state(11)` (`0x140aae200` case 0xb): the prelude ([`BuildAction::leave`]), then a
@@ -206,19 +213,19 @@ impl BuildAction {
     /// [`MoveToReads::to_point`]: crate::movement::move_to::MoveToReads::to_point
     pub(super) fn walk_to_point(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &Unit,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.leave(c, builder)?;
+        self.leave(step, builder)?;
         self.state = BuildState::WalkPoint { move_to: None };
         let move_reads = builder.move_to_reads(
-            c.w.parts.motion.mover(builder.id),
-            MasterTables::new(&c.w.model.masters, &c.w.parts.own_master),
-            c.player,
+            step.w.parts.motion.mover(builder.id),
+            MasterTables::new(&step.w.model.masters, &step.w.parts.own_master),
+            step.player,
             (
-                &c.w.model.graphics,
-                c.w.parts.combat_of(builder.id).abilities.look.as_ref(),
+                &step.w.model.graphics,
+                step.w.parts.combat_of(builder.id).abilities.look.as_ref(),
             ),
             roles,
         )?;
@@ -227,7 +234,7 @@ impl BuildAction {
                 self.point,
                 Distance::ZERO,
                 self.task.moving,
-                &c.w.model.tuning.move_to,
+                &step.w.model.tuning.move_to,
             )?,
         };
         Ok(())

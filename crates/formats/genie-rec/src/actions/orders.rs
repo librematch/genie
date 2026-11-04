@@ -130,7 +130,10 @@ impl WorkCommand {
     /// Also fails if there are more than 127 objects, the most the format's `i8` count holds.
     pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_all(&[0, 0, 0])?;
-        output.write_i32::<LE>(self.target_id.map_or(-1, |u| u32::from(u).cast_signed()))?;
+        output.write_i32::<LE>(
+            self.target_id
+                .map_or(-1, |object_id| u32::from(object_id).cast_signed()),
+        )?;
         output.write_i8(fits(self.objects.len())?)?;
         output.write_all(&[0, 0, 0])?;
         output.write_f32::<LE>(self.location.0)?;
@@ -183,7 +186,10 @@ impl MoveCommand {
     pub fn write_to<W: Write>(&self, output: &mut W) -> GenieResult<()> {
         output.write_u8(self.player_id.into())?;
         output.write_all(&[0, 0])?;
-        output.write_i32::<LE>(self.target_id.map_or(-1, |u| u32::from(u).cast_signed()))?;
+        output.write_i32::<LE>(
+            self.target_id
+                .map_or(-1, |object_id| u32::from(object_id).cast_signed()),
+        )?;
         output.write_i8(fits(self.objects.len())?)?;
         output.write_all(&[0, 0, 0])?;
         output.write_f32::<LE>(self.location.0)?;

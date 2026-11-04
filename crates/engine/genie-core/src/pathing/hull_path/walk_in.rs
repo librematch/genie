@@ -81,13 +81,13 @@ impl HullPather<'_> {
                 if HULL_ITERATIONS <= iterations || ways.most <= *ways.count {
                     break 'search;
                 }
-                let Some(n) = self.nodes.checked(NodeList::WALKS.head())?.next else {
+                let Some(node_index) = self.nodes.checked(NodeList::WALKS.head())?.next else {
                     break 'search;
                 };
                 iterations += 1;
-                self.close(NodeList::WALKS, n)?;
-                if self.on_map(self.nodes.checked(n)?.at) {
-                    break n;
+                self.close(NodeList::WALKS, node_index)?;
+                if self.on_map(self.nodes.checked(node_index)?.at) {
+                    break node_index;
                 }
             };
             let at = self.nodes.checked(node)?.at;
@@ -140,12 +140,12 @@ impl HullPather<'_> {
                     .bounds
             }
             Some(t) => {
-                let r = self.radius;
+                let distance = self.radius;
                 Rect::new(
-                    (t.at.x() - t.radius.x()) - r.get(),
-                    (t.at.y() - t.radius.y()) - r.get(),
-                    t.at.x() + t.radius.x() + r.get(),
-                    t.at.y() + t.radius.y() + r.get(),
+                    (t.at.x() - t.radius.x()) - distance.get(),
+                    (t.at.y() - t.radius.y()) - distance.get(),
+                    t.at.x() + t.radius.x() + distance.get(),
+                    t.at.y() + t.radius.y() + distance.get(),
                 )
             }
         };
@@ -169,14 +169,14 @@ impl HullPather<'_> {
         let mut left_boxes = false;
         {
             for side in 0..4 {
-                let n = *self.nodes.checked(node)?;
-                if !Self::may_cast(&n, side) {
+                let checked = *self.nodes.checked(node)?;
+                if !Self::may_cast(&checked, side) {
                     continue;
                 }
-                if let Some((q, b, box_side)) = self
-                    .hulls
-                    .checked(hull.index())?
-                    .ray_to_box(at, side, n.hull)
+                if let Some((q, b, box_side)) =
+                    self.hulls
+                        .checked(hull.index())?
+                        .ray_to_box(at, side, checked.hull)
                 {
                     let _ = self.add_node(NewNode {
                         list: NodeList::WALKS,
@@ -192,20 +192,24 @@ impl HullPather<'_> {
                     continue;
                 }
                 left_boxes = true;
-                let Some((mut q, edge)) = self.hulls.checked(hull.index())?.ray_to_hull(at, side)
+                let Some((mut point, edge)) =
+                    self.hulls.checked(hull.index())?.ray_to_hull(at, side)
                 else {
                     continue;
                 };
                 if ways.most <= *ways.count {
                     continue;
                 }
-                let s = *SIDES.checked(side as usize)?;
-                q = Point::new(q.x() - s.x() * NUDGE, q.y() - s.y() * NUDGE);
+                let ground_offset = *SIDES.checked(side as usize)?;
+                point = Point::new(
+                    point.x() - ground_offset.x() * NUDGE,
+                    point.y() - ground_offset.y() * NUDGE,
+                );
                 if let Some(end) = self.add_node(NewNode {
                     list: NodeList::WALKS,
                     open: false,
                     parent: Some(node),
-                    position: q,
+                    position: point,
                     goal: Some(to),
                     hull: -1,
                     vertex: -1,

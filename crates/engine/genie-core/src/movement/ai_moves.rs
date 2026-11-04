@@ -69,51 +69,54 @@ pub(crate) struct MoveSprites<'a> {
 
 impl Unit {
     /// The unit's slot 0x340 on its unit AI's move ([`Unit::ai_move_with`]), what it lets go and
-    /// the standing sprite of a `MoveTo` that fails at its start into the context `c`.
+    /// the standing sprite of a `MoveTo` that fails at its start into the context `step`.
     pub(crate) fn ai_move(
         &mut self,
         actions: &mut Action,
         m: AiMove,
         class: ClassId,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let by = self.releaser(c)?;
-        let sprite_rng = c.w.streams.get(Stream::Sprite);
+        let by = self.releaser(step)?;
+        let sprite_rng = step.w.streams.get(Stream::Sprite);
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         let sails = self.ai_move_with(
-            (actions, c.w.parts.unread.get(self.id)),
-            c.w.parts.motion.layer_mut(self.id),
+            (actions, step.w.parts.unread.get(self.id)),
+            step.w.parts.motion.layer_mut(self.id),
             m,
-            (class, c.player),
+            (class, step.player),
             (&mut releases, &mut leaves, by),
             (
                 MoveSprites {
                     masters: OwnerMasters::new(
-                        &c.w.parts.own_master,
-                        c.w.model.masters.of(c.player),
+                        &step.w.parts.own_master,
+                        step.w.model.masters.of(step.player),
                     ),
-                    graphics: &c.w.model.graphics,
-                    look: c.w.parts.combat.of(self.id).abilities.look.as_ref(),
+                    graphics: &step.w.model.graphics,
+                    look: step.w.parts.combat.of(self.id).abilities.look.as_ref(),
                     roles,
-                    sprite_tuning: c.w.model.tuning.sprite,
-                    move_to_tuning: &c.w.model.tuning.move_to,
+                    sprite_tuning: step.w.model.tuning.sprite,
+                    move_to_tuning: &step.w.model.tuning.move_to,
                 },
                 sprite_rng,
             ),
         )?;
-        torn_down(c, self, (leaves, releases))?;
-        if let MoveWith::Sails(t) = sails {
-            let sprite_rng = c.w.streams.get(Stream::Sprite);
+        torn_down(step, self, (leaves, releases))?;
+        if let MoveWith::Sails(transport_action) = sails {
+            let sprite_rng = step.w.streams.get(Stream::Sprite);
             self.transport_sail(
-                (t, actions),
-                c.w.parts.motion.layer_mut(self.id),
+                (transport_action, actions),
+                step.w.parts.motion.layer_mut(self.id),
                 m.point,
-                (&c.w.spatial, &mut c.w.zones, &mut c.w.pathing),
-                &c.w.model,
+                (&step.w.spatial, &mut step.w.zones, &mut step.w.pathing),
+                &step.w.model,
                 (
-                    OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                    c.w.parts.combat.of(self.id).abilities.look.as_ref(),
+                    OwnerMasters::new(
+                        &step.w.parts.own_master,
+                        step.w.model.masters.of(step.player),
+                    ),
+                    step.w.parts.combat.of(self.id).abilities.look.as_ref(),
                     sprite_rng,
                 ),
             )?;
@@ -121,17 +124,18 @@ impl Unit {
         Ok(())
     }
 
-    /// The unit's slot 0x340 (`FUN_141216c50`) on a move to `m.point` its unit AI gives it (also
-    /// its move off a footprint, [`crate::world::World::move_aside`]), the unit of `class` of
+    /// The unit's slot 0x340 (`FUN_141216c50`) on a move to `ai_move.point` its unit AI gives it
+    /// (also its move off a footprint, [`crate::world::World::move_aside`]), the unit of `class` of
     /// player `player`. An unpacked trebuchet (class 54) packs instead (its Pack action,
     /// `FUN_140ad4ff0` through slot 0x808), which is not modelled; a packed one (class 51) whose
-    /// head action packs or unpacks (types `0x7c`, `0x7d`) does nothing, and the slice holds no such
-    /// action, so it moves as any other: `FUN_1410866e0`. Without `m.force` a head `MoveTo` whose
-    /// point (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `m.point` stands: the move is done.
-    /// Then the head action's slot 0x40 may take the point ([`Unit::head_takes_point`]; the
-    /// target it lets go into `releases`). Otherwise a `MoveTo` to the point within `m.range`
-    /// (`FUN_140aa0d30`, the master's walking sprite with [`Pace::Walk`], else its running one; the
-    /// sprite is not held) is made, the action list is cleared (`FUN_140a98620`,
+    /// head action packs or unpacks (types `0x7c`, `0x7d`) does nothing, and the slice holds no
+    /// such action, so it moves as any other: `FUN_1410866e0`. Without `ai_move.force` a head
+    /// `MoveTo` whose point (`+0x38`..`+0x40`, [`MoveToAction::point`]) is `ai_move.point` stands:
+    /// the move is done. Then the head action's slot 0x40 may take the point
+    /// ([`Unit::head_takes_point`]; the target it lets go into `releases`). Otherwise a `MoveTo` to
+    /// the point within `ai_move.range` (`FUN_140aa0d30`, the master's walking sprite with
+    /// [`Pace::Walk`], else its running one; the sprite is not held) is made, the action list is
+    /// cleared (`FUN_140a98620`,
     /// [`Unit::clear_own_actions`]: the teardowns let their targets go into `releases` and a
     /// counted builder's foundation into `builder_leaves`, by `by`) and the `MoveTo` installed and
     /// started (slot 0x808, `FUN_14106e990`: its slot 0x70 sees an empty list; `FUN_140a977e0`
@@ -145,7 +149,7 @@ impl Unit {
         &mut self,
         (actions, unread): (&mut Action, Option<&Unread>),
         mut motion: MotionMut<'_>,
-        m: AiMove,
+        ai_move: AiMove,
         (class, player): (ClassId, PlayerId),
         (releases, builder_leaves, by): (
             &mut Vec<(ObjectId, Releaser)>,
@@ -167,16 +171,19 @@ impl Unit {
                 "an AI move of an unpacked trebuchet (class 54: its Pack action, FUN_140ad4ff0)",
             ));
         }
-        if m.force == OrderForce::Unforced
+        if ai_move.force == OrderForce::Unforced
             && actions.top_action_kind() == Some(MOVE_TO)
-            && actions.list.move_to().is_some_and(|mt| mt.point == m.point)
+            && actions
+                .list
+                .move_to()
+                .is_some_and(|mt| mt.point == ai_move.point)
         {
             return Ok(MoveWith::Walks);
         }
         match self.head_takes_point(
             (actions, unread),
             motion.reborrow(),
-            m.point,
+            ai_move.point,
             player,
             sprites,
         )? {
@@ -188,20 +195,21 @@ impl Unit {
             }
             PointMove::Repairs(released, left) => {
                 builder_leaves.extend(left);
-                if let Some(t) = released {
-                    releases.push((t, by));
+                if let Some(object_id) = released {
+                    releases.push((object_id, by));
                 }
                 return Ok(MoveWith::Walks);
             }
-            PointMove::Sails(t) => return Ok(MoveWith::Sails(t)),
+            PointMove::Sails(transport_action) => return Ok(MoveWith::Sails(transport_action)),
             PointMove::Declined => {}
         }
         self.clear_own_actions(actions, motion.reborrow(), releases, builder_leaves, by)?;
         let master = self.master_in(masters)?;
-        let sprite = ai_sprite(master, m.pace)
+        let sprite = ai_sprite(master, ai_move.pace)
             .or_else(|| point_sprite(master, look, Cargo::Empty, roles))
             .and_then(|id| graphics.get(id).copied());
-        let move_to = MoveToAction::to_point(m.point, m.range, sprite, motion.mover_mut());
+        let move_to =
+            MoveToAction::to_point(ai_move.point, ai_move.range, sprite, motion.mover_mut());
         if move_to.shows_standing() {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
@@ -294,7 +302,9 @@ impl Unit {
                 )
             }
             // the Transport's (0x140aa3e40): the caller sails it there
-            Some(ActionsAction::Transport(t)) => Ok(PointMove::Sails(*t)),
+            Some(ActionsAction::Transport(transport_action)) => {
+                Ok(PointMove::Sails(*transport_action))
+            }
             // the Repair's (FUN_140ad9700): its point, slot 0x68 with none, set_state(11)
             Some(ActionsAction::Repair(repair)) => {
                 let move_reads = MoveToReads::of(
@@ -340,7 +350,7 @@ impl Unit {
     ) -> GenieResult<PointMove> {
         let reads = MoveToReads::with_sprites(*sprites, (self, mover.as_deref()));
         let gone = match actions.list.artifact_mut() {
-            Some(a) => a.take_point(point, &reads, move_to_tuning)?,
+            Some(artifact) => artifact.take_point(point, &reads, move_to_tuning)?,
             None => SubActionsGone::default(),
         };
         if gone.stops {
@@ -423,61 +433,73 @@ impl Unit {
         actions: &mut Action,
         (target, state): (ObjectId, ObjectState),
         range: Distance,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        if c.w.parts.unread.contains(self.id) {
+        if step.w.parts.unread.contains(self.id) {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit with an action",
             ));
         }
-        if c.w.parts.mover_of(self.id).is_none() {
+        if step.w.parts.mover_of(self.id).is_none() {
             return Err(GenieError::unsupported(
                 "an AI move to an object of a unit that does not move",
             ));
         }
         let livestock = roles
-            .of_class(self.master(c.w.master_tables(), c.player)?.class)
+            .of_class(self.master(step.w.master_tables(), step.player)?.class)
             .contains(ClassRoles::LIVESTOCK);
-        let master = c.w.spatial.get_known(target)?.ok_or(TARGET_LACKING)?.master;
-        let by = self.releaser(c)?;
+        let master = step
+            .w
+            .spatial
+            .get_known(target)?
+            .ok_or(TARGET_LACKING)?
+            .master;
+        let by = self.releaser(step)?;
         if holds_object(livestock, master, state, roles) {
-            take(c, self, target, by, roles)?;
+            take(step, self, target, by, roles)?;
         }
         let (mut releases, mut leaves) = (Vec::new(), Vec::new());
         self.clear_own_actions(
             actions,
-            c.w.parts.motion_mut(self.id),
+            step.w.parts.motion_mut(self.id),
             &mut releases,
             &mut leaves,
             by,
         )?;
-        torn_down(c, self, (leaves, releases))?;
-        let own = self.master(c.w.master_tables(), c.player)?;
-        let range = object_range(range, Some(own), &c.w.model.tuning.order);
+        torn_down(step, self, (leaves, releases))?;
+        let own = self.master(step.w.master_tables(), step.player)?;
+        let range = object_range(range, Some(own), &step.w.model.tuning.order);
         let sprite = ai_sprite(own, Pace::Run)
             .or_else(|| object_sprite(own))
-            .and_then(|id| c.w.model.graphics.get(id).copied());
+            .and_then(|id| step.w.model.graphics.get(id).copied());
         let here = self.position();
-        let mover = c.w.parts.mover_mut(self.id).ok_or(GenieError::unreachable(
-            "a walker tested above without its mover",
-        ))?;
+        let mover = step
+            .w
+            .parts
+            .mover_mut(self.id)
+            .ok_or(GenieError::unreachable(
+                "a walker tested above without its mover",
+            ))?;
         let move_to = MoveToAction::to_object(
-            &c.w.spatial,
+            &step.w.spatial,
             here,
             mover,
             (target, state),
             range,
             (sprite, livestock),
-            &c.w.model,
+            &step.w.model,
         )?;
         if move_to.shows_standing() {
             self.shows_standing_sprite(
-                c.w.parts.motion.layer_mut(self.id),
-                OwnerMasters::new(&c.w.parts.own_master, c.w.model.masters.of(c.player)),
-                &c.w.model.graphics,
-                c.w.streams.get(Stream::Sprite),
-                c.w.model.tuning.sprite,
+                step.w.parts.motion.layer_mut(self.id),
+                OwnerMasters::new(
+                    &step.w.parts.own_master,
+                    step.w.model.masters.of(step.player),
+                ),
+                &step.w.model.graphics,
+                step.w.streams.get(Stream::Sprite),
+                step.w.model.tuning.sprite,
             )?;
         }
         actions.list.set_move_to(Some(move_to));
@@ -503,11 +525,11 @@ impl Unit {
         (masters, graphics, sprite_rng): (OwnerMasters<'_>, &Graphics, &mut Well512),
         sprite_tuning: SpriteTuning,
     ) -> GenieResult<()> {
-        let Some(m) = actions.list.move_to_mut() else {
+        let Some(move_to_action) = actions.list.move_to_mut() else {
             return Ok(());
         };
-        m.state = m.wait.give_up(patience, stance);
-        if m.state == MoveTo::Failed {
+        move_to_action.state = move_to_action.wait.give_up(patience, stance);
+        if move_to_action.state == MoveTo::Failed {
             self.shows_standing_sprite(motion, masters, graphics, sprite_rng, sprite_tuning)?;
         }
         Ok(())
@@ -527,10 +549,10 @@ impl Unit {
         let standing = self
             .master_in(masters)?
             .standing_sprite
-            .and_then(|s| graphics.get(s))
+            .and_then(|sprite_id| graphics.get(sprite_id))
             .copied();
-        if let Some(m) = motion.mover_mut() {
-            m.shows(standing.as_ref());
+        if let Some(mover) = motion.mover_mut() {
+            mover.shows(standing.as_ref());
         }
         if self.sprite.is_some() {
             let standing = standing.ok_or(GenieError::unsupported(

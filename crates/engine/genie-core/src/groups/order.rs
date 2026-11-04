@@ -70,7 +70,7 @@ impl World {
         g.flags &= !GroupFlags::MEMBERS_SENT;
         let target = target.filter(|&t| self.world_object(t).is_some());
         let task = match target {
-            Some(t) => self.group_task(group, t, point, order)?,
+            Some(object_id) => self.group_task(group, object_id, point, order)?,
             None => None,
         };
         if self.all_horde_units(group)? {
@@ -80,9 +80,9 @@ impl World {
         }
         let g = self.groups.held_mut(group)?;
         g.replaces_queue = u8::from(!order.queued);
-        let command = task.map(|t| GroupCommandKind::of_action(t.command));
+        let command = task.map(|target_task| GroupCommandKind::of_action(target_task.command));
         let mut moved = GroupMove::NotBegun;
-        if command.is_none_or(|c| c == MOVE_COMMAND) {
+        if command.is_none_or(|group_command_kind| group_command_kind == MOVE_COMMAND) {
             let mut flags = MoveFlags::FORGET_TARGET;
             flags.set(MoveFlags::QUEUED, order.queued);
             flags.set(MoveFlags::DIRECT, order.direct);
@@ -113,8 +113,8 @@ impl World {
         if moved == GroupMove::Begun {
             self.stop_all_units(group, StopScope::Busy)?;
         }
-        let g = self.groups.held_mut(group)?;
-        g.flags &= !GroupFlags::JOINED;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.flags &= !GroupFlags::JOINED;
         Ok(moved)
     }
 
@@ -170,8 +170,8 @@ impl World {
         }
         g.forget_target_data();
         g.current_target.range = Distance::ZERO;
-        for m in &mut g.members {
-            m.seconds_since_attacking = Seconds::MAX;
+        for member in &mut g.members {
+            member.seconds_since_attacking = Seconds::MAX;
         }
         let moved = self.command_move_to(
             group,
@@ -188,8 +188,8 @@ impl World {
         self.raise_attack_ranges(group, target)?;
         let at = self.moved_place_of(target)?;
         let radius = self.target_radius(target)?;
-        let g = self.groups.held_mut(group)?;
-        g.current_target = TargetData {
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.current_target = TargetData {
             target: GroupTarget::Object(target),
             original_position: at,
             range,
@@ -197,7 +197,7 @@ impl World {
             disable_retargeting: 0,
             certain_action: None,
         };
-        g.current_command = command;
+        unit_group.current_command = command;
         Ok(GroupMove::Begun)
     }
 
@@ -215,7 +215,7 @@ impl World {
         (task, order): (TargetTask, CommandArgs),
         moved: GroupMove,
     ) -> GenieResult<GroupMove> {
-        let g = self.groups.held_mut(group)?;
+        let unit_group = self.groups.held_mut(group)?;
         let entry = |approved: u8| GroupCommand {
             command: GroupCommandKind::of_action(task.command),
             target_id: Some(target),
@@ -226,20 +226,23 @@ impl World {
             approved_2: ActionKind::field(order.filter).cast_unsigned(),
         };
         if order.queued {
-            g.queue_command(entry(u8::from(order.direct)));
-            if g.current_command == GroupCommandKind::NONE && order.direct && g.hibernating != 1 {
-                g.hibernating = 1;
+            unit_group.queue_command(entry(u8::from(order.direct)));
+            if unit_group.current_command == GroupCommandKind::NONE
+                && order.direct
+                && unit_group.hibernating != 1
+            {
+                unit_group.hibernating = 1;
             }
             return Ok(moved);
         }
-        if !order.direct && !g.command_queue.is_empty() {
-            g.queue_command(entry(0));
-            g.approve_queued();
+        if !order.direct && !unit_group.command_queue.is_empty() {
+            unit_group.queue_command(entry(0));
+            unit_group.approve_queued();
             self.check_queued_orders(group)?;
             return Ok(GroupMove::Begun);
         }
-        if g.replaces_queue != 0 {
-            g.clear_command_queue();
+        if unit_group.replaces_queue != 0 {
+            unit_group.clear_command_queue();
         }
         self.command_attack(
             group,

@@ -191,13 +191,13 @@ impl World {
             });
         let ai = match ai {
             Ok(ai) => ai,
-            Err(e) => {
+            Err(error) => {
                 // the constructor's draws are unknown, so the turn player's are too
-                player_unsupported(self.ticks, self.player_turn, &e);
+                player_unsupported(self.ticks, self.player_turn, &error);
                 let ticks = self.ticks;
                 let turn = self.players.player_mut(self.player_turn)?;
                 let at = turn.objects.next_place();
-                let _ = turn.unsupported.get_or_insert((ticks, at, e));
+                let _ = turn.unsupported.get_or_insert((ticks, at, error));
                 turn.stopped = true;
                 None
             }
@@ -208,8 +208,8 @@ impl World {
             .standing_sprite
             .and_then(|s| self.model.graphics.get(s).copied());
         let (mut sprite, angle) = standing.map_or((None, Angle::ZERO), |g| {
-            let (s, _, angle) = self.setup_draws(g);
-            (Some(s), angle)
+            let (active_sprite, _, angle) = self.setup_draws(g);
+            (Some(active_sprite), angle)
         });
         self.building_combat_setup(player, master)?;
         let held = self.building_storage(player, master)?;
@@ -261,13 +261,13 @@ impl World {
         if foundation && WholeSeconds::ZERO < made.creatable_part().build_time {
             let shown = building
                 .construction_sprite
-                .and_then(|s| self.model.graphics.get(s).copied())
+                .and_then(|sprite_id| self.model.graphics.get(sprite_id).copied())
                 .or(standing);
-            if let Some(g) = shown {
+            if let Some(graphic) = shown {
                 new_sprite(
                     &mut sprite,
                     mover.as_mut().map(|m| &mut m.stats),
-                    g,
+                    graphic,
                     self.streams.get(Stream::Sprite),
                     self.model.tuning.sprite,
                 );
@@ -460,14 +460,14 @@ impl World {
             self.unwatch(player, aid)?;
         }
         if Distance::ZERO < am.height {
-            let c = self
+            let construction = self
                 .parts
                 .building_mut(aid)?
                 .construction
                 .as_mut()
                 .ok_or(NO_CONSTRUCTION)?;
-            if !c.desolid {
-                c.desolid = true;
+            if !construction.desolid {
+                construction.desolid = true;
                 self.pathing.removed(aid);
                 self.spatial.drop_record(aid);
                 self.spatial.set_tall(aid, false);

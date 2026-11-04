@@ -105,14 +105,14 @@ impl HuntAction {
     /// What the drop-off does not model, and the walk's.
     pub(crate) fn update_drop(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         unit: &mut Unit,
         me: Me,
         site: Option<DropOff>,
         who: PointWalker,
     ) -> GenieResult<Dropped> {
         if self.timer < Seconds::ZERO {
-            self.timer += c.dt.seconds();
+            self.timer += step.dt.seconds();
             if self.timer < Seconds::ZERO {
                 return Ok(Dropped::Going);
             }
@@ -127,15 +127,15 @@ impl HuntAction {
             },
             stance: who.stance,
         };
-        match self.update_list(c, unit, me, gives_up)? {
+        match self.update_list(step, unit, me, gives_up)? {
             SubCode::UnderWay => return Ok(Dropped::Going),
             // failed or its target let go: the hunt waits and the unit's animation stops
             SubCode::Failed | SubCode::TargetGone => {
                 self.timer = DROP_WAIT;
-                set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
+                set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
                 return Ok(Dropped::Going);
             }
-            SubCode::Done => self.tear_down(c.w.parts.mover_mut(unit.id))?,
+            SubCode::Done => self.tear_down(step.w.parts.mover_mut(unit.id))?,
         }
         let site = site.ok_or(GenieError::unsupported(
             "a drop-off whose drop site is gone",
@@ -145,13 +145,13 @@ impl HuntAction {
                 "a drop site that does not take the load (set_state 2)",
             ));
         }
-        if c.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
+        if step.w.model.tuning.hunt.drop_reach < site.gap_squared.get() {
             self.timer = DROP_WAIT;
-            set_walker_anim(c.w.parts.motion_mut(unit.id), Speed::new(0.0));
+            set_walker_anim(step.w.parts.motion_mut(unit.id), Speed::new(0.0));
             return Ok(Dropped::Going);
         }
-        let attributes = c.w.players.player(c.player)?.attributes.len();
-        let kind = resource_kind(unit.life.attribute_kind, attributes, c.w.model.slots);
+        let attributes = step.w.players.player(step.player)?.attributes.len();
+        let kind = resource_kind(unit.life.attribute_kind, attributes, step.w.model.slots);
         let amount = unit.life.amount;
         unit.life.attribute_kind = None;
         unit.life.amount = Amount::ZERO;
@@ -190,8 +190,8 @@ impl HuntAction {
     /// The teardown (`FUN_140a73fc0`): the sub-actions go; the caller releases the target (slot
     /// 0x180).
     pub fn tear_down(&mut self, mut mover: Option<&mut Mover>) -> GenieResult<()> {
-        if let Some(mut a) = self.state.take_attack() {
-            a.tear_down(mover.as_deref_mut())?;
+        if let Some(mut attack) = self.state.take_attack() {
+            attack.tear_down(mover.as_deref_mut())?;
         }
         if self.state.take_move_to().is_some()
             && let Some(m) = mover
@@ -229,33 +229,34 @@ impl Unit {
         &mut self,
         hunt: &mut HuntAction,
         actions: &mut Action,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let (mover, by_id) =
-            c.w.parts
-                .lend_mover(self.id, (&c.w.players, &c.w.index, &c.w.model));
-        let w = DropWorld {
-            masters: by_id.masters().of(c.player),
-            spatial: &mut c.w.spatial,
-            zones: &mut c.w.zones,
-            pathing: &mut c.w.pathing,
-            object: c.w.streams.get(Stream::Object),
-            world_time: c.w.world_time,
-            player_kind: c.w.players.player(c.player)?.kind,
-            groups: &c.w.groups,
+        let (mover, by_id) = step
+            .w
+            .parts
+            .lend_mover(self.id, (&step.w.players, &step.w.index, &step.w.model));
+        let drop_world = DropWorld {
+            masters: by_id.masters().of(step.player),
+            spatial: &mut step.w.spatial,
+            zones: &mut step.w.zones,
+            pathing: &mut step.w.pathing,
+            object: step.w.streams.get(Stream::Object),
+            world_time: step.w.world_time,
+            player_kind: step.w.players.player(step.player)?.kind,
+            groups: &step.w.groups,
         };
-        let others = OthersRef::of(&c.w.players, &c.w.index, c.player)?;
+        let others = OthersRef::of(&step.w.players, &step.w.index, step.player)?;
         if let Some(site) = self.drop_off_in(
             (hunt, actions),
             mover,
-            w,
+            drop_world,
             others,
-            &c.w.model.graphics,
+            &step.w.model.graphics,
             by_id,
         )? {
-            let by = self.releaser(c)?;
-            take(c, self, site, by, roles)?;
+            let by = self.releaser(step)?;
+            take(step, self, site, by, roles)?;
         }
         Ok(())
     }

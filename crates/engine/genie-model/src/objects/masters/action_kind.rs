@@ -129,7 +129,7 @@ impl ActionKind {
     #[must_use]
     pub const fn field(kind: Option<Self>) -> i16 {
         match kind {
-            Some(k) => k.0,
+            Some(action_kind) => action_kind.0,
             None => -1,
         }
     }
@@ -157,7 +157,7 @@ impl TryFrom<i16> for ActionKind {
 }
 
 impl Diff for ActionKind {
-    fn diff(&self, other: &Self, d: &mut Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut Differ) {
+        differ.equal(self, other);
     }
 }

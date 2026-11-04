@@ -32,20 +32,20 @@ pub enum ResourceShare {
 }
 
 impl World {
-    /// The trickles of player `p`: each of attributes 230 to 233 above 0 (`COMISS` with 0,
+    /// The trickles of player `player_id`: each of attributes 230 to 233 above 0 (`COMISS` with 0,
     /// `JBE` skips a NaN) adds its sixtieth to food, wood, stone and gold in turn, through the
     /// attribute add with its statistic and its sharing ([`World::add_resource`] with 1 and 1).
-    pub fn trickles(&mut self, p: PlayerId) -> GenieResult<()> {
+    pub fn trickles(&mut self, player_id: PlayerId) -> GenieResult<()> {
         for kind in AttributeId::resources() {
             let rate = get(
-                &self.players.player(p)?.attributes,
+                &self.players.player(player_id)?.attributes,
                 self.model.slots.attribute.trickles.offset(kind.index())?,
             );
             if at_most_or_unordered(rate.get(), 0.0) {
                 continue;
             }
             self.add_resource(
-                p,
+                player_id,
                 kind,
                 rate / MINUTE,
                 ResourceStat::Gathered,
@@ -55,17 +55,18 @@ impl World {
         Ok(())
     }
 
-    /// The food of player `p`'s mills' livestock: over the ids its tracker files under the mill
-    /// (master 68, [`crate::players::tracker::Tracker::list`]), each object the world holds whose type is
-    /// a building's sums its livestock (`mLivestockSummation`, `+0xc28`, in the list's order from
-    /// 0); food grows by attribute 254 over 60 times (`time` times logf(sum / 200 + 1))
-    /// ([`crate::math::fmath::log`]), with its statistic and its sharing ([`World::add_resource`]),
-    /// also when that is 0. `time` is the update time before the loop's step.
-    pub fn mill_food(&mut self, p: PlayerId, time: Seconds) -> GenieResult<()> {
+    /// The food of player `player_id`'s mills' livestock: over the ids its tracker files under the
+    /// mill (master 68, [`crate::players::tracker::Tracker::list`]), each object the world holds
+    /// whose type is a building's sums its livestock (`mLivestockSummation`, `+0xc28`, in the
+    /// list's order from 0); food grows by attribute 254 over 60 times (`time` times logf(sum /
+    /// 200 + 1)) ([`crate::math::fmath::log`]), with its statistic and its sharing
+    /// ([`World::add_resource`]), also when that is 0. `time` is the update time before the loop's
+    /// step.
+    pub fn mill_food(&mut self, player_id: PlayerId, time: Seconds) -> GenieResult<()> {
         let mut sum = 0.0;
         for &id in self
             .players
-            .player(p)?
+            .player(player_id)?
             .tracker
             .list(ListKey::master(self.model.slots.master.mill))
         {
@@ -75,20 +76,20 @@ impl World {
             let building = unit
                 .master(self.master_tables(), owner)
                 // The buildings' type (the object's `+0xf`, `'P'`).
-                .is_ok_and(|m| m.kind == MasterKind::BUILDING);
+                .is_ok_and(|master| master.kind == MasterKind::BUILDING);
             if building {
                 sum += self.parts.building_of(unit.id).livestock_summation.get();
             }
         }
         let grows = log(sum / self.model.tuning.world_player.livestock_scale + SECOND);
         let rate = get(
-            &self.players.player(p)?.attributes,
+            &self.players.player(player_id)?.attributes,
             self.model.slots.attribute.mill_food,
         )
         .get()
             / MINUTE;
         self.add_resource(
-            p,
+            player_id,
             self.model.slots.attribute.food,
             Amount::new(rate * (time * grows)),
             ResourceStat::Gathered,
@@ -98,15 +99,16 @@ impl World {
     }
 
     /// The world player's attribute add (slot 0xf8, `FUN_141616820`) of `amount` to resource `kind`
-    /// (food, wood, stone, gold: 0 to 3) of player `p`, with `stat` (its fourth argument) and
-    /// `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first (166 to
-    /// 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to 169), then the
-    /// resource ([`World::add_attribute_base`]). The resource panel's event when a resource crosses
-    /// 100 (`FUN_140c898a0` 0x80) is the interface's. The kinds 50, 183 and 196 and the others are
-    /// not resources: their branches are [`crate::world::Player::add_attribute`]'s.
+    /// (food, wood, stone, gold: 0 to 3) of player `player_id`, with `stat` (its fourth argument)
+    /// and `share` (its fifth, [`ResourceShare`]): with `stat` 1 the gathered total grows first
+    /// (166 to 168; gold: any `stat` but 0 adds to attribute 49 unchecked, then 1 adds to 169),
+    /// then the resource ([`World::add_attribute_base`]). The resource panel's event when a
+    /// resource crosses 100 (`FUN_140c898a0` 0x80) is the interface's. The kinds 50, 183 and 196
+    /// and the others are not resources: their branches are
+    /// [`crate::world::Player::add_attribute`]'s.
     pub fn add_resource(
         &mut self,
-        p: PlayerId,
+        player_id: PlayerId,
         kind: AttributeId,
         amount: Amount,
         stat: ResourceStat,
@@ -119,12 +121,16 @@ impl World {
             .contains(AttributeRoles::GOLD)
         {
             if stat.counts_gold() {
-                let a = &mut self.players.player_mut(p)?.attributes;
-                let counter = get(a, self.model.slots.attribute.gold_counter);
-                set(a, self.model.slots.attribute.gold_counter, amount + counter);
+                let amounts = &mut self.players.player_mut(player_id)?.attributes;
+                let counter = get(amounts, self.model.slots.attribute.gold_counter);
+                set(
+                    amounts,
+                    self.model.slots.attribute.gold_counter,
+                    amount + counter,
+                );
                 if stat.gathered() {
                     self.add_attribute_base(
-                        p,
+                        player_id,
                         self.model.slots.attribute.gold_gathered,
                         amount,
                         ResourceStat::Gathered,
@@ -134,14 +140,14 @@ impl World {
             }
         } else if stat.gathered() {
             self.add_attribute_base(
-                p,
+                player_id,
                 self.model.slots.attribute.gathered.offset(kind.index())?,
                 amount,
                 ResourceStat::Gathered,
                 share,
             )?;
         }
-        self.add_attribute_base(p, kind, amount, stat, share)?;
+        self.add_attribute_base(player_id, kind, amount, stat, share)?;
         Ok(())
     }
 
@@ -164,19 +170,19 @@ impl World {
         share: ResourceShare,
     ) -> GenieResult<()> {
         let player = self.players.player_mut(p)?;
-        let k = kind.index();
-        if player.attributes.len() <= k {
+        let index = kind.index();
+        if player.attributes.len() <= index {
             return Ok(());
         }
-        *player.attributes.checked_mut(k)? += amount;
+        *player.attributes.checked_mut(index)? += amount;
         if player.kind == PlayerKind::Computer && kind.is_resource() {
-            let pct = *player.escrow_percentage.checked(k)?;
+            let pct = *player.escrow_percentage.checked(index)?;
             if !at_most_or_unordered(amount.get(), 0.0) && !at_most_or_unordered(pct.get(), 0.0) {
-                *player.escrow.checked_mut(k)? += pct.of(amount);
+                *player.escrow.checked_mut(index)? += pct.of(amount);
             }
-            let held = *player.attributes.checked(k)?;
-            if !at_most_or_unordered(player.escrow.checked(k)?.get(), held.get()) {
-                *player.escrow.checked_mut(k)? = if at_most_or_unordered(0.0, held.get()) {
+            let held = *player.attributes.checked(index)?;
+            if !at_most_or_unordered(player.escrow.checked(index)?.get(), held.get()) {
+                *player.escrow.checked_mut(index)? = if at_most_or_unordered(0.0, held.get()) {
                     held
                 } else {
                     Amount::ZERO
@@ -187,9 +193,9 @@ impl World {
             && player.ally_sharing.contains(AllySharing::RESOURCES)
             && kind.is_resource()
         {
-            for q in PlayerId::each(self.players.len()) {
-                if q != p && self.shares_with(p, q) {
-                    self.add_resource(q, kind, amount, stat, ResourceShare::Unshared)?;
+            for player_id in PlayerId::each(self.players.len()) {
+                if player_id != p && self.shares_with(p, player_id) {
+                    self.add_resource(player_id, kind, amount, stat, ResourceShare::Unshared)?;
                 }
             }
         }
@@ -203,8 +209,8 @@ impl World {
     /// slice does not model.
     #[must_use]
     pub fn shares_with(&self, p: PlayerId, q: PlayerId) -> bool {
-        let n = self.players.len();
-        if q == PlayerId::GAIA || n <= q.index() || p == q {
+        let count = self.players.len();
+        if q == PlayerId::GAIA || count <= q.index() || p == q {
             return false;
         }
         let mine = self
@@ -216,31 +222,33 @@ impl World {
             return false;
         }
         p != PlayerId::GAIA
-            && p.index() < n
+            && p.index() < count
             && self
                 .players
                 .player(q)
                 .ok()
                 .and_then(|pl| pl.relations.get(p))
-                .is_some_and(|r| r.allied(AllyTest::WithRelation4))
+                .is_some_and(|relation| relation.allied(AllyTest::WithRelation4))
     }
 
-    /// `WorldPlayer::update` after `WorldPlayerBase::update`: player `p`'s scout map (`+0x1370`,
-    /// once made) takes 1 on each tile its tile list (`+0x180`) holds, in order: until the world
-    /// time is 5000 ms only on the tiles the player sees ([`crate::map::spatial::Spatial::scout_sight`]
-    /// is 0xf), after it on all. The list's new count (`+8`, `FUN_141662720`), which it reads and
-    /// clears, is the list's length: only the AI's `FUN_140b90b90`, which a playback does not
-    /// run, reads it too, and the player's update ends with the list emptied (`FUN_141661030`).
-    /// Gaia's update has no tail.
-    pub fn world_player_tail(&mut self, p: PlayerId) -> GenieResult<()> {
-        if self.players.player(p)?.kind == PlayerKind::Gaia || self.spatial.scout_map(p).is_none() {
+    /// `WorldPlayer::update` after `WorldPlayerBase::update`: player `player_id`'s scout map
+    /// (`+0x1370`, once made) takes 1 on each tile its tile list (`+0x180`) holds, in order: until
+    /// the world time is 5000 ms only on the tiles the player sees
+    /// ([`crate::map::spatial::Spatial::scout_sight`] is 0xf), after it on all. The list's new
+    /// count (`+8`, `FUN_141662720`), which it reads and clears, is the list's length: only the
+    /// AI's `FUN_140b90b90`, which a playback does not run, reads it too, and the player's update
+    /// ends with the list emptied (`FUN_141661030`). Gaia's update has no tail.
+    pub fn world_player_tail(&mut self, player_id: PlayerId) -> GenieResult<()> {
+        if self.players.player(player_id)?.kind == PlayerKind::Gaia
+            || self.spatial.scout_map(player_id).is_none()
+        {
             return Ok(());
         }
         let Some(tiles) = self
             .spatial
             .sight
             .as_ref()
-            .and_then(|v| v.new_tiles.get(p.index()))
+            .and_then(|visibility| visibility.new_tiles.get(player_id.index()))
             .cloned()
         else {
             return Ok(());
@@ -249,11 +257,11 @@ impl World {
             let (x, y) = (pair.x(), pair.y());
             let seen = self
                 .spatial
-                .scout_sight(p, Tile::new(x, y))
+                .scout_sight(player_id, Tile::new(x, y))
                 .is_some_and(TileSight::seen);
             if (self.world_time < EARLY_SCOUTING_MS && seen) || EARLY_SCOUTING_MS <= self.world_time
             {
-                self.spatial.scout(p, Tile::new(x, y));
+                self.spatial.scout(player_id, Tile::new(x, y));
             }
         }
         Ok(())

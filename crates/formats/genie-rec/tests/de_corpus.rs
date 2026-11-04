@@ -16,7 +16,10 @@ fn recordings(dir: &Path, out: &mut Vec<PathBuf>) {
         let path = entry.path();
         if path.is_dir() {
             recordings(&path, out);
-        } else if path.extension().is_some_and(|e| e == "aoe2record") {
+        } else if path
+            .extension()
+            .is_some_and(|extension| extension == "aoe2record")
+        {
             out.push(path);
         }
     }
@@ -63,17 +66,17 @@ fn tier_1_recordings_read_and_round_trip() {
         let mut failed = false;
         for chapter in &chapters {
             let (mut written, mut interval, mut syncs) = (Vec::new(), 0, 0);
-            for (i, op) in chapter.ops().enumerate() {
+            for (index, op) in chapter.ops().enumerate() {
                 let op = match op {
                     Ok(op) => op,
-                    Err(e) => {
-                        problems.push(format!("{}: {e}", path.display()));
+                    Err(error) => {
+                        problems.push(format!("{}: {error}", path.display()));
                         failed = true;
                         break;
                     }
                 };
                 match &op {
-                    Op::Pregame(p) => interval = p.checkpoint_interval as usize,
+                    Op::Pregame(pregame) => interval = pregame.checkpoint_interval as usize,
                     Op::Command { .. } => rec.commands += 1,
                     Op::Sync { .. } => {
                         rec.syncs += 1;
@@ -96,7 +99,7 @@ fn tier_1_recordings_read_and_round_trip() {
                         path.display()
                     )),
                 }
-                if chapter.index == 0 && i == 0 && !matches!(op, Op::Pregame(_)) {
+                if chapter.index == 0 && index == 0 && !matches!(op, Op::Pregame(_)) {
                     problems.push(format!(
                         "{}: chapter 0 does not start with Pregame",
                         path.display()

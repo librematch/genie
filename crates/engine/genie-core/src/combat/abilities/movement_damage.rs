@@ -35,19 +35,19 @@ use crate::world::layer::Roles;
 use crate::world::slots::PlayerSlots;
 
 /// A movement damage task's timer (`+0x9a4`, `0x141207758`): above 0 (not a NaN) it runs down by
-/// the world's dt, never below 0. The task hits once it is at most 0 (`COMISS 0, t` / `JC`: a
+/// the world's dt, never below 0. The task hits once it is at most 0 (`COMISS 0, seconds` / `JC`: a
 /// NaN never hits).
 pub fn movement_damage_due(timer: &mut Seconds, dt: Seconds) -> bool {
-    let mut t = *timer;
-    if Seconds::ZERO < t {
-        t -= dt;
-        *timer = t;
-        if t < Seconds::ZERO {
+    let mut seconds = *timer;
+    if Seconds::ZERO < seconds {
+        seconds -= dt;
+        *timer = seconds;
+        if seconds < Seconds::ZERO {
             *timer = Seconds::ZERO;
-            t = Seconds::ZERO;
+            seconds = Seconds::ZERO;
         }
     }
-    !below_or_unordered(0.0, t.get())
+    !below_or_unordered(0.0, seconds.get())
 }
 
 /// The tiles a movement damage task reaches about the object at `position` (`0x1412077e1`): the
@@ -111,43 +111,50 @@ pub struct Hitter {
     pub(crate) radius: Footprint,
 }
 
-/// Whether a movement damage of `range` hits `b` (`0x141207a29`..`0x141207c0d`): not the hitter
-/// itself, not allied nor Gaia's, a building only of class 51 or 54, in state 2 at most, reached
-/// by the hitter's level (its own level 2 or more, or the hitter's at most it), and its
+/// Whether a movement damage of `range` hits `bystander` (`0x141207a29`..`0x141207c0d`): not the
+/// hitter itself, not allied nor Gaia's, a building only of class 51 or 54, in state 2 at most,
+/// reached by the hitter's level (its own level 2 or more, or the hitter's at most it), and its
 /// footprint gap squared (`FUN_14118f8c0`) not past the range squared (`COMISS`/`JA`: a NaN is
 /// within).
 #[must_use]
-pub fn struck(hitter: &Hitter, range: Distance, b: &Bystander, roles: &Roles) -> bool {
-    if b.id == hitter.id || b.allied || b.player == PlayerId::GAIA {
+pub fn struck(hitter: &Hitter, range: Distance, bystander: &Bystander, roles: &Roles) -> bool {
+    if bystander.id == hitter.id || bystander.allied || bystander.player == PlayerId::GAIA {
         return false;
     }
-    if b.kind == MasterKind::BUILDING
+    if bystander.kind == MasterKind::BUILDING
         && !roles
-            .of_class(b.class)
+            .of_class(bystander.class)
             .contains(ClassRoles::STRUCK_BUILDING)
     {
         return false;
     }
-    if ObjectState::Alive < b.state {
+    if ObjectState::Alive < bystander.state {
         return false;
     }
-    if !(ALWAYS_REACHED <= b.blast_defense || hitter.blast_level.reaches(b.blast_defense)) {
+    if !(ALWAYS_REACHED <= bystander.blast_defense
+        || hitter.blast_level.reaches(bystander.blast_defense))
+    {
         return false;
     }
-    let d2 = footprint_gap_squared(hitter.position, hitter.radius, b.position, b.radius);
+    let d2 = footprint_gap_squared(
+        hitter.position,
+        hitter.radius,
+        bystander.position,
+        bystander.radius,
+    );
     at_most_or_unordered(d2.get(), range.squared().get())
 }
 
 /// The hit's end on an object left below 1 hit point (`COMISS 1.0, hp` / `JBE`: a NaN is not):
 /// it has 0, and holds 0 (`FUN_14119d320` with 0, 0 and 1: at most its master's capacity, a
 /// capacity below 0 taken as it is): [`HitEnd::Killed`], else [`HitEnd::Survived`].
-pub fn finish(v: &mut Victim) -> HitEnd {
-    if v.hp < HitPoints::new(ONE) {
-        v.hp = HitPoints::ZERO;
-        v.amount = Amount::ZERO;
-        let capacity = Amount::of_master(v.capacity);
-        if capacity < v.amount {
-            v.amount = capacity;
+pub fn finish(victim: &mut Victim) -> HitEnd {
+    if victim.hp < HitPoints::new(ONE) {
+        victim.hp = HitPoints::ZERO;
+        victim.amount = Amount::ZERO;
+        let capacity = Amount::of_master(victim.capacity);
+        if capacity < victim.amount {
+            victim.amount = capacity;
         }
         return HitEnd::Killed;
     }
@@ -165,19 +172,19 @@ pub enum HitEnd {
 }
 
 impl World {
-    /// A movement damage task of the object at `(p, i)` as `owner`'s ([`movement_damage_due`]):
-    /// once due, a combat unit (its master of type 70) that moves (slot 0x5c8, `FUN_1411583d0`:
-    /// its velocity's length above 0) hits each object on the tiles of [`reach`], row by row,
-    /// each tile's list in order, that it strikes ([`struck`]): the object loses the task's
-    /// `work_val1` (slot 0xb0, [`crate::combat::damage::lose`]), the timer takes the task's `work_val2`,
-    /// and one left below 1 hit point ends the hit ([`finish`]): a combat unit (type 70) counts
-    /// killed by the owner (`FUN_1412005b0`, [`World::count_kill`]). A ghost on a tile is struck
-    /// as an object of type 25 of its viewer, of the ghost master, in its state; the hit points
-    /// it loses are not held. Not held: the alerts the hit's player hears (its slot 0x2e8 with
-    /// 0x201, `FUN_14162dab0`: the human player's alerts and a computer player's AI), as for a
-    /// hit ([`crate::combat::damage`]). A reach past the map's last row or column reads a tile the map
-    /// does not have (`FUN_140f5ec30`'s null tile, whose count the routine reads: the game
-    /// faults); the scan stops there.
+    /// A movement damage task of the object at `(player_id, list_index)` as `owner`'s
+    /// ([`movement_damage_due`]): once due, a combat unit (its master of type 70) that moves (slot
+    /// 0x5c8, `FUN_1411583d0`: its velocity's length above 0) hits each object on the tiles of
+    /// [`reach`], row by row, each tile's list in order, that it strikes ([`struck`]): the object
+    /// loses the task's `work_val1` (slot 0xb0, [`crate::combat::damage::lose`]), the timer takes
+    /// the task's `work_val2`, and one left below 1 hit point ends the hit ([`finish`]): a combat
+    /// unit (type 70) counts killed by the owner (`FUN_1412005b0`, [`World::count_kill`]). A ghost
+    /// on a tile is struck as an object of type 25 of its viewer, of the ghost master, in its
+    /// state; the hit points it loses are not held. Not held: the alerts the hit's player hears
+    /// (its slot 0x2e8 with 0x201, `FUN_14162dab0`: the human player's alerts and a computer
+    /// player's AI), as for a hit ([`crate::combat::damage`]). A reach past the map's last row or
+    /// column reads a tile the map does not have (`FUN_140f5ec30`'s null tile, whose count the
+    /// routine reads: the game faults); the scan stops there.
     ///
     /// # Errors
     ///
@@ -185,13 +192,13 @@ impl World {
     /// model.
     pub(super) fn movement_damage(
         &mut self,
-        (p, i): (PlayerId, ListIndex),
+        (player_id, list_index): (PlayerId, ListIndex),
         owner: PlayerId,
         master: Own,
         task: &Task,
     ) -> GenieResult<()> {
         let dt = self.dt_seconds;
-        let unit = self.players.live_mut(p, i)?;
+        let unit = self.players.live_mut(player_id, list_index)?;
         if !movement_damage_due(
             &mut self
                 .parts
@@ -205,8 +212,8 @@ impl World {
         let moving = self
             .parts
             .mover_of(unit.id)
-            .and_then(|m| m.velocity.as_ref())
-            .is_some_and(|v| 0.0 < length(v.velocity));
+            .and_then(|mover| mover.velocity.as_ref())
+            .is_some_and(|velocity| 0.0 < length(velocity.velocity));
         if master.kind != MasterKind::COMBAT || !moving {
             return Ok(());
         }
@@ -225,17 +232,17 @@ impl World {
                     return Ok(());
                 }
                 for id in self.spatial.tile_list(Tile::new(x, y)).to_vec() {
-                    let Some(b) = self.bystander(id, owner)? else {
+                    let Some(bystander) = self.bystander(id, owner)? else {
                         continue;
                     };
-                    if !struck(&hitter, range, &b, &self.model.roles) {
+                    if !struck(&hitter, range, &bystander, &self.model.roles) {
                         continue;
                     }
                     self.parts
-                        .combat_mut(self.players.live(p, i)?.id)?
+                        .combat_mut(self.players.live(player_id, list_index)?.id)?
                         .abilities
                         .movement_damage_timer = Seconds::new(task.work_val2.get());
-                    self.movement_hit(b, owner, HitPoints::new(task.work_val1.get()))?;
+                    self.movement_hit(bystander, owner, HitPoints::new(task.work_val1.get()))?;
                 }
             }
         }
@@ -256,55 +263,55 @@ impl World {
     ) -> GenieResult<Option<Bystander>> {
         let relations = &self.players.player(owner)?.relations;
         let allied = |q: PlayerId| allied(relations, owner, q, AllyTest::WithRelation4);
-        if let Some((q, u)) = self.object(id) {
-            let m = u.master(self.master_tables(), q)?;
+        if let Some((q, unit)) = self.object(id) {
+            let m = unit.master(self.master_tables(), q)?;
             return Ok(Some(Bystander {
                 id,
                 player: q,
                 allied: allied(q),
                 kind: m.kind,
                 class: m.class,
-                state: u.life.state,
+                state: unit.life.state,
                 blast_defense: m.blast_defense,
-                position: u.position(),
+                position: unit.position(),
                 radius: m.radius,
             }));
         }
-        for (q, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            if let Some(g) = player.ghosts.iter().find(|g| g.id == id) {
-                let m = self.master(q, self.model.slots.master.doppelganger)?;
+        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
+            if let Some(g) = player.ghosts.iter().find(|ghost| ghost.id == id) {
+                let master = self.master(player_id, self.model.slots.master.doppelganger)?;
                 return Ok(Some(Bystander {
                     id,
-                    player: q,
-                    allied: allied(q),
+                    player: player_id,
+                    allied: allied(player_id),
                     kind: MasterKind::DOPPELGANGER,
-                    class: m.class,
+                    class: master.class,
                     state: g.state,
-                    blast_defense: m.blast_defense,
+                    blast_defense: master.blast_defense,
                     position: g.position,
-                    radius: m.radius,
+                    radius: master.radius,
                 }));
             }
         }
         Err(NOT_HELD)
     }
 
-    /// A movement damage's hit of `b` by player `owner`'s hitter: `damage` hit points off (slot
-    /// 0xb0), then [`finish`] and a combat unit's kill count.
+    /// A movement damage's hit of `bystander` by player `owner`'s hitter: `damage` hit points off
+    /// (slot 0xb0), then [`finish`] and a combat unit's kill count.
     pub(super) fn movement_hit(
         &mut self,
-        b: Bystander,
+        bystander: Bystander,
         owner: PlayerId,
         damage: HitPoints,
     ) -> GenieResult<()> {
-        if b.kind == MasterKind::DOPPELGANGER {
+        if bystander.kind == MasterKind::DOPPELGANGER {
             return Ok(());
         }
-        let Some((q, u)) = self.object(b.id) else {
+        let Some((player_id, u)) = self.object(bystander.id) else {
             return Err(NOT_HELD);
         };
-        let m = u.master(self.master_tables(), q)?;
-        let mut v = victim_of(
+        let master = u.master(self.master_tables(), player_id)?;
+        let mut victim = victim_of(
             (
                 u,
                 self.parts.unit_ai.contains(u.id),
@@ -313,23 +320,23 @@ impl World {
                 self.parts.actions.of(u.id),
                 self.parts.unread.get(u.id),
             ),
-            m,
-            &self.players.player(q)?.attributes,
-            q,
+            master,
+            &self.players.player(player_id)?.attributes,
+            player_id,
             self.spatial.terrain.as_ref(),
             self.mode_680,
             &self.model.roles,
         );
-        lose(&mut v, damage);
-        let killed = finish(&mut v) == HitEnd::Killed;
-        let (_, u) = self.object_mut(b.id).ok_or(NOT_HELD)?;
-        u.life.hp = v.hp;
-        u.life.amount = v.amount;
-        if let Some(a) = v.armored.as_ref() {
-            self.parts.combat_mut(b.id)?.hp_powerup = a.hp_powerup;
+        lose(&mut victim, damage);
+        let killed = finish(&mut victim) == HitEnd::Killed;
+        let (_, unit) = self.object_mut(bystander.id).ok_or(NOT_HELD)?;
+        unit.life.hp = victim.hp;
+        unit.life.amount = victim.amount;
+        if let Some(armored) = victim.armored.as_ref() {
+            self.parts.combat_mut(bystander.id)?.hp_powerup = armored.hp_powerup;
         }
-        if killed && b.kind == MasterKind::COMBAT {
-            self.count_kill(b.id, owner)?;
+        if killed && bystander.kind == MasterKind::COMBAT {
+            self.count_kill(bystander.id, owner)?;
         }
         Ok(())
     }

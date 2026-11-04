@@ -33,12 +33,12 @@ pub const ONLY_IN_THE_GAME: &str = "only in the game";
 pub const ONLY_IN_THE_SLICE: &str = "only in the slice";
 
 impl Display for Difference {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> Result<(), Error> {
         match self.field.as_str() {
-            ONLY_IN_THE_GAME => write!(f, "{}: {} ({})", self.id, self.field, self.game),
-            ONLY_IN_THE_SLICE => write!(f, "{}: {} ({})", self.id, self.field, self.slice),
+            ONLY_IN_THE_GAME => write!(formatter, "{}: {} ({})", self.id, self.field, self.game),
+            ONLY_IN_THE_SLICE => write!(formatter, "{}: {} ({})", self.id, self.field, self.slice),
             _ => write!(
-                f,
+                formatter,
                 "{}: {} slice {} game {}",
                 self.id, self.field, self.slice, self.game
             ),
@@ -102,12 +102,12 @@ pub fn object_field_differences_in<'a>(
         out.extend(
             genie_diff::differences(s, g, scope)
                 .into_iter()
-                .map(|d| Difference {
+                .map(|difference| Difference {
                     id,
                     master,
-                    field: d.path,
-                    slice: d.left,
-                    game: d.right,
+                    field: difference.path,
+                    slice: difference.left,
+                    game: difference.right,
                 }),
         );
     }
@@ -127,14 +127,15 @@ pub fn object_field_differences_in<'a>(
 }
 
 /// What names an object one side lacks: its master, state, hit points, place and top action.
-fn summary(o: &ObjectView<'_>) -> String {
-    let u = o.unit;
+fn summary(object_view: &ObjectView<'_>) -> String {
+    let unit = object_view.unit;
     format!(
         "master {} state {} hp {:?} at {:?} action {:?}",
-        u.life.master_id,
-        u.life.state,
-        u.life.hp.get(),
-        u.position(),
-        crate::top_action(&o.parts.actions).map(|a| (a.kind, a.state))
+        unit.life.master_id,
+        unit.life.state,
+        unit.life.hp.get(),
+        unit.position(),
+        crate::top_action(&object_view.parts.actions)
+            .map(|top_action| (top_action.kind, top_action.state))
     )
 }

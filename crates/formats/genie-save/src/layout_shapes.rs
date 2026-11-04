@@ -86,10 +86,11 @@ impl BinWrite for SigString {
         endian: Endian,
         (): (),
     ) -> BinResult<()> {
-        let len = u16::try_from(self.bytes.len()).map_err(|e| binrw::Error::Custom {
-            pos: writer.stream_position().unwrap_or_default(),
-            err: Box::new(e),
-        })?;
+        let len =
+            u16::try_from(self.bytes.len()).map_err(|try_from_int_error| binrw::Error::Custom {
+                pos: writer.stream_position().unwrap_or_default(),
+                err: Box::new(try_from_int_error),
+            })?;
         let pair = if self.swapped {
             [len, STRING_SIGNATURE]
         } else {
@@ -129,10 +130,11 @@ where
         endian: Endian,
         (): (),
     ) -> BinResult<()> {
-        let count = u32::try_from(self.0.len()).map_err(|e| binrw::Error::Custom {
-            pos: writer.stream_position().unwrap_or_default(),
-            err: Box::new(e),
-        })?;
+        let count =
+            u32::try_from(self.0.len()).map_err(|try_from_int_error| binrw::Error::Custom {
+                pos: writer.stream_position().unwrap_or_default(),
+                err: Box::new(try_from_int_error),
+            })?;
         count.write_options(writer, endian, ())?;
         self.0.write_options(writer, endian, ())
     }
@@ -141,8 +143,8 @@ where
 /// The part a read error names as not read yet ([`Unsupported`]) anywhere in it, with its
 /// position.
 #[must_use]
-pub fn unsupported_in(e: &binrw::Error) -> Option<(GenieError, usize)> {
-    let root = e.root_cause();
+pub fn unsupported_in(error: &binrw::Error) -> Option<(GenieError, usize)> {
+    let root = error.root_cause();
     let unsupported = root.custom_err::<GenieError>()?.clone();
     let at = match root {
         binrw::Error::Custom { pos, .. } => *pos as usize,
@@ -243,35 +245,35 @@ mod tests {
 
     #[test]
     fn positioned_value_keeps_where_it_was_read_and_writes_the_value_only() {
-        let mut c = Cursor::new(b"\x01\x02\x00".as_slice());
-        let _ = u8::read_le(&mut c).unwrap();
-        let p = Positioned::<u16>::read_le(&mut c).unwrap();
-        assert_eq!((p.pos, p.val, *p), (1, 2, 2));
+        let mut cursor = Cursor::new(b"\x01\x02\x00".as_slice());
+        let _ = u8::read_le(&mut cursor).unwrap();
+        let positioned = Positioned::<u16>::read_le(&mut cursor).unwrap();
+        assert_eq!((positioned.pos, positioned.val, *positioned), (1, 2, 2));
         let mut out = Cursor::new(Vec::new());
-        p.write_le(&mut out).unwrap();
+        positioned.write_le(&mut out).unwrap();
         assert_eq!(out.into_inner(), b"\x02\x00");
     }
 
     #[test]
     fn strings_read_their_length_then_the_bytes() {
-        let mut c = Cursor::new(b"\x02\x00hi\x01\x00\x00\x00!rest".as_slice());
-        assert_eq!(LenString16::read(&mut c).unwrap().bytes, b"hi");
-        assert_eq!(LenString32::read(&mut c).unwrap().bytes, b"!");
-        assert_eq!(c.position(), 9);
+        let mut cursor = Cursor::new(b"\x02\x00hi\x01\x00\x00\x00!rest".as_slice());
+        assert_eq!(LenString16::read(&mut cursor).unwrap().bytes, b"hi");
+        assert_eq!(LenString32::read(&mut cursor).unwrap().bytes, b"!");
+        assert_eq!(cursor.position(), 9);
     }
 
     #[test]
     fn sig_string_takes_the_signature_before_or_after_the_length() {
-        let mut c = Cursor::new(b"\x60\x0a\x02\x00hi\x01\x00\x60\x0a!".as_slice());
+        let mut cursor = Cursor::new(b"\x60\x0a\x02\x00hi\x01\x00\x60\x0a!".as_slice());
         assert_eq!(
-            SigString::read_le(&mut c).unwrap(),
+            SigString::read_le(&mut cursor).unwrap(),
             SigString {
                 swapped: false,
                 bytes: b"hi".to_vec()
             }
         );
         assert_eq!(
-            SigString::read_le(&mut c).unwrap(),
+            SigString::read_le(&mut cursor).unwrap(),
             SigString {
                 swapped: true,
                 bytes: b"!".to_vec()
@@ -309,21 +311,21 @@ mod tests {
         let e = Unsupported::read_le_args(&mut Cursor::new(b"\0".as_slice()), ("the AI state",))
             .unwrap_err();
         assert_eq!(
-            unsupported_in(&e).map(|(e, at)| (e.kind(), e.reason(), at)),
+            unsupported_in(&e).map(|(error, at)| (error.kind(), error.reason(), at)),
             Some((genie_error::ErrorKind::Unsupported, "the AI state", 0))
         );
     }
 
     #[test]
     fn vec_reads_its_count_then_the_values() {
-        let mut c = Cursor::new(
+        let mut cursor = Cursor::new(
             b"\x02\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff"
                 .as_slice(),
         );
         assert_eq!(
-            LenVec32::<i64>::read_le(&mut c).unwrap(),
+            LenVec32::<i64>::read_le(&mut cursor).unwrap(),
             LenVec32(vec![1, -1])
         );
-        assert_eq!(c.position(), 20);
+        assert_eq!(cursor.position(), 20);
     }
 }

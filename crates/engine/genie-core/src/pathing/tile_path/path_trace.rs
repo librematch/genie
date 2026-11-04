@@ -23,14 +23,14 @@ impl Planner {
 
     /// `FUN_140f77d00`: the tile of a node cell nearest the goal's tile, child by child down to
     /// level 0 (ties to the earlier child).
-    pub(super) fn tile_toward(&self, n: NodeIndex, goal: PlanTile) -> PlanTile {
-        let node = self.nodes[n];
+    pub(super) fn tile_toward(&self, node_index: NodeIndex, goal: PlanTile) -> PlanTile {
+        let node = self.nodes[node_index];
         let mut at = node.at;
-        for l in (1..=node.level.get()).rev().map(GridLevel::new) {
-            let cl = l.down();
+        for grid_level in (1..=node.level.get()).rev().map(GridLevel::new) {
+            let cl = grid_level.down();
             // the children in the order (2x, 2y), (2x, 2y + 1), (2x + 1, 2y), (2x + 1, 2y + 1)
             let [c0, c1, c2, c3] = at.children();
-            let to = goal.at_level(l.down());
+            let to = goal.at_level(grid_level.down());
             let d = [
                 self.steps_to(to, cl, c0),
                 self.steps_to(to, cl, c2),
@@ -39,9 +39,9 @@ impl Planner {
             ];
             let mut best = if d[0] < 9999 { d[0] } else { 9999 };
             let mut which: i32 = if 9998 < d[0] { -1 } else { 0 };
-            for (k, &dk) in d.iter().enumerate().skip(1).take(2) {
+            for (index, &dk) in d.iter().enumerate().skip(1).take(2) {
                 if -1 < dk as i16 && (dk as i16) < best as i16 {
-                    which = k as i32;
+                    which = index as i32;
                     best = dk;
                 }
             }
@@ -93,8 +93,8 @@ impl Planner {
 
     /// `FUN_140f775a0`: the tile where a node's path crosses into its parent: on the node's edge
     /// toward the parent, nearest the middle of the smaller of the two cells.
-    pub(super) fn crossing(&self, n: NodeIndex) -> Option<PlanTile> {
-        let node = self.nodes[n];
+    pub(super) fn crossing(&self, node_index: NodeIndex) -> Option<PlanTile> {
+        let node = self.nodes[node_index];
         let parent = self.nodes[node.parent?];
         // the levels as the shifts from a cell to its tiles
         let (smaller, l) = if parent.level < node.level {
@@ -162,8 +162,13 @@ impl Planner {
     /// `FUN_140f794f0`: the tile where the path from the last point `from` toward the look-ahead
     /// `toward` crosses a node's edge into its parent, moved along the edge to the nearest tile
     /// with that edge; -1 along the edge when none has it.
-    pub(super) fn aim(&self, n: NodeIndex, toward: PlanTile, from: PlanTile) -> Option<PlanTile> {
-        let node = self.nodes[n];
+    pub(super) fn aim(
+        &self,
+        node_index: NodeIndex,
+        toward: PlanTile,
+        from: PlanTile,
+    ) -> Option<PlanTile> {
+        let node = self.nodes[node_index];
         let parent = self.nodes[node.parent?];
         // the levels as the shifts from a cell to its tiles
         let (smaller, bl) = if parent.level < node.level {
@@ -216,12 +221,12 @@ impl Planner {
             }
         };
         let passes = |s: i16| {
-            let c = if dir == CellEdges::N || dir == CellEdges::S {
+            let cell = if dir == CellEdges::N || dir == CellEdges::S {
                 self.cell(GridLevel::TILES, PlanTile::new(s, fixed))
             } else {
                 self.cell(GridLevel::TILES, PlanTile::new(fixed, s))
             };
-            c.edges.intersects(dir)
+            cell.edges.intersects(dir)
         };
         let result = if lo < at {
             if at < hi {
@@ -263,22 +268,29 @@ impl Planner {
         })
     }
 
-    /// Whether the map holds tile `t`.
-    pub(super) const fn on_map(&self, t: PlanTile) -> bool {
+    /// Whether the map holds tile `plan_tile`.
+    pub(super) const fn on_map(&self, plan_tile: PlanTile) -> bool {
         let last = self.last_tile();
-        0 <= t.x() && t.x() <= last.x() && 0 <= t.y() && t.y() <= last.y()
+        0 <= plan_tile.x()
+            && plan_tile.x() <= last.x()
+            && 0 <= plan_tile.y()
+            && plan_tile.y() <= last.y()
     }
 
     /// A tile's centre as a path point.
-    pub(super) fn centre(t: PlanTile) -> BVector {
-        BVector::new(f32::from(t.x()) + HALF, 0.0, f32::from(t.y()) + HALF)
+    pub(super) fn centre(plan_tile: PlanTile) -> BVector {
+        BVector::new(
+            f32::from(plan_tile.x()) + HALF,
+            0.0,
+            f32::from(plan_tile.y()) + HALF,
+        )
     }
 
     /// The path's points from the goal's node back to the start (the loops of `FUN_140f77f20` and
     /// `FUN_140f78ba0`): per node the tile where the path enters its parent, aimed from the last
     /// point toward the crossing two nodes on (the start's tile when there is none).
-    pub(super) fn trace_back(&mut self, n: NodeIndex, start: PlanTile) {
-        let mut node = n;
+    pub(super) fn trace_back(&mut self, goal: NodeIndex, start: PlanTile) {
+        let mut node = goal;
         loop {
             let parent = self.nodes[node].parent;
             let toward = parent
@@ -290,7 +302,7 @@ impl Planner {
                 self.last = at;
             }
             match parent {
-                Some(p) => node = p,
+                Some(node_index) => node = node_index,
                 None => break,
             }
         }

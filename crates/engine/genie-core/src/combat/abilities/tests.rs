@@ -83,32 +83,32 @@ fn the_living_path_takes_at_least_1_hit_point_or_nan() {
 #[test]
 fn task_with_its_kind_flag_bit_generates_always() {
     // bit 1 for an object of type 70, bit 2 for one of type 80
-    let mut t = feitoria_food();
-    t.combat_level_flag = TaskFlags::UNITS_ALWAYS;
+    let mut task = feitoria_food();
+    task.combat_level_flag = TaskFlags::UNITS_ALWAYS;
     assert!(generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
         None
     ));
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
         None
     ));
-    t.combat_level_flag = TaskFlags::BUILDINGS_ALWAYS;
+    task.combat_level_flag = TaskFlags::BUILDINGS_ALWAYS;
     assert!(generates(
-        &t,
+        &task,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
         None
     ));
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
@@ -118,16 +118,16 @@ fn task_with_its_kind_flag_bit_generates_always() {
 
 #[test]
 fn building_generates_once_built() {
-    let t = feitoria_food();
+    let task = feitoria_food();
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
         None
     ));
     assert!(generates(
-        &t,
+        &task,
         MasterKind::BUILDING,
         MasterKind::BUILDING,
         None,
@@ -135,7 +135,7 @@ fn building_generates_once_built() {
     ));
     // a combat unit's master is not a building's
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
@@ -145,7 +145,7 @@ fn building_generates_once_built() {
 
 #[test]
 fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
-    let t = keshik_gold();
+    let task = keshik_gold();
     let target = WorkTarget {
         hp: HitPoints::new(45.0),
         storage: Amount::ZERO,
@@ -161,7 +161,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
     // the Attack (9), type 7, the Gather (5) and the Hunt (0x6e), in state 7
     for kind in [ATTACK, ActionKind::COMBAT, GATHER, HUNT] {
         assert!(generates(
-            &t,
+            &task,
             MasterKind::COMBAT,
             MasterKind::COMBAT,
             top(kind, ActionState::new(7), Some(target)),
@@ -169,28 +169,28 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         ));
     }
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(MOVE_TO, ActionState::new(7), Some(target)),
         None
     ));
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(6), Some(target)),
         None
     ));
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), None),
         None
     ));
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         None,
@@ -202,7 +202,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         ..target
     };
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(other)),
@@ -215,7 +215,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         ..target
     };
     assert!(generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(dead)),
@@ -227,7 +227,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         ..target
     };
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(empty)),
@@ -239,7 +239,7 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
         ..target
     };
     assert!(!generates(
-        &t,
+        &task,
         MasterKind::COMBAT,
         MasterKind::COMBAT,
         top(ATTACK, ActionState::new(7), Some(nan)),
@@ -249,22 +249,25 @@ fn unit_generates_while_its_top_action_works_on_target_of_the_task_class() {
 
 #[test]
 fn the_amount_is_dt_times_the_rate_times_the_attribute_in_that_order() {
-    let t = feitoria_food();
+    let task = feitoria_food();
     let dt = 0.044_f32;
     assert_eq!(
-        generated(Seconds::new(dt), &t, Amount::new(1.0))
+        generated(Seconds::new(dt), &task, Amount::new(1.0))
             .get()
             .to_bits(),
         (dt * 1.6 * 1.0).to_bits()
     );
-    let m = 0.3_f32;
+    let amount = 0.3_f32;
     assert_eq!(
-        generated(Seconds::new(dt), &t, Amount::new(m))
+        generated(Seconds::new(dt), &task, Amount::new(amount))
             .get()
             .to_bits(),
-        ((dt * 1.6) * m).to_bits()
+        ((dt * 1.6) * amount).to_bits()
     );
-    assert_eq!(generated(Seconds::new(dt), &t, Amount::ZERO), Amount::ZERO);
+    assert_eq!(
+        generated(Seconds::new(dt), &task, Amount::ZERO),
+        Amount::ZERO
+    );
 }
 
 #[test]
@@ -309,9 +312,9 @@ fn the_movement_damage_timer_runs_down_to_0_and_then_hits() {
     assert!(movement_damage_due(&mut t, Seconds::new(0.1)));
     assert_eq!(t, Seconds::new(-1.0));
     // a NaN never hits and stays
-    let mut t = Seconds::new(f32::NAN);
-    assert!(!movement_damage_due(&mut t, Seconds::new(0.1)));
-    assert!(t.get().is_nan());
+    let mut seconds = Seconds::new(f32::NAN);
+    assert!(!movement_damage_due(&mut seconds, Seconds::new(0.1)));
+    assert!(seconds.get().is_nan());
 }
 
 #[test]
@@ -370,42 +373,50 @@ fn bystander() -> Bystander {
 
 #[test]
 fn movement_damage_strikes_enemies_in_reach() {
-    let h = hitter();
-    let b = bystander();
+    let hitter = hitter();
+    let bystander = bystander();
     // the gap is 1.5 - 0.6 = 0.9: within 1 (0.81 at most 1), not within 0.5
-    assert!(struck(&h, Distance::new(1.0), &b, &roles()));
-    assert!(!struck(&h, Distance::new(0.5), &b, &roles()));
-    assert!(struck(&h, Distance::new(f32::NAN), &b, &roles()));
+    assert!(struck(&hitter, Distance::new(1.0), &bystander, &roles()));
+    assert!(!struck(&hitter, Distance::new(0.5), &bystander, &roles()));
+    assert!(struck(
+        &hitter,
+        Distance::new(f32::NAN),
+        &bystander,
+        &roles()
+    ));
     assert!(!struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
         &Bystander {
             id: object_id(1),
-            ..b
+            ..bystander
         },
         &roles()
     ));
     assert!(!struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
-        &Bystander { allied: true, ..b },
+        &Bystander {
+            allied: true,
+            ..bystander
+        },
         &roles()
     ));
     assert!(!struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
         &Bystander {
             player: PlayerId::new(0),
-            ..b
+            ..bystander
         },
         &roles()
     ));
     assert!(!struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
         &Bystander {
             state: ObjectState::Dying,
-            ..b
+            ..bystander
         },
         &roles()
     ));
@@ -413,11 +424,11 @@ fn movement_damage_strikes_enemies_in_reach() {
     let building = Bystander {
         kind: MasterKind::BUILDING,
         class: class::BUILDING,
-        ..b
+        ..bystander
     };
-    assert!(!struck(&h, Distance::new(1.0), &building, &roles()));
+    assert!(!struck(&hitter, Distance::new(1.0), &building, &roles()));
     assert!(struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
         &Bystander {
             class: class::CLASS_51,
@@ -426,7 +437,7 @@ fn movement_damage_strikes_enemies_in_reach() {
         &roles()
     ));
     assert!(struck(
-        &h,
+        &hitter,
         Distance::new(1.0),
         &Bystander {
             class: class::CLASS_54,
@@ -437,27 +448,27 @@ fn movement_damage_strikes_enemies_in_reach() {
     // the blast levels
     let high = Hitter {
         blast_level: BlastLevel::from_bits_retain(3),
-        ..h
+        ..hitter
     };
-    assert!(!struck(&high, Distance::new(1.0), &b, &roles()));
+    assert!(!struck(&high, Distance::new(1.0), &bystander, &roles()));
     assert!(struck(
         &high,
         Distance::new(1.0),
         &Bystander {
             blast_defense: BlastDefense::new(2),
-            ..b
+            ..bystander
         },
         &roles()
     ));
     assert!(struck(
         &Hitter {
             blast_level: BlastLevel::from_bits_retain(1),
-            ..h
+            ..hitter
         },
         Distance::new(1.0),
         &Bystander {
             blast_defense: BlastDefense::new(1),
-            ..b
+            ..bystander
         },
         &roles()
     ));
@@ -489,11 +500,11 @@ fn hit_below_1_hit_point_leaves_0_and_holds_nothing() {
     };
     assert_eq!(finish(&mut v), HitEnd::Survived);
     assert_eq!(v.amount, Amount::new(30.0));
-    let mut v = Victim {
+    let mut victim = Victim {
         hp: HitPoints::new(f32::NAN),
         ..Victim::default()
     };
-    assert_eq!(finish(&mut v), HitEnd::Survived);
+    assert_eq!(finish(&mut victim), HitEnd::Survived);
 }
 
 #[test]
@@ -541,11 +552,11 @@ fn longboat_look() -> Task {
 
 #[test]
 fn terrain_look_gives_the_task_sprites_on_its_terrains() {
-    let t = longboat_look();
+    let longboat = longboat_look();
     let all = |_| true;
     assert_eq!(
         look(
-            &t,
+            &longboat,
             TerrainFlags::LAND,
             TerrainFlags::WATER | TerrainFlags::LAND,
             all
@@ -559,20 +570,23 @@ fn terrain_look_gives_the_task_sprites_on_its_terrains() {
             undead: Some(SpriteId::named(19600)),
         })
     );
-    assert_eq!(look(&t, TerrainFlags::LAND, TerrainFlags::WATER, all), None);
+    assert_eq!(
+        look(&longboat, TerrainFlags::LAND, TerrainFlags::WATER, all),
+        None
+    );
     // a sprite the table lacks is a null one
     let some = |id: i32| id != 19600 && id != 19599;
-    let l = look(&t, TerrainFlags::LAND, TerrainFlags::LAND, some).unwrap();
+    let l = look(&longboat, TerrainFlags::LAND, TerrainFlags::LAND, some).unwrap();
     assert_eq!(
         (l.standing, l.undead, l.walking),
         (None, None, Some(SpriteId::named(19601)))
     );
     // an event id past the table's ids is none
-    let t = Task {
+    let task = Task {
         sound_events: SoundEvents::new(0x62d4_b3ec, -5),
         ..longboat_look()
     };
-    let l = look(&t, TerrainFlags::LAND, TerrainFlags::LAND, all).unwrap();
+    let l = look(&task, TerrainFlags::LAND, TerrainFlags::LAND, all).unwrap();
     assert_eq!((l.dying, l.undead), (None, None));
 }
 
@@ -588,9 +602,9 @@ fn bounty() -> Task {
 
 #[test]
 fn removal_reward_pays_the_rate_times_the_attribute() {
-    let t = bounty();
+    let task = bounty();
     assert_eq!(
-        reward(&t, PlayerId::new(2), Some(Amount::new(1.5)), &[]),
+        reward(&task, PlayerId::new(2), Some(Amount::new(1.5)), &[]),
         Reward {
             player: PlayerId::new(2),
             attribute: Some(attribute::GOLD),
@@ -599,11 +613,11 @@ fn removal_reward_pays_the_rate_times_the_attribute() {
     );
     // truncated
     assert_eq!(
-        reward(&t, PlayerId::new(2), Some(Amount::new(0.25)), &[]).amount,
+        reward(&task, PlayerId::new(2), Some(Amount::new(0.25)), &[]).amount,
         2
     );
     // the player lacks the attribute, or the task names none
-    assert_eq!(reward(&t, PlayerId::new(2), None, &[]).amount, 10);
+    assert_eq!(reward(&task, PlayerId::new(2), None, &[]).amount, 10);
     let none = Task {
         attribute_kind2: None,
         ..bounty()
@@ -614,14 +628,14 @@ fn removal_reward_pays_the_rate_times_the_attribute() {
     );
     // a NaN rate is the integer indefinite
     assert_eq!(
-        reward(&t, PlayerId::new(2), Some(Amount::new(f32::NAN)), &[]).amount,
+        reward(&task, PlayerId::new(2), Some(Amount::new(f32::NAN)), &[]).amount,
         i32::MIN
     );
 }
 
 #[test]
 fn removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_the_rate() {
-    let t = Task {
+    let task = Task {
         combat_level_flag: TaskFlags::from_bits_retain(0x1),
         ..bounty()
     };
@@ -631,17 +645,17 @@ fn removal_reward_with_its_flag_pays_the_last_paid_cost_of_its_resource_times_th
         (attribute::GOLD, 30, false),
     ]);
     assert_eq!(
-        reward(&t, PlayerId::new(1), Some(Amount::new(0.5)), &cost).amount,
+        reward(&task, PlayerId::new(1), Some(Amount::new(0.5)), &cost).amount,
         100
     );
     let cost = costs(&[(attribute::GOLD, 20, true), (attribute::GOLD, 30, true)]);
     assert_eq!(
-        reward(&t, PlayerId::new(1), Some(Amount::new(1.0)), &cost).amount,
+        reward(&task, PlayerId::new(1), Some(Amount::new(1.0)), &cost).amount,
         300
     );
     assert_eq!(
         reward(
-            &t,
+            &task,
             PlayerId::new(1),
             Some(Amount::new(1.0)),
             &costs(&[(attribute::FOOD, 50, true)])
@@ -705,8 +719,14 @@ fn world() -> World {
 }
 
 /// Master `id` of `kind` and `class` with `tasks`, given to every player.
-fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, tasks: Vec<Task>) {
-    let m = Master {
+fn give_master(
+    world: &mut World,
+    id: MasterId,
+    kind: MasterKind,
+    class: ClassId,
+    tasks: Vec<Task>,
+) {
+    let master = Master {
         id,
         kind,
         class,
@@ -718,36 +738,43 @@ fn give_master(t: &mut World, id: MasterId, kind: MasterKind, class: ClassId, ta
         }),
         ..Master::default()
     };
-    for ms in &mut t.model.masters {
+    for ms in &mut world.model.masters {
         let mut all: Vec<Master> = ms.iter().cloned().collect();
-        all.push(m.clone());
+        all.push(master.clone());
         *ms = Arc::new(Masters::new(all));
     }
 }
 
-/// Object `id` of master `m` with `hp` hit points at (`x`, `y`) in player `p`'s list, placed
-/// on its tile.
-fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Point) {
-    let mut u = Unit {
+/// Object `id` of master `m` with `hp` hit points at (`x`, `y`) in player `player_id`'s list,
+/// placed on its tile.
+fn put(
+    world: &mut World,
+    player_id: PlayerId,
+    id: i32,
+    master_id: MasterId,
+    hp: HitPoints,
+    at: Point,
+) {
+    let mut unit = Unit {
         id: object_id(id),
         place: Static::at(at.with_height(0.0)),
         ..Unit::default()
     };
-    u.life.master_id = m;
-    u.life.hp = hp;
-    u.life.state = ObjectState::Alive;
-    let _ = t.push_live(p, u).unwrap();
-    let radius = t.model.masters[p.index()]
-        .get(m)
-        .map_or(Footprint::new(0.5, 0.5), |m| m.radius);
-    t.spatial.insert(
+    unit.life.master_id = master_id;
+    unit.life.hp = hp;
+    unit.life.state = ObjectState::Alive;
+    let _ = world.push_live(player_id, unit).unwrap();
+    let radius = world.model.masters[player_id.index()]
+        .get(master_id)
+        .map_or(Footprint::new(0.5, 0.5), |master| master.radius);
+    world.spatial.insert(
         object_id(id),
         Placed {
             position: at.with_height(0.0),
             radius,
             class: class::CLASS_0,
-            player: p,
-            master: m,
+            player: player_id,
+            master: master_id,
             obstruction_kind: ObstructionKind::NONE,
             buildable_on: BuildableOn::NO,
             tall: false,
@@ -758,27 +785,29 @@ fn put(t: &mut World, p: PlayerId, id: i32, m: MasterId, hp: HitPoints, at: Poin
     );
 }
 
-/// The abilities of object `id` of player `p` as `p`'s, which issue no command.
-fn run(t: &mut World, p: PlayerId, id: i32) {
-    assert_eq!(rewards(t, p, id, false), Vec::new());
+/// The abilities of object `id` of player `player_id` as `player_id`'s, which issue no command.
+fn run(world: &mut World, player_id: PlayerId, id: i32) {
+    assert_eq!(rewards(world, player_id, id, false), Vec::new());
 }
 
-/// The abilities of object `id` of player `p` as `p`'s: the commands they issue.
-fn rewards(t: &mut World, p: PlayerId, id: i32, leaves: bool) -> Vec<Reward> {
-    let i = t.players[p.index()]
+/// The abilities of object `id` of player `player_id` as `player_id`'s: the commands they issue.
+fn rewards(world: &mut World, player_id: PlayerId, id: i32, leaves: bool) -> Vec<Reward> {
+    let list_index = world.players[player_id.index()]
         .objects
         .position_of(object_id(id))
         .unwrap();
-    t.abilities((object_id(id), p, i), p, leaves).unwrap()
+    world
+        .abilities((object_id(id), player_id, list_index), player_id, leaves)
+        .unwrap()
 }
 
-/// The players' sight with `id` a building of player `p` whose sight is `sight`.
-fn building_sight(t: &mut World, p: PlayerId, id: i32, sight: BuildingSight) {
+/// The players' sight with `id` a building of player `player_id` whose sight is `sight`.
+fn building_sight(world: &mut World, player_id: PlayerId, id: i32, sight: BuildingSight) {
     let map = || VisibleMap {
         counts: vec![0; 400],
         explored: TileCount::ZERO,
     };
-    let mut v = Visibility::new(
+    let mut visibility = Visibility::new(
         GridSize::new(20, 20),
         vec![map(), map(), map()],
         vec![VisionBits::NONE; 400],
@@ -786,10 +815,10 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, sight: BuildingSight) {
         0,
         vec![PlayerKind::Human; 3],
     );
-    v.add_seer(
+    visibility.add_seer(
         object_id(id),
         Seer {
-            player: p,
+            player: player_id,
             master: master_id(1021),
             los: Distance::new(6.0),
             state: ObjectState::Alive,
@@ -800,61 +829,61 @@ fn building_sight(t: &mut World, p: PlayerId, id: i32, sight: BuildingSight) {
             kind: MasterKind::BUILDING,
         },
     );
-    t.spatial.sight = Some(v);
+    world.spatial.sight = Some(visibility);
 }
 
 #[test]
 fn built_feitoria_trickles_food_through_its_player_store() {
-    let mut t = world();
+    let mut world = world();
     // its explore task (6) does nothing here
     give_master(
-        &mut t,
+        &mut world,
         master_id(1021),
         MasterKind::BUILDING,
         class::BUILDING,
         vec![task(ActionKind::named(6)), feitoria_food()],
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(1),
         50,
         master_id(1021),
         HitPoints::new(2000.0),
         Point::new(5.5, 5.5),
     );
-    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Built);
-    t.players[1].attributes[205] = Amount::new(1.0);
-    run(&mut t, PlayerId::new(1), 50);
+    building_sight(&mut world, PlayerId::new(1), 50, BuildingSight::Built);
+    world.players[1].attributes[205] = Amount::new(1.0);
+    run(&mut world, PlayerId::new(1), 50);
     let made = 0.5_f32 * 1.6 * 1.0;
-    assert_eq!(t.players[1].generated[0], Amount::new(made));
-    assert_eq!(t.players[1].attributes[0], Amount::ZERO);
-    run(&mut t, PlayerId::new(1), 50);
+    assert_eq!(world.players[1].generated[0], Amount::new(made));
+    assert_eq!(world.players[1].attributes[0], Amount::ZERO);
+    run(&mut world, PlayerId::new(1), 50);
     let given = made + made;
-    assert_eq!(t.players[1].attributes[0], Amount::new(given));
-    assert_eq!(t.players[1].attributes[166], Amount::new(given));
-    assert_eq!(t.players[1].generated[0], Amount::ZERO);
+    assert_eq!(world.players[1].attributes[0], Amount::new(given));
+    assert_eq!(world.players[1].attributes[166], Amount::new(given));
+    assert_eq!(world.players[1].generated[0], Amount::ZERO);
     // unbuilt, nothing
-    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Started);
-    run(&mut t, PlayerId::new(1), 50);
-    assert_eq!(t.players[1].generated[0], Amount::ZERO);
+    building_sight(&mut world, PlayerId::new(1), 50, BuildingSight::Started);
+    run(&mut world, PlayerId::new(1), 50);
+    assert_eq!(world.players[1].generated[0], Amount::ZERO);
     // the player's attribute 205 at 0: nothing joins the store
-    building_sight(&mut t, PlayerId::new(1), 50, BuildingSight::Built);
-    t.players[1].attributes[205] = Amount::ZERO;
-    run(&mut t, PlayerId::new(1), 50);
-    assert_eq!(t.players[1].generated[0], Amount::ZERO);
+    building_sight(&mut world, PlayerId::new(1), 50, BuildingSight::Built);
+    world.players[1].attributes[205] = Amount::ZERO;
+    run(&mut world, PlayerId::new(1), 50);
+    assert_eq!(world.players[1].generated[0], Amount::ZERO);
 }
 
 /// A Keshik of player 1 attacking object 77 in state 7.
-fn keshik(t: &mut World) {
+fn keshik(world: &mut World) {
     give_master(
-        t,
+        world,
         master_id(1228),
         MasterKind::COMBAT,
         class::CLASS_12,
         vec![keshik_gold()],
     );
     put(
-        t,
+        world,
         PlayerId::new(1),
         60,
         master_id(1228),
@@ -887,57 +916,59 @@ fn keshik(t: &mut World) {
         on_target_moved: TargetMoved::Follows,
         same_owner: false,
     };
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .set_attack(Some(attack));
-    t.players[1].attributes[213] = Amount::new(0.5);
-    t.players[1].generated[3] = Amount::new(0.999);
+    world.players[1].attributes[213] = Amount::new(0.5);
+    world.players[1].generated[3] = Amount::new(0.999);
 }
 
 #[test]
 fn keshik_makes_gold_while_it_fights_target_of_its_task_class() {
-    let mut t = world();
-    keshik(&mut t);
+    let mut world = world();
+    keshik(&mut world);
     give_master(
-        &mut t,
+        &mut world,
         master_id(4),
         MasterKind::COMBAT,
         class::CLASS_0,
         Vec::new(),
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(2),
         77,
         master_id(4),
         HitPoints::new(30.0),
         Point::new(6.5, 5.5),
     );
-    run(&mut t, PlayerId::new(1), 60);
+    run(&mut world, PlayerId::new(1), 60);
     let given = 0.5_f32 * 0.01 * 0.5 + 0.999;
-    assert_eq!(t.players[1].attributes[3], Amount::new(given));
-    assert_eq!(t.players[1].attributes[49], Amount::new(given));
-    assert_eq!(t.players[1].attributes[169], Amount::new(given));
-    assert_eq!(t.players[1].generated[3], Amount::ZERO);
+    assert_eq!(world.players[1].attributes[3], Amount::new(given));
+    assert_eq!(world.players[1].attributes[49], Amount::new(given));
+    assert_eq!(world.players[1].attributes[169], Amount::new(given));
+    assert_eq!(world.players[1].generated[3], Amount::ZERO);
     // in another state, nothing
-    t.parts
+    world
+        .parts
         .actions
-        .of_mut(t.players[1].objects[ListIndex::new(0)].id)
+        .of_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .list
         .attack_mut()
         .unwrap()
         .state = AttackState::Ready;
-    run(&mut t, PlayerId::new(1), 60);
-    assert_eq!(t.players[1].generated[3], Amount::ZERO);
+    run(&mut world, PlayerId::new(1), 60);
+    assert_eq!(world.players[1].generated[3], Amount::ZERO);
 }
 
 /// A combat unit of master 9 at (5.5, 5.5) moving east, with a movement damage of range 2,
 /// 5 hit points and a timer of 3 s.
-fn trampler(t: &mut World) {
+fn trampler(world: &mut World) {
     let trample = Task {
         work_range: Distance::new(2.0),
         work_val1: WorkValue::new(5.0),
@@ -945,14 +976,14 @@ fn trampler(t: &mut World) {
         ..task(MOVEMENT_DAMAGE)
     };
     give_master(
-        t,
+        world,
         master_id(9),
         MasterKind::COMBAT,
         class::CLASS_12,
         vec![trample],
     );
     put(
-        t,
+        world,
         PlayerId::new(1),
         10,
         master_id(9),
@@ -964,16 +995,17 @@ fn trampler(t: &mut World) {
         velocity: BVector::new(1.0, 0.0, 0.0),
         acceleration: BVector::ZERO,
     });
-    t.parts
-        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(mover));
+    world
+        .parts
+        .put_mover(world.players[1].objects[ListIndex::new(0)].id, Some(mover));
 }
 
 #[test]
 fn moving_unit_movement_damage_hits_the_enemies_about_it() {
-    let mut t = world();
-    trampler(&mut t);
+    let mut world = world();
+    trampler(&mut world);
     give_master(
-        &mut t,
+        &mut world,
         master_id(4),
         MasterKind::COMBAT,
         class::CLASS_6,
@@ -981,7 +1013,7 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
     );
     // an enemy in reach, one out of it, one of its own player, one of Gaia
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(2),
         20,
         master_id(4),
@@ -989,7 +1021,7 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
         Point::new(6.5, 5.5),
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(2),
         21,
         master_id(4),
@@ -997,7 +1029,7 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
         Point::new(9.5, 5.5),
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(1),
         30,
         master_id(4),
@@ -1005,83 +1037,90 @@ fn moving_unit_movement_damage_hits_the_enemies_about_it() {
         Point::new(5.5, 6.5),
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(0),
         40,
         master_id(4),
         HitPoints::new(30.0),
         Point::new(4.5, 5.5),
     );
-    run(&mut t, PlayerId::new(1), 10);
+    run(&mut world, PlayerId::new(1), 10);
     let hp = |t: &World, id: ObjectId| t.object(id).unwrap().1.life.hp;
-    assert_eq!(hp(&t, object_id(20)), HitPoints::new(25.0));
-    assert_eq!(hp(&t, object_id(21)), HitPoints::new(30.0));
-    assert_eq!(hp(&t, object_id(30)), HitPoints::new(30.0));
-    assert_eq!(hp(&t, object_id(40)), HitPoints::new(30.0));
+    assert_eq!(hp(&world, object_id(20)), HitPoints::new(25.0));
+    assert_eq!(hp(&world, object_id(21)), HitPoints::new(30.0));
+    assert_eq!(hp(&world, object_id(30)), HitPoints::new(30.0));
+    assert_eq!(hp(&world, object_id(40)), HitPoints::new(30.0));
     assert_eq!(
-        t.parts
-            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .combat_of(world.players[1].objects[ListIndex::new(0)].id)
             .abilities
             .movement_damage_timer,
         Seconds::new(3.0)
     );
     // the timer runs down first: no hit for 3 s
-    run(&mut t, PlayerId::new(1), 10);
-    assert_eq!(hp(&t, object_id(20)), HitPoints::new(25.0));
+    run(&mut world, PlayerId::new(1), 10);
+    assert_eq!(hp(&world, object_id(20)), HitPoints::new(25.0));
     assert_eq!(
-        t.parts
-            .combat_of(t.players[1].objects[ListIndex::new(0)].id)
+        world
+            .parts
+            .combat_of(world.players[1].objects[ListIndex::new(0)].id)
             .abilities
             .movement_damage_timer,
         Seconds::new(2.5)
     );
     // standing, no hit even when due
-    t.parts
-        .combat_mut(t.players[1].objects[ListIndex::new(0)].id)
+    world
+        .parts
+        .combat_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .abilities
         .movement_damage_timer = Seconds::ZERO;
-    t.parts
-        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
+    world
+        .parts
+        .mover_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .velocity = None;
-    run(&mut t, PlayerId::new(1), 10);
-    assert_eq!(hp(&t, object_id(20)), HitPoints::new(25.0));
+    run(&mut world, PlayerId::new(1), 10);
+    assert_eq!(hp(&world, object_id(20)), HitPoints::new(25.0));
 }
 
 #[test]
 fn movement_damage_kill_leaves_0_hit_points_and_counts_the_kill() {
-    let mut t = world();
-    trampler(&mut t);
+    let mut world = world();
+    trampler(&mut world);
     give_master(
-        &mut t,
+        &mut world,
         master_id(4),
         MasterKind::COMBAT,
         class::CLASS_6,
         Vec::new(),
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(2),
         20,
         master_id(4),
         HitPoints::new(3.0),
         Point::new(6.5, 5.5),
     );
-    t.players[2].objects[ListIndex::new(0)].life.amount = Amount::new(10.0);
-    run(&mut t, PlayerId::new(1), 10);
-    let (_, u) = t.object(object_id(20)).unwrap();
-    assert_eq!((u.life.hp, u.life.amount), (HitPoints::ZERO, Amount::ZERO));
+    world.players[2].objects[ListIndex::new(0)].life.amount = Amount::new(10.0);
+    run(&mut world, PlayerId::new(1), 10);
+    let (_, unit) = world.object(object_id(20)).unwrap();
+    assert_eq!(
+        (unit.life.hp, unit.life.amount),
+        (HitPoints::ZERO, Amount::ZERO)
+    );
     // FUN_1412005b0: player 1 a kill (20) of player 2 (302), player 2 a loss (154)
-    assert_eq!(t.players[1].attributes[20], Amount::new(1.0));
-    assert_eq!(t.players[1].attributes[302], Amount::new(1.0));
-    assert_eq!(t.players[2].attributes[154], Amount::new(1.0));
-    assert_eq!(t.players[2].attributes[326], Amount::new(1.0));
+    assert_eq!(world.players[1].attributes[20], Amount::new(1.0));
+    assert_eq!(world.players[1].attributes[302], Amount::new(1.0));
+    assert_eq!(world.players[2].attributes[154], Amount::new(1.0));
+    assert_eq!(world.players[2].attributes[326], Amount::new(1.0));
 }
 
 /// The map's terrain: every tile of terrain 1 but (5, 6) of terrain 2, whose flag byte has
 /// 32 (deep water).
-fn waters(t: &mut World) {
+fn waters(world: &mut World) {
     let mut tiles = vec![(1u8, 255u8, -1i16); 400];
     tiles[6 * 20 + 5] = (2, 255, -1);
     let kind = |flags| TerrainKind {
@@ -1089,7 +1128,7 @@ fn waters(t: &mut World) {
         flags,
         forest: false,
     };
-    t.spatial.terrain = Some(Terrain::new(
+    world.spatial.terrain = Some(Terrain::new(
         GridSize::new(20, 20),
         tiles
             .into_iter()
@@ -1113,23 +1152,23 @@ fn waters(t: &mut World) {
     };
     for id in [19598, 19599, 19600, 19601] {
         let id = SpriteId::named(id);
-        let _ = Arc::make_mut(&mut t.model.graphics).insert(id, g(id));
+        let _ = Arc::make_mut(&mut world.model.graphics).insert(id, g(id));
     }
 }
 
 #[test]
 fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
-    let mut t = world();
-    waters(&mut t);
+    let mut world = world();
+    waters(&mut world);
     give_master(
-        &mut t,
+        &mut world,
         master_id(250),
         MasterKind::COMBAT,
         class::WARSHIP,
         vec![longboat_look()],
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(1),
         70,
         master_id(250),
@@ -1138,12 +1177,13 @@ fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
     );
     let mut mover = walker();
     mover.moved_at = Position::new(5.5, 6.5, 0.0);
-    t.parts
-        .put_mover(t.players[1].objects[ListIndex::new(0)].id, Some(mover));
-    run(&mut t, PlayerId::new(1), 70);
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.mover_of(u.id).unwrap().factor, 0.35);
-    let abilities = t.parts.combat_of(u.id).abilities;
+    world
+        .parts
+        .put_mover(world.players[1].objects[ListIndex::new(0)].id, Some(mover));
+    run(&mut world, PlayerId::new(1), 70);
+    let players = &world.players[1].objects[ListIndex::new(0)];
+    assert_eq!(world.parts.mover_of(players.id).unwrap().factor, 0.35);
+    let abilities = world.parts.combat_of(players.id).abilities;
     assert_eq!(abilities.attack_rate, 1.0);
     assert_eq!(
         abilities.look,
@@ -1157,89 +1197,96 @@ fn longboat_takes_its_task_look_on_its_terrains_and_its_master_off_them() {
         })
     );
     // where it last moved to decides, not its place
-    t.parts
-        .mover_mut(t.players[1].objects[ListIndex::new(0)].id)
+    world
+        .parts
+        .mover_mut(world.players[1].objects[ListIndex::new(0)].id)
         .unwrap()
         .moved_at = Position::new(5.5, 7.5, 0.0);
-    run(&mut t, PlayerId::new(1), 70);
-    let u = &t.players[1].objects[ListIndex::new(0)];
-    assert_eq!(t.parts.mover_of(u.id).unwrap().factor, 1.0);
-    let abilities = t.parts.combat_of(u.id).abilities;
+    run(&mut world, PlayerId::new(1), 70);
+    let unit = &world.players[1].objects[ListIndex::new(0)];
+    assert_eq!(world.parts.mover_of(unit.id).unwrap().factor, 1.0);
+    let abilities = world.parts.combat_of(unit.id).abilities;
     assert_eq!((abilities.attack_rate, abilities.look), (1.0, None));
 }
 
 #[test]
 fn dead_object_that_leaves_issues_its_removal_rewards() {
-    let mut t = world();
+    let mut world = world();
     let far = Task {
         work_range: Distance::new(1.0),
         ..bounty()
     };
     give_master(
-        &mut t,
+        &mut world,
         master_id(5),
         MasterKind::COMBAT,
         class::CLASS_6,
         vec![bounty(), far, bounty()],
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(1),
         80,
         master_id(5),
         HitPoints::ZERO,
         Point::new(5.5, 5.5),
     );
-    t.players[1].attributes[7] = Amount::new(2.0);
-    assert_eq!(rewards(&mut t, PlayerId::new(1), 80, false), Vec::new());
-    let r = Reward {
+    world.players[1].attributes[7] = Amount::new(2.0);
+    assert_eq!(rewards(&mut world, PlayerId::new(1), 80, false), Vec::new());
+    let reward = Reward {
         player: PlayerId::new(1),
         attribute: Some(attribute::GOLD),
         amount: 20,
     };
-    assert_eq!(rewards(&mut t, PlayerId::new(1), 80, true), vec![r, r]);
+    assert_eq!(
+        rewards(&mut world, PlayerId::new(1), 80, true),
+        vec![reward, reward]
+    );
     // alive, it issues none
-    t.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(1.0);
-    assert_eq!(rewards(&mut t, PlayerId::new(1), 80, true), Vec::new());
+    world.players[1].objects[ListIndex::new(0)].life.hp = HitPoints::new(1.0);
+    assert_eq!(rewards(&mut world, PlayerId::new(1), 80, true), Vec::new());
 }
 
 #[test]
 fn an_object_of_another_kind_has_no_abilities() {
-    let mut t = world();
+    let mut world = world();
     give_master(
-        &mut t,
+        &mut world,
         ids::ID_7,
         MasterKind::MOVING,
         class::CLASS_6,
         vec![bounty()],
     );
     put(
-        &mut t,
+        &mut world,
         PlayerId::new(1),
         90,
         ids::ID_7,
         HitPoints::ZERO,
         Point::new(5.5, 5.5),
     );
-    assert_eq!(rewards(&mut t, PlayerId::new(1), 90, true), Vec::new());
+    assert_eq!(rewards(&mut world, PlayerId::new(1), 90, true), Vec::new());
 }
 
 /// `FUN_1416625b0`: an attribute below the player's count, none past it; the resources are the
 /// first four attributes, and the construction rate attribute 195 (0 past the count).
 #[test]
 fn player_attribute_reads_its_place_and_none_past_the_count() {
-    let mut p = Player {
+    let mut player = Player {
         attributes: attributes(6, [1.0, 2.0, 3.0, 4.0]),
         ..Player::default()
     };
-    p.attributes[5] = Amount::new(9.0);
-    assert_eq!(p.attribute(attribute::STONE), Some(Amount::new(3.0)));
-    assert_eq!(p.attribute(AttributeId::named(5)), Some(Amount::new(9.0)));
-    assert_eq!(p.attribute(attribute::CURRENT_AGE), None);
-    assert_eq!(p.resources(), amounts([1.0, 2.0, 3.0, 4.0]));
-    assert_eq!(p.construction_rate(slots()), Amount::ZERO);
-    p.attributes.resize(196, Amount::ZERO);
-    p.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
-    assert_eq!(p.construction_rate(slots()), Amount::new(1.5));
+    player.attributes[5] = Amount::new(9.0);
+    assert_eq!(player.attribute(attribute::STONE), Some(Amount::new(3.0)));
+    assert_eq!(
+        player.attribute(AttributeId::named(5)),
+        Some(Amount::new(9.0))
+    );
+    assert_eq!(player.attribute(attribute::CURRENT_AGE), None);
+    assert_eq!(player.resources(), amounts([1.0, 2.0, 3.0, 4.0]));
+    assert_eq!(player.construction_rate(slots()), Amount::ZERO);
+    player.attributes.resize(196, Amount::ZERO);
+    player.attributes[attribute::CONSTRUCTION_RATE.index()] = Amount::new(1.5);
+    assert_eq!(player.construction_rate(slots()), Amount::new(1.5));
     assert_eq!(Player::default().resources(), amounts([0.0; 4]));
 }

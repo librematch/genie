@@ -16,7 +16,6 @@ use crate::movement::Speed;
 use crate::objects::ListIndex;
 use crate::objects::ObjectId;
 use crate::objects::ObjectState;
-use crate::objects::actions::Action;
 use crate::objects::masters::ActionKind;
 use crate::objects::masters::Master;
 use crate::objects::masters::MasterId;
@@ -40,12 +39,12 @@ use crate::unit_ai::task_finder::{Actor, enabled};
 use crate::unit_ai::task_finder::{TaskOn, find_task};
 use crate::world::World;
 use crate::world::layer::ClassRoles;
-use crate::world::layer::MasterRoles;
 use crate::world::slots::CheckedIndex;
 use crate::world::slots::PlayerSlots;
 use crate::{GenieError, GenieResult};
 
 mod garrison;
+mod retarget;
 
 /// A task of an object's action (Enter, Attack, Hunt, Build, Repair, Gather) that the task
 /// finder gave a work command without a target, for the terrain at its point: the game starts
@@ -57,10 +56,10 @@ const TERRAIN_TASK: GenieError =
 const UNMODELLED_FACTORY: GenieError =
     GenieError::unsupported("the action factory for a task the slice does not model");
 
-/// Whether the unit's top action (`top`) is the Attack `a` on `target` (both none counts, as
+/// Whether the unit's top action (`top`) is the Attack `attack` on `target` (both none counts, as
 /// the game compares −1 with −1).
-fn attack_on(top: Option<ActionKind>, a: &Attack, target: Option<ObjectId>) -> bool {
-    top == Some(ATTACK) && a.target.map(AttackTargetId::id) == target
+fn attack_on(top: Option<ActionKind>, attack: &Attack, target: Option<ObjectId>) -> bool {
+    top == Some(ATTACK) && attack.target.map(AttackTargetId::id) == target
 }
 
 /// Whether a unit changes its master to the one whose task it found (1) or keeps its own (0):
@@ -98,10 +97,10 @@ impl World {
             .list
             .attack()
             .filter(|a| attack_on(top, a, target));
-        let Some(a) = attacking.filter(|_| matches!(filter, None | Some(ATTACK))) else {
+        let Some(attack) = attacking.filter(|_| matches!(filter, None | Some(ATTACK))) else {
             return Ok(Answer::NotTaken);
         };
-        if !a.keeps(target)? {
+        if !attack.keeps(target)? {
             return Ok(Answer::NotTaken);
         }
         self.tell_of_attack(player, idx, (target, point), notifies)?;
@@ -120,11 +119,11 @@ impl World {
         (target, point): (Option<ObjectId>, Position),
         notifies: Notifies,
     ) -> GenieResult<()> {
-        let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+        let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
             "an attack's target the slice does not hold",
         ))?;
-        let target = t.id;
-        let class = t.master(self.master_tables(), tp)?.class;
+        let target = target_unit.id;
+        let class = target_unit.master(self.master_tables(), tp)?.class;
         let world_time = self.world_time;
         let unit = self.players.live_mut(player, idx)?;
         if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
@@ -291,7 +290,7 @@ impl World {
             players: &self.players,
             drop_sites: &self.model.drop_sites,
         };
-        let (t, general) = match target {
+        let (task_target, general) = match target {
             None => (None, None),
             Some(target) => (
                 Some(self.task_target(target, 1)?),
@@ -299,7 +298,7 @@ impl World {
             ),
         };
         let on = TaskOn {
-            target: t.as_ref(),
+            target: task_target.as_ref(),
             general: general.as_ref(),
             terrain: self.task_terrain(point),
         };
@@ -319,161 +318,6 @@ impl World {
     /// [`crate::unit_ai::task_finder::world::point_terrain`] on the map's terrain).
     pub(crate) fn task_terrain(&self, point: Position) -> Option<TerrainId> {
         point_terrain(self.spatial.terrain.as_ref(), point)
-    }
-
-    /// `LAB_1410706a8`: an action of the unit already on the `task` found takes the new target
-    /// itself (its slot 9): a Hunt or Gather on the same task retargets, a Build or Repair on
-    /// top takes the target again, a Transport on the same task works at the point
-    /// ([`World::retake_transport`]); the base action types on top answer 0 (the factory
-    /// follows).
-    /// Taken when an action kept the work.
-    pub(super) fn retake_task(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        (target, point, notifies): (Option<ObjectId>, Position, Notifies),
-        task: &Task,
-        master: MasterSwap,
-    ) -> GenieResult<Answer> {
-        let unit = &self.players.live(player, idx)?;
-        let head = self.parts.actions_of(unit.id).list.head().cloned();
-        let top = head.as_ref().map(Action::kind);
-        Ok(match head {
-            Some(Action::Hunt(h)) if task.action_kind == HUNT && h.task.id == task.id => {
-                self.retarget_hunt_work(
-                    player,
-                    idx,
-                    (target.ok_or(TERRAIN_TASK)?, point, notifies),
-                )?;
-                Answer::Taken
-            }
-            Some(Action::Build(build)) if task.action_kind == ActionKind::BUILD => {
-                if master == MasterSwap::Change {
-                    return Err(GenieError::unsupported(
-                        "a work command on the Build task of the unit's former master",
-                    ));
-                }
-                let target = target.ok_or(TERRAIN_TASK)?;
-                self.retake_build((player, idx), build, (target, point, notifies))?;
-                Answer::Taken
-            }
-            Some(Action::Repair(repair)) if task.action_kind == REPAIR => {
-                let target = target.ok_or(TERRAIN_TASK)?;
-                self.retake_repair((player, idx), repair, (target, point, notifies))?;
-                Answer::Taken
-            }
-            Some(Action::Gather(g)) if task.action_kind == GATHER && g.task.id == task.id => self
-                .retarget_gather_work(
-                player,
-                idx,
-                (target.ok_or(TERRAIN_TASK)?, point, notifies),
-            )?,
-            Some(Action::Transport(_)) if task.action_kind == TRANSPORT => {
-                self.retake_transport((player, idx), (target, point), task, notifies)?
-            }
-            // the top action's slot 0x48 (FUN_140a977a0) on the same task: the base's
-            // (FUN_140a7bf40: the MoveTo's, the Enter's, the missile's, the Fly's, the Make's, the
-            // wait for a foundation's) answers 0, and the work goes on to the factory
-            Some(other) if top == Some(task.action_kind) && top != Some(HUNT) => match other {
-                Action::MoveTo(_)
-                | Action::Enter(_)
-                | Action::Missile(_)
-                | Action::Fly(_)
-                | Action::Make(_)
-                | Action::WaitSolidify(_) => Answer::NotTaken,
-                _ => {
-                    return Err(GenieError::unsupported(
-                        "a work command on the unit's current task",
-                    )
-                    .with("action", format_args!("{top:?}"))
-                    .with("task", task.id.get())
-                    .with("target", ObjectId::field(target)));
-                }
-            },
-            _ => Answer::NotTaken,
-        })
-    }
-
-    /// A Hunt on the work's task retargets (slot 9, [`World::retarget_hunt`]) and its unit AI
-    /// hears the hunt order and action on the target at the work's point; a hunt sent to its
-    /// player's master 84 is not modelled.
-    pub(super) fn retarget_hunt_work(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> GenieResult<()> {
-        let t = self.task_target(target, 0)?;
-        if self
-            .model
-            .roles
-            .of_master(t.master.id)
-            .contains(MasterRoles::MARKET)
-            && t.player == player
-        {
-            return Err(GenieError::unsupported(
-                "a hunt sent to its player's master 84",
-            ));
-        }
-        let class = t.master.class;
-        self.retarget_hunt(player, idx, target)?;
-        let unit = self.players.live_mut(player, idx)?;
-        if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-            ai.notify_work(
-                Some(OrderKind::Hunt),
-                Some(AiAction::Hunt),
-                Some((target, class)),
-                point,
-                notifies,
-                self.streams.get(Stream::Ai),
-            )?;
-            self.remember_order(player, idx, (Some(OrderKind::Hunt), Some(AiAction::Hunt)))?;
-        }
-        Ok(())
-    }
-
-    /// A Gather on the work's task retargets (slot 9, [`World::retarget_gather`]); when it took
-    /// the target its unit AI hears the gather order and action on it at the work's point.
-    /// Answers whether it took it; a gather sent to its player's master 84 is not modelled.
-    pub(super) fn retarget_gather_work(
-        &mut self,
-        player: PlayerId,
-        idx: ListIndex,
-        (target, point, notifies): (ObjectId, Position, Notifies),
-    ) -> GenieResult<Answer> {
-        let t = self.task_target(target, 0)?;
-        if self
-            .model
-            .roles
-            .of_master(t.master.id)
-            .contains(MasterRoles::MARKET)
-            && t.player == player
-        {
-            return Err(GenieError::unsupported(
-                "a gather sent to its player's master 84",
-            ));
-        }
-        let class = t.master.class;
-        let took = self.retarget_gather(player, idx, target)?;
-        if took == Answer::Taken {
-            let unit = self.players.live_mut(player, idx)?;
-            if let Some(ai) = self.parts.unit_ai.get_mut(unit.id) {
-                ai.notify_work(
-                    Some(OrderKind::Gather),
-                    Some(AiAction::Gather),
-                    Some((target, class)),
-                    point,
-                    notifies,
-                    self.streams.get(Stream::Ai),
-                )?;
-                self.remember_order(
-                    player,
-                    idx,
-                    (Some(OrderKind::Gather), Some(AiAction::Gather)),
-                )?;
-            }
-        }
-        Ok(took)
     }
 
     /// The action list's factory (slot 0x10) for the work's `task` on `target`: the Enter,
@@ -552,7 +396,10 @@ impl World {
     ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let master = unit.master(self.master_tables(), player)?;
-        if !master.move_stats.is_some_and(|m| Speed::ZERO < m.speed) {
+        if !master
+            .move_stats
+            .is_some_and(|move_stats| Speed::ZERO < move_stats.speed)
+        {
             return Ok(());
         }
         // slot 0x828 with 1 (the move's order and action) for a unit in state 2, -1 for
@@ -562,10 +409,10 @@ impl World {
         let named = match target {
             None => None,
             Some(target) => {
-                let (tp, t) = self.object(target).ok_or(GenieError::unsupported(
+                let (tp, target_unit) = self.object(target).ok_or(GenieError::unsupported(
                     "a work command's target the slice does not hold",
                 ))?;
-                Some((target, t.master(self.master_tables(), tp)?.class))
+                Some((target, target_unit.master(self.master_tables(), tp)?.class))
             }
         };
         let (order, action) = if alive {
@@ -635,7 +482,7 @@ impl World {
             players: &self.players,
             drop_sites: &self.model.drop_sites,
         };
-        let t = self.task_target(target, 1)?;
+        let task_target = self.task_target(target, 1)?;
         let general = self.task_target(target, 2)?;
         // slot 0x820's point: the target's place
         let at = self
@@ -647,7 +494,7 @@ impl World {
                 list,
                 &actor,
                 &TaskOn {
-                    target: Some(&t),
+                    target: Some(&task_target),
                     general: Some(&general),
                     terrain,
                 },

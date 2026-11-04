@@ -3,10 +3,10 @@
 use genie_rec::de::command::Command as Packet;
 
 /// Why the engine stops on a packet it does not run, by the command's name.
-pub(crate) const fn unmodelled_command(p: &Packet) -> &'static str {
+pub(crate) const fn unmodelled_command(command: &Packet) -> &'static str {
     macro_rules! named {
         ($($v:ident),* $(,)?) => {
-            match p {
+            match command {
                 $(Packet::$v(_) => concat!("a command the slice does not model: ", stringify!($v)),)*
                 _ => "a command the slice does not model",
             }

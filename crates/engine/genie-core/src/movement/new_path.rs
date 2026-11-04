@@ -138,18 +138,18 @@ impl Mover {
                 AfterRequest::Walk
             });
         }
-        let mut i = path.points.len() as i32 - 1;
-        while 0 < i {
+        let mut count = path.points.len() as i32 - 1;
+        while 0 < count {
             let (a, b) = (
-                *path.points.checked(i as usize)?,
-                *path.points.checked(i as usize - 1)?,
+                *path.points.checked(count as usize)?,
+                *path.points.checked(count as usize - 1)?,
             );
             let mut d = a - b;
             d = d.with_height(0.0);
             if movement_tuning.split < d.x() * d.x() + 0.0 + d.y() * d.y() {
-                split(&mut path, i - 1);
+                split(&mut path, count - 1);
             }
-            i -= 1;
+            count -= 1;
         }
         new.length = path.length;
         new.points = path.points;
@@ -226,18 +226,20 @@ impl Mover {
             let r = self.stats.radius.x();
             let skip = [RecordId::from(me.id), RecordId::from(target_id)];
             for id in world.obstruction_candidates(rect, Distance::new(grow), &skip) {
-                let Some(p) = world.get(id) else { continue };
+                let Some(placed) = world.get(id) else {
+                    continue;
+                };
                 let gait = by_id.gait(id);
                 if gait.is_some_and(|g| g.moving) {
                     continue;
                 }
                 // a worker whose path is this update's walks: it is passed
-                if gait.and_then(|g| g.path_made) == Some(now) {
+                if gait.and_then(|now_gait| now_gait.path_made) == Some(now) {
                     continue;
                 }
                 // slot 0x4f0: a building's master with a task of action type 0x99
                 // (FUN_1415c60b0), 0 for anything else
-                let worker_building = roles.of_class(p.class).intersects(
+                let worker_building = roles.of_class(placed.class).intersects(
                     ClassRoles::BUILDING
                         | ClassRoles::WALL
                         | ClassRoles::GATE
@@ -245,9 +247,9 @@ impl Mover {
                         | ClassRoles::TOWER,
                 ) && world
                     .task_0x99
-                    .get(p.player.index())
-                    .is_some_and(|m| m.contains(&p.master));
-                if !roles.of_class(p.class).intersects(
+                    .get(placed.player.index())
+                    .is_some_and(|master_ids| master_ids.contains(&placed.master));
+                if !roles.of_class(placed.class).intersects(
                     ClassRoles::TRADE_BOAT
                         | ClassRoles::VILLAGER
                         | ClassRoles::TRADE_CART
@@ -261,11 +263,12 @@ impl Mover {
                 if !self.start_blocked(world, plan, t, line)? {
                     continue;
                 }
-                let allied = owner.is_some_and(|o| {
-                    let relations = world.relations.get(p.player).unwrap_or(&NO_RELATIONS);
-                    task_finder_allied(relations, p.player, o, AllyTest::WithRelation4)
+                let allied = owner.is_some_and(|player_id| {
+                    let relations = world.relations.get(placed.player).unwrap_or(&NO_RELATIONS);
+                    task_finder_allied(relations, placed.player, player_id, AllyTest::WithRelation4)
                 });
-                let gap = footprint_gap_squared(p.position, p.radius, t.position, t.radius);
+                let gap =
+                    footprint_gap_squared(placed.position, placed.radius, t.position, t.radius);
                 if !allied || gap <= DistanceSquared::new(r * r) {
                     continue;
                 }
@@ -310,7 +313,11 @@ impl Mover {
     /// of the walked level) was made this tick, the new path takes the unit's ignore units
     /// (`FUN_140f9b7a0`).
     pub(super) fn give_ignored(&self, new: &mut PathData, now: WorldTime) {
-        if self.paths.last().is_some_and(|t| t.created == now) {
+        if self
+            .paths
+            .last()
+            .is_some_and(|path_data| path_data.created == now)
+        {
             new.ignored.clone_from(&self.ignore_units);
         }
     }
@@ -370,8 +377,8 @@ impl Mover {
         let level_target = self
             .paths
             .first()
-            .and_then(|l| l.target)
-            .filter(|&t| world.get(t).is_some());
+            .and_then(|path_data| path_data.target)
+            .filter(|&object_id| world.get(object_id).is_some());
         // from +0x824, the motion step's `local_18c8`
         tile_plan_for(
             self.walker(me.id),
@@ -417,10 +424,10 @@ impl Mover {
         range: Distance,
         master: MasterId,
     ) -> GenieResult<bool> {
-        let Some(t) = world.get_known(target)? else {
+        let Some(placed) = world.get_known(target)? else {
             return Ok(false);
         };
-        let to = t.position.ground();
+        let to = placed.position.ground();
         let ask = ReachAsk {
             goal: to,
             target: Some(target),
@@ -445,10 +452,10 @@ impl Mover {
         range: Distance,
         by_id: ObjectsRef<'_>,
     ) -> GenieResult<Option<Distance>> {
-        let Some(t) = world.get_known(target)? else {
+        let Some(placed) = world.get_known(target)? else {
             return Ok(None);
         };
-        let to = t.position.ground();
+        let to = placed.position.ground();
         let mask = self.stats.restriction_mask;
         let mut pather = HullPather::new(
             (world, by_id),

@@ -84,8 +84,9 @@ fn parse_bytes(bytes: &[u8]) -> GenieResult<String> {
     if bytes.is_empty() {
         Ok("<empty>".to_string())
     } else {
-        String::from_utf8(bytes).map_err(|e| {
-            GenieError::invalid_input("an AI error text that is not valid UTF-8").with_source(e)
+        String::from_utf8(bytes).map_err(|from_utf8_error| {
+            GenieError::invalid_input("an AI error text that is not valid UTF-8")
+                .with_source(from_utf8_error)
         })
     }
 }

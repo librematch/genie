@@ -18,22 +18,24 @@ impl Player {
         None.or_else(|| {
             self.scenario_editor_phantom_player
                 .as_deref()
-                .map(|p| &p.world_player_scenario_editor_phantom)
+                .map(|scenario_editor_phantom_player| {
+                    &scenario_editor_phantom_player.world_player_scenario_editor_phantom
+                })
         })
         .or_else(|| {
             self.human_or_coop_player
                 .as_deref()
-                .map(|p| &p.world_player_human_or_coop)
+                .map(|human_or_coop_player| &human_or_coop_player.world_player_human_or_coop)
         })
         .or_else(|| {
             self.gaia_player
                 .as_deref()
-                .map(|p| &p.world_player_gaia.world_player)
+                .map(|gaia_player| &gaia_player.world_player_gaia.world_player)
         })
         .or_else(|| {
             self.computer_player
                 .as_deref()
-                .map(|p| &p.world_player_computer)
+                .map(|computer_player| &computer_player.world_player_computer)
         })
     }
 
@@ -43,15 +45,25 @@ impl Player {
         None.or_else(|| {
             self.scenario_editor_phantom_player
                 .as_deref()
-                .map(|p| &p.player_objects)
+                .map(|scenario_editor_phantom_player| {
+                    &scenario_editor_phantom_player.player_objects
+                })
         })
         .or_else(|| {
             self.human_or_coop_player
                 .as_deref()
-                .map(|p| &p.player_objects)
+                .map(|human_or_coop_player| &human_or_coop_player.player_objects)
         })
-        .or_else(|| self.gaia_player.as_deref().map(|p| &p.player_objects))
-        .or_else(|| self.computer_player.as_deref().map(|p| &p.player_objects))
+        .or_else(|| {
+            self.gaia_player
+                .as_deref()
+                .map(|gaia_player| &gaia_player.player_objects)
+        })
+        .or_else(|| {
+            self.computer_player
+                .as_deref()
+                .map(|computer_player| &computer_player.player_objects)
+        })
     }
 }
 
@@ -63,8 +75,11 @@ impl PlayerObjects {
         self.masters
             .iter()
             .flatten()
-            .map(|m| &m.master)
-            .find(|m| m.static_part().is_some_and(|s| s.id() == id))
+            .map(|player_master| &player_master.master)
+            .find(|m| {
+                m.static_part()
+                    .is_some_and(|rge_master_static_object| rge_master_static_object.id() == id)
+            })
     }
 
     /// The `.dat` master whose values the player's master `id` holds where the save does not
@@ -82,38 +97,63 @@ impl Master {
     /// The static master every class starts with.
     #[must_use]
     pub fn static_part(&self) -> Option<&RgeMasterStaticObject> {
-        if let Some(t) = &self.tribe_master_tree_object {
-            return Some(t);
+        if let Some(rge_master_static_object) = &self.tribe_master_tree_object {
+            return Some(rge_master_static_object);
         }
-        if let Some(c) = &self.tribe_master_combat_object {
-            return Some(tribe_combat_master(c));
+        if let Some(tribe_master_combat_object) = &self.tribe_master_combat_object {
+            return Some(tribe_combat_master(tribe_master_combat_object));
         }
-        if let Some(b) = &self.tribe_master_building_object {
-            return Some(tribe_combat_master(&b.tribe_master_combat_object));
+        if let Some(tribe_master_building_object) = &self.tribe_master_building_object {
+            return Some(tribe_combat_master(
+                &tribe_master_building_object.tribe_master_combat_object,
+            ));
         }
-        let r = self.rge_master.as_deref()?;
-        None.or(r.rge_master_static_object.as_deref())
+        let rge_master = self.rge_master.as_deref()?;
+        None.or(rge_master.rge_master_static_object.as_deref())
             .or_else(|| {
-                r.rge_master_animated_object
+                rge_master
+                    .rge_master_animated_object
                     .as_deref()
                     .map(|a| &a.rge_master_static_object)
             })
             .or_else(|| {
-                r.rge_master_doppleganger_object
-                    .as_deref()
-                    .map(|d| &d.rge_master_static_object)
-            })
-            .or_else(|| r.rge_master_moving_object.as_deref().map(moving_master))
-            .or_else(|| r.rge_master_action_object.as_deref().map(action_master))
-            .or_else(|| {
-                r.rge_master_combat_object
-                    .as_deref()
-                    .map(|c| action_master(&c.rge_master_action_object))
+                rge_master.rge_master_doppleganger_object.as_deref().map(
+                    |rge_master_animated_object| {
+                        &rge_master_animated_object.rge_master_static_object
+                    },
+                )
             })
             .or_else(|| {
-                r.rge_master_missile_object
+                rge_master
+                    .rge_master_moving_object
                     .as_deref()
-                    .map(|m| action_master(&m.rge_master_combat_object.rge_master_action_object))
+                    .map(moving_master)
+            })
+            .or_else(|| {
+                rge_master
+                    .rge_master_action_object
+                    .as_deref()
+                    .map(action_master)
+            })
+            .or_else(|| {
+                rge_master
+                    .rge_master_combat_object
+                    .as_deref()
+                    .map(|rge_master_combat_object| {
+                        action_master(&rge_master_combat_object.rge_master_action_object)
+                    })
+            })
+            .or_else(|| {
+                rge_master
+                    .rge_master_missile_object
+                    .as_deref()
+                    .map(|rge_master_missile_object| {
+                        action_master(
+                            &rge_master_missile_object
+                                .rge_master_combat_object
+                                .rge_master_action_object,
+                        )
+                    })
             })
     }
 }
@@ -134,16 +174,24 @@ impl RgeMasterStaticObject {
     }
 }
 
-const fn moving_master(m: &RgeMasterMovingObject) -> &RgeMasterStaticObject {
-    &m.rge_master_animated_object.rge_master_static_object
+const fn moving_master(rge_master_moving_object: &RgeMasterMovingObject) -> &RgeMasterStaticObject {
+    &rge_master_moving_object
+        .rge_master_animated_object
+        .rge_master_static_object
 }
 
-const fn action_master(a: &RgeMasterActionObject) -> &RgeMasterStaticObject {
-    moving_master(&a.rge_master_moving_object)
+const fn action_master(rge_master_action_object: &RgeMasterActionObject) -> &RgeMasterStaticObject {
+    moving_master(&rge_master_action_object.rge_master_moving_object)
 }
 
-const fn tribe_combat_master(c: &TribeMasterCombatObject) -> &RgeMasterStaticObject {
-    action_master(&c.rge_master_combat_object.rge_master_action_object)
+const fn tribe_combat_master(
+    tribe_master_combat_object: &TribeMasterCombatObject,
+) -> &RgeMasterStaticObject {
+    action_master(
+        &tribe_master_combat_object
+            .rge_master_combat_object
+            .rge_master_action_object,
+    )
 }
 
 impl RgeStaticObject {
@@ -155,13 +203,18 @@ impl RgeStaticObject {
             .or_else(|| {
                 self.rge_master_animated_object
                     .as_deref()
-                    .map(|a| &a.own_rge_master_static_object)
+                    .map(|own_rge_master_animated_object| {
+                        &own_rge_master_animated_object.own_rge_master_static_object
+                    })
             })
             .or_else(|| {
-                self.rge_master_moving_object.as_deref().map(|m| {
-                    &m.own_rge_master_animated_object
-                        .own_rge_master_static_object
-                })
+                self.rge_master_moving_object
+                    .as_deref()
+                    .map(|own_rge_master_moving_object| {
+                        &own_rge_master_moving_object
+                            .own_rge_master_animated_object
+                            .own_rge_master_static_object
+                    })
             })
             .or_else(|| {
                 self.rge_master_action_object
@@ -169,9 +222,15 @@ impl RgeStaticObject {
                     .map(own_action_master)
             })
             .or_else(|| {
-                self.rge_master_missile_object.as_deref().map(|m| {
-                    own_action_master(&m.own_rge_master_combat_object.own_rge_master_action_object)
-                })
+                self.rge_master_missile_object
+                    .as_deref()
+                    .map(|own_rge_master_missile_object| {
+                        own_action_master(
+                            &own_rge_master_missile_object
+                                .own_rge_master_combat_object
+                                .own_rge_master_action_object,
+                        )
+                    })
             })
             .or_else(|| {
                 self.tribe_master_combat_object
@@ -179,9 +238,13 @@ impl RgeStaticObject {
                     .map(own_tribe_combat_master)
             })
             .or_else(|| {
-                self.tribe_master_building_object
-                    .as_deref()
-                    .map(|b| own_tribe_combat_master(&b.own_tribe_master_combat_object))
+                self.tribe_master_building_object.as_deref().map(
+                    |own_tribe_master_building_object| {
+                        own_tribe_combat_master(
+                            &own_tribe_master_building_object.own_tribe_master_combat_object,
+                        )
+                    },
+                )
             })
     }
 }
@@ -198,23 +261,38 @@ impl RgeStaticObject {
                     .map(own_action_moving)
             })
             .or_else(|| {
-                self.rge_master_missile_object.as_deref().map(|m| {
-                    own_action_moving(&m.own_rge_master_combat_object.own_rge_master_action_object)
-                })
+                self.rge_master_missile_object
+                    .as_deref()
+                    .map(|own_rge_master_missile_object| {
+                        own_action_moving(
+                            &own_rge_master_missile_object
+                                .own_rge_master_combat_object
+                                .own_rge_master_action_object,
+                        )
+                    })
             })
             .or_else(|| {
-                self.tribe_master_combat_object.as_deref().map(|c| {
-                    own_action_moving(&c.own_rge_master_combat_object.own_rge_master_action_object)
-                })
+                self.tribe_master_combat_object
+                    .as_deref()
+                    .map(|own_tribe_master_combat_object| {
+                        own_action_moving(
+                            &own_tribe_master_combat_object
+                                .own_rge_master_combat_object
+                                .own_rge_master_action_object,
+                        )
+                    })
             })
             .or_else(|| {
-                self.tribe_master_building_object.as_deref().map(|b| {
-                    own_action_moving(
-                        &b.own_tribe_master_combat_object
-                            .own_rge_master_combat_object
-                            .own_rge_master_action_object,
-                    )
-                })
+                self.tribe_master_building_object.as_deref().map(
+                    |own_tribe_master_building_object| {
+                        own_action_moving(
+                            &own_tribe_master_building_object
+                                .own_tribe_master_combat_object
+                                .own_rge_master_combat_object
+                                .own_rge_master_action_object,
+                        )
+                    },
+                )
             })
     }
 
@@ -225,7 +303,9 @@ impl RgeStaticObject {
             .or_else(|| {
                 self.rge_master_moving_object
                     .as_deref()
-                    .map(|m| &m.own_rge_master_animated_object)
+                    .map(|own_rge_master_moving_object| {
+                        &own_rge_master_moving_object.own_rge_master_animated_object
+                    })
             })
             .or_else(|| {
                 self.rge_master_action_object
@@ -233,11 +313,15 @@ impl RgeStaticObject {
                     .map(own_action_animated)
             })
             .or_else(|| {
-                self.rge_master_missile_object.as_deref().map(|m| {
-                    own_action_animated(
-                        &m.own_rge_master_combat_object.own_rge_master_action_object,
-                    )
-                })
+                self.rge_master_missile_object
+                    .as_deref()
+                    .map(|own_rge_master_missile_object| {
+                        own_action_animated(
+                            &own_rge_master_missile_object
+                                .own_rge_master_combat_object
+                                .own_rge_master_action_object,
+                        )
+                    })
             })
             .or_else(|| {
                 self.tribe_master_combat_object
@@ -245,34 +329,58 @@ impl RgeStaticObject {
                     .map(own_combat_animated)
             })
             .or_else(|| {
-                self.tribe_master_building_object
-                    .as_deref()
-                    .map(|b| own_combat_animated(&b.own_tribe_master_combat_object))
+                self.tribe_master_building_object.as_deref().map(
+                    |own_tribe_master_building_object| {
+                        own_combat_animated(
+                            &own_tribe_master_building_object.own_tribe_master_combat_object,
+                        )
+                    },
+                )
             })
     }
 }
 
-const fn own_action_moving(a: &OwnRgeMasterActionObject) -> &OwnRgeMasterMovingObject {
-    &a.own_rge_master_moving_object
+const fn own_action_moving(
+    own_rge_master_action_object: &OwnRgeMasterActionObject,
+) -> &OwnRgeMasterMovingObject {
+    &own_rge_master_action_object.own_rge_master_moving_object
 }
 
-const fn own_action_animated(a: &OwnRgeMasterActionObject) -> &OwnRgeMasterAnimatedObject {
-    &a.own_rge_master_moving_object
+const fn own_action_animated(
+    own_rge_master_action_object: &OwnRgeMasterActionObject,
+) -> &OwnRgeMasterAnimatedObject {
+    &own_rge_master_action_object
+        .own_rge_master_moving_object
         .own_rge_master_animated_object
 }
 
-const fn own_combat_animated(c: &OwnTribeMasterCombatObject) -> &OwnRgeMasterAnimatedObject {
-    own_action_animated(&c.own_rge_master_combat_object.own_rge_master_action_object)
+const fn own_combat_animated(
+    own_tribe_master_combat_object: &OwnTribeMasterCombatObject,
+) -> &OwnRgeMasterAnimatedObject {
+    own_action_animated(
+        &own_tribe_master_combat_object
+            .own_rge_master_combat_object
+            .own_rge_master_action_object,
+    )
 }
 
-const fn own_action_master(a: &OwnRgeMasterActionObject) -> &OwnRgeMasterStaticObject {
-    &a.own_rge_master_moving_object
+const fn own_action_master(
+    own_rge_master_action_object: &OwnRgeMasterActionObject,
+) -> &OwnRgeMasterStaticObject {
+    &own_rge_master_action_object
+        .own_rge_master_moving_object
         .own_rge_master_animated_object
         .own_rge_master_static_object
 }
 
-const fn own_tribe_combat_master(c: &OwnTribeMasterCombatObject) -> &OwnRgeMasterStaticObject {
-    own_action_master(&c.own_rge_master_combat_object.own_rge_master_action_object)
+const fn own_tribe_combat_master(
+    own_tribe_master_combat_object: &OwnTribeMasterCombatObject,
+) -> &OwnRgeMasterStaticObject {
+    own_action_master(
+        &own_tribe_master_combat_object
+            .own_rge_master_combat_object
+            .own_rge_master_action_object,
+    )
 }
 
 impl ObjectList {
@@ -280,15 +388,15 @@ impl ObjectList {
     pub fn objects(&self) -> impl Iterator<Item = &Object> {
         self.object_kind_list
             .iter()
-            .filter_map(|e| e.object.as_deref())
+            .filter_map(|entry| entry.object.as_deref())
     }
 }
 
 impl Object {
     /// The static object every class starts with.
     pub fn static_part(&self) -> Option<&RgeStaticObject> {
-        if let Some(c) = self.combat() {
-            return Some(combat_static(c));
+        if let Some(tribe_combat_object) = self.combat() {
+            return Some(combat_static(tribe_combat_object));
         }
         self.rge_object.as_deref().and_then(RgeObject::static_part)
     }
@@ -296,21 +404,38 @@ impl Object {
     /// The moving object of the types 30 and up: its velocity, orientation and path data.
     #[must_use]
     pub fn moving_part(&self) -> Option<&RgeMovingObject> {
-        if let Some(c) = self.combat() {
-            return Some(&c.rge_combat_object.rge_action_object.rge_moving_object);
+        if let Some(tribe_combat_object) = self.combat() {
+            return Some(
+                &tribe_combat_object
+                    .rge_combat_object
+                    .rge_action_object
+                    .rge_moving_object,
+            );
         }
-        let r = self.rge_object.as_deref()?;
-        None.or(r.rge_moving_object.as_deref())
-            .or_else(|| r.rge_action_object.as_deref().map(|a| &a.rge_moving_object))
+        let rge_object = self.rge_object.as_deref()?;
+        None.or(rge_object.rge_moving_object.as_deref())
             .or_else(|| {
-                r.rge_combat_object
+                rge_object
+                    .rge_action_object
                     .as_deref()
-                    .map(|c| &c.rge_action_object.rge_moving_object)
+                    .map(|rge_action_object| &rge_action_object.rge_moving_object)
             })
             .or_else(|| {
-                r.rge_missile_object
+                rge_object
+                    .rge_combat_object
                     .as_deref()
-                    .map(|m| &m.rge_combat_object.rge_action_object.rge_moving_object)
+                    .map(|rge_combat_object| &rge_combat_object.rge_action_object.rge_moving_object)
+            })
+            .or_else(|| {
+                rge_object
+                    .rge_missile_object
+                    .as_deref()
+                    .map(|rge_missile_object| {
+                        &rge_missile_object
+                            .rge_combat_object
+                            .rge_action_object
+                            .rge_moving_object
+                    })
             })
     }
 
@@ -318,14 +443,15 @@ impl Object {
     /// game's `+0x7b8`), its sprite list's owner.
     #[must_use]
     pub fn animated_part(&self) -> Option<&RgeAnimatedObject> {
-        if let Some(m) = self.moving_part() {
-            return Some(&m.rge_animated_object);
+        if let Some(rge_moving_object) = self.moving_part() {
+            return Some(&rge_moving_object.rge_animated_object);
         }
-        let r = self.rge_object.as_deref()?;
-        r.rge_animated_object.as_deref().or_else(|| {
-            r.rge_doppleganger_object
+        let rge_object = self.rge_object.as_deref()?;
+        rge_object.rge_animated_object.as_deref().or_else(|| {
+            rge_object
+                .rge_doppleganger_object
                 .as_deref()
-                .map(|d| &d.rge_animated_object)
+                .map(|rge_doppleganger_object| &rge_doppleganger_object.rge_animated_object)
         })
     }
 
@@ -335,7 +461,7 @@ impl Object {
         self.tribe_combat_object.as_deref().or_else(|| {
             self.tribe_building_object
                 .as_deref()
-                .map(|b| &b.tribe_combat_object)
+                .map(|tribe_building_object| &tribe_building_object.tribe_combat_object)
         })
     }
 }
@@ -349,38 +475,44 @@ impl RgeObject {
             .or_else(|| {
                 self.rge_animated_object
                     .as_deref()
-                    .map(|a| &a.rge_static_object)
+                    .map(|rge_animated_object| &rge_animated_object.rge_static_object)
             })
             .or_else(|| {
                 self.rge_doppleganger_object
                     .as_deref()
-                    .map(|d| &d.rge_animated_object.rge_static_object)
+                    .map(|rge_doppleganger_object| {
+                        &rge_doppleganger_object
+                            .rge_animated_object
+                            .rge_static_object
+                    })
             })
             .or_else(|| self.rge_moving_object.as_deref().map(moving))
             .or_else(|| self.rge_action_object.as_deref().map(action))
             .or_else(|| {
                 self.rge_combat_object
                     .as_deref()
-                    .map(|c| action(&c.rge_action_object))
+                    .map(|rge_combat_object| action(&rge_combat_object.rge_action_object))
             })
             .or_else(|| {
                 self.rge_missile_object
                     .as_deref()
-                    .map(|m| action(&m.rge_combat_object.rge_action_object))
+                    .map(|rge_missile_object| {
+                        action(&rge_missile_object.rge_combat_object.rge_action_object)
+                    })
             })
     }
 }
 
-const fn moving(m: &RgeMovingObject) -> &RgeStaticObject {
-    &m.rge_animated_object.rge_static_object
+const fn moving(rge_moving_object: &RgeMovingObject) -> &RgeStaticObject {
+    &rge_moving_object.rge_animated_object.rge_static_object
 }
 
-const fn action(a: &RgeActionObject) -> &RgeStaticObject {
-    moving(&a.rge_moving_object)
+const fn action(rge_action_object: &RgeActionObject) -> &RgeStaticObject {
+    moving(&rge_action_object.rge_moving_object)
 }
 
-const fn combat_static(c: &TribeCombatObject) -> &RgeStaticObject {
-    action(&c.rge_combat_object.rge_action_object)
+const fn combat_static(tribe_combat_object: &TribeCombatObject) -> &RgeStaticObject {
+    action(&tribe_combat_object.rge_combat_object.rge_action_object)
 }
 
 impl TribeCombatObject {
@@ -394,17 +526,21 @@ impl TribeCombatObject {
             .or_else(|| {
                 self.tribe_elephant_unit_ai_module
                     .as_deref()
-                    .map(|m| &m.unit_ai_module)
+                    .map(|tribe_elephant_unit_ai_module| {
+                        &tribe_elephant_unit_ai_module.unit_ai_module
+                    })
             })
             .or_else(|| {
                 self.tribe_tower_unit_ai_module
                     .as_deref()
-                    .map(|m| &m.unit_ai_module)
+                    .map(|tribe_tower_unit_ai_module| &tribe_tower_unit_ai_module.unit_ai_module)
             })
             .or_else(|| {
                 self.tribe_building_unit_ai_module
                     .as_deref()
-                    .map(|m| &m.unit_ai_module)
+                    .map(|tribe_building_unit_ai_module| {
+                        &tribe_building_unit_ai_module.unit_ai_module
+                    })
             })
     }
 }
@@ -413,27 +549,43 @@ impl Object {
     /// The action list of an action object (types 40 to 80): its actions, the top one first.
     #[must_use]
     pub fn actions(&self) -> Option<&ActionList> {
-        if let Some(c) = self.combat() {
-            return Some(&c.rge_combat_object.rge_action_object.actions);
+        if let Some(tribe_combat_object) = self.combat() {
+            return Some(
+                &tribe_combat_object
+                    .rge_combat_object
+                    .rge_action_object
+                    .actions,
+            );
         }
-        let r = self.rge_object.as_deref()?;
-        None.or(r.rge_action_object.as_deref())
-            .or_else(|| r.rge_combat_object.as_deref().map(|c| &c.rge_action_object))
+        let rge_object = self.rge_object.as_deref()?;
+        None.or(rge_object.rge_action_object.as_deref())
             .or_else(|| {
-                r.rge_missile_object
+                rge_object
+                    .rge_combat_object
                     .as_deref()
-                    .map(|m| &m.rge_combat_object.rge_action_object)
+                    .map(|rge_combat_object| &rge_combat_object.rge_action_object)
             })
-            .map(|a| &a.actions)
+            .or_else(|| {
+                rge_object
+                    .rge_missile_object
+                    .as_deref()
+                    .map(|rge_missile_object| {
+                        &rge_missile_object.rge_combat_object.rge_action_object
+                    })
+            })
+            .map(|rge_action_object| &rge_action_object.actions)
     }
 }
 
 impl ActionList {
     /// The actions with their types, without the entry of type 0 that ends the list.
     pub fn entries(&self) -> impl Iterator<Item = (i16, &Action)> {
-        self.action_kind_list
-            .iter()
-            .filter_map(|e| e.action.as_deref().map(|a| (e.action_kind, a)))
+        self.action_kind_list.iter().filter_map(|entry| {
+            entry
+                .action
+                .as_deref()
+                .map(|action| (entry.action_kind, action))
+        })
     }
 }
 
@@ -443,8 +595,8 @@ impl Action {
     pub fn move_to_range(&self) -> Option<f32> {
         self.rge_action_by_kind
             .as_deref()
-            .and_then(|b| b.rge_action_move_to.as_deref())
-            .map(|m| m.range)
+            .and_then(|rge_action_by_kind| rge_action_by_kind.rge_action_move_to.as_deref())
+            .map(|rge_action_move_to| rge_action_move_to.range)
     }
 
     /// The base every action class starts with (`RGE_Action`: state, targets, timer, sub-actions),

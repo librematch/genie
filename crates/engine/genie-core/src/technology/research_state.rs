@@ -57,8 +57,8 @@ impl ResearchState {
 }
 
 impl genie_diff::Diff for ResearchState {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -72,10 +72,10 @@ mod tests {
     fn its_states_read_back_from_their_values_in_order() {
         let mut last = None;
         for v in -1..=4 {
-            let s = ResearchState::of_int(v).unwrap();
-            assert_eq!(s.get(), v);
-            assert!(last < Some(s), "{v}");
-            last = Some(s);
+            let research_state = ResearchState::of_int(v).unwrap();
+            assert_eq!(research_state.get(), v);
+            assert!(last < Some(research_state), "{v}");
+            last = Some(research_state);
         }
         for v in [i16::MIN, -2, 5, 255, i16::MAX] {
             assert!(ResearchState::of_int(v).is_err(), "{v}");

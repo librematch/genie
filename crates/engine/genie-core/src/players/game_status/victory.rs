@@ -16,17 +16,17 @@ use crate::world::{GameMode, PlayState};
 use crate::{GenieError, GenieResult};
 
 impl World {
-    /// The relations of players `a` and `b` each way (`player+0x260`).
-    pub(super) fn relations(&self, a: PlayerId, b: PlayerId) -> (Relation, Relation) {
+    /// The relations of players `first` and `second` each way (`player+0x260`).
+    pub(super) fn relations(&self, first: PlayerId, second: PlayerId) -> (Relation, Relation) {
         let r = |x: PlayerId, y: PlayerId| {
             self.players
                 .player(x)
                 .ok()
-                .and_then(|p| p.relations.get(y))
+                .and_then(|player| player.relations.get(y))
                 .copied()
                 .unwrap_or(Relation::Ally)
         };
-        (r(a, b), r(b, a))
+        (r(first, second), r(second, first))
     }
 
     /// `FUN_14152f810`: the game is over: the world's game state is 1 or a player won; else,
@@ -37,12 +37,12 @@ impl World {
             return true;
         }
         let mut count = Count::default();
-        for (i, p) in PlayerId::each(self.players.len())
+        for (player_id, player) in PlayerId::each(self.players.len())
             .zip(&self.players)
             .skip(1)
         {
-            let rel = self.relations(count.first, i);
-            count.add(i, p.game_status, p.allied_victory, rel);
+            let rel = self.relations(count.first, player_id);
+            count.add(player_id, player.game_status, player.allied_victory, rel);
         }
         if 0 < count.won {
             return true;
@@ -67,38 +67,42 @@ impl World {
         self.set_status(player, GameStatus::Lost)
     }
 
-    /// The status setter (slot 1, `FUN_141639860`) of player `p`: `FUN_1416768e0` takes the new
-    /// status unless the player resigned (a defeat it always takes). A defeat without a resignation
-    /// (the world player's defeat check, [`World::defeat_check`]) then posts the interface's event
-    /// 6 (`FUN_140c898a0`), the local player's comm message (`FUN_140d3c710`) and, with a comm
-    /// handler in session (`DAT_143e8d7d0`'s `+0x388`), marks the player's comm players defeated or
-    /// dropped in the game object (`+0xb1c`, `+0xb13`) and the local one's map flags
-    /// (`FUN_140c915d0`, `FUN_140c915b0`): the lobby's and the local view's, which a playback has
-    /// none of. A status that turned won or lost while the game goes on reveals the map to the
+    /// The status setter (slot 1, `FUN_141639860`) of player `player_id`: `FUN_1416768e0` takes the
+    /// new status unless the player resigned (a defeat it always takes). A defeat without a
+    /// resignation (the world player's defeat check, [`World::defeat_check`]) then posts the
+    /// interface's event 6 (`FUN_140c898a0`), the local player's comm message (`FUN_140d3c710`)
+    /// and, with a comm handler in session (`DAT_143e8d7d0`'s `+0x388`), marks the player's comm
+    /// players defeated or dropped in the game object (`+0xb1c`, `+0xb13`) and the local one's map
+    /// flags (`FUN_140c915d0`, `FUN_140c915b0`): the lobby's and the local view's, which a playback
+    /// has none of. A status that turned won or lost while the game goes on reveals the map to the
     /// player (`FUN_1412847b0`, with no lobby settings object or its setting `FUN_141300cd0`, as
     /// the playback holds it, [`Spatial::reveal_to`](crate::map::spatial::Spatial::reveal_to)); the
     /// battle royale's is not modelled. A lost player's objects stop ([`World::stop_everything`])
     /// once the game is a minute old; its fealty (`+0x12f8`) would give its resources and units
     /// away while the game goes on, which is not modelled. A newly lost player's history takes its
     /// defeat ([`World::defeat_event`]).
-    pub(crate) fn set_status(&mut self, p: PlayerId, status: GameStatus) -> GenieResult<()> {
-        let old = self.players.player(p)?.game_status;
+    pub(crate) fn set_status(
+        &mut self,
+        player_id: PlayerId,
+        status: GameStatus,
+    ) -> GenieResult<()> {
+        let old = self.players.player(player_id)?.game_status;
         if status != old
             && (!self
                 .players
-                .player(p)?
+                .player(player_id)?
                 .departures
                 .contains(Departures::RESIGNED)
                 || status == GameStatus::Lost)
         {
-            self.players.player_mut(p)?.game_status = status;
+            self.players.player_mut(player_id)?.game_status = status;
         }
-        let now = self.players.player(p)?.game_status;
+        let now = self.players.player(player_id)?.game_status;
         if now != old && now.ended() && !self.game_ended() {
             // the map revealed to the player (FUN_1412847b0 with 0x4000000040000000): every
             // tile of the unified map and the player's masks take the ended bits; the view's
             // refresh (FUN_140c80bb0) is not held
-            self.spatial.reveal_to(p);
+            self.spatial.reveal_to(player_id);
         }
         if self.settings.game_mode == GameMode::BattleRoyale {
             return Err(GenieError::unsupported(
@@ -107,13 +111,13 @@ impl World {
         }
         if now == GameStatus::Lost {
             if STOP_AFTER_MS < self.world_time {
-                self.stop_everything(p)?;
+                self.stop_everything(player_id)?;
             }
             if old != GameStatus::Lost {
-                self.defeat_event(p)?;
+                self.defeat_event(player_id)?;
             }
             if old != GameStatus::Lost
-                && self.players.player(p)?.fealty.names_player()
+                && self.players.player(player_id)?.fealty.names_player()
                 && self.game_state == PlayState::Playing
             {
                 return Err(GenieError::unsupported(
@@ -124,39 +128,40 @@ impl World {
         Ok(())
     }
 
-    /// The defeat's history event (`FUN_141639860` from `0x141639cd1`) of player `p`, unless it
-    /// resigned (`+0x8b`) or is Gaia: the other players but Gaia (ids up to 24) are weighed by
-    /// their attribute 300 + their own id (the game reads each one's own, not the defeated
-    /// player's); the first strictly above the best so far (`COMISS` with `JBE`, from 0) is the
-    /// event's `data1`, its value through `CVTTSS2SI` its `data2`; none gives player 1 and 0.
-    pub(crate) fn defeat_event(&mut self, p: PlayerId) -> GenieResult<()> {
+    /// The defeat's history event (`FUN_141639860` from `0x141639cd1`) of player `player_id`,
+    /// unless it resigned (`+0x8b`) or is Gaia: the other players but Gaia (ids up to 24) are
+    /// weighed by their attribute 300 + their own id (the game reads each one's own, not the
+    /// defeated player's); the first strictly above the best so far (`COMISS` with `JBE`, from 0)
+    /// is the event's `data1`, its value through `CVTTSS2SI` its `data2`; none gives player 1
+    /// and 0.
+    pub(crate) fn defeat_event(&mut self, player_id: PlayerId) -> GenieResult<()> {
         if self
             .players
-            .player(p)?
+            .player(player_id)?
             .departures
             .contains(Departures::RESIGNED)
-            || p == PlayerId::GAIA
+            || player_id == PlayerId::GAIA
         {
             return Ok(());
         }
         let mut killer = 1u8;
         let mut most = 0i32;
-        for (i, other) in self.players.iter().enumerate() {
-            if i == 0 || i == p.index() || DEFEAT_IDS <= i {
+        for (index, other) in self.players.iter().enumerate() {
+            if index == 0 || index == player_id.index() || DEFEAT_IDS <= index {
                 continue;
             }
-            let v = other
+            let amount = other
                 .attributes
-                .get(KILLS_OF + i)
+                .get(KILLS_OF + index)
                 .copied()
                 .unwrap_or(Amount::ZERO);
-            if v > Amount::new(most as f32) {
-                most = cvttss2si(v.get());
-                killer = i as u8;
+            if amount > Amount::new(most as f32) {
+                most = cvttss2si(amount.get());
+                killer = index as u8;
             }
         }
         let now = self.world_time;
-        self.players.player_mut(p)?.history.add_event(
+        self.players.player_mut(player_id)?.history.add_event(
             EventKind::Defeat,
             f32::from(killer),
             most as f32,
@@ -166,21 +171,21 @@ impl World {
         Ok(())
     }
 
-    /// `FUN_14165d720`: player `i`'s status for the victory check. A player still playing whose
-    /// victory conditions are met (`FUN_1414f35d0`) wins (slot 1 with won; the world's `+0x8c`,
-    /// 2, is not held); one counting its allies' victory as its own is not modelled.
-    pub(super) fn own_victory(&mut self, i: PlayerId) -> GenieResult<GameStatus> {
-        let p = &self.players.player(i)?;
-        if p.game_status == GameStatus::Lost || p.victory != VictoryState::MET {
-            return Ok(p.game_status);
+    /// `FUN_14165d720`: player `player_id`'s status for the victory check. A player still playing
+    /// whose victory conditions are met (`FUN_1414f35d0`) wins (slot 1 with won; the world's
+    /// `+0x8c`, 2, is not held); one counting its allies' victory as its own is not modelled.
+    pub(super) fn own_victory(&mut self, player_id: PlayerId) -> GenieResult<GameStatus> {
+        let player = &self.players.player(player_id)?;
+        if player.game_status == GameStatus::Lost || player.victory != VictoryState::MET {
+            return Ok(player.game_status);
         }
-        if p.allied_victory != 0 {
+        if player.allied_victory != 0 {
             return Err(GenieError::unsupported(
                 "a player's victory with its allies' (allied victory)",
             ));
         }
-        self.set_status(i, GameStatus::Won)?;
-        Ok(self.players.player(i)?.game_status)
+        self.set_status(player_id, GameStatus::Won)?;
+        Ok(self.players.player(player_id)?.game_status)
     }
 
     /// The world's victory check after every update (`TRIBE_World` slot 0x68, `FUN_1415c9480`):
@@ -194,7 +199,7 @@ impl World {
         let mut count = Count::default();
         for i in PlayerId::each(self.players.len()).skip(1) {
             let status = match self.own_victory(i) {
-                Ok(s) => s,
+                Ok(game_status) => game_status,
                 Err(e) => {
                     self.stop_player(i, e);
                     return Ok(());
@@ -214,11 +219,11 @@ impl World {
             return Ok(());
         };
         self.game_state = PlayState::Over;
-        for i in PlayerId::each(self.players.len()).skip(1) {
-            if self.players.player(i)?.game_status == GameStatus::Playing
-                && let Err(e) = self.set_status(i, outcome)
+        for player_id in PlayerId::each(self.players.len()).skip(1) {
+            if self.players.player(player_id)?.game_status == GameStatus::Playing
+                && let Err(error) = self.set_status(player_id, outcome)
             {
-                self.stop_player(i, e);
+                self.stop_player(player_id, error);
             }
         }
         Ok(())

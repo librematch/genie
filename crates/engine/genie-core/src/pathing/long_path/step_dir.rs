@@ -42,13 +42,13 @@ impl StepDir {
     /// `DAT_142f43a28`: the three that turn back, bits `came + 3` to `came + 5`; none for the
     /// start, the game's `came` 8).
     pub(super) fn behind(came: Option<Self>) -> StepDirs {
-        StepDirs(came.map_or(0, |c| (0x38u8).rotate_left(u32::from(c.0))))
+        StepDirs(came.map_or(0, |step_dir| (0x38u8).rotate_left(u32::from(step_dir.0))))
     }
 
-    /// The tiles beside a diagonal step (directions 0, 2, 4, 6) onto `n`, which the step needs
+    /// The tiles beside a diagonal step (directions 0, 2, 4, 6) onto `tile`, which the step needs
     /// as clear as the tile.
-    pub(super) const fn beside_diagonal(self, n: Tile) -> Option<[Tile; 2]> {
-        let (nx, ny) = (n.x(), n.y());
+    pub(super) const fn beside_diagonal(self, tile: Tile) -> Option<[Tile; 2]> {
+        let (nx, ny) = (tile.x(), tile.y());
         match self.0 {
             0 => Some([Tile::new(nx + 1, ny), Tile::new(nx, ny + 1)]),
             2 => Some([Tile::new(nx, ny + 1), Tile::new(nx - 1, ny)]),
@@ -64,9 +64,9 @@ impl StepDir {
 pub(super) struct StepDirs(u8);
 
 impl StepDirs {
-    /// Whether it holds direction `d`.
-    pub(super) const fn holds(self, d: StepDir) -> bool {
-        self.0 & (1 << d.0) != 0
+    /// Whether it holds direction `step_dir`.
+    pub(super) const fn holds(self, step_dir: StepDir) -> bool {
+        self.0 & (1 << step_dir.0) != 0
     }
 }
 
@@ -81,7 +81,7 @@ mod tests {
             .into_iter()
             .map(Some)
             .chain([None])
-            .map(|c| StepDir::behind(c).0)
+            .map(|step_dir| StepDir::behind(step_dir).0)
             .collect();
         assert_eq!(
             table,
@@ -94,12 +94,12 @@ mod tests {
     /// tile is its place in the table.
     #[test]
     fn diagonal_step_needs_the_tiles_beside_it() {
-        let n = Tile::new(5, 5);
+        let tile = Tile::new(5, 5);
         assert_eq!(
-            StepDir(0).beside_diagonal(n),
+            StepDir(0).beside_diagonal(tile),
             Some([Tile::new(6, 5), Tile::new(5, 6)])
         );
-        assert_eq!(StepDir(1).beside_diagonal(n), None);
+        assert_eq!(StepDir(1).beside_diagonal(tile), None);
         assert_eq!(StepDir::ALL.map(StepDir::offset), STEPS.map(Some));
     }
 }

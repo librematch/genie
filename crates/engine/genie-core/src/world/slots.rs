@@ -26,58 +26,62 @@ const NO_ELEMENT: GenieError = GenieError::unreachable("a position the list does
 /// Player `p`, and the objects at a position of its lists, as errors where a slice's index
 /// would panic.
 pub(crate) trait PlayerSlots {
-    /// Player `p`.
+    /// Player `player_id`.
     ///
     /// # Errors
     ///
     /// A player the table does not hold.
-    fn player(&self, p: PlayerId) -> GenieResult<&Player>;
+    fn player(&self, player_id: PlayerId) -> GenieResult<&Player>;
 
-    /// Player `p`, to change.
+    /// Player `player_id`, to change.
     ///
     /// # Errors
     ///
     /// A player the table does not hold.
-    fn player_mut(&mut self, p: PlayerId) -> GenieResult<&mut Player>;
+    fn player_mut(&mut self, player_id: PlayerId) -> GenieResult<&mut Player>;
 
-    /// The object at position `i` of player `p`'s live list.
+    /// The object at position `list_index` of player `player_id`'s live list.
     ///
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn live(&self, p: PlayerId, i: ListIndex) -> GenieResult<&Unit> {
-        self.player(p)?.live(i).map_err(|e| e.with("player", p))
+    fn live(&self, player_id: PlayerId, list_index: ListIndex) -> GenieResult<&Unit> {
+        self.player(player_id)?
+            .live(list_index)
+            .map_err(|error| error.with("player", player_id))
     }
 
-    /// The object at position `i` of player `p`'s live list, to change.
+    /// The object at position `list_index` of player `player_id`'s live list, to change.
     ///
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn live_mut(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<&mut Unit> {
-        self.player_mut(p)?
-            .live_mut(i)
-            .map_err(|e| e.with("player", p))
+    fn live_mut(&mut self, player_id: PlayerId, list_index: ListIndex) -> GenieResult<&mut Unit> {
+        self.player_mut(player_id)?
+            .live_mut(list_index)
+            .map_err(|error| error.with("player", player_id))
     }
 
-    /// The object at position `i` of player `p`'s sleeping list.
+    /// The object at position `list_index` of player `player_id`'s sleeping list.
     ///
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn asleep(&self, p: PlayerId, i: ListIndex) -> GenieResult<&Unit> {
-        self.player(p)?.asleep(i).map_err(|e| e.with("player", p))
+    fn asleep(&self, player_id: PlayerId, list_index: ListIndex) -> GenieResult<&Unit> {
+        self.player(player_id)?
+            .asleep(list_index)
+            .map_err(|error| error.with("player", player_id))
     }
 
-    /// The object at position `i` of player `p`'s sleeping list, to change.
+    /// The object at position `list_index` of player `player_id`'s sleeping list, to change.
     ///
     /// # Errors
     ///
     /// A player or a position the lists do not hold.
-    fn asleep_mut(&mut self, p: PlayerId, i: ListIndex) -> GenieResult<&mut Unit> {
-        self.player_mut(p)?
-            .asleep_mut(i)
-            .map_err(|e| e.with("player", p))
+    fn asleep_mut(&mut self, player_id: PlayerId, list_index: ListIndex) -> GenieResult<&mut Unit> {
+        self.player_mut(player_id)?
+            .asleep_mut(list_index)
+            .map_err(|error| error.with("player", player_id))
     }
 
     /// The object at `place` (the world's table by id gave it).
@@ -88,7 +92,7 @@ pub(crate) trait PlayerSlots {
     fn at(&self, place: Place) -> GenieResult<&Unit> {
         match place {
             Place::Live(p, i) => self.live(p, i),
-            Place::Sleeping(p, i) => self.asleep(p, i),
+            Place::Sleeping(player_id, list_index) => self.asleep(player_id, list_index),
         }
     }
 
@@ -100,7 +104,7 @@ pub(crate) trait PlayerSlots {
     fn at_mut(&mut self, place: Place) -> GenieResult<&mut Unit> {
         match place {
             Place::Live(p, i) => self.live_mut(p, i),
-            Place::Sleeping(p, i) => self.asleep_mut(p, i),
+            Place::Sleeping(player_id, list_index) => self.asleep_mut(player_id, list_index),
         }
     }
 }
@@ -168,56 +172,60 @@ impl<T> CheckedIndex<T> for [T] {
 }
 
 impl PlayerSlots for [Player] {
-    fn player(&self, p: PlayerId) -> GenieResult<&Player> {
-        self.get(p.index())
-            .ok_or_else(|| NO_PLAYER.with("player", p))
+    fn player(&self, player_id: PlayerId) -> GenieResult<&Player> {
+        self.get(player_id.index())
+            .ok_or_else(|| NO_PLAYER.with("player", player_id))
     }
 
-    fn player_mut(&mut self, p: PlayerId) -> GenieResult<&mut Player> {
-        self.get_mut(p.index())
-            .ok_or_else(|| NO_PLAYER.with("player", p))
+    fn player_mut(&mut self, player_id: PlayerId) -> GenieResult<&mut Player> {
+        self.get_mut(player_id.index())
+            .ok_or_else(|| NO_PLAYER.with("player", player_id))
     }
 }
 
 impl Player {
-    /// The object at position `i` of the live list.
+    /// The object at position `list_index` of the live list.
     ///
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn live(&self, i: ListIndex) -> GenieResult<&Unit> {
-        self.objects.get(i).ok_or_else(|| NO_SLOT.with("index", i))
-    }
-
-    /// The object at position `i` of the live list, to change.
-    ///
-    /// # Errors
-    ///
-    /// A position the list does not hold.
-    pub(crate) fn live_mut(&mut self, i: ListIndex) -> GenieResult<&mut Unit> {
+    pub(crate) fn live(&self, list_index: ListIndex) -> GenieResult<&Unit> {
         self.objects
-            .get_mut(i)
-            .ok_or_else(|| NO_SLOT.with("index", i))
+            .get(list_index)
+            .ok_or_else(|| NO_SLOT.with("index", list_index))
     }
 
-    /// The object at position `i` of the sleeping list.
+    /// The object at position `list_index` of the live list, to change.
     ///
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn asleep(&self, i: ListIndex) -> GenieResult<&Unit> {
-        self.sleeping.get(i).ok_or_else(|| NO_SLOT.with("index", i))
+    pub(crate) fn live_mut(&mut self, list_index: ListIndex) -> GenieResult<&mut Unit> {
+        self.objects
+            .get_mut(list_index)
+            .ok_or_else(|| NO_SLOT.with("index", list_index))
     }
 
-    /// The object at position `i` of the sleeping list, to change.
+    /// The object at position `list_index` of the sleeping list.
     ///
     /// # Errors
     ///
     /// A position the list does not hold.
-    pub(crate) fn asleep_mut(&mut self, i: ListIndex) -> GenieResult<&mut Unit> {
+    pub(crate) fn asleep(&self, list_index: ListIndex) -> GenieResult<&Unit> {
         self.sleeping
-            .get_mut(i)
-            .ok_or_else(|| NO_SLOT.with("index", i))
+            .get(list_index)
+            .ok_or_else(|| NO_SLOT.with("index", list_index))
+    }
+
+    /// The object at position `list_index` of the sleeping list, to change.
+    ///
+    /// # Errors
+    ///
+    /// A position the list does not hold.
+    pub(crate) fn asleep_mut(&mut self, list_index: ListIndex) -> GenieResult<&mut Unit> {
+        self.sleeping
+            .get_mut(list_index)
+            .ok_or_else(|| NO_SLOT.with("index", list_index))
     }
 }
 
@@ -232,16 +240,16 @@ mod tests {
         assert_eq!(*v.checked(2).unwrap(), 3);
         *v.checked_mut(0).unwrap() = 9;
         assert_eq!(v, [9, 2, 3]);
-        let e = v.checked(3).unwrap_err();
-        assert_eq!(e.context().collect::<Vec<_>>(), [("index", "3")]);
+        let checked = v.checked(3).unwrap_err();
+        assert_eq!(checked.context().collect::<Vec<_>>(), [("index", "3")]);
         assert!(v.checked_mut(4).is_err());
         assert_eq!(v.head(2).unwrap(), &[9, 2]);
         assert!(v.head(4).is_err());
         v.tail_mut(1).unwrap()[0] = 7;
         assert_eq!(v, [9, 7, 3]);
         assert_eq!(v.tail_mut(3).unwrap(), [0_i32; 0]);
-        let e = v.tail_mut(4).unwrap_err();
-        assert_eq!(e.context().collect::<Vec<_>>(), [("start", "4")]);
+        let error = v.tail_mut(4).unwrap_err();
+        assert_eq!(error.context().collect::<Vec<_>>(), [("start", "4")]);
     }
 
     /// A player or a position the table does not hold is an error that names it.
@@ -249,13 +257,16 @@ mod tests {
     fn missing_player_or_slot_is_an_error_naming_it() {
         let mut players = [Player::default(), Player::default()];
         assert!(players.player(PlayerId::new(1)).is_ok());
-        let e = players.player(PlayerId::new(2)).unwrap_err();
-        assert_eq!(e.context().collect::<Vec<_>>(), [("player", "2")]);
+        let player = players.player(PlayerId::new(2)).unwrap_err();
+        assert_eq!(player.context().collect::<Vec<_>>(), [("player", "2")]);
         assert!(players.player_mut(PlayerId::new(5)).is_err());
-        let e = players
+        let error = players
             .live(PlayerId::new(1), ListIndex::new(0))
             .unwrap_err();
-        let keys: Vec<_> = e.context().map(|(k, v)| (k, v.to_owned())).collect();
+        let keys: Vec<_> = error
+            .context()
+            .map(|(k, text)| (k, text.to_owned()))
+            .collect();
         assert_eq!(
             keys,
             [("index", "0".to_owned()), ("player", "1".to_owned())]

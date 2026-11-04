@@ -132,9 +132,9 @@ pub fn garrison_kind_takes(
 /// `+0x10`). A building's test asks for 3 on its own class (a transport) or on buildings (3).
 pub(super) fn has_garrison_task(tasks: &[Task], action: ActionKind, class: ClassId) -> bool {
     let byte = |v: i16| u16::from(v.to_le_bytes()[0]);
-    tasks.iter().any(|t| {
-        t.action_kind.get().cast_unsigned() == byte(action.get())
-            && ClassId::field(t.object_group).cast_unsigned() == byte(class.get())
+    tasks.iter().any(|task| {
+        task.action_kind.get().cast_unsigned() == byte(action.get())
+            && ClassId::field(task.object_group).cast_unsigned() == byte(class.get())
     })
 }
 
@@ -159,7 +159,7 @@ impl World {
     ) -> GenieResult<bool> {
         let capacity = b.master(self.master_tables(), bp)?.garrison;
         let with = match unit {
-            Some(u) => self.garrisoned(u)?.plus(InsideCount::ONE),
+            Some(object_id) => self.garrisoned(object_id)?.plus(InsideCount::ONE),
             None => InsideCount::ONE,
         };
         Ok(self.garrisoned(b.id)?.plus(with).within(capacity))
@@ -202,7 +202,7 @@ impl World {
         else {
             return Ok(false);
         };
-        let Some((bp, b)) = self.object(building) else {
+        let Some((bp, building_unit)) = self.object(building) else {
             return Ok(false);
         };
         if bp != player {
@@ -217,10 +217,10 @@ impl World {
                 return Ok(false);
             }
         }
-        if b.life.state != ObjectState::Alive {
+        if building_unit.life.state != ObjectState::Alive {
             return Ok(false);
         }
-        let own = b.master(self.master_tables(), bp)?;
+        let own = building_unit.master(self.master_tables(), bp)?;
         if own.object_flags.contains(ObjectFlags::GARRISON)
             && (unit.kind == MasterKind::COMBAT
                 || class_has_flags(unit.class, ClassFlags::TRANSPORTED))
@@ -228,16 +228,16 @@ impl World {
             if !has_garrison_task(&unit.action_part().tasks, GARRISON, own.class) {
                 return Ok(false);
             }
-            return Ok(unchecked || self.has_room(bp, b, None)?);
+            return Ok(unchecked || self.has_room(bp, building_unit, None)?);
         }
         if unit.kind < MasterKind::COMBAT || own.kind != MasterKind::BUILDING {
             return Ok(false);
         }
-        let (bp, b) = match self.parts.building_of(b.id).annex_of {
+        let (bp, b) = match self.parts.building_of(building_unit.id).annex_of {
             Some(main) => self.object(main).ok_or(GenieError::unsupported(
                 "an annex whose main building is gone",
             ))?,
-            None => (bp, b),
+            None => (bp, building_unit),
         };
         let bm = b.master(self.master_tables(), bp)?;
         // CVTPS2PD, CVTDQ2PD, MULSD, then COMISD with JBE: an unordered hit point count takes
@@ -254,7 +254,9 @@ impl World {
         ) {
             return Ok(false);
         }
-        let garrison_kind = bm.building.map_or(GarrisonKinds::NONE, |m| m.garrison_kind);
+        let garrison_kind = bm.building.map_or(GarrisonKinds::NONE, |building_master| {
+            building_master.garrison_kind
+        });
         if !garrison_kind_takes(
             garrison_kind,
             unit.class,
@@ -286,26 +288,26 @@ impl World {
             .object(building)
             .map(|(bp, b)| {
                 b.master(self.master_tables(), bp)
-                    .map(|m| m.kind == MasterKind::BUILDING)
+                    .map(|master| master.kind == MasterKind::BUILDING)
             })
             .transpose()?
             .unwrap_or(false);
         let mut count = 0;
-        for (p, player) in PlayerId::each(self.players.len()).zip(&self.players) {
-            for u in player.objects.iter().chain(&player.sleeping) {
-                if u.life.inside.key() != Some(building) {
+        for (player_id, player) in PlayerId::each(self.players.len()).zip(&self.players) {
+            for unit in player.objects.iter().chain(&player.sleeping) {
+                if unit.life.inside.key() != Some(building) {
                     continue;
                 }
-                let kind = u.master(self.master_tables(), p)?.kind;
+                let kind = unit.master(self.master_tables(), player_id)?.kind;
                 if is_building
                     && kind == MasterKind::COMBAT
-                    && self.parts.combat_of(u.id).raider_countdown.is_set()
+                    && self.parts.combat_of(unit.id).raider_countdown.is_set()
                 {
                     return Err(GenieError::unsupported(
                         "a unit inside a building with its raider_build_countdown (+0xc2c)",
                     ));
                 }
-                if holds(u.id) {
+                if holds(unit.id) {
                     return Err(GenieError::unsupported(
                         "an object inside a building that holds others (+0x9a8)",
                     ));

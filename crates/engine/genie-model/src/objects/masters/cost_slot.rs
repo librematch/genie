@@ -49,7 +49,7 @@ impl CostSlot {
 /// The entries of `slots` with an attribute, in their order (the readers that pass over the
 /// empty ones).
 pub fn entries(slots: &[CostSlot]) -> impl Iterator<Item = (AttributeId, CostAmount, bool)> + '_ {
-    slots.iter().filter_map(|s| s.entry())
+    slots.iter().filter_map(|cost_slot| cost_slot.entry())
 }
 
 #[cfg(test)]
@@ -70,7 +70,7 @@ mod tests {
         assert_eq!(villager[1].entry(), None);
         assert_eq!(
             entries(&villager)
-                .map(|(a, n, p)| (a, n.get(), p))
+                .map(|(attribute_id, cost_amount, p)| (attribute_id, cost_amount.get(), p))
                 .collect::<Vec<_>>(),
             [(attribute::FOOD, 50, true), (attribute::HEADROOM, 1, false)]
         );

@@ -54,7 +54,7 @@ impl Spatial {
     pub fn records(&self) -> impl Iterator<Item = (ObjectId, ObstructionKind, Rect)> + '_ {
         self.objects
             .iter()
-            .filter_map(|(id, p)| Some((id, p.obstruction?.kind, p.bounds())))
+            .filter_map(|(id, placed)| Some((id, placed.obstruction?.kind, placed.bounds())))
     }
 
     /// Each obstruction record's grid cell ([`Spatial::filed`]): the object's id, the level and
@@ -62,17 +62,17 @@ impl Spatial {
     pub fn record_cells(&self) -> impl Iterator<Item = (ObjectId, (i32, i32, i32))> + '_ {
         self.objects
             .iter()
-            .filter_map(|(id, p)| Some((id, self.filed(p, p.obstruction?.kind))))
+            .filter_map(|(id, placed)| Some((id, self.filed(placed, placed.obstruction?.kind))))
     }
 
     /// The grid cell an object's record of kind `kind` is filed in (`FUN_141056460`): level and
     /// cell x, y. Its box's tiles, held on the map; a box of kind 2 (10), 11 or 13 whose centre
     /// sits on a half tile ends 0.001 short on both axes. The level is the finest whose cell holds
     /// both corners' tiles, the cell the one of the low corner's tile.
-    pub(super) fn filed(&self, p: &Placed, kind: ObstructionKind) -> (i32, i32, i32) {
-        let b = p.bounds();
-        let (x0, y0, mut x1, mut y1) = (b.x0(), b.y0(), b.x1(), b.y1());
-        let (x, y) = (p.position.x(), p.position.y());
+    pub(super) fn filed(&self, placed: &Placed, kind: ObstructionKind) -> (i32, i32, i32) {
+        let rect = placed.bounds();
+        let (x0, y0, mut x1, mut y1) = (rect.x0(), rect.y0(), rect.x1(), rect.y1());
+        let (x, y) = (placed.position.x(), placed.position.y());
         let half_tile_box = matches!(
             kind,
             ObstructionKind::KIND_2
@@ -99,8 +99,8 @@ impl Spatial {
     /// visits the cell an object's record of kind `kind` is filed in ([`Spatial::filed`]): the
     /// query's tiles run from the low corner's (at least 0) to the high corner's (at most the
     /// map's size), and on each level it visits the cells they cover.
-    pub(super) fn visits(&self, p: &Placed, kind: ObstructionKind, rect: Rect) -> bool {
-        let (level, cx, cy) = self.filed(p, kind);
+    pub(super) fn visits(&self, placed: &Placed, kind: ObstructionKind, rect: Rect) -> bool {
+        let (level, cx, cy) = self.filed(placed, kind);
         self.visits_cell(level, cx, cy, rect)
     }
 
@@ -127,10 +127,11 @@ impl Spatial {
     ///
     /// [`RecordCells`]: crate::map::spatial::RecordCells
     pub(super) fn refile(&mut self, id: ObjectId) {
-        let cell = self
-            .objects
-            .get(id)
-            .and_then(|p| p.obstruction.map(|o| self.filed(p, o.kind)));
+        let cell = self.objects.get(id).and_then(|placed| {
+            placed
+                .obstruction
+                .map(|obstruction| self.filed(placed, obstruction.kind))
+        });
         let records = &mut self.records;
         let old = records.filed.get(id).copied();
         if old == cell {
@@ -178,9 +179,9 @@ impl Spatial {
                 }
             } else {
                 let level_cells = self.records.cells.range((level, x0, y0)..=(level, x1, y1));
-                for (&(_, _, cy), c) in level_cells {
+                for (&(_, _, cy), object_ids) in level_cells {
                     if y0 <= cy && cy <= y1 {
-                        ids.extend(c);
+                        ids.extend(object_ids);
                     }
                 }
             }
@@ -193,7 +194,7 @@ impl Spatial {
     pub(super) fn records_in(&self, rect: Rect) -> impl Iterator<Item = (ObjectId, &Placed)> + '_ {
         self.visited_records(rect)
             .into_iter()
-            .filter_map(|id| self.objects.get(id).map(|p| (id, p)))
+            .filter_map(|id| self.objects.get(id).map(|placed| (id, placed)))
     }
 
     /// The object moved: its record moves with it, and it changes tiles when its centre crosses
@@ -211,8 +212,8 @@ impl Spatial {
 
     /// `tile` of player `player`'s scout map, if it has one, takes 1 (`FUN_140f4d5e0`).
     pub fn scout(&mut self, player: PlayerId, tile: Tile) {
-        if let Some(m) = self.scout_maps.get_mut(&player) {
-            m.set(tile, 1);
+        if let Some(influence_map) = self.scout_maps.get_mut(&player) {
+            influence_map.set(tile, 1);
         }
     }
 
@@ -305,7 +306,7 @@ impl Spatial {
         let mut hits: Vec<RecordId> = if query.leaves_map(self.map) {
             self.edge_records(query, QUERY_HITS)
                 .iter()
-                .map(|e| e.id)
+                .map(|hit| hit.id)
                 .collect()
         } else {
             Vec::new()
@@ -315,24 +316,24 @@ impl Spatial {
         // which costs the most. Without a player a moving object's test fails, so then all go
         // through it
         let reach = Distance::new(grow.get().max(ally_factor * grow.get()));
-        let skip = |p: &Placed| !rect.overlaps(p.bounds().grown(reach));
-        for (id, p) in self.records_in(query) {
-            let Some(o) = p.obstruction else {
+        let skip = |reach_placed: &Placed| !rect.overlaps(reach_placed.bounds().grown(reach));
+        for (id, placed) in self.records_in(query) {
+            let Some(obstruction) = placed.obstruction else {
                 continue;
             };
-            if player.is_some() && skip(p) {
+            if player.is_some() && skip(placed) {
                 continue;
             }
-            let kind = o.kind.filed();
+            let kind = obstruction.kind.filed();
             if !kind.tested()
                 || ignore.contains(&RecordId::from(id))
-                || !self.visits(p, kind, query)
+                || !self.visits(placed, kind, query)
             {
                 continue;
             }
-            let g = if by_id.moving(id) {
+            let distance = if by_id.moving(id) {
                 let player = player.ok_or(GenieError::unsupported("a walker without a place"))?;
-                if self.allied(p.player, player) {
+                if self.allied(placed.player, player) {
                     ally_factor * grow
                 } else {
                     grow
@@ -340,8 +341,10 @@ impl Spatial {
             } else {
                 grow
             };
-            let b = p.bounds();
-            if rect.overlaps(b.grown(g)) && record_meets_segment(kind, b, g, walk) {
+            let bounds = placed.bounds();
+            if rect.overlaps(bounds.grown(distance))
+                && record_meets_segment(kind, bounds, distance, walk)
+            {
                 hits.push(RecordId::from(id));
             }
         }
@@ -404,7 +407,11 @@ impl Spatial {
         let query = rect.grown(grow);
         let mut hits: Vec<RecordId> = Vec::new();
         if query.leaves_map(self.map) {
-            hits.extend(self.edge_records(query, QUERY_HITS).iter().map(|e| e.id));
+            hits.extend(
+                self.edge_records(query, QUERY_HITS)
+                    .iter()
+                    .map(|hit| hit.id),
+            );
             if MOST_HITS <= hits.len() {
                 hits.truncate(MOST_HITS);
                 return Ok(hits);
@@ -432,18 +439,18 @@ impl Spatial {
                 }
             }
         }
-        for (id, p) in self.records_in(query) {
-            let Some(o) = p.obstruction else {
+        for (id, placed) in self.records_in(query) {
+            let Some(obstruction) = placed.obstruction else {
                 continue;
             };
-            let kind = o.kind.filed();
+            let kind = obstruction.kind.filed();
             if !kind.tested()
                 || ignore.contains(&RecordId::from(id))
-                || !self.visits(p, kind, query)
+                || !self.visits(placed, kind, query)
             {
                 continue;
             }
-            if !meets(kind, p.bounds()) {
+            if !meets(kind, placed.bounds()) {
                 continue;
             }
             hits.push(RecordId::from(id));

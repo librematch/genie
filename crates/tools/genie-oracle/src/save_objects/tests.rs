@@ -32,7 +32,7 @@ fn pool_dump_out_of_shape_is_an_error() {
         "pool 60 1\n101 one\n",
     ] {
         assert!(
-            recycle_pools_from_dump(text).is_err_and(|e| e == bad_pool_dump()),
+            recycle_pools_from_dump(text).is_err_and(|text_error| text_error == bad_pool_dump()),
             "{text:?}"
         );
     }
@@ -43,7 +43,7 @@ fn pool_dump_out_of_shape_is_an_error() {
         "pool 25 1\n1\n",
     ] {
         assert!(
-            ghost_pool_from_dump(text).is_err_and(|e| e == bad_pool_dump()),
+            ghost_pool_from_dump(text).is_err_and(|error| error == bad_pool_dump()),
             "{text:?}"
         );
     }
@@ -97,7 +97,7 @@ fn registry_dump_out_of_shape_is_an_error() {
         "registry 2 3\nwhat\n".to_owned(),
     ] {
         assert!(
-            registry_from_dump(&text).is_err_and(|e| e == bad_registry_dump()),
+            registry_from_dump(&text).is_err_and(|error| error == bad_registry_dump()),
             "{text:?}"
         );
     }

@@ -50,8 +50,8 @@ pub struct DeleteCommand {
 
 impl DeleteCommand {
     /// Its handler ([`World::delete`]).
-    pub(crate) fn run(self, w: &mut World) -> GenieResult<()> {
-        w.delete(self.player, self.id)
+    pub(crate) fn run(self, world: &mut World) -> GenieResult<()> {
+        world.delete(self.player, self.id)
     }
 }
 
@@ -139,28 +139,28 @@ impl World {
         let mut gone = Vec::new();
         for ty in y0..=y1 {
             for tx in x0..=x1 {
-                for (oid, o) in self.spatial.objects_on(Tile::new(tx, ty)) {
-                    if oid == id || gone.iter().any(|&(_, g)| g == oid) {
+                for (oid, placed) in self.spatial.objects_on(Tile::new(tx, ty)) {
+                    if oid == id || gone.iter().any(|&(_, object_id)| object_id == oid) {
                         continue;
                     }
-                    let Some((owner, u)) = self.object(oid) else {
+                    let Some((owner, oid_unit)) = self.object(oid) else {
                         continue;
                     };
-                    let kind = u.master(self.master_tables(), owner)?.kind;
+                    let kind = oid_unit.master(self.master_tables(), owner)?.kind;
                     let desolid = self
                         .parts
-                        .building_of(u.id)
+                        .building_of(oid_unit.id)
                         .construction
-                        .is_some_and(|c| c.desolid);
+                        .is_some_and(|construction| construction.desolid);
                     if kind != MasterKind::BUILDING
                         || !desolid
                         || !self.spatial.sees_and_explored(owner, Tile::new(tx, ty))
                     {
                         continue;
                     }
-                    let dx = (o.position.x() - x).abs();
-                    let dy = (o.position.y() - y).abs();
-                    if dx < o.radius.x() + rx && dy < ry + o.radius.y() {
+                    let dx = (placed.position.x() - x).abs();
+                    let dy = (placed.position.y() - y).abs();
+                    if dx < placed.radius.x() + rx && dy < ry + placed.radius.y() {
                         gone.push((owner, oid));
                     }
                 }
@@ -169,8 +169,8 @@ impl World {
         for (owner, oid) in gone {
             self.remove_building(owner, oid)?;
             // its record went with it (`+0x686` set)
-            if let Some((_, u)) = self.object_mut(oid) {
-                u.flags.set(UnitFlags::ROO_CALLED, true);
+            if let Some((_, unit)) = self.object_mut(oid) {
+                unit.flags.set(UnitFlags::ROO_CALLED, true);
             }
         }
         Ok(())
@@ -205,8 +205,8 @@ impl World {
         {
             return Ok(());
         }
-        let i = self.wake(id)?;
-        self.players.live_mut(owner, i)?.life.hp = HitPoints::ZERO;
+        let list_index = self.wake(id)?;
+        self.players.live_mut(owner, list_index)?.life.hp = HitPoints::ZERO;
         Ok(())
     }
 
@@ -248,9 +248,9 @@ impl World {
         let site = self.parts.building_of(unit.id).construction;
         let desolid = site.is_some_and(|c| c.desolid);
         let share = if state < ObjectState::Alive && HitPoints::new(1.0) <= hp {
-            let c = site.ok_or(NO_CONSTRUCTION)?;
-            let build_time = Seconds::of_master(c.build_time).get();
-            (build_time - c.progress.get()) / build_time
+            let construction = site.ok_or(NO_CONSTRUCTION)?;
+            let build_time = Seconds::of_master(construction.build_time).get();
+            (build_time - construction.progress.get()) / build_time
         } else {
             0.0
         };
@@ -268,8 +268,8 @@ impl World {
                 }
             }
         }
-        let i = self.wake(id)?;
-        self.players.live_mut(owner, i)?.life.hp = HitPoints::ZERO;
+        let list_index = self.wake(id)?;
+        self.players.live_mut(owner, list_index)?.life.hp = HitPoints::ZERO;
         if state < ObjectState::Alive && desolid {
             self.destroy_foundation(owner, id)?;
         }
@@ -296,9 +296,9 @@ impl World {
     ///
     /// An object the slice does not hold, and what the parts do not model.
     pub(crate) fn destroy(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
-        let (_, u) = self.object(id).ok_or(NOT_HELD)?;
-        let state = u.life.state;
-        let master = u.master(self.master_tables(), owner)?.clone();
+        let (_, unit) = self.object(id).ok_or(NOT_HELD)?;
+        let state = unit.life.state;
+        let master = unit.master(self.master_tables(), owner)?.clone();
         if master.kind == MasterKind::BUILDING {
             if state == ObjectState::Alive {
                 self.storage_leaves(owner, id, &master)?;
@@ -314,9 +314,9 @@ impl World {
             }
         }
         if MasterKind::ACTION <= master.kind
-            && let Some(Place::Live(p, i)) = self.place(id)
+            && let Some(Place::Live(player_id, list_index)) = self.place(id)
         {
-            self.clear_actions(p, i)?;
+            self.clear_actions(player_id, list_index)?;
         }
         self.base_destroy(owner, id)?;
         if master.kind == MasterKind::BUILDING {
@@ -355,17 +355,17 @@ impl World {
     /// modelled. Not held: the special-object list (`+0x30c` bit 0, `FUN_141677380`) and the log
     /// line.
     pub(crate) fn base_destroy(&mut self, owner: PlayerId, id: ObjectId) -> GenieResult<()> {
-        let (_, u) = self.object(id).ok_or(NOT_HELD)?;
-        if ObjectState::Removed <= u.life.state {
+        let (_, unit) = self.object(id).ok_or(NOT_HELD)?;
+        if ObjectState::Removed <= unit.life.state {
             return Ok(());
         }
-        if u.life.inside.is_some() {
+        if unit.life.inside.is_some() {
             return Err(GenieError::unsupported(
                 "a destroyed object inside another (slot 0x1a8)",
             ));
         }
-        let i = self.wake(id)?;
-        self.players.live_mut(owner, i)?.life.hp = HitPoints::ZERO;
+        let list_index = self.wake(id)?;
+        self.players.live_mut(owner, list_index)?.life.hp = HitPoints::ZERO;
         self.set_state(owner, id, ObjectState::Removed)
     }
 
@@ -384,10 +384,10 @@ impl World {
         id: ObjectId,
         new: ObjectState,
     ) -> GenieResult<()> {
-        let (_, u) = self.object(id).ok_or(GenieError::unsupported(
+        let (_, unit) = self.object(id).ok_or(GenieError::unsupported(
             "a set_state of an object the slice does not hold",
         ))?;
-        let master = u.master(self.master_tables(), owner)?.clone();
+        let master = unit.master(self.master_tables(), owner)?.clone();
         match master.kind {
             MasterKind::BUILDING => self.building_set_state(owner, id, new, &master),
             MasterKind::COMBAT => self.combat_set_state(owner, id, new, &master),
@@ -411,11 +411,11 @@ impl World {
     ) -> GenieResult<()> {
         let annexes = self.objects().annexes(id);
         for annex in annexes.ids() {
-            if let Some((q, a)) = self.object(annex)
-                && a.master(self.master_tables(), q)?.kind == MasterKind::BUILDING
+            if let Some((player_id, annex_unit)) = self.object(annex)
+                && annex_unit.master(self.master_tables(), player_id)?.kind == MasterKind::BUILDING
             {
                 // the annexes come from the spatial index's raw ids yet (T9's spatial keys)
-                self.set_state(q, annex, new)?;
+                self.set_state(player_id, annex, new)?;
             }
         }
         let state = self
@@ -429,7 +429,7 @@ impl World {
             self.completion_part(owner, id, master)?;
             let still = self
                 .object(id)
-                .is_some_and(|(_, u)| u.life.state == ObjectState::Foundation);
+                .is_some_and(|(_, unit)| unit.life.state == ObjectState::Foundation);
             if still && (ObjectState::Unfinished..=ObjectState::Undead).contains(&new) {
                 self.construction_starts(owner, id)?;
             }
@@ -455,11 +455,11 @@ impl World {
         let Some(place) = self.place(id) else {
             return self.base_set_state(owner, id, new, master);
         };
-        let u = held(&mut self.players, place)?;
-        let (state, main) = (u.life.state, self.parts.building_of(u.id).annex_of);
+        let unit = held(&mut self.players, place)?;
+        let (state, main) = (unit.life.state, self.parts.building_of(unit.id).annex_of);
         if ObjectState::Dying <= new && state < ObjectState::Dying {
             combat_dies(
-                u,
+                unit,
                 self.parts.building_of(id),
                 master,
                 &mut self.spatial,
@@ -515,8 +515,8 @@ impl World {
         if old < ObjectState::Removed && new == ObjectState::Removed {
             self.leave_storage(owner, master, |flag| flag == 32)?;
         }
-        if let Some((_, u)) = self.object_mut(id) {
-            u.life.state = new;
+        if let Some((_, unit)) = self.object_mut(id) {
+            unit.life.state = new;
         }
         if !matches!(new, ObjectState::Alive | ObjectState::Undead)
             && matches!(self.place(id), Some(Place::Sleeping(..)))
@@ -566,8 +566,8 @@ impl World {
                 .add_attribute(kind, amount)?;
         }
         self.unwatch(owner, id)?;
-        if let (Some(v), Some(at)) = (self.spatial.sight.as_mut(), death.unlink) {
-            v.unlink_building(at, master.radius, self.model.tuning.visibility)?;
+        if let (Some(visibility), Some(at)) = (self.spatial.sight.as_mut(), death.unlink) {
+            visibility.unlink_building(at, master.radius, self.model.tuning.visibility)?;
         }
         self.combat_set_state(owner, id, ObjectState::Dying, master)?;
         if let Some(kind) = death.building.count {
@@ -575,8 +575,8 @@ impl World {
                 .player_mut(owner)?
                 .take_at_least_zero(kind, Amount::new(1.0))?;
         }
-        if let Some((m, tech)) = death.building.tech {
-            self.withdraw_tech(owner, m, tech)?;
+        if let Some((master_id, tech)) = death.building.tech {
+            self.withdraw_tech(owner, master_id, tech)?;
         }
         Ok(())
     }
@@ -593,14 +593,14 @@ impl World {
                 self.players.live_mut(p, i)?.life.goto_sleep = false;
                 i
             }
-            Place::Sleeping(p, i) => {
-                let mut woken = self.swap_remove_asleep(p, i)?;
+            Place::Sleeping(player_id, i) => {
+                let mut woken = self.swap_remove_asleep(player_id, i)?;
                 woken.unit.life.goto_sleep = false;
                 let (id, master) = (woken.unit.id, woken.unit.life.master_id);
-                let i = self.push_live(p, woken)?;
+                let list_index = self.push_live(player_id, woken)?;
                 // the remove and add (slots 0x2d8, 0x2d0) file it last in the tracker
-                self.track_relist(p, id, master)?;
-                i
+                self.track_relist(player_id, id, master)?;
+                list_index
             }
         })
     }
@@ -663,7 +663,7 @@ mod tests {
             }),
             ..Default::default()
         };
-        let mut t = World::new(
+        let mut world = World::new(
             WorldTime::ZERO,
             FrameSeed::of_data(1),
             PlayerId::new(0),
@@ -702,15 +702,15 @@ mod tests {
             (2, &[(0, 83)]),
         ] {
             for &(i, master) in objects {
-                let u = &mut t.players[p].objects[ListIndex::new(i)];
-                u.life.master_id = master_id(master);
-                u.life.hp = HitPoints::new(25.0);
-                u.pasture = None;
-                u.my_pasture = None;
+                let unit = &mut world.players[p].objects[ListIndex::new(i)];
+                unit.life.master_id = master_id(master);
+                unit.life.hp = HitPoints::new(25.0);
+                unit.pasture = None;
+                unit.my_pasture = None;
             }
         }
-        t.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Foundation;
-        t.players[1].objects[ListIndex::new(2)].life.amount = Amount::new(100.0);
+        world.players[1].objects[ListIndex::new(1)].life.state = ObjectState::Foundation;
+        world.players[1].objects[ListIndex::new(2)].life.amount = Amount::new(100.0);
         let masters = Masters::new([
             Master {
                 id: ids::VILLAGER_MALE,
@@ -735,12 +735,12 @@ mod tests {
                 ..Master::default()
             },
         ]);
-        t.model.masters = vec![
+        world.model.masters = vec![
             Arc::new(masters.clone()),
             Arc::new(masters.clone()),
             Arc::new(masters),
         ];
-        t
+        world
     }
 
     #[test]
@@ -749,7 +749,8 @@ mod tests {
         t.delete(player_id(1), object_id(10)).unwrap();
         t.delete(player_id(1), object_id(20)).unwrap();
         t.delete(player_id(1), object_id(12)).unwrap();
-        let hp = |t: &World, p: usize, i: ListIndex| t.players[p].objects[i].life.hp;
+        let hp =
+            |t: &World, p: usize, list_index: ListIndex| t.players[p].objects[list_index].life.hp;
         assert_eq!(
             (
                 hp(&t, 1, ListIndex::new(0)),
@@ -763,12 +764,12 @@ mod tests {
         t.delete(player_id(1), object_id(20)).unwrap();
         assert_eq!(hp(&t, 2, ListIndex::new(0)), HitPoints::ZERO);
         // a unit whose deletion is disabled stays
-        let mut t = game(0.0, true);
-        t.players[1].objects[ListIndex::new(0)]
+        let mut world = game(0.0, true);
+        world.players[1].objects[ListIndex::new(0)]
             .flags
             .set(UnitFlags::UNDELETABLE, true);
-        t.delete(player_id(1), object_id(10)).unwrap();
-        assert_eq!(hp(&t, 1, ListIndex::new(0)), HitPoints::new(25.0));
+        world.delete(player_id(1), object_id(10)).unwrap();
+        assert_eq!(hp(&world, 1, ListIndex::new(0)), HitPoints::new(25.0));
     }
 
     #[test]
@@ -783,12 +784,12 @@ mod tests {
         );
         // 10 of its 25 seconds of work done: 15/25 of the wood (in f32: 15.000001); it dies in
         // its own update
-        let mut t = game(10.0, false);
-        t.delete(player_id(1), object_id(11)).unwrap();
-        let house = &t.players[1].objects[ListIndex::new(1)].life;
+        let mut world = game(10.0, false);
+        world.delete(player_id(1), object_id(11)).unwrap();
+        let house = &world.players[1].objects[ListIndex::new(1)].life;
         let share = (25.0_f32 - 10.0) / 25.0;
         assert_eq!(
-            (t.players[1].attributes[1], house.hp, house.state),
+            (world.players[1].attributes[1], house.hp, house.state),
             (
                 Amount::new(25.0 * share),
                 HitPoints::ZERO,
@@ -804,10 +805,10 @@ mod tests {
     #[test]
     fn deleted_town_centre_foundation_clears_no_zones_without_treaty() {
         let town_centre = |t: &mut World| {
-            for m in &mut t.model.masters {
-                let mut tc = m.get(ids::HOUSE).unwrap().clone();
+            for masters in &mut t.model.masters {
+                let mut tc = masters.get(ids::HOUSE).unwrap().clone();
                 tc.id = TOWN_CENTRE_621;
-                *m = Arc::new(Masters::new(m.iter().cloned().chain([tc])));
+                *masters = Arc::new(Masters::new(masters.iter().cloned().chain([tc])));
             }
             t.players[1].objects[ListIndex::new(1)].life.master_id = TOWN_CENTRE_621;
         };
@@ -819,11 +820,11 @@ mod tests {
             (t.players[1].attributes[1], tc.hp, tc.state),
             (Amount::new(25.0), HitPoints::ZERO, ObjectState::Removed)
         );
-        let mut t = game(0.0, true);
-        town_centre(&mut t);
-        t.settings.treaty_length = TreatyLength::of_minutes(10);
+        let mut world = game(0.0, true);
+        town_centre(&mut world);
+        world.settings.treaty_length = TreatyLength::of_minutes(10);
         assert_eq!(
-            t.delete(player_id(1), object_id(11)),
+            world.delete(player_id(1), object_id(11)),
             Err(GenieError::unsupported(
                 "a deleted town centre 621 during a treaty (its owner's treaty zones)"
             ))
@@ -892,16 +893,16 @@ mod clearing_tests {
     }
 
     /// Its place on the map, from its master.
-    fn placed(u: &Unit, m: &Master, player: PlayerId) -> Placed {
+    fn placed(unit: &Unit, master: &Master, player: PlayerId) -> Placed {
         Placed {
-            position: u.position(),
-            radius: m.radius,
-            class: m.class,
+            position: unit.position(),
+            radius: master.radius,
+            class: master.class,
             player,
-            master: m.id,
-            obstruction_kind: m.obstruction_kind,
-            buildable_on: m.buildable_on,
-            tall: m.is_tall(),
+            master: master.id,
+            obstruction_kind: master.obstruction_kind,
+            buildable_on: master.buildable_on,
+            tall: master.is_tall(),
             moves: false,
             unknown: None,
             obstruction: None,
@@ -996,23 +997,23 @@ mod clearing_tests {
             GridSize::new(20, 20),
             Tiles::new(GridSize::new(20, 20), vec![0; 400]),
         );
-        for p in PlayerId::each(2) {
-            let all: Vec<Unit> = t.players[p.index()]
+        for player_id in PlayerId::each(2) {
+            let all: Vec<Unit> = t.players[player_id.index()]
                 .objects
                 .iter()
-                .chain(&t.players[p.index()].sleeping)
+                .chain(&t.players[player_id.index()].sleeping)
                 .cloned()
                 .collect();
-            for u in all {
-                let m = ms.get(u.life.master_id).expect("a test master");
-                let mut at = placed(&u, m, p);
-                if m.obstruction_kind == ObstructionKind::KIND_2 {
+            for unit in all {
+                let master = ms.get(unit.life.master_id).expect("a test master");
+                let mut at = placed(&unit, master, player_id);
+                if master.obstruction_kind == ObstructionKind::KIND_2 {
                     at.obstruction = Some(Obstruction {
                         kind: ObstructionKind::KIND_2,
                         class: ObstructionClass::NONE,
                     });
                 }
-                t.spatial.insert(u.id, at);
+                t.spatial.insert(unit.id, at);
             }
         }
         t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
@@ -1025,7 +1026,7 @@ mod clearing_tests {
     /// the end of Gaia's live list and goes to state 7.
     #[test]
     fn footprint_clearing_wakes_two_sleeping_decorations_in_their_tile_order() {
-        let mut t = world(
+        let mut world = world(
             vec![object(1, master_id(1351), 3.5, 3.5)],
             vec![
                 object(6084, master_id(1358), 10.6, 10.6),
@@ -1034,27 +1035,28 @@ mod clearing_tests {
             vec![],
         );
         assert_eq!(
-            t.spatial.tiles().list(Tile::new(10, 10)),
+            world.spatial.tiles().list(Tile::new(10, 10)),
             [object_id(6084), object_id(6083)]
         );
-        t.clear_footprint(
-            PlayerId::new(1),
-            ids::HOUSE,
-            Point::new(10.5, 10.5),
-            Clearer::Constructor,
-        )
-        .unwrap();
-        let ids: Vec<ObjectId> = t.players[0].objects.iter().map(|u| u.id).collect();
+        world
+            .clear_footprint(
+                PlayerId::new(1),
+                ids::HOUSE,
+                Point::new(10.5, 10.5),
+                Clearer::Constructor,
+            )
+            .unwrap();
+        let ids: Vec<ObjectId> = world.players[0].objects.iter().map(|u| u.id).collect();
         assert_eq!(ids, [object_id(1), object_id(6084), object_id(6083)]);
-        assert_eq!(t.players[0].sleeping.len(), 0);
-        for u in &t.players[0].objects.as_slice()[1..] {
+        assert_eq!(world.players[0].sleeping.len(), 0);
+        for unit in &world.players[0].objects.as_slice()[1..] {
             assert_eq!(
-                (u.life.state, u.life.hp),
+                (unit.life.state, unit.life.hp),
                 (ObjectState::Removed, HitPoints::ZERO)
             );
         }
         assert_eq!(
-            t.players[0].objects[ListIndex::new(0)].life.state,
+            world.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Alive
         );
     }
@@ -1067,21 +1069,22 @@ mod clearing_tests {
         let mut corpse = object(30, master_id(43), 10.5, 10.5);
         corpse.life.state = ObjectState::Dead;
         corpse.life.class = Class::Animated;
-        let mut t = world(vec![], vec![], vec![corpse]);
-        t.players[1].attributes[7] = Amount::new(3.0);
-        t.clear_footprint(
-            PlayerId::new(1),
-            ids::HOUSE,
-            Point::new(10.5, 10.5),
-            Clearer::Constructor,
-        )
-        .unwrap();
-        let u = &t.players[1].objects[ListIndex::new(0)];
+        let mut world = world(vec![], vec![], vec![corpse]);
+        world.players[1].attributes[7] = Amount::new(3.0);
+        world
+            .clear_footprint(
+                PlayerId::new(1),
+                ids::HOUSE,
+                Point::new(10.5, 10.5),
+                Clearer::Constructor,
+            )
+            .unwrap();
+        let unit = &world.players[1].objects[ListIndex::new(0)];
         assert_eq!(
-            (u.life.state, u.life.hp),
+            (unit.life.state, unit.life.hp),
             (ObjectState::Removed, HitPoints::ZERO)
         );
-        assert_eq!(t.players[1].attributes[7], Amount::new(2.0));
+        assert_eq!(world.players[1].attributes[7], Amount::new(2.0));
     }
 
     /// A pile (type 70) a new object's clearing (`param_6`) destroys: its action list goes
@@ -1089,28 +1092,36 @@ mod clearing_tests {
     /// record and its height and sets `+0x686`; it gets no refund (only state 3 from 2 does).
     #[test]
     fn cleared_pile_loses_its_record_in_its_destroy() {
-        let mut t = world(vec![object(40, master_id(254), 10.5, 10.5)], vec![], vec![]);
-        t.players[0].attributes[98] = Amount::new(5.0);
-        assert!(t.spatial.get(object_id(40)).unwrap().obstruction.is_some());
-        t.clear_footprint(
-            PlayerId::new(1),
-            ids::HOUSE,
-            Point::new(10.5, 10.5),
-            Clearer::Builder,
-        )
-        .unwrap();
-        let u = &t.players[0].objects[ListIndex::new(0)];
+        let mut world = world(vec![object(40, master_id(254), 10.5, 10.5)], vec![], vec![]);
+        world.players[0].attributes[98] = Amount::new(5.0);
+        assert!(
+            world
+                .spatial
+                .get(object_id(40))
+                .unwrap()
+                .obstruction
+                .is_some()
+        );
+        world
+            .clear_footprint(
+                PlayerId::new(1),
+                ids::HOUSE,
+                Point::new(10.5, 10.5),
+                Clearer::Builder,
+            )
+            .unwrap();
+        let unit = &world.players[0].objects[ListIndex::new(0)];
         assert_eq!(
             (
-                u.life.state,
-                u.life.hp,
-                u.flags.contains(UnitFlags::ROO_CALLED)
+                unit.life.state,
+                unit.life.hp,
+                unit.flags.contains(UnitFlags::ROO_CALLED)
             ),
             (ObjectState::Removed, HitPoints::ZERO, true)
         );
-        let p = t.spatial.get(object_id(40)).unwrap();
-        assert_eq!((p.obstruction, p.tall), (None, false));
-        assert_eq!(t.players[0].attributes[98], Amount::new(5.0));
+        let placed = world.spatial.get(object_id(40)).unwrap();
+        assert_eq!((placed.obstruction, placed.tall), (None, false));
+        assert_eq!(world.players[0].attributes[98], Amount::new(5.0));
     }
 
     /// A dead farm (`FARM_D`, a building of type 80) a new farm's constructor clears: the
@@ -1119,20 +1130,21 @@ mod clearing_tests {
     /// `set_state`, and its owner's watched list lets it go.
     #[test]
     fn cleared_dead_farm_goes_through_the_building_destroy() {
-        let mut t = world(vec![], vec![], vec![object(50, ids::ID_357, 10.5, 10.5)]);
-        t.clear_footprint(
-            PlayerId::new(1),
-            ids::HOUSE,
-            Point::new(10.5, 10.5),
-            Clearer::Constructor,
-        )
-        .unwrap();
-        let u = &t.players[1].objects[ListIndex::new(0)];
+        let mut world = world(vec![], vec![], vec![object(50, ids::ID_357, 10.5, 10.5)]);
+        world
+            .clear_footprint(
+                PlayerId::new(1),
+                ids::HOUSE,
+                Point::new(10.5, 10.5),
+                Clearer::Constructor,
+            )
+            .unwrap();
+        let unit = &world.players[1].objects[ListIndex::new(0)];
         assert_eq!(
             (
-                u.life.state,
-                u.life.hp,
-                u.flags.contains(UnitFlags::ROO_CALLED)
+                unit.life.state,
+                unit.life.hp,
+                unit.flags.contains(UnitFlags::ROO_CALLED)
             ),
             (ObjectState::Removed, HitPoints::ZERO, true)
         );
@@ -1144,7 +1156,7 @@ mod clearing_tests {
     /// live list unless the state is 6; an object the world does not hold is not modelled.
     #[test]
     fn the_base_set_state_lets_its_storage_go_and_wakes_sleeper() {
-        let mut t = world(
+        let mut world = world(
             vec![object(1, master_id(1351), 3.5, 3.5)],
             vec![
                 object(2, master_id(1358), 5.5, 5.5),
@@ -1153,7 +1165,7 @@ mod clearing_tests {
             vec![],
         );
         for m in [1351, 1358] {
-            Arc::make_mut(&mut t.model.masters[0])
+            Arc::make_mut(&mut world.model.masters[0])
                 .get_mut(master_id(m))
                 .unwrap()
                 .storage = vec![
@@ -1164,50 +1176,61 @@ mod clearing_tests {
             ];
         }
         let at = |t: &World| [4, 5, 7].map(|i| t.players[0].attributes[i]);
-        t.players[0].attributes[4..8].copy_from_slice(&[
+        world.players[0].attributes[4..8].copy_from_slice(&[
             Amount::new(10.0),
             Amount::new(10.0),
             Amount::new(10.0),
             Amount::new(10.0),
         ]);
-        t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
+        world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
         // the same state, then a lower one: nothing
-        t.set_state(PlayerId::new(0), object_id(1), ObjectState::Alive)
+        world
+            .set_state(PlayerId::new(0), object_id(1), ObjectState::Alive)
             .unwrap();
-        t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dead;
-        t.set_state(PlayerId::new(0), object_id(1), ObjectState::Dying)
+        world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Dead;
+        world
+            .set_state(PlayerId::new(0), object_id(1), ObjectState::Dying)
             .unwrap();
         assert_eq!(
-            t.players[0].objects[ListIndex::new(0)].life.state,
+            world.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Dead
         );
-        assert_eq!(at(&t), amounts([10.0; 3]));
+        assert_eq!(at(&world), amounts([10.0; 3]));
         // from 2 to 5: flags 2 and 16 leave, flag 32 stays; then to 7, flag 32 leaves
-        t.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
-        t.set_state(PlayerId::new(0), object_id(1), ObjectState::Dead)
+        world.players[0].objects[ListIndex::new(0)].life.state = ObjectState::Alive;
+        world
+            .set_state(PlayerId::new(0), object_id(1), ObjectState::Dead)
             .unwrap();
-        assert_eq!(at(&t), amounts([8.0, 7.0, 10.0]));
-        t.set_state(PlayerId::new(0), object_id(1), ObjectState::Removed)
+        assert_eq!(at(&world), amounts([8.0, 7.0, 10.0]));
+        world
+            .set_state(PlayerId::new(0), object_id(1), ObjectState::Removed)
             .unwrap();
-        assert_eq!(at(&t), amounts([8.0, 7.0, 9.0]));
+        assert_eq!(at(&world), amounts([8.0, 7.0, 9.0]));
         assert_eq!(
-            t.players[0].objects[ListIndex::new(0)].life.state,
+            world.players[0].objects[ListIndex::new(0)].life.state,
             ObjectState::Removed
         );
         // a sleeper set to 6 sleeps on, one set to 7 wakes
-        t.players[0].sleeping[ListIndex::new(0)].life.state = ObjectState::Dead;
-        t.set_state(PlayerId::new(0), object_id(2), ObjectState::Undead)
+        world.players[0].sleeping[ListIndex::new(0)].life.state = ObjectState::Dead;
+        world
+            .set_state(PlayerId::new(0), object_id(2), ObjectState::Undead)
             .unwrap();
-        assert_eq!(t.players[0].sleeping.len(), 2);
-        t.set_state(PlayerId::new(0), object_id(3), ObjectState::Removed)
+        assert_eq!(world.players[0].sleeping.len(), 2);
+        world
+            .set_state(PlayerId::new(0), object_id(3), ObjectState::Removed)
             .unwrap();
-        let ids: Vec<ObjectId> = t.players[0].objects.iter().map(|u| u.id).collect();
+        let ids: Vec<ObjectId> = world.players[0]
+            .objects
+            .iter()
+            .map(|unit| unit.id)
+            .collect();
         assert_eq!(
-            (ids, t.players[0].sleeping.len()),
+            (ids, world.players[0].sleeping.len()),
             (vec![object_id(1), object_id(3)], 1)
         );
         assert!(
-            t.set_state(PlayerId::new(0), object_id(99), ObjectState::Removed)
+            world
+                .set_state(PlayerId::new(0), object_id(99), ObjectState::Removed)
                 .is_err()
         );
     }

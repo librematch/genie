@@ -42,33 +42,33 @@ pub enum Heard {
 }
 
 impl UnitView<'_, '_> {
-    /// The owner hears `n` (the hear logic after slot 0x2e8): a computer player's AI that holds
-    /// its module hears an explorer wanting a point. Its tasking and detasking of the unit
+    /// The owner hears `notify` (the hear logic after slot 0x2e8): a computer player's AI that
+    /// holds its module hears an explorer wanting a point. Its tasking and detasking of the unit
     /// (the tactical module's groups) are not modelled.
     ///
     /// # Errors
     ///
     /// The tasking or detasking, and what the search does not model.
-    pub(crate) fn hears(&mut self, n: Notify, roles: &Roles) -> GenieResult<()> {
+    pub(crate) fn hears(&mut self, notify: Notify, roles: &Roles) -> GenieResult<()> {
         let player = self.player;
-        if !self.player_kind.is_computer() || n.kind != NotifyKind::REQUIRES_SEARCH {
+        if !self.player_kind.is_computer() || notify.kind != NotifyKind::REQUIRES_SEARCH {
             return Ok(());
         }
         let Some(mut module) = self.c.w.ai.take(player) else {
             return Ok(());
         };
         let saved = self.c.w.streams.clone();
-        let heard = self.hear_explore(&mut module, n, roles);
+        let heard = self.hear_explore(&mut module, notify, roles);
         self.c.w.streams = saved;
         self.c.w.ai.put_back(player, module);
         match heard? {
             Heard::Nothing => Ok(()),
-            Heard::Task(t) => alert_owner(PlayerKind::Computer).map_err(|e| {
-                e.with("tasks explorer", ObjectId::field(n.caller))
-                    .with("to", format_args!("({}, {})", t.x(), t.y()))
+            Heard::Task(tile) => alert_owner(PlayerKind::Computer).map_err(|e| {
+                e.with("tasks explorer", ObjectId::field(notify.caller))
+                    .with("to", format_args!("({}, {})", tile.x(), tile.y()))
             }),
             Heard::Detask => alert_owner(PlayerKind::Computer)
-                .map_err(|e| e.with("detasks explorer", ObjectId::field(n.caller))),
+                .map_err(|error| error.with("detasks explorer", ObjectId::field(notify.caller))),
         }
     }
 
@@ -80,14 +80,14 @@ impl UnitView<'_, '_> {
     pub(crate) fn hear_explore(
         &mut self,
         module: &mut AiModule,
-        n: Notify,
+        notify: Notify,
         roles: &Roles,
     ) -> GenieResult<Heard> {
         let explore = [
             AiAction::Explore.value(),
             AiAction::ExploreAndDestroy.value(),
         ];
-        if !explore.contains(&n.p[0]) {
+        if !explore.contains(&notify.p[0]) {
             return Ok(Heard::Nothing);
         }
         let own = self.unit.master(self.c.w.master_tables(), self.player)?;
@@ -137,7 +137,7 @@ impl UnitView<'_, '_> {
         match info.explorer {
             None => info.explorer = Some(id),
             Some(_) if !explorer_alive => info.explorer = Some(id),
-            Some(e) if e != id => {
+            Some(object_id) if object_id != id => {
                 return Ok(search(info, unit.position)?.map_or(Heard::Detask, Heard::Task));
             }
             Some(_) => {}

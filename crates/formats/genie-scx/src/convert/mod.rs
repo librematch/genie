@@ -69,9 +69,9 @@ mod tests {
     /// A scenario of a version the converters do not take is a gap.
     #[test]
     fn unknown_version_does_not_convert() {
-        let e = not_convertible();
+        let error = not_convertible();
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (
                 genie_error::ErrorKind::Unsupported,
                 "a scenario version the converter does not take"

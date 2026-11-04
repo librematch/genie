@@ -324,9 +324,9 @@ pub(crate) const NO_QUEUE: GenieError =
     GenieError::unreachable("a building without a production queue where one is read");
 
 impl World {
-    /// The live slot of object `id` when its own update knows it, `(p, i)`: that slot while it
-    /// still holds the object (the game's update works on the object itself, not its id), else
-    /// the live slot [`World::place`] finds.
+    /// The live slot of object `id` when its own update knows it, `(player_id, list_index)`: that
+    /// slot while it still holds the object (the game's update works on the object itself, not its
+    /// id), else the live slot [`World::place`] finds.
     pub(crate) fn live_slot(
         &self,
         (p, i, id): (PlayerId, ListIndex, ObjectId),
@@ -335,11 +335,11 @@ impl World {
             .players
             .get(p.index())
             .and_then(|player| player.objects.get(i));
-        if held.is_some_and(|u| u.id == id) {
+        if held.is_some_and(|unit| unit.id == id) {
             return Some((p, i));
         }
         match self.place(id)? {
-            Place::Live(p, i) => Some((p, i)),
+            Place::Live(player_id, list_index) => Some((player_id, list_index)),
             Place::Sleeping(..) => None,
         }
     }
@@ -347,22 +347,22 @@ impl World {
     /// The object `id`, live or sleeping, with its player (the table by id's object,
     /// [`World::place`]).
     pub(crate) fn object(&self, id: impl ObjectKey) -> Option<(PlayerId, &Unit)> {
-        let (p, u, _) = self.locate(id)?;
-        Some((p, u))
+        let (player_id, unit, _) = self.locate(id)?;
+        Some((player_id, unit))
     }
 
     /// The object state (`+0x640`) of the object `id`, live or sleeping, None for −1 or an id the
     /// world no longer holds: what a `MoveTo`'s first check reads of its target
     /// ([`crate::movement::move_to::MoveToAction::check_held`]).
     pub(crate) fn object_state(&self, id: impl ObjectKey) -> Option<ObjectState> {
-        self.object(id).map(|(_, u)| u.life.state)
+        self.object(id).map(|(_, unit)| unit.life.state)
     }
 
     /// The object `id`, live or sleeping, to change (`FUN_1415417a0`'s object).
     pub(crate) fn object_mut(&mut self, id: impl ObjectKey) -> Option<(PlayerId, &mut Unit)> {
         let place = self.place(id)?;
-        let u = self.players.at_mut(place).ok()?;
-        Some((place.player(), u))
+        let unit = self.players.at_mut(place).ok()?;
+        Some((place.player(), unit))
     }
 
     /// [`World::object_mut`] with the object's combat layer to change beside it, a new
@@ -378,9 +378,9 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
-        let u = self.players.at_mut(place)?;
-        let combat = self.parts.combat_mut(u.id)?;
-        Ok(Some((u, combat)))
+        let unit = self.players.at_mut(place)?;
+        let combat = self.parts.combat_mut(unit.id)?;
+        Ok(Some((unit, combat)))
     }
 
     /// [`World::object_mut`] with the object's building layer to change beside it, put in where
@@ -396,9 +396,9 @@ impl World {
         let Some(place) = self.place(id) else {
             return Ok(None);
         };
-        let u = self.players.at_mut(place)?;
-        let layer = self.parts.building_mut(u.id)?;
-        Ok(Some((u, layer)))
+        let unit = self.players.at_mut(place)?;
+        let layer = self.parts.building_mut(unit.id)?;
+        Ok(Some((unit, layer)))
     }
 
     /// Player `player`'s master `master` ([`player_master`]), which the caller's object or
@@ -426,22 +426,22 @@ impl World {
                 None => break,
             }
         }
-        let (player, u) = self
+        let (player, unit) = self
             .object(id)
             .ok_or(GenieError::unsupported("a target the slice does not hold"))?;
-        let master = u.master(self.master_tables(), player)?;
+        let master = unit.master(self.master_tables(), player)?;
         Ok(TaskTarget {
-            id: u.id,
+            id: unit.id,
             master,
             player,
-            state: u.life.state,
-            held: u.life.held(),
-            hp: u.life.hp + self.parts.combat_of(u.id).hp_powerup.room(),
+            state: unit.life.state,
+            held: unit.life.held(),
+            hp: unit.life.hp + self.parts.combat_of(unit.id).hp_powerup.room(),
             max_hp: HitPoints::of_master(master.hit_points)
-                + self.parts.combat_of(u.id).hp_powerup.max,
-            attackable: u.flags.contains(UnitFlags::ATTACKABLE),
-            pasture: u.pasture,
-            top_action: self.parts.actions_of(u.id).top_action_kind(),
+                + self.parts.combat_of(unit.id).hp_powerup.max,
+            attackable: unit.flags.contains(UnitFlags::ATTACKABLE),
+            pasture: unit.pasture,
+            top_action: self.parts.actions_of(unit.id).top_action_kind(),
         })
     }
 }
@@ -524,15 +524,15 @@ const ATTACK_MOVE_QUEUED: GenieError =
 fn waypoints_from(from: Point, waypoints: &[Point], order_tuning: &OrderTuning) -> Vec<Point> {
     let mut last = from;
     let mut kept = Vec::with_capacity(waypoints.len());
-    for &w in waypoints {
-        let (dx, dy) = (w.x() - last.x(), w.y() - last.y());
+    for &point in waypoints {
+        let (dx, dy) = (point.x() - last.x(), point.y() - last.y());
         if order_tuning.waypoint_apart <= dx
             || dx <= order_tuning.waypoint_apart_low
             || order_tuning.waypoint_apart <= dy
             || dy <= order_tuning.waypoint_apart_low
         {
-            kept.push(w);
-            last = w;
+            kept.push(point);
+            last = point;
         }
     }
     kept
@@ -542,8 +542,12 @@ fn own_order_target(ai: &UnitAi, id: ObjectId) -> Option<ObjectId> {
     // the issuer compares as the game's integer (a player's number equals that object's id)
     ai.orders
         .iter()
-        .filter(|o| o.issuer.is_some_and(|i| i == id))
-        .find_map(|o| o.target.filter(|t| !t.is_recyclable()))
+        .filter(|o| o.issuer.is_some_and(|issuer| issuer == id))
+        .find_map(|queued_order| {
+            queued_order
+                .target
+                .filter(|object_id| !object_id.is_recyclable())
+        })
 }
 
 /// A unit AI's slot 0x1c0 (`FUN_140c64d50`): the stance (`+0x1a9`) takes `state` and the stance's
@@ -594,12 +598,12 @@ pub(crate) fn lock_gate(
     Ok(())
 }
 
-/// `setDifferentiatorGroups` (`FUN_1410395a0`): group `g`'s differentiator groups (`+0x108`,
+/// `setDifferentiatorGroups` (`FUN_1410395a0`): group `group`'s differentiator groups (`+0x108`,
 /// count `+0x110`) are `list` instead. The routine's false for an allocation that failed cannot
 /// come: `operator new` (`FUN_142a8bd2c`) throws rather than return none.
-fn set_differentiator_groups(g: &mut UnitGroup, list: &[GroupId]) {
-    g.differentiator_groups.clear();
-    g.differentiator_groups.extend_from_slice(list);
+fn set_differentiator_groups(group: &mut UnitGroup, list: &[GroupId]) {
+    group.differentiator_groups.clear();
+    group.differentiator_groups.extend_from_slice(list);
 }
 
 /// `FUN_14118c790`: unit `id` joins the end of a unit's ignore list (`+0x670`, count `+0x678`);
@@ -672,9 +676,9 @@ pub(crate) fn nearest_table_site(
 ) -> Option<(DropSiteId, Position)> {
     let buildings = table_drop_buildings(table, held, Some(class), civ);
     let mut best = (None, order_tuning.table_drop_far);
-    for m in buildings {
+    for master_id in buildings {
         // a queued unit's place (−1) names no object
-        for &id in tracker.list(ListKey::master(m)).iter().flatten() {
+        for &id in tracker.list(ListKey::master(master_id)).iter().flatten() {
             let Some((state, position)) = look(id) else {
                 continue;
             };

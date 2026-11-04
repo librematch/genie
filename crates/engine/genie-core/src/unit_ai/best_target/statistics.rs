@@ -215,7 +215,7 @@ impl<T: Bounded> Bounds<T> {
 }
 
 impl Statistics {
-    /// `FUN_140c66590`: the object `c` joins the table, while it holds fewer than
+    /// `FUN_140c66590`: the object `candidate` joins the table, while it holds fewer than
     /// [`STATISTICS`] (the caller's test that both have a unit AI, `+0x6b0`): its id, distance
     /// and category; the category's count when not −1; the count of others unless it is the
     /// current target; a moving one counts and may be the closest moving object (`COMISS`, a
@@ -225,55 +225,58 @@ impl Statistics {
     /// a NaN damage too), else 5 for one the unit's AI could work on and the largest float for
     /// another; the kill times' bounds; the current target's bonus 5; a moving one's bounds of
     /// both.
-    pub fn add(&mut self, c: &Candidate, best_target_tuning: &BestTargetTuning) {
+    pub fn add(&mut self, candidate: &Candidate, best_target_tuning: &BestTargetTuning) {
         if STATISTICS <= self.entries.len() {
             return;
         }
-        let mut e = Entry {
-            id: c.id,
-            distance: c.distance,
-            category: c.category,
+        let mut entry = Entry {
+            id: candidate.id,
+            distance: candidate.distance,
+            category: candidate.category,
             ..Entry::default()
         };
-        if let Some(k) = c.category {
-            self.by_category[k].count_one();
+        if let Some(attack_category) = candidate.category {
+            self.by_category[attack_category].count_one();
         }
-        if !c.current {
+        if !candidate.current {
             self.others.count_one();
         }
-        if Speed::ZERO < c.speed {
-            e.moving = true;
-            if self.closest_moving.0 > c.distance {
-                self.closest_moving = (c.distance, Some(c.id));
+        if Speed::ZERO < candidate.speed {
+            entry.moving = true;
+            if self.closest_moving.0 > candidate.distance {
+                self.closest_moving = (candidate.distance, Some(candidate.id));
             }
             self.moving.count_one();
         }
-        e.fixed = FIXED_CLASSES.contains(c.class);
-        if c.armed {
+        entry.fixed = FIXED_CLASSES.contains(candidate.class);
+        if candidate.armed {
             self.armed.count_one();
         }
-        if !(c.reach < c.distance || c.reach.get().is_nan() || c.distance.get().is_nan()) {
+        if !(candidate.reach < candidate.distance
+            || candidate.reach.get().is_nan()
+            || candidate.distance.get().is_nan())
+        {
             self.in_reach.count_one();
         }
-        self.distance.take(c.distance);
-        e.kill_time = KillTime::new(if below_or_unordered(EPSILON, c.damage.get()) {
-            (c.hp / c.damage) / c.reload.get()
-        } else if c.workable {
+        self.distance.take(candidate.distance);
+        entry.kill_time = KillTime::new(if below_or_unordered(EPSILON, candidate.damage.get()) {
+            (candidate.hp / candidate.damage) / candidate.reload.get()
+        } else if candidate.workable {
             best_target_tuning.five
         } else {
             NEVER
         });
-        self.kill_time.take(e.kill_time);
-        e.bonus = if c.current {
+        self.kill_time.take(entry.kill_time);
+        entry.bonus = if candidate.current {
             TargetScore::new(best_target_tuning.five)
         } else {
             TargetScore::ZERO
         };
-        if Speed::ZERO < c.speed {
-            self.moving_distance.take(c.distance);
-            self.moving_kill_time.take(e.kill_time);
+        if Speed::ZERO < candidate.speed {
+            self.moving_distance.take(candidate.distance);
+            self.moving_kill_time.take(entry.kill_time);
         }
-        self.entries.push(e);
+        self.entries.push(entry);
     }
 
     /// `FUN_140c48150`: every entry's scores, with the order history's `weights` by category and
@@ -305,43 +308,44 @@ impl Statistics {
             self.moving_kill_time.least.get(),
             self.moving_distance.least.get(),
         );
-        for e in &mut self.entries {
+        for entry in &mut self.entries {
             let top = if mode == TargetingMode::KillTime {
                 factor.as_f32() * PER_CENT
             } else {
                 1.0
             };
             let mut kill = top * best_target_tuning.score;
-            if e.moving {
+            if entry.moving {
                 if at_most_or_unordered(EPSILON, moving_kill_span) {
-                    kill -= ((e.kill_time.get() - moving_kill_low) / moving_kill_span) * kill;
+                    kill -= ((entry.kill_time.get() - moving_kill_low) / moving_kill_span) * kill;
                 }
-                e.kill_score = TargetScore::new(kill);
-                let mut d = best_target_tuning.distance_score;
+                entry.kill_score = TargetScore::new(kill);
+                let mut distance_score = best_target_tuning.distance_score;
                 if at_most_or_unordered(EPSILON, moving_distance_span) {
-                    d -= ((e.distance.get() - moving_distance_low) / moving_distance_span)
+                    distance_score -= ((entry.distance.get() - moving_distance_low)
+                        / moving_distance_span)
                         * best_target_tuning.distance_score;
                 }
-                e.distance_score = TargetScore::new(d);
+                entry.distance_score = TargetScore::new(distance_score);
             } else {
                 if at_most_or_unordered(EPSILON, kill_span) {
-                    kill -= ((e.kill_time.get() - kill_low) / kill_span) * kill;
+                    kill -= ((entry.kill_time.get() - kill_low) / kill_span) * kill;
                 }
-                e.kill_score = TargetScore::new(kill);
-                e.distance_score = TargetScore::new(if EPSILON > distance_span {
+                entry.kill_score = TargetScore::new(kill);
+                entry.distance_score = TargetScore::new(if EPSILON > distance_span {
                     best_target_tuning.distance_score
                 } else {
                     best_target_tuning.distance_score
-                        - ((e.distance.get() - distance_low) / distance_span)
+                        - ((entry.distance.get() - distance_low) / distance_span)
                             * best_target_tuning.distance_score
                 });
             }
-            e.weight = e.category.map_or(TargetScore::ZERO, |k| {
-                TargetScore::new(weights[k].get() * best_target_tuning.score)
+            entry.weight = entry.category.map_or(TargetScore::ZERO, |attack_category| {
+                TargetScore::new(weights[attack_category].get() * best_target_tuning.score)
             });
-            e.total = ((e.kill_score + e.distance_score) + e.weight) + e.bonus;
-            if mode == TargetingMode::Armored && armored(e.id)? {
-                e.total *= factor.as_f32() * PER_CENT;
+            entry.total = ((entry.kill_score + entry.distance_score) + entry.weight) + entry.bonus;
+            if mode == TargetingMode::Armored && armored(entry.id)? {
+                entry.total *= factor.as_f32() * PER_CENT;
             }
         }
         Ok(())
@@ -359,8 +363,9 @@ impl Statistics {
         best_target_tuning: &BestTargetTuning,
     ) -> GenieResult<()> {
         self.order = (0..self.entries.len()).collect();
-        for e in &mut self.entries {
-            e.rank = TargetScore::new(tier(e)? as f32 * best_target_tuning.tier + e.total.get());
+        for entry in &mut self.entries {
+            entry.rank =
+                TargetScore::new(tier(entry)? as f32 * best_target_tuning.tier + entry.total.get());
         }
         Ok(())
     }
@@ -375,10 +380,10 @@ impl Statistics {
     pub(super) fn partition(&mut self, lo: usize, hi: usize) -> GenieResult<usize> {
         let pivot = *self.entries.checked(*self.order.checked(hi)?)?;
         let mut i = lo;
-        for j in lo..hi {
-            let e = *self.entries.checked(*self.order.checked(j)?)?;
-            if pivot.rank < e.rank || (e.rank == pivot.rank && e.id < pivot.id) {
-                self.order.swap(i, j);
+        for index in lo..hi {
+            let entry = *self.entries.checked(*self.order.checked(index)?)?;
+            if pivot.rank < entry.rank || (entry.rank == pivot.rank && entry.id < pivot.id) {
+                self.order.swap(i, index);
                 i += 1;
             }
         }
@@ -394,11 +399,11 @@ impl Statistics {
     /// A slot or an entry the sort does not hold.
     pub(super) fn quicksort(&mut self, mut lo: usize, hi: usize) -> GenieResult<()> {
         while lo < hi {
-            let p = self.partition(lo, hi)?;
-            if p > 0 {
-                self.quicksort(lo, p - 1)?;
+            let pivot = self.partition(lo, hi)?;
+            if pivot > 0 {
+                self.quicksort(lo, pivot - 1)?;
             }
-            lo = p + 1;
+            lo = pivot + 1;
         }
         Ok(())
     }
@@ -414,11 +419,11 @@ impl Statistics {
         let Some(last) = self.entries.len().checked_sub(1).filter(|&l| 0 < l) else {
             return Ok(());
         };
-        let p = self.partition(0, last)?;
-        if p > 0 {
-            self.quicksort(0, p - 1)?;
+        let pivot = self.partition(0, last)?;
+        if pivot > 0 {
+            self.quicksort(0, pivot - 1)?;
         }
-        self.quicksort(p + 1, last)
+        self.quicksort(pivot + 1, last)
     }
 }
 
@@ -432,17 +437,18 @@ pub fn order_weights(
     now: WorldTime,
     best_target_tuning: &BestTargetTuning,
 ) -> ByCategory<OrderWeight> {
-    let mut w = ByCategory::default();
-    for r in history {
-        let age = now.since(r.time);
+    let mut by_category = ByCategory::default();
+    for order_record in history {
+        let age = now.since(order_record.time);
         if Millis::new(60000) < age {
             break;
         }
-        if let Some(k) = r.category {
-            w[k] += OrderWeight::new((60000 - age.get()) as f32 / best_target_tuning.order_window);
+        if let Some(attack_category) = order_record.category {
+            by_category[attack_category] +=
+                OrderWeight::new((60000 - age.get()) as f32 / best_target_tuning.order_window);
         }
     }
-    w
+    by_category
 }
 
 #[cfg(test)]
@@ -454,13 +460,16 @@ mod tests {
     /// them, pass over a NaN, and span the most less the least.
     #[test]
     fn bounds_widen_by_each_value_beyond_them_and_pass_over_nan() {
-        let mut b = Bounds::<Distance>::reset();
-        assert_eq!((b.least.get(), b.most.get()), (f32::MAX, -1.0));
-        b.take(Distance::new(3.0));
-        assert_eq!((b.least.get(), b.most.get()), (3.0, 3.0));
-        b.take(Distance::new(1.0));
-        b.take(Distance::new(7.0));
-        b.take(Distance::new(f32::NAN));
-        assert_eq!((b.least.get(), b.most.get(), b.span()), (1.0, 7.0, 6.0));
+        let mut bounds = Bounds::<Distance>::reset();
+        assert_eq!((bounds.least.get(), bounds.most.get()), (f32::MAX, -1.0));
+        bounds.take(Distance::new(3.0));
+        assert_eq!((bounds.least.get(), bounds.most.get()), (3.0, 3.0));
+        bounds.take(Distance::new(1.0));
+        bounds.take(Distance::new(7.0));
+        bounds.take(Distance::new(f32::NAN));
+        assert_eq!(
+            (bounds.least.get(), bounds.most.get(), bounds.span()),
+            (1.0, 7.0, 6.0)
+        );
     }
 }

@@ -15,9 +15,9 @@ pub(super) fn centroid(points: &[Point], order_tuning: &OrderTuning) -> Option<P
         Spread::new(order_tuning.box_start),
         Spread::new(order_tuning.box_start),
     );
-    for p in points {
-        x.take(p.x());
-        y.take(p.y());
+    for point in points {
+        x.take(point.x());
+        y.take(point.y());
     }
     if order_tuning.spread < x.most - x.least || order_tuning.spread < y.most - y.least {
         return None;
@@ -25,8 +25,8 @@ pub(super) fn centroid(points: &[Point], order_tuning: &OrderTuning) -> Option<P
     if points.is_empty() {
         return Some(Point::new(x.sum, y.sum));
     }
-    let n = points.len() as f32;
-    Some(Point::new(x.sum / n, y.sum / n))
+    let count = points.len() as f32;
+    Some(Point::new(x.sum / count, y.sum / count))
 }
 
 /// One axis of [`centroid`]'s box: the least and the greatest value so far and the sum.
@@ -112,8 +112,8 @@ pub(super) fn follow_spread(points: &[Point], order_tuning: &OrderTuning) -> Opt
         0.0f32,
     );
     let (mut sx, mut sy) = (0.0f32, 0.0f32);
-    for p in points {
-        let (x, y) = (p.x(), p.y());
+    for point in points {
+        let (x, y) = (point.x(), point.y());
         least = if at_most_or_unordered(lesser, least) {
             lesser
         } else {
@@ -135,8 +135,8 @@ pub(super) fn follow_spread(points: &[Point], order_tuning: &OrderTuning) -> Opt
         return None;
     }
     if !points.is_empty() {
-        let n = points.len() as i32 as f32;
-        (sx, sy) = (sx / n, sy / n);
+        let count = points.len() as i32 as f32;
+        (sx, sy) = (sx / count, sy / count);
     }
     Some(Point::new(sx, sy))
 }

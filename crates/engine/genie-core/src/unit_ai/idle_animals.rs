@@ -45,8 +45,8 @@ impl UnitAi {
     ) -> GenieResult<IdleOutcome> {
         self.cap_human_order(side, ai)?;
         let (produced, moved) = self.boar_wander(at, ai);
-        if let Some(m) = moved {
-            side.effect_now(Effect::Move(m), self, ai)?;
+        if let Some(ai_move) = moved {
+            side.effect_now(Effect::Move(ai_move), self, ai)?;
         }
         Ok(if produced {
             IdleOutcome::Acted
@@ -79,11 +79,11 @@ impl UnitAi {
             pace: Pace::Walk,
         };
         if home.homeward {
-            let m = self.move_to(go_home);
+            let ai_move = self.move_to(go_home);
             if let Some(h) = self.home.as_mut() {
                 h.homeward = false;
             }
-            return (true, m);
+            return (true, ai_move);
         }
         // comiss; jbe: unordered counts as inside
         if d2.partial_cmp(&leash) != Some(Ordering::Greater) {
@@ -189,19 +189,19 @@ impl UnitAi {
         ai: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<IdleOutcome> {
-        let h = self.hunted.ok_or(GenieError::unsupported(
+        let hunted = self.hunted.ok_or(GenieError::unsupported(
             "a hunted animal without its origin",
         ))?;
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
         let go_home = AiMove {
-            point: h.origin.with_z(z),
+            point: hunted.origin.with_z(z),
             range: AI_MOVE_RANGE,
             force: OrderForce::Forced,
             pace: Pace::Walk,
         };
-        let leash = h.leash.squared();
+        let leash = hunted.leash.squared();
         if DistanceSquared::ZERO < leash {
-            let gap = point_gap_squared(h.origin.ground(), at.position, at.size);
+            let gap = point_gap_squared(hunted.origin.ground(), at.position, at.size);
             if leash < gap {
                 if let Some(m) = self.move_to(go_home) {
                     side.effect_now(Effect::Move(m), self, ai)?;
@@ -244,13 +244,13 @@ impl UnitAi {
             self.evade(at, other, ai, side)?;
             return Ok(IdleOutcome::Acted);
         }
-        let r = ai.rand15();
-        if r.is_multiple_of(BOAR_WANDER) {
-            let dx = x - h.origin.x();
-            let dy = y - h.origin.y();
+        let draw = ai.rand15();
+        if draw.is_multiple_of(BOAR_WANDER) {
+            let dx = x - hunted.origin.x();
+            let dy = y - hunted.origin.y();
             if HUNTED_HOME < dy * dy + dx * dx {
-                if let Some(m) = self.move_to(go_home) {
-                    side.effect_now(Effect::Move(m), self, ai)?;
+                if let Some(go_home_ai_move) = self.move_to(go_home) {
+                    side.effect_now(Effect::Move(go_home_ai_move), self, ai)?;
                 }
                 return Ok(IdleOutcome::Acted);
             }
@@ -268,8 +268,8 @@ impl UnitAi {
                 point: Position::new(x + sx, sy + y, z),
                 ..go_home
             });
-            if let Some(m) = wander {
-                side.effect_now(Effect::Move(m), self, ai)?;
+            if let Some(ai_move) = wander {
+                side.effect_now(Effect::Move(ai_move), self, ai)?;
             }
             return Ok(IdleOutcome::Acted);
         }
@@ -343,10 +343,10 @@ impl UnitAi {
         let Some(id) = found.id else {
             return Ok(IdleOutcome::Idle);
         };
-        let Some(t) = side.seen_unit(id)? else {
+        let Some(unit_seen) = side.seen_unit(id)? else {
             return Ok(IdleOutcome::Idle);
         };
-        if Distance::ZERO <= reach && reach.squared() < t.gap_squared {
+        if Distance::ZERO <= reach && reach.squared() < unit_seen.gap_squared {
             return Ok(IdleOutcome::Idle);
         }
         let _ = self.attack_object(id, OrderForce::Unforced, TargetRules::Own, at, side)?;

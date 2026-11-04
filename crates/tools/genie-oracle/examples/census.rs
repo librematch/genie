@@ -33,22 +33,27 @@ fn main() -> Result<(), Box<dyn Error>> {
         "{} updates ({:?}), {} checkpoints",
         run.updates, run.end, run.checkpoints
     );
-    for (p, player) in run.players.iter().enumerate() {
+    for (index, player) in run.players.iter().enumerate() {
         let stop = player.stop.as_ref().map_or_else(
             || "no stop".to_owned(),
-            |s| format!("stops at update {}: {}", s.update, s.reason),
+            |census_stop| {
+                format!(
+                    "stops at update {}: {}",
+                    census_stop.update, census_stop.reason
+                )
+            },
         );
         let mismatch = player.mismatch.as_ref().map_or_else(
             || "no checkpoint differs".to_owned(),
-            |m| {
+            |census_mismatch| {
                 format!(
                     "the checkpoint after {} syncs differs in words {:?}",
-                    m.syncs, m.words
+                    census_mismatch.syncs, census_mismatch.words
                 )
             },
         );
         println!(
-            "player {p}: {stop}; {} checkpoints hold; {mismatch}",
+            "player {index}: {stop}; {} checkpoints hold; {mismatch}",
             player.checkpoints_held
         );
     }

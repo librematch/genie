@@ -35,11 +35,19 @@ impl Mover {
         let ground_radius = self.stats.radius.ground();
         let level = self.paths.walked()?;
         match goal.target {
-            Some((id, t)) => {
+            Some((id, placed)) => {
                 let range = level.range;
-                let own = footprint_gap(at, ground_radius, t.position, t.radius) - range;
+                let own = footprint_gap(at, ground_radius, placed.position, placed.radius) - range;
                 let near = (at, ground_radius);
-                let gap = gate_gap(world, near, (id, t), own, |g| g - range, by_id, roles);
+                let gap = gate_gap(
+                    world,
+                    near,
+                    (id, placed),
+                    own,
+                    |distance| distance - range,
+                    by_id,
+                    roles,
+                );
                 if gap.get() < EPSILON {
                     // in range of the target: the waypoint counts as reached
                     let level = self.paths.walked_mut()?;
@@ -90,7 +98,7 @@ impl Mover {
         if self
             .paths
             .first()
-            .is_some_and(|l| l.state == PathState::WantsPath)
+            .is_some_and(|path_data| path_data.state == PathState::WantsPath)
         {
             self.stop()?;
         }

@@ -92,48 +92,51 @@ impl BuildAction {
     /// What the states, the walks and the work do not model.
     pub(crate) fn update(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         me: Me,
         reads: &BuildReads,
     ) -> GenieResult<HeadCode> {
-        let roles = &c.w.model.roles.clone();
-        let slots = c.w.model.slots;
+        let roles = &step.w.model.roles.clone();
+        let slots = step.w.model.slots;
         // state 3 without a target: the update does nothing (0x140ab0370's default case)
         if self.state == BuildState::Idle && self.target.is_none() {
             return Ok(HeadCode::Keeps);
         }
-        if self.lost_foundation(c, reads) {
-            self.idle(c, builder, reads)?;
+        if self.lost_foundation(step, reads) {
+            self.idle(step, builder, reads)?;
             return Ok(HeadCode::Keeps);
         }
         // the second target's id names no object of the world: FUN_140a7a190 with none, whose
         // release finds nothing to call
-        if self.site.is_some() && c.w.spatial.get(self.site).is_none() {
+        if self.site.is_some() && step.w.spatial.get(self.site).is_none() {
             self.site = None;
         }
         if reads.site.is_some() {
-            if self.pasture_built(c, builder, reads)? {
+            if self.pasture_built(step, builder, reads)? {
                 return Ok(HeadCode::Deletes);
             }
-            self.foundation_done(c, builder, reads, roles)?;
+            self.foundation_done(step, builder, reads, roles)?;
         }
         if self.state == BuildState::Finished {
-            return self.after_work(c, builder, actions, reads, roles);
+            return self.after_work(step, builder, actions, reads, roles);
         }
         if matches!(self.state, BuildState::Drop { .. }) {
-            return self.update_drop(c, builder, me, reads, roles, slots);
+            return self.update_drop(step, builder, me, reads, roles, slots);
         }
-        self.update_state(c, builder, actions, me, reads, roles)
+        self.update_state(step, builder, actions, me, reads, roles)
     }
 
     /// The target's id names no object of the world (`FUN_1415417a0`; the builder's player
     /// does not hold it either, `reads`): slot 0x68 with none (its builders' count went with
     /// it); then a Build in state 2 or 8 goes on, any other waits (true: the caller's
     /// `set_state(3)`, and the update returns 0).
-    fn lost_foundation(&mut self, c: &Step<'_>, reads: &BuildReads) -> bool {
-        if self.target.is_none() || reads.site.is_some() || c.w.spatial.get(self.target).is_some() {
+    fn lost_foundation(&mut self, step: &Step<'_>, reads: &BuildReads) -> bool {
+        if self.target.is_none()
+            || reads.site.is_some()
+            || step.w.spatial.get(self.target).is_some()
+        {
             return false;
         }
         self.added = false;
@@ -150,31 +153,31 @@ impl BuildAction {
     /// returns 1. True when it ended.
     fn pasture_built(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<bool> {
-        let player_kind = c.w.players.player(c.player)?.kind;
-        let site = Self::site_unit(c, reads)?;
+        let player_kind = step.w.players.player(step.player)?.kind;
+        let site = Self::site_unit(step, reads)?;
         let pasture = match site {
-            Some(u) => {
-                c.w.model
-                    .roles
-                    .of_master(u.master(c.w.master_tables(), c.player)?.id)
-                    .contains(MasterRoles::PASTURE_1889)
-            }
+            Some(u) => step
+                .w
+                .model
+                .roles
+                .of_master(u.master(step.w.master_tables(), step.player)?.id)
+                .contains(MasterRoles::PASTURE_1889),
             None => false,
         };
-        let built = site.is_some_and(|u| u.life.state != ObjectState::Foundation);
+        let built = site.is_some_and(|unit| unit.life.state != ObjectState::Foundation);
         if player_kind.is_computer() || !pasture || !built {
             return Ok(false);
         }
-        let Some(ai) = c.w.parts.unit_ai.get_mut(builder.id) else {
+        let Some(ai) = step.w.parts.unit_ai.get_mut(builder.id) else {
             return Ok(false);
         };
         ai.end_order_and_action()?;
         builder.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::PASTURE_BUILT,
             [
                 AiAction::Build.value(),
@@ -183,23 +186,23 @@ impl BuildAction {
                 0,
             ],
         )?;
-        self.uncount(c)?;
+        self.uncount(step)?;
         if self.target.is_some() {
             let target = self.target.take();
-            release(c, builder, target, reads.by)?;
+            release(step, builder, target, reads.by)?;
         }
         let Held { kind, amount } = builder.life.held();
-        let attributes = c.w.players.player(c.player)?.attributes.len();
-        if let Some(kind) = kind.filter(|k| k.index() < attributes) {
+        let attributes = step.w.players.player(step.player)?.attributes.len();
+        if let Some(kind) = kind.filter(|attribute_id| attribute_id.index() < attributes) {
             // the foods a unit carries (15 to 17) as food
             let kind = if kind.is_food_load() {
-                c.w.model.slots.attribute.food
+                step.w.model.slots.attribute.food
             } else {
                 kind
             };
-            Self::drop_load(c, builder, kind, amount)?;
+            Self::drop_load(step, builder, kind, amount)?;
         }
-        self.end(c, builder, BuildState::Done)?;
+        self.end(step, builder, BuildState::Done)?;
         Ok(true)
     }
 
@@ -209,12 +212,12 @@ impl BuildAction {
     /// slot 0x68 with none lets it go (its `MoveTo` keeps walking to it unless it refused it).
     fn foundation_done(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        let Some(site) = Self::site_unit(c, reads)? else {
+        let Some(site) = Self::site_unit(step, reads)? else {
             return Ok(());
         };
         let state = site.life.state;
@@ -226,31 +229,34 @@ impl BuildAction {
         {
             return Ok(());
         }
-        let master = site.master(c.w.master_tables(), c.player)?;
+        let master = site.master(step.w.master_tables(), step.player)?;
         let special = roles
             .of_master(master.id)
             .contains(MasterRoles::TOWN_CENTRE_621)
             || roles.of_class(master.class).contains(ClassRoles::GATE);
-        let unbuilt =
-            c.w.parts
-                .building_of(site.id)
-                .construction
-                .is_some_and(|k| k.progress < Seconds::of_master(k.build_time));
+        let unbuilt = step
+            .w
+            .parts
+            .building_of(site.id)
+            .construction
+            .is_some_and(|construction| {
+                construction.progress < Seconds::of_master(construction.build_time)
+            });
         if (special || state < ObjectState::Dying)
             && !(special && ObjectState::Alive < state && unbuilt)
         {
-            return self.finish(c, builder, reads);
+            return self.finish(step, builder, reads);
         }
-        self.restart(c, builder, roles)?;
+        self.restart(step, builder, roles)?;
         let target = self.target.take();
-        release(c, builder, target, reads.by)?;
+        release(step, builder, target, reads.by)?;
         Ok(())
     }
 
     /// The update's case by the state, and the update's code.
     fn update_state(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         me: Me,
@@ -261,16 +267,18 @@ impl BuildAction {
             // case 0: the update returns 1, the action list removes it
             BuildState::Done => return Ok(HeadCode::Deletes),
             // case 1: set_state(13); the update returns 0
-            BuildState::Halted => self.end(c, builder, BuildState::Failed)?,
+            BuildState::Halted => self.end(step, builder, BuildState::Failed)?,
             BuildState::Move { .. } | BuildState::Clear { .. } => {
-                self.walking(c, builder, me, reads, roles)?;
+                self.walking(step, builder, me, reads, roles)?;
             }
-            BuildState::Work => self.face_and_place(c, builder, actions, reads, roles)?,
-            BuildState::Place => self.work(c, builder, actions, reads)?,
-            BuildState::WalkPoint { .. } => self.walking_to_point(c, builder, me, reads, roles)?,
+            BuildState::Work => self.face_and_place(step, builder, actions, reads, roles)?,
+            BuildState::Place => self.work(step, builder, actions, reads)?,
+            BuildState::WalkPoint { .. } => {
+                self.walking_to_point(step, builder, me, reads, roles)?;
+            }
             // 13 (`0xd`): the Build failed; its next update tells its unit AI and halts it
-            BuildState::Failed => return self.failed(c, builder, reads),
-            BuildState::Wait => self.wait_out(c, builder, actions, reads, roles)?,
+            BuildState::Failed => return self.failed(step, builder, reads),
+            BuildState::Wait => self.wait_out(step, builder, actions, reads, roles)?,
             // the default case (3 with a target, and the bytes without a state, which no step
             // sets): the update returns 0; 8 and 224 returned before the switch
             BuildState::Idle | BuildState::Drop { .. } | BuildState::Finished => {}
@@ -291,16 +299,16 @@ impl BuildAction {
     /// The walk's and the next states'.
     fn walking(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        match self.step_walk(c, builder, me, reads, roles)? {
-            SubCode::Done => self.walk_ended(c, builder, reads, roles),
-            SubCode::Failed => self.walk_failed(c, builder, reads, roles),
-            SubCode::TargetGone => self.lose_foundation(c, builder, reads, roles),
+        match self.step_walk(step, builder, me, reads, roles)? {
+            SubCode::Done => self.walk_ended(step, builder, reads, roles),
+            SubCode::Failed => self.walk_failed(step, builder, reads, roles),
+            SubCode::TargetGone => self.lose_foundation(step, builder, reads, roles),
             SubCode::UnderWay => Ok(()),
         }
     }
@@ -316,14 +324,16 @@ impl BuildAction {
     /// The walk's and the next states'.
     fn walking_to_point(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         me: Me,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        match self.step_walk(c, builder, me, reads, roles)? {
-            SubCode::Done | SubCode::Failed | SubCode::TargetGone => self.idle(c, builder, reads),
+        match self.step_walk(step, builder, me, reads, roles)? {
+            SubCode::Done | SubCode::Failed | SubCode::TargetGone => {
+                self.idle(step, builder, reads)
+            }
             SubCode::UnderWay => Ok(()),
         }
     }
@@ -338,16 +348,16 @@ impl BuildAction {
     /// The notify's and the halt's.
     fn failed(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         reads: &BuildReads,
     ) -> GenieResult<HeadCode> {
         builder.post_own(
-            &mut c.w.parts.unit_ai,
+            &mut step.w.parts.unit_ai,
             NotifyKind::ACTION_FAILED,
             [AiAction::Build.value(), 0, 0],
         )?;
-        self.halt_in(c, builder, reads)?;
+        self.halt_in(step, builder, reads)?;
         Ok(HeadCode::Deletes)
     }
 
@@ -359,29 +369,29 @@ impl BuildAction {
     /// The placing's.
     fn wait_out(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
-        self.timer -= c.dt.seconds();
+        self.timer -= step.dt.seconds();
         if Seconds::ZERO < self.timer {
             return Ok(());
         }
         self.timer = Seconds::ZERO;
-        self.place(c, builder, actions, reads, roles)
+        self.place(step, builder, actions, reads, roles)
     }
 
     /// What the `MoveTo`'s answer to the motion step giving up reads ([`GiveUp`]): a human
     /// player's villager waits (by its unit AI's stance).
     pub(super) fn gives_up(
-        c: &Step<'_>,
+        step: &Step<'_>,
         builder: &Unit,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<GiveUp> {
-        let player_kind = c.w.players.player(c.player)?.kind;
+        let player_kind = step.w.players.player(step.player)?.kind;
         Ok(GiveUp {
             patience: if roles
                 .of_some_class(reads.class)
@@ -392,7 +402,7 @@ impl BuildAction {
             } else {
                 Patience::Fails
             },
-            stance: c
+            stance: step
                 .w
                 .parts
                 .unit_ai
@@ -405,28 +415,29 @@ impl BuildAction {
     /// time is not modelled), then `set_state(7)` places it ([`BuildAction::place`]).
     fn face_and_place(
         &mut self,
-        c: &mut Step<'_>,
+        step: &mut Step<'_>,
         builder: &mut Unit,
         actions: &mut Action,
         reads: &BuildReads,
         roles: &Roles,
     ) -> GenieResult<()> {
         let at = builder.position();
-        let to =
-            c.w.spatial
-                .get_known(self.target)?
-                .ok_or(GenieError::unsupported(
-                    "a builder's foundation without a place",
-                ))?
-                .position;
-        let now = c.w.world_time;
-        let mover = c.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
+        let to = step
+            .w
+            .spatial
+            .get_known(self.target)?
+            .ok_or(GenieError::unsupported(
+                "a builder's foundation without a place",
+            ))?
+            .position;
+        let now = step.w.world_time;
+        let mover = step.w.parts.mover_mut(builder.id).ok_or(BUILDER_UNMOVING)?;
         if face_target(mover, at, to, now)? == Aim::Turning {
             return Err(GenieError::unsupported(
                 "a builder that turns over time to face its foundation",
             ));
         }
-        self.place(c, builder, actions, reads, roles)
+        self.place(step, builder, actions, reads, roles)
     }
 }
 
@@ -438,16 +449,16 @@ pub(super) fn drop_done_orders(
     site: Option<(ObjectId, ObjectState)>,
     build_targets: &[(Option<ObjectId>, Option<ObjectState>)],
 ) {
-    ai.orders.retain(|o| {
-        if o.order != OrderKind::Build {
+    ai.orders.retain(|queued_order| {
+        if queued_order.order != OrderKind::Build {
             return true;
         }
         let state = match site {
-            Some((id, state)) if Some(id) == o.target => Some(state),
+            Some((id, state)) if Some(id) == queued_order.target => Some(state),
             _ => build_targets
                 .iter()
-                .find(|&&(id, _)| id == o.target)
-                .and_then(|&(_, s)| s),
+                .find(|&&(id, _)| id == queued_order.target)
+                .and_then(|&(_, object_state)| object_state),
         };
         state == Some(ObjectState::Foundation)
     });

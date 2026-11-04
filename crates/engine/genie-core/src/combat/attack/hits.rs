@@ -135,20 +135,20 @@ pub(crate) fn strike(
             executed: None,
         });
     }
-    let a = own.source;
+    let attacker = own.source;
     let mut struck = Struck {
         result: StrikeResult::Hit,
         executed: None,
     };
-    if MasterKind::MISSILE <= a.kind
-        && Distance::ZERO < a.area_effect
-        && (a.charge_kind != ChargeKind::AREA || charge_hit(&a, victim, roles))
+    if MasterKind::MISSILE <= attacker.kind
+        && Distance::ZERO < attacker.area_effect
+        && (attacker.charge_kind != ChargeKind::AREA || charge_hit(&attacker, victim, roles))
     {
         let main = victim.id;
         let mut targets: Vec<&mut Victim> = blasted.iter_mut().collect();
         targets.push(victim);
         blast(own, hit.at, None, Some(main), &mut targets, 1.0, layer)?;
-        if a.charge_kind == ChargeKind::AREA {
+        if attacker.charge_kind == ChargeKind::AREA {
             own.source.charge = Charge::ZERO;
         }
         return Ok(struck);
@@ -161,16 +161,25 @@ pub(crate) fn strike(
     }
     let draw = object_rng.raw64();
     let r = (i64::from(draw as u32 & 0x7fff_ffff) * 100) / DRAW_SCALE;
-    if i64::from(hit.chance.get()) < r && a.missile.is_none() {
+    if i64::from(hit.chance.get()) < r && attacker.missile.is_none() {
         return Ok(struck);
     }
     // a building's slot 0x1f0 (FUN_1411cc890) scales the factor by its relics and a building
     // target's
     let factor = hit.from_z.map_or(1.0, |z| {
-        let f = elevation_factor(z, own.attack_elevation, victim, damage_tuning);
-        own.building.as_ref().map_or(f, |b| {
-            let theirs = victim.building.as_ref().map_or(Relics::NONE, |t| t.relics);
-            building_elevation_factor(f, b.relics, victim.kind, theirs, damage_tuning)
+        let elevation_factor = elevation_factor(z, own.attack_elevation, victim, damage_tuning);
+        own.building.as_ref().map_or(elevation_factor, |b| {
+            let theirs = victim
+                .building
+                .as_ref()
+                .map_or(Relics::NONE, |building| building.relics);
+            building_elevation_factor(
+                elevation_factor,
+                b.relics,
+                victim.kind,
+                theirs,
+                damage_tuning,
+            )
         })
     });
     let weapons = own.weapons.clone();
@@ -194,15 +203,15 @@ pub(super) fn blast_so_far(victim: &Victim, blasted: &[Victim]) -> GenieResult<H
     // The livestock (58, `0x3a`) and farm (49, `0x31`) classes: the ally test spares an Attack on
     // one that was its unit's player's when the Attack took it ([`Attack::same_owner`]).
     // A building's master type (`'P'`), whose main building (`+0xbb8`) an area effect attacks.
-    let Some(b) = victim
+    let Some(building) = victim
         .building
         .as_ref()
         .filter(|_| victim.kind == MasterKind::BUILDING)
     else {
         return Ok(HitPoints::ZERO);
     };
-    let Some(main) = b.main else {
-        return Ok(b.blast_taken);
+    let Some(main) = building.main else {
+        return Ok(building.blast_taken);
     };
     blasted
         .iter()

@@ -31,6 +31,7 @@ use genie_model::combat::missile::arc_ratio;
 use genie_model::combat::missile::hit_mode;
 use genie_model::combat::missile::miss_spread;
 use genie_model::combat::missile::missile_modes;
+mod landing;
 mod missile_state;
 use genie_model::combat::missile::missile_stats;
 mod missile_target;
@@ -230,16 +231,16 @@ pub fn volley_spawn_point(
     } else {
         offset
     };
-    let mut p = spawn_point(at, angle, offset);
-    if let Some(t) = building_at {
-        let (dx, dy) = (t.x() - at.x(), t.y() - at.y());
+    let mut position = spawn_point(at, angle, offset);
+    if let Some(point) = building_at {
+        let (dx, dy) = (point.x() - at.x(), point.y() - at.y());
         let gap = (dx * dx + dy * dy).sqrt();
         if gap < (ox * ox + oy * oy).sqrt() {
-            let (tx, ty) = (t.x(), t.y());
-            p = p.with_x(tx).with_y(ty);
+            let (tx, ty) = (point.x(), point.y());
+            position = position.with_x(tx).with_y(ty);
         }
     }
-    p
+    position
 }
 
 /// `FUN_141226690`'s reach: the firing master's radii's length plus its range plus 6.
@@ -439,14 +440,14 @@ impl MissileAction {
         let mut step = match stats.projectile_kind {
             ProjectileKind::STRAIGHT => {
                 let way = stats.speed * dt;
-                let d = way.get() * self.direction;
+                let offset = way.get() * self.direction;
                 self.timer += way;
                 self.distance -= way;
                 if max_range <= self.timer && self.distance < Distance::new(missile_tuning.beyond) {
                     // State 1: the missile ends.
                     self.state = MissileState::Done;
                 }
-                d
+                offset
             }
             ProjectileKind::WHOLE_WAY => {
                 self.distance = Distance::ZERO;
@@ -529,7 +530,7 @@ mod tests {
             radius: Radii::new(0.1, 0.1, 0.0),
             ..MissileStats::default()
         };
-        let mut a = MissileAction {
+        let mut missile_action = MissileAction {
             state: MissileState::Launch,
             target: Some(MissileTargetId::new(object_id(9655))),
             fired_from: Some(ShooterId::new(object_id(9171))),
@@ -545,7 +546,7 @@ mod tests {
             met: Vec::new(),
         };
         // a way of 2.80657 along x
-        let angle = a
+        let angle = missile_action
             .launch(
                 Position::new(0.0, 0.0, 0.0),
                 Position::new(2.80657, 0.0, 0.0),
@@ -553,11 +554,11 @@ mod tests {
             )
             .unwrap();
         assert_eq!(angle, Some(Angle::ZERO));
-        assert_eq!(a.state, MissileState::Flying);
-        assert!((a.ballistic_acceleration.get() - -23.52).abs() < 1e-3);
-        assert!((a.ballistic_velocity.get() - 4.71503).abs() < 1e-4);
+        assert_eq!(missile_action.state, MissileState::Flying);
+        assert!((missile_action.ballistic_acceleration.get() - -23.52).abs() < 1e-3);
+        assert!((missile_action.ballistic_velocity.get() - 4.71503).abs() < 1e-4);
         // one update of 52 ms: 0.364 of the way
-        let (step, flying) = a
+        let (step, flying) = missile_action
             .fly(
                 Seconds::new(0.052),
                 Distance::new(5.282_842_6),
@@ -565,8 +566,13 @@ mod tests {
                 &tuning().missile,
             )
             .unwrap();
-        assert!((a.timer.get() - 0.364).abs() < 1e-6);
-        assert!((a.distance - Distance::new(2.44257)).get().abs() < 1e-5);
+        assert!((missile_action.timer.get() - 0.364).abs() < 1e-6);
+        assert!(
+            (missile_action.distance - Distance::new(2.44257))
+                .get()
+                .abs()
+                < 1e-5
+        );
         assert!((step.x() - 0.364).abs() < 1e-6);
         assert!(flying);
     }
@@ -665,12 +671,12 @@ mod tests {
     #[test]
     fn shot_turns_its_offset_by_the_facing() {
         // facing along x: the offset's y is ahead, its x to the side
-        let p = spawn_point(
+        let position = spawn_point(
             Position::new(10.0, 20.0, 0.0),
             Angle::ZERO,
             Offset::new(0.0, 0.5, 1.5),
         );
-        assert_eq!(p, Position::new(10.5, 20.0, 1.5));
+        assert_eq!(position, Position::new(10.5, 20.0, 1.5));
         assert_eq!(
             reach(
                 Footprint::new(0.2, 0.2),
@@ -775,7 +781,7 @@ mod tests {
             Some(Point::new(11.0, 10.0)),
         );
         assert_eq!(p, Position::new(11.0, 10.0, 1.0));
-        let p = volley_spawn_point(
+        let position = volley_spawn_point(
             at,
             Angle::ZERO,
             Offset::new(0.0, 2.0, 1.0),
@@ -783,6 +789,6 @@ mod tests {
             GroundOffset::ZERO,
             Some(Point::new(13.0, 10.0)),
         );
-        assert_eq!(p, Position::new(12.0, 10.0, 1.0));
+        assert_eq!(position, Position::new(12.0, 10.0, 1.0));
     }
 }

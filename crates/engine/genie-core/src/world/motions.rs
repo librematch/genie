@@ -125,7 +125,7 @@ impl PartTable<Motion> {
 
     /// Object `id`'s movement values to change, none for an object that does not move.
     pub(crate) fn move_stats_mut(&mut self, id: ObjectId) -> Option<&mut MoveStats> {
-        self.mover_mut(id).map(|m| &mut m.stats)
+        self.mover_mut(id).map(|mover| &mut mover.stats)
     }
 }
 
@@ -226,13 +226,13 @@ impl Parts {
     /// Object `id`'s animation speed (`+0x7b8`), none for a static object.
     #[must_use]
     pub fn anim_speed_of(&self, id: ObjectId) -> Option<Speed> {
-        self.motion.get(id).map(|m| m.animated().speed)
+        self.motion.get(id).map(|motion| motion.animated().speed)
     }
 
     /// Object `id`'s animation speed (`+0x7b8`) becomes `speed`; a static object has none.
     pub(crate) fn set_anim_speed(&mut self, id: ObjectId, speed: Speed) {
-        if let Some(m) = self.motion.get_mut(id) {
-            m.animated_mut().speed = speed;
+        if let Some(motion) = self.motion.get_mut(id) {
+            motion.animated_mut().speed = speed;
         }
     }
 
@@ -243,7 +243,7 @@ impl Parts {
         let motion = self.motion.get_mut(id)?;
         let animated = *motion.animated();
         match replace(motion, Motion::Animated(animated)) {
-            Motion::Moving(m) => Some(m),
+            Motion::Moving(mover) => Some(mover),
             animated @ Motion::Animated(_) => {
                 *motion = animated;
                 None
@@ -293,7 +293,7 @@ mod tests {
         parts.set_anim_speed(id, Speed::ZERO);
         parts.put_mover(id, taken);
         assert_eq!(
-            parts.mover_of(id).map(|m| m.animated.speed),
+            parts.mover_of(id).map(|mover| mover.animated.speed),
             Some(Speed::ZERO)
         );
         let still = object_id(8);

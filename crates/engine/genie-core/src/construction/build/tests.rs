@@ -167,8 +167,8 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
             seen(HitPoints::new(1.0), 0.0),
         ),
     ];
-    for (id, p, _) in &objects {
-        world.insert(object_id(*id), *p);
+    for (id, placed, _) in &objects {
+        world.insert(object_id(*id), *placed);
     }
     let look: BTreeMap<ObjectId, ClearLook> =
         objects.iter().map(|o| (object_id(o.0), o.2)).collect();
@@ -180,11 +180,11 @@ fn the_footprint_clearing_takes_buildable_objects_in_the_tiles_order() {
         at: Point::new(10.5, 10.5),
         by,
     };
-    let ids = |world: &Spatial, s: ClearingSite| -> Vec<ObjectId> {
-        footprint_clearing(world, &s, &look, &roles(), &tuning().build)
+    let ids = |world: &Spatial, clearing_site: ClearingSite| -> Vec<ObjectId> {
+        footprint_clearing(world, &clearing_site, &look, &roles(), &tuning().build)
             .unwrap()
             .iter()
-            .map(|c| c.id)
+            .map(|cleared| cleared.id)
             .collect()
     };
     assert_eq!(
@@ -310,17 +310,19 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
             },
         ),
     ];
-    for (k, (id, _)) in looks.iter().enumerate() {
-        let x = 9.5 + 0.1 * k as f32;
+    for (index, (id, _)) in looks.iter().enumerate() {
+        let x = 9.5 + 0.1 * index as f32;
         world.insert(
             object_id(*id),
             on_map(x, 10.5, master_id(1358), class::CLASS_5, 0.5, 1),
         );
     }
-    let look: BTreeMap<ObjectId, ClearLook> =
-        looks.iter().map(|&(id, l)| (object_id(id), l)).collect();
+    let look: BTreeMap<ObjectId, ClearLook> = looks
+        .iter()
+        .map(|&(id, clear_look)| (object_id(id), clear_look))
+        .collect();
     let goes = |by: Clearer| -> Vec<ObjectId> {
-        let s = ClearingSite {
+        let clearing_site = ClearingSite {
             player: PlayerId::new(1),
             master: ids::HOUSE,
             class: class::BUILDING,
@@ -328,11 +330,11 @@ fn cleared_object_loses_its_record_by_its_kind_and_the_call() {
             at: Point::new(10.5, 10.5),
             by,
         };
-        footprint_clearing(&world, &s, &look, &roles(), &tuning().build)
+        footprint_clearing(&world, &clearing_site, &look, &roles(), &tuning().build)
             .unwrap()
             .iter()
             .filter(|c| c.record_goes)
-            .map(|c| c.id)
+            .map(|cleared| cleared.id)
             .collect()
     };
     assert_eq!(
@@ -370,7 +372,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
         snow: Snow::None,
         sprite_override: false,
     };
-    let part = |[amount, resource, near]: [f32; 3], c: &Construction| {
+    let part = |[amount, resource, near]: [f32; 3], construction: &Construction| {
         Completion {
             master: Some(&farm),
             farm_bonus: FarmBonus {
@@ -382,7 +384,7 @@ fn farm_bonus_wants_both_attributes_238_and_239() {
             player_kind: PlayerKind::Human,
             ai: false,
         }
-        .first_part(c, &roles())
+        .first_part(construction, &roles())
     };
     assert_eq!(
         part([45.0, 0.0, -1.0], &built).unwrap().attributes,
@@ -462,7 +464,7 @@ pub(super) const MOVING_TASK: BuildTask = BuildTask {
 pub(crate) fn graphics() -> Graphics {
     [3, 7, 20, 21]
         .map(|id| {
-            let g = Graphic {
+            let graphic = Graphic {
                 id: SpriteId::named(id),
                 frames: Frame::of_data(10),
                 facets: FacetCount::of_data(16),
@@ -471,7 +473,7 @@ pub(crate) fn graphics() -> Graphics {
                 replay_delay: Seconds::ZERO,
                 flags: SpriteFlags::ANIMATED,
             };
-            (g.id, g)
+            (graphic.id, graphic)
         })
         .into()
 }
@@ -524,8 +526,8 @@ fn build_move_to_takes_its_task_moving_sprite() {
             .state
             .move_to()
             .copied()
-            .and_then(|m| m.sprite)
-            .map(|g| g.id),
+            .and_then(|move_to_action| move_to_action.sprite)
+            .map(|graphic| graphic.id),
         Some(SpriteId::named(3))
     );
 }
@@ -556,7 +558,7 @@ fn house() -> Placed {
 #[test]
 fn stop_halts_the_build_and_lets_its_foundation_go() {
     let mut mover = walker();
-    let mut b = BuildAction {
+    let mut build_action = BuildAction {
         state: BuildState::Move {
             move_to: Some(MoveToAction::sub_in(MoveTo::Moving)),
         },
@@ -564,14 +566,19 @@ fn stop_halts_the_build_and_lets_its_foundation_go() {
         ..started(object_id(31148), Position::ORIGIN, Distance::ZERO, TASK)
     };
     assert_eq!(
-        b.halt(Some(&mut mover)),
+        build_action.halt(Some(&mut mover)),
         Ok((true, Some(FoundationId::new(object_id(31148))), None))
     );
     assert_eq!(
-        (b.state, b.added, b.state.move_to().copied(), b.target),
+        (
+            build_action.state,
+            build_action.added,
+            build_action.state.move_to().copied(),
+            build_action.target
+        ),
         (BuildState::Halted, false, None, None)
     );
-    assert_eq!(b.point, Position::new(-1.0, -1.0, -1.0));
+    assert_eq!(build_action.point, Position::new(-1.0, -1.0, -1.0));
     assert_eq!(mover.velocity.unwrap().velocity.y(), 0.0);
     // one not counted among the builders, standing: nothing to stop
     let mut idle = BuildAction {
@@ -588,16 +595,16 @@ fn stop_halts_the_build_and_lets_its_foundation_go() {
 /// as the action's point (`+0x38`..`+0x40`) and its `MoveTo` the foundation as its target.
 #[test]
 fn build_point_is_its_foundation_place() {
-    let b = started(
+    let build_action = started(
         object_id(10913),
         Position::new(61.5, 92.5, 1.0),
         Distance::new(0.8),
         TASK,
     );
-    let walk = b.state.move_to().copied().unwrap();
+    let walk = build_action.state.move_to().copied().unwrap();
     assert_eq!(
         (
-            b.point,
+            build_action.point,
             ObjectId::field(walk.target),
             walk.point,
             walk.state
@@ -613,7 +620,7 @@ fn build_point_is_its_foundation_place() {
 
 #[test]
 fn builder_sent_to_another_foundation_starts_over() {
-    let mut b = BuildAction {
+    let mut build_action = BuildAction {
         state: BuildState::Work,
         added: true,
         timer: Seconds::new(0.5),
@@ -623,16 +630,17 @@ fn builder_sent_to_another_foundation_starts_over() {
         .state
         .move_to()
         .copied();
-    b.retarget(
-        FoundationId::new(object_id(31150)),
-        Position::ORIGIN,
-        walk,
-        None,
-    )
-    .unwrap();
+    build_action
+        .retarget(
+            FoundationId::new(object_id(31150)),
+            Position::ORIGIN,
+            walk,
+            None,
+        )
+        .unwrap();
     // set_state(4) keeps the timer
     assert_eq!(
-        b,
+        build_action,
         BuildAction {
             timer: Seconds::new(0.5),
             ..started(object_id(31150), Position::ORIGIN, Distance::ZERO, TASK)
@@ -640,9 +648,13 @@ fn builder_sent_to_another_foundation_starts_over() {
     );
     assert_eq!(
         (
-            b.state.bare(),
-            b.added,
-            b.state.move_to().copied().map(|m| m.state)
+            build_action.state.bare(),
+            build_action.added,
+            build_action
+                .state
+                .move_to()
+                .copied()
+                .map(|move_to_action| move_to_action.state)
         ),
         (
             BuildState::Move { move_to: None },
@@ -657,7 +669,7 @@ fn builder_sent_to_another_foundation_starts_over() {
 /// starts over (state 4, its `MoveTo` arrived beside the house); one at work (state 6) stays.
 #[test]
 fn builder_told_to_build_its_foundation_again_starts_over() {
-    let mut c = Construction {
+    let mut construction = Construction {
         progress: Seconds::new(3.0),
         desolid: false,
         builders: BuilderCount::of_data(2),
@@ -670,7 +682,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         snow: Snow::None,
         sprite_override: false,
     };
-    let mut b = BuildAction {
+    let mut build_action = BuildAction {
         state: BuildState::Place,
         added: true,
         ..started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
@@ -679,21 +691,26 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
         .state
         .move_to()
         .copied();
-    b.retake(
-        Position::ORIGIN,
-        walk,
-        None,
-        Some(&mut c.builders),
-        PlayerKind::Human,
-    )
-    .unwrap();
-    assert_eq!(c.builders, BuilderCount::of_data(1));
+    build_action
+        .retake(
+            Position::ORIGIN,
+            walk,
+            None,
+            Some(&mut construction.builders),
+            PlayerKind::Human,
+        )
+        .unwrap();
+    assert_eq!(construction.builders, BuilderCount::of_data(1));
     assert_eq!(
-        b,
+        build_action,
         started(object_id(31011), Position::ORIGIN, Distance::ZERO, TASK)
     );
     assert_eq!(
-        b.state.move_to().copied().map(|m| m.state),
+        build_action
+            .state
+            .move_to()
+            .copied()
+            .map(|move_to_action| move_to_action.state),
         Some(MoveTo::Arrived)
     );
     let mut working = BuildAction {
@@ -706,12 +723,12 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
             Position::ORIGIN,
             walk,
             None,
-            Some(&mut c.builders),
+            Some(&mut construction.builders),
             PlayerKind::Human,
         )
         .unwrap();
     assert_eq!(working, before);
-    assert_eq!(c.builders, BuilderCount::of_data(1));
+    assert_eq!(construction.builders, BuilderCount::of_data(1));
 }
 
 /// A world of player 1 holding the foundations `objects` on `spatial`, `masters` its masters'
@@ -719,7 +736,7 @@ fn builder_told_to_build_its_foundation_again_starts_over() {
 fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> World {
     let ms = Masters::new(masters);
     let (units, parts) = World::split_layers(objects);
-    let mut t = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(0),
@@ -734,9 +751,9 @@ fn site_world(spatial: Spatial, masters: Vec<Master>, objects: Vec<Object>) -> W
         ],
     )
     .with_parts(parts);
-    t.spatial = spatial;
-    t.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
-    t
+    world.spatial = spatial;
+    world.model.masters = vec![Arc::new(ms.clone()), Arc::new(ms)];
+    world
 }
 
 /// The foundation `id` at `at` with its life cycle and construction.
@@ -861,8 +878,8 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         (None, Amount::ZERO, 0),
         (None, Amount::ZERO, 0),
     ];
-    if let Some(b) = master.building.as_mut() {
-        b.foundation_terrain = Some(TerrainId::named(27));
+    if let Some(building_master) = master.building.as_mut() {
+        building_master.foundation_terrain = Some(TerrainId::named(27));
     }
     let life = Lifecycle {
         state: ObjectState::Foundation,
@@ -884,23 +901,26 @@ fn the_work_that_reaches_the_build_time_completes_the_building() {
         sprite_override: false,
     };
     let house = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
-    let mut t = site_world(world, vec![master], vec![house]);
+    let mut site_world = site_world(world, vec![master], vec![house]);
     assert_eq!(
-        t.work_building(FoundationId::new(object_id(10026)), Seconds::new(0.02)),
+        site_world.work_building(FoundationId::new(object_id(10026)), Seconds::new(0.02)),
         Ok(BuildProgress::Ended)
     );
-    let h = t.players[1].objects.by_id(object_id(10026)).unwrap();
-    let c = t.parts.building_of(h.id).construction.unwrap();
+    let unit = site_world.players[1]
+        .objects
+        .by_id(object_id(10026))
+        .unwrap();
+    let construction = site_world.parts.building_of(unit.id).construction.unwrap();
     assert_eq!(
-        (h.life.state, c.progress, c.snow),
+        (unit.life.state, construction.progress, construction.snow),
         (ObjectState::Alive, Seconds::new(25.0), Snow::Completed)
     );
-    let a = &t.players[1].attributes;
+    let amounts = &site_world.players[1].attributes;
     assert_eq!(
-        (a[4], a[98], a[165]),
+        (amounts[4], amounts[98], amounts[165]),
         (Amount::new(5.0), Amount::new(25.0), Amount::new(25.0))
     );
-    let terrain = t.spatial.terrain.as_ref().unwrap();
+    let terrain = site_world.spatial.terrain.as_ref().unwrap();
     assert_eq!(
         (terrain.kinds[5], terrain.layers[5], terrain.kinds[0]),
         (
@@ -940,7 +960,7 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             master_id: id,
             ..Lifecycle::default()
         };
-        let c = Construction {
+        let construction = Construction {
             progress: Seconds::new(100.0),
             desolid: false,
             builders: BuilderCount::of_data(1),
@@ -953,18 +973,18 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
             snow: Snow::None,
             sprite_override: false,
         };
-        let mut h = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, c);
-        h.parts.building.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
-        let mut t = site_world(world, vec![built_master(id, cost)], vec![h]);
+        let mut object = foundation_at(10026, Position::new(2.0, 2.0, 0.0), life, construction);
+        object.parts.building.annex_of = main.then_some(MainBuildingId::new(object_id(10027)));
+        let mut site_world = site_world(world, vec![built_master(id, cost)], vec![object]);
         // a history records events from its first time slice on
-        t.players[1].history.add_entry(
+        site_world.players[1].history.add_entry(
             EntryKind::POPULATION,
             Population::of_data(3),
             Population::ZERO,
         );
-        t.complete_building(object_id(10026)).unwrap();
+        site_world.complete_building(object_id(10026)).unwrap();
         assert_eq!(
-            t.players[1]
+            site_world.players[1]
                 .objects
                 .by_id(object_id(10026))
                 .unwrap()
@@ -972,14 +992,19 @@ fn the_castle_the_wonder_and_the_monastery_count_their_completion() {
                 .state,
             ObjectState::Alive
         );
-        let gained = t.players[1]
+        let gained = site_world.players[1]
             .attributes
             .iter()
             .enumerate()
             .filter(|&(_, &v)| v != Amount::ZERO)
-            .map(|(k, &v)| (k, v.get()))
+            .map(|(k, &amount)| (k, amount.get()))
             .collect();
-        let events = t.players[1].history.events.iter().map(|e| e.kind).collect();
+        let events = site_world.players[1]
+            .history
+            .events
+            .iter()
+            .map(|event| event.kind)
+            .collect();
         (gained, events)
     }
     let castle = || vec![(attribute::STONE, 650, true)];
@@ -1047,29 +1072,36 @@ fn the_first_work_starts_the_foundation_and_adds_its_share_of_hit_points() {
         sprite_override: false,
     };
     let site = foundation_at(10028, house().position, life, c);
-    let mut t = site_world(
+    let mut site_world = site_world(
         world,
         vec![built_master(ids::HOUSE, &Vec::new())],
         vec![site],
     );
     let rate = 1.0f32 * 1.0 * 0.021;
     assert_eq!(
-        t.work_building(FoundationId::new(object_id(10028)), Seconds::new(rate)),
+        site_world.work_building(FoundationId::new(object_id(10028)), Seconds::new(rate)),
         Ok(BuildProgress::Ongoing)
     );
-    let h = t.players[1].objects.by_id(object_id(10028)).unwrap();
-    let c = t.parts.building_of(h.id).construction.unwrap();
-    assert_eq!(h.life.hp, HitPoints::new(1.462));
-    assert!(!c.desolid);
-    assert_eq!(c.progress, Seconds::new(f32::from_bits(STARTED) + rate));
+    let unit = site_world.players[1]
+        .objects
+        .by_id(object_id(10028))
+        .unwrap();
+    let construction = site_world.parts.building_of(unit.id).construction.unwrap();
+    assert_eq!(unit.life.hp, HitPoints::new(1.462));
+    assert!(!construction.desolid);
+    assert_eq!(
+        construction.progress,
+        Seconds::new(f32::from_bits(STARTED) + rate)
+    );
     assert!(
-        t.spatial
+        site_world
+            .spatial
             .get(object_id(10028))
             .unwrap()
             .obstruction
             .is_some()
     );
-    assert!(t.spatial.tiles().word(Tile::new(29, 87)).unwrap() & BLOCKED != 0);
+    assert!(site_world.spatial.tiles().word(Tile::new(29, 87)).unwrap() & BLOCKED != 0);
 }
 
 /// A gate's foundation (master 665) with its two posts (1192, annexes of a building type):
@@ -1110,21 +1142,21 @@ fn the_work_starts_the_desolid_annexes_first() {
         ..Lifecycle::default()
     };
     let unit = |id, x, master, desolid| {
-        let mut u = foundation_at(
+        let mut object = foundation_at(
             id,
             Position::new(x, 88.0, 0.0),
             life(master),
             foundation(desolid),
         );
-        u.parts.building.annex_of =
+        object.parts.building.annex_of =
             (master == master_id(1192)).then_some(MainBuildingId::new(object_id(10028)));
-        u
+        object
     };
     let mut post = built_master(master_id(1192), &Vec::new());
     post.creatable
         .get_or_insert_with(Default::default)
         .volley_fire = Firepower::new(2.0);
-    let mut t = site_world(
+    let mut site_world = site_world(
         world,
         vec![built_master(master_id(665), &Vec::new()), post],
         vec![
@@ -1134,22 +1166,23 @@ fn the_work_starts_the_desolid_annexes_first() {
         ],
     );
     for post in [10029, 10030] {
-        t.link_test_annex(object_id(post), object_id(10028));
+        site_world.link_test_annex(object_id(post), object_id(10028));
     }
     assert_eq!(
-        t.work_building(FoundationId::new(object_id(10028)), Seconds::new(0.021)),
+        site_world.work_building(FoundationId::new(object_id(10028)), Seconds::new(0.021)),
         Ok(BuildProgress::Ongoing)
     );
-    let site = |id: ObjectId| t.parts.building_of(id).construction.unwrap();
+    let site = |id: ObjectId| site_world.parts.building_of(id).construction.unwrap();
     let post = site(object_id(10029));
     assert!(!post.desolid);
     assert_eq!(post.progress, Seconds::new(f32::from_bits(STARTED)));
     assert_eq!(
-        t.parts.combat_of(object_id(10029)).firepower,
+        site_world.parts.combat_of(object_id(10029)).firepower,
         Firepower::new(2.0)
     );
     assert!(
-        t.spatial
+        site_world
+            .spatial
             .get(object_id(10029))
             .unwrap()
             .obstruction
@@ -1158,7 +1191,7 @@ fn the_work_starts_the_desolid_annexes_first() {
     assert_eq!(
         (
             site(object_id(10030)),
-            t.parts.combat_of(object_id(10030)).firepower
+            site_world.parts.combat_of(object_id(10030)).firepower
         ),
         (foundation(false), Firepower::new(0.0))
     );
@@ -1183,7 +1216,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
             ..house()
         },
     );
-    let mut c = Construction {
+    let mut construction = Construction {
         progress: Seconds::ZERO,
         desolid: true,
         builders: BuilderCount::of_data(1),
@@ -1199,7 +1232,7 @@ fn construction_start_moves_its_foundation_for_the_walks_of_the_update() {
     let mut mover = walker();
     let started = Construction::begin(
         object_id(33439),
-        &mut c,
+        &mut construction,
         Some(&mut mover),
         &mut world,
         &mut Pathing::default(),
@@ -1263,15 +1296,22 @@ fn an_annex_work_goes_to_its_main_building() {
             built_master(master_id(665), &Vec::new()),
             built_master(master_id(1192), &Vec::new()),
         ];
-        let mut t = site_world(world, masters, vec![gate, post]);
-        let going = t.work_building(FoundationId::new(object_id(10029)), Seconds::new(amount));
-        let post = t.players[1].objects.by_id(object_id(10029)).unwrap();
+        let mut site_world = site_world(world, masters, vec![gate, post]);
+        let going =
+            site_world.work_building(FoundationId::new(object_id(10029)), Seconds::new(amount));
+        let post = site_world.players[1]
+            .objects
+            .by_id(object_id(10029))
+            .unwrap();
         assert_eq!(
-            (t.parts.building_of(post.id).construction, post.life.hp),
+            (
+                site_world.parts.building_of(post.id).construction,
+                post.life.hp
+            ),
             (Some(foundation), HitPoints::new(1.0)),
             "the post itself is not worked"
         );
-        let state = t.players[1]
+        let state = site_world.players[1]
             .objects
             .by_id(object_id(10028))
             .unwrap()

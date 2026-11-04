@@ -242,11 +242,11 @@ fn one_of_each(p: u8) -> Vec<Command> {
 fn command_names_the_player_whose_lane_it_stops() {
     let commands = one_of_each(3);
     assert_eq!(commands.len(), 28);
-    for c in &commands {
+    for command in &commands {
         assert_eq!(
-            (c.player(), c.stopped_player(8)),
+            (command.player(), command.stopped_player(8)),
             (player_id(3), player_id(3)),
-            "{c:?}"
+            "{command:?}"
         );
     }
     let game = Command::Game(GameCommand {
@@ -275,14 +275,14 @@ fn patrol_reads_one_to_ten_waypoints() {
 #[test]
 fn trade_of_another_commodity_does_nothing() {
     let player = Player::default();
-    let mut w = World::new(
+    let mut world = World::new(
         WorldTime::ZERO,
         FrameSeed::of_data(1),
         PlayerId::new(1),
         vec![Millis::ZERO; 2],
         vec![player; 2],
     );
-    let before = w.clone();
+    let before = world.clone();
     for attribute in [3, 0x0103] {
         TradeCommand {
             player: player_id(1),
@@ -291,8 +291,8 @@ fn trade_of_another_commodity_does_nothing() {
             market: None,
             buy: true,
         }
-        .run(&mut w)
+        .run(&mut world)
         .unwrap();
     }
-    assert_eq!(w, before);
+    assert_eq!(world, before);
 }

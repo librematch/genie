@@ -126,15 +126,15 @@ impl Pathing {
 
     /// `FUN_141663c50`: player `player` made a plan.
     pub fn count_plan(&mut self, player: PlayerId) {
-        if let Some(b) = self.budgets.get_mut(player.index()) {
-            b.plans = b.plans.plus_one();
+        if let Some(plan_budget) = self.budgets.get_mut(player.index()) {
+            plan_budget.plans = plan_budget.plans.plus_one();
         }
     }
 
     /// `WorldPlayerBase::update` (`0x141677450`): the player's plans start over.
     pub fn reset_plans(&mut self, player: PlayerId) {
-        if let Some(b) = self.budgets.get_mut(player.index()) {
-            b.plans = PlanCount::ZERO;
+        if let Some(plan_budget) = self.budgets.get_mut(player.index()) {
+            plan_budget.plans = PlanCount::ZERO;
         }
     }
 }
@@ -142,9 +142,9 @@ impl Pathing {
 /// A shape's rectangle for an object (`FUN_141056460`): its box grown by half a tile, in fixed
 /// point by truncation.
 #[must_use]
-pub fn shape_rect(p: &Placed) -> FixedRect {
-    let (x, y) = (p.position.x(), p.position.y());
-    let (rx, ry) = (p.radius.x(), p.radius.y());
+pub fn shape_rect(placed: &Placed) -> FixedRect {
+    let (x, y) = (placed.position.x(), placed.position.y());
+    let (rx, ry) = (placed.radius.x(), placed.radius.y());
     let fixed = |v: f32| (v * ONE as f32) as i64 as i32;
     FixedRect::new(
         fixed((x - rx) - 0.5),
@@ -207,13 +207,13 @@ impl Pathing {
         };
         slots[1] = target;
         let mut count = 2;
-        for (i, (cell, &a)) in slots
+        for (i, (cell, &object_id)) in slots
             .iter_mut()
             .skip(1)
             .zip(annexes.iter().take(4))
             .enumerate()
         {
-            *cell = a;
+            *cell = object_id;
             count = 3 + i;
         }
         (slots, slots.iter().take(count).copied().collect())
@@ -273,16 +273,20 @@ impl Pathing {
     /// the load's planners.
     fn planned_for(&self, restriction: RestrictionId) -> Option<RestrictionId> {
         let values = self.restrictions.get(restriction.index())?;
-        self.planned.as_ref()?.iter().copied().find(|&r| {
-            let own = self
-                .restrictions
-                .get(r.index())
-                .map_or(&[][..], Restriction::values);
-            let values = values.values();
-            own.len() != values.len()
-                || own.is_empty()
-                || own.iter().zip(values).all(|(a, b)| a == b)
-        })
+        self.planned
+            .as_ref()?
+            .iter()
+            .copied()
+            .find(|&restriction_id| {
+                let own = self
+                    .restrictions
+                    .get(restriction_id.index())
+                    .map_or(&[][..], Restriction::values);
+                let values = values.values();
+                own.len() != values.len()
+                    || own.is_empty()
+                    || own.iter().zip(values).all(|(a, b)| a == b)
+            })
     }
 
     /// The planner of a terrain restriction (`FUN_140f7cb30` -> `FUN_140f7ca70`): the first of
@@ -318,11 +322,11 @@ impl Pathing {
     /// while it is not moving (object slot 185, `0x1411583d0`), added or replaced
     /// (`FUN_140fdb8d0`, `FUN_140fdc730`), and none while it moves (`FUN_140fdc250`). Without the
     /// game's mesh nothing is kept.
-    pub fn moved(&mut self, id: ObjectId, p: &Placed, moving: MoveState) {
+    pub fn moved(&mut self, id: ObjectId, placed: &Placed, moving: MoveState) {
         let Some(mesh) = self.mesh.as_mut() else {
             return;
         };
-        let has_shape = p.tall && p.obstruction.is_some_and(Obstruction::recorded);
+        let has_shape = placed.tall && placed.obstruction.is_some_and(Obstruction::recorded);
         if !has_shape {
             return;
         }
@@ -332,24 +336,24 @@ impl Pathing {
             }
             return;
         }
-        let rect = shape_rect(p);
+        let rect = shape_rect(placed);
         let s = match self.shapes.get(id) {
             None => mesh.add(rect),
-            Some(&s) => mesh.replace(s, rect),
+            Some(&shape_id) => mesh.replace(shape_id, rect),
         };
         let _ = self.shapes.insert(id, s);
     }
 
     /// `FUN_141056460`'s shape for an object that does not move, by its master's obstruction
     /// kind and class whether or not it has its record (the load's rehook): added or replaced.
-    pub fn place_shape(&mut self, id: ObjectId, p: &Placed) {
+    pub fn place_shape(&mut self, id: ObjectId, placed: &Placed) {
         let Some(mesh) = self.mesh.as_mut() else {
             return;
         };
-        let rect = shape_rect(p);
+        let rect = shape_rect(placed);
         let s = match self.shapes.get(id) {
             None => mesh.add(rect),
-            Some(&s) => mesh.replace(s, rect),
+            Some(&shape_id) => mesh.replace(shape_id, rect),
         };
         let _ = self.shapes.insert(id, s);
     }
@@ -361,11 +365,17 @@ impl Pathing {
     /// ([`refreshed_rect`]), added or replaced (an odd box always replaces: its shape is removed
     /// and added again); none while it moves. The record's moving flag (byte 3, 0x10) is not
     /// held: the walk reads the gait. Without the game's mesh nothing is kept.
-    pub fn refresh(&mut self, id: ObjectId, p: &Placed, moving: MoveState, outline: Footprint) {
+    pub fn refresh(
+        &mut self,
+        id: ObjectId,
+        placed: &Placed,
+        moving: MoveState,
+        outline: Footprint,
+    ) {
         let Some(mesh) = self.mesh.as_mut() else {
             return;
         };
-        if p.obstruction.is_none() {
+        if placed.obstruction.is_none() {
             return;
         }
         if moving == MoveState::Moving {
@@ -374,25 +384,25 @@ impl Pathing {
             }
             return;
         }
-        let radius = if p.obstruction_kind == ObstructionKind::KIND_11 {
+        let radius = if placed.obstruction_kind == ObstructionKind::KIND_11 {
             outline
         } else {
-            p.radius
+            placed.radius
         };
-        let rect = refreshed_rect(p.position, radius);
+        let rect = refreshed_rect(placed.position, radius);
         let s = match self.shapes.get(id) {
             None => mesh.add(rect),
-            Some(&s) => mesh.replace(s, rect),
+            Some(&shape_id) => mesh.replace(shape_id, rect),
         };
         let _ = self.shapes.insert(id, s);
     }
 
     /// A temporary shape for a kept hit of the walk (`FUN_141054fe0` with 1 on an object without a
     /// shape, which the object does not keep): [`refreshed_rect`] of its radii.
-    pub fn add_temporary_shape(&mut self, p: &Placed) {
+    pub fn add_temporary_shape(&mut self, placed: &Placed) {
         if let Some(mesh) = self.mesh.as_mut() {
-            let s = mesh.add(refreshed_rect(p.position, p.radius));
-            self.temporary.push(s);
+            let shape_id = mesh.add(refreshed_rect(placed.position, placed.radius));
+            self.temporary.push(shape_id);
         }
     }
 
@@ -401,16 +411,16 @@ impl Pathing {
     pub fn drop_temporary_shapes(&mut self) {
         let shapes = take(&mut self.temporary);
         if let Some(mesh) = self.mesh.as_mut() {
-            for s in shapes {
-                mesh.remove(s);
+            for shape_id in shapes {
+                mesh.remove(shape_id);
             }
         }
     }
 
     /// The object left the world: its shape leaves the mesh.
     pub fn removed(&mut self, id: ObjectId) {
-        if let (Some(mesh), Some(s)) = (self.mesh.as_mut(), self.shapes.remove(id)) {
-            mesh.remove(s);
+        if let (Some(mesh), Some(shape_id)) = (self.mesh.as_mut(), self.shapes.remove(id)) {
+            mesh.remove(shape_id);
         }
     }
 }
@@ -454,9 +464,9 @@ mod tests {
     /// A fixed-point length adds and subtracts as the game's 32-bit words, wrapping.
     #[test]
     fn fixed_distance_wraps_as_32_bit_word() {
-        let a = FixedDistance::new(i32::MAX);
+        let fixed_distance = FixedDistance::new(i32::MAX);
         assert_eq!(
-            a.wrapping_add(FixedDistance::TILE).get(),
+            fixed_distance.wrapping_add(FixedDistance::TILE).get(),
             i32::MIN + ONE - 1
         );
         assert_eq!(
@@ -486,46 +496,49 @@ mod tests {
     /// for its player, and the player's update starts the count over.
     #[test]
     fn players_budget_ends_at_its_attempt_cap() {
-        let b = PlanBudget {
+        let plan_budget = PlanBudget {
             attempt_cap: PlanCap::of_data(6),
             delay_cap: PlanCap::of_data(2),
             plans: PlanCount::of_data(6),
         };
-        assert!(!b.allows(DelayCount::ZERO));
-        assert!(!b.allows(DelayCount::of_data(2)));
-        assert!(b.allows(DelayCount::of_data(3)));
+        assert!(!plan_budget.allows(DelayCount::ZERO));
+        assert!(!plan_budget.allows(DelayCount::of_data(2)));
+        assert!(plan_budget.allows(DelayCount::of_data(3)));
         assert!(
             PlanBudget {
                 plans: PlanCount::of_data(5),
-                ..b
+                ..plan_budget
             }
             .allows(DelayCount::ZERO)
         );
         assert!(
             PlanBudget {
                 attempt_cap: PlanCap::NONE,
-                ..b
+                ..plan_budget
             }
             .allows(DelayCount::ZERO)
         );
         assert!(
             !PlanBudget {
                 delay_cap: PlanCap::NONE,
-                ..b
+                ..plan_budget
             }
             .allows(DelayCount::of_data(9))
         );
-        let mut p = Pathing {
-            budgets: vec![PlanBudget::default(), b],
+        let mut pathing = Pathing {
+            budgets: vec![PlanBudget::default(), plan_budget],
             ..Pathing::default()
         };
-        p.count_plan(PlayerId::new(1));
-        assert_eq!(p.budget(PlayerId::new(1)).plans, PlanCount::of_data(7));
-        p.reset_plans(PlayerId::new(1));
-        assert_eq!(p.budget(PlayerId::new(1)).plans, PlanCount::ZERO);
+        pathing.count_plan(PlayerId::new(1));
+        assert_eq!(
+            pathing.budget(PlayerId::new(1)).plans,
+            PlanCount::of_data(7)
+        );
+        pathing.reset_plans(PlayerId::new(1));
+        assert_eq!(pathing.budget(PlayerId::new(1)).plans, PlanCount::ZERO);
         // a player the slice holds no budget of: no caps
-        assert!(p.budget(PlayerId::new(5)).allows(DelayCount::ZERO));
-        p.count_plan(PlayerId::new(5));
+        assert!(pathing.budget(PlayerId::new(5)).allows(DelayCount::ZERO));
+        pathing.count_plan(PlayerId::new(5));
     }
 
     /// `FUN_140f7ca70`: the first planner whose values are another length, or none, or all
@@ -533,7 +546,7 @@ mod tests {
     /// none is found.
     #[test]
     fn the_planner_lookup_takes_the_first_of_another_length_or_of_equal_values() {
-        let mut p = Pathing {
+        let mut pathing = Pathing {
             restrictions: [
                 vec![1.0, 0.0],
                 vec![1.0, 0.0],
@@ -546,50 +559,50 @@ mod tests {
             .into(),
             ..Pathing::default()
         };
-        p.register(RestrictionId::named(2));
-        p.register(RestrictionId::named(0));
-        p.register(RestrictionId::named(1));
+        pathing.register(RestrictionId::named(2));
+        pathing.register(RestrictionId::named(0));
+        pathing.register(RestrictionId::named(1));
         assert_eq!(
-            p.planned,
+            pathing.planned,
             Some(vec![RestrictionId::named(2), RestrictionId::named(0)])
         );
         assert_eq!(
-            p.planned_for(RestrictionId::named(1)),
+            pathing.planned_for(RestrictionId::named(1)),
             Some(RestrictionId::named(0))
         );
         assert_eq!(
-            p.planned_for(RestrictionId::named(0)),
+            pathing.planned_for(RestrictionId::named(0)),
             Some(RestrictionId::named(0))
         );
         // another length or none: the first planner
         assert_eq!(
-            p.planned_for(RestrictionId::named(3)),
+            pathing.planned_for(RestrictionId::named(3)),
             Some(RestrictionId::named(2))
         );
         assert_eq!(
-            p.planned_for(RestrictionId::named(4)),
+            pathing.planned_for(RestrictionId::named(4)),
             Some(RestrictionId::named(2))
         );
-        p.register(RestrictionId::named(3));
-        p.register(RestrictionId::named(4));
+        pathing.register(RestrictionId::named(3));
+        pathing.register(RestrictionId::named(4));
         assert_eq!(
-            p.planned,
+            pathing.planned,
             Some(vec![RestrictionId::named(2), RestrictionId::named(0)])
         );
         // a NaN equals nothing: a planner of its own
-        assert_eq!(p.planned_for(RestrictionId::named(5)), None);
-        p.register(RestrictionId::named(5));
+        assert_eq!(pathing.planned_for(RestrictionId::named(5)), None);
+        pathing.register(RestrictionId::named(5));
         assert_eq!(
-            p.planned,
+            pathing.planned,
             Some(vec![
                 RestrictionId::named(2),
                 RestrictionId::named(0),
                 RestrictionId::named(5)
             ])
         );
-        assert_eq!(p.planned_for(RestrictionId::named(5)), None);
+        assert_eq!(pathing.planned_for(RestrictionId::named(5)), None);
         // a restriction the data has not got
-        assert_eq!(p.planned_for(RestrictionId::named(9)), None);
+        assert_eq!(pathing.planned_for(RestrictionId::named(9)), None);
     }
 
     /// 425906646's villagers walking to player 6's town centre 27171 (annexes 27172, 27173,
@@ -597,17 +610,18 @@ mod tests {
     /// overwritten, and one slot more than written, here never written: object 0.
     #[test]
     fn the_smoothing_ignores_main_building_annexes_over_its_own_slot() {
-        let mut p = Pathing::default();
+        let mut pathing = Pathing::default();
         assert_eq!(
-            p.smoothing_ignore(object_id(31128), None).1,
+            pathing.smoothing_ignore(object_id(31128), None).1,
             [object_id(31128)]
         );
         assert_eq!(
-            p.smoothing_ignore(object_id(31128), Some((object_id(9156), &[])))
+            pathing
+                .smoothing_ignore(object_id(31128), Some((object_id(9156), &[])))
                 .1,
             [object_id(31128), object_id(9156)]
         );
-        let (slots, ignore) = p.smoothing_ignore(
+        let (slots, ignore) = pathing.smoothing_ignore(
             object_id(31128),
             Some((
                 object_id(27171),
@@ -626,8 +640,8 @@ mod tests {
         );
         // the static keeps the list once the smoothing ran: a later one-annex list's extra slot
         // holds the second annex
-        p.smoothing_ran(slots);
-        let (_, ignore) = p.smoothing_ignore(
+        pathing.smoothing_ran(slots);
+        let (_, ignore) = pathing.smoothing_ignore(
             object_id(31143),
             Some((object_id(5000), &[object_id(5001)])),
         );
@@ -659,9 +673,9 @@ mod tests {
 
     #[test]
     fn unit_shape_is_its_box_grown_by_half_tile() {
-        let r = shape_rect(&villager(30.0, 89.0));
+        let fixed_rect = shape_rect(&villager(30.0, 89.0));
         assert_eq!(
-            r,
+            fixed_rect,
             FixedRect::new(
                 (29.3f32 * 4_194_304.0) as i32,
                 (88.3f32 * 4_194_304.0) as i32,
@@ -675,70 +689,70 @@ mod tests {
     /// MarvinBlue/426048731's update 1141: the hunter 10029 at (106.53662, 46.65576), standing,
     /// gets its shape at its update's end, the box of its radii (0.2) grown by half a tile.
     fn standing_unit_gets_its_shape_at_its_update_end() {
-        let mut p = Pathing::default();
-        p.set_mesh(Mesh::new(120), []);
+        let mut pathing = Pathing::default();
+        pathing.set_mesh(Mesh::new(120), []);
         let hunter = villager(106.53662, 46.65576);
-        p.refresh(
+        pathing.refresh(
             object_id(10029),
             &hunter,
             MoveState::Standing,
             Footprint::ZERO,
         );
-        let s = p.shape(object_id(10029)).unwrap();
-        let r = refreshed_rect(hunter.position, hunter.radius);
+        let shape_id = pathing.shape(object_id(10029)).unwrap();
+        let fixed_rect = refreshed_rect(hunter.position, hunter.radius);
         assert_eq!(
-            r.x0(),
+            fixed_rect.x0(),
             (106.53662f32 * 4_194_304.0) as i32 - 838_860 - 0x20_0000
         );
         assert_eq!(
-            p.mesh().unwrap().shapes[s.index()],
+            pathing.mesh().unwrap().shapes[shape_id.index()],
             FixedRect::new(
-                r.x0() & !1,
-                r.y0() & !1,
-                (r.x1() + 1) & !1,
-                (r.y1() + 1) & !1
+                fixed_rect.x0() & !1,
+                fixed_rect.y0() & !1,
+                (fixed_rect.x1() + 1) & !1,
+                (fixed_rect.y1() + 1) & !1
             )
         );
         // moving, it has none; without a record, none either
-        p.refresh(
+        pathing.refresh(
             object_id(10029),
             &hunter,
             MoveState::Moving,
             Footprint::ZERO,
         );
-        assert_eq!(p.shape(object_id(10029)), None);
+        assert_eq!(pathing.shape(object_id(10029)), None);
         let mut bare = hunter;
         bare.obstruction = None;
-        p.refresh(
+        pathing.refresh(
             object_id(10029),
             &bare,
             MoveState::Standing,
             Footprint::ZERO,
         );
-        assert_eq!(p.shape(object_id(10029)), None);
+        assert_eq!(pathing.shape(object_id(10029)), None);
     }
 
     #[test]
     fn unit_has_shape_while_it_stands_and_none_while_it_moves() {
-        let mut p = Pathing::default();
-        p.set_mesh(Mesh::new(120), []);
-        p.moved(object_id(9175), &villager(30.0, 89.0), MoveState::Standing);
-        let s = p.shape(object_id(9175)).unwrap();
-        assert_eq!(p.mesh().unwrap().shapes[s.index()], {
-            let r = shape_rect(&villager(30.0, 89.0));
+        let mut pathing = Pathing::default();
+        pathing.set_mesh(Mesh::new(120), []);
+        pathing.moved(object_id(9175), &villager(30.0, 89.0), MoveState::Standing);
+        let shape_id = pathing.shape(object_id(9175)).unwrap();
+        assert_eq!(pathing.mesh().unwrap().shapes[shape_id.index()], {
+            let fixed_rect = shape_rect(&villager(30.0, 89.0));
             FixedRect::new(
-                r.x0() & !1,
-                r.y0() & !1,
-                (r.x1() + 1) & !1,
-                (r.y1() + 1) & !1,
+                fixed_rect.x0() & !1,
+                fixed_rect.y0() & !1,
+                (fixed_rect.x1() + 1) & !1,
+                (fixed_rect.y1() + 1) & !1,
             )
         });
-        p.moved(object_id(9175), &villager(30.1, 89.0), MoveState::Moving);
-        assert_eq!(p.shape(object_id(9175)), None);
+        pathing.moved(object_id(9175), &villager(30.1, 89.0), MoveState::Moving);
+        assert_eq!(pathing.shape(object_id(9175)), None);
         // a foundation without its record has none
         let mut site = villager(30.0, 88.0);
         site.obstruction = None;
-        p.moved(object_id(10028), &site, MoveState::Standing);
-        assert_eq!(p.shape(object_id(10028)), None);
+        pathing.moved(object_id(10028), &site, MoveState::Standing);
+        assert_eq!(pathing.shape(object_id(10028)), None);
     }
 }

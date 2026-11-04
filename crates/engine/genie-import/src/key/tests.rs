@@ -31,10 +31,10 @@ fn names_and_contents_stay_apart() {
 /// The hex form is the 64 lowercase digits of the hash.
 #[test]
 fn the_hex_form_is_sixty_four_lowercase_digits() {
-    let k = key(&[], &[0; 32]).hex();
-    assert_eq!(k.len(), 64);
+    let text = key(&[], &[0; 32]).hex();
+    assert_eq!(text.len(), 64);
     assert!(
-        k.bytes()
+        text.bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     );
 }

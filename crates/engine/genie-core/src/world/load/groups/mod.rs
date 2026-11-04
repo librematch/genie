@@ -74,7 +74,7 @@ fn motion(m: &saved::Motion, paths: &[saved::Path]) -> GenieResult<Motion> {
             .temp_path_data
             .iter()
             .rev()
-            .map(|d| path_level(d, paths))
+            .map(|path_data| path_level(path_data, paths))
             .collect::<Result<_, _>>()?,
         flags: MotionFlags::from_bits_retain(m.motion_flags_bits),
         maximum_velocity_forward: Speed::new(m.maximum_velocity_forward),
@@ -90,20 +90,20 @@ fn formation(f: &saved::Formation) -> GenieResult<Formation> {
         slots: f
             .slots
             .iter()
-            .map(|s| {
+            .map(|slot| {
                 Ok(Slot {
-                    unit_id: ObjectId::of_field(s.slots_unit_id),
-                    offset: vec3(&s.slots_offset),
-                    transform_position: vec3(&s.slots_transform_position),
-                    time: WorldTime::from_millis(s.slots_time),
-                    state: SlotState::of_int(s.slots_state)?,
-                    depth: s.slots_depth,
-                    desired_transform_position: vec3(&s.slots_desired_transform_position),
-                    position_filled: s.slots_position_filled,
-                    desired_category: FormationCategory::named(s.slots_desired_category),
-                    active: s.slots_active,
+                    unit_id: ObjectId::of_field(slot.slots_unit_id),
+                    offset: vec3(&slot.slots_offset),
+                    transform_position: vec3(&slot.slots_transform_position),
+                    time: WorldTime::from_millis(slot.slots_time),
+                    state: SlotState::of_int(slot.slots_state)?,
+                    depth: slot.slots_depth,
+                    desired_transform_position: vec3(&slot.slots_desired_transform_position),
+                    position_filled: slot.slots_position_filled,
+                    desired_category: FormationCategory::named(slot.slots_desired_category),
+                    active: slot.slots_active,
                     desired_sub_category: UnitKind::of_word(
-                        s.slots_desired_sub_category.cast_unsigned(),
+                        slot.slots_desired_sub_category.cast_unsigned(),
                     ),
                     transformed: 0,
                 })
@@ -116,11 +116,11 @@ fn formation(f: &saved::Formation) -> GenieResult<Formation> {
         lines: f
             .lines
             .iter()
-            .map(|l| FormationLine {
-                depth: l.temp_depth,
-                indices: l.line_indices.clone(),
-                attack_range: Distance::new(l.attack_range),
-                distance_back: Distance::new(l.distance_back),
+            .map(|formation_line| FormationLine {
+                depth: formation_line.temp_depth,
+                indices: formation_line.line_indices.clone(),
+                attack_range: Distance::new(formation_line.attack_range),
+                distance_back: Distance::new(formation_line.distance_back),
             })
             .collect(),
         transform_kind: TransformKind::of_data(f.transform_kind),
@@ -132,7 +132,7 @@ fn formation(f: &saved::Formation) -> GenieResult<Formation> {
 }
 
 fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> {
-    let t = &g.current_target;
+    let target_data = &g.current_target;
     Ok(UnitGroup {
         motion: motion(&g.motion, paths)?,
         id: GroupId::try_from(g.id)?,
@@ -153,20 +153,20 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> 
         members: g
             .units
             .iter()
-            .map(|u| {
+            .map(|member| {
                 Ok(Member {
-                    id: ObjectId::try_from(u.units)?,
+                    id: ObjectId::try_from(member.units)?,
                     specific_move: SpecificMove {
-                        active: u.specific_moves_active,
-                        path_id: MovePath::of_data(u.specific_moves_path_id),
-                        reason: MoveReason::of_data(u.specific_moves_reason),
-                        goal: vec3(&u.specific_moves_goal),
-                        timer: Seconds::new(u.specific_moves_timer),
-                        consecutive_move_failures: u.specific_moves_consecutive_move_failures,
-                        distance: Distance::new(u.specific_moves_distance),
-                        last_position: vec3(&u.specific_moves_last_position),
+                        active: member.specific_moves_active,
+                        path_id: MovePath::of_data(member.specific_moves_path_id),
+                        reason: MoveReason::of_data(member.specific_moves_reason),
+                        goal: vec3(&member.specific_moves_goal),
+                        timer: Seconds::new(member.specific_moves_timer),
+                        consecutive_move_failures: member.specific_moves_consecutive_move_failures,
+                        distance: Distance::new(member.specific_moves_distance),
+                        last_position: vec3(&member.specific_moves_last_position),
                     },
-                    seconds_since_attacking: Seconds::new(u.seconds_since_attacking),
+                    seconds_since_attacking: Seconds::new(member.seconds_since_attacking),
                 })
             })
             .collect::<GenieResult<_>>()?,
@@ -189,11 +189,11 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> 
                 .stored_positions
                 .points
                 .iter()
-                .map(|p| LinePoint {
-                    point: vec3(&p.ve_point),
-                    forward: vec3(&p.ve_forward),
-                    up: vec3(&p.ve_up),
-                    right: vec3(&p.ve_right),
+                .map(|line_point| LinePoint {
+                    point: vec3(&line_point.ve_point),
+                    forward: vec3(&line_point.ve_forward),
+                    up: vec3(&line_point.ve_up),
+                    right: vec3(&line_point.ve_right),
                 })
                 .collect(),
             length: Distance::new(g.stored_positions.length),
@@ -203,40 +203,42 @@ fn group(g: &saved::UnitGroup, paths: &[saved::Path]) -> GenieResult<UnitGroup> 
             .unit_kinds
             .unit_kind_statistic
             .iter()
-            .map(|u| {
+            .map(|unit_kind_statistic| {
                 Ok(UnitKindStatistic {
-                    formation_category: FormationCategory::named(u.formation_category),
-                    units: object_ids(&u.units)?,
-                    used: u.used,
-                    attack_range: Distance::new(u.attack_range),
-                    desired_spacing: Distance::new(u.desired_spacing),
-                    number_unit_kinds: u.number_unit_kinds,
-                    unit_kinds: unit_kinds(&u.unit_kinds),
-                    unit_kind_counts: words(&u.unit_kind_counts),
+                    formation_category: FormationCategory::named(
+                        unit_kind_statistic.formation_category,
+                    ),
+                    units: object_ids(&unit_kind_statistic.units)?,
+                    used: unit_kind_statistic.used,
+                    attack_range: Distance::new(unit_kind_statistic.attack_range),
+                    desired_spacing: Distance::new(unit_kind_statistic.desired_spacing),
+                    number_unit_kinds: unit_kind_statistic.number_unit_kinds,
+                    unit_kinds: unit_kinds(&unit_kind_statistic.unit_kinds),
+                    unit_kind_counts: words(&unit_kind_statistic.unit_kind_counts),
                 })
             })
             .collect::<GenieResult<_>>()?,
         waypoints: g.waypoints.iter().map(vec3).collect(),
         current_command: GroupCommandKind::named(g.current_command),
         current_target: TargetData {
-            target: GroupTarget::of_saved(t.target, t.kind),
-            original_position: vec3(&t.original_position),
-            range: Distance::new(t.range),
-            target_radius: Distance::new(t.target_radius),
-            disable_retargeting: t.disable_retargeting,
-            certain_action: ActionKind::of_data(t.certain_action),
+            target: GroupTarget::of_saved(target_data.target, target_data.kind),
+            original_position: vec3(&target_data.original_position),
+            range: Distance::new(target_data.range),
+            target_radius: Distance::new(target_data.target_radius),
+            disable_retargeting: target_data.disable_retargeting,
+            certain_action: ActionKind::of_data(target_data.certain_action),
         },
         attack_plan_kind: g.attack_plan_kind,
         idle_timer: Millis::new(g.idle_timer),
         order_queue: g
             .order_queue
             .iter()
-            .map(|o| GroupOrder {
-                command: GroupCommandKind::named(o.new_order_command),
-                target_id: ObjectId::of_field(o.new_order_target_id),
-                parm: o.new_order_parm,
-                point: vec3(&o.new_order_point),
-                execute_time: WorldTime::from_millis(o.new_order_execute_time),
+            .map(|order| GroupOrder {
+                command: GroupCommandKind::named(order.new_order_command),
+                target_id: ObjectId::of_field(order.new_order_target_id),
+                parm: order.new_order_parm,
+                point: vec3(&order.new_order_point),
+                execute_time: WorldTime::from_millis(order.new_order_execute_time),
             })
             .collect(),
         hibernating: g.hibernating,

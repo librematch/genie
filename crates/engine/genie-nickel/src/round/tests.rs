@@ -187,9 +187,9 @@ fn halfway_values_round_to_the_even_neighbour() {
     );
     // 1 + 2^-53 lies halfway between 1.0 and the next f64: the even one, 1.0
     let half = BigUint::from(1u8) << 53usize;
-    let n = (&half + 1u8).to_string();
+    let text = (&half + 1u8).to_string();
     assert_eq!(
-        round_to_f64(&n, &half.to_string()).unwrap().to_bits(),
+        round_to_f64(&text, &half.to_string()).unwrap().to_bits(),
         1.0f64.to_bits()
     );
 }

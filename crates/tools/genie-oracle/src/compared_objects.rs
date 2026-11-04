@@ -23,7 +23,7 @@ pub fn object_rows(world: &World, player: usize) -> Vec<ObjectView<'_>> {
         p.objects
             .iter()
             .filter(|u| listed(u))
-            .map(|u| world.object_view(u))
+            .map(|unit| world.object_view(unit))
             .collect()
     })
 }

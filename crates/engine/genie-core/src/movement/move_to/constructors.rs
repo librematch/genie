@@ -86,7 +86,7 @@ impl WalkTo {
     /// ([`NO_TARGET_GAP`]).
     fn held(&self) -> (Option<ObjectId>, f32) {
         match self.state {
-            Some(s) if LAST_TAKEN < s => (None, NO_TARGET_GAP),
+            Some(object_state) if LAST_TAKEN < object_state => (None, NO_TARGET_GAP),
             _ => (self.id, self.gap.get()),
         }
     }
@@ -134,26 +134,30 @@ impl<'g> MoveToReads<'g> {
     /// # Errors
     ///
     /// An object whose master its player's table lacks.
-    pub fn walk_to(&self, w: &World, id: Option<ObjectId>) -> GenieResult<Option<WalkTo>> {
-        let Some(found) = w.object(id) else {
+    pub fn walk_to(&self, world: &World, id: Option<ObjectId>) -> GenieResult<Option<WalkTo>> {
+        let Some(found) = world.object(id) else {
             return Ok(None);
         };
-        self.walk_to_found(w, found).map(Some)
+        self.walk_to_found(world, found).map(Some)
     }
 
-    /// [`MoveToReads::walk_to`] to the object `t` of `player` that the caller found.
+    /// [`MoveToReads::walk_to`] to the object `unit` of `player` that the caller found.
     ///
     /// # Errors
     ///
     /// A master the player has not got.
-    pub fn walk_to_found(&self, w: &World, (player, t): (PlayerId, &Unit)) -> GenieResult<WalkTo> {
-        let at = t.position();
-        let radius = t.master(w.master_tables(), player)?.radius;
+    pub fn walk_to_found(
+        &self,
+        world: &World,
+        (player, unit): (PlayerId, &Unit),
+    ) -> GenieResult<WalkTo> {
+        let at = unit.position();
+        let radius = unit.master(world.master_tables(), player)?.radius;
         Ok(WalkTo {
-            id: Some(t.id),
+            id: Some(unit.id),
             at,
             gap: footprint_gap(self.at, self.ground, at, radius),
-            state: Some(t.life.state),
+            state: Some(unit.life.state),
         })
     }
 
@@ -330,20 +334,26 @@ mod tests {
             gap: Distance::new(5.0),
             state: Some(ObjectState::Foundation),
         };
-        let to = |w: &MoveToReads<'_>, to, given| {
-            w.to_object(
-                to,
-                Distance::new(0.1),
-                given,
-                TargetMoved::Follows,
-                &tuning().move_to,
-            )
-            .unwrap()
-            .unwrap()
+        let to = |move_to_reads: &MoveToReads<'_>, to, given| {
+            move_to_reads
+                .to_object(
+                    to,
+                    Distance::new(0.1),
+                    given,
+                    TargetMoved::Follows,
+                    &tuning().move_to,
+                )
+                .unwrap()
+                .unwrap()
         };
-        let m = to(&move_reads, house, None);
+        let move_to_action = to(&move_reads, house, None);
         assert_eq!(
-            (m.state, ObjectId::field(m.target), m.point, m.range),
+            (
+                move_to_action.state,
+                ObjectId::field(move_to_action.target),
+                move_to_action.point,
+                move_to_action.range
+            ),
             (
                 MoveTo::Start,
                 10028,
@@ -352,7 +362,11 @@ mod tests {
             )
         );
         assert_eq!(
-            (m.sprite.map(|g| g.id), m.voice, m.wait),
+            (
+                move_to_action.sprite.map(|g| g.id),
+                move_to_action.voice,
+                move_to_action.wait
+            ),
             (Some(SpriteId::named(21)), Voice::Quiet, MoveWait::NEW)
         );
         assert_eq!(
@@ -411,7 +425,7 @@ mod tests {
                 point.state,
                 ObjectId::field(point.target),
                 point.range,
-                point.sprite.map(|g| g.id)
+                point.sprite.map(|graphic| graphic.id)
             ),
             (MoveTo::Start, -1, Distance::ZERO, Some(SpriteId::named(20)))
         );

@@ -143,7 +143,7 @@ impl<'a> Chapter<'a> {
     /// chapter's place (`chapter`) if it cannot be read as a world save.
     pub fn header(&self) -> GenieResult<genie_save::Header> {
         genie_save::parse(&self.inflate_header()?)
-            .map_err(|e| e.with("chapter", format_args!("{:#x}", self.offset)))
+            .map_err(|error| error.with("chapter", format_args!("{:#x}", self.offset)))
     }
 
     /// Inflate the start of the header and read its version fields.
@@ -174,9 +174,9 @@ mod tests {
     use std::io::Write;
 
     fn deflate(bytes: &[u8]) -> Vec<u8> {
-        let mut e = DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
-        e.write_all(bytes).unwrap();
-        e.finish().unwrap()
+        let mut deflate_encoder = DeflateEncoder::new(Vec::new(), flate2::Compression::fast());
+        deflate_encoder.write_all(bytes).unwrap();
+        deflate_encoder.finish().unwrap()
     }
 
     fn le(words: &[u32]) -> Vec<u8> {
@@ -186,10 +186,10 @@ mod tests {
     /// A recording with the given chapters, each a (compressed header, body) pair.
     fn recording(parts: &[(&[u8], &[u8])]) -> Vec<u8> {
         let mut out = Vec::new();
-        for (i, (header, body)) in parts.iter().enumerate() {
+        for (index, (header, body)) in parts.iter().enumerate() {
             let start = out.len();
             let header_end = start + 8 + header.len();
-            let next = if i + 1 < parts.len() {
+            let next = if index + 1 < parts.len() {
                 header_end + body.len()
             } else {
                 0
@@ -229,9 +229,9 @@ mod tests {
     fn chapter_pointing_outside_the_file_is_an_error() {
         let mut data = recording(&[(b"HDR0", b"body")]);
         data[0..4].copy_from_slice(&999u32.to_le_bytes());
-        let e = chapters(&data).unwrap_err();
-        assert_eq!(e, invalid_chapter(0));
-        assert_eq!(e.context().collect::<Vec<_>>(), [("at", "0x0")]);
+        let error = chapters(&data).unwrap_err();
+        assert_eq!(error, invalid_chapter(0));
+        assert_eq!(error.context().collect::<Vec<_>>(), [("at", "0x0")]);
     }
 
     #[test]
@@ -243,9 +243,14 @@ mod tests {
         header.extend(158_041_u32.to_le_bytes());
         header.extend([0u8; 64]);
         let data = recording(&[(&deflate(&header), b"")]);
-        let v = chapters(&data).unwrap()[0].save_version().unwrap();
+        let save_version = chapters(&data).unwrap()[0].save_version().unwrap();
         assert_eq!(
-            (v.major, v.minor, v.build, v.hundredths()),
+            (
+                save_version.major,
+                save_version.minor,
+                save_version.build,
+                save_version.hundredths()
+            ),
             (66, 39321, 158_041, 6660)
         );
     }
@@ -253,8 +258,8 @@ mod tests {
     #[test]
     fn header_that_does_not_inflate_is_an_error() {
         let data = recording(&[(&[0xff; 16], b"")]);
-        let e = chapters(&data).unwrap()[0].save_version().unwrap_err();
-        assert_eq!(e, not_inflating(0));
-        assert_eq!(e.context().collect::<Vec<_>>(), [("at", "0x0")]);
+        let error = chapters(&data).unwrap()[0].save_version().unwrap_err();
+        assert_eq!(error, not_inflating(0));
+        assert_eq!(error.context().collect::<Vec<_>>(), [("at", "0x0")]);
     }
 }

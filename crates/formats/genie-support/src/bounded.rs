@@ -118,7 +118,7 @@ mod tests {
         );
         let mut input = Cursor::new(vec![0u8; 4]);
         assert_eq!(
-            read_le(&mut input, 2, f32::from_le_bytes).map_err(|e| e.reason()),
+            read_le(&mut input, 2, f32::from_le_bytes).map_err(|error| error.reason()),
             Err("a list past the input's end")
         );
         let mut next = 0;

@@ -87,7 +87,7 @@ pub fn inside_lists_from_dump(text: &str) -> GenieResult<Vec<(ObjectId, Vec<Obje
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             match words[..] {
-                [c, ..] => Ok((c, words[1..].to_vec())),
+                [object_id, ..] => Ok((object_id, words[1..].to_vec())),
                 [] => Err(bad_tile_dump()),
             }
         })
@@ -226,37 +226,37 @@ pub fn registry_from_dump(text: &str) -> GenieResult<Registry> {
     let mut out = Registry::new(number(players)? as usize, number(classes)? as usize);
     let mut list: Option<(usize, usize)> = None;
     for line in lines {
-        let w: Vec<&str> = line.split_whitespace().collect();
-        match w.first().copied() {
-            Some("list") if w.len() == 5 => {
-                let (p, c) = (number(w[1])? as usize, number(w[2])? as usize);
+        let texts: Vec<&str> = line.split_whitespace().collect();
+        match texts.first().copied() {
+            Some("list") if texts.len() == 5 => {
+                let (p, c) = (number(texts[1])? as usize, number(texts[2])? as usize);
                 if out.players <= p || out.classes <= c {
                     return Err(bad());
                 }
                 list = Some((p, c));
             }
-            Some("rec") if w.len() == 8 => {
+            Some("rec") if texts.len() == 8 => {
                 let (p, c) = list.ok_or_else(bad)?;
                 out.lists[p][c].push(Record {
-                    id: object(w[1])?,
-                    distance: Distance::new(bits(w[2])?),
-                    owner: PlayerId::new(number(w[3])? as u8),
-                    at: Point::new(bits(w[4])?, bits(w[5])?),
-                    radius: Footprint::new(bits(w[6])?, bits(w[7])?),
+                    id: object(texts[1])?,
+                    distance: Distance::new(bits(texts[2])?),
+                    owner: PlayerId::new(number(texts[3])? as u8),
+                    at: Point::new(bits(texts[4])?, bits(texts[5])?),
+                    radius: Footprint::new(bits(texts[6])?, bits(texts[7])?),
                 });
             }
-            Some("mask") if w.len() == 3 + SLOTS => {
+            Some("mask") if texts.len() == 3 + SLOTS => {
                 let mut entry = Entry {
                     mask: VisionBits::from_bits_retain(
-                        u64::from_str_radix(w[2], 16).map_err(|_| bad())?,
+                        u64::from_str_radix(texts[2], 16).map_err(|_| bad())?,
                     ),
                     ..Entry::default()
                 };
-                for (k, slot) in entry.slots.iter_mut().enumerate() {
-                    let v = number(w[3 + k])?;
+                for (index, slot) in entry.slots.iter_mut().enumerate() {
+                    let v = number(texts[3 + index])?;
                     *slot = usize::try_from(v).ok();
                 }
-                let _ = out.entries.insert(object(w[1])?, entry);
+                let _ = out.entries.insert(object(texts[1])?, entry);
             }
             _ => return Err(bad()),
         }
@@ -298,7 +298,11 @@ pub fn objects_from_save(
         stopped: turns
             .players
             .iter()
-            .map(|p| p.unsupported.clone().map(|(t, i, e)| (t.get(), i, e)))
+            .map(|p| {
+                p.unsupported
+                    .clone()
+                    .map(|(t, list_index, e)| (t.get(), list_index, e))
+            })
             .collect(),
         visibility: turns.spatial.sight.take(),
         terrain: turns.spatial.terrain.take(),
@@ -306,7 +310,7 @@ pub fn objects_from_save(
             .players
             .iter()
             .flat_map(|p| p.objects.iter().filter(|u| p.stopped || u.stopped))
-            .map(|u| u.id)
+            .map(|unit| unit.id)
             .collect(),
         freezes: turns
             .players
@@ -314,7 +318,7 @@ pub fn objects_from_save(
             .map(|p| {
                 p.freezes
                     .iter()
-                    .map(|(t, o, e)| (t.get(), *o, e.clone()))
+                    .map(|(tick, object_id, error)| (tick.get(), *object_id, error.clone()))
                     .collect()
             })
             .collect(),

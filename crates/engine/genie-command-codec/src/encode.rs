@@ -32,7 +32,7 @@ const UNIT_ORDER_GAP: [u8; 1] = [1];
 /// packet.
 pub fn encode(command: &Command) -> GenieResult<Vec<u8>> {
     match command {
-        Command::Unmodelled(c) => Ok(c.packet.clone()),
+        Command::Unmodelled(unmodelled_command) => Ok(unmodelled_command.packet.clone()),
         other => Ok(packet(other)?.encode()?),
     }
 }
@@ -63,7 +63,7 @@ fn ids(ids: &[Option<ObjectId>], fixed: usize) -> GenieResult<Vec<i32>> {
 /// A command's layout in genie-rec.
 fn packet(command: &Command) -> GenieResult<Packet> {
     match command {
-        Command::Order(c) => order(c),
+        Command::Order(order_command) => order(order_command),
         Command::Build(_)
         | Command::BuildWall(_)
         | Command::Queue(_)
@@ -89,30 +89,40 @@ fn packet(command: &Command) -> GenieResult<Packet> {
 /// GATHER POINT and `BUILDING_COMMAND_QUEUE`.
 fn building(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
-        Command::Build(c) => build(c)?,
-        Command::BuildWall(c) => build_wall(c)?,
-        Command::Queue(c) => queue(c)?,
-        Command::Research(c) => research(c)?,
-        Command::GatherPoint(c) => Packet::SetGatherPoint(packets::SetGatherPoint {
-            commp_id: c.player.get(),
-            num: c.units.count,
-            gap_0x06: [0; 2],
-            x: c.point.x(),
-            y: c.point.y(),
-            tid: ObjectId::field(c.target),
-            tm_id: i32::from(MasterId::field(c.target_master)),
-            field_0x18: u8::from(c.own),
-            ids: ids(&c.units.ids, packets::SetGatherPoint::FIXED)?,
-        }),
-        Command::CommandQueue(c) => Packet::BuildingCommandQueue(packets::BuildingCommandQueue {
-            commp_id: c.player.get(),
-            tid: ObjectId::field(c.target),
-            x: c.point.x(),
-            y: c.point.y(),
-            num: c.units.count,
-            gap_0x12: COMMAND_QUEUE_GAP,
-            ids: ids(&c.units.ids, packets::BuildingCommandQueue::FIXED)?,
-        }),
+        Command::Build(build_command) => build(build_command)?,
+        Command::BuildWall(build_wall_command) => build_wall(build_wall_command)?,
+        Command::Queue(queue_command) => queue(queue_command)?,
+        Command::Research(research_command) => research(research_command)?,
+        Command::GatherPoint(gather_point_command) => {
+            Packet::SetGatherPoint(packets::SetGatherPoint {
+                commp_id: gather_point_command.player.get(),
+                num: gather_point_command.units.count,
+                gap_0x06: [0; 2],
+                x: gather_point_command.point.x(),
+                y: gather_point_command.point.y(),
+                tid: ObjectId::field(gather_point_command.target),
+                tm_id: i32::from(MasterId::field(gather_point_command.target_master)),
+                field_0x18: u8::from(gather_point_command.own),
+                ids: ids(
+                    &gather_point_command.units.ids,
+                    packets::SetGatherPoint::FIXED,
+                )?,
+            })
+        }
+        Command::CommandQueue(building_queue_command) => {
+            Packet::BuildingCommandQueue(packets::BuildingCommandQueue {
+                commp_id: building_queue_command.player.get(),
+                tid: ObjectId::field(building_queue_command.target),
+                x: building_queue_command.point.x(),
+                y: building_queue_command.point.y(),
+                num: building_queue_command.units.count,
+                gap_0x12: COMMAND_QUEUE_GAP,
+                ids: ids(
+                    &building_queue_command.units.ids,
+                    packets::BuildingCommandQueue::FIXED,
+                )?,
+            })
+        }
         other => return elsewhere(other),
     })
 }
@@ -120,54 +130,71 @@ fn building(command: &Command) -> GenieResult<Packet> {
 /// The commands to the objects listed that do not go through the orders' reader.
 fn listed(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
-        Command::Stop(c) => Packet::Stop(packets::Stop {
-            commp_id: c.player.get(),
-            num: c.units.count,
+        Command::Stop(stop_command) => Packet::Stop(packets::Stop {
+            commp_id: stop_command.player.get(),
+            num: stop_command.units.count,
             gap_0x06: [0; 2],
-            ids: ids(&c.units.ids, packets::Stop::FIXED)?,
+            ids: ids(&stop_command.units.ids, packets::Stop::FIXED)?,
         }),
-        Command::UnitAiState(c) => Packet::UnitAiState(packets::UnitAiState {
-            commp_id: c.player.get(),
-            num: c.units.count,
+        Command::UnitAiState(unit_ai_state_command) => Packet::UnitAiState(packets::UnitAiState {
+            commp_id: unit_ai_state_command.player.get(),
+            num: unit_ai_state_command.units.count,
             gap_0x06: [0; 2],
-            state: c.state.get(),
+            state: unit_ai_state_command.state.get(),
             gap_0x09: [0; 3],
-            ids: ids(&c.units.ids, packets::UnitAiState::FIXED)?,
+            ids: ids(
+                &unit_ai_state_command.units.ids,
+                packets::UnitAiState::FIXED,
+            )?,
         }),
-        Command::AutoScout(c) => Packet::AutoScout(packets::AutoScout {
-            commp_id: c.player.get(),
-            field_0x04: c.units.count,
+        Command::AutoScout(auto_scout_command) => Packet::AutoScout(packets::AutoScout {
+            commp_id: auto_scout_command.player.get(),
+            field_0x04: auto_scout_command.units.count,
             gap_0x06: [0; 2],
-            ids: ids(&c.units.ids, packets::AutoScout::FIXED)?,
+            ids: ids(&auto_scout_command.units.ids, packets::AutoScout::FIXED)?,
         }),
-        Command::FormFormation(c) => Packet::FormFormation(packets::FormFormation {
-            commp_id: c.player.get(),
-            num: c.units.count,
+        Command::FormFormation(form_formation_command) => {
+            Packet::FormFormation(packets::FormFormation {
+                commp_id: form_formation_command.player.get(),
+                num: form_formation_command.units.count,
+                gap_0x06: [0; 2],
+                formation: form_formation_command.formation.get(),
+                ids: ids(
+                    &form_formation_command.units.ids,
+                    packets::FormFormation::FIXED,
+                )?,
+            })
+        }
+        Command::SetGatherState(set_gather_state_command) => {
+            Packet::SetGatherState(packets::SetGatherState {
+                commp_id: set_gather_state_command.player.get(),
+                num: set_gather_state_command.units.count,
+                gap_0x06: [0; 2],
+                field_0x08: set_gather_state_command
+                    .state
+                    .map_or(0, GatherPointState::get),
+                ids: ids(
+                    &set_gather_state_command.units.ids,
+                    packets::SetGatherState::FIXED,
+                )?,
+            })
+        }
+        Command::SeekShelter(seek_shelter_command) => Packet::SeekShelter(packets::SeekShelter {
+            commp_id: seek_shelter_command.player.get(),
+            num: seek_shelter_command.units.count,
             gap_0x06: [0; 2],
-            formation: c.formation.get(),
-            ids: ids(&c.units.ids, packets::FormFormation::FIXED)?,
+            ids: ids(&seek_shelter_command.units.ids, packets::SeekShelter::FIXED)?,
         }),
-        Command::SetGatherState(c) => Packet::SetGatherState(packets::SetGatherState {
-            commp_id: c.player.get(),
-            num: c.units.count,
-            gap_0x06: [0; 2],
-            field_0x08: c.state.map_or(0, GatherPointState::get),
-            ids: ids(&c.units.ids, packets::SetGatherState::FIXED)?,
-        }),
-        Command::SeekShelter(c) => Packet::SeekShelter(packets::SeekShelter {
-            commp_id: c.player.get(),
-            num: c.units.count,
-            gap_0x06: [0; 2],
-            ids: ids(&c.units.ids, packets::SeekShelter::FIXED)?,
-        }),
-        Command::Patrol(c) => patrol(c)?,
-        Command::AttackMove(c) => attack_move(c)?,
-        Command::Unload(c) => unload(c)?,
-        Command::UnitOrder(c) => unit_order(c)?,
-        Command::GoBackToWork2(c) => Packet::GoBackToWork2(packets::GoBackToWork2 {
-            commp_id: c.player.get(),
-            rest: go_back_to_work_rest(&c.units)?,
-        }),
+        Command::Patrol(patrol_command) => patrol(patrol_command)?,
+        Command::AttackMove(attack_move_command) => attack_move(attack_move_command)?,
+        Command::Unload(unload_command) => unload(unload_command)?,
+        Command::UnitOrder(unit_order_command) => unit_order(unit_order_command)?,
+        Command::GoBackToWork2(go_back_to_work2_command) => {
+            Packet::GoBackToWork2(packets::GoBackToWork2 {
+                commp_id: go_back_to_work2_command.player.get(),
+                rest: go_back_to_work_rest(&go_back_to_work2_command.units)?,
+            })
+        }
         other => return elsewhere(other),
     })
 }
@@ -182,40 +209,46 @@ fn elsewhere(command: &Command) -> GenieResult<Packet> {
 /// The commands of one object, one player or the game.
 fn single(command: &Command) -> GenieResult<Packet> {
     Ok(match command {
-        Command::Resign(c) => Packet::Resign(packets::Resign {
-            commp_id: c.player.get(),
-            dropped: u8::from(c.departure == Departure::Dropped),
+        Command::Resign(resign_command) => Packet::Resign(packets::Resign {
+            commp_id: resign_command.player.get(),
+            dropped: u8::from(resign_command.departure == Departure::Dropped),
         }),
-        Command::TransformObject(c) => Packet::TransformObject(packets::TransformObject {
-            commp_id: c.player.get(),
-            field_0x04: i32::from(c.master.get()),
-            field_0x08: c.id.get().cast_unsigned(),
+        Command::TransformObject(transform_object_command) => {
+            Packet::TransformObject(packets::TransformObject {
+                commp_id: transform_object_command.player.get(),
+                field_0x04: i32::from(transform_object_command.master.get()),
+                field_0x08: transform_object_command.id.get().cast_unsigned(),
+            })
+        }
+        Command::Delete(delete_command) => Packet::CancelBuild(packets::CancelBuild {
+            commp_id: delete_command.player.get(),
+            uid: delete_command.id.get(),
         }),
-        Command::Delete(c) => Packet::CancelBuild(packets::CancelBuild {
-            commp_id: c.player.get(),
-            uid: c.id.get(),
+        Command::GoBackToWork(go_back_to_work_command) => {
+            Packet::GoBackToWork(packets::GoBackToWork {
+                commp_id: go_back_to_work_command.player.get(),
+                uid: go_back_to_work_command.id.get(),
+            })
+        }
+        Command::AllBackToWork(all_back_to_work_command) => {
+            Packet::AllBackToWork(packets::AllBackToWork {
+                commp_id: all_back_to_work_command.player.get(),
+                uid: all_back_to_work_command.id.get(),
+            })
+        }
+        Command::TownBell(town_bell_command) => Packet::TownBell(packets::TownBell {
+            commp_id: town_bell_command.player.get(),
+            uid: town_bell_command.id.get(),
+            activate: town_bell_command.bell.byte(),
         }),
-        Command::GoBackToWork(c) => Packet::GoBackToWork(packets::GoBackToWork {
-            commp_id: c.player.get(),
-            uid: c.id.get(),
+        Command::Gate(gate_command) => Packet::Gate(packets::Gate {
+            commp_id: gate_command.player.get(),
+            uid: gate_command.id.get(),
         }),
-        Command::AllBackToWork(c) => Packet::AllBackToWork(packets::AllBackToWork {
-            commp_id: c.player.get(),
-            uid: c.id.get(),
-        }),
-        Command::TownBell(c) => Packet::TownBell(packets::TownBell {
-            commp_id: c.player.get(),
-            uid: c.id.get(),
-            activate: c.bell.byte(),
-        }),
-        Command::Gate(c) => Packet::Gate(packets::Gate {
-            commp_id: c.player.get(),
-            uid: c.id.get(),
-        }),
-        Command::Tribute(c) => tribute(c),
-        Command::Trade(c) => trade(c),
-        Command::Flare(c) => flare(c)?,
-        Command::Game(c) => game(c),
+        Command::Tribute(tribute_command) => tribute(tribute_command),
+        Command::Trade(trade_command) => trade(trade_command),
+        Command::Flare(flare_command) => flare(flare_command)?,
+        Command::Game(game_command) => game(game_command),
         other => return elsewhere(other),
     })
 }
@@ -240,22 +273,22 @@ macro_rules! interact_packet {
 }
 
 /// INTERACT, WORK, MOVE, RETREAT, FOLLOW and GUARD.
-fn order(c: &OrderCommand) -> GenieResult<Packet> {
-    let (player, units) = (c.player.get(), &c.units);
-    Ok(match c.order {
+fn order(order_command: &OrderCommand) -> GenieResult<Packet> {
+    let (player, units) = (order_command.player.get(), &order_command.units);
+    Ok(match order_command.order {
         Order::Interact(o) => interact_packet!(Interact, player, units, o),
         Order::Work(o) => interact_packet!(Work, player, units, o),
-        Order::Retreat(o) => interact_packet!(Retreat, player, units, o),
-        Order::Move(o) => Packet::Move(packets::Move {
+        Order::Retreat(interact) => interact_packet!(Retreat, player, units, interact),
+        Order::Move(move_order) => Packet::Move(packets::Move {
             commp_id: player,
-            tid: ObjectId::field(o.target),
-            x: o.point.x(),
-            y: o.point.y(),
+            tid: ObjectId::field(move_order.target),
+            x: move_order.point.x(),
+            y: move_order.point.y(),
             num: units.count,
-            field_0x12: o.control.byte(),
-            field_0x13: o.flags.byte(OrderFlags::QUEUED),
-            field_0x14: o.flags.byte(OrderFlags::DIRECT),
-            field_0x15: o.flags.byte(OrderFlags::HUMAN),
+            field_0x12: move_order.control.byte(),
+            field_0x13: move_order.flags.byte(OrderFlags::QUEUED),
+            field_0x14: move_order.flags.byte(OrderFlags::DIRECT),
+            field_0x15: move_order.flags.byte(OrderFlags::HUMAN),
             gap_0x16: [0; 2],
             ids: ids(&units.ids, packets::Move::FIXED)?,
         }),
@@ -277,21 +310,21 @@ fn order(c: &OrderCommand) -> GenieResult<Packet> {
 }
 
 /// BUILD (0x66).
-fn build(c: &BuildCommand) -> GenieResult<Packet> {
+fn build(build_command: &BuildCommand) -> GenieResult<Packet> {
     Ok(Packet::Build(packets::Build {
-        commp_id: c.player.get(),
-        num: c.builders.count,
+        commp_id: build_command.player.get(),
+        num: build_command.builders.count,
         gap_0x06: [0; 2],
-        x: c.position.x(),
-        y: c.position.y(),
-        oid: i32::from(c.master.get()),
-        qid: c.queue_id.get(),
-        field_0x18: c.sprite_override.get().cast_unsigned(),
-        frame: c.frame.byte(),
+        x: build_command.position.x(),
+        y: build_command.position.y(),
+        oid: i32::from(build_command.master.get()),
+        qid: build_command.queue_id.get(),
+        field_0x18: build_command.sprite_override.get().cast_unsigned(),
+        frame: build_command.frame.byte(),
         gap_0x1d: [0; 1],
-        field_0x1e: u8::from(c.queued),
-        field_0x1f: u8::from(!c.commits),
-        ids: ids(&c.builders.ids, packets::Build::FIXED)?,
+        field_0x1e: u8::from(build_command.queued),
+        field_0x1f: u8::from(!build_command.commits),
+        ids: ids(&build_command.builders.ids, packets::Build::FIXED)?,
     }))
 }
 
@@ -307,62 +340,62 @@ fn tile_word(v: i32) -> GenieResult<u16> {
 }
 
 /// `BUILD_WALL` (0x69).
-fn build_wall(c: &BuildWallCommand) -> GenieResult<Packet> {
+fn build_wall(build_wall_command: &BuildWallCommand) -> GenieResult<Packet> {
     Ok(Packet::BuildWall(packets::BuildWall {
-        commp_id: c.player.get(),
-        num: c.builders.count,
+        commp_id: build_wall_command.player.get(),
+        num: build_wall_command.builders.count,
         gap_0x06: [0; 2],
-        x1: tile_word(c.from.x())?,
-        y1: tile_word(c.from.y())?,
-        x2: tile_word(c.to.x())?,
-        y2: tile_word(c.to.y())?,
-        oid: i32::from(c.master.get()),
-        qid: c.queue_id.get(),
+        x1: tile_word(build_wall_command.from.x())?,
+        y1: tile_word(build_wall_command.from.y())?,
+        x2: tile_word(build_wall_command.to.x())?,
+        y2: tile_word(build_wall_command.to.y())?,
+        oid: i32::from(build_wall_command.master.get()),
+        qid: build_wall_command.queue_id.get(),
         gap_0x18: [0; 2],
-        field_0x1a: u8::from(c.queued),
-        field_0x1b: u8::from(!c.commits),
-        ids: ids(&c.builders.ids, packets::BuildWall::FIXED)?,
+        field_0x1a: u8::from(build_wall_command.queued),
+        field_0x1b: u8::from(!build_wall_command.commits),
+        ids: ids(&build_wall_command.builders.ids, packets::BuildWall::FIXED)?,
     }))
 }
 
 /// QUEUE (0x81, `MULTI_QUEUE`).
-fn queue(c: &QueueCommand) -> GenieResult<Packet> {
+fn queue(queue_command: &QueueCommand) -> GenieResult<Packet> {
     Ok(Packet::MultiQueue(packets::MultiQueue {
-        commp_id: c.player.get(),
-        num: c.buildings.count,
+        commp_id: queue_command.player.get(),
+        num: queue_command.buildings.count,
         gap_0x06: [0; 4],
-        bid: c.building_master.get(),
-        tid: c.unit.get(),
-        count: c.amount.get(),
-        button_location_id: c.button.get(),
-        ids: ids(&c.buildings.ids, packets::MultiQueue::FIXED)?,
+        bid: queue_command.building_master.get(),
+        tid: queue_command.unit.get(),
+        count: queue_command.amount.get(),
+        button_location_id: queue_command.button.get(),
+        ids: ids(&queue_command.buildings.ids, packets::MultiQueue::FIXED)?,
     }))
 }
 
 /// RESEARCH (0x65).
-fn research(c: &ResearchCommand) -> GenieResult<Packet> {
+fn research(research_command: &ResearchCommand) -> GenieResult<Packet> {
     Ok(Packet::Research(packets::Research {
-        commp_id: c.player.get(),
-        uid: ObjectId::field(c.building),
-        field_0x08: c.count.cast_unsigned(),
-        tid: TechId::field(c.tech),
-        qid: c.queue_id.get(),
-        field_0x10: u8::from(c.shift),
-        ids: ids(&c.buildings, packets::Research::FIXED)?,
+        commp_id: research_command.player.get(),
+        uid: ObjectId::field(research_command.building),
+        field_0x08: research_command.count.cast_unsigned(),
+        tid: TechId::field(research_command.tech),
+        qid: research_command.queue_id.get(),
+        field_0x10: u8::from(research_command.shift),
+        ids: ids(&research_command.buildings, packets::Research::FIXED)?,
     }))
 }
 
 /// PATROL (0x15): x as each slot's f32 bits.
-fn patrol(c: &PatrolCommand) -> GenieResult<Packet> {
-    let x = |i: usize| c.waypoints.points[i].x().to_bits();
-    let y = |i: usize| c.waypoints.points[i].y();
+fn patrol(patrol_command: &PatrolCommand) -> GenieResult<Packet> {
+    let x = |i: usize| patrol_command.waypoints.points[i].x().to_bits();
+    let y = |i: usize| patrol_command.waypoints.points[i].y();
     Ok(Packet::Patrol(packets::Patrol {
-        commp_id: c.player.get(),
-        num: c.units.count,
+        commp_id: patrol_command.player.get(),
+        num: patrol_command.units.count,
         gap_0x06: [0; 2],
-        field_0x08: u8::from(c.patrols == SavedPatrols::Dropped),
+        field_0x08: u8::from(patrol_command.patrols == SavedPatrols::Dropped),
         gap_0x09: [0; 2],
-        waypoints_count: c.waypoints.count,
+        waypoints_count: patrol_command.waypoints.count,
         field_0x0c: x(0),
         field_0x10: x(1),
         field_0x14: x(2),
@@ -383,70 +416,70 @@ fn patrol(c: &PatrolCommand) -> GenieResult<Packet> {
         field_0x50: y(7),
         field_0x54: y(8),
         field_0x58: y(9),
-        ids: ids(&c.units.ids, packets::Patrol::FIXED)?,
+        ids: ids(&patrol_command.units.ids, packets::Patrol::FIXED)?,
     }))
 }
 
 /// `ATTACK_MOVE` (0x21): the first x as its f32 bits, the other slots' x and y as bytes.
-fn attack_move(c: &AttackMoveCommand) -> GenieResult<Packet> {
-    let points = &c.waypoints.points;
+fn attack_move(attack_move_command: &AttackMoveCommand) -> GenieResult<Packet> {
+    let points = &attack_move_command.waypoints.points;
     let tail = |axis: Axis| -> [u8; 36] {
         let mut out = [0; 36];
-        for (i, p) in points[1..].iter().enumerate() {
-            out[4 * i..4 * i + 4].copy_from_slice(&p.along(axis).to_le_bytes());
+        for (index, point) in points[1..].iter().enumerate() {
+            out[4 * index..4 * index + 4].copy_from_slice(&point.along(axis).to_le_bytes());
         }
         out
     };
     Ok(Packet::AttackMove(packets::AttackMove {
-        commp_id: c.player.get(),
-        num: c.units.count,
+        commp_id: attack_move_command.player.get(),
+        num: attack_move_command.units.count,
         gap_0x06: [0; 2],
-        field_0x08: u8::from(c.patrols == SavedPatrols::Dropped),
-        field_0x09: u8::from(c.queued),
-        field_0x0a: u8::from(c.ignore_pending),
-        waypoints_count: c.waypoints.count,
+        field_0x08: u8::from(attack_move_command.patrols == SavedPatrols::Dropped),
+        field_0x09: u8::from(attack_move_command.queued),
+        field_0x0a: u8::from(attack_move_command.ignore_pending),
+        waypoints_count: attack_move_command.waypoints.count,
         field_0x0c: points[0].x().to_bits(),
         gap_0x10: tail(Axis::X),
         field_0x34: points[0].y(),
         gap_0x38: tail(Axis::Y),
-        ids: ids(&c.units.ids, packets::AttackMove::FIXED)?,
+        ids: ids(&attack_move_command.units.ids, packets::AttackMove::FIXED)?,
     }))
 }
 
 /// UNLOAD (0x6f).
-fn unload(c: &UnloadCommand) -> GenieResult<Packet> {
-    let (flag, unit_kind) = c.pick.packet();
+fn unload(unload_command: &UnloadCommand) -> GenieResult<Packet> {
+    let (flag, unit_kind) = unload_command.pick.packet();
     Ok(Packet::Unload(packets::Unload {
-        commp_id: c.player.get(),
-        num: c.units.count,
+        commp_id: unload_command.player.get(),
+        num: unload_command.units.count,
         gap_0x06: [0; 2],
-        x: c.point.x(),
-        y: c.point.y(),
+        x: unload_command.point.x(),
+        y: unload_command.point.y(),
         unit_kind,
         flag,
         gap_0x15: [0; 3],
-        field_0x18: u8::from(c.sound),
-        ids: ids(&c.units.ids, packets::Unload::FIXED)?,
+        field_0x18: u8::from(unload_command.sound),
+        ids: ids(&unload_command.units.ids, packets::Unload::FIXED)?,
     }))
 }
 
 /// `UNIT_ORDER` (0x75).
-fn unit_order(c: &UnitOrderCommand) -> GenieResult<Packet> {
+fn unit_order(unit_order_command: &UnitOrderCommand) -> GenieResult<Packet> {
     Ok(Packet::UnitOrder(packets::UnitOrder {
-        commp_id: c.player.get(),
-        num: c.units.count,
+        commp_id: unit_order_command.player.get(),
+        num: unit_order_command.units.count,
         gap_0x06: [0; 2],
-        tid: ObjectId::field(c.target),
-        x: c.point.x(),
-        y: c.point.y(),
-        qid: c.queue_id.get(),
-        param: c.param.get().cast_signed(),
-        action: c.action.byte(),
-        field_0x1d: c.shift.byte(),
-        field_0x1e: c.scope.byte(),
+        tid: ObjectId::field(unit_order_command.target),
+        x: unit_order_command.point.x(),
+        y: unit_order_command.point.y(),
+        qid: unit_order_command.queue_id.get(),
+        param: unit_order_command.param.get().cast_signed(),
+        action: unit_order_command.action.byte(),
+        field_0x1d: unit_order_command.shift.byte(),
+        field_0x1e: unit_order_command.scope.byte(),
         gap_0x1f: UNIT_ORDER_GAP,
-        field_0x20: u8::from(c.human),
-        ids: ids(&c.units.ids, packets::UnitOrder::FIXED)?,
+        field_0x20: u8::from(unit_order_command.human),
+        ids: ids(&unit_order_command.units.ids, packets::UnitOrder::FIXED)?,
     }))
 }
 
@@ -461,10 +494,10 @@ fn go_back_to_work_rest(units: &UnitList) -> GenieResult<Vec<u8>> {
 }
 
 /// GIVE ATTRIBUTES (0xc4).
-fn tribute(c: &TributeCommand) -> Packet {
-    let [first, second, third, fourth] = &c.gifts;
+fn tribute(tribute_command: &TributeCommand) -> Packet {
+    let [first, second, third, fourth] = &tribute_command.gifts;
     Packet::TribeGiveAttributes(packets::TribeGiveAttributes {
-        commp_id: c.player.get(),
+        commp_id: tribute_command.player.get(),
         amt: first.amount.get(),
         field_0x08: second.amount.get(),
         field_0x0c: third.amount.get(),
@@ -477,45 +510,45 @@ fn tribute(c: &TributeCommand) -> Packet {
         field_0x26: second.attribute.get(),
         field_0x28: third.attribute.get(),
         field_0x2a: fourth.attribute.get(),
-        to: c.to.get(),
+        to: tribute_command.to.get(),
     })
 }
 
 /// `SELL_COMMODITY` (0x7a) or `BUY_COMMODITY` (0x7b).
-fn trade(c: &TradeCommand) -> Packet {
-    let player = c.player.get();
-    if c.buy {
+fn trade(trade_command: &TradeCommand) -> Packet {
+    let player = trade_command.player.get();
+    if trade_command.buy {
         Packet::BuyCommodity(packets::BuyCommodity {
             commp_id: player,
-            attr: c.attribute.get(),
-            amt: c.times.get(),
-            uid: ObjectId::field(c.market),
+            attr: trade_command.attribute.get(),
+            amt: trade_command.times.get(),
+            uid: ObjectId::field(trade_command.market),
         })
     } else {
         Packet::SellCommodity(packets::SellCommodity {
             commp_id: player,
-            attr: c.attribute.get(),
-            amt: c.times.get(),
-            uid: ObjectId::field(c.market),
+            attr: trade_command.attribute.get(),
+            amt: trade_command.times.get(),
+            uid: ObjectId::field(trade_command.market),
         })
     }
 }
 
 /// FLARE (0x73): the players' bytes from `+0x11`, of which the layout's fixed part holds three.
-fn flare(c: &FlareCommand) -> GenieResult<Packet> {
-    let shown: Vec<u8> = c.shown.iter().map(|&s| u8::from(s)).collect();
+fn flare(flare_command: &FlareCommand) -> GenieResult<Packet> {
+    let shown: Vec<u8> = flare_command.shown.iter().map(|&s| u8::from(s)).collect();
     let [first, second, third, rest @ ..] = shown.as_slice() else {
         return Err(GenieError::invalid_input(
             "a FLARE's packet holds three players' bytes at least",
         )
-        .with("players", c.shown.len()));
+        .with("players", flare_command.shown.len()));
     };
     Ok(Packet::Flare(packets::Flare {
-        commp_id: c.player.get(),
-        field_0x04: ObjectId::field(c.target).cast_unsigned(),
-        field_0x08: c.point.x(),
-        field_0x0c: c.point.y(),
-        field_0x10: c.players,
+        commp_id: flare_command.player.get(),
+        field_0x04: ObjectId::field(flare_command.target).cast_unsigned(),
+        field_0x08: flare_command.point.x(),
+        field_0x0c: flare_command.point.y(),
+        field_0x10: flare_command.players,
         gap_0x11: [*first],
         field_0x12: *second,
         field_0x13: *third,
@@ -524,14 +557,14 @@ fn flare(c: &FlareCommand) -> GenieResult<Packet> {
 }
 
 /// GAME (0x67).
-fn game(c: &GameCommand) -> Packet {
+fn game(game_command: &GameCommand) -> Packet {
     Packet::Game(packets::Game {
-        commp_id: c.issuer.get(),
-        field_0x04: c.sub.get(),
+        commp_id: game_command.issuer.get(),
+        field_0x04: game_command.sub.get(),
         gap_0x06: [0; 2],
-        field_0x08: c.player,
-        field_0x0a: c.a,
-        field_0x0c: c.speed,
-        field_0x10: c.value,
+        field_0x08: game_command.player,
+        field_0x0a: game_command.a,
+        field_0x0c: game_command.speed,
+        field_0x10: game_command.value,
     })
 }

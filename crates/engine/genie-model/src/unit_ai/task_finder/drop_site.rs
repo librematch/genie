@@ -61,7 +61,10 @@ impl DropSite {
         state: ObjectState,
         workers: WorkerCount,
     ) -> Option<AttributeId> {
-        let t = self.targets.iter().find(|t| t.class == class)?;
+        let t = self
+            .targets
+            .iter()
+            .find(|drop_target| drop_target.class == class)?;
         if t.workers.caps(workers) || t.state.is_some_and(|wanted| wanted != state) {
             return None;
         }

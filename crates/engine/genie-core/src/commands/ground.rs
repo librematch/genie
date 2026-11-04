@@ -79,25 +79,25 @@ impl World {
         ];
         let mut together = Vec::new();
         for &id in units {
-            let Some((owner, u)) = self.object(id) else {
+            let Some((owner, unit)) = self.object(id) else {
                 continue;
             };
-            let master = u.master(self.master_tables(), owner)?;
+            let master = unit.master(self.master_tables(), owner)?;
             if master.kind < MasterKind::MOVING
-                || u.life.state != ObjectState::Alive
-                || self.parts.actions_of(u.id).top_target() == Some(foundation.id())
+                || unit.life.state != ObjectState::Alive
+                || self.parts.actions_of(unit.id).top_target() == Some(foundation.id())
             {
                 continue;
             }
             let walking = self
                 .parts
-                .anim_speed_of(u.id)
-                .is_some_and(|s| Speed::ZERO < s);
+                .anim_speed_of(unit.id)
+                .is_some_and(|speed| Speed::ZERO < speed);
             let level = self
                 .parts
-                .mover_of(u.id)
-                .and_then(|m| m.paths.first())
-                .map(|l| l.state);
+                .mover_of(unit.id)
+                .and_then(|mover| mover.paths.first())
+                .map(|path_data| path_data.state);
             let stands = (owner == PlayerId::GAIA
                 && self
                     .model
@@ -105,8 +105,10 @@ impl World {
                     .of_class(master.class)
                     .intersects(ClassRoles::PREY | ClassRoles::PREDATOR))
                 || (!walking
-                    && level.is_none_or(|s| matches!(s, PathState::Idle | PathState::GaveUp)));
-            let busy = self.parts.unit_ai.get(u.id).is_none_or(|ai| {
+                    && level.is_none_or(|path_state| {
+                        matches!(path_state, PathState::Idle | PathState::GaveUp)
+                    }));
+            let busy = self.parts.unit_ai.get(unit.id).is_none_or(|ai| {
                 matches!(
                     ai.current_action,
                     Some(AiAction::MoveAside | AiAction::GroupAside)
@@ -122,13 +124,17 @@ impl World {
                 together.push(id);
                 continue;
             }
-            let state = u.life.state;
-            let Some(Place::Live(q, i)) = self.place(id) else {
+            let state = unit.life.state;
+            let Some(Place::Live(player_id, list_index)) = self.place(id) else {
                 return Err(GenieError::unsupported(
                     "a sleeping unit sent off a footprint",
                 ));
             };
-            if let Some(ai) = self.parts.unit_ai.get_mut(self.players.live(q, i)?.id) {
+            if let Some(ai) = self
+                .parts
+                .unit_ai
+                .get_mut(self.players.live(player_id, list_index)?.id)
+            {
                 ai.post(Notify::own(id, NotifyKind::SENT_OFF, p), state)?;
             }
         }
@@ -203,10 +209,10 @@ impl World {
             self.move_point_order(q, i, Position::new(x, y, z))?;
         }
         for &id in units {
-            let Some(Place::Live(q, i)) = self.place(id) else {
+            let Some(Place::Live(player_id, list_index)) = self.place(id) else {
                 continue;
             };
-            let unit = self.players.live_mut(q, i)?;
+            let unit = self.players.live_mut(player_id, list_index)?;
             let state = unit.life.state;
             if let Some(ai) = self.parts.unit_ai.get_mut(unit.id)
                 && ai.current_action != Some(AiAction::MoveAside)
@@ -230,20 +236,20 @@ impl World {
         master: MasterId,
         position: Position,
     ) -> GenieResult<()> {
-        let s = self.model.slots.master;
+        let master_slots = self.model.slots.master;
         // the farms and the terrain their foundations lay (`0x1d`, `0x41`)
         let farms = [
-            (s.farm, TerrainId::named(29)),
-            (s.rice_farm, TerrainId::named(65)),
+            (master_slots.farm, TerrainId::named(29)),
+            (master_slots.rice_farm, TerrainId::named(65)),
         ];
-        let Some(&(_, laid)) = farms.iter().find(|(m, _)| *m == master) else {
+        let Some(&(_, laid)) = farms.iter().find(|(master_id, _)| *master_id == master) else {
             return Ok(());
         };
         let m = self.master(player, master)?;
         if m.creatable_part().build_time <= WholeSeconds::ZERO {
             return Ok(());
         }
-        let f = Foundation {
+        let foundation = Foundation {
             position,
             clearance: m.clearance,
             terrain: laid,
@@ -259,7 +265,7 @@ impl World {
             .ok_or(GenieError::unsupported(
                 "a farm's foundation without the map's terrain",
             ))?
-            .cover(&f, &self.model.roles, self.model.tuning.terrain)
+            .cover(&foundation, &self.model.roles, self.model.tuning.terrain)
     }
 
     /// The footprint clearing (`FUN_1415c3620` with `param_7` 0) of a new building of `master`
@@ -315,14 +321,14 @@ impl World {
             let recorded = self
                 .spatial
                 .get(cl.id)
-                .is_some_and(|o| o.obstruction.is_some());
+                .is_some_and(|placed| placed.obstruction.is_some());
             if !look.roo_called && (below_or_unordered(0.0, look.height.get()) || recorded) {
                 self.pathing.removed(cl.id);
                 self.spatial.drop_record(cl.id);
                 self.pathing.tiles_changed(self.spatial.take_changes());
             }
-            if let Some((_, u)) = self.object_mut(cl.id) {
-                u.flags.set(UnitFlags::ROO_CALLED, true);
+            if let Some((_, unit)) = self.object_mut(cl.id) {
+                unit.flags.set(UnitFlags::ROO_CALLED, true);
             }
         }
         Ok(())
@@ -330,13 +336,13 @@ impl World {
 
     /// What the footprint clearing reads of object `id` ([`crate::construction::build::ClearLook`]).
     pub(crate) fn clear_look(&self, id: ObjectId) -> GenieResult<Option<ClearLook>> {
-        let Some((p, u)) = self.object(id) else {
+        let Some((player_id, unit)) = self.object(id) else {
             return Ok(None);
         };
         Ok(Some(clear_look_of(
-            u,
+            unit,
             self.parts.building_of(id),
-            OwnerMasters::new(&self.parts.own_master, self.model.masters.of(p)),
+            OwnerMasters::new(&self.parts.own_master, self.model.masters.of(player_id)),
         )?))
     }
 
@@ -358,9 +364,9 @@ impl World {
         }
         self.destroy(owner, cl.id)?;
         if record == RecordDrop::Dropped
-            && let Some((_, u)) = self.object_mut(cl.id)
+            && let Some((_, unit)) = self.object_mut(cl.id)
         {
-            u.flags.set(UnitFlags::ROO_CALLED, true);
+            unit.flags.set(UnitFlags::ROO_CALLED, true);
         }
         Ok(())
     }
@@ -405,12 +411,13 @@ impl World {
             self.pathing.moved(id, &placed, MoveState::Standing);
             self.pathing.tiles_changed(self.spatial.take_changes());
         }
-        if let Some(v) = self.spatial.sight.as_mut() {
-            let umv = v.link_building(position, made.radius, self.model.tuning.visibility)?;
+        if let Some(visibility) = self.spatial.sight.as_mut() {
+            let umv =
+                visibility.link_building(position, made.radius, self.model.tuning.visibility)?;
             if desolid {
-                v.unlink_building(position, made.radius, self.model.tuning.visibility)?;
+                visibility.unlink_building(position, made.radius, self.model.tuning.visibility)?;
             }
-            v.add_seer(
+            visibility.add_seer(
                 id,
                 Seer {
                     player,

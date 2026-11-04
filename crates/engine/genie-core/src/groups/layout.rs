@@ -79,11 +79,11 @@ pub(crate) fn slots_by_place(
     world_time: WorldTime,
     group_tuning: &GroupTuning,
 ) -> GenieResult<Layout> {
-    let n = group.members.len();
-    if n == 0 {
+    let count = group.members.len();
+    if count == 0 {
         return Ok(Layout::NotLaid);
     }
-    formation.resize_slots(n);
+    formation.resize_slots(count);
     for s in formation.every_slot_mut() {
         s.active = 0;
     }
@@ -101,25 +101,25 @@ pub(crate) fn slots_by_place(
         TransformKind::Unturned
     };
     let position = group.motion.position[0];
-    for (i, m) in members.iter().enumerate().take(n) {
-        let Some(m) = m else {
+    for (index, m) in members.iter().enumerate().take(count) {
+        let Some(member_place) = m else {
             continue;
         };
-        let s = formation.slot_mut(i)?;
-        s.unit_id = Some(m.id);
-        s.offset = m.at - position;
-        s.desired_transform_position = m.at;
-        s.transform_position = m.at;
+        let s = formation.slot_mut(index)?;
+        s.unit_id = Some(member_place.id);
+        s.offset = member_place.at - position;
+        s.desired_transform_position = member_place.at;
+        s.transform_position = member_place.at;
         s.transformed = 1;
         s.time = world_time;
         s.state = SlotState::Steering;
         s.depth = 0;
         s.position_filled = 1;
         s.active = 1;
-        s.desired_category = m.category;
+        s.desired_category = member_place.category;
         s.desired_sub_category = UnitKind::NONE;
     }
-    formation.use_slots(n);
+    formation.use_slots(count);
     if layout == PlaceLayout::UserDefined {
         let mut ahead = 0.0f32;
         for s in &formation.slots {
@@ -131,11 +131,15 @@ pub(crate) fn slots_by_place(
             s.offset = s.offset.with_x(s.offset.x() - back);
         }
     }
-    for s in &mut formation.slots {
-        let l = length(s.offset);
-        if group_tuning.horde_reach < l {
-            let k = group_tuning.horde_reach / l;
-            s.offset = BVector::new(k * s.offset.x(), k * s.offset.height(), k * s.offset.y());
+    for slot in &mut formation.slots {
+        let length = length(slot.offset);
+        if group_tuning.horde_reach < length {
+            let k = group_tuning.horde_reach / length;
+            slot.offset = BVector::new(
+                k * slot.offset.x(),
+                k * slot.offset.height(),
+                k * slot.offset.y(),
+            );
         }
     }
     Ok(Layout::Laid)
@@ -176,20 +180,18 @@ fn next_statistic(group: &UnitGroup, current: Option<usize>, placed: &mut usize)
         return current;
     }
     *placed = 0;
-    let mut c = match current {
+    let mut formation_category = match current {
         Some(i) => group.unit_kinds.get(i)?.formation_category.next(),
         None => FormationCategory::named(0),
     };
-    while c <= FormationCategory::PROTECTED {
-        if let Some(i) = group
-            .unit_kinds
-            .iter()
-            .position(|s| s.formation_category == c)
-            && !group.unit_kinds.get(i)?.units.is_empty()
+    while formation_category <= FormationCategory::PROTECTED {
+        if let Some(i) = group.unit_kinds.iter().position(|unit_kind_statistic| {
+            unit_kind_statistic.formation_category == formation_category
+        }) && !group.unit_kinds.get(i)?.units.is_empty()
         {
             return Some(i);
         }
-        c = c.next();
+        formation_category = formation_category.next();
     }
     None
 }
@@ -210,12 +212,12 @@ pub(crate) fn phalanx_slots(
     world_time: WorldTime,
     group_tuning: &GroupTuning,
 ) -> GenieResult<Layout> {
-    let n = group.members.len() as i32;
-    if n < 1 {
+    let count = group.members.len() as i32;
+    if count < 1 {
         return Ok(Layout::NotLaid);
     }
     let mut lines = 0;
-    let mut left = n;
+    let mut left = count;
     let mut step = 1;
     while 0 < left {
         left -= step;
@@ -240,7 +242,7 @@ pub(crate) fn phalanx_slots(
     for line in 0..lines {
         let mut width = line + 1;
         if 1 < lines && line == lines - 1 {
-            width = n - slot as i32;
+            width = count - slot as i32;
         }
         let l = formation.lines.checked_mut(line as usize)?;
         clear_line(l);
@@ -254,7 +256,7 @@ pub(crate) fn phalanx_slots(
             ];
             at = BVector::new(at.x() - half[0], at.height() - half[1], at.y() - half[2]);
         }
-        for k in 0..width.max(0) as usize {
+        for index in 0..width.max(0) as usize {
             statistic = next_statistic(group, statistic, &mut placed);
             *formation.slot_mut(slot)? = Slot {
                 unit_id: None,
@@ -273,16 +275,16 @@ pub(crate) fn phalanx_slots(
                 desired_sub_category: UnitKind::NONE,
                 transformed: formation.slot_mut(slot)?.transformed,
             };
-            let l = formation.lines.checked_mut(line as usize)?;
-            if k < l.indices.len() {
-                *l.indices.checked_mut(k)? = slot as u32;
+            let formation_line = formation.lines.checked_mut(line as usize)?;
+            if index < formation_line.indices.len() {
+                *formation_line.indices.checked_mut(index)? = slot as u32;
             }
             placed += 1;
             at = at - single;
             slot += 1;
         }
     }
-    formation.use_slots(n as usize);
+    formation.use_slots(count as usize);
     Ok(Layout::Laid)
 }
 
@@ -372,8 +374,8 @@ pub fn place_box_perimeter(
     *first = first.with_x(max.x()).with_y(min.y());
     let mut corner = 0.0f32;
     let mut state = 0;
-    for i in 1..count {
-        let prev = *out.checked(i - 1)?;
+    for index in 1..count {
+        let prev = *out.checked(index - 1)?;
         let (x, z) = match state {
             0 => {
                 let z = prev.y() + step;
@@ -415,11 +417,11 @@ pub fn place_box_perimeter(
                 (x, min.y())
             }
             _ => {
-                *out.checked_mut(i)? = *out.checked_mut(0)?;
+                *out.checked_mut(index)? = *out.checked_mut(0)?;
                 continue;
             }
         };
-        let o = out.checked_mut(i)?;
+        let o = out.checked_mut(index)?;
         *o = o.with_x(x).with_y(z);
     }
     Ok(Layout::Laid)
@@ -448,9 +450,9 @@ pub fn create_lines(formation: &mut Formation) -> GenieResult<()> {
         let line = formation.lines.checked_mut(k)?;
         clear_line(line);
         let _ = reset_line(line, slots.len() as i32, k as i32);
-        for (m, &slot) in slots.iter().enumerate() {
-            if m < line.indices.len() {
-                *line.indices.checked_mut(m)? = slot;
+        for (index, &slot) in slots.iter().enumerate() {
+            if index < line.indices.len() {
+                *line.indices.checked_mut(index)? = slot;
             }
         }
     }
@@ -492,12 +494,12 @@ pub(crate) fn box_slots(
     formation.use_slots(0);
     let mut positions = [BVector::ZERO; BOX_POSITIONS];
     let mut used = 0usize;
-    for c in FormationCategory::EACH.into_iter().rev() {
+    for formation_category in FormationCategory::EACH.into_iter().rev() {
         let Some(stat) = group
             .unit_kinds
             .iter()
-            .find(|u| u.formation_category == c)
-            .filter(|u| !u.units.is_empty())
+            .find(|u| u.formation_category == formation_category)
+            .filter(|unit_kind_statistic| !unit_kind_statistic.units.is_empty())
         else {
             continue;
         };
@@ -534,8 +536,8 @@ pub(crate) fn box_slots(
             );
             (min_x, min_z, max_x, max_z) = (min.x(), min.y(), max.x(), max.y());
         }
-        for (j, &p) in positions.iter().enumerate().take(count) {
-            let at = used + j;
+        for (index, &p) in positions.iter().enumerate().take(count) {
+            let at = used + index;
             *formation.slot_mut(at)? = Slot {
                 unit_id: None,
                 offset: p,
@@ -546,7 +548,7 @@ pub(crate) fn box_slots(
                 depth: 0,
                 position_filled: 0,
                 active: 1,
-                desired_category: c,
+                desired_category: formation_category,
                 desired_sub_category: UnitKind::NONE,
                 transformed: formation.slot_mut(at)?.transformed,
             };
@@ -566,7 +568,7 @@ pub(crate) fn box_slots(
 }
 
 impl World {
-    /// `createHorde` (`FUN_141013eb0`) of `formation` for group `g`: not laid without members.
+    /// `createHorde` (`FUN_141013eb0`) of `formation` for group `group`: not laid without members.
     /// Each member the world's table holds ([`World::world_object`]) gives its
     /// place (slot 0x520) and its sub-formation (`FUN_141011300` with 0,
     /// [`World::unit_category`]) to the slots ([`slots_by_place`]).
@@ -578,12 +580,12 @@ impl World {
     pub(crate) fn create_horde(
         &self,
         formation: &mut Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
     ) -> GenieResult<Layout> {
-        let members = self.member_places(g)?;
+        let members = self.member_places(group)?;
         slots_by_place(
             formation,
-            g,
+            group,
             &members,
             PlaceLayout::Horde,
             self.world_time,
@@ -591,7 +593,7 @@ impl World {
         )
     }
 
-    /// `createUDF` (`FUN_141014f60`) of `formation` for group `g`, as [`Self::create_horde`]
+    /// `createUDF` (`FUN_141014f60`) of `formation` for group `group`, as [`Self::create_horde`]
     /// with a user defined formation's slots ([`slots_by_place`]).
     ///
     /// # Errors
@@ -600,12 +602,12 @@ impl World {
     pub(crate) fn create_udf(
         &self,
         formation: &mut Formation,
-        g: &UnitGroup,
+        group: &UnitGroup,
     ) -> GenieResult<Layout> {
-        let members = self.member_places(g)?;
+        let members = self.member_places(group)?;
         slots_by_place(
             formation,
-            g,
+            group,
             &members,
             PlaceLayout::UserDefined,
             self.world_time,
@@ -615,12 +617,12 @@ impl World {
 
     /// What `createHorde` and `createUDF` read of each member (`FUN_1415417a0`, slot 0x520,
     /// `FUN_141011300` with 0), None for one the world's table does not hold.
-    fn member_places(&self, g: &UnitGroup) -> GenieResult<Vec<Option<MemberPlace>>> {
-        let mut places = Vec::with_capacity(g.members.len());
-        for m in &g.members {
-            let place = match self.world_object(m.id) {
+    fn member_places(&self, group: &UnitGroup) -> GenieResult<Vec<Option<MemberPlace>>> {
+        let mut places = Vec::with_capacity(group.members.len());
+        for member in &group.members {
+            let place = match self.world_object(member.id) {
                 Some(object) => Some(MemberPlace {
-                    id: m.id,
+                    id: member.id,
                     at: object.moved_vector(),
                     category: self.unit_category(Some(object))?,
                 }),
@@ -758,34 +760,34 @@ mod tests {
             (FormationKind::Horde, TransformKind::Unturned, -1, -1, 0)
         );
         assert_eq!(f.slots.len(), 3);
-        let s = &f.slots[0];
+        let slot = &f.slots[0];
         assert_eq!(
-            (s.unit_id, s.offset, s.desired_transform_position),
+            (slot.unit_id, slot.offset, slot.desired_transform_position),
             (
                 Some(object_id(7)),
                 BVector::new(2.0, 0.0, 0.0),
                 BVector::new(12.0, 0.0, 10.0)
             )
         );
-        assert_eq!(s.transform_position, BVector::new(12.0, 0.0, 10.0));
+        assert_eq!(slot.transform_position, BVector::new(12.0, 0.0, 10.0));
         assert_eq!(
             (
-                s.transformed,
-                s.time,
-                s.position_filled,
-                s.active,
-                s.desired_category.get()
+                slot.transformed,
+                slot.time,
+                slot.position_filled,
+                slot.active,
+                slot.desired_category.get()
             ),
             (1, WorldTime::from_millis(640), 1, 1, 1)
         );
-        assert_eq!(s.desired_sub_category, UnitKind::NONE);
+        assert_eq!(slot.desired_sub_category, UnitKind::NONE);
         assert_eq!((f.slots[1].unit_id, f.slots[1].active), (None, 0));
         assert_eq!(f.slots[2].offset, BVector::new(5.0, 0.0, 0.0));
         // no members, no layout
-        let mut f = Formation::new();
+        let mut formation = Formation::new();
         assert_eq!(
             slots_by_place(
-                &mut f,
+                &mut formation,
                 &group(0, 1.0, &[]),
                 &[],
                 PlaceLayout::Horde,
@@ -795,15 +797,15 @@ mod tests {
             .unwrap(),
             Layout::NotLaid
         );
-        assert_eq!(f, Formation::new());
+        assert_eq!(formation, Formation::new());
     }
 
     /// `FUN_141014f60`: the offsets on x move back by the farthest ahead (10) plus 0.5, the
     /// unheld member's slot too, then are cut to 5.
     #[test]
     fn user_defined_formation_moves_back_behind_its_farthest_member() {
-        let g = group(3, 1.0, &[]);
-        let mut f = Formation::new();
+        let group = group(3, 1.0, &[]);
+        let mut formation = Formation::new();
         let members = [
             Some(place(7, 12.0, 10.0, 1)),
             None,
@@ -811,8 +813,8 @@ mod tests {
         ];
         assert_eq!(
             slots_by_place(
-                &mut f,
-                &g,
+                &mut formation,
+                &group,
                 &members,
                 PlaceLayout::UserDefined,
                 WorldTime::from_millis(640),
@@ -822,10 +824,10 @@ mod tests {
             Layout::Laid
         );
         assert_eq!(
-            (f.kind, f.transform_kind),
+            (formation.kind, formation.transform_kind),
             (FormationKind::UserDefined, TransformKind::Turned)
         );
-        let offsets: Vec<BVector> = f.slots.iter().map(|s| s.offset).collect();
+        let offsets: Vec<BVector> = formation.slots.iter().map(|slot| slot.offset).collect();
         assert_eq!(
             offsets,
             [
@@ -841,16 +843,16 @@ mod tests {
     /// `MAXSS` at 0x141015208 skips a NaN offset in the search for the farthest slot ahead.
     #[test]
     fn user_defined_formation_search_ahead_skips_nan_offset() {
-        let g = group(2, 1.0, &[]);
-        let mut f = Formation::new();
+        let group = group(2, 1.0, &[]);
+        let mut formation = Formation::new();
         let members = [
             Some(place(9, 20.0, 10.0, 3)),
             Some(place(7, f32::NAN, 10.0, 1)),
         ];
         assert_eq!(
             slots_by_place(
-                &mut f,
-                &g,
+                &mut formation,
+                &group,
                 &members,
                 PlaceLayout::UserDefined,
                 WorldTime::from_millis(640),
@@ -860,7 +862,11 @@ mod tests {
             Layout::Laid
         );
         // the farthest ahead stays finite, so the finite member's offset moves back by it
-        assert!(f.slots[0].offset.x().is_finite(), "{:?}", f.slots[0].offset);
+        assert!(
+            formation.slots[0].offset.x().is_finite(),
+            "{:?}",
+            formation.slots[0].offset
+        );
     }
 
     /// `FUN_14102ab30`'s walk tests are `COMISS`/`JC` (0x14102b17e, 0x14102b132, 0x14102b0f1):
@@ -914,10 +920,10 @@ mod tests {
                 distance_back: Distance::new(4.0),
             }
         );
-        let mut l = line;
-        clear_line(&mut l);
+        let mut formation_line = line;
+        clear_line(&mut formation_line);
         assert_eq!(
-            l,
+            formation_line,
             FormationLine {
                 distance_back: Distance::new(4.0),
                 ..FormationLine::default()
@@ -928,14 +934,14 @@ mod tests {
     /// Group 1 of `slot_world`'s units 10, 11 (category 1) and 12 (category 3) at (5.5, 5.5),
     /// (6.5, 5.5) and (5.5, 6.5), their statistics, the group at (6, 6), spacing 1.
     fn three_at_six() -> World {
-        let mut t = slot_world(
+        let mut world = slot_world(
             &[(10, 4, 5.5, 5.5), (11, 4, 6.5, 5.5), (12, 6, 5.5, 6.5)],
             &[],
         );
-        let g = &mut t.groups.groups[0];
-        g.desired_spacing = Distance::new(1.0);
-        g.motion.position[0] = BVector::new(6.0, 0.0, 6.0);
-        g.unit_kinds = vec![
+        let group = &mut world.groups.groups[0];
+        group.desired_spacing = Distance::new(1.0);
+        group.motion.position[0] = BVector::new(6.0, 0.0, 6.0);
+        group.unit_kinds = vec![
             UnitKindStatistic {
                 formation_category: FormationCategory::named(1),
                 units: vec![object_id(10), object_id(11)],
@@ -949,7 +955,7 @@ mod tests {
                 ..UnitKindStatistic::default()
             },
         ];
-        t
+        world
     }
 
     /// `FUN_1410147b0` and `FUN_141011a00` lay their slots, then transform them and take the
@@ -958,8 +964,8 @@ mod tests {
     /// slots and `lay_units` without the column-to-line flag.
     #[test]
     fn phalanx_and_box_take_their_units_after_their_slots() {
-        let mut t = three_at_six();
-        let g = t.groups.get(group_id(1)).unwrap().clone();
+        let mut world = three_at_six();
+        let g = world.groups.get(group_id(1)).unwrap().clone();
         let stale = Slot {
             unit_id: Some(object_id(99)),
             position_filled: 1,
@@ -969,15 +975,16 @@ mod tests {
         start.spare_slots = vec![stale; 9];
         let mut whole = start.clone();
         assert_eq!(
-            t.create_phalanx(&mut whole, group_id(1)).unwrap(),
+            world.create_phalanx(&mut whole, group_id(1)).unwrap(),
             Layout::Laid
         );
         let mut parts = start.clone();
         assert_eq!(
-            phalanx_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap(),
+            phalanx_slots(&mut parts, &g, world.world_time, &tuning().group).unwrap(),
             Layout::Laid
         );
-        t.lay_units(&mut parts, group_id(1), SlotOrder::Closest)
+        world
+            .lay_units(&mut parts, group_id(1), SlotOrder::Closest)
             .unwrap();
         assert_eq!(whole, parts);
         let mut ids: Vec<Option<ObjectId>> = whole.slots.iter().map(|s| s.unit_id).collect();
@@ -997,25 +1004,29 @@ mod tests {
                 .all(|s| (s.unit_id, s.position_filled) == (None, 0))
         );
         let mut whole = start.clone();
-        assert_eq!(t.create_box(&mut whole, group_id(1)).unwrap(), Layout::Laid);
-        let mut parts = start;
         assert_eq!(
-            box_slots(&mut parts, &g, t.world_time, &tuning().group).unwrap(),
+            world.create_box(&mut whole, group_id(1)).unwrap(),
             Layout::Laid
         );
-        t.lay_units(&mut parts, group_id(1), SlotOrder::Closest)
+        let mut parts = start;
+        assert_eq!(
+            box_slots(&mut parts, &g, world.world_time, &tuning().group).unwrap(),
+            Layout::Laid
+        );
+        world
+            .lay_units(&mut parts, group_id(1), SlotOrder::Closest)
             .unwrap();
         assert_eq!(whole, parts);
-        assert!(whole.slots.iter().all(|s| s.unit_id.is_some()));
+        assert!(whole.slots.iter().all(|slot| slot.unit_id.is_some()));
         // without members, nothing
         let mut none = Formation::new();
-        t.groups.groups[0] = group(0, 1.0, &[]);
+        world.groups.groups[0] = group(0, 1.0, &[]);
         assert_eq!(
-            t.create_box(&mut none, group_id(1)).unwrap(),
+            world.create_box(&mut none, group_id(1)).unwrap(),
             Layout::NotLaid
         );
         assert_eq!(
-            t.create_phalanx(&mut none, group_id(1)).unwrap(),
+            world.create_phalanx(&mut none, group_id(1)).unwrap(),
             Layout::NotLaid
         );
     }
@@ -1025,26 +1036,26 @@ mod tests {
     /// of a member the world's table does not hold stays fresh and inactive.
     #[test]
     fn horde_looks_its_members_up_in_the_world() {
-        let mut t = three_at_six();
-        t.groups.groups[0].members.insert(
+        let mut world = three_at_six();
+        world.groups.groups[0].members.insert(
             1,
             Member {
                 id: object_id(50),
                 ..Member::default()
             },
         );
-        let g = t.groups.get(group_id(1)).unwrap().clone();
+        let group = world.groups.get(group_id(1)).unwrap().clone();
         let mut f = Formation::new();
-        assert_eq!(t.create_horde(&mut f, &g).unwrap(), Layout::Laid);
+        assert_eq!(world.create_horde(&mut f, &group).unwrap(), Layout::Laid);
         let slots: Vec<(Option<ObjectId>, BVector, i32, u32)> = f
             .slots
             .iter()
-            .map(|s| {
+            .map(|slot| {
                 (
-                    s.unit_id,
-                    s.transform_position,
-                    s.desired_category.get(),
-                    s.active,
+                    slot.unit_id,
+                    slot.transform_position,
+                    slot.desired_category.get(),
+                    slot.active,
                 )
             })
             .collect();
@@ -1061,10 +1072,17 @@ mod tests {
             (f.kind, f.transform_kind),
             (FormationKind::Horde, TransformKind::Unturned)
         );
-        let mut f = Formation::new();
-        assert_eq!(t.create_udf(&mut f, &g).unwrap(), Layout::Laid);
+        let mut formation = Formation::new();
         assert_eq!(
-            (f.kind, f.transform_kind, f.slots[3].unit_id),
+            world.create_udf(&mut formation, &group).unwrap(),
+            Layout::Laid
+        );
+        assert_eq!(
+            (
+                formation.kind,
+                formation.transform_kind,
+                formation.slots[3].unit_id
+            ),
             (
                 FormationKind::UserDefined,
                 TransformKind::Turned,
@@ -1077,10 +1095,10 @@ mod tests {
     /// gives `i32::MIN`, where Rust's `as` would give 0.
     #[test]
     fn box_of_nan_spacing_is_i32_min_wide() {
-        let mut f = Formation::new();
+        let mut formation = Formation::new();
         assert_eq!(
             box_slots(
-                &mut f,
+                &mut formation,
                 &group(2, f32::NAN, &[(1, 2)]),
                 WorldTime::ZERO,
                 &tuning().group
@@ -1088,7 +1106,10 @@ mod tests {
             .unwrap(),
             Layout::Laid
         );
-        assert_eq!((f.maximum_width, f.maximum_depth), (i32::MIN, i32::MIN));
+        assert_eq!(
+            (formation.maximum_width, formation.maximum_depth),
+            (i32::MIN, i32::MIN)
+        );
     }
 
     #[test]
@@ -1126,7 +1147,7 @@ mod tests {
         let lines: Vec<(i32, Vec<u32>)> = f
             .lines
             .iter()
-            .map(|l| (l.depth, l.indices.clone()))
+            .map(|formation_line| (formation_line.depth, formation_line.indices.clone()))
             .collect();
         assert_eq!(lines, [(0, vec![0]), (1, vec![1, 2]), (2, vec![3])]);
         assert!(
@@ -1135,10 +1156,10 @@ mod tests {
                 .all(|s| (s.unit_id, s.active, s.time) == (None, 1, WorldTime::from_millis(99)))
         );
         // without statistics the slots take no category
-        let mut f = Formation::new();
+        let mut formation = Formation::new();
         assert_eq!(
             phalanx_slots(
-                &mut f,
+                &mut formation,
                 &group(2, 2.0, &[]),
                 WorldTime::ZERO,
                 &tuning().group
@@ -1147,9 +1168,10 @@ mod tests {
             Layout::Laid
         );
         assert!(
-            f.slots
+            formation
+                .slots
                 .iter()
-                .all(|s| s.desired_category == FormationCategory::named(-1))
+                .all(|slot| slot.desired_category == FormationCategory::named(-1))
         );
     }
 
@@ -1265,11 +1287,11 @@ mod tests {
             ],
         ];
         for places in fixed {
-            let n = places.len();
+            let count = places.len();
             let (mut min, mut max) = (BVector::new(lo, 0.0, lo), BVector::new(hi, 0.0, hi));
             assert_eq!(
                 place_box_perimeter(
-                    n,
+                    count,
                     &mut out,
                     &mut min,
                     &mut max,
@@ -1279,8 +1301,8 @@ mod tests {
                 .unwrap(),
                 Layout::Laid
             );
-            let got: Vec<(f32, f32)> = out[..n].iter().map(|p| (p.x(), p.y())).collect();
-            assert_eq!(got, places, "{n}");
+            let got: Vec<(f32, f32)> = out[..count].iter().map(|p| (p.x(), p.y())).collect();
+            assert_eq!(got, places, "{count}");
         }
         // none, or more than the buffer holds, writes nothing
         assert_eq!(
@@ -1313,15 +1335,15 @@ mod tests {
     /// keeps its distance back and loses its attack range.
     #[test]
     fn create_lines_groups_the_slots_by_their_offset_on_x() {
-        let mut f = Formation::new();
-        f.slots = [0.25, -1.0, 0.250_000_06, 3.0]
+        let mut formation = Formation::new();
+        formation.slots = [0.25, -1.0, 0.250_000_06, 3.0]
             .iter()
             .map(|&x| Slot {
                 offset: BVector::new(x, 0.0, 0.0),
                 ..Slot::default()
             })
             .collect();
-        f.lines = vec![
+        formation.lines = vec![
             FormationLine {
                 attack_range: Distance::new(4.0),
                 distance_back: Distance::new(2.0),
@@ -1329,16 +1351,19 @@ mod tests {
             };
             3
         ];
-        create_lines(&mut f).unwrap();
-        assert_eq!(f.number_lines, 3);
-        let lines: Vec<(i32, Vec<u32>)> = f
+        create_lines(&mut formation).unwrap();
+        assert_eq!(formation.number_lines, 3);
+        let lines: Vec<(i32, Vec<u32>)> = formation
             .lines
             .iter()
-            .map(|l| (l.depth, l.indices.clone()))
+            .map(|formation_line| (formation_line.depth, formation_line.indices.clone()))
             .collect();
         assert_eq!(lines, [(0, vec![0, 2]), (1, vec![1]), (2, vec![3])]);
         assert_eq!(
-            (f.lines[0].attack_range, f.lines[0].distance_back),
+            (
+                formation.lines[0].attack_range,
+                formation.lines[0].distance_back
+            ),
             (Distance::ZERO, Distance::new(2.0))
         );
     }
@@ -1348,19 +1373,30 @@ mod tests {
     #[test]
     fn box_rings_its_categories_from_the_middle_out() {
         let g = group(4, 2.0, &[(1, 3), (5, 1)]);
-        let mut f = Formation::new();
+        let mut formation = Formation::new();
         assert_eq!(
-            box_slots(&mut f, &g, WorldTime::from_millis(5), &tuning().group).unwrap(),
+            box_slots(
+                &mut formation,
+                &g,
+                WorldTime::from_millis(5),
+                &tuning().group
+            )
+            .unwrap(),
             Layout::Laid
         );
         assert_eq!(
-            (f.kind, f.transform_kind, f.maximum_width, f.maximum_depth),
+            (
+                formation.kind,
+                formation.transform_kind,
+                formation.maximum_width,
+                formation.maximum_depth
+            ),
             (FormationKind::Box, TransformKind::Turned, 4, 4)
         );
-        let slots: Vec<(BVector, i32)> = f
+        let slots: Vec<(BVector, i32)> = formation
             .slots
             .iter()
-            .map(|s| (s.offset, s.desired_category.get()))
+            .map(|slot| (slot.offset, slot.desired_category.get()))
             .collect();
         assert_eq!(
             slots,
@@ -1371,9 +1407,13 @@ mod tests {
                 (BVector::new(-2.0, 0.0, 0.0), 1),
             ]
         );
-        let lines: Vec<Vec<u32>> = f.lines.iter().map(|l| l.indices.clone()).collect();
+        let lines: Vec<Vec<u32>> = formation
+            .lines
+            .iter()
+            .map(|formation_line| formation_line.indices.clone())
+            .collect();
         assert_eq!(lines, [vec![0], vec![1, 2], vec![3]]);
-        assert_eq!(f.number_lines, 3);
+        assert_eq!(formation.number_lines, 3);
         // more than the buffer holds of one category
         let g = group(61, 2.0, &[(1, 61)]);
         assert!(

@@ -20,17 +20,17 @@ impl Restriction {
         Self(values)
     }
 
-    /// Terrain `t`'s value; none past the values.
+    /// Terrain `terrain_id`'s value; none past the values.
     #[must_use]
-    pub fn value(&self, t: TerrainId) -> Option<f32> {
-        self.0.get(t.index()).copied()
+    pub fn value(&self, terrain_id: TerrainId) -> Option<f32> {
+        self.0.get(terrain_id.index()).copied()
     }
 
-    /// Whether an object of the restriction may stand on terrain `t`: its value is above 0
+    /// Whether an object of the restriction may stand on terrain `terrain_id`: its value is above 0
     /// (`0 < v`, a NaN is not); a terrain past the values is not passable.
     #[must_use]
-    pub fn passes(&self, t: TerrainId) -> bool {
-        self.value(t).is_some_and(|v| 0.0 < v)
+    pub fn passes(&self, terrain_id: TerrainId) -> bool {
+        self.value(terrain_id).is_some_and(|v| 0.0 < v)
     }
 
     /// The values, terrain 0's first, as the data and the save hold them.
@@ -48,14 +48,17 @@ mod tests {
     /// values has no value and does not pass.
     #[test]
     fn terrain_passes_on_value_above_zero() {
-        let r = Restriction::new(vec![1.0, 0.0, -1.0, f32::NAN, 0.25]);
+        let restriction = Restriction::new(vec![1.0, 0.0, -1.0, f32::NAN, 0.25]);
         let t = TerrainId::named;
         assert_eq!(
-            [0, 1, 2, 3, 4, 5].map(|k| r.passes(t(k))),
+            [0, 1, 2, 3, 4, 5].map(|k| restriction.passes(t(k))),
             [true, false, false, false, true, false]
         );
-        assert_eq!((r.value(t(4)), r.value(t(5))), (Some(0.25), None));
-        assert_eq!(r.values().len(), 5);
+        assert_eq!(
+            (restriction.value(t(4)), restriction.value(t(5))),
+            (Some(0.25), None)
+        );
+        assert_eq!(restriction.values().len(), 5);
         assert_eq!(Restriction::default(), Restriction::new(Vec::new()));
     }
 }

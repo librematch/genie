@@ -218,7 +218,11 @@ impl Mover {
                 .map_or(PlayerSet::NONE, |p| world.allies_of(p.player)),
         };
         let player = world.get(me.id).map(|p| p.player);
-        let gates = |t| player.map_or(Ok(false), |p| gate_lets_pass(world, by_id, p, t));
+        let gates = |tile| {
+            player.map_or(Ok(false), |player_id| {
+                gate_lets_pass(world, by_id, player_id, tile)
+            })
+        };
         reaches(world.tiles(), world.map, &req, &gates, *long_path_tuning)
     }
 
@@ -228,11 +232,9 @@ impl Mover {
     /// path's last point (`FUN_140f95fb0`, compared x, y, z). A top path of one point, where the
     /// game compares with its static point, is not modelled.
     pub fn walks_to_path_end(&self) -> GenieResult<bool> {
-        let Some(level) = self
-            .paths
-            .first()
-            .filter(|l| l.level == WaypointLevel::Walked && !l.points.is_empty())
-        else {
+        let Some(level) = self.paths.first().filter(|path_data| {
+            path_data.level == WaypointLevel::Walked && !path_data.points.is_empty()
+        }) else {
             return Ok(false);
         };
         let Some(top) = self.top_path() else {
@@ -258,7 +260,11 @@ impl Mover {
             }
             level.flags &= !(LevelFlags::REACHED | LevelFlags::AT_WAYPOINT);
         }
-        if let Some(last) = self.paths.last_mut().and_then(|l| l.points.last_mut()) {
+        if let Some(last) = self
+            .paths
+            .last_mut()
+            .and_then(|path_data| path_data.points.last_mut())
+        {
             *last = point;
         }
     }
@@ -268,7 +274,7 @@ impl Mover {
     pub(super) fn top_path(&self) -> Option<&Vec<BVector>> {
         self.paths
             .last()
-            .map(|l| &l.points)
+            .map(|path_data| &path_data.points)
             .filter(|p| !p.is_empty())
     }
 
@@ -298,7 +304,10 @@ impl Mover {
         now: WorldTime,
         planned: bool,
     ) {
-        let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
+        let repath_time = self
+            .paths
+            .first()
+            .map_or(Seconds::ZERO, |path_data| path_data.repath_time);
         self.paths = vec![PathData {
             level: if planned {
                 WaypointLevel::Top
@@ -385,7 +394,10 @@ impl Mover {
         } else {
             path_flags & !PathFlags::BACK_AND_FORTH
         };
-        let repath_time = self.paths.first().map_or(Seconds::ZERO, |l| l.repath_time);
+        let repath_time = self
+            .paths
+            .first()
+            .map_or(Seconds::ZERO, |path_data| path_data.repath_time);
         self.paths = vec![PathData {
             level: WaypointLevel::Top,
             points: path.points,
@@ -445,10 +457,10 @@ impl Mover {
     /// more step of acceleration, capped by the top speed (COMISS/JA, then JC: a NaN speed stays).
     pub(crate) fn projected(&self, direction: BVector, dt: Seconds) -> BVector {
         let position = self.moved_at.vector();
-        let Some(v) = &self.velocity else {
+        let Some(velocity) = &self.velocity else {
             return position;
         };
-        let mut next = v.velocity + dt.get() * v.acceleration;
+        let mut next = velocity.velocity + dt.get() * velocity.acceleration;
         if self.stats.speed < Speed::new(next.y()) || next.y() <= 0.0 {
             next = next.with_y(self.stats.speed.get());
         }
@@ -472,12 +484,17 @@ impl Mover {
     ) -> GenieResult<bool> {
         let movement_tuning = &by_id.tuning().movement;
         let level = self.paths.walked()?;
-        let top = self.paths.last().filter(|l| !l.points.is_empty());
+        let top = self
+            .paths
+            .last()
+            .filter(|path_data| !path_data.points.is_empty());
         let ground = self.stats.radius.ground();
-        let o = other.position.vector();
-        let now_overlap = overlap(at.vector(), ground, o, other.radius);
-        let next_overlap = overlap(projected, ground, o, other.radius);
-        let last_move = by_id.gait(id).map_or(WorldTime::ZERO, |g| g.last_move);
+        let vector = other.position.vector();
+        let now_overlap = overlap(at.vector(), ground, vector, other.radius);
+        let next_overlap = overlap(projected, ground, vector, other.radius);
+        let last_move = by_id
+            .gait(id)
+            .map_or(WorldTime::ZERO, |gait| gait.last_move);
         let mut pushed = false;
         if let Some(top) = top.filter(|_| now_overlap <= next_overlap) {
             if top.created == now
@@ -541,13 +558,13 @@ impl Mover {
             else {
                 return Ok(None);
             };
-            Ok(world.get_known(id)?.map(|p| (id, p)))
+            Ok(world.get_known(id)?.map(|placed| (id, placed)))
         };
         // the walker's group (FUN_14152ff40 on +0x6d0) and its own move's reason there
         // (FUN_141017590): a member on one of reason 0 keeps buildings, walls and gates alone
         let own_move = groups
             .and_then(|gs| gs.get(me.group?))
-            .is_some_and(|g| g.member_reason(me.id) == MoveReason::Detour);
+            .is_some_and(|group| group.member_reason(me.id) == MoveReason::Detour);
         let mut target_hit = false;
         let mut kept = Vec::new();
         for &hit in hits {
@@ -604,7 +621,7 @@ impl Mover {
                     continue;
                 }
                 // slot 0x528's walked level, paused for dt more when its pause is shorter
-                if let Some(p) = self.pause_of(id, by_id).filter(|&p| p < dt) {
+                if let Some(p) = self.pause_of(id, by_id).filter(|&seconds| seconds < dt) {
                     pauses.push((id, p + dt));
                 }
             }
@@ -623,9 +640,9 @@ impl Mover {
         self.pauses
             .iter()
             .rev()
-            .find(|&&(i, _)| i == id)
-            .map(|&(_, p)| p)
-            .or_else(|| by_id.gait(id).and_then(|g| g.pause))
+            .find(|&&(object_id, _)| object_id == id)
+            .map(|&(_, seconds)| seconds)
+            .or_else(|| by_id.gait(id).and_then(|gait| gait.pause))
     }
 }
 

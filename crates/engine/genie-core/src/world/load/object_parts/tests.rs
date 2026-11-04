@@ -64,9 +64,12 @@ fn an_object_without_unit_ai_imports_none() {
 fn saved_unit_ai_of_kind_one_fails_the_import() {
     let mut object = with_ai(idle());
     combat_mut(&mut object).need_unit_ai = 1;
-    let e = unit_ai(&object, object_id(5), PLAYERS).unwrap_err();
-    assert_eq!(e.kind(), ErrorKind::InvalidInput);
-    assert!(e.to_string().contains("no constructor makes"), "{e}");
+    let error = unit_ai(&object, object_id(5), PLAYERS).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidInput);
+    assert!(
+        error.to_string().contains("no constructor makes"),
+        "{error}"
+    );
 }
 
 /// The orders and actions import as their kinds: a field's −1 as none, the history's and the
@@ -97,7 +100,7 @@ fn the_saved_orders_and_actions_import_as_their_kinds() {
     let records: Vec<_> = ai
         .order_history
         .iter()
-        .map(|r| (r.order, r.action))
+        .map(|order_record| (order_record.order, order_record.action))
         .collect();
     assert_eq!(
         records,
@@ -158,7 +161,7 @@ fn value_none_names_fails_the_import() {
     for save in saves {
         assert_eq!(
             unit_ai(&with_ai(save), object_id(5), PLAYERS)
-                .map_err(|e| e.kind())
+                .map_err(|error| error.kind())
                 .err(),
             Some(ErrorKind::InvalidInput)
         );
@@ -198,7 +201,7 @@ fn the_saved_unit_ai_is_the_object_part() {
     }));
     assert_eq!(odd.parts.unit_ai, None);
     assert_eq!(
-        odd.parts.unread.map(|e| e.error().kind()),
+        odd.parts.unread.map(|unread| unread.error().kind()),
         Some(ErrorKind::InvalidInput)
     );
 }
@@ -226,7 +229,11 @@ fn saved_patrol_without_points_fails_the_import() {
     )
     .unwrap()
     .unwrap();
-    assert_eq!(held.patrol_path.map(|p| p.path.points.len()), Some(1));
+    assert_eq!(
+        held.patrol_path
+            .map(|patrol_path| patrol_path.path.points.len()),
+        Some(1)
+    );
     let empty = unit_ai(&patrol(Vec::new()), object_id(5), PLAYERS).unwrap_err();
     assert_eq!(
         (empty.kind(), empty.reason()),

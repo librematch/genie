@@ -136,13 +136,13 @@ impl UnitAi {
         let Some(id) = found.id else {
             return Ok(IdleOutcome::Idle);
         };
-        let Some(u) = side.seen_unit(id)? else {
+        let Some(unit_seen) = side.seen_unit(id)? else {
             return Ok(IdleOutcome::Idle);
         };
         let reach = (at.speed * unit_ai_tuning.ship_evade_reach).get();
         let (x, y, z) = (at.position.x(), at.position.y(), at.position.z());
-        let dx = u.position.x() - x;
-        let dy = u.position.y() - y;
+        let dx = unit_seen.position.x() - x;
+        let dy = unit_seen.position.y() - y;
         let d = sqrt(dy * dy + dx * dx);
         let point = Position::new(x - (dx / d) * reach, y - (dy / d) * reach, z);
         let _ = self.evasive_move(point, (OrderForce::Forced, BadPoint::Moves), at, ai, side)?;
@@ -202,8 +202,8 @@ impl UnitAi {
         if target.is_none() {
             target = self.siege_best(at, player_kind, side)?;
         }
-        if let Some(t) = target
-            && self.siege_attack(t, at, ai, side)? == Answer::Taken
+        if let Some(object_id) = target
+            && self.siege_attack(object_id, at, ai, side)? == Answer::Taken
         {
             return Ok(IdleOutcome::Acted);
         }
@@ -401,8 +401,8 @@ impl UnitAi {
             Some(t) => t,
             None => self.soldier_best(at, player_kind, side)?,
         };
-        if let Some(t) = target
-            && self.soldier_attack(t, at, ai, side)? == Answer::Taken
+        if let Some(object_id) = target
+            && self.soldier_attack(object_id, at, ai, side)? == Answer::Taken
         {
             return Ok(IdleOutcome::Acted);
         }
@@ -639,7 +639,7 @@ impl UnitAi {
         self.seeker_with(
             at.target
                 .filter(|_| self.current_target.is_some())
-                .map(|t| t.kind),
+                .map(|seen| seen.kind),
         )
     }
 

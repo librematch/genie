@@ -124,10 +124,13 @@ struct Shape {
 }
 
 impl Shape {
-    /// Whether `p` lies inside the box, its sides excluded (`FUN_140f89dc0`'s test).
-    fn holds(&self, p: Point) -> bool {
-        let b = self.bounds;
-        b.x0() < p.x() && p.x() < b.x1() && b.y0() < p.y() && p.y() < b.y1()
+    /// Whether `point` lies inside the box, its sides excluded (`FUN_140f89dc0`'s test).
+    fn holds(&self, point: Point) -> bool {
+        let rect = self.bounds;
+        rect.x0() < point.x()
+            && point.x() < rect.x1()
+            && rect.y0() < point.y()
+            && point.y() < rect.y1()
     }
 }
 
@@ -204,19 +207,19 @@ impl Nodes {
         Self(vec![Node::head(), Node::head()])
     }
 
-    /// Node `i`.
-    fn checked(&self, i: NodeIndex) -> GenieResult<&Node> {
-        self.0.checked(i.0)
+    /// Node `node_index`.
+    fn checked(&self, node_index: NodeIndex) -> GenieResult<&Node> {
+        self.0.checked(node_index.0)
     }
 
-    /// Node `i`, if there is one.
-    fn get(&self, i: NodeIndex) -> Option<&Node> {
-        self.0.get(i.0)
+    /// Node `node_index`, if there is one.
+    fn get(&self, node_index: NodeIndex) -> Option<&Node> {
+        self.0.get(node_index.0)
     }
 
-    /// Node `i`, to change.
-    fn checked_mut(&mut self, i: NodeIndex) -> GenieResult<&mut Node> {
-        self.0.checked_mut(i.0)
+    /// Node `node_index`, to change.
+    fn checked_mut(&mut self, node_index: NodeIndex) -> GenieResult<&mut Node> {
+        self.0.checked_mut(node_index.0)
     }
 
     /// Append `node`; its place.
@@ -229,8 +232,8 @@ impl Nodes {
 impl Index<NodeIndex> for Nodes {
     type Output = Node;
 
-    fn index(&self, i: NodeIndex) -> &Node {
-        &self.0[i.0]
+    fn index(&self, node_index: NodeIndex) -> &Node {
+        &self.0[node_index.0]
     }
 }
 
@@ -239,14 +242,14 @@ impl Index<NodeIndex> for Nodes {
 struct ClosedLists([Vec<NodeIndex>; 2]);
 
 impl ClosedLists {
-    /// List `l`'s closed nodes.
-    const fn of(&self, l: NodeList) -> &Vec<NodeIndex> {
-        &self.0[l.0]
+    /// List `node_list`'s closed nodes.
+    const fn of(&self, node_list: NodeList) -> &Vec<NodeIndex> {
+        &self.0[node_list.0]
     }
 
-    /// List `l`'s closed nodes, to change.
-    const fn of_mut(&mut self, l: NodeList) -> &mut Vec<NodeIndex> {
-        &mut self.0[l.0]
+    /// List `node_list`'s closed nodes, to change.
+    const fn of_mut(&mut self, node_list: NodeList) -> &mut Vec<NodeIndex> {
+        &mut self.0[node_list.0]
     }
 }
 
@@ -308,27 +311,27 @@ pub struct Waypoints {
 impl Waypoints {
     /// `BPath::InsertWaypoint` (`FUN_140f95060`): a waypoint at `index`, unless the one before or
     /// at it is the same point.
-    fn insert(&mut self, index: usize, p: Point) {
-        if 0 < index && self.points.get(index - 1) == Some(&p) {
+    fn insert(&mut self, index: usize, point: Point) {
+        if 0 < index && self.points.get(index - 1) == Some(&point) {
             return;
         }
-        if self.points.get(index) == Some(&p) {
+        if self.points.get(index) == Some(&point) {
             return;
         }
-        self.points.insert(index, p);
+        self.points.insert(index, point);
     }
 
     /// `FUN_140f95a10`: a waypoint at the end.
-    fn push(&mut self, p: Point) {
-        self.insert(self.points.len(), p);
+    fn push(&mut self, point: Point) {
+        self.insert(self.points.len(), point);
     }
 
     /// `BPath::calculatePathLength` (`FUN_140f95a60`): the waypoints' distances summed.
     #[must_use]
     pub fn length(&self) -> Distance {
         let mut total = 0.0;
-        for w in self.points.windows(2) {
-            let [a, b] = w else {
+        for points in self.points.windows(2) {
+            let [a, b] = points else {
                 continue;
             };
             let (dx, dy) = (b.x() - a.x(), b.y() - a.y());

@@ -18,26 +18,29 @@ use crate::world::World;
 use crate::{GenieError, GenieResult};
 
 impl World {
-    /// The groups player `p` owns update before its objects (`BaseWorld::update` calls them at
-    /// `0x141551796`, then the player's own update, slot 0x100 at `0x1415518f0`, which updates
-    /// its objects): `BUnitGroup::update` ([`World::group_update`]) for each group of the
-    /// world's list the player owns; a group whose update returns 0 goes
-    /// ([`World::delete_group`]), any other runs its vtable slot 8 (`FUN_141040b50`). A stopped
-    /// player's groups wait with it.
+    /// The groups player `player_id` owns update before its objects (`BaseWorld::update` calls them
+    /// at `0x141551796`, then the player's own update, slot 0x100 at `0x1415518f0`, which updates
+    /// its objects): `BUnitGroup::update` ([`World::group_update`]) for each group of the world's
+    /// list the player owns; a group whose update returns 0 goes ([`World::delete_group`]), any
+    /// other runs its vtable slot 8 (`FUN_141040b50`). A stopped player's groups wait with it.
     ///
     /// # Errors
     ///
     /// What the update does not model.
-    pub(crate) fn update_groups(&mut self, p: PlayerId) -> GenieResult<()> {
-        if self.players.get(p.index()).is_some_and(|q| q.stopped) {
+    pub(crate) fn update_groups(&mut self, player_id: PlayerId) -> GenieResult<()> {
+        if self
+            .players
+            .get(player_id.index())
+            .is_some_and(|player| player.stopped)
+        {
             return Ok(());
         }
         let ids: Vec<GroupId> = self
             .groups
             .groups
             .iter()
-            .filter(|g| g.owner == Some(p))
-            .map(|g| g.id)
+            .filter(|g| g.owner == Some(player_id))
+            .map(|group| group.id)
             .collect();
         for id in ids {
             if self.group_update(id)? == GroupFate::Kept {
@@ -80,22 +83,22 @@ impl World {
         let Some(index) = self.groups.groups.iter().position(|g| g.id == group) else {
             return Ok(());
         };
-        let g = self.groups.groups.remove(index);
-        for m in &g.members {
-            let Some((_, u)) = self.object_mut(m.id) else {
+        let index_group = self.groups.groups.remove(index);
+        for member in &index_group.members {
+            let Some((_, unit)) = self.object_mut(member.id) else {
                 continue;
             };
-            if u.group.id != Some(g.id) {
+            if unit.group.id != Some(index_group.id) {
                 continue;
             }
-            u.group.id = None;
-            if self.member_idle(m.id)? {
-                if self.object(m.id).is_some()
-                    && let Some(mover) = self.parts.mover_mut(m.id)
+            unit.group.id = None;
+            if self.member_idle(member.id)? {
+                if self.object(member.id).is_some()
+                    && let Some(mover) = self.parts.mover_mut(member.id)
                 {
                     mover.stand()?;
                 }
-                self.show_standing(m.id)?;
+                self.show_standing(member.id)?;
             }
         }
         Ok(())
@@ -146,17 +149,17 @@ impl World {
         let mut removed = false;
         let mut i = 0;
         loop {
-            let g = self.groups.held(group)?;
-            let Some(m) = g.members.get(i) else {
+            let held = self.groups.held(group)?;
+            let Some(member) = held.members.get(i) else {
                 break;
             };
-            let (id, owner) = (m.id, g.owner);
+            let (id, owner) = (member.id, held.owner);
             let leaves = match self.world_object(id) {
                 None | Some(WorldObject::Ghost(..)) => true,
-                Some(WorldObject::Unit(p, u, _)) => {
-                    !self.parts.unit_ai.contains(u.id)
-                        || u.life.hp < HitPoints::new(1.0)
-                        || Some(p) != owner
+                Some(WorldObject::Unit(player_id, unit, _)) => {
+                    !self.parts.unit_ai.contains(unit.id)
+                        || unit.life.hp < HitPoints::new(1.0)
+                        || Some(player_id) != owner
                 }
             };
             if leaves && self.remove_unit(group, id, None, LeavingWalk::Stands)? {
@@ -206,16 +209,16 @@ impl World {
     ///
     /// When the world does not hold `group`.
     pub(super) fn hibernation(&self, group: GroupId) -> GenieResult<Option<bool>> {
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         // the readers look the target's integer up as an object, whatever its kind
-        let (target, owner) = (g.current_target.target.key(), g.owner_player()?);
-        Ok(Some(match g.current_command {
+        let (target, owner) = (held.current_target.target.key(), held.owner_player()?);
+        Ok(Some(match held.current_command {
             PICK_UP_RELIC | DELIVER_RELIC | ATTACK => !self.target_pending(group)?,
             REPAIR => !self.repair_waits(target, owner)?,
-            NO_COMMAND | MOVE_COMMAND => !g.command_queue.is_empty(),
-            BUILD => !self
-                .world_object(target)
-                .is_some_and(|t| t.state() < ObjectState::Alive && t.player() == owner),
+            NO_COMMAND | MOVE_COMMAND => !held.command_queue.is_empty(),
+            BUILD => !self.world_object(target).is_some_and(|world_object| {
+                world_object.state() < ObjectState::Alive && world_object.player() == owner
+            }),
             _ => return Ok(None),
         }))
     }
@@ -236,14 +239,15 @@ impl World {
         let Some(object) = self.world_object(target) else {
             return Ok(false);
         };
-        let WorldObject::Unit(p, u, _) = object else {
+        let WorldObject::Unit(player_id, unit, _) = object else {
             return Err(GenieError::unsupported(
                 "a hibernating repair of a ghost (its hit points, +0x278)",
             ));
         };
-        let most = HitPoints::of_master(u.master(self.master_tables(), p)?.hit_points).get();
-        Ok(below_or_unordered(u.life.hp.get(), most)
-            && self.spatial.allied_with(owner, p)
-            && self.spatial.allied_with(p, owner))
+        let most =
+            HitPoints::of_master(unit.master(self.master_tables(), player_id)?.hit_points).get();
+        Ok(below_or_unordered(unit.life.hp.get(), most)
+            && self.spatial.allied_with(owner, player_id)
+            && self.spatial.allied_with(player_id, owner))
     }
 }

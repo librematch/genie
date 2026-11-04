@@ -294,8 +294,8 @@ fn write_fixed(
 
 /// A list's first `size` ids, -1 past its end.
 fn write_padded(mut output: impl Write, list: &[i32], size: usize) -> GenieResult<()> {
-    for i in 0..size {
-        output.write_i32::<LE>(*list.get(i).unwrap_or(&-1))?;
+    for index in 0..size {
+        output.write_i32::<LE>(*list.get(index).unwrap_or(&-1))?;
     }
     Ok(())
 }

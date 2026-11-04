@@ -30,14 +30,14 @@ impl Mul<Acceleration> for Seconds {
     type Output = Speed;
 
     /// The speed `self` of the acceleration gains (one `f32` product, the time first).
-    fn mul(self, a: Acceleration) -> Speed {
-        Speed::new(self.get() * a.0)
+    fn mul(self, acceleration: Acceleration) -> Speed {
+        Speed::new(self.get() * acceleration.0)
     }
 }
 
 impl genie_diff::Diff for Acceleration {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -49,12 +49,12 @@ mod tests {
     /// A time times an acceleration is the one `f32` product, the time first.
     #[test]
     fn time_times_an_acceleration_is_speed() {
-        let a = Acceleration::new(-23.52);
+        let acceleration = Acceleration::new(-23.52);
         assert_eq!(
-            (Seconds::new(0.1) * a).get().to_bits(),
+            (Seconds::new(0.1) * acceleration).get().to_bits(),
             (0.1_f32 * -23.52).to_bits()
         );
         assert_eq!(Acceleration::default(), Acceleration::ZERO);
-        assert_eq!(a.get(), -23.52);
+        assert_eq!(acceleration.get(), -23.52);
     }
 }

@@ -54,13 +54,13 @@ impl AttackCategory {
     /// The value of a field that holds −1 for none.
     #[must_use]
     pub fn field(category: Option<Self>) -> i32 {
-        category.map_or(Self::NONE, |c| i32::from(c.0))
+        category.map_or(Self::NONE, |attack_category| i32::from(attack_category.0))
     }
 }
 
 impl genie_diff::Diff for AttackCategory {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -113,12 +113,13 @@ mod tests {
         assert_eq!(AttackCategory::field(siege), 6);
         assert_eq!(AttackCategory::field(None), -1);
         assert_eq!(
-            AttackCategory::of_field(11).map(|c| c.map(AttackCategory::get)),
+            AttackCategory::of_field(11)
+                .map(|attack_category| attack_category.map(AttackCategory::get)),
             Ok(Some(11))
         );
         for bad in [-2, 12, 300] {
             assert_eq!(
-                AttackCategory::of_field(bad).map_err(|e| e.kind()),
+                AttackCategory::of_field(bad).map_err(|error| error.kind()),
                 Err(ErrorKind::InvalidInput)
             );
         }
@@ -127,10 +128,10 @@ mod tests {
     /// A table holds one value per category, read and written by category in their order.
     #[test]
     fn table_by_category_holds_one_value_each() {
-        let mut t = ByCategory::new([0; AttackCategory::COUNT]);
-        t[AttackCategory::SIEGE] += 3;
-        t[AttackCategory::named(11)] = 7;
-        assert_eq!(t[AttackCategory::SIEGE], 3);
-        assert_eq!(t.values(), &[0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 7]);
+        let mut by_category = ByCategory::new([0; AttackCategory::COUNT]);
+        by_category[AttackCategory::SIEGE] += 3;
+        by_category[AttackCategory::named(11)] = 7;
+        assert_eq!(by_category[AttackCategory::SIEGE], 3);
+        assert_eq!(by_category.values(), &[0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 7]);
     }
 }

@@ -50,7 +50,7 @@ impl UnitAi {
     /// modelled.
     pub(super) fn hunted_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         player_kind: PlayerKind,
@@ -58,7 +58,7 @@ impl UnitAi {
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
@@ -66,7 +66,7 @@ impl UnitAi {
         if at.player != PlayerId::GAIA {
             alert_owner(player_kind)?;
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         // the game also tests the action values 0x25f and 0x268 here, which no unit AI holds
         // ([`AiAction`])
@@ -128,13 +128,15 @@ impl UnitAi {
         let mut class_22 = false;
         // none (−1) is an object the update does not hold
         for id in self.attackers.iter().flatten() {
-            let Some(u) = at.unit(id) else {
+            let Some(unit_seen) = at.unit(id) else {
                 continue;
             };
-            vx += u.position.x() - x;
-            vy += u.position.y() - y;
+            vx += unit_seen.position.x() - x;
+            vy += unit_seen.position.y() - y;
             // The class whose attackers make a computer's unit warn its group (`FUN_140c5e900`: 22).
-            class_22 |= roles.of_class(u.class).contains(ClassRoles::WARSHIP);
+            class_22 |= roles
+                .of_class(unit_seen.class)
+                .contains(ClassRoles::WARSHIP);
         }
         if player_kind.is_computer() && class_22 && Speed::ZERO < at.speed {
             return Err(GenieError::unsupported(
@@ -155,8 +157,8 @@ impl UnitAi {
         if d < RUN_EPSILON {
             let r = ai.rand15() as i32 as f32;
             vx = (r + r) / RUN_DRAW_SCALE - RUN_ONE;
-            let r = ai.rand15() as i32 as f32;
-            vy = (r + r) / RUN_DRAW_SCALE - RUN_ONE;
+            let draw = ai.rand15() as i32 as f32;
+            vy = (draw + draw) / RUN_DRAW_SCALE - RUN_ONE;
             d = sqrt(vy * vy + vx * vx);
         }
         let mut ex = x - (vx / d) * reach;
@@ -235,14 +237,14 @@ impl UnitAi {
                 y = held(y, at.map.height());
             }
         }
-        let m = self.move_to(AiMove {
+        let move_to = self.move_to(AiMove {
             point: Position::new(x, y, point.z()),
             range: Distance::ZERO,
             force: OrderForce::Forced,
             pace: Pace::Run,
         });
-        if let Some(m) = m {
-            side.effect_now(Effect::Move(m), self, ai)?;
+        if let Some(ai_move) = move_to {
+            side.effect_now(Effect::Move(ai_move), self, ai)?;
         }
         // the move (slot 0x340) gives the unit its MoveTo at once: the update's later checks see
         // it busy
@@ -260,22 +262,22 @@ impl UnitAi {
     /// restarts. With an attacker it returns 3, else 2.
     pub(super) fn boar_damaged(
         &mut self,
-        n: Notify,
+        notify: Notify,
         time: Millis,
         at: &Surroundings,
         ai_rng: &mut Well512,
         side: &mut UnitView<'_, '_>,
     ) -> GenieResult<u32> {
         let roles = &at.roles;
-        if n.p[1] < 1 {
+        if notify.p[1] < 1 {
             self.end_notifies(time, at, side, ai_rng)?;
             return Ok(DEAD);
         }
-        let _ = self.attackers.add(n.caller);
+        let _ = self.attackers.add(notify.caller);
         side.set_under_attack(true);
         let Some((target, attacker)) = self
             .closest_valid_attacker(at, ai_rng)
-            .and_then(|t| at.unit(t).map(|u| (t, u)))
+            .and_then(|object_id| at.unit(object_id).map(|unit_seen| (object_id, unit_seen)))
         else {
             return Ok(GO_ON);
         };
@@ -370,7 +372,7 @@ impl UnitAi {
     /// notify to the owner, not held); it returns 2.
     pub(super) fn villager_search(
         &mut self,
-        n: Notify,
+        notify: Notify,
         at: &Surroundings,
         player_kind: PlayerKind,
         side: &mut UnitView<'_, '_>,
@@ -379,13 +381,13 @@ impl UnitAi {
         let unit_ai_tuning = &at.unit_ai_tuning;
         match self.current_action {
             Some(AiAction::Hunt) => {
-                return self.hunter_search(n, at, player_kind, side, rng);
+                return self.hunter_search(notify, at, player_kind, side, rng);
             }
             Some(AiAction::Shepherd) => {
                 return Err(VILLAGER_NOTIFY.with("action", AiAction::Shepherd.value()));
             }
             Some(AiAction::Gather) => {
-                return self.gatherer_search(n, at, player_kind, side, rng);
+                return self.gatherer_search(notify, at, player_kind, side, rng);
             }
             Some(AiAction::Build) => {
                 if let Some(found) = side.foundation_search()?
@@ -411,11 +413,14 @@ impl UnitAi {
             Some(AiAction::Explore) => closest_undiscovered_tile()?,
             _ => {}
         }
-        if (n.p[0] == AiAction::Gather.value() || n.p[0] == AiAction::Hunt.value()) && n.p[1] != 10
+        if (notify.p[0] == AiAction::Gather.value() || notify.p[0] == AiAction::Hunt.value())
+            && notify.p[1] != 10
         {
-            return Err(VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", n.kind, n.p)));
+            return Err(
+                VILLAGER_NOTIFY.with("notify", format!("{:#x} {:?}", notify.kind, notify.p))
+            );
         }
-        if n.kind != NotifyKind::REQUIRES_SEARCH
+        if notify.kind != NotifyKind::REQUIRES_SEARCH
             && !matches!(
                 self.current_action,
                 Some(AiAction::Shepherd | AiAction::Repair)

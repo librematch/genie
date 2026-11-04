@@ -136,7 +136,9 @@ impl Header {
             .base_world
             .players
             .iter()
-            .filter_map(|p| PlayerSection::new(p.pos as usize, &p.val).ok())
+            .filter_map(|positioned| {
+                PlayerSection::new(positioned.pos as usize, &positioned.val).ok()
+            })
             .collect()
     }
 }
@@ -149,7 +151,7 @@ where
     let mut out = Cursor::new(Vec::new());
     value
         .write_le(&mut out)
-        .map_err(|e| GenieError::io("a value that does not write back").with("binrw", e))?;
+        .map_err(|error| GenieError::io("a value that does not write back").with("binrw", error))?;
     Ok(out.into_inner().len())
 }
 
@@ -200,7 +202,7 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
     let here = position(r)?;
     let end = r
         .seek(SeekFrom::End(0))
-        .map_err(|e| read_error(&e.into()))? as usize;
+        .map_err(|error| read_error(&error.into()))? as usize;
     if here != end {
         return Err(
             GenieError::invalid_input("a world that ends before the save's end")
@@ -221,7 +223,7 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
             .base_world
             .players
             .first()
-            .map_or(here, |p| p.pos as usize),
+            .map_or(here, |positioned| positioned.pos as usize),
     };
     Ok(Header {
         file_header,
@@ -236,22 +238,23 @@ pub fn parse_reader<R: Read + Seek>(r: &mut R) -> GenieResult<Header> {
 /// # Errors
 ///
 /// [`ErrorKind::Io`] when the writer fails or a value cannot be written back.
-pub fn write<W: Write + Seek>(h: &Header, w: &mut W) -> GenieResult<()> {
+pub fn write<W: Write + Seek>(header: &Header, w: &mut W) -> GenieResult<()> {
     use binrw::BinWrite;
     (|| {
-        h.file_header.write_le(w)?;
-        h.world.write_le(w)
+        header.file_header.write_le(w)?;
+        header.world.write_le(w)
     })()
-    .map_err(|e| GenieError::io("a save that does not write").with("binrw", e))
+    .map_err(|error| GenieError::io("a save that does not write").with("binrw", error))
 }
 
 fn position<R: Seek>(r: &mut R) -> GenieResult<usize> {
-    Ok(r.stream_position().map_err(|e| read_error(&e.into()))? as usize)
+    Ok(r.stream_position()
+        .map_err(|error| read_error(&error.into()))? as usize)
 }
 
 #[track_caller]
-fn read_error(e: &binrw::Error) -> GenieError {
-    GenieError::invalid_input("a save that does not read").with("binrw", e)
+fn read_error(error: &binrw::Error) -> GenieError {
+    GenieError::invalid_input("a save that does not read").with("binrw", error)
 }
 
 #[cfg(test)]
@@ -261,12 +264,12 @@ mod tests {
 
     #[test]
     fn the_save_version_rounds_its_fraction_to_hundredths() {
-        let v = SaveVersion {
+        let save_version = SaveVersion {
             major: 66,
             minor: 39321,
             build: 158_041,
         };
-        assert_eq!(v.hundredths(), 6660);
+        assert_eq!(save_version.hundredths(), 6660);
     }
 
     #[test]
@@ -274,9 +277,9 @@ mod tests {
         let mut save = b"VER 9.4\0".to_vec();
         save.extend((-1.0f32).to_le_bytes());
         save.extend(0x0041_0000u32.to_le_bytes());
-        let e = parse(&save).unwrap_err();
-        assert_eq!(e, GenieError::invalid_input("a save older than 66.0"));
-        assert_eq!(e.context().collect::<Vec<_>>(), [("version", "6500")]);
+        let error = parse(&save).unwrap_err();
+        assert_eq!(error, GenieError::invalid_input("a save older than 66.0"));
+        assert_eq!(error.context().collect::<Vec<_>>(), [("version", "6500")]);
     }
 
     /// Save 66.6, build 158041's own version: its fraction in sixteen bits.
@@ -284,14 +287,14 @@ mod tests {
 
     /// A save of the build's own version, every generated part its default.
     fn default_save() -> Header {
-        let mut h = Header::default();
-        h.file_header.new_save_game_version = SAVE_66_6;
-        h
+        let mut header = Header::default();
+        header.file_header.new_save_game_version = SAVE_66_6;
+        header
     }
 
-    fn bytes(h: &Header) -> Vec<u8> {
+    fn bytes(header: &Header) -> Vec<u8> {
         let mut out = Cursor::new(Vec::new());
-        write(h, &mut out).unwrap();
+        write(header, &mut out).unwrap();
         out.into_inner()
     }
 
@@ -313,13 +316,13 @@ mod tests {
     fn bytes_after_the_world_are_an_error() {
         let mut save = bytes(&default_save());
         save.push(0);
-        let e = parse(&save).unwrap_err();
+        let error = parse(&save).unwrap_err();
         assert_eq!(
-            e,
+            error,
             GenieError::invalid_input("a world that ends before the save's end")
         );
         assert_eq!(
-            e.context().collect::<Vec<_>>(),
+            error.context().collect::<Vec<_>>(),
             [
                 ("world end", &*(save.len() - 1).to_string()),
                 ("bytes after it", "1")
@@ -332,9 +335,9 @@ mod tests {
     fn cut_save_does_not_read() {
         let save = bytes(&default_save());
         for len in [20, save.len() - 1] {
-            let e = parse(&save[..len]).unwrap_err();
+            let error = parse(&save[..len]).unwrap_err();
             assert_eq!(
-                e,
+                error,
                 GenieError::invalid_input("a save that does not read"),
                 "{len}"
             );
@@ -345,8 +348,8 @@ mod tests {
     /// A player whose type has no class is the game's own error.
     #[test]
     fn player_of_no_known_kind_is_invalid() {
-        let mut h = default_save();
-        let world = &mut h.world.base_world;
+        let mut header = default_save();
+        let world = &mut header.world.base_world;
         world.num_players = 1;
         world.player_time_delta = vec![0];
         world.victory_conditions = vec![generated::world::RgeVictoryConditions::default()];
@@ -357,9 +360,9 @@ mod tests {
                 ..Player::default()
             },
         }];
-        let e = parse(&bytes(&h)).unwrap_err();
-        assert_eq!(e, GenieError::invalid_input("InvalidPlayerType"));
-        assert_eq!(e.context().next(), Some(("type", "4")));
+        let error = parse(&bytes(&header)).unwrap_err();
+        assert_eq!(error, GenieError::invalid_input("InvalidPlayerType"));
+        assert_eq!(error.context().next(), Some(("type", "4")));
     }
 
     /// The state a version `v` AI writes: each part the version enables, zeroed.
@@ -392,9 +395,9 @@ mod tests {
     /// state a version-0.14 AI writes.
     fn save_with_ai_scripts() -> Header {
         use crate::generated::world::{AiExpertEngine, AiGroupTable, AiList, AiRule, AiString};
-        let mut h = default_save();
-        h.world.load_ai_rules = 1;
-        h.world.ai_scripts = Some(Box::new(AiExpertEngine {
+        let mut header = default_save();
+        header.world.load_ai_rules = 1;
+        header.world.ai_scripts = Some(Box::new(AiExpertEngine {
             max_strings: 2,
             num_strings: 1,
             strings: vec![AiString {
@@ -428,8 +431,8 @@ mod tests {
             ],
             ..AiExpertEngine::default()
         }));
-        h.world.ai_state = Some(Box::new(ai_state(0.14)));
-        h
+        header.world.ai_state = Some(Box::new(ai_state(0.14)));
+        header
     }
 
     /// The world's AI scripts (`AIExpertEngine::load`) and their state read back byte for byte,
@@ -452,11 +455,11 @@ mod tests {
     #[test]
     fn the_ai_states_parts_follow_its_version() {
         let state_len = |v: f32| {
-            let mut h = save_with_ai_scripts();
-            h.world.ai_state = Some(Box::new(ai_state(v)));
-            let with = bytes(&h).len();
-            h.world.ai_state = None;
-            with - bytes(&h).len()
+            let mut header = save_with_ai_scripts();
+            header.world.ai_state = Some(Box::new(ai_state(v)));
+            let with = bytes(&header).len();
+            header.world.ai_state = None;
+            with - bytes(&header).len()
         };
         // the version alone, then each part: 0.08 two word tables and the byte table, 0.09 a
         // fourth table, 0.12 the timer manager (8 x 50 words), 0.13 a float, 0.14 nine words

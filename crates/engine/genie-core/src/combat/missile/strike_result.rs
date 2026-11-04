@@ -43,8 +43,8 @@ impl TryFrom<u8> for StrikeResult {
 }
 
 impl genie_diff::Diff for StrikeResult {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.get().diff(&other.get(), d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.get().diff(&other.get(), differ);
     }
 }
 
@@ -68,7 +68,7 @@ mod tests {
                 Ok(value)
             );
         }
-        let e = StrikeResult::try_from(3).unwrap_err();
-        assert!(e.to_string().contains("no hit answers"), "{e}");
+        let error = StrikeResult::try_from(3).unwrap_err();
+        assert!(error.to_string().contains("no hit answers"), "{error}");
     }
 }

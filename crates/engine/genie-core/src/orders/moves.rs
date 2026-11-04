@@ -90,7 +90,10 @@ impl World {
             .players
             .live(player, idx)?
             .master(self.master_tables(), player)?;
-        let speed = master.move_stats.as_ref().map_or(Speed::ZERO, |m| m.speed);
+        let speed = master
+            .move_stats
+            .as_ref()
+            .map_or(Speed::ZERO, |move_stats| move_stats.speed);
         if master.kind < MasterKind::MOVING || speed <= Speed::ZERO {
             if order.flags.contains(OrderFlags::QUEUED) {
                 return Err(GenieError::unsupported(
@@ -124,9 +127,10 @@ impl World {
             let Some(ai) = self.parts.unit_ai.get_mut(unit.id) else {
                 return Ok(());
             };
-            let (target_kind, target_owner) = target.map_or((None, None), |(m, o)| {
-                (Some(OrderTargetKind::of_master(m)), Some(o))
-            });
+            let (target_kind, target_owner) =
+                target.map_or((None, None), |(master_id, player_id)| {
+                    (Some(OrderTargetKind::of_master(master_id)), Some(player_id))
+                });
             let queued = QueuedOrder {
                 issuer: Some(Issuer::Player(issuer)),
                 order: OrderKind::Move,
@@ -174,7 +178,7 @@ impl World {
             let ai_stream = self.streams.get(Stream::Ai);
             match cell {
                 None => ai.notify_move(taken == Answer::NotTaken, None, order.point, ai_stream),
-                Some(c) => ai.notify_grid_move(c, ai_stream),
+                Some(point) => ai.notify_grid_move(point, ai_stream),
             }
         }
         Ok(())
@@ -278,7 +282,7 @@ impl World {
         &mut self,
         player: PlayerId,
         idx: ListIndex,
-        m: AiMove,
+        ai_move: AiMove,
     ) -> GenieResult<()> {
         let unit = &self.players.live(player, idx)?;
         let class = unit.master(self.master_tables(), player)?.class;
@@ -288,7 +292,7 @@ impl World {
         let sails = self.players.live_mut(player, idx)?.ai_move_with(
             (self.parts.actions.of_mut(id)?, self.parts.unread.get(id)),
             self.parts.motion.layer_mut(id),
-            m,
+            ai_move,
             (class, player),
             (&mut releases, &mut builder_leaves, by),
             (
@@ -306,8 +310,8 @@ impl World {
                 self.streams.get(Stream::Sprite),
             ),
         )?;
-        if let MoveWith::Sails(t) = sails {
-            self.transport_move((player, idx), t, m.point)?;
+        if let MoveWith::Sails(transport_action) = sails {
+            self.transport_move((player, idx), transport_action, ai_move.point)?;
         }
         for id in builder_leaves {
             self.leave_builders(Some(id))?;

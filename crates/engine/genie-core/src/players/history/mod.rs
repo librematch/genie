@@ -125,8 +125,8 @@ impl From<u8> for EventKind {
 }
 
 impl genie_diff::Diff for EventKind {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        d.equal(self, other);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        differ.equal(self, other);
     }
 }
 
@@ -289,19 +289,19 @@ impl History {
         let mut seen = 0;
         let mut widest = 0.0f32;
         let mut furthest = None;
-        for (i, e) in self.events.iter().enumerate() {
+        for (index, event) in self.events.iter().enumerate() {
             if BATTLES_COMPARED <= seen {
                 break;
             }
-            if e.kind != EventKind::Battle {
+            if event.kind != EventKind::Battle {
                 continue;
             }
             seen += 1;
-            if new > e.data2 {
-                let gap = new - e.data2;
+            if new > event.data2 {
+                let gap = new - event.data2;
                 if gap > widest {
                     widest = gap;
-                    furthest = Some(i);
+                    furthest = Some(index);
                 }
             }
         }
@@ -317,7 +317,7 @@ impl History {
     /// `FUN_141560e20`: the newest event of `kind`.
     #[must_use]
     pub fn event_of_kind(&self, kind: EventKind) -> Option<&Event> {
-        self.events.iter().find(|e| e.kind == kind)
+        self.events.iter().find(|event| event.kind == kind)
     }
 
     /// `get_history_event_by_time` (`FUN_141560ea0`, the post-game timeline's): the events of
@@ -327,10 +327,10 @@ impl History {
     pub fn events_at(&self, time_slice: TimeSlice) -> Option<(i32, i8)> {
         let mut first = None;
         let mut count = 0i8;
-        for (i, e) in self.events.iter().enumerate() {
-            if e.time_slice == time_slice {
+        for (index, event) in self.events.iter().enumerate() {
+            if event.time_slice == time_slice {
                 count = count.wrapping_add(1);
-                let _ = first.get_or_insert(i as i32 + 1);
+                let _ = first.get_or_insert(index as i32 + 1);
             }
         }
         first.map(|f| (f, count))
@@ -348,8 +348,9 @@ impl History {
             3 => EventKind::ImperialAge,
             _ => return now,
         };
-        self.event_of_kind(kind)
-            .map_or(now, |e| now.wrapping_sub(e.world_time.millis() / 1000))
+        self.event_of_kind(kind).map_or(now, |event| {
+            now.wrapping_sub(event.world_time.millis() / 1000)
+        })
     }
 
     /// `update` (`FUN_141569450`), once a game second with the player's `attributes`, the world's
@@ -469,10 +470,10 @@ impl History {
         self.old_current_build_value_units = tally(slots.attribute.units_value.index());
         self.old_current_build_value_buildings = tally(slots.attribute.buildings_value.index());
         if self.battle_flag == 0 {
-            for (i, kill) in self.old_player_kill_bv.iter_mut().enumerate() {
-                *kill = Tally::of_amount_64(a(KILL_VALUE_OF + i));
-                if let Some(r) = self.old_player_razing_bv.get_mut(i) {
-                    *r = Tally::of_amount_64(a(RAZING_VALUE_OF + i));
+            for (index, kill) in self.old_player_kill_bv.iter_mut().enumerate() {
+                *kill = Tally::of_amount_64(a(KILL_VALUE_OF + index));
+                if let Some(r) = self.old_player_razing_bv.get_mut(index) {
+                    *r = Tally::of_amount_64(a(RAZING_VALUE_OF + index));
                 }
             }
         }
@@ -508,11 +509,11 @@ impl History {
             .collect();
         let mut best = 0.0f32;
         let mut opponent = PlayerId::GAIA;
-        for (i, q) in PlayerId::each(players).enumerate() {
-            let weight = razings.checked(i)?.ratio(value) + kills.checked(i)?.get() as f32;
+        for (index, player_id) in PlayerId::each(players).enumerate() {
+            let weight = razings.checked(index)?.ratio(value) + kills.checked(index)?.get() as f32;
             if weight > best {
                 best = weight;
-                opponent = q;
+                opponent = player_id;
             }
         }
         if self.entries.is_empty() {
@@ -553,15 +554,16 @@ mod tests {
     }
 
     /// The update with the period of 30 runs.
-    fn update(h: &mut History, a: &[Amount], millis: u32) {
-        h.update(
-            a,
-            WorldTime::from_millis(millis),
-            HistoryUpdates::of_data(30),
-            slots(),
-            &tuning().history,
-        )
-        .unwrap();
+    fn update(history: &mut History, amounts: &[Amount], millis: u32) {
+        history
+            .update(
+                amounts,
+                WorldTime::from_millis(millis),
+                HistoryUpdates::of_data(30),
+                slots(),
+                &tuning().history,
+            )
+            .unwrap();
     }
 
     /// A saved byte is its kind; the default is the Feudal Age's 0.
@@ -594,23 +596,26 @@ mod tests {
     #[test]
     fn an_entry_grows_the_buffer_by_sixty_and_keeps_shorts() {
         let pop = |c: f32, m: f32| (Population::of_count(c), Population::of_count(m));
-        let mut h = History::default();
+        let mut history = History::default();
         let (c, m) = pop(7.9, 70_000.0);
-        h.add_entry(EntryKind::POPULATION, c, m);
+        history.add_entry(EntryKind::POPULATION, c, m);
         assert_eq!(
-            (h.max_entries, h.entries.clone()),
+            (history.max_entries, history.entries.clone()),
             (TimeSlice::of_data(60), vec![entry(7, 70_000_i32 as i16)])
         );
         let (c, m) = pop(3.0, 4.0);
-        h.add_entry(EntryKind::of_data(1), c, m);
+        history.add_entry(EntryKind::of_data(1), c, m);
         let (c, m) = pop(f32::NAN, -2.5);
-        h.add_entry(EntryKind::POPULATION, c, m);
-        assert_eq!(h.entries, vec![entry(7, 4464), entry(0, 0), entry(0, -2)]);
-        h.entries.resize(60, HistoryEntry::default());
-        let (c, m) = pop(1.0, 1.0);
-        h.add_entry(EntryKind::POPULATION, c, m);
+        history.add_entry(EntryKind::POPULATION, c, m);
         assert_eq!(
-            (h.max_entries, h.entries.len()),
+            history.entries,
+            vec![entry(7, 4464), entry(0, 0), entry(0, -2)]
+        );
+        history.entries.resize(60, HistoryEntry::default());
+        let (c, m) = pop(1.0, 1.0);
+        history.add_entry(EntryKind::POPULATION, c, m);
+        assert_eq!(
+            (history.max_entries, history.entries.len()),
             (TimeSlice::of_data(120), 61)
         );
     }
@@ -619,24 +624,24 @@ mod tests {
     /// entries' count and the world's time, its byte as `data3`.
     #[test]
     fn an_event_needs_an_entry_and_joins_the_head() {
-        let mut h = History::default();
-        h.add_event(
+        let mut history = History::default();
+        history.add_event(
             EventKind::CastleBuilt,
             2.0,
             0.0,
             0,
             WorldTime::from_millis(5000),
         );
-        assert_eq!(h.events, []);
-        h.entries = vec![HistoryEntry::default(); 3];
-        h.add_event(
+        assert_eq!(history.events, []);
+        history.entries = vec![HistoryEntry::default(); 3];
+        history.add_event(
             EventKind::FeudalAge,
             0.0,
             0.0,
             0,
             WorldTime::from_millis(5000),
         );
-        h.add_event(
+        history.add_event(
             EventKind::CastleBuilt,
             2.0,
             0.5,
@@ -644,7 +649,7 @@ mod tests {
             WorldTime::from_millis(9000),
         );
         assert_eq!(
-            h.events,
+            history.events,
             vec![
                 Event {
                     kind: EventKind::CastleBuilt,
@@ -662,54 +667,55 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(h.number_of_events, 0);
+        assert_eq!(history.number_of_events, 0);
     }
 
     /// `mark_new_battle`: up to three battles all stay (the new one's `data3` 1); a fourth
     /// pushes out the battle among the three newest furthest below it, or goes itself.
     #[test]
     fn fourth_battle_pushes_out_the_weakest_of_the_newest_three() {
-        let mut h = with_entry();
+        let mut history = with_entry();
         for d in [0.2, 0.9, 0.3] {
-            h.add_event(EventKind::Battle, 1.0, d, 0, WorldTime::ZERO);
+            history.add_event(EventKind::Battle, 1.0, d, 0, WorldTime::ZERO);
         }
-        assert_eq!(h.events.len(), 3);
-        assert!(h.events.iter().all(|e| e.data3 == 1.0));
+        assert_eq!(history.events.len(), 3);
+        assert!(history.events.iter().all(|e| e.data3 == 1.0));
         // the newest three are 0.5 (new), 0.3, 0.9: 0.3 lies furthest below
-        h.add_event(EventKind::Battle, 1.0, 0.5, 0, WorldTime::ZERO);
-        let d: Vec<f32> = h.events.iter().map(|e| e.data2).collect();
+        history.add_event(EventKind::Battle, 1.0, 0.5, 0, WorldTime::ZERO);
+        let d: Vec<f32> = history.events.iter().map(|e| e.data2).collect();
         assert_eq!(d, vec![0.5, 0.9, 0.2]);
         // a new battle below the newest three goes itself; 0.2 is fourth and not compared
-        h.events.insert(
+        history.events.insert(
             0,
             Event {
                 kind: EventKind::FeudalAge,
                 ..Event::default()
             },
         );
-        h.add_event(EventKind::Battle, 1.0, 0.4, 0, WorldTime::ZERO);
+        history.add_event(EventKind::Battle, 1.0, 0.4, 0, WorldTime::ZERO);
         assert_eq!(
-            h.events
+            history
+                .events
                 .iter()
-                .filter(|e| e.kind == EventKind::Battle)
+                .filter(|event| event.kind == EventKind::Battle)
                 .count(),
             3
         );
-        assert_eq!(h.events[0].kind, EventKind::FeudalAge);
+        assert_eq!(history.events[0].kind, EventKind::FeudalAge);
         // a NaN gap never qualifies
-        h.events.insert(0, battle(f32::NAN));
-        assert_eq!(h.mark_new_battle(), BattleMark::NewDropped);
-        assert_eq!(h.events.len(), 4);
+        history.events.insert(0, battle(f32::NAN));
+        assert_eq!(history.mark_new_battle(), BattleMark::NewDropped);
+        assert_eq!(history.events.len(), 4);
     }
 
     /// `mark_new_battle` scans the newest battles in list order: the first of two equal gaps
     /// wins, and other events between them do not count.
     #[test]
     fn equal_gaps_push_out_the_newer_battle() {
-        let mut h = with_entry();
-        h.events = vec![battle(0.1), Event::default(), battle(0.1), battle(0.9)];
-        h.add_event(EventKind::Battle, 3.0, 0.6, 0, WorldTime::ZERO);
-        let d: Vec<f32> = h.events.iter().map(|e| e.data2).collect();
+        let mut history = with_entry();
+        history.events = vec![battle(0.1), Event::default(), battle(0.1), battle(0.9)];
+        history.add_event(EventKind::Battle, 3.0, 0.6, 0, WorldTime::ZERO);
+        let d: Vec<f32> = history.events.iter().map(|event| event.data2).collect();
         assert_eq!(d, vec![0.6, 0.0, 0.1, 0.9]);
     }
 
@@ -717,7 +723,7 @@ mod tests {
     /// (1 based) and count of a time slice's events.
     #[test]
     fn the_readers_find_the_newest_event_and_time_slice_events() {
-        let h = History {
+        let history = History {
             events: vec![
                 Event {
                     kind: EventKind::CastleAge,
@@ -741,19 +747,21 @@ mod tests {
             ..History::default()
         };
         assert_eq!(
-            h.event_of_kind(EventKind::FeudalAge).map(|e| e.world_time),
+            history
+                .event_of_kind(EventKind::FeudalAge)
+                .map(|event| event.world_time),
             Some(WorldTime::from_millis(4000))
         );
-        assert_eq!(h.event_of_kind(EventKind::ImperialAge), None);
-        assert_eq!(h.events_at(TimeSlice::of_data(2)), Some((2, 2)));
-        assert_eq!(h.events_at(TimeSlice::of_data(4)), Some((1, 1)));
-        assert_eq!(h.events_at(TimeSlice::of_data(3)), None);
+        assert_eq!(history.event_of_kind(EventKind::ImperialAge), None);
+        assert_eq!(history.events_at(TimeSlice::of_data(2)), Some((2, 2)));
+        assert_eq!(history.events_at(TimeSlice::of_data(4)), Some((1, 1)));
+        assert_eq!(history.events_at(TimeSlice::of_data(3)), None);
     }
 
     /// `FUN_140b077d0`: the seconds since the current age's event, else the world's seconds.
     #[test]
     fn the_age_time_counts_from_the_age_event() {
-        let h = History {
+        let history = History {
             events: vec![Event {
                 kind: EventKind::CastleAge,
                 world_time: WorldTime::from_millis(600_999),
@@ -762,19 +770,19 @@ mod tests {
             ..History::default()
         };
         assert_eq!(
-            h.age_time(Amount::new(2.0), WorldTime::from_millis(900_500)),
+            history.age_time(Amount::new(2.0), WorldTime::from_millis(900_500)),
             300
         );
         assert_eq!(
-            h.age_time(Amount::new(1.9), WorldTime::from_millis(900_500)),
+            history.age_time(Amount::new(1.9), WorldTime::from_millis(900_500)),
             900
         );
         assert_eq!(
-            h.age_time(Amount::new(3.0), WorldTime::from_millis(900_500)),
+            history.age_time(Amount::new(3.0), WorldTime::from_millis(900_500)),
             900
         );
         assert_eq!(
-            h.age_time(Amount::new(0.0), WorldTime::from_millis(900_500)),
+            history.age_time(Amount::new(0.0), WorldTime::from_millis(900_500)),
             900
         );
     }
@@ -786,45 +794,48 @@ mod tests {
     /// The update counts its runs: the period's run adds the entry and keeps the attributes.
     #[test]
     fn the_period_update_adds_an_entry_and_keeps_the_attributes() {
-        let mut h = History {
+        let mut history = History {
             update_count: HistoryUpdates::of_data(28),
             old_player_kill_bv: vec![Tally::ZERO; 3],
             old_player_razing_bv: vec![Tally::ZERO; 3],
             ..History::default()
         };
-        let mut a = attributes();
-        a[attribute::CIVILIAN_POPULATION.index()] = Amount::new(12.0);
-        a[attribute::MILITARY_POPULATION.index()] = Amount::new(3.0);
-        a[attribute::KILLS.index()] = Amount::new(2.0);
-        a[attribute::UNITS_VALUE.index()] = Amount::new(500.0);
-        a[attribute::BUILDINGS_VALUE.index()] = Amount::new(900.7);
-        a[KILL_VALUE_OF + 2] = Amount::new(45.0);
-        a[RAZING_VALUE_OF + 1] = Amount::new(5_000_000_000.0);
-        update(&mut h, &a, 0);
+        let mut amounts = attributes();
+        amounts[attribute::CIVILIAN_POPULATION.index()] = Amount::new(12.0);
+        amounts[attribute::MILITARY_POPULATION.index()] = Amount::new(3.0);
+        amounts[attribute::KILLS.index()] = Amount::new(2.0);
+        amounts[attribute::UNITS_VALUE.index()] = Amount::new(500.0);
+        amounts[attribute::BUILDINGS_VALUE.index()] = Amount::new(900.7);
+        amounts[KILL_VALUE_OF + 2] = Amount::new(45.0);
+        amounts[RAZING_VALUE_OF + 1] = Amount::new(5_000_000_000.0);
+        update(&mut history, &amounts, 0);
         assert_eq!(
-            (h.update_count, h.entries.len()),
+            (history.update_count, history.entries.len()),
             (HistoryUpdates::of_data(29), 0)
         );
-        update(&mut h, &a, 0);
+        update(&mut history, &amounts, 0);
         assert_eq!(
-            (h.update_count, h.entries.clone()),
+            (history.update_count, history.entries.clone()),
             (HistoryUpdates::of_data(0), vec![entry(12, 3)])
         );
         assert_eq!(
-            (h.old_total_kills, h.old_current_build_value_buildings),
+            (
+                history.old_total_kills,
+                history.old_current_build_value_buildings
+            ),
             (Tally::of_data(2), Tally::of_data(900))
         );
-        assert_eq!(h.old_player_kill_bv, tallies(&[0, 0, 45]));
+        assert_eq!(history.old_player_kill_bv, tallies(&[0, 0, 45]));
         // 5e9 through the 64-bit conversion keeps its low half
         assert_eq!(
-            h.old_player_razing_bv,
+            history.old_player_razing_bv,
             tallies(&[0, 5_000_000_000_i64 as i32, 0])
         );
         // a negative population sum gives an entry of zeros
-        a[attribute::MILITARY_POPULATION.index()] = Amount::new(-13.0);
-        h.update_count = HistoryUpdates::of_data(29);
-        update(&mut h, &a, 0);
-        assert_eq!(h.entries[1], entry(0, 0));
+        amounts[attribute::MILITARY_POPULATION.index()] = Amount::new(-13.0);
+        history.update_count = HistoryUpdates::of_data(29);
+        update(&mut history, &amounts, 0);
+        assert_eq!(history.entries[1], entry(0, 0));
     }
 
     /// A share of the player's value of 0.12 or more starts a battle and sums it; falling below
@@ -832,7 +843,7 @@ mod tests {
     /// razings over the value plus kills since the start weigh most.
     #[test]
     fn battle_starts_sums_and_ends_with_its_event() {
-        let mut h = History {
+        let mut history = History {
             update_count: HistoryUpdates::of_data(29),
             old_current_build_value_units: Tally::of_data(600),
             old_current_build_value_buildings: Tally::of_data(400),
@@ -840,40 +851,46 @@ mod tests {
             old_player_razing_bv: vec![Tally::ZERO; 3],
             ..History::default()
         };
-        let mut a = attributes();
-        a[attribute::UNITS_VALUE.index()] = Amount::new(600.0);
-        a[attribute::BUILDINGS_VALUE.index()] = Amount::new(400.0);
-        a[attribute::KILLS_VALUE.index()] = Amount::new(100.0);
-        a[attribute::RAZINGS_VALUE.index()] = Amount::new(30.0);
-        a[attribute::KILLS_VALUE_OTHER.index()] = Amount::new(30.0);
-        a[attribute::KILLS.index()] = Amount::new(70_000.0);
-        a[attribute::KILLS_OTHER.index()] = Amount::new(3.0);
-        a[attribute::RAZINGS.index()] = Amount::new(1.0);
-        a[KILL_VALUE_OF + 1] = Amount::new(50.0);
-        a[KILL_VALUE_OF + 2] = Amount::new(40.0);
-        a[RAZING_VALUE_OF + 2] = Amount::new(20_000.0);
+        let mut amounts = attributes();
+        amounts[attribute::UNITS_VALUE.index()] = Amount::new(600.0);
+        amounts[attribute::BUILDINGS_VALUE.index()] = Amount::new(400.0);
+        amounts[attribute::KILLS_VALUE.index()] = Amount::new(100.0);
+        amounts[attribute::RAZINGS_VALUE.index()] = Amount::new(30.0);
+        amounts[attribute::KILLS_VALUE_OTHER.index()] = Amount::new(30.0);
+        amounts[attribute::KILLS.index()] = Amount::new(70_000.0);
+        amounts[attribute::KILLS_OTHER.index()] = Amount::new(3.0);
+        amounts[attribute::RAZINGS.index()] = Amount::new(1.0);
+        amounts[KILL_VALUE_OF + 1] = Amount::new(50.0);
+        amounts[KILL_VALUE_OF + 2] = Amount::new(40.0);
+        amounts[RAZING_VALUE_OF + 2] = Amount::new(20_000.0);
         // (30 + 100) / 1000: the battle starts; all four: 160 / 1000
-        update(&mut h, &a, 30_000);
-        assert_eq!(h.battle_flag, 1);
+        update(&mut history, &amounts, 30_000);
+        assert_eq!(history.battle_flag, 1);
         assert_eq!(
-            (h.running_total_bv_kills, h.running_total_bv_razings),
+            (
+                history.running_total_bv_kills,
+                history.running_total_bv_razings
+            ),
             (Tally::of_data(130), Tally::of_data(30))
         );
         assert_eq!(
-            (h.running_total_kills, h.running_total_razings),
+            (history.running_total_kills, history.running_total_razings),
             (Tally::of_data(4464 + 3), Tally::of_data(1))
         );
-        assert_eq!(h.running_ave_bv_percent, Share::of_data(160.0 / 1000.0));
+        assert_eq!(
+            history.running_ave_bv_percent,
+            Share::of_data(160.0 / 1000.0)
+        );
         // in a battle the per-player values stay as they were
-        assert_eq!(h.old_player_kill_bv, tallies(&[0, 0, 0]));
+        assert_eq!(history.old_player_kill_bv, tallies(&[0, 0, 0]));
         // nothing more: the share falls to 0, the battle ends with its event; player 2's
         // 20000 / 1000 + 40 outweighs player 1's 50
-        h.update_count = HistoryUpdates::of_data(29);
-        update(&mut h, &a, 60_000);
-        assert_eq!(h.battle_flag, 0);
-        assert_eq!(h.running_ave_bv_percent, Share::ZERO);
+        history.update_count = HistoryUpdates::of_data(29);
+        update(&mut history, &amounts, 60_000);
+        assert_eq!(history.battle_flag, 0);
+        assert_eq!(history.running_ave_bv_percent, Share::ZERO);
         assert_eq!(
-            h.events,
+            history.events,
             vec![Event {
                 kind: EventKind::Battle,
                 time_slice: TimeSlice::of_data(2),
@@ -883,15 +900,15 @@ mod tests {
                 data3: 1.0,
             }]
         );
-        assert_eq!(h.old_player_kill_bv, tallies(&[0, 50, 40]));
-        assert_eq!(h.old_player_razing_bv, tallies(&[0, 0, 20_000]));
+        assert_eq!(history.old_player_kill_bv, tallies(&[0, 50, 40]));
+        assert_eq!(history.old_player_razing_bv, tallies(&[0, 0, 20_000]));
     }
 
     /// A battle whose summed share stays below 0.15 ends without an event; a saved battle flag
     /// other than 1 goes on as a battle.
     #[test]
     fn small_battle_ends_without_its_event() {
-        let mut h = History {
+        let mut history = History {
             update_count: HistoryUpdates::of_data(29),
             battle_flag: 2,
             running_ave_bv_percent: Share::of_data(0.149_999),
@@ -900,38 +917,38 @@ mod tests {
             old_player_razing_bv: vec![Tally::ZERO; 2],
             ..History::default()
         };
-        let mut a = attributes();
-        a[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
-        a[attribute::KILLS_VALUE.index()] = Amount::new(130.0);
-        update(&mut h, &a, 0);
-        assert_eq!(h.battle_flag, 2);
-        h.update_count = HistoryUpdates::of_data(29);
-        h.running_ave_bv_percent = Share::of_data(0.149_999);
-        update(&mut h, &a, 0);
-        assert_eq!((h.battle_flag, h.events.len()), (0, 0));
+        let mut amounts = attributes();
+        amounts[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
+        amounts[attribute::KILLS_VALUE.index()] = Amount::new(130.0);
+        update(&mut history, &amounts, 0);
+        assert_eq!(history.battle_flag, 2);
+        history.update_count = HistoryUpdates::of_data(29);
+        history.running_ave_bv_percent = Share::of_data(0.149_999);
+        update(&mut history, &amounts, 0);
+        assert_eq!((history.battle_flag, history.events.len()), (0, 0));
         // a NaN sum fails the record's COMISD (JC): no event either
-        h.update_count = HistoryUpdates::of_data(29);
-        h.battle_flag = 1;
-        h.running_ave_bv_percent = Share::of_data(f32::NAN);
-        update(&mut h, &a, 0);
-        assert_eq!((h.battle_flag, h.events.len()), (0, 0));
-        assert_eq!(h.running_ave_bv_percent, Share::ZERO);
+        history.update_count = HistoryUpdates::of_data(29);
+        history.battle_flag = 1;
+        history.running_ave_bv_percent = Share::of_data(f32::NAN);
+        update(&mut history, &amounts, 0);
+        assert_eq!((history.battle_flag, history.events.len()), (0, 0));
+        assert_eq!(history.running_ave_bv_percent, Share::ZERO);
     }
 
     /// The share is a float compared as a double: 120 of 1000 as an f32 lies just below the
     /// double 0.12 and starts no battle.
     #[test]
     fn share_of_exactly_twelve_percent_starts_no_battle() {
-        let mut h = History {
+        let mut history = History {
             update_count: HistoryUpdates::of_data(29),
             old_current_build_value_units: Tally::of_data(1000),
             ..History::default()
         };
-        let mut a = attributes();
-        a[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
-        a[attribute::KILLS_VALUE.index()] = Amount::new(120.0);
-        update(&mut h, &a, 0);
-        assert_eq!(h.battle_flag, 0);
+        let mut amounts = attributes();
+        amounts[attribute::UNITS_VALUE.index()] = Amount::new(1000.0);
+        amounts[attribute::KILLS_VALUE.index()] = Amount::new(120.0);
+        update(&mut history, &amounts, 0);
+        assert_eq!(history.battle_flag, 0);
     }
 
     /// Each named value and one the set names nowhere go to their variant and back.

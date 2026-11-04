@@ -124,11 +124,11 @@ pub(crate) const fn carrying(kind: Option<AttributeId>, amount: f32) -> Held {
 /// A player's `n` attributes (at least the four resources): food, wood, stone and gold from
 /// `resources`, the rest 0.
 pub(crate) fn attributes(n: usize, resources: [f32; 4]) -> Vec<Amount> {
-    let mut a = vec![Amount::ZERO; n.max(4)];
-    for (v, r) in a.iter_mut().zip(resources) {
-        *v = Amount::new(r);
+    let mut amounts = vec![Amount::ZERO; n.max(4)];
+    for (amount, r) in amounts.iter_mut().zip(resources) {
+        *amount = Amount::new(r);
     }
-    a
+    amounts
 }
 
 /// `values` as attribute amounts, a test's expected attributes.

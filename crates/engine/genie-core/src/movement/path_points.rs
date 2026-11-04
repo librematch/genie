@@ -55,8 +55,8 @@ pub(super) fn point_or_zero_of(level: &PathData, index: WaypointIndex) -> BVecto
 
 /// The position setter's test for a move (`FUN_141161950`): a coordinate changed by more than
 /// 1e-7.
-pub(super) fn moved_far(a: Position, b: Position) -> bool {
-    [b.x() - a.x(), b.y() - a.y(), b.z() - a.z()]
+pub(super) fn moved_far(from: Position, to: Position) -> bool {
+    [to.x() - from.x(), to.y() - from.y(), to.z() - from.z()]
         .iter()
         .any(|d| EPSILON < d.abs())
 }
@@ -97,11 +97,11 @@ pub(super) fn short_range(
     if near == GoalReach::Far {
         return Distance::ZERO;
     }
-    let r = range - Distance::new(movement_tuning.range_floor);
-    if r <= Distance::ZERO {
+    let distance = range - Distance::new(movement_tuning.range_floor);
+    if distance <= Distance::ZERO {
         Distance::ZERO
     } else {
-        r
+        distance
     }
 }
 

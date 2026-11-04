@@ -8,9 +8,8 @@ use crate::pathing::mesh::Contact;
 use crate::pathing::mesh::Mesh;
 use crate::pathing::short_path::axis_dir::AxisDir;
 use crate::pathing::short_path::{
-    Corner, Emit, FixedPoint, Foot, Kind, NodeIndex, Poly, PolyIndex, Run, Search, TRACE_STEPS,
-    UNSET, VertexIndex, WalkDir, cheb, clamp_to_box, contact_point, corner_emits, in_box, inside,
-    shrunk_corner,
+    FixedPoint, Poly, Search, TRACE_STEPS, UNSET, VertexIndex, clamp_to_box, contact_point, in_box,
+    inside, shrunk_corner,
 };
 use crate::pathing::{ShapeId, ShapeSide};
 use crate::world::slots::CheckedIndex;
@@ -53,12 +52,6 @@ pub(super) enum VertexTrace {
     Closes,
     /// The vertex joined the polygon.
     Appended,
-}
-
-/// A new polygon's walk: the polygon and the node it comes from.
-struct NewWalk {
-    poly: PolyIndex,
-    parent: NodeIndex,
 }
 
 impl Search<'_> {
@@ -109,9 +102,13 @@ impl Search<'_> {
         VertexTrace::Appended
     }
 
-    /// The coordinate of `p` along a side's axis (x for sides 0 and 2, y for 1 and 3).
-    pub(super) const fn along(p: FixedPoint, side: ShapeSide) -> i32 {
-        if side.along_y() { p.y() } else { p.x() }
+    /// The coordinate of `fixed_point` along a side's axis (x for sides 0 and 2, y for 1 and 3).
+    pub(super) const fn along(fixed_point: FixedPoint, side: ShapeSide) -> i32 {
+        if side.along_y() {
+            fixed_point.y()
+        } else {
+            fixed_point.x()
+        }
     }
 
     /// `FUN_140fa9630`: the trace left the bounds: walk the bounds' border from `pos` in the turn
@@ -125,22 +122,34 @@ impl Search<'_> {
         u: &mut i32,
         steps: i32,
     ) -> GenieResult<Option<ShapeId>> {
-        let b = self.bounds;
-        let w = side.prev();
-        let (target, dir) = match w {
-            ShapeSide::LowY => (FixedPoint::new(b.x0(), b.y1()), AxisDir::PlusY),
-            ShapeSide::HighX => (FixedPoint::new(b.x0(), b.y0()), AxisDir::MinusX),
-            ShapeSide::HighY => (FixedPoint::new(b.x1(), b.y0()), AxisDir::MinusY),
-            ShapeSide::LowX => (FixedPoint::new(b.x1(), b.y1()), AxisDir::PlusX),
+        let fixed_rect = self.bounds;
+        let shape_side = side.prev();
+        let (target, dir) = match shape_side {
+            ShapeSide::LowY => (
+                FixedPoint::new(fixed_rect.x0(), fixed_rect.y1()),
+                AxisDir::PlusY,
+            ),
+            ShapeSide::HighX => (
+                FixedPoint::new(fixed_rect.x0(), fixed_rect.y0()),
+                AxisDir::MinusX,
+            ),
+            ShapeSide::HighY => (
+                FixedPoint::new(fixed_rect.x1(), fixed_rect.y0()),
+                AxisDir::MinusY,
+            ),
+            ShapeSide::LowX => (
+                FixedPoint::new(fixed_rect.x1(), fixed_rect.y1()),
+                AxisDir::PlusX,
+            ),
         };
         let sw = self.ctx.sweep(*pos, target, dir)?;
-        let new_u = Self::along(*pos, w);
+        let new_u = Self::along(*pos, shape_side);
         let Some((hid, hs, hp)) = sw.counted()? else {
             if steps == 0 {
                 *first = target;
             }
             *u = new_u;
-            *side = w;
+            *side = shape_side;
             *pos = target;
             return Ok(None);
         };
@@ -164,9 +173,9 @@ impl Search<'_> {
         start: Option<FixedPoint>,
         poly: &mut Poly,
     ) -> GenieResult<Outline> {
-        let d = self.ctx.d;
+        let fixed_distance = self.ctx.d;
         let mesh = self.ctx.mesh;
-        let b = self.bounds;
+        let fixed_rect = self.bounds;
         let vertical = s0.along_y();
         let mut steps: i32 = 0;
         let mut winding: i32 = 0;
@@ -175,7 +184,11 @@ impl Search<'_> {
         let mut side = s0;
         let mut pos = match start {
             Some(p) => p,
-            None => shrunk_corner(*mesh.shapes.checked(shape.index())?, s0.first_corner(), d),
+            None => shrunk_corner(
+                *mesh.shapes.checked(shape.index())?,
+                s0.first_corner(),
+                fixed_distance,
+            ),
         };
         let mut u = Self::along(pos, s0);
         let mut first = pos;
@@ -183,24 +196,29 @@ impl Search<'_> {
             let contacts = mesh.sides.checked(shape.index())?.checked(side.index())?;
             let next_side;
             if let Some(k) = self.nearest_contact(contacts, side, u) {
-                let c = *contacts.checked(k)?;
-                let q = contact_point(c.at, c.side, d, c.at_side_start);
-                pos = q;
+                let contact = *contacts.checked(k)?;
+                let fixed_point = contact_point(
+                    contact.at,
+                    contact.side,
+                    fixed_distance,
+                    contact.at_side_start,
+                );
+                pos = fixed_point;
                 if steps == 0 {
-                    first = q;
+                    first = fixed_point;
                 }
-                if side != c.side {
+                if side != contact.side {
                     winding -= 1;
                 }
-                u = Self::along(q, c.side);
-                side = c.side;
-                shape = c.other;
+                u = Self::along(fixed_point, contact.side);
+                side = contact.side;
+                shape = contact.other;
             } else {
                 next_side = side.next();
                 let corner = shrunk_corner(
                     *mesh.shapes.checked(shape.index())?,
                     next_side.first_corner(),
-                    d,
+                    fixed_distance,
                 );
                 if steps == 0 {
                     first = corner;
@@ -223,10 +241,10 @@ impl Search<'_> {
                 if TRACE_STEPS <= steps {
                     return Ok(Outline::StepLimit);
                 }
-                let out = !in_box(pos, b);
+                let out = !in_box(pos, fixed_rect);
                 if out {
                     side = side.opposite();
-                    let clamped = clamp_to_box(pos, b);
+                    let clamped = clamp_to_box(pos, fixed_rect);
                     if pos == first {
                         first = clamped;
                     }
@@ -270,38 +288,43 @@ impl Search<'_> {
         }
     }
 
-    /// [`Search::trace`]'s next contact on a side: of the side's contacts (`contacts`), those
-    /// wider than twice `d`, not ignored and whose contact point lies in the bounds, the one
-    /// nearest ahead of `u` along `side` (each one's run start moved by `d`, back for a flagged
-    /// contact on the same side; the sides 2 and 3 measure backwards); ties to the first.
+    /// [`Search::trace`]'s next contact on a side: of the side's contacts (`contacts`), those wider
+    /// than twice `fixed_distance`, not ignored and whose contact point lies in the bounds, the one
+    /// nearest ahead of `u` along `side` (each one's run start moved by `fixed_distance`, back for
+    /// a flagged contact on the same side; the sides 2 and 3 measure backwards); ties to the first.
     pub(super) fn nearest_contact(
         &self,
         contacts: &[Contact],
         side: ShapeSide,
         u: i32,
     ) -> Option<usize> {
-        let d = self.ctx.d;
+        let fixed_distance = self.ctx.d;
         let mut chosen = None;
         let mut best_key = 0x7fc0_0000_i32;
-        for (k, c) in contacts.iter().enumerate() {
-            if (d >= c.half) || self.ctx.ignored(c.other) {
+        for (index, contact) in contacts.iter().enumerate() {
+            if (fixed_distance >= contact.half) || self.ctx.ignored(contact.other) {
                 continue;
             }
-            let q = contact_point(c.at, c.side, d, c.at_side_start);
-            if !in_box(q, self.bounds) {
+            let fixed_point = contact_point(
+                contact.at,
+                contact.side,
+                fixed_distance,
+                contact.at_side_start,
+            );
+            if !in_box(fixed_point, self.bounds) {
                 continue;
             }
             // the sides 0 and 1 measure forward (the game's `side < 2`, and any side past 3)
             let forward = matches!(side, ShapeSide::LowY | ShapeSide::HighX);
-            let off = if side == c.side && c.at_side_start {
-                d.get().wrapping_neg()
+            let off = if side == contact.side && contact.at_side_start {
+                fixed_distance.get().wrapping_neg()
             } else {
-                d.get()
+                fixed_distance.get()
             };
             let mut key = if forward {
-                c.along.wrapping_add(off)
+                contact.along.wrapping_add(off)
             } else {
-                c.along.wrapping_sub(off)
+                contact.along.wrapping_sub(off)
             };
             key = key.wrapping_sub(u);
             if !forward {
@@ -309,33 +332,33 @@ impl Search<'_> {
             }
             if -1 < key && key < best_key {
                 best_key = key;
-                chosen = Some(k);
+                chosen = Some(index);
             }
         }
         chosen
     }
 
-    /// `FUN_140fa77b0`: the polygon's edge that holds `p` going along `side` (the start of the
-    /// edge's run), or the vertex `p` is when it lies in the overlap of its shape with `shape`;
-    /// None if none.
+    /// `FUN_140fa77b0`: the polygon's edge that holds `fixed_point` going along `side` (the start
+    /// of the edge's run), or the vertex `fixed_point` is when it lies in the overlap of its shape
+    /// with `shape`; None if none.
     pub(super) fn edge_holding(
         poly: &Poly,
-        p: FixedPoint,
+        fixed_point: FixedPoint,
         side: ShapeSide,
         mesh: &Mesh,
         shape: Option<ShapeId>,
-        d: FixedDistance,
+        fixed_distance: FixedDistance,
     ) -> Option<VertexIndex> {
         let shape = shape?;
-        let n = poly.vertices.len() as u32;
-        if n == 0 {
+        let count = poly.vertices.len() as u32;
+        if count == 0 {
             return None;
         }
-        let v = &poly.vertices;
+        let fixed_points = &poly.vertices;
         let sides = &poly.sides;
-        let mut limit = n;
-        let mut prev = *sides.get(n.wrapping_sub(2) as usize % sides.len())?;
-        let mut cur = n - 1;
+        let mut limit = count;
+        let mut prev = *sides.get(count.wrapping_sub(2) as usize % sides.len())?;
+        let mut cur = count - 1;
         let mut i: u32 = 0;
         loop {
             let cur_side = *sides.get(cur as usize)?;
@@ -343,21 +366,30 @@ impl Search<'_> {
             let mut nxt = i;
             if side_i == cur_side {
                 loop {
-                    i = (i + 1) % n;
+                    i = (i + 1) % count;
                     side_i = *sides.get(i as usize)?;
                     if side_i != cur_side {
                         break;
                     }
                 }
                 nxt = i;
-                if i < cur && cur != n - 1 {
+                if i < cur && cur != count - 1 {
                     limit = 0;
                 }
             }
-            let vc = *v.get(cur as usize)?;
-            if Self::vertex_in_overlap(mesh, (p, vc, *poly.shapes.get(cur as usize)?), shape, d)
-                || (side == cur_side
-                    && Self::on_edge(cur_side, (vc, *v.get(nxt as usize)?), p, (prev, side_i)))
+            let vc = *fixed_points.get(cur as usize)?;
+            if Self::vertex_in_overlap(
+                mesh,
+                (fixed_point, vc, *poly.shapes.get(cur as usize)?),
+                shape,
+                fixed_distance,
+            ) || (side == cur_side
+                && Self::on_edge(
+                    cur_side,
+                    (vc, *fixed_points.get(nxt as usize)?),
+                    fixed_point,
+                    (prev, side_i),
+                ))
             {
                 return Some(VertexIndex::new(cur));
             }
@@ -370,17 +402,17 @@ impl Search<'_> {
         }
     }
 
-    /// `FUN_140fa77b0`'s vertex test: the vertex `vc` of shape `vs` is `p`, and `p` lies in the
-    /// overlap of that shape with `shape` (the higher low corner, the lower high one), shrunk by
-    /// `d` on every side.
+    /// `FUN_140fa77b0`'s vertex test: the vertex `vc` of shape `vs` is `fixed_point`, and
+    /// `fixed_point` lies in the overlap of that shape with `shape` (the higher low corner, the
+    /// lower high one), shrunk by `fixed_distance` on every side.
     pub(super) fn vertex_in_overlap(
         mesh: &Mesh,
-        (p, vc, vs): (FixedPoint, FixedPoint, Option<ShapeId>),
+        (fixed_point, vc, vs): (FixedPoint, FixedPoint, Option<ShapeId>),
         shape: ShapeId,
-        d: FixedDistance,
+        fixed_distance: FixedDistance,
     ) -> bool {
-        let d = d.get();
-        let Some(vs) = vs.filter(|_| p == vc) else {
+        let d = fixed_distance.get();
+        let Some(vs) = vs.filter(|_| fixed_point == vc) else {
             return false;
         };
         let (Some(&sr), Some(&vr)) = (mesh.shapes.get(shape.index()), mesh.shapes.get(vs.index()))
@@ -407,258 +439,82 @@ impl Search<'_> {
         } else {
             vr.x0()
         };
-        let o = FixedRect::new(x0 + d, y0 + d, x1, y1);
-        o.x0() < o.x1() && o.y0() < o.y1() && inside(o, p, FixedDistance::ZERO)
+        let fixed_rect = FixedRect::new(x0 + d, y0 + d, x1, y1);
+        fixed_rect.x0() < fixed_rect.x1()
+            && fixed_rect.y0() < fixed_rect.y1()
+            && inside(fixed_rect, fixed_point, FixedDistance::ZERO)
     }
 
-    /// `FUN_140fa77b0`'s edge test: `p` lies on the edge of side `cur_side` from `vc` to `vn`; the
-    /// side before the edge's run (`prev`) and the one after it (`next`) decide whether each end
-    /// counts.
+    /// `FUN_140fa77b0`'s edge test: `fixed_point` lies on the edge of side `cur_side` from `vc` to
+    /// `vn`; the side before the edge's run (`prev`) and the one after it (`next`) decide whether
+    /// each end counts.
     pub(super) const fn on_edge(
         cur_side: ShapeSide,
         (vc, vn): (FixedPoint, FixedPoint),
-        p: FixedPoint,
+        fixed_point: FixedPoint,
         (prev, next): (ShapeSide, ShapeSide),
     ) -> bool {
         use ShapeSide::{HighX, HighY, LowX, LowY};
         // the game's unsigned compares of the side numbers: `prev < 2`, `prev - 1 < 2` and the
         // like name two neighbouring sides
         match cur_side {
-            LowY if vc.y() == p.y() => {
+            LowY if vc.y() == fixed_point.y() => {
                 let (a, b) = (vc.x(), vn.x());
                 let start = if matches!(prev, LowY | HighX) {
-                    a <= p.x()
+                    a <= fixed_point.x()
                 } else {
-                    a < p.x()
+                    a < fixed_point.x()
                 };
                 start
                     && if matches!(next, LowX | LowY) {
-                        p.x() <= b
+                        fixed_point.x() <= b
                     } else {
-                        p.x() < b
+                        fixed_point.x() < b
                     }
             }
-            HighX if vc.x() == p.x() => {
+            HighX if vc.x() == fixed_point.x() => {
                 let (a, b) = (vc.y(), vn.y());
                 let start = if matches!(prev, HighX | HighY) {
-                    a <= p.y()
+                    a <= fixed_point.y()
                 } else {
-                    a < p.y()
+                    a < fixed_point.y()
                 };
                 start
                     && if matches!(next, LowY | HighX) {
-                        p.y() <= b
+                        fixed_point.y() <= b
                     } else {
-                        p.y() < b
+                        fixed_point.y() < b
                     }
             }
-            HighY if vc.y() == p.y() => {
+            HighY if vc.y() == fixed_point.y() => {
                 let (a, b) = (vc.x(), vn.x());
                 let start = if matches!(next, HighX | HighY) {
-                    b <= p.x()
+                    b <= fixed_point.x()
                 } else {
-                    b < p.x()
+                    b < fixed_point.x()
                 };
                 start
                     && if matches!(prev, HighY | LowX) {
-                        p.x() <= a
+                        fixed_point.x() <= a
                     } else {
-                        p.x() < a
+                        fixed_point.x() < a
                     }
             }
-            LowX if vc.x() == p.x() => {
+            LowX if vc.x() == fixed_point.x() => {
                 let (a, b) = (vc.y(), vn.y());
                 let start = if matches!(next, HighY | LowX) {
-                    b <= p.y()
+                    b <= fixed_point.y()
                 } else {
-                    b < p.y()
+                    b < fixed_point.y()
                 };
                 start
                     && if matches!(prev, LowY | LowX) {
-                        p.y() <= a
+                        fixed_point.y() <= a
                     } else {
-                        p.y() < a
+                        fixed_point.y() < a
                     }
             }
             _ => false,
         }
-    }
-
-    /// `FUN_140fa7b50`: from `p` on a new polygon's closing edge, walk the outline both ways at
-    /// once, the cheaper side first (ties forward): each corner the goal test does not end
-    /// becomes a corner node toward the goal when it emits; each edge gets its foot test.
-    pub(super) fn walk_new(
-        &mut self,
-        pi: PolyIndex,
-        p: FixedPoint,
-        g0: FixedDistance,
-        parent: NodeIndex,
-    ) -> GenieResult<()> {
-        let poly = self.poly(pi)?.clone();
-        let n = poly.count();
-        let walk = NewWalk { poly: pi, parent };
-        let (mut cb, mut cf) = self.walk_new_start(&walk, &poly, p, g0)?;
-        let mut bi = VertexIndex::new(n - 1);
-        let mut fi = VertexIndex::FIRST;
-        if bi == VertexIndex::FIRST {
-            return Ok(());
-        }
-        loop {
-            if cb < cf {
-                let vv = poly.vertex(bi)?;
-                self.walk_new_corner(
-                    &walk,
-                    &poly,
-                    (bi, bi.pred()),
-                    cb,
-                    (WalkDir::Backward, bi, VertexIndex::FIRST),
-                )?;
-                let w = poly.vertex(bi.pred())?;
-                let dx = vv.x() - w.x();
-                self.foot_test(Foot {
-                    start: vv,
-                    end: w,
-                    extent_x: dx,
-                    run: Run {
-                        poly: pi,
-                        dir: WalkDir::Backward,
-                        lo: bi.pred(),
-                        hi: VertexIndex::FIRST,
-                    },
-                    start_cost: cb,
-                    parent,
-                })?;
-                cb = cb.wrapping_add(cheb(vv, w));
-                bi = bi.pred();
-            } else {
-                let vv = poly.vertex(fi)?;
-                self.walk_new_corner(
-                    &walk,
-                    &poly,
-                    (fi, fi.prev_in(n)),
-                    cf,
-                    (WalkDir::Forward, VertexIndex::FIRST, fi),
-                )?;
-                fi = fi.succ();
-                let w = poly.vertex(fi)?;
-                let dx = vv.x() - w.x();
-                self.foot_test(Foot {
-                    start: vv,
-                    end: w,
-                    extent_x: dx,
-                    run: Run {
-                        poly: pi,
-                        dir: WalkDir::Forward,
-                        lo: VertexIndex::FIRST,
-                        hi: fi,
-                    },
-                    start_cost: cf,
-                    parent,
-                })?;
-                cf = cf.wrapping_add(cheb(vv, w));
-            }
-            if fi >= bi {
-                return Ok(());
-            }
-        }
-    }
-
-    /// The walk of a new polygon's start: the foot tests of the two edges from `p` to the
-    /// closing vertices, and the costs of the two walks (the larger axis distance on top of
-    /// `g0`), backward then forward.
-    fn walk_new_start(
-        &mut self,
-        walk: &NewWalk,
-        poly: &Poly,
-        p: FixedPoint,
-        g0: FixedDistance,
-    ) -> GenieResult<(FixedDistance, FixedDistance)> {
-        let last = VertexIndex::new(poly.count() - 1);
-        let (vb, vf) = (poly.vertex(last)?, poly.vertex(VertexIndex::FIRST)?);
-        let (dxb, dyb) = (vb.x() - p.x(), vb.y() - p.y());
-        let (dxf, dyf) = (vf.x() - p.x(), vf.y() - p.y());
-        self.foot_test(Foot {
-            start: p,
-            end: vb,
-            extent_x: dxb,
-            run: Run {
-                poly: walk.poly,
-                dir: WalkDir::Backward,
-                lo: last,
-                hi: VertexIndex::FIRST,
-            },
-            start_cost: g0,
-            parent: walk.parent,
-        })?;
-        self.foot_test(Foot {
-            start: p,
-            end: vf,
-            extent_x: dxf,
-            run: Run {
-                poly: walk.poly,
-                dir: WalkDir::Forward,
-                lo: VertexIndex::FIRST,
-                hi: VertexIndex::FIRST,
-            },
-            start_cost: g0,
-            parent: walk.parent,
-        })?;
-        let cost = |dx: i32, dy: i32| {
-            FixedDistance::new(if dy.wrapping_abs() < dx.wrapping_abs() {
-                dx.wrapping_abs()
-            } else {
-                dy.wrapping_abs()
-            })
-            .wrapping_add(g0)
-        };
-        Ok((cost(dxb, dyb), cost(dxf, dyf)))
-    }
-
-    /// The corner at vertex `at` of a new polygon (its side before it at `before`), reached with
-    /// cost `g` as a walk in direction `dir` over the run `lo`..`hi`: where the goal test does not
-    /// end it, the sides differ and the corner emits a token, it becomes a corner node and the
-    /// polygon is flagged.
-    fn walk_new_corner(
-        &mut self,
-        walk: &NewWalk,
-        poly: &Poly,
-        (at, before): (VertexIndex, VertexIndex),
-        g: FixedDistance,
-        (dir, lo, hi): (WalkDir, VertexIndex, VertexIndex),
-    ) -> GenieResult<()> {
-        let vv = poly.vertex(at)?;
-        let sp = poly.side(before)?;
-        let sn = poly.side(at)?;
-        let sh = poly.shape(at)?;
-        let run = Run {
-            poly: walk.poly,
-            dir,
-            lo,
-            hi,
-        };
-        if !self.goal_test(Corner {
-            cost: g,
-            parent: walk.parent,
-            run,
-            point: vv,
-        })? && sp != sn
-            && sh.is_some()
-            && let Some(token) = corner_emits(sp, sn, vv, self.goal.at)
-        {
-            let kind = Kind::Corner {
-                run: Some(run),
-                emit: Some(Emit {
-                    token,
-                    prev: sp,
-                    next: sn,
-                }),
-            };
-            let node = self.add(g, walk.parent, vv, kind);
-            self.push(node);
-            let pm = self.poly_mut(walk.poly)?;
-            pm.flag = true;
-            *pm.cost_mut(at)? = g;
-        }
-        Ok(())
     }
 }

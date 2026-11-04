@@ -42,8 +42,8 @@ pub enum ErrorKind {
 }
 
 impl fmt::Display for ErrorKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
             Self::Unsupported => "not modelled",
             Self::Unreachable => "unreachable",
             Self::MissingData => "missing data",
@@ -164,7 +164,7 @@ impl GenieError {
     pub fn context(&self) -> impl Iterator<Item = (&'static str, &str)> {
         self.extra
             .iter()
-            .flat_map(|e| e.context.iter().map(|(k, v)| (*k, v.as_str())))
+            .flat_map(|extra| extra.context.iter().map(|(k, text)| (*k, text.as_str())))
     }
 }
 
@@ -197,10 +197,10 @@ pub const fn invalid_input(reason: &'static str) -> GenieError {
 }
 
 impl From<IoError> for GenieError {
-    /// A failed read or write ([`ErrorKind::Io`]) caused by `e`, raised where `?` converts it.
+    /// A failed read or write ([`ErrorKind::Io`]) caused by `error`, raised where `?` converts it.
     #[track_caller]
-    fn from(e: IoError) -> Self {
-        Self::io("a read or write that failed").with_source(e)
+    fn from(error: IoError) -> Self {
+        Self::io("a read or write that failed").with_source(error)
     }
 }
 
@@ -231,42 +231,42 @@ impl Hash for GenieError {
 }
 
 impl fmt::Debug for GenieError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut d = f.debug_struct("GenieError");
-        let _ = d
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut debug = formatter.debug_struct("GenieError");
+        let _ = debug
             .field("kind", &self.kind)
             .field("reason", &self.reason)
             .field("at", &format_args!("{}", self.at));
-        if let Some(e) = &self.extra {
-            if !e.context.is_empty() {
-                let _ = d.field("context", &e.context);
+        if let Some(extra) = &self.extra {
+            if !extra.context.is_empty() {
+                let _ = debug.field("context", &extra.context);
             }
-            if let Some(s) = &e.source {
-                let _ = d.field("source", s);
+            if let Some(s) = &extra.source {
+                let _ = debug.field("source", s);
             }
         }
-        d.finish()
+        debug.finish()
     }
 }
 
 impl fmt::Display for GenieError {
     /// `reason (key: value, …) at file:line:column`, then `: source` when it has one.
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.reason)?;
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.reason)?;
         let mut context = self.context().peekable();
         if context.peek().is_some() {
-            f.write_str(" (")?;
-            for (i, (key, value)) in context.enumerate() {
-                if 0 < i {
-                    f.write_str(", ")?;
+            formatter.write_str(" (")?;
+            for (index, (key, value)) in context.enumerate() {
+                if 0 < index {
+                    formatter.write_str(", ")?;
                 }
-                write!(f, "{key}: {value}")?;
+                write!(formatter, "{key}: {value}")?;
             }
-            f.write_str(")")?;
+            formatter.write_str(")")?;
         }
-        write!(f, " at {}", self.at)?;
-        if let Some(source) = self.extra.as_ref().and_then(|e| e.source.as_ref()) {
-            write!(f, ": {source}")?;
+        write!(formatter, " at {}", self.at)?;
+        if let Some(source) = self.extra.as_ref().and_then(|extra| extra.source.as_ref()) {
+            write!(formatter, ": {source}")?;
         }
         Ok(())
     }
@@ -288,15 +288,18 @@ mod tests {
     #[cfg(feature = "serde")]
     #[test]
     fn serde_custom_error_is_invalid_input() {
-        let e = GenieError::custom("not a number");
+        let error = GenieError::custom("not a number");
         assert_eq!(
-            (e.kind(), e.reason()),
+            (error.kind(), error.reason()),
             (
                 ErrorKind::InvalidInput,
                 "a value that does not deserialize into its field"
             )
         );
-        assert_eq!(e.context().collect::<Vec<_>>(), [("why", "not a number")]);
+        assert_eq!(
+            error.context().collect::<Vec<_>>(),
+            [("why", "not a number")]
+        );
     }
 
     /// A constant error, whose place is its definition's.
@@ -305,13 +308,13 @@ mod tests {
     #[test]
     fn an_error_names_where_it_was_raised() {
         let line = line!() + 1;
-        let e = unsupported("a branch not modelled");
+        let error = unsupported("a branch not modelled");
         assert_eq!(
             (
-                e.kind(),
-                e.reason(),
-                e.location().file(),
-                e.location().line()
+                error.kind(),
+                error.reason(),
+                error.location().file(),
+                error.location().line()
             ),
             (
                 ErrorKind::Unsupported,
@@ -343,22 +346,22 @@ mod tests {
     #[test]
     fn errors_are_equal_by_kind_and_reason_alone() {
         let a = unsupported("a").with("id", 7);
-        let b = unsupported("a");
-        assert_eq!(a, b);
+        let error = unsupported("a");
+        assert_eq!(a, error);
         assert_ne!(unsupported("a"), unreachable("a"));
         assert_ne!(unsupported("a"), unsupported("b"));
     }
 
     #[test]
     fn the_context_follows_the_reason_and_the_place_ends_the_text() {
-        let e = missing_data("a sprite the data file does not have")
+        let error = missing_data("a sprite the data file does not have")
             .with("sprite", 214)
             .with("object", -16_347_136);
         assert_eq!(
-            e.context().collect::<Vec<_>>(),
+            error.context().collect::<Vec<_>>(),
             [("sprite", "214"), ("object", "-16347136")]
         );
-        let text = e.to_string();
+        let text = error.to_string();
         assert!(text.starts_with(
             "a sprite the data file does not have (sprite: 214, object: -16347136) at "
         ));
@@ -370,12 +373,12 @@ mod tests {
     #[test]
     fn source_is_the_cause() {
         let io = IoError::other("short read");
-        let e = invalid_input("a header too short").with_source(io);
+        let error = invalid_input("a header too short").with_source(io);
         assert_eq!(
-            Error::source(&e).map(ToString::to_string),
+            Error::source(&error).map(ToString::to_string),
             Some("short read".to_owned())
         );
-        assert!(e.to_string().ends_with(": short read"));
+        assert!(error.to_string().ends_with(": short read"));
     }
 
     #[test]
@@ -385,9 +388,12 @@ mod tests {
             Ok(())
         }
         let line = line!() - 3;
-        let e = open().unwrap_err();
-        assert_eq!((e.kind(), e.location().line()), (ErrorKind::Io, line));
-        assert!(e.to_string().ends_with(": no such file"));
+        let error = open().unwrap_err();
+        assert_eq!(
+            (error.kind(), error.location().line()),
+            (ErrorKind::Io, line)
+        );
+        assert!(error.to_string().ends_with(": no such file"));
     }
 
     #[test]

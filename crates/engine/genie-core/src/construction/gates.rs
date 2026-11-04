@@ -40,7 +40,7 @@ pub fn lets_pass(
     let transforms = master
         .building
         .as_ref()
-        .is_some_and(|b| b.transform_unit.is_some());
+        .is_some_and(|building_master| building_master.transform_unit.is_some());
     master.kind == MasterKind::BUILDING
         && gate.life.state < ObjectState::Dying
         && roles.of_class(master.class).contains(ClassRoles::GATE)
@@ -103,17 +103,20 @@ pub(crate) fn gate_units(
         if GATE_COUNT_CAP <= units.len() {
             break;
         }
-        let Some((id, p)) = id.key().and_then(|o| Some((o, spatial.get(o)?))) else {
+        let Some((id, placed)) = id
+            .key()
+            .and_then(|object_id| Some((object_id, spatial.get(object_id)?)))
+        else {
             continue;
         };
         let counts = !roles
-            .of_class(p.class)
+            .of_class(placed.class)
             .intersects(ClassRoles::WALL | ClassRoles::GATE | ClassRoles::TOWER)
-            && (!roles.of_class(p.class).contains(ClassRoles::BUILDING) || p.moves)
-            && (p.moves || p.player != PlayerId::GAIA);
+            && (!roles.of_class(placed.class).contains(ClassRoles::BUILDING) || placed.moves)
+            && (placed.moves || placed.player != PlayerId::GAIA);
         if counts {
             units.push(id);
-            if spatial.allied_with(owner, p.player) {
+            if spatial.allied_with(owner, placed.player) {
                 allied += 1;
             }
         }
@@ -122,71 +125,86 @@ pub(crate) fn gate_units(
 }
 
 impl World {
-    /// Player `q`'s gate list (`+0x1360`, `FUN_141616200` adds to its front): its live objects
-    /// of class 39 whose master transforms ([`crate::objects::masters::BuildingMaster::transform_unit`]),
-    /// newest first.
-    pub(crate) fn gate_list(&self, q: PlayerId) -> GenieResult<Vec<ListIndex>> {
-        let masters = self.model.masters.of(q);
-        let owner = self.players.player(q)?;
+    /// Player `player_id`'s gate list (`+0x1360`, `FUN_141616200` adds to its front): its live
+    /// objects of class 39 whose master transforms
+    /// ([`crate::objects::masters::BuildingMaster::transform_unit`]), newest first.
+    pub(crate) fn gate_list(&self, player_id: PlayerId) -> GenieResult<Vec<ListIndex>> {
+        let masters = self.model.masters.of(player_id);
+        let owner = self.players.player(player_id)?;
         let mut gates = Vec::new();
-        for i in owner.objects.places().rev() {
-            let m = owner
+        for list_index in owner.objects.places().rev() {
+            let master = owner
                 .objects
-                .checked(i)?
+                .checked(list_index)?
                 .master_in(OwnerMasters::new(&self.parts.own_master, masters))?;
             if self
                 .model
                 .roles
-                .of_class(m.class)
+                .of_class(master.class)
                 .contains(ClassRoles::GATE)
-                && m.building
+                && master
+                    .building
                     .as_ref()
-                    .is_some_and(|b| b.transform_unit.is_some())
+                    .is_some_and(|building_master| building_master.transform_unit.is_some())
             {
-                gates.push(i);
+                gates.push(list_index);
             }
         }
         Ok(gates)
     }
 
-    /// A gate's slot 0x678 ([`lets_pass`]) for object `i` of player `q` and a unit of player `p`.
-    pub(crate) fn gate_passes(&self, q: PlayerId, i: ListIndex, p: PlayerId) -> GenieResult<bool> {
-        let gate = self.players.live(q, i)?;
-        let m = gate.master(self.master_tables(), q)?;
+    /// A gate's slot 0x678 ([`lets_pass`]) for object `list_index` of player `gate_owner` and a
+    /// unit of player `unit_owner`.
+    pub(crate) fn gate_passes(
+        &self,
+        gate_owner: PlayerId,
+        list_index: ListIndex,
+        unit_owner: PlayerId,
+    ) -> GenieResult<bool> {
+        let gate = self.players.live(gate_owner, list_index)?;
+        let master = gate.master(self.master_tables(), gate_owner)?;
         let layer = self.parts.building_of(gate.id);
         Ok(lets_pass(
-            (gate, layer, m),
-            q,
-            p,
+            (gate, layer, master),
+            gate_owner,
+            unit_owner,
             &self.spatial,
             &self.model.roles,
         ))
     }
 
-    /// `BaseWorld::update` before player `p` updates (not Gaia): the gates of each player `q`
-    /// that is `p` or counts `p` an ally and is counted one by it, unless `q`'s are open already
-    /// (`open`, the update's flags), open for `p` (`q`'s slot 0x318, `FUN_14162faf0`): each gate
-    /// `p` may pass ([`World::gate_passes`]) loses its record, its tiles' marks and its mesh shape
-    /// (`FUN_141055b40`), so `p`'s units walk and plan through it.
-    pub(crate) fn open_gates(&mut self, p: PlayerId, open: &mut [bool]) -> GenieResult<()> {
-        if p == PlayerId::GAIA {
+    /// `BaseWorld::update` before player `gate_owner` updates (not Gaia): the gates of each player
+    /// `player_id` that is `gate_owner` or counts `gate_owner` an ally and is counted one by it,
+    /// unless `player_id`'s are open already (`open`, the update's flags), open for `gate_owner`
+    /// (`player_id`'s slot 0x318, `FUN_14162faf0`): each gate `gate_owner` may pass
+    /// ([`World::gate_passes`]) loses its record, its tiles' marks and its mesh shape
+    /// (`FUN_141055b40`), so `gate_owner`'s units walk and plan through it.
+    pub(crate) fn open_gates(
+        &mut self,
+        gate_owner: PlayerId,
+        open: &mut [bool],
+    ) -> GenieResult<()> {
+        if gate_owner == PlayerId::GAIA {
             return Ok(());
         }
         let players = self.players.len();
-        for (q, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
+        for (player_id, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
             if *is_open
-                || (q != p && !(self.spatial.allied_with(p, q) && self.spatial.allied_with(q, p)))
+                || (player_id != gate_owner
+                    && !(self.spatial.allied_with(gate_owner, player_id)
+                        && self.spatial.allied_with(player_id, gate_owner)))
             {
                 continue;
             }
-            for i in self.gate_list(q)? {
-                if !self.gate_passes(q, i, p)? {
+            for list_index in self.gate_list(player_id)? {
+                if !self.gate_passes(player_id, list_index, gate_owner)? {
                     continue;
                 }
-                let id = self.players.live(q, i)?.id;
-                if self.spatial.get(id).is_some_and(|g| {
-                    g.obstruction
-                        .is_some_and(|o| o.kind == ObstructionKind::KIND_10)
+                let id = self.players.live(player_id, list_index)?.id;
+                if self.spatial.get(id).is_some_and(|placed| {
+                    placed
+                        .obstruction
+                        .is_some_and(|obstruction| obstruction.kind == ObstructionKind::KIND_10)
                 }) {
                     return Err(GenieError::unsupported(
                         "a gate of obstruction kind 10 opens (FUN_140f65580)",
@@ -201,35 +219,40 @@ impl World {
         Ok(())
     }
 
-    /// `BaseWorld::update` after player `p` updated (not Gaia): each open player `q`'s gates close
-    /// (`q`'s slot 0x320, `FUN_141619480`) unless the next player counts `q` an ally and is
-    /// counted one by it (they stay open for it): each gate `p` may pass gets its record, its
-    /// tiles' marks and its mesh shape again (`FUN_141056460`), but for a part of obstruction
-    /// kind 0 or 12 or of class 0 ([`crate::map::spatial::Obstruction::recorded`]).
-    pub(crate) fn close_gates(&mut self, p: PlayerId, open: &mut [bool]) -> GenieResult<()> {
-        if p == PlayerId::GAIA {
+    /// `BaseWorld::update` after player `gate_owner` updated (not Gaia): each open player `other`'s
+    /// gates close (`other`'s slot 0x320, `FUN_141619480`) unless the next player counts `other` an
+    /// ally and is counted one by it (they stay open for it): each gate `gate_owner` may pass gets
+    /// its record, its tiles' marks and its mesh shape again (`FUN_141056460`), but for a part of
+    /// obstruction kind 0 or 12 or of class 0 ([`crate::map::spatial::Obstruction::recorded`]).
+    pub(crate) fn close_gates(
+        &mut self,
+        gate_owner: PlayerId,
+        open: &mut [bool],
+    ) -> GenieResult<()> {
+        if gate_owner == PlayerId::GAIA {
             return Ok(());
         }
         let players = self.players.len();
-        let next = PlayerId::try_from(p.index() + 1)
+        let next = PlayerId::try_from(gate_owner.index() + 1)
             .ok()
             .filter(|n| n.index() < players);
-        for (q, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
+        for (other, is_open) in PlayerId::each(players).zip(open.iter_mut()).skip(1) {
             if !*is_open {
                 continue;
             }
-            if next
-                .is_some_and(|n| self.spatial.allied_with(n, q) && self.spatial.allied_with(q, n))
-            {
+            if next.is_some_and(|player_id| {
+                self.spatial.allied_with(player_id, other)
+                    && self.spatial.allied_with(other, player_id)
+            }) {
                 continue;
             }
-            for i in self.gate_list(q)? {
-                if !self.gate_passes(q, i, p)? {
+            for list_index in self.gate_list(other)? {
+                if !self.gate_passes(other, list_index, gate_owner)? {
                     continue;
                 }
-                let gate = &self.players.live(q, i)?;
+                let gate = &self.players.live(other, list_index)?;
                 let (id, master) = (gate.id, gate.life.master_id);
-                let Some(m) = player_master(&self.model.masters, q, master) else {
+                let Some(m) = player_master(&self.model.masters, other, master) else {
                     continue;
                 };
                 let record = Obstruction {

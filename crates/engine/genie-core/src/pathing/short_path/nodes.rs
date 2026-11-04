@@ -87,8 +87,8 @@ pub(super) fn clip(
     } else {
         (bx[1], bx[3])
     };
-    let code = |p: FixedPoint| {
-        let [x, y] = p.get();
+    let code = |fixed_point: FixedPoint| {
+        let [x, y] = fixed_point.get();
         let mut c = if x < xmin {
             1
         } else if xmax < x {
@@ -142,21 +142,32 @@ pub(super) fn clip(
     Some((a, b))
 }
 
-pub(super) const fn in_box(p: FixedPoint, b: FixedRect) -> bool {
-    b.x0() <= p.x() && b.y0() <= p.y() && p.x() <= b.x1() && p.y() <= b.y1()
+pub(super) const fn in_box(fixed_point: FixedPoint, fixed_rect: FixedRect) -> bool {
+    fixed_rect.x0() <= fixed_point.x()
+        && fixed_rect.y0() <= fixed_point.y()
+        && fixed_point.x() <= fixed_rect.x1()
+        && fixed_point.y() <= fixed_rect.y1()
 }
 
-/// `p` held in the box `b` on each axis (`[x0, y0, x1, y1]`).
-pub(super) const fn clamp_to_box(p: FixedPoint, b: FixedRect) -> FixedPoint {
-    let b = b.get();
+/// `fixed_point` held in the box `fixed_rect` on each axis (`[x0, y0, x1, y1]`).
+pub(super) const fn clamp_to_box(fixed_point: FixedPoint, fixed_rect: FixedRect) -> FixedPoint {
+    let b = fixed_rect.get();
     FixedPoint::new(
-        if b[0] <= p.x() {
-            if b[2] < p.x() { b[2] } else { p.x() }
+        if b[0] <= fixed_point.x() {
+            if b[2] < fixed_point.x() {
+                b[2]
+            } else {
+                fixed_point.x()
+            }
         } else {
             b[0]
         },
-        if b[1] <= p.y() {
-            if b[3] < p.y() { b[3] } else { p.y() }
+        if b[1] <= fixed_point.y() {
+            if b[3] < fixed_point.y() {
+                b[3]
+            } else {
+                fixed_point.y()
+            }
         } else {
             b[1]
         },
@@ -164,91 +175,92 @@ pub(super) const fn clamp_to_box(p: FixedPoint, b: FixedRect) -> FixedPoint {
 }
 
 /// Chebyshev distance (`max(|dx|, |dy|)`), the polygon walks' cost.
-pub(super) const fn cheb(a: FixedPoint, b: FixedPoint) -> FixedDistance {
-    let dy = (a.y().wrapping_sub(b.y())).wrapping_abs();
-    let dx = (a.x().wrapping_sub(b.x())).wrapping_abs();
+pub(super) const fn cheb(from: FixedPoint, to: FixedPoint) -> FixedDistance {
+    let dy = (from.y().wrapping_sub(to.y())).wrapping_abs();
+    let dx = (from.x().wrapping_sub(to.x())).wrapping_abs();
     FixedDistance::new(if dy < dx { dx } else { dy })
 }
 
 impl Search<'_> {
-    /// The node at `i`.
-    pub(super) fn node(&self, i: NodeIndex) -> GenieResult<&Node> {
-        self.arena.checked(i.get())
+    /// The node at `node_index`.
+    pub(super) fn node(&self, node_index: NodeIndex) -> GenieResult<&Node> {
+        self.arena.checked(node_index.get())
     }
 
-    /// The node at `i`, to change.
-    pub(super) fn node_mut(&mut self, i: NodeIndex) -> GenieResult<&mut Node> {
-        self.arena.checked_mut(i.get())
+    /// The node at `node_index`, to change.
+    pub(super) fn node_mut(&mut self, node_index: NodeIndex) -> GenieResult<&mut Node> {
+        self.arena.checked_mut(node_index.get())
     }
 
-    /// The polygon at `i`.
-    pub(super) fn poly(&self, i: PolyIndex) -> GenieResult<&Poly> {
-        self.polys.checked(i.get())
+    /// The polygon at `poly_index`.
+    pub(super) fn poly(&self, poly_index: PolyIndex) -> GenieResult<&Poly> {
+        self.polys.checked(poly_index.get())
     }
 
-    /// The polygon at `i`, to change.
-    pub(super) fn poly_mut(&mut self, i: PolyIndex) -> GenieResult<&mut Poly> {
-        self.polys.checked_mut(i.get())
+    /// The polygon at `poly_index`, to change.
+    pub(super) fn poly_mut(&mut self, poly_index: PolyIndex) -> GenieResult<&mut Poly> {
+        self.polys.checked_mut(poly_index.get())
     }
 
-    /// No goal node yet, or `g` cheaper than the goal node's cost: the game's
-    /// `goal == -1 || g < arena[goal].g`.
-    pub(super) fn beats_goal(&self, g: FixedDistance) -> GenieResult<bool> {
+    /// No goal node yet, or `fixed_distance` cheaper than the goal node's cost: the game's
+    /// `goal == -1 || fixed_distance < arena[goal].fixed_distance`.
+    pub(super) fn beats_goal(&self, fixed_distance: FixedDistance) -> GenieResult<bool> {
         Ok(match self.goal_node {
             None => true,
-            Some(goal) => g < self.node(goal)?.g,
+            Some(goal) => fixed_distance < self.node(goal)?.g,
         })
     }
 
     /// Append a node to the arena (`FUN_140fa3fe0`, `FUN_140fa40d0`, `FUN_140fa4210`,
-    /// `FUN_140fa4340`): `f = g + h(at)`.
+    /// `FUN_140fa4340`): `f = fixed_distance + h(at)`.
     pub(super) fn add(
         &mut self,
-        g: FixedDistance,
+        fixed_distance: FixedDistance,
         parent: NodeIndex,
         at: FixedPoint,
         kind: Kind,
     ) -> Node {
-        let n = Node {
-            g,
-            f: self.goal.heuristic(at).wrapping_add(g),
+        let node = Node {
+            g: fixed_distance,
+            f: self.goal.heuristic(at).wrapping_add(fixed_distance),
             idx: NodeIndex::next_of(&self.arena),
             parent: Some(parent),
             at,
             kind,
         };
-        self.arena.push(n);
-        n
+        self.arena.push(node);
+        node
     }
 
     /// `FUN_140fa2eb0`: into the open list, sorted by f descending, before the equal ones from the
     /// back (so equal f leave first in, first out).
-    pub(super) fn push(&mut self, n: Node) {
+    pub(super) fn push(&mut self, pushed: Node) {
         let at = self
             .open
             .iter()
-            .rposition(|o| n.f < o.f)
+            .rposition(|node| pushed.f < node.f)
             .map_or(0, |i| i + 1);
-        self.open.insert(at, n);
+        self.open.insert(at, pushed);
     }
 
     pub(super) fn side_node(
         &mut self,
-        g: FixedDistance,
+        fixed_distance: FixedDistance,
         parent: NodeIndex,
         shape: ShapeId,
         side: ShapeSide,
         at: FixedPoint,
     ) {
-        let n = self.add(g, parent, at, Kind::Side { shape, side });
-        self.push(n);
+        let node = self.add(fixed_distance, parent, at, Kind::Side { shape, side });
+        self.push(node);
     }
 
-    /// `FUN_140fa3860`: a node at `pt` reached with cost `g`: within range and better than the goal
-    /// so far, it becomes the goal (true); else, nearer than the best so far, the best.
+    /// `FUN_140fa3860`: a node at `pt` reached with cost `fixed_distance`: within range and better
+    /// than the goal so far, it becomes the goal (true); else, nearer than the best so far, the
+    /// best.
     pub(super) fn goal_test(&mut self, corner: Corner) -> GenieResult<bool> {
         let Corner {
-            cost: g,
+            cost: fixed_distance,
             parent,
             run,
             point: pt,
@@ -266,35 +278,35 @@ impl Search<'_> {
             run: Some(run),
             emit: None,
         };
-        let better = self.beats_goal(g)?;
+        let better = self.beats_goal(fixed_distance)?;
         if self.goal.range2 < d2 || !better {
             let b = *self.node(self.best)?;
             if d2 < FixedDistanceSquared::of(b.f.wrapping_sub(b.g)) {
-                let n = self.add(g, parent, pt, kind);
-                self.best = n.idx;
+                let added = self.add(fixed_distance, parent, pt, kind);
+                self.best = added.idx;
             }
             return Ok(false);
         }
-        let n = self.add(g, parent, pt, kind);
-        self.goal_node = Some(n.idx);
+        let node = self.add(fixed_distance, parent, pt, kind);
+        self.goal_node = Some(node.idx);
         Ok(true)
     }
 
-    /// `FUN_140fa8210`: the goal's foot on an axis edge `a`–`b` (horizontal when `dx != 0`) as a
-    /// goal candidate.
+    /// `FUN_140fa8210`: the goal's foot on an axis edge `a`–`fixed_point` (horizontal when `dx !=
+    /// 0`) as a goal candidate.
     pub(super) fn foot_test(&mut self, edge: Foot) -> GenieResult<()> {
         let Foot {
             start: a,
-            end: b,
+            end: fixed_point,
             extent_x: dx,
             run,
             start_cost: g0,
             parent,
         } = edge;
         let (s, e, gv) = if dx != 0 {
-            (a.x(), b.x(), self.goal.at.x())
+            (a.x(), fixed_point.x(), self.goal.at.x())
         } else {
-            (a.y(), b.y(), self.goal.at.y())
+            (a.y(), fixed_point.y(), self.goal.at.y())
         };
         let low = if e < s { e } else { s };
         let high = if s < e { e } else { s };
@@ -304,9 +316,10 @@ impl Search<'_> {
             } else {
                 FixedPoint::new(a.x(), gv)
             };
-            let g = g0.wrapping_add(FixedDistance::new((gv.wrapping_sub(s)).wrapping_abs()));
+            let fixed_distance =
+                g0.wrapping_add(FixedDistance::new((gv.wrapping_sub(s)).wrapping_abs()));
             let _ = self.goal_test(Corner {
-                cost: g,
+                cost: fixed_distance,
                 parent,
                 run,
                 point: foot,
@@ -317,15 +330,18 @@ impl Search<'_> {
 
     /// `FUN_140fa2740`, a popped node's test: the best (lowest estimate) so far; in range and
     /// cheaper than the goal: the new goal (true); no cheaper than the goal: pruned (true).
-    pub(super) fn pop_test(&mut self, n: &Node) -> GenieResult<bool> {
-        let h = n.f.wrapping_sub(n.g);
-        let b = *self.node(self.best)?;
-        if h < b.f.wrapping_sub(b.g) {
-            self.best = n.idx;
+    pub(super) fn pop_test(&mut self, popped: &Node) -> GenieResult<bool> {
+        let fixed_distance = popped.f.wrapping_sub(popped.g);
+        let node = *self.node(self.best)?;
+        if fixed_distance < node.f.wrapping_sub(node.g) {
+            self.best = popped.idx;
         }
-        let better = self.beats_goal(n.g)?;
-        if (h < self.goal.range || self.goal.rect_distance2(n.at) <= self.goal.range2) && better {
-            self.goal_node = Some(n.idx);
+        let better = self.beats_goal(popped.g)?;
+        if (fixed_distance < self.goal.range
+            || self.goal.rect_distance2(popped.at) <= self.goal.range2)
+            && better
+        {
+            self.goal_node = Some(popped.idx);
             return Ok(true);
         }
         Ok(!better)

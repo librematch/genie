@@ -64,8 +64,8 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 /// A sprite field as the attribute tests read it: its id, −1 for none.
-fn sprite_value(s: Option<SpriteId>) -> f32 {
-    f32::from(s.map_or(-1, SpriteId::get))
+fn sprite_value(sprite_id: Option<SpriteId>) -> f32 {
+    f32::from(sprite_id.map_or(-1, SpriteId::get))
 }
 
 fn task(action_kind: ActionKind, object_group: i16, object_id: i16, work_val1: f32) -> Task {
@@ -230,15 +230,15 @@ fn stocked(kind: MasterKind) -> Master {
 /// Each row (attribute, its field, the field after a set of 3, then after an add of 2, then
 /// after a multiply by 2) on a fresh [`stocked`] master of `kind`.
 fn sets_adds_multiplies(kind: MasterKind, rows: &[(MasterAttribute, Read, [f32; 3])]) {
-    let w = world(false);
-    for &(a, read, [set, add, multiply]) in rows {
-        let mut m = stocked(kind);
-        m.set_attribute(a, 3.0, &w);
-        assert_eq!(read(&m), set, "set {a}");
-        m.add_attribute(a, 2.0, &w);
-        assert_eq!(read(&m), add, "add {a}");
-        m.multiply_attribute(a, 2.0, &w);
-        assert_eq!(read(&m), multiply, "multiply {a}");
+    let attribute_world = world(false);
+    for &(master_attribute, read, [set, add, multiply]) in rows {
+        let mut master = stocked(kind);
+        master.set_attribute(master_attribute, 3.0, &attribute_world);
+        assert_eq!(read(&master), set, "set {master_attribute}");
+        master.add_attribute(master_attribute, 2.0, &attribute_world);
+        assert_eq!(read(&master), add, "add {master_attribute}");
+        master.multiply_attribute(master_attribute, 2.0, &attribute_world);
+        assert_eq!(read(&master), multiply, "multiply {master_attribute}");
     }
 }
 
@@ -433,19 +433,19 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
     sets_adds_multiplies(MasterKind::STATIC, rows);
     // an obstruction type the table does not hold is 0; the trait piece keeps the low half;
     // a flag of 0 is off
-    let mut m = stocked(MasterKind::STATIC);
-    m.object_flags = ObjectFlags::from_bits_retain(0x1234);
-    m.set_attribute(MasterAttribute::TRAIT_PIECE, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
-    m.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 0.0, &world(false));
+    let mut master = stocked(MasterKind::STATIC);
+    master.object_flags = ObjectFlags::from_bits_retain(0x1234);
+    master.set_attribute(MasterAttribute::TRAIT_PIECE, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
+    master.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 0.0, &world(false));
     assert_eq!(
-        (m.object_flags, m.obstruction_kind),
+        (master.object_flags, master.obstruction_kind),
         (
             ObjectFlags::from_bits_retain(0x2_1234),
             ObstructionKind::NONE
         )
     );
-    assert!(!m.available.is_available());
+    assert!(!master.available.is_available());
 }
 
 /// `FUN_1410c1bf0` on the armor and attack amounts: a percentage of the class's entry plus
@@ -456,50 +456,53 @@ fn each_static_attribute_sets_adds_and_multiplies_its_field() {
 #[test]
 fn effects_on_layers_the_master_lacks_change_nothing() {
     let before = of_kind(MasterKind::MOVING);
-    let mut m = before.clone();
-    for a in [
+    let mut master = before.clone();
+    for master_attribute in [
         MasterAttribute::ATTACK,
         MasterAttribute::ARMOR,
         MasterAttribute::MAXIMUM_RANGE,
         MasterAttribute::ATTACK_RELOAD_TIME,
         MasterAttribute::WORK_RATE,
     ] {
-        m.set_attribute(a, 3.0, &world(false));
-        m.add_attribute(a, 2.0, &world(false));
-        m.multiply_attribute(a, 2.0, &world(false));
+        master.set_attribute(master_attribute, 3.0, &world(false));
+        master.add_attribute(master_attribute, 2.0, &world(false));
+        master.multiply_attribute(master_attribute, 2.0, &world(false));
     }
-    assert_eq!(m, before);
+    assert_eq!(master, before);
 }
 
 /// raises scales the percentage by the factor (which a product of 0 keeps at 0).
 #[test]
 fn combat_multiply_takes_percentage_of_the_class_amount() {
-    let mut m = of_kind(MasterKind::RGE_COMBAT);
-    m.combat.get_or_insert_with(Default::default).armors =
+    let mut master = of_kind(MasterKind::RGE_COMBAT);
+    master.combat.get_or_insert_with(Default::default).armors =
         vec![ClassAmount::new(4, 3), ClassAmount::new(3, 5)];
-    m.combat.get_or_insert_with(Default::default).weapons =
+    master.combat.get_or_insert_with(Default::default).weapons =
         vec![ClassAmount::new(4, 7), ClassAmount::new(21, 0)];
     // class 3 at 150%: 5 x 1.5 + 0.5 = 8; class 4 at 50%: 7 x 0.5 + 0.5 = 4
-    m.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x396_i16), &world(false));
-    m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x432_i16), &world(false));
+    master.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x396_i16), &world(false));
+    master.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x432_i16), &world(false));
     assert_eq!(
-        (m.combat_part().armors.clone(), m.combat_part().weapons[0]),
+        (
+            master.combat_part().armors.clone(),
+            master.combat_part().weapons[0]
+        ),
         (
             vec![ClassAmount::new(4, 3), ClassAmount::new(3, 8)],
             ClassAmount::new(4, 4)
         )
     );
-    m.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x996_i16), &world(false));
+    master.multiply_attribute(MasterAttribute::ARMOR, f32::from(0x996_i16), &world(false));
     assert_eq!(
-        m.combat_part().armors,
+        master.combat_part().armors,
         vec![ClassAmount::new(4, 3), ClassAmount::new(3, 8)]
     );
     let raised = AttributeWorld {
         handicap: Some(1.5),
         ..world(false)
     };
-    m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x15c8_i16), &raised);
-    assert_eq!(m.combat_part().weapons[1], ClassAmount::new(21, 0));
+    master.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x15c8_i16), &raised);
+    assert_eq!(master.combat_part().weapons[1], ClassAmount::new(21, 0));
 }
 
 /// `FUN_1410c12b0`, `FUN_1410c16e0` and `FUN_1410c1bf0`: each RGE combat attribute's field
@@ -625,7 +628,7 @@ fn each_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::DISPLACEMENT_Z,
-            |m| m.combat_part().weapon_offset.z(),
+            |master| master.combat_part().weapon_offset.z(),
             [3.0, 5.0, 10.0],
         ),
     ];
@@ -804,7 +807,7 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
         ),
         (
             MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
-            |m| m.creatable_part().train_locations.len() as f32,
+            |master| master.creatable_part().train_locations.len() as f32,
             [3.0, 3.0, 6.0],
         ),
     ];
@@ -816,99 +819,108 @@ fn each_tribe_combat_attribute_sets_adds_and_multiplies_its_field() {
 /// `+0x648`) both stop at 0x7fff, a NaN too (`COMISS` then `JBE`).
 #[test]
 fn the_hit_points_add_and_multiply_up_to_their_cap_when_capped() {
-    let mut m = of_kind(MasterKind::STATIC);
-    m.set_attribute(MasterAttribute::HIT_POINTS, 25.9, &world(false));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(25));
-    m.add_attribute(MasterAttribute::HIT_POINTS, 15.7, &world(false));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(40));
-    m.multiply_attribute(MasterAttribute::HIT_POINTS, 1.2, &world(false));
+    let mut master = of_kind(MasterKind::STATIC);
+    master.set_attribute(MasterAttribute::HIT_POINTS, 25.9, &world(false));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(25));
+    master.add_attribute(MasterAttribute::HIT_POINTS, 15.7, &world(false));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(40));
+    master.multiply_attribute(MasterAttribute::HIT_POINTS, 1.2, &world(false));
     // 40 × 1.2 + 0.5 = 48.5
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(48));
-    m.hit_points = MasterHitPoints::of_data(32760);
-    m.add_attribute(MasterAttribute::HIT_POINTS, 10.0, &world(false));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(-32766));
-    m.hit_points = MasterHitPoints::of_data(32760);
-    m.add_attribute(MasterAttribute::HIT_POINTS, 10.0, &world(true));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
-    m.hit_points = MasterHitPoints::of_data(100);
-    m.add_attribute(MasterAttribute::HIT_POINTS, f32::NAN, &world(true));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
-    m.hit_points = MasterHitPoints::of_data(20000);
-    m.multiply_attribute(MasterAttribute::HIT_POINTS, 2.0, &world(true));
-    assert_eq!(m.hit_points, MasterHitPoints::of_data(0x7fff));
-    m.capacity = CarryCapacity::of_data(10);
-    m.multiply_attribute(MasterAttribute::CARRY_CAPACITY, 1.25, &world(true));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(48));
+    master.hit_points = MasterHitPoints::of_data(32760);
+    master.add_attribute(MasterAttribute::HIT_POINTS, 10.0, &world(false));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(-32766));
+    master.hit_points = MasterHitPoints::of_data(32760);
+    master.add_attribute(MasterAttribute::HIT_POINTS, 10.0, &world(true));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(0x7fff));
+    master.hit_points = MasterHitPoints::of_data(100);
+    master.add_attribute(MasterAttribute::HIT_POINTS, f32::NAN, &world(true));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(0x7fff));
+    master.hit_points = MasterHitPoints::of_data(20000);
+    master.multiply_attribute(MasterAttribute::HIT_POINTS, 2.0, &world(true));
+    assert_eq!(master.hit_points, MasterHitPoints::of_data(0x7fff));
+    master.capacity = CarryCapacity::of_data(10);
+    master.multiply_attribute(MasterAttribute::CARRY_CAPACITY, 1.25, &world(true));
     // 12.5 + 0.5 = 13
-    assert_eq!(m.capacity, CarryCapacity::of_data(13));
+    assert_eq!(master.capacity, CarryCapacity::of_data(13));
 }
 
 /// The storage amounts take a short (`(float)(int)(short)(int)v`), the object flags a 64-bit
 /// truncation, the trait piece its high half; an obstruction type the table refuses is 0.
 #[test]
 fn the_static_setters_truncate_as_the_game_does() {
-    let mut m = of_kind(MasterKind::TREE);
-    m.storage = vec![
+    let mut master = of_kind(MasterKind::TREE);
+    master.storage = vec![
         (Some(player_attribute::MEAT), Amount::new(100.0), 1),
         (None, Amount::ZERO, 0),
         (None, Amount::ZERO, 0),
     ];
-    m.set_attribute(MasterAttribute::STORAGE_1, 70000.5, &world(false));
-    assert_eq!(m.storage[0].1, Amount::new(4464.0));
-    m.add_attribute(MasterAttribute::STORAGE_1, 5.9, &world(false));
-    assert_eq!(m.storage[0].1, Amount::new(4469.0));
-    m.multiply_attribute(MasterAttribute::STORAGE_1, 0.5, &world(false));
+    master.set_attribute(MasterAttribute::STORAGE_1, 70000.5, &world(false));
+    assert_eq!(master.storage[0].1, Amount::new(4464.0));
+    master.add_attribute(MasterAttribute::STORAGE_1, 5.9, &world(false));
+    assert_eq!(master.storage[0].1, Amount::new(4469.0));
+    master.multiply_attribute(MasterAttribute::STORAGE_1, 0.5, &world(false));
     // 2234.5 + 0.5 = 2235
-    assert_eq!(m.storage[0].1, Amount::new(2235.0));
-    m.set_attribute(MasterAttribute::UNIT_TRAIT, 5_000_000_000.0, &world(false));
+    assert_eq!(master.storage[0].1, Amount::new(2235.0));
+    master.set_attribute(MasterAttribute::UNIT_TRAIT, 5_000_000_000.0, &world(false));
     assert_eq!(
-        m.object_flags,
+        master.object_flags,
         ObjectFlags::from_bits_retain(5_000_000_000_i64 as u32)
     );
-    m.object_flags = ObjectFlags::from_bits_retain(0x1234_5678);
-    m.set_attribute(MasterAttribute::TRAIT_PIECE, 3.0, &world(false));
-    assert_eq!(m.object_flags, ObjectFlags::from_bits_retain(0x0003_5678));
-    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 5.0, &world(false));
-    assert_eq!(m.obstruction_kind, ObstructionKind::CIRCLE);
-    m.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
-    assert_eq!(m.obstruction_kind, ObstructionKind::NONE);
+    master.object_flags = ObjectFlags::from_bits_retain(0x1234_5678);
+    master.set_attribute(MasterAttribute::TRAIT_PIECE, 3.0, &world(false));
+    assert_eq!(
+        master.object_flags,
+        ObjectFlags::from_bits_retain(0x0003_5678)
+    );
+    master.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 5.0, &world(false));
+    assert_eq!(master.obstruction_kind, ObstructionKind::CIRCLE);
+    master.set_attribute(MasterAttribute::OBSTRUCTION_KIND, 4.0, &world(false));
+    assert_eq!(master.obstruction_kind, ObstructionKind::NONE);
     // "Can Be Built On" writes the blast defense level; its multiply does not round
-    m.set_attribute(MasterAttribute::CAN_BE_BUILT_ON, 3.0, &world(false));
-    m.multiply_attribute(MasterAttribute::BLAST_DEFENSE_LEVEL, 1.9, &world(false));
-    assert_eq!(m.blast_defense, BlastDefense::new(5));
+    master.set_attribute(MasterAttribute::CAN_BE_BUILT_ON, 3.0, &world(false));
+    master.multiply_attribute(MasterAttribute::BLAST_DEFENSE_LEVEL, 1.9, &world(false));
+    assert_eq!(master.blast_defense, BlastDefense::new(5));
     // the available flag holds the byte's test against 0
-    m.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 256.0, &world(false));
-    assert!(!m.available.is_available());
-    m.add_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 1.0, &world(false));
-    assert!(m.available.is_available());
+    master.set_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 256.0, &world(false));
+    assert!(!master.available.is_available());
+    master.add_attribute(MasterAttribute::AVAILABLE_UNIT_FLAG, 1.0, &world(false));
+    assert!(master.available.is_available());
 }
 
 /// `FUN_14152e360`: a sprite attribute takes an id only where the world's table holds a
 /// sprite; an add starts from −1 for none.
 #[test]
 fn sprite_attribute_takes_only_sprite_the_world_has() {
-    let mut m = of_kind(MasterKind::MOVING);
-    m.standing_sprite = Some(SpriteId::named(5));
-    m.moving.get_or_insert_with(Default::default).move_sprite = None;
-    m.set_attribute(MasterAttribute::STANDING_GRAPHIC, 150.0, &world(false));
-    assert_eq!(m.standing_sprite, Some(SpriteId::named(5)));
-    m.add_attribute(MasterAttribute::STANDING_GRAPHIC, 3.0, &world(false));
-    assert_eq!(m.standing_sprite, Some(SpriteId::named(8)));
-    m.add_attribute(MasterAttribute::WALKING_GRAPHIC, 11.0, &world(false));
-    assert_eq!(m.moving_part().move_sprite, Some(SpriteId::named(10)));
-    m.set_attribute(MasterAttribute::STANDING_GRAPHIC_2, 7.0, &world(false));
-    assert_eq!(m.standing_sprite_2, Some(SpriteId::named(7)));
+    let mut master = of_kind(MasterKind::MOVING);
+    master.standing_sprite = Some(SpriteId::named(5));
+    master
+        .moving
+        .get_or_insert_with(Default::default)
+        .move_sprite = None;
+    master.set_attribute(MasterAttribute::STANDING_GRAPHIC, 150.0, &world(false));
+    assert_eq!(master.standing_sprite, Some(SpriteId::named(5)));
+    master.add_attribute(MasterAttribute::STANDING_GRAPHIC, 3.0, &world(false));
+    assert_eq!(master.standing_sprite, Some(SpriteId::named(8)));
+    master.add_attribute(MasterAttribute::WALKING_GRAPHIC, 11.0, &world(false));
+    assert_eq!(master.moving_part().move_sprite, Some(SpriteId::named(10)));
+    master.set_attribute(MasterAttribute::STANDING_GRAPHIC_2, 7.0, &world(false));
+    assert_eq!(master.standing_sprite_2, Some(SpriteId::named(7)));
 }
 
 /// `FUN_1410a8b60`, `FUN_1410a8c00`: a capped add or multiply of the speed stops at 4.5, a
 /// missile master's at 20; a NaN speed passes (`COMISS`, `JBE`).
 #[test]
 fn capped_speed_stops_at_its_kind_cap() {
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(4.0);
-    m.add_attribute(MasterAttribute::MOVEMENT_SPEED, 1.0, &world(false));
-    assert_eq!(m.animated_part().max_speed, Speed::new(5.0));
-    m.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(true));
-    assert_eq!(m.animated_part().max_speed, Speed::new(4.5));
+    let mut master = of_kind(MasterKind::COMBAT);
+    master
+        .animated
+        .get_or_insert_with(Default::default)
+        .max_speed = Speed::new(4.0);
+    master.add_attribute(MasterAttribute::MOVEMENT_SPEED, 1.0, &world(false));
+    assert_eq!(master.animated_part().max_speed, Speed::new(5.0));
+    master.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(true));
+    assert_eq!(master.animated_part().max_speed, Speed::new(4.5));
     let mut missile = of_kind(MasterKind::MISSILE);
     missile
         .animated
@@ -925,18 +937,18 @@ fn capped_speed_stops_at_its_kind_cap() {
 /// multiply by `amount / 100`.
 #[test]
 fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.combat.get_or_insert_with(Default::default).armors = vec![
+    let mut master = of_kind(MasterKind::COMBAT);
+    master.combat.get_or_insert_with(Default::default).armors = vec![
         ClassAmount::new(4, 1),
         ClassAmount::new(3, 2),
         ClassAmount::new(3, 9),
     ];
-    m.combat.get_or_insert_with(Default::default).weapons =
+    master.combat.get_or_insert_with(Default::default).weapons =
         vec![ClassAmount::new(4, 6), ClassAmount::new(3, 0)];
     // class 3, 1 more (0x301)
-    m.add_attribute(MasterAttribute::ARMOR, 769.0, &world(false));
+    master.add_attribute(MasterAttribute::ARMOR, 769.0, &world(false));
     assert_eq!(
-        m.combat_part().armors,
+        master.combat_part().armors,
         vec![
             ClassAmount::new(4, 1),
             ClassAmount::new(3, 3),
@@ -944,17 +956,17 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
         ]
     );
     // −0x402: class 4, 2 less
-    m.add_attribute(MasterAttribute::ARMOR, -1026.0, &world(false));
-    assert_eq!(m.combat_part().armors[0], ClassAmount::new(4, -1));
-    m.set_attribute(MasterAttribute::ARMOR, 1029.0, &world(false));
-    assert_eq!(m.combat_part().armors[0], ClassAmount::new(4, 5));
+    master.add_attribute(MasterAttribute::ARMOR, -1026.0, &world(false));
+    assert_eq!(master.combat_part().armors[0], ClassAmount::new(4, -1));
+    master.set_attribute(MasterAttribute::ARMOR, 1029.0, &world(false));
+    assert_eq!(master.combat_part().armors[0], ClassAmount::new(4, 5));
     // 150 %: 6 × 1.5 + 0.5 = 9.5
-    m.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x496_i16), &world(false));
-    assert_eq!(m.combat_part().weapons[0], ClassAmount::new(4, 9));
+    master.multiply_attribute(MasterAttribute::ATTACK, f32::from(0x496_i16), &world(false));
+    assert_eq!(master.combat_part().weapons[0], ClassAmount::new(4, 9));
     // a NaN takes the negative branch: class 0, amount 0, which no entry has
-    m.add_attribute(MasterAttribute::ATTACK, f32::NAN, &world(false));
+    master.add_attribute(MasterAttribute::ATTACK, f32::NAN, &world(false));
     assert_eq!(
-        m.combat_part().weapons,
+        master.combat_part().weapons,
         vec![ClassAmount::new(4, 9), ClassAmount::new(3, 0)]
     );
     // a handicap of 1.5 raises a class at 0 (not 3, 4, 31 or 33)
@@ -962,58 +974,75 @@ fn armor_and_attack_change_the_class_in_the_amount_high_byte() {
         handicap: Some(1.5),
         ..world(false)
     };
-    m.combat.get_or_insert_with(Default::default).weapons =
+    master.combat.get_or_insert_with(Default::default).weapons =
         vec![ClassAmount::new(4, 0), ClassAmount::new(21, 0)];
-    m.set_attribute(MasterAttribute::ATTACK, f32::from(0x406_i16), &raised);
-    m.set_attribute(MasterAttribute::ATTACK, f32::from(0x1506_i16), &raised);
+    master.set_attribute(MasterAttribute::ATTACK, f32::from(0x406_i16), &raised);
+    master.set_attribute(MasterAttribute::ATTACK, f32::from(0x1506_i16), &raised);
     assert_eq!(
-        m.combat_part().weapons,
+        master.combat_part().weapons,
         vec![ClassAmount::new(4, 6), ClassAmount::new(21, 9)]
     );
     // once above 0 the add adds
-    m.add_attribute(MasterAttribute::ATTACK, f32::from(0x1502_i16), &raised);
-    assert_eq!(m.combat_part().weapons[1], ClassAmount::new(21, 11));
+    master.add_attribute(MasterAttribute::ATTACK, f32::from(0x1502_i16), &raised);
+    assert_eq!(master.combat_part().weapons[1], ClassAmount::new(21, 11));
 }
 
 /// The RGE combat master's multiply rounds most shorts by 0.5 but multiplies the frame delay
 /// and the shown values by the truncated amount (`IMUL`).
 #[test]
 fn some_combat_shorts_multiply_by_the_truncated_amount() {
-    let mut m = of_kind(MasterKind::RGE_COMBAT);
-    m.combat.get_or_insert_with(Default::default).base_armor = DamageAmount::new(3);
-    m.combat.get_or_insert_with(Default::default).fire_frame = Frame::of_data(5);
-    m.combat.get_or_insert_with(Default::default).shown.attack = DamageAmount::new(7);
-    m.multiply_attribute(MasterAttribute::BASE_ARMOR, 1.5, &world(false));
-    assert_eq!(m.combat_part().base_armor, DamageAmount::new(5));
-    m.multiply_attribute(MasterAttribute::FRAME_DELAY, 2.9, &world(false));
-    assert_eq!(m.combat_part().fire_frame, Frame::of_data(10));
-    m.multiply_attribute(MasterAttribute::SHOWN_ATTACK, 3.5, &world(false));
-    assert_eq!(m.combat_part().shown.attack, DamageAmount::new(21));
-    m.add_attribute(MasterAttribute::ROTATION_SPEED, 0.25, &world(false));
-    assert_eq!(m.moving_part().turn_speed, Seconds::new(0.25));
-    m.set_attribute(MasterAttribute::DISPLACEMENT_Y, 0.75, &world(false));
-    assert_eq!(m.combat_part().weapon_offset, Offset::new(0.0, 0.75, 0.0));
+    let mut master = of_kind(MasterKind::RGE_COMBAT);
+    master
+        .combat
+        .get_or_insert_with(Default::default)
+        .base_armor = DamageAmount::new(3);
+    master
+        .combat
+        .get_or_insert_with(Default::default)
+        .fire_frame = Frame::of_data(5);
+    master
+        .combat
+        .get_or_insert_with(Default::default)
+        .shown
+        .attack = DamageAmount::new(7);
+    master.multiply_attribute(MasterAttribute::BASE_ARMOR, 1.5, &world(false));
+    assert_eq!(master.combat_part().base_armor, DamageAmount::new(5));
+    master.multiply_attribute(MasterAttribute::FRAME_DELAY, 2.9, &world(false));
+    assert_eq!(master.combat_part().fire_frame, Frame::of_data(10));
+    master.multiply_attribute(MasterAttribute::SHOWN_ATTACK, 3.5, &world(false));
+    assert_eq!(master.combat_part().shown.attack, DamageAmount::new(21));
+    master.add_attribute(MasterAttribute::ROTATION_SPEED, 0.25, &world(false));
+    assert_eq!(master.moving_part().turn_speed, Seconds::new(0.25));
+    master.set_attribute(MasterAttribute::DISPLACEMENT_Y, 0.75, &world(false));
+    assert_eq!(
+        master.combat_part().weapon_offset,
+        Offset::new(0.0, 0.75, 0.0)
+    );
 }
 
 /// `FUN_1410d5b50`: a missile master's smart mode takes the multiply's amount; its arc
 /// multiplies; then the RGE combat master's setter runs.
 #[test]
 fn missile_smart_mode_multiply_sets_it() {
-    let mut m = of_kind(MasterKind::MISSILE);
-    m.missile = Some(MissilePart {
+    let mut master = of_kind(MasterKind::MISSILE);
+    master.missile = Some(MissilePart {
         projectile_kind: ProjectileKind::STRAIGHT,
         smart_mode: SmartMode::LEADS_TARGET,
         hit_mode: HitMode::TARGET_ALONE,
         vanish_mode: VanishMode::NONE,
         arc: ArcRatio::new(0.5),
     });
-    m.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
-    m.multiply_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
-    m.multiply_attribute(MasterAttribute::PROJECTILE_ARC, 0.5, &world(false));
-    m.multiply_attribute(MasterAttribute::ATTACK_RELOAD_TIME, 0.5, &world(false));
-    let s = m.missile.unwrap();
+    master.combat.get_or_insert_with(Default::default).reload = Seconds::new(2.0);
+    master.multiply_attribute(MasterAttribute::PROJECTILE_SMART_MODE, 3.0, &world(false));
+    master.multiply_attribute(MasterAttribute::PROJECTILE_ARC, 0.5, &world(false));
+    master.multiply_attribute(MasterAttribute::ATTACK_RELOAD_TIME, 0.5, &world(false));
+    let missile_part = master.missile.unwrap();
     assert_eq!(
-        (s.smart_mode, s.arc, m.combat_part().reload),
+        (
+            missile_part.smart_mode,
+            missile_part.arc,
+            master.combat_part().reload
+        ),
         (
             SmartMode::from_bits_retain(3),
             ArcRatio::new(0.25),
@@ -1027,48 +1056,48 @@ fn missile_smart_mode_multiply_sets_it() {
 /// to the negated amount and the population storage to the amount.
 #[test]
 fn the_cost_attributes_change_their_resource_entries() {
-    let mut m = of_kind(MasterKind::BUILDING);
-    m.creatable.get_or_insert_with(Default::default).cost = costs(&[
+    let mut master = of_kind(MasterKind::BUILDING);
+    master.creatable.get_or_insert_with(Default::default).cost = costs(&[
         (player_attribute::WOOD, 25, true),
         (player_attribute::HEADROOM, 1, false),
     ]);
-    m.storage = vec![
+    master.storage = vec![
         (Some(player_attribute::HEADROOM), Amount::new(5.0), 4),
         (Some(player_attribute::POPULATION), Amount::new(-1.0), 4),
         (None, Amount::ZERO, 0),
     ];
-    m.add_attribute(MasterAttribute::WOOD_COSTS, -5.0, &world(false));
+    master.add_attribute(MasterAttribute::WOOD_COSTS, -5.0, &world(false));
     assert_eq!(
-        m.creatable_part().cost,
+        master.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 20, true),
             (player_attribute::HEADROOM, 1, false)
         ])
     );
-    m.multiply_attribute(MasterAttribute::RESOURCE_COSTS, 0.85, &world(false));
+    master.multiply_attribute(MasterAttribute::RESOURCE_COSTS, 0.85, &world(false));
     // 20 × 0.85 + 0.5 = 17.5
     assert_eq!(
-        m.creatable_part().cost,
+        master.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 17, true),
             (player_attribute::HEADROOM, 1, false)
         ])
     );
-    m.set_attribute(MasterAttribute::GOLD_COSTS, 50.0, &world(false));
+    master.set_attribute(MasterAttribute::GOLD_COSTS, 50.0, &world(false));
     assert_eq!(
-        m.creatable_part().cost[0].entry(),
+        master.creatable_part().cost[0].entry(),
         Some((player_attribute::WOOD, CostAmount::of_data(17), true))
     );
-    m.set_attribute(MasterAttribute::POPULATION, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::POPULATION, 2.0, &world(false));
     assert_eq!(
-        m.creatable_part().cost,
+        master.creatable_part().cost,
         costs(&[
             (player_attribute::WOOD, 17, true),
             (player_attribute::HEADROOM, -2, false)
         ])
     );
     assert_eq!(
-        m.storage[..2],
+        master.storage[..2],
         [
             (Some(player_attribute::HEADROOM), Amount::new(2.0), 4),
             (Some(player_attribute::POPULATION), Amount::new(-2.0), 4)
@@ -1087,91 +1116,100 @@ fn the_train_location_attributes_change_the_selected_entry() {
         button: LocationButton::of_data(1),
         hotkey: HotkeyId::of_data(16_000),
     };
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.creatable
+    let mut master = of_kind(MasterKind::COMBAT);
+    master
+        .creatable
         .get_or_insert_with(Default::default)
         .train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.creatable
+    master
+        .creatable
         .get_or_insert_with(Default::default)
         .train_location_entry = TrainLocationEntry::of_data(1);
-    m.multiply_attribute(MasterAttribute::TRAIN_TIME, 0.9, &world(false));
+    master.multiply_attribute(MasterAttribute::TRAIN_TIME, 0.9, &world(false));
     // 30 × 0.9 + 0.5 = 27.5
     assert_eq!(
-        m.creatable_part().train_locations[1].time,
+        master.creatable_part().train_locations[1].time,
         WholeSeconds::of_data(27)
     );
-    m.set_attribute(
+    master.set_attribute(
         MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
         9.0,
         &world(false),
     );
     assert_eq!(
-        m.creatable_part().train_location_entry,
+        master.creatable_part().train_location_entry,
         TrainLocationEntry::of_data(1)
     );
     // the add's count is the selected entry plus the amount: 1 + 2
-    m.add_attribute(
+    master.add_attribute(
         MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
         2.0,
         &world(false),
     );
-    assert_eq!(m.creatable_part().train_locations.len(), 3);
+    assert_eq!(master.creatable_part().train_locations.len(), 3);
     assert_eq!(
-        m.creatable_part().train_locations[2],
-        m.creatable_part().train_locations[1]
+        master.creatable_part().train_locations[2],
+        master.creatable_part().train_locations[1]
     );
-    m.set_attribute(
+    master.set_attribute(
         MasterAttribute::TRAIN_LOCATIONS_TOTAL_NUM,
         -4.0,
         &world(false),
     );
-    assert_eq!(m.creatable_part().train_locations, []);
+    assert_eq!(master.creatable_part().train_locations, []);
     assert_eq!(
-        m.creatable_part().train_location_entry,
+        master.creatable_part().train_location_entry,
         TrainLocationEntry::of_data(-1)
     );
-    m.creatable
+    master
+        .creatable
         .get_or_insert_with(Default::default)
         .train_locations = vec![
         barracks(WholeSeconds::of_data(21)),
         barracks(WholeSeconds::of_data(30)),
     ];
-    m.creatable
+    master
+        .creatable
         .get_or_insert_with(Default::default)
         .train_location_entry = TrainLocationEntry::of_data(0);
     // ~(−1) = 0: the first goes, the entry stays at 0
-    m.multiply_attribute(
+    master.multiply_attribute(
         MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
         -1.0,
         &world(false),
     );
     assert_eq!(
         (
-            m.creatable_part().train_locations.len(),
-            m.creatable_part().train_locations[0].time
+            master.creatable_part().train_locations.len(),
+            master.creatable_part().train_locations[0].time
         ),
         (1, WholeSeconds::of_data(30))
     );
-    m.multiply_attribute(
+    master.multiply_attribute(
         MasterAttribute::TRAIN_LOCATIONS_ENTRY_MOD,
         5.0,
         &world(false),
     );
     assert_eq!(
         (
-            m.creatable_part().train_locations.len(),
-            m.creatable_part().train_location_entry.get()
+            master.creatable_part().train_locations.len(),
+            master.creatable_part().train_location_entry.get()
         ),
         (2, 1)
     );
-    follow(&mut m, MasterAttribute::TRAIN_TIME, &Graphics::new(), None);
+    follow(
+        &mut master,
+        MasterAttribute::TRAIN_TIME,
+        &Graphics::new(),
+        None,
+    );
     assert_eq!(
         (
-            m.creatable_part().trained_at.clone(),
-            m.creatable_part().build_time
+            master.creatable_part().trained_at.clone(),
+            master.creatable_part().build_time
         ),
         (
             vec![master_id(12), master_id(12)],
@@ -1185,46 +1223,49 @@ fn the_train_location_attributes_change_the_selected_entry() {
 /// entry removing the last leaves 0xff.
 #[test]
 fn the_damage_sprite_attributes_resize_and_select() {
-    let mut m = of_kind(MasterKind::ANIMATED);
-    m.damage_graphic_entry = DamageGraphicEntry::of_data(2);
-    m.set_attribute(
+    let mut master = of_kind(MasterKind::ANIMATED);
+    master.damage_graphic_entry = DamageGraphicEntry::of_data(2);
+    master.set_attribute(
         MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM,
         2.0,
         &world(false),
     );
-    assert_eq!(m.damage_graphics, vec![DamageGraphic::default(); 2]);
-    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(1));
-    m.set_attribute(MasterAttribute::DAMAGE_GRAPHIC, 40.0, &world(false));
-    m.set_attribute(MasterAttribute::DAMAGE_GRAPHIC_PERCENT, 75.0, &world(false));
-    assert_eq!(m.damage_graphics[1].sprite, Some(SpriteId::named(40)));
-    assert_eq!(m.damage_graphics[1].percent, HpPercent::of_data(75));
-    m.set_attribute(
+    assert_eq!(master.damage_graphics, vec![DamageGraphic::default(); 2]);
+    assert_eq!(master.damage_graphic_entry, DamageGraphicEntry::of_data(1));
+    master.set_attribute(MasterAttribute::DAMAGE_GRAPHIC, 40.0, &world(false));
+    master.set_attribute(MasterAttribute::DAMAGE_GRAPHIC_PERCENT, 75.0, &world(false));
+    assert_eq!(master.damage_graphics[1].sprite, Some(SpriteId::named(40)));
+    assert_eq!(master.damage_graphics[1].percent, HpPercent::of_data(75));
+    master.set_attribute(
         MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM,
         f32::NAN,
         &world(false),
     );
-    assert_eq!(m.damage_graphics.len(), 255);
-    m.set_attribute(
+    assert_eq!(master.damage_graphics.len(), 255);
+    master.set_attribute(
         MasterAttribute::DAMAGE_GRAPHICS_TOTAL_NUM,
         0.0,
         &world(false),
     );
-    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(1));
-    m.damage_graphics = vec![DamageGraphic::default()];
-    m.multiply_attribute(
+    assert_eq!(master.damage_graphic_entry, DamageGraphicEntry::of_data(1));
+    master.damage_graphics = vec![DamageGraphic::default()];
+    master.multiply_attribute(
         MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD,
         -3.0,
         &world(false),
     );
-    assert_eq!(m.damage_graphics, []);
-    assert_eq!(m.damage_graphic_entry, DamageGraphicEntry::of_data(0xff));
+    assert_eq!(master.damage_graphics, []);
+    assert_eq!(
+        master.damage_graphic_entry,
+        DamageGraphicEntry::of_data(0xff)
+    );
     follow(
-        &mut m,
+        &mut master,
         MasterAttribute::DAMAGE_GRAPHICS_ENTRY_MOD,
         &Graphics::new(),
         None,
     );
-    assert!(!m.has_damage_sprites());
+    assert!(!master.has_damage_sprites());
 }
 
 /// `FUN_14123d310`: a building master's garrison heal rate, foundation and garrison type are
@@ -1232,26 +1273,32 @@ fn the_damage_sprite_attributes_resize_and_select() {
 /// master's setter (the regeneration from the hit points, 120).
 #[test]
 fn building_master_setters_fall_back_on_the_combat_master_s() {
-    let mut m = of_kind(MasterKind::BUILDING);
-    m.building = Some(BuildingMaster {
+    let mut master = of_kind(MasterKind::BUILDING);
+    master.building = Some(BuildingMaster {
         foundation_terrain: Some(TerrainId::named(0)),
         ..BuildingMaster::default()
     });
-    m.hit_points = MasterHitPoints::of_data(600);
-    m.set_attribute(MasterAttribute::GARRISON_HEAL_RATE, 2.0, &world(false));
-    m.multiply_attribute(MasterAttribute::GARRISON_HEAL_RATE, 1.5, &world(false));
-    m.set_attribute(MasterAttribute::CONSTRUCTION_GRAPHIC, 9.0, &world(false));
-    m.set_attribute(MasterAttribute::REGENERATION_HP_PERCENT, 0.5, &world(false));
-    m.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
-    let b = m.building.unwrap();
+    master.hit_points = MasterHitPoints::of_data(600);
+    master.set_attribute(MasterAttribute::GARRISON_HEAL_RATE, 2.0, &world(false));
+    master.multiply_attribute(MasterAttribute::GARRISON_HEAL_RATE, 1.5, &world(false));
+    master.set_attribute(MasterAttribute::CONSTRUCTION_GRAPHIC, 9.0, &world(false));
+    master.set_attribute(MasterAttribute::REGENERATION_HP_PERCENT, 0.5, &world(false));
+    master.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
+    let building_master = master.building.unwrap();
     assert_eq!(
-        (b.garrison_heal_rate, b.foundation_terrain),
+        (
+            building_master.garrison_heal_rate,
+            building_master.foundation_terrain
+        ),
         (HitPoints::new(3.0), Some(TerrainId::named(2)))
     );
-    assert_eq!(m.creatable_part().regeneration, Regeneration::new(300.0));
-    assert_eq!(m, {
+    assert_eq!(
+        master.creatable_part().regeneration,
+        Regeneration::new(300.0)
+    );
+    assert_eq!(master, {
         let mut same = of_kind(MasterKind::BUILDING);
-        same.building = Some(b);
+        same.building = Some(building_master);
         same.hit_points = MasterHitPoints::of_data(600);
         same.creatable
             .get_or_insert_with(Default::default)
@@ -1273,11 +1320,11 @@ fn an_effect_on_the_creatable_layer_leaves_masters_without_it_unchanged() {
         MasterAttribute::TRAIN_TIME,
         MasterAttribute::HERO_STATUS,
     ] {
-        let mut m = moving.clone();
-        m.set_attribute(attribute, 5.0, &world(false));
-        m.add_attribute(attribute, 5.0, &world(false));
-        m.multiply_attribute(attribute, 2.0, &world(false));
-        assert_eq!(m, moving, "{attribute:?}");
+        let mut master = moving.clone();
+        master.set_attribute(attribute, 5.0, &world(false));
+        master.add_attribute(attribute, 5.0, &world(false));
+        master.multiply_attribute(attribute, 2.0, &world(false));
+        assert_eq!(master, moving, "{attribute:?}");
     }
 }
 
@@ -1285,15 +1332,21 @@ fn an_effect_on_the_creatable_layer_leaves_masters_without_it_unchanged() {
 /// terrain 1, and a set below 0 is none again.
 #[test]
 fn foundation_terrain_add_counts_none_as_minus_one() {
-    let mut m = of_kind(MasterKind::BUILDING);
-    m.building = Some(BuildingMaster::default());
-    m.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
+    let mut master = of_kind(MasterKind::BUILDING);
+    master.building = Some(BuildingMaster::default());
+    master.add_attribute(MasterAttribute::FOUNDATION_TERRAIN, 2.0, &world(false));
     assert_eq!(
-        m.building.as_ref().and_then(|b| b.foundation_terrain),
+        master.building.as_ref().and_then(|b| b.foundation_terrain),
         Some(TerrainId::named(1))
     );
-    m.set_attribute(MasterAttribute::FOUNDATION_TERRAIN, -1.0, &world(false));
-    assert_eq!(m.building.as_ref().and_then(|b| b.foundation_terrain), None);
+    master.set_attribute(MasterAttribute::FOUNDATION_TERRAIN, -1.0, &world(false));
+    assert_eq!(
+        master
+            .building
+            .as_ref()
+            .and_then(|building_master| building_master.foundation_terrain),
+        None
+    );
 }
 
 /// What a unit moving with a master reads follows the master's values: its radii, its base
@@ -1337,13 +1390,16 @@ fn moving_master_derived_values_follow_its_attributes() {
     ]
     .into_iter()
     .collect();
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.standing_sprite = Some(SpriteId::named(1));
-    let moving = m.moving.get_or_insert_with(Default::default);
+    let mut master = of_kind(MasterKind::COMBAT);
+    master.standing_sprite = Some(SpriteId::named(1));
+    let moving = master.moving.get_or_insert_with(Default::default);
     (moving.move_sprite, moving.run_sprite) = (Some(SpriteId::named(2)), None);
-    m.animated.get_or_insert_with(Default::default).max_speed = Speed::new(1.0);
-    m.radius = Footprint::new(0.2, 0.2);
-    m.move_stats = Some(MoveStats {
+    master
+        .animated
+        .get_or_insert_with(Default::default)
+        .max_speed = Speed::new(1.0);
+    master.radius = Footprint::new(0.2, 0.2);
+    master.move_stats = Some(MoveStats {
         fly_mode: FlyMode::GROUND,
         speed: Speed::new(1.5),
         base: Speed::new(1.5),
@@ -1360,24 +1416,39 @@ fn moving_master_derived_values_follow_its_attributes() {
         facets: None,
         weapon_range: Distance::ZERO,
     });
-    m.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(false));
-    follow(&mut m, MasterAttribute::MOVEMENT_SPEED, &graphics, None);
-    let s = m.move_stats.unwrap();
+    master.multiply_attribute(MasterAttribute::MOVEMENT_SPEED, 1.1, &world(false));
+    follow(
+        &mut master,
+        MasterAttribute::MOVEMENT_SPEED,
+        &graphics,
+        None,
+    );
+    let s = master.move_stats.unwrap();
     assert_eq!((s.base, s.speed), (Speed::new(1.1), Speed::new(1.1 * 1.5)));
-    m.set_attribute(MasterAttribute::SIZE_Z, 1.0, &world(false));
-    follow(&mut m, MasterAttribute::SIZE_Z, &graphics, None);
-    assert!(m.is_tall());
-    assert_eq!(m.move_stats.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
-    m.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 3.0, &world(false));
-    follow(&mut m, MasterAttribute::RUNNING_GRAPHIC, &graphics, None);
-    let s = m.move_stats.unwrap();
-    assert_eq!(s.speed, Speed::new(1.1 * 0.5));
+    master.set_attribute(MasterAttribute::SIZE_Z, 1.0, &world(false));
+    follow(&mut master, MasterAttribute::SIZE_Z, &graphics, None);
+    assert!(master.is_tall());
+    assert_eq!(master.move_stats.unwrap().radius, Radii::new(0.2, 0.2, 1.0));
+    master.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 3.0, &world(false));
+    follow(
+        &mut master,
+        MasterAttribute::RUNNING_GRAPHIC,
+        &graphics,
+        None,
+    );
+    let move_stats = master.move_stats.unwrap();
+    assert_eq!(move_stats.speed, Speed::new(1.1 * 0.5));
     // 8 facets and 16: no common count
-    assert_eq!(s.facets, None);
-    m.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 2.0, &world(false));
-    follow(&mut m, MasterAttribute::RUNNING_GRAPHIC, &graphics, None);
+    assert_eq!(move_stats.facets, None);
+    master.set_attribute(MasterAttribute::RUNNING_GRAPHIC, 2.0, &world(false));
+    follow(
+        &mut master,
+        MasterAttribute::RUNNING_GRAPHIC,
+        &graphics,
+        None,
+    );
     assert_eq!(
-        m.move_stats.unwrap().facets,
+        master.move_stats.unwrap().facets,
         Some(SpriteFacets {
             count: FacetCount::of_data(8),
             turns: false
@@ -1390,13 +1461,13 @@ fn moving_master_derived_values_follow_its_attributes() {
 /// multiply's negative result is kept as well.
 #[test]
 fn an_id_field_keeps_negative_value_through_an_add() {
-    let w = world(false);
+    let attribute_world = world(false);
     let mut m = of_kind(MasterKind::RGE_COMBAT);
     for a in [
         MasterAttribute::PROJECTILE_UNIT,
         MasterAttribute::TERRAIN_DEFENSE_BONUS,
     ] {
-        m.set_attribute(a, -3.0, &w);
+        m.set_attribute(a, -3.0, &attribute_world);
     }
     assert_eq!(
         (
@@ -1405,11 +1476,11 @@ fn an_id_field_keeps_negative_value_through_an_add() {
         ),
         (None, None)
     );
-    for a in [
+    for master_attribute in [
         MasterAttribute::PROJECTILE_UNIT,
         MasterAttribute::TERRAIN_DEFENSE_BONUS,
     ] {
-        m.add_attribute(a, 5.0, &w);
+        m.add_attribute(master_attribute, 5.0, &attribute_world);
     }
     assert_eq!(m.combat_part().missile.master(), Some(master_id(2)));
     assert_eq!(
@@ -1417,13 +1488,13 @@ fn an_id_field_keeps_negative_value_through_an_add() {
         RestrictionId::of_data(2)
     );
     // 2 × −2 + 0.5 truncates to −3, kept: plus 4 is 1
-    m.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &w);
-    m.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &w);
+    m.multiply_attribute(MasterAttribute::PROJECTILE_UNIT, -2.0, &attribute_world);
+    m.add_attribute(MasterAttribute::PROJECTILE_UNIT, 4.0, &attribute_world);
     assert_eq!(m.combat_part().missile.get(), 1);
-    let mut t = of_kind(MasterKind::MOVING);
-    t.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &w);
-    t.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &w);
-    assert_eq!(t.moving_part().trail.unit.master(), Some(master_id(2)));
+    let mut master = of_kind(MasterKind::MOVING);
+    master.set_attribute(MasterAttribute::TRAILING_UNIT, -3.0, &attribute_world);
+    master.add_attribute(MasterAttribute::TRAILING_UNIT, 5.0, &attribute_world);
+    assert_eq!(master.moving_part().trail.unit.master(), Some(master_id(2)));
 }
 
 /// The action master's (`FUN_14109fbb0` and its add and multiply) work rate, search radius
@@ -1431,30 +1502,30 @@ fn an_id_field_keeps_negative_value_through_an_add() {
 /// interface's sounds change nothing.
 #[test]
 fn the_action_and_moving_setters_change_their_values() {
-    let mut m = of_kind(MasterKind::ACTION);
-    m.set_attribute(MasterAttribute::WORK_RATE, 0.5, &world(false));
-    m.add_attribute(MasterAttribute::WORK_RATE, 0.25, &world(false));
-    m.multiply_attribute(MasterAttribute::WORK_RATE, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::SEARCH_RADIUS, 4.0, &world(false));
-    m.multiply_attribute(MasterAttribute::SEARCH_RADIUS, 1.5, &world(false));
-    m.set_attribute(MasterAttribute::RUN_PATTERN, 2.0, &world(false));
-    m.add_attribute(MasterAttribute::RUN_PATTERN, 255.0, &world(false));
-    m.set_attribute(MasterAttribute::ROTATION_SPEED, 0.5, &world(false));
-    m.multiply_attribute(MasterAttribute::ROTATION_SPEED, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::TRAILING_UNIT, 1300.0, &world(false));
-    m.add_attribute(MasterAttribute::TRAILING_UNIT, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::TRAIL_MODE, 3.0, &world(false));
-    m.set_attribute(MasterAttribute::TRAIL_DENSITY, 1.5, &world(false));
-    m.multiply_attribute(MasterAttribute::TRAIL_DENSITY, 2.0, &world(false));
-    let before = m.clone();
-    m.set_attribute(MasterAttribute::COMMAND_SOUND, 9.0, &world(false));
-    m.add_attribute(MasterAttribute::COMMAND_SOUND, 9.0, &world(false));
-    assert_eq!(m, before);
+    let mut master = of_kind(MasterKind::ACTION);
+    master.set_attribute(MasterAttribute::WORK_RATE, 0.5, &world(false));
+    master.add_attribute(MasterAttribute::WORK_RATE, 0.25, &world(false));
+    master.multiply_attribute(MasterAttribute::WORK_RATE, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::SEARCH_RADIUS, 4.0, &world(false));
+    master.multiply_attribute(MasterAttribute::SEARCH_RADIUS, 1.5, &world(false));
+    master.set_attribute(MasterAttribute::RUN_PATTERN, 2.0, &world(false));
+    master.add_attribute(MasterAttribute::RUN_PATTERN, 255.0, &world(false));
+    master.set_attribute(MasterAttribute::ROTATION_SPEED, 0.5, &world(false));
+    master.multiply_attribute(MasterAttribute::ROTATION_SPEED, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::TRAILING_UNIT, 1300.0, &world(false));
+    master.add_attribute(MasterAttribute::TRAILING_UNIT, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::TRAIL_MODE, 3.0, &world(false));
+    master.set_attribute(MasterAttribute::TRAIL_DENSITY, 1.5, &world(false));
+    master.multiply_attribute(MasterAttribute::TRAIL_DENSITY, 2.0, &world(false));
+    let before = master.clone();
+    master.set_attribute(MasterAttribute::COMMAND_SOUND, 9.0, &world(false));
+    master.add_attribute(MasterAttribute::COMMAND_SOUND, 9.0, &world(false));
+    assert_eq!(master, before);
     assert_eq!(
         (
-            m.action_part().work_rate,
-            m.action_part().search_radius,
-            m.action_part().run_pattern
+            master.action_part().work_rate,
+            master.action_part().search_radius,
+            master.action_part().run_pattern
         ),
         (
             WorkRate::new(1.5),
@@ -1462,9 +1533,9 @@ fn the_action_and_moving_setters_change_their_values() {
             RunPattern::of_data(1)
         )
     );
-    assert_eq!(m.moving_part().turn_speed, Seconds::new(1.0));
+    assert_eq!(master.moving_part().turn_speed, Seconds::new(1.0));
     assert_eq!(
-        m.moving_part().trail,
+        master.moving_part().trail,
         Trail {
             unit: MasterField::of(Some(master_id(1302))),
             mode: TrailMode::of_data(3),
@@ -1479,58 +1550,61 @@ fn the_action_and_moving_setters_change_their_values() {
 /// change nothing.
 #[test]
 fn the_combat_master_own_values_change() {
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.hit_points = MasterHitPoints::of_data(100);
-    m.combat.get_or_insert_with(Default::default).attack_sprite2 = Some(SpriteId::named(10));
-    m.set_attribute(MasterAttribute::HERO_STATUS, 1.0, &world(false));
-    m.add_attribute(MasterAttribute::HERO_STATUS, 4.0, &world(false));
-    m.set_attribute(MasterAttribute::MAXIMUM_CHARGE, 10.0, &world(false));
-    m.multiply_attribute(MasterAttribute::MAXIMUM_CHARGE, 1.5, &world(false));
-    m.set_attribute(MasterAttribute::RECHARGE_RATE, 0.5, &world(false));
-    m.set_attribute(MasterAttribute::CHARGE_EVENT, 2.0, &world(false));
-    m.set_attribute(MasterAttribute::CHARGE_KIND, 6.0, &world(false));
-    m.set_attribute(
+    let mut master = of_kind(MasterKind::COMBAT);
+    master.hit_points = MasterHitPoints::of_data(100);
+    master
+        .combat
+        .get_or_insert_with(Default::default)
+        .attack_sprite2 = Some(SpriteId::named(10));
+    master.set_attribute(MasterAttribute::HERO_STATUS, 1.0, &world(false));
+    master.add_attribute(MasterAttribute::HERO_STATUS, 4.0, &world(false));
+    master.set_attribute(MasterAttribute::MAXIMUM_CHARGE, 10.0, &world(false));
+    master.multiply_attribute(MasterAttribute::MAXIMUM_CHARGE, 1.5, &world(false));
+    master.set_attribute(MasterAttribute::RECHARGE_RATE, 0.5, &world(false));
+    master.set_attribute(MasterAttribute::CHARGE_EVENT, 2.0, &world(false));
+    master.set_attribute(MasterAttribute::CHARGE_KIND, 6.0, &world(false));
+    master.set_attribute(
         MasterAttribute::MAX_CONVERSION_TIME_MODIFIER,
         3.0,
         &world(false),
     );
-    m.add_attribute(
+    master.add_attribute(
         MasterAttribute::MAX_CONVERSION_TIME_MODIFIER,
         1.0,
         &world(false),
     );
-    m.set_attribute(
+    master.set_attribute(
         MasterAttribute::REGENERATION_HP_PERCENT,
         0.25,
         &world(false),
     );
-    m.add_attribute(MasterAttribute::REGENERATION_RATE, 5.0, &world(false));
-    m.set_attribute(MasterAttribute::TOTAL_MISSILES, 2.0, &world(false));
-    m.multiply_attribute(MasterAttribute::MAXIMUM_TOTAL_MISSILES, 3.0, &world(false));
-    m.add_attribute(MasterAttribute::ATTACK_GRAPHIC_2, 2.0, &world(false));
-    m.set_attribute(
+    master.add_attribute(MasterAttribute::REGENERATION_RATE, 5.0, &world(false));
+    master.set_attribute(MasterAttribute::TOTAL_MISSILES, 2.0, &world(false));
+    master.multiply_attribute(MasterAttribute::MAXIMUM_TOTAL_MISSILES, 3.0, &world(false));
+    master.add_attribute(MasterAttribute::ATTACK_GRAPHIC_2, 2.0, &world(false));
+    master.set_attribute(
         MasterAttribute::SPAWNING_AREA_RANDOMNESS,
         0.5,
         &world(false),
     );
-    m.set_attribute(
+    master.set_attribute(
         MasterAttribute::SECONDARY_PROJECTILE_UNIT,
         -1.0,
         &world(false),
     );
-    m.set_attribute(
+    master.set_attribute(
         MasterAttribute::CHARGE_PROJECTILE_UNIT,
         1500.0,
         &world(false),
     );
-    let before = m.clone();
-    m.set_attribute(MasterAttribute::ABILITY_BUTTON_ICON_ID, 9.0, &world(false));
-    assert_eq!(m, before);
+    let before = master.clone();
+    master.set_attribute(MasterAttribute::ABILITY_BUTTON_ICON_ID, 9.0, &world(false));
+    assert_eq!(master, before);
     assert_eq!(
         (
-            m.creatable_part().hero_flag,
-            m.creatable_part().max_charge,
-            m.creatable_part().recharge_rate
+            master.creatable_part().hero_flag,
+            master.creatable_part().max_charge,
+            master.creatable_part().recharge_rate
         ),
         (
             HeroFlags::FULL_HERO | HeroFlags::REGENERATES,
@@ -1540,25 +1614,28 @@ fn the_combat_master_own_values_change() {
     );
     assert_eq!(
         (
-            m.creatable_part().charge_event.get(),
-            m.creatable_part().charge_kind.get()
+            master.creatable_part().charge_event.get(),
+            master.creatable_part().charge_kind.get()
         ),
         (2, 6)
     );
     assert_eq!(
-        m.creatable_part().conversion,
+        master.creatable_part().conversion,
         ConversionAdjust {
             min_time: 0.0,
             max_time: 4.0,
             chance: 0.0
         }
     );
-    assert_eq!(m.creatable_part().regeneration, Regeneration::new(30.0));
+    assert_eq!(
+        master.creatable_part().regeneration,
+        Regeneration::new(30.0)
+    );
     assert_eq!(
         (
-            m.creatable_part().volley_fire,
-            m.creatable_part().max_volley,
-            m.combat_part().attack_sprite2
+            master.creatable_part().volley_fire,
+            master.creatable_part().max_volley,
+            master.combat_part().attack_sprite2
         ),
         (
             Firepower::new(2.0),
@@ -1567,7 +1644,7 @@ fn the_combat_master_own_values_change() {
         )
     );
     assert_eq!(
-        m.creatable_part().volley_spread,
+        master.creatable_part().volley_spread,
         VolleySpread {
             x: Distance::new(0.0),
             y: Distance::new(0.0),
@@ -1576,8 +1653,8 @@ fn the_combat_master_own_values_change() {
     );
     assert_eq!(
         (
-            m.creatable_part().volley_missile,
-            m.creatable_part().charge_projectile
+            master.creatable_part().volley_missile,
+            master.creatable_part().charge_projectile
         ),
         (None, Some(master_id(1500)))
     );
@@ -1600,9 +1677,13 @@ fn the_missile_building_and_animated_setters() {
     m.add_attribute(MasterAttribute::PROJECTILE_HIT_MODE, 1.0, &world(false));
     m.add_attribute(MasterAttribute::PROJECTILE_ARC, 0.25, &world(false));
     m.set_attribute(MasterAttribute::MAXIMUM_RANGE, 5.0, &world(false));
-    let s = m.missile.unwrap();
+    let missile_part = m.missile.unwrap();
     assert_eq!(
-        (s.smart_mode, s.hit_mode, s.arc),
+        (
+            missile_part.smart_mode,
+            missile_part.hit_mode,
+            missile_part.arc
+        ),
         (
             SmartMode::LEADS_TARGET,
             HitMode::of_data(2),
@@ -1618,9 +1699,9 @@ fn the_missile_building_and_animated_setters() {
         (b.building.unwrap().facet, b.building.unwrap().garrison_kind),
         (3, GarrisonKinds::INFANTRY)
     );
-    let mut a = of_kind(MasterKind::DOPPELGANGER);
-    a.set_attribute(MasterAttribute::MOVEMENT_SPEED, 1.2, &world(false));
-    assert_eq!(a.animated_part().max_speed, Speed::new(1.2));
+    let mut master = of_kind(MasterKind::DOPPELGANGER);
+    master.set_attribute(MasterAttribute::MOVEMENT_SPEED, 1.2, &world(false));
+    assert_eq!(master.animated_part().max_speed, Speed::new(1.2));
 }
 
 /// The master copy (slot 8, `Master::copy_from`): every value but the id, class,
@@ -1735,21 +1816,21 @@ fn villager_on_farm_takes_its_group_farmer_for_the_farm_class() {
         1,
         vec![task(ActionKind::COMBAT, -1, -1, 0.0)],
     );
-    let m = with(
+    let masters = with(
         vec![task(ActionKind::COMBAT, -1, -1, 0.0)],
         vec![attacker, by_class],
     );
-    assert_eq!(pick(&m, &own(&m)), Ok(Some((122, 49, -1))));
+    assert_eq!(pick(&masters, &own(&masters)), Ok(Some((122, 49, -1))));
     let stranger = master(master_id(999), 1, vec![]);
-    assert!(pick(&m, &stranger).is_err());
+    assert!(pick(&masters, &stranger).is_err());
 }
 
 #[test]
 fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundation() {
-    let m = villagers();
+    let masters = villagers();
     let site = TaskTarget {
         id: object_id(10028),
-        master: m.get(ids::HOUSE).unwrap(),
+        master: masters.get(ids::HOUSE).unwrap(),
         player: PlayerId::new(2),
         state: ObjectState::Foundation,
         held: carrying(None, 0.0),
@@ -1762,7 +1843,7 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
     let pick = |own| {
         let actor = Actor {
             id: object_id(9181),
-            master: m.get(own).unwrap(),
+            master: masters.get(own).unwrap(),
             player: PlayerId::new(2),
             held: carrying(None, 0.0),
             attribute_95: Amount::ZERO,
@@ -1773,8 +1854,8 @@ fn villager_takes_the_first_master_of_its_swap_group_with_task_for_its_foundatio
             general: Some(&site),
             terrain: None,
         };
-        work_master(&m, &actor, &on, None, &ALONE, slots(), &roles())
-            .map(|w| w.map(|(m, t)| (m.id.get(), t.action_kind)))
+        work_master(&masters, &actor, &on, None, &ALONE, slots(), &roles())
+            .map(|w| w.map(|(master, task)| (master.id.get(), task.action_kind)))
     };
     assert_eq!(pick(ids::VILLAGER_MALE), Ok(Some((118, ActionKind::BUILD))));
     assert_eq!(
@@ -1844,7 +1925,7 @@ fn master_unit_ai_kind_reads_its_class_volley_missile_and_combat_level() {
 #[test]
 fn master_is_found_by_its_player_and_id() {
     let every = vec![Arc::new(Masters::default()), Arc::new(villagers())];
-    let found = player_master(&every, PlayerId::new(1), ids::VILLAGER_MALE).map(|m| m.id);
+    let found = player_master(&every, PlayerId::new(1), ids::VILLAGER_MALE).map(|master| master.id);
     assert_eq!(found, Some(ids::VILLAGER_MALE));
     assert!(player_master(&every, PlayerId::new(0), ids::VILLAGER_MALE).is_none());
     assert!(player_master(&every, PlayerId::new(2), ids::VILLAGER_MALE).is_none());
@@ -1870,7 +1951,7 @@ fn the_world_masters_are_looked_up_by_player() {
     assert!(
         every
             .of(PlayerId::new(1))
-            .is_some_and(|m| m.get(house().id).is_some())
+            .is_some_and(|masters| masters.get(house().id).is_some())
     );
     assert!(every.of_mut(PlayerId::new(2)).is_none());
 }
@@ -1897,11 +1978,11 @@ fn master_moves_with_moving_part_whose_speed_is_above_0() {
         facets: None,
         weapon_range: Distance::ZERO,
     };
-    let mut m = of_kind(MasterKind::COMBAT);
-    m.move_stats = None;
-    assert!(!m.moves());
-    m.move_stats = Some(moving(0.9));
-    assert!(m.moves());
-    m.move_stats = Some(moving(0.0));
-    assert!(!m.moves());
+    let mut master = of_kind(MasterKind::COMBAT);
+    master.move_stats = None;
+    assert!(!master.moves());
+    master.move_stats = Some(moving(0.9));
+    assert!(master.moves());
+    master.move_stats = Some(moving(0.0));
+    assert!(!master.moves());
 }

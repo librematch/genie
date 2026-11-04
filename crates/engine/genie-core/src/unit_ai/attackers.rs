@@ -21,7 +21,9 @@ impl Attackers {
     /// `FUN_140b43f30`'s binary search for `id` over the integers.
     fn search(&self, id: Option<ObjectId>) -> Result<usize, usize> {
         self.0
-            .binary_search_by_key(&ObjectId::field(id), |&a| ObjectId::field(a))
+            .binary_search_by_key(&ObjectId::field(id), |&object_id| {
+                ObjectId::field(object_id)
+            })
     }
 
     /// `id` is in the set.
@@ -70,8 +72,8 @@ impl Attackers {
 }
 
 impl genie_diff::Diff for Attackers {
-    fn diff(&self, other: &Self, d: &mut genie_diff::Differ) {
-        self.0.diff(&other.0, d);
+    fn diff(&self, other: &Self, differ: &mut genie_diff::Differ) {
+        self.0.diff(&other.0, differ);
     }
 }
 
@@ -84,20 +86,20 @@ mod tests {
     /// others; an id joins once and leaves by its value.
     #[test]
     fn attackers_sort_by_the_game_integers() {
-        let mut a = Attackers::default();
-        assert!(a.add(Some(object_id(7))));
-        assert!(a.add(None));
-        assert!(a.add(Some(object_id(-2))));
-        assert!(!a.add(Some(object_id(7))));
+        let mut attackers = Attackers::default();
+        assert!(attackers.add(Some(object_id(7))));
+        assert!(attackers.add(None));
+        assert!(attackers.add(Some(object_id(-2))));
+        assert!(!attackers.add(Some(object_id(7))));
         assert_eq!(
-            a.iter().collect::<Vec<_>>(),
+            attackers.iter().collect::<Vec<_>>(),
             [Some(object_id(-2)), None, Some(object_id(7))]
         );
-        assert!(a.contains(None));
-        a.remove(None);
-        assert!(!a.contains(None));
-        a.remove_first(|id| id.is_some_and(|id| id.get() > 0));
-        assert_eq!(a.iter().collect::<Vec<_>>(), [Some(object_id(-2))]);
+        assert!(attackers.contains(None));
+        attackers.remove(None);
+        assert!(!attackers.contains(None));
+        attackers.remove_first(|id| id.is_some_and(|id| id.get() > 0));
+        assert_eq!(attackers.iter().collect::<Vec<_>>(), [Some(object_id(-2))]);
         assert_eq!(
             Attackers::of_saved(&[-1, 4]).iter().collect::<Vec<_>>(),
             [None, Some(object_id(4))]

@@ -82,30 +82,32 @@ impl World {
         }
         let lead = self.nearest_to_target(group);
         self.groups.held_mut(group)?.motion.lead = lead;
-        let g = self.groups.held(group)?;
-        if self.lead_object(&g.motion).is_none() {
+        let held = self.groups.held(group)?;
+        if self.lead_object(&held.motion).is_none() {
             return Ok(GroupFate::Deleted);
         }
-        let horde = g
+        let horde = held
             .current_formation
             .as_ref()
-            .is_some_and(|f| f.kind == FormationKind::Horde);
-        if (g.motion.flags.contains(MotionFlags::NEW)
-            && !g.flags.contains(GroupFlags::PLACED)
+            .is_some_and(|formation| formation.kind == FormationKind::Horde);
+        if (held.motion.flags.contains(MotionFlags::NEW)
+            && !held.flags.contains(GroupFlags::PLACED)
             && !horde)
-            || g.flags.contains(GroupFlags::PLACE_AGAIN)
+            || held.flags.contains(GroupFlags::PLACE_AGAIN)
         {
             self.set_initial_position(group)?;
             self.groups.held_mut(group)?.flags &= !GroupFlags::PLACE_AGAIN;
         }
-        let g = self.groups.held_mut(group)?;
-        g.unit_kinds.retain(|s| !s.units.is_empty());
-        let budget = if g.flags.contains(GroupFlags::TURN) {
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group
+            .unit_kinds
+            .retain(|unit_kind_statistic| !unit_kind_statistic.units.is_empty());
+        let budget = if unit_group.flags.contains(GroupFlags::TURN) {
             PathBudget::Untested
         } else {
             PathBudget::Tested
         };
-        let forward = g.motion.position[1];
+        let forward = unit_group.motion.position[1];
         self.motion_update(group, budget)?;
         self.after_motion(group, far, forward)
     }
@@ -121,8 +123,8 @@ impl World {
     /// What the target's test and the leaving do not model.
     pub(super) fn kept_apart_leave(&mut self, group: GroupId) -> GenieResult<FarMembers> {
         let g = self.groups.held(group)?;
-        let patrol =
-            top_path(&g.motion.paths).is_some_and(|p| p.path_flags.contains(PathFlags::LOOPS));
+        let patrol = top_path(&g.motion.paths)
+            .is_some_and(|path_data| path_data.path_flags.contains(PathFlags::LOOPS));
         // the dword compare at 0x14103dd78: the list's size (64 bits) against the count
         if g.objects.len() as u32 == g.members.len() as u32
             && !self.target_pending(group)?
@@ -135,9 +137,9 @@ impl World {
                 }
             }
         }
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         Ok(
-            if g.command_queue.is_empty() && !g.motion.flags.contains(MotionFlags::NEW) {
+            if held.command_queue.is_empty() && !held.motion.flags.contains(MotionFlags::NEW) {
                 FarMembers::Leave
             } else {
                 FarMembers::Stay
@@ -168,9 +170,9 @@ impl World {
             .contains(MotionFlags::NEW)
         {
             self.group_statistics(group, far)?;
-            let g = self.groups.held_mut(group)?;
-            g.motion.new_position[0] = g.centroid;
-            g.motion.position[0] = g.centroid;
+            let unit_group = self.groups.held_mut(group)?;
+            unit_group.motion.new_position[0] = unit_group.centroid;
+            unit_group.motion.position[0] = unit_group.centroid;
         }
         self.groups.held_mut(group)?.flags &= !GroupFlags::LEAD_TO_TARGET;
         Ok(())
@@ -228,8 +230,8 @@ impl World {
         if !self.any_member_held(group) {
             relayout = false;
         }
-        let g = self.groups.held(group)?;
-        if refill && g.current_formation.is_some() {
+        let held = self.groups.held(group)?;
+        if refill && held.current_formation.is_some() {
             // FUN_1410163f0: an attack's formation of kind 6 fills its slots anew; only an
             // attack (9) chooses it, whose update stops above
             return Err(OTHER_COMMANDS);
@@ -245,12 +247,13 @@ impl World {
     /// clears [`GroupFlags::CATCHING_UP`] and, with a formation holding slots, moves its members to
     /// them ([`World::members_to_slots`]).
     fn slots_step(&mut self, group: GroupId, differentiators: &[ObjectId]) -> GenieResult<()> {
-        let g = self.groups.held_mut(group)?;
-        if g.hibernating == 0 {
-            g.flags &= !GroupFlags::CATCHING_UP;
-            if g.current_formation
+        let unit_group = self.groups.held_mut(group)?;
+        if unit_group.hibernating == 0 {
+            unit_group.flags &= !GroupFlags::CATCHING_UP;
+            if unit_group
+                .current_formation
                 .as_ref()
-                .is_some_and(|f| !f.slots.is_empty())
+                .is_some_and(|formation| !formation.slots.is_empty())
             {
                 self.members_to_slots(group, differentiators)?;
             }
@@ -288,7 +291,11 @@ impl World {
     pub(super) fn turn_formation(&mut self, group: GroupId, forward: BVector) -> GenieResult<()> {
         if self.turns_formation(group, forward)? {
             let g = self.groups.held(group)?;
-            let without_path = g.motion.paths.first().is_some_and(|l| !l.has_path);
+            let without_path = g
+                .motion
+                .paths
+                .first()
+                .is_some_and(|path_data| !path_data.has_path);
             self.groups.held_mut(group)?.stored_positions.clear_points();
             if without_path {
                 self.front_by_centroid(group)?;
@@ -299,20 +306,21 @@ impl World {
                 )?;
             }
             self.update_desired_positions(group, None)?;
-            if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
-                f.clear_units();
-                let g = self.groups.held(group)?.clone();
-                let placed = self.populate_slots(&mut f, &g);
-                self.groups.held_mut(group)?.current_formation = Some(f);
+            if let Some(mut group_formation) = self.groups.held_mut(group)?.current_formation.take()
+            {
+                group_formation.clear_units();
+                let held = self.groups.held(group)?.clone();
+                let placed = self.populate_slots(&mut group_formation, &held);
+                self.groups.held_mut(group)?.current_formation = Some(group_formation);
                 placed?;
             }
             self.groups.held_mut(group)?.flags &= !GroupFlags::RELAYOUT_AT_TURN;
         }
         self.groups.held_mut(group)?.motion.drop_to_high_level()?;
         self.motion_update(group, PathBudget::Tested)?;
-        if let Some(mut f) = self.groups.held_mut(group)?.current_formation.take() {
-            let moved = self.formation_transform(&mut f, group, SlotOrder::Closest);
-            self.groups.held_mut(group)?.current_formation = Some(f);
+        if let Some(mut formation) = self.groups.held_mut(group)?.current_formation.take() {
+            let moved = self.formation_transform(&mut formation, group, SlotOrder::Closest);
+            self.groups.held_mut(group)?.current_formation = Some(formation);
             let _ = moved?;
         }
         self.groups.held_mut(group)?.flags &= !GroupFlags::TURN;
@@ -323,11 +331,11 @@ impl World {
     /// `forward` (the size of `FUN_14087e650`'s angle; `COMISS` then `JA` at `0x14103e154`, a NaN
     /// does not), or [`MotionFlags::NEW`] or [`GroupFlags::RELAYOUT_AT_TURN`] is set.
     pub(super) fn turns_formation(&self, group: GroupId, forward: BVector) -> GenieResult<bool> {
-        let g = self.groups.held(group)?;
-        let turn = angle_between(g.motion.position[1], forward).abs();
+        let held = self.groups.held(group)?;
+        let turn = angle_between(held.motion.position[1], forward).abs();
         Ok(TURN_LIMIT < turn
-            || g.motion.flags.contains(MotionFlags::NEW)
-            || g.flags.contains(GroupFlags::RELAYOUT_AT_TURN))
+            || held.motion.flags.contains(MotionFlags::NEW)
+            || held.flags.contains(GroupFlags::RELAYOUT_AT_TURN))
     }
 
     /// `movePositionToFrontUsingCentroid` (inline at `0x14103e199`, its log aside): the group's
@@ -340,25 +348,25 @@ impl World {
     /// When the world does not hold a member: the game reads its null object; the members'
     /// check at the update's start leaves only held ones.
     pub(super) fn front_by_centroid(&mut self, group: GroupId) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
+        let held = self.groups.held(group)?;
         let mut sum = BVector::ZERO;
-        for m in &g.members {
+        for member in &held.members {
             let v = self
-                .world_object(m.id)
-                .ok_or_else(|| member_gone(m.id))?
+                .world_object(member.id)
+                .ok_or_else(|| member_gone(member.id))?
                 .moved_vector();
             sum = BVector::new(sum.x() + v.x(), sum.height() + v.height(), sum.y() + v.y());
         }
-        let n = g.members.len() as i32 as f32;
-        let ahead = 0.0 * g.motion.position[1];
+        let count = held.members.len() as i32 as f32;
+        let ahead = 0.0 * held.motion.position[1];
         let point = BVector::new(
-            sum.x() / n + ahead.x(),
-            sum.height() / n + ahead.height(),
-            sum.y() / n + ahead.y(),
+            sum.x() / count + ahead.x(),
+            sum.height() / count + ahead.height(),
+            sum.y() / count + ahead.y(),
         );
-        let g = self.groups.held_mut(group)?;
-        g.motion.new_position[0] = point;
-        g.motion.position[0] = point;
+        let unit_group = self.groups.held_mut(group)?;
+        unit_group.motion.new_position[0] = point;
+        unit_group.motion.position[0] = point;
         Ok(())
     }
 
@@ -373,8 +381,8 @@ impl World {
     /// A line place without a slot (index -1 or past the slots, where the game reads outside the
     /// slots' array), and a unit of a master the slice does not have.
     pub(crate) fn line_ranges(&mut self, group: GroupId) -> GenieResult<()> {
-        let g = self.groups.held(group)?;
-        let Some(f) = g.current_formation.as_ref() else {
+        let held = self.groups.held(group)?;
+        let Some(f) = held.current_formation.as_ref() else {
             return Ok(());
         };
         let lines = usize::try_from(f.number_lines).unwrap_or(0);
@@ -405,13 +413,13 @@ impl World {
             ranges.push(range);
         }
         // the reads above change no group: the formation tested first is still the group's
-        let f = self
+        let formation = self
             .groups
             .held_mut(group)?
             .current_formation
             .as_mut()
             .ok_or(NO_FORMATION)?;
-        for (line, range) in f.lines.iter_mut().zip(ranges) {
+        for (line, range) in formation.lines.iter_mut().zip(ranges) {
             line.attack_range = Distance::new(range);
         }
         Ok(())
@@ -429,35 +437,38 @@ impl World {
         count: usize,
     ) -> GenieResult<(bool, bool)> {
         let idle = self.is_idle(group);
-        let g = self.groups.held_mut(group)?;
+        let unit_group = self.groups.held_mut(group)?;
         let (mut relayout, mut refill) = (false, false);
-        if count != g.members.len() {
-            if g.current_command == ATTACK
-                && g.current_formation
+        if count != unit_group.members.len() {
+            if unit_group.current_command == ATTACK
+                && unit_group
+                    .current_formation
                     .as_ref()
-                    .is_some_and(|f| f.kind == FormationKind::Kind6)
+                    .is_some_and(|formation| formation.kind == FormationKind::Kind6)
             {
                 refill = true;
             } else if at_most_or_unordered(
-                g.total_spacing.get(),
+                unit_group.total_spacing.get(),
                 Distance::new(self.model.tuning.missile.volley_reach_margin).get(),
             ) {
-                g.flags |= GroupFlags::RELAYOUT_SPREAD;
+                unit_group.flags |= GroupFlags::RELAYOUT_SPREAD;
             } else {
                 relayout = true;
             }
         }
-        if g.flags.contains(GroupFlags::RELAYOUT_SPREAD)
-            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
+        if unit_group.flags.contains(GroupFlags::RELAYOUT_SPREAD)
+            && Distance::new(self.model.tuning.missile.volley_reach_margin)
+                < unit_group.total_spacing
         {
             relayout = true;
-            g.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
+            unit_group.flags &= !(GroupFlags::RELAYOUT | GroupFlags::RELAYOUT_SPREAD);
         }
-        if g.flags.contains(GroupFlags::RELAYOUT)
-            && Distance::new(self.model.tuning.missile.volley_reach_margin) < g.total_spacing
+        if unit_group.flags.contains(GroupFlags::RELAYOUT)
+            && Distance::new(self.model.tuning.missile.volley_reach_margin)
+                < unit_group.total_spacing
             && idle
         {
-            g.flags &= !GroupFlags::RELAYOUT;
+            unit_group.flags &= !GroupFlags::RELAYOUT;
             relayout = true;
         }
         Ok((relayout, refill))
@@ -469,13 +480,16 @@ pub const IDLE_SPAN: Millis = Millis::new(750);
 
 /// [`World::awake_update`]'s end before the motion: the group goes without members, and without
 /// a queued command or a current one when its formation has every slot in state 3 (or has none).
-pub(super) fn awake_group_ends(g: &UnitGroup) -> bool {
-    if g.members.is_empty() {
+pub(super) fn awake_group_ends(group: &UnitGroup) -> bool {
+    if group.members.is_empty() {
         return true;
     }
-    g.command_queue.is_empty()
-        && g.current_command == NO_COMMAND
-        && g.current_formation
-            .as_ref()
-            .is_some_and(|f| f.slots.iter().all(|s| s.state == SlotState::InPlace))
+    group.command_queue.is_empty()
+        && group.current_command == NO_COMMAND
+        && group.current_formation.as_ref().is_some_and(|formation| {
+            formation
+                .slots
+                .iter()
+                .all(|slot| slot.state == SlotState::InPlace)
+        })
 }
