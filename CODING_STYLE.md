@@ -295,9 +295,64 @@ fn command(raw: i32) -> Result<(), GenieError> {
 - Implement `Default` where a natural empty value exists (C-COMMON-TRAITS).
 - Convert with `From`, `TryFrom` and `AsRef`, on the more specific type (C-CONV-TRAITS,
   C-CONV-SPECIFIC).
+- Implement `From`, never `Into`, and `Display`, never `ToString`. The standard library's
+  blanket implementations give every `From` its `Into` and every `Display` its `ToString`
+  (C-CONV-TRAITS). Clippy's `from_over_into` and `to_string_trait_impl` fail on the other way.
+- Give a collection type `FromIterator` and `Extend` (C-COLLECT). Then `collect` and `extend`
+  fill it from any iterator of its elements, and no source needs a conversion of its own.
+- Make an iterator type an `Iterator`, never a type with a `next` method of its own. Also give
+  it `DoubleEndedIterator`, `ExactSizeIterator` and `FusedIterator` where it can have them: a
+  wrapper has them where its inner iterator has them. Then `rev`, `len` and every adapter of
+  the standard library work on it.
+- Put a trait bound on the `impl` or the function that needs it, never on the struct
+  (C-STRUCT-BOUNDS). A bound on the struct must be repeated at every `impl` and every function
+  that names the type. Without it, the type holds any `T`, and only the operation that needs
+  the trait asks for it: `#[derive(Clone)]` on `Batch<T>` makes `impl<T: Clone> Clone for
+  Batch<T>`. A bound stays on a struct only where the compiler requires it: a field of an
+  associated type (`I::Item`), or a `Drop` that needs the bound.
 - Keep `World`, the readers and `GenieError` `Send` and `Sync`. The world holds no interior
   mutability (C-SEND-SYNC).
 - Implement `Deref` only for a smart pointer. `Deref` never imitates inheritance (C-DEREF).
+
+### Traits as capabilities
+
+A trait states a capability: what a type can do, not what it is. Two sides that share one
+contract connect without knowing each other. `collect` builds any `FromIterator` type from any
+`Iterator`, so a new iterator or a new collection works with all the existing ones. (Matthias
+Endler, "Thinking in Traits", 2026.)
+
+- Write the code for its concrete type first. If a second type needs the same contract now,
+  add a trait, as a module needs a caller that exists now (section 2).
+- Look for the contract in the standard library first: `From`, `Iterator`, `FromIterator`,
+  `Extend`, `Display`, `Ord`, `Add`. A genie type that implements one works with every
+  algorithm and adapter that is written against it.
+- Choose between an enum and a trait by the set. An enum is a closed set: a `match` handles
+  every variant, and a new variant shows each `match` that must change. A trait is an open set:
+  an implementation can come later, from another crate. The game fixes its sets (the action
+  kinds, the classes, the commands, the unit AI's kinds), so they are enums. A trait serves a
+  port (section 10), or a capability that several genie types share: `ObjectKey` is what a
+  lookup by id takes, and an `ObjectId`, an `Option<ObjectId>`, a `RecordId` and a
+  `GroupTarget` are such keys.
+- Name a trait for its capability (`ObjectKey`, `Diff`). A chain of supertraits that copies the
+  game's class chain is a defect (section 9).
+- State the contract in the first sentence of the trait's doc. If one sentence cannot hold it,
+  the trait joins several capabilities: split it.
+- Give every implementation every method. An implementation that answers a method with
+  `unsupported` or `unreachable` because it lacks the capability shows a wrong contract. Split
+  the trait, and implement only the parts that the type has.
+- Bound a generic function by the capabilities that it uses, and by no others. This is section
+  8's rule for traits: a function takes exactly what it reads and writes.
+- A test double alone does not justify a trait. Test the one implementation on real data: a
+  world of the scene builder (`testing::scene`). Only a port keeps its double (section 10).
+- An extension trait adds methods to a type that the crate does not own: `CheckedIndex` on
+  `[T]`, `ReadSkipExt` on every `Read`. It gives that type the methods that C-METHOD asks for
+  (section 6). It abstracts over no implementations, so the rules on a second implementation
+  (section 10) do not apply to it. Its methods still share one capability. A behaviour that
+  reads or writes more than its receiver stays a system's function (section 8).
+- Weigh the cost of a generic. A reader follows its bounds and implementations across files.
+  Each type that a generic function serves compiles a copy of it, so the build time and the
+  WebAssembly size grow. `dyn Trait` compiles once, but it calls through a pointer and blocks
+  inlining. A concrete type costs neither.
 
 ### Parameter structs and builders (C-BUILDER)
 
@@ -336,6 +391,10 @@ raising `file:line` (`#[track_caller]`) and key-value context.
 - Propagate the error with `?` where it happens. No function takes a `Result` as a parameter.
   No accumulator carries an error past later effects. If a caller must branch on a result, it
   matches the result. Then it passes the `Ok` value or the error on.
+- Let the target type of `collect` choose how a walk with errors ends.
+  `Result<Vec<T>, GenieError>` stops at the first error, as a loop with `?` does: the later
+  items do not run. Collect a `Vec<Result<T, GenieError>>` only where each item's result counts
+  on its own, as in a check that reports every answer.
 - Never panic on what a recording, a save or a `.dat` can cause. On those paths, write no
   `unwrap`, `expect`, `unreachable!` or panicking index. For a state that the code holds
   impossible, return `GenieError::unreachable("…")`. Panics belong in tests only.
@@ -437,10 +496,12 @@ scheduler breaks a bit-for-bit replay. No pattern changes the game's order of up
 - Put each outside system into an adapter crate, behind a port that the core defines: a trait,
   or the data that the core exposes.
 - Shape a port by the core's need. No type of an adapter's library is in its signature.
-- Give a trait a real second implementation (a test double counts), and keep it small. A trait
-  with many methods and one production implementation is a defect: pass the data instead.
+- Give a port's trait a real second implementation (at a port, a test double counts), and keep
+  it small. A trait with many methods and one production implementation is a defect: pass the
+  data instead.
 - If a trait can serve as `dyn`, keep it object-safe (C-OBJECT). Seal a trait that others must
   not implement (C-SEALED).
+- Section 5 ("Traits as capabilities") sets the rules for every trait, a port's included.
 
 ## 11. Sans-io in the leaf crates
 
