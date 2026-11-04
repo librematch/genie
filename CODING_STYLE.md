@@ -68,7 +68,8 @@ data-oriented architect makes it.
   code too:
   - `UpperCamelCase` for types, traits and enum variants; `snake_case` for crates, modules,
     functions, methods, fields and locals; `SCREAMING_SNAKE_CASE` for constants and statics;
-    a short `UpperCamelCase` type parameter (`T`, `K`) and a short lowercase lifetime (`'a`).
+    a short `UpperCamelCase` type parameter (`T`, `K`) and a lowercase lifetime that names
+    what it borrows (`'save`, `'world`).
   - An enum's values are its variants, in `UpperCamelCase`: `BuildState::Move { move_to:
     None }`, never an alias constant on the enum (`BuildState::MOVE`). A newtype over a value
     that the game holds as any integer (`GameMode`, `NotifyKind`) names its known values as
@@ -99,14 +100,22 @@ data-oriented architect makes it.
   This is why the workspace allows `clippy::module_name_repetitions`.
 - Use `as_` for a free borrowed view, `to_` for a conversion that costs, `into_` for one that
   consumes (C-CONV).
-- Name a getter `foo()`, not `get_foo()`. `get` is only for a lookup by key (C-GETTER).
+- Name a getter `foo()`, not `get_foo()`. `get` is only for a lookup by key (C-GETTER). Name
+  the mutable twin of `foo()` `foo_mut()`, and a setter `set_foo()` (RFC 199, RFC 344).
 - Name constructors `new`, `with_…` and `from_…` (C-CTOR).
 - Give a collection `iter`, `iter_mut` and `into_iter`, and name an iterator type after its
   method (C-ITER, C-ITER-TY).
-- Keep one word order in a crate: `ParseError` and `ReadError`, not `ErrorParse` (C-WORD-ORDER).
+- Keep one word order in a crate: `HuntAction` and `BuildAction`, not `ActionBuild`
+  (C-WORD-ORDER).
 - Name a Cargo feature after the thing: `serde`, not `with-serde` (C-FEATURE).
-- In a ported formula, short names that match the decompile (`dx`, `x0`, `y1`) are correct. The
-  reader compares them with the routine.
+- Give every variable, parameter, field, closure parameter and loop binding a speaking name,
+  in the tests too: `world`, `context`, `object`, `master`, not `w`, `c`, `o`, `m`. A reader then
+  understands a line without looking up what a letter stands for. In a geometry formula, a
+  coordinate or a difference keeps its short name (`x`, `y`, `z`, `dx`, `x0`). That name is
+  the word of its domain, and the reader compares it with the routine.
+- Name a lifetime after what it borrows (`'save` for a view into the save's bytes, `'world`
+  for a borrow of the world), never with a single letter. Write `'_` where the compiler infers
+  it. serde's `'de` keeps its name.
 
 ## 4. Modules and files
 
@@ -216,7 +225,7 @@ King, "Parse, don't validate", 2019.)
   boundary. These are the codec's encoder, a notify's parameters, a report line in the game's
   terms, and a sort key or sum of the game's integers.
 - Write no `is_valid` function that returns a `bool` for later code to trust. Write no
-  `check_…` either that returns `Result<(), GenieError>` for an input and drops what it
+  `check_…` either that returns `GenieResult<()>` for an input and drops what it
   learnt. Write a constructor that returns the type or an error (`TryFrom`, `of_field`). A
   routine of the game's whose effect is its point, and a guard on genie's own state
   (`World::check_parts`), can return `()`.
@@ -250,7 +259,7 @@ fn is_object(id: i32) -> bool {
 // Parse: the check makes the type, and the type travels on. `attack` cannot receive −1.
 fn attack(target: ObjectId) {}
 
-fn command(raw: i32) -> Result<(), GenieError> {
+fn command(raw: i32) -> GenieResult<()> {
     let target = ObjectId::try_from(raw)?;
     attack(target);
     Ok(())
@@ -355,8 +364,10 @@ Endler, "Thinking in Traits", 2026.)
   port (section 10), or a capability that several genie types share: `ObjectKey` is what a
   lookup by id takes, and an `ObjectId`, an `Option<ObjectId>`, a `RecordId` and a
   `GroupTarget` are such keys.
-- Name a trait for its capability (`ObjectKey`, `Diff`). A chain of supertraits that copies the
-  game's class chain is a defect (section 9).
+- Name a trait for its capability, with a verb or a noun (`Read`, `ObjectKey`, `Diff`), not an
+  adjective in `-able` (`Readable`, RFC 344). A trait with one dominant method can take that
+  method's name. A chain of supertraits that copies the game's class chain is a defect
+  (section 9).
 - State the contract in the first sentence of the trait's doc. If one sentence cannot hold it,
   the trait joins several capabilities: split it.
 - Give every implementation every method. An implementation that answers a method with
@@ -366,15 +377,17 @@ Endler, "Thinking in Traits", 2026.)
   8's rule for traits: a function takes exactly what it reads and writes.
 - A test double alone does not justify a trait. Test the one implementation on real data: a
   world of the scene builder (`testing::scene`). Only a port keeps its double (section 10).
-- An extension trait adds methods to a type that the crate does not own: `CheckedIndex` on
-  `[T]`, `ReadSkipExt` on every `Read`. It gives that type the methods that C-METHOD asks for
-  (section 6). It abstracts over no implementations, so the rules on a second implementation
+- An extension trait adds methods to a type that the crate does not own: `ReadSkipExt` on
+  every `Read`, a checked lookup on `[T]`. Its name ends in `Ext` (RFC 445). It gives that type
+  the methods that C-METHOD asks for (section 6). It abstracts over no implementations, so the rules on a second implementation
   (section 10) do not apply to it. Its methods still share one capability. A behaviour that
   reads or writes more than its receiver stays a system's function (section 8).
 - Weigh the cost of a generic. A reader follows its bounds and implementations across files.
   Each type that a generic function serves compiles a copy of it, so the build time and the
   WebAssembly size grow. `dyn Trait` compiles once, but it calls through a pointer and blocks
-  inlining. A concrete type costs neither.
+  inlining. A concrete type costs neither. A public generic function converts its argument at
+  once and calls a private function that is not generic: `open(path: impl AsRef<Path>)` calls
+  `open_path(path.as_ref())`. Then only the thin shell compiles once per type.
 
 ### Parameter structs and builders (C-BUILDER)
 
@@ -387,11 +400,16 @@ Endler, "Thinking in Traits", 2026.)
 ## 6. Functions
 
 - Take borrowed types: `&str`, `&[T]`, `&T`, not `&String` or `&Vec<T>`.
+- Take what the callers hold: `&[T]` where they hold a slice, `impl IntoIterator<Item = T>`
+  where they hold an iterator. No caller collects a list only to make the call. Return `impl
+  Iterator` where every caller only walks the result, so that no call builds a `Vec`. A caller
+  that changes what the walk reads collects first: the walk borrows what it reads (section 9).
 - Take ownership only of a value that the function keeps (C-CALLER-CONTROL).
 - Return values, not out-parameters (C-NO-OUT).
 - Make a function whose first parameter is its main object a method of that object (C-METHOD).
 - Return the intermediate results that a caller needs (C-INTERMEDIATE).
-- Keep a value mutable only while you build it: `let v = { let mut v = …; v.sort(); v };`.
+- Keep a value mutable only while you build it:
+  `let sorted = { let mut list = …; list.sort(); list };`.
 - Move a value out of a changed enum with `mem::take` or `mem::replace`, not with a clone.
 - Do not clone to satisfy the borrow checker. Split the borrow, or pass the id. A clone of a
   large value (a master, a unit list) in production code needs a written reason.
@@ -404,6 +422,12 @@ Endler, "Thinking in Traits", 2026.)
 Every crate uses one error type, `genie_error::GenieError`. It holds a kind, a reason, the
 raising `file:line` (`#[track_caller]`) and key-value context.
 
+- Define no error type of a crate's own, and no `Result` alias of a crate's own. A function
+  that can fail returns `GenieResult<T>`, genie-error's one alias of `Result<T, GenieError>`.
+  Its name leaves the prelude's `Result` unshadowed (section 4). A trait's error type is
+  `GenieError` too: `type Err = GenieError` for `FromStr`, `type Error = GenieError` for
+  `TryFrom`. An error of another library (`io::Error`, binrw's) converts into a `GenieError`
+  where it enters genie, with its context.
 - Make the error with its kind: `invalid_input`, `missing_data`, `io`, `unreachable` or
   `unsupported`.
 - Write the reason as a static, lowercase phrase without a full stop. It names what is wrong.
@@ -414,8 +438,8 @@ raising `file:line` (`#[track_caller]`) and key-value context.
   No accumulator carries an error past later effects. If a caller must branch on a result, it
   matches the result. Then it passes the `Ok` value or the error on.
 - Let the target type of `collect` choose how a walk with errors ends.
-  `Result<Vec<T>, GenieError>` stops at the first error, as a loop with `?` does: the later
-  items do not run. Collect a `Vec<Result<T, GenieError>>` only where each item's result counts
+  `GenieResult<Vec<T>>` stops at the first error, as a loop with `?` does: the later
+  items do not run. Collect a `Vec<GenieResult<T>>` only where each item's result counts
   on its own, as in a check that reports every answer.
 - Never panic on what a recording, a save or a `.dat` can cause. On those paths, write no
   `unwrap`, `expect`, `unreachable!` or panicking index. For a state that the code holds
@@ -430,8 +454,8 @@ raising `file:line` (`#[track_caller]`) and key-value context.
   buffer checks the count against the bytes that are left: the count times the smallest
   record's size. It returns an error for a count that they cannot hold. A reader over
   `R: Read` cannot know the bytes that are left: it reserves at most a fixed cap and grows the
-  list as it reads. A `Vec::with_capacity(n)` or a
-  `vec![x; n]` with an unchecked `n` from a file is a defect: a hostile recording makes the
+  list as it reads. A `Vec::with_capacity(count)` or a `vec![value; count]` with an unchecked
+  `count` from a file is a defect: a hostile recording makes the
   process panic or abort, in a browser and in a server instance too.
 - Do not add a `GenieError::unsupported`. Port every branch of a routine, the branches that no
   recording reaches included, and test them with unit tests. The existing sites are the gaps
@@ -442,8 +466,9 @@ raising `file:line` (`#[track_caller]`) and key-value context.
 
 ### Indexing
 
-`v[i]` checks the bound, and an `i` out of range panics: in production code an index is a
-hidden `unwrap`. It also hides what the code means. `t.players[1].objects[0]` names a slot in
+`list[index]` checks the bound, and an `index` out of range panics: in production code an
+index is a hidden `unwrap`. It also hides what the code means. `turn.players[1].objects[0]`
+names a slot in
 two nested lists, and that slot holds another object after the next swap-remove.
 
 - Reach an object by its id through the world's lookup (`World::object`), not by its position
@@ -539,6 +564,9 @@ scheduler breaks a bit-for-bit replay. No pattern changes the game's order of up
 - If a trait can serve as `dyn`, keep it object-safe (C-OBJECT). Seal a trait that others must
   not implement (C-SEALED).
 - Section 5 ("Traits as capabilities") sets the rules for every trait, a port's included.
+- Release an adapter's resource (a socket, a file) in its `Drop`. A `Drop` never fails and
+  never blocks (C-DTOR-FAIL, C-DTOR-BLOCK). A release that can fail or block is an explicit
+  `close(self) -> GenieResult<()>`, and the `Drop` does only what cannot fail.
 
 ## 11. Sans-io in the leaf crates
 
@@ -559,6 +587,10 @@ WebAssembly use the same code without assumptions. This section does not apply t
   the bytes, or into a buffer that the caller owns.
 - Check a count from the input against the bytes that are left before you allocate for it
   (section 7). A parse is finished before anything acts on its data (section 5).
+- Encode an order that the caller must keep in types (typestate). Each step consumes `self`
+  and returns the type of the next state, so a call out of order does not compile: a reader's
+  header before its body, a protocol's handshake before its traffic. The game's own states (an
+  action's state, the unit AI's mode) are data that a save holds: they stay enums (section 5).
 - Put the I/O into thin drivers beside the logic. A blocking driver works over `std::io::Read`
   and `Write`. An async driver sits behind a Cargo feature named after its runtime (`tokio`,
   not `with-tokio`, C-FEATURE). A driver holds no format or protocol logic: it moves bytes and
@@ -608,13 +640,16 @@ genie gives the same bits as the game on every host, WebAssembly included.
   one (`RGE_Action_Attack::work`), else its address in build 158041 (`0x140a82ae0`). Name its
   virtual slot and the fields that it reads and writes, with their offsets (`+0x18`). A reader
   finds a behaviour by these names.
-- Describe what the code does in the game's terms. Use plain English and short sentences. Spell
-  as the rest of the repository does (British: "behaviour", "licence").
+- Describe what an item does in its doc comment (`///`), in the game's terms. Use plain English
+  and short sentences. Spell as the rest of the repository does (British: "behaviour",
+  "licence").
 - Link the items that the prose names: [`MoveWait`] (C-LINK). The docs build without a broken
   link.
 - Write `# Errors` and `# Panics` sections (C-FAILURE). A doc example uses `?`, not `unwrap`,
   and hides its set-up behind `#` (C-QUESTION-MARK).
-- Write a comment for a decision or for the game's reason, not for what the code says.
+- Write a line comment (`//`) for why the code does what it does: the game's reason or a
+  decision. The names say what it does. A line that needs a comment to say what it does gets
+  speaking names (section 3), or it moves into a function whose name says it.
 - Record a known difference from the game at the field: `#[diff(gap = "why")]`. Mark a field
   that the save does not hold `#[diff(unsaved)]`, and a field compared as one value
   `#[diff(eq)]`.
